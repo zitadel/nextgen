@@ -2,15 +2,9 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 2 of 6 (see [`README.md`](README.md))
+> **Area:** 2 of 4 (see [`README.md`](README.md))
 
 This document defines how a user schema declares which external identity providers (like Google or GitHub) its users are permitted to sign in with, and how that configuration is wired into the login flow.
-
-## Imported Requirements
-
-- [x] **Stable `slug` on the connection** ([`1-resource-model.md`](1-resource-model.md#exported-requirements)): "user schemas and flow definitions reference connections by slug only, never by revision id." Answered: both the `sso.providers` array and `sso_providers[].id` reference connections strictly by their slugs.
-
-This area's own exports are in [Exported Requirements](#exported-requirements). The Go mirror of the cross-resource SSO rules is tracked in area 1's [exported table](1-resource-model.md#exported-requirements), and the conflict-step scaffolding rules (owed to area 4) are detailed in [`3-social-login-flow.md`](3-social-login-flow.md).
 
 ## The Three-Way Linkage
 
@@ -80,7 +74,7 @@ Three files can name a provider, and the same provider can be in any of four sta
 
 A disabled slot is always written `{"enabled": false}` with no `providers` array. Disabling while keeping the list is rejected by the schema ([below](#providers-and-enabled-must-agree)), so there is no state that reads as paused but behaves as removed. Whether `enabled: false` should instead mean paused, flows untouched and the button hidden at render, is a question about every authentication method, not only `sso`; it is recorded in the [README](README.md#product-decisions).
 
-Removing a provider by hand is a two-file edit, and the plan says so: a flow pins a schema revision, so the schema edit re-pins every flow on it, and a flow that still offers the provider fails the plan before anything is applied (`apps/cli/src/lib/sync/flow-validation.ts`). Production keeps the old revisions. The Sign-in methods picker makes both edits in one step ([area 5](5-post-claim-menu.md#adding-and-removing-methods)).
+Removing a provider by hand is a two-file edit, and the plan says so: a flow pins a schema revision, so the schema edit re-pins every flow on it, and a flow that still offers the provider fails the plan before anything is applied (`apps/cli/src/lib/sync/flow-validation.ts`). Production keeps the old revisions. The Sign-in methods journey makes both edits in one step (area 4, [Post-Claim Re-entry](4-cli-provider-setup.md#post-claim-re-entry)): it removes the slug from `sso.providers` and from every step's `sso_providers`; an emptied list becomes `{"enabled": false}`; an emptied step drops its SSO-only transitions, the now-unreachable `register-sso` and `sso-conflict` steps, and the `user_already_exists` retarget. At least one method stays selected. Deselecting never deletes the connection file or the credentials; an unused connection is area 1's inert-connection warning, and whether removing the last provider should offer to delete the file is open.
 
 ### Schema Location for `providers`
 
@@ -93,71 +87,7 @@ The `providers` array is required and non-empty when SSO is enabled, and absent 
 - **Avoiding the "Absent-Means-All" Footgun:** If an omitted array defaulted to "allow all," adding a new GitHub connection for one specific schema would silently activate it across *every* schema where `sso.enabled: true`. This directly violates the rule that simply creating a provider connection does not make it universally available.
 - **Disabled carries no `providers` array:** A generator that emits all five slots as `{"enabled": false}` stays valid. A disabled slot that still carries a list is rejected, so `enabled` and the list never disagree about whether the user type uses social sign-in ([What Each State Means](#what-each-state-means)).
 
-<details open>
-<summary><code>packages/config/meta-schemas/sso-auth-method.json</code></summary>
-
-```jsonc
-// packages/config/meta-schemas/sso-auth-method.json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "SSOAuthMethod",
-  "type": "object",
-  "required": [
-    "enabled"
-  ],
-  "additionalProperties": false,
-  "properties": {
-    "enabled": {
-      "type": "boolean",
-      "description": "Whether the authentication method is enabled or not"
-    },
-    "providers": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "pattern": "^[a-z0-9][a-z0-9_-]*$",
-        "maxLength": 64,
-        "examples": [
-          "google",
-          "github",
-          "corp_idp"
-        ]
-      },
-      "description": "Slugs of the Project-level identity provider connections available to users of this schema. Each entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does not by itself make it available here."
-    }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "enabled": {
-            "const": true
-          }
-        },
-        "required": [
-          "enabled"
-        ]
-      },
-      "then": {
-        "required": [
-          "providers"
-        ]
-      },
-      "else": {
-        "not": {
-          "required": [
-            "providers"
-          ]
-        }
-      }
-    }
-  ]
-}
-```
-
-</details>
+The draft: [`schemas/sso-auth-method.json`](schemas/sso-auth-method.json).
 
 The `enabled` field remains strictly required, matching the behavior of the other four authentication methods.
 
@@ -166,21 +96,6 @@ The `enabled` field remains strictly required, matching the behavior of the othe
 - **Multi-file impact:** Disabling SSO is never a single-file edit. If you set `enabled: false` on the schema, but a flow still actively offers those providers, the validator will immediately flag it as an error.
 
 These exact schema constraints (specifically that `{"enabled": false}` is valid for migrations, that `enabled: false` with a list is rejected, and that `enabled: true` paired with an empty or missing `providers` list is rejected) are verified in [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts).
-
-### Referencing by Slug, Not ID
-
-The `providers` list strictly holds slugs (names) rather than revision IDs (as detailed in [`1-resource-model.md`](1-resource-model.md)). This design choice prevents a cascading update cycle: if connections relied on revision IDs, setting `revisioned: true` on a connection would force new schema revisions and require flow re-pins every time the connection was edited.
-
-**Authoring vs. Runtime Alignment:**
-- **Authoring side:** This structure is already in place. The `SSOProvider.id` is correctly documented as the *"Provider instance identifier … routed to the corresponding configured IdP at the engine"*, using human-authored slugs like `["google", "corp_idp"]` instead of opaque platform IDs.
-- **Runtime side:** The runtime documentation currently contradicts this. The example in `components/flows/sso-provider.yaml` shows an instance-suffixed ID (`id: google-1`). This runtime example must be updated to align with the authoring schema before the engine ships.
-
-**Defining the Identity:**
-The connection's `slug` field acts as its sole referenced identity.
-- It is **not** the `id` (which `state.json` uses exclusively for the platform ID).
-- It is **not** the filename (relying on file paths would cause references to silently break if a file is renamed).
-
-To guarantee consistency, the validator strictly enforces that the `slug` remains unique across the entire `.zitadel/idps/` directory.
 
 ## Validation Rules
 
@@ -195,7 +110,7 @@ The validation model strictly follows the established password precedent: the fl
 | **Full outcome routing** | **New:** A step with `sso_providers` must properly route `user_not_found` and `user_already_exists`. The engine fires three possible outcomes, and routing only the callback dead-ends the other two. |
 | **Empty `claim_mapping` intersection** | **New (Warning):** If an offered provider's `claim_mapping` shares zero properties with the pinned schema, the pairing prefills nothing. Sign-up will degrade to fully manual data collection. |
 | **Empty `verified_claims` intersection** | **New (Warning):** If a provider's `verified_claims` keys share no properties with the pinned schema, the verification state has nowhere to land. |
-| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs that external providers require. *(Note: Environment declarations are currently design-only; the `issuer` / `issuer_pattern` shapes live in [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments), and persistence lands with [#534](https://github.com/zitadel/nextgen/issues/534)).* Plan warns because exact environments may coexist in the same project; deploying a social-login flow to a pattern environment is the error-grade moment, enforced once #534's persistence lands. |
+| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs that external providers require. *(Note: Environment declarations are currently design-only; the `issuer` / `issuer_pattern` shapes live in [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments), and persistence lands with [#534](https://github.com/zitadel/nextgen/issues/534)).* Plan warns, never errors: a release is one artifact promoted through every environment, and exact and pattern environments coexist in one project, so a pattern environment must not block the release. In a pattern environment the engine leaves the provider buttons out at render ([area 3](3-social-login-flow.md#constraints--edge-cases)). |
 | **Dead capability** | **Warning:** A schema lists a provider that no flow ever offers. The Console would advertise a sign-in method that has no actual login path. |
 | **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
 
@@ -211,26 +126,6 @@ While these fields duplicate properties found on the connection, this duplicatio
 
 A flow is fully permitted to legitimately override both of these values to suit the context of the user journey. Only the `id` (the slug) is strictly required to resolve.
 
-## End-to-End Workflow
-
-```jsonc
-// .zitadel/flows/customers-login.json - identifier step
-{
-  "name": "identifier",
-  "fields": ["email"],
-  "actions": [ /* submit, passkey, register */ ],
-  "sso_providers": [{ "id": "google", "name": "Google", "template": "google" }],
-  "transitions": { "callback": { "target": "done" } /* ... */ }
-}
-```
-The execution chain resolves as follows:
-1. The flow step names `google` in its sso_providers.
-2. The pinned user schema's `sso.providers` array permits it.
-3. The configuration loader locates `.zitadel/idps/google.json` matching `slug: "google"`.
-4. The engine routes the authentication request to that connection.
-
-Because every hop in this chain uses a slug rather than a revision ID, editing or updating an IdP connection creates a new revision without requiring any upstream changes to the flow or schema definitions.
-
 ## Open Points
 
 - **Generators around a method set:** `sign-in-preset.ts` currently acts as a single-select over two presets (`password-first` and `passkey-first`), driving both schema and flow generation through `getDefaultHumanUserSchema` and `getDefaultLoginFlow`. These are keyed strictly by preset (`PRESET_TEMPLATES`), with the specific use case applied via post-transforms to avoid maintaining a combinatorial matrix. Auth methods can follow this exact pattern: a base template transformed dynamically based on the selected method set. The epic requires a multi-select interface covering four methods (with passkeys pre-selected and Google/GitHub flagged as "additional setup required"). Recomposing these generators around a method set rather than a preset enum represents the main CLI work in this area and remains to be fully designed.
@@ -244,18 +139,9 @@ Because every hop in this chain uses a slug rather than a revision ID, editing o
 | **Pair-level `claim_mapping` intersection:** warn when an offered provider's `claim_mapping` shares zero properties with the pinned schema (the [Validation Rules](#validation-rules) row). | `validate.ts` and the Go server mirror, at flow create and update |
 | **Pair-level `verified_claims` intersection:** warn when a provider's `verified_claims` keys share no properties with the pinned schema. | `validate.ts` and the Go server mirror, at flow create and update |
 | **Register-step topology:** "both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision" ([Open Points](#open-points)). | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: shared entry step) |
+| **Runtime example alignment:** `components/flows/sso-provider.yaml` shows an instance-suffixed `id: google-1`; `SSOProvider.id` is the connection slug, and the runtime example must say so before the engine reads it. | Flow API docs |
 
-The two pairing validation rows live in this document rather than with the connection's validation rules because the flow definition is the sole document that references both sides simultaneously: its `user_schema` field pins the schema revision, while its `sso_providers` array names the connection slug. As a result, only flow-level validation can evaluate the exact schema-connection pair.
-
-`claim_mapping` and `verified_claims` represent the complete intersection between these resources, as they are the only fields on a connection keyed by tenant schema property names (all other connection fields use external provider vocabulary).
-
-- **Connection-Level vs. Pair-Level Validation:** Connection-side checks operate at the union level, flagging an error only when a key exists in *zero* referencing schemas (which signals an obvious typo). Conversely, partial per-pair overlap is standard, legitimate superset usage and remains completely silent.
-- **Validation Triggers:** Flow creation and updates are the pair-check triggers. The (schema revision, provider slug) pairing itself changes only with a flow write (schema revisions are immutable, and re-pinning is a flow update), but the slug's resolved connection content can change through a connection revise with no flow write. Those writes are deliberately not server-side pair triggers: the CLI plan re-lints the whole tree on every change, and runtime superset filtering keeps a stale pairing safe (area 1, Validation vs. Runtime Safety). Pair warnings for hand-authored connection revises therefore surface at the next plan or flow write.
-- **Provisional Status:** The shape and severity of these two pairing rows remain provisional, pending the resolution of schema-keyed validation in [area 1](1-resource-model.md#open-points).
-
-Under the system's mirroring rule, all cross-resource validation rules listed in the table above must be implemented in two places: once in `validate.ts` (TypeScript CLI) and once on the server in Go. The `issuer_pattern` check is environment-contingent rather than strictly cross-resource, while the three-outcome routing check is localized entirely to the flow definition.
-
-The Go server analog of `xAuthMethodsReader` for provider lists remains an unclaimed work item; it is tracked in area 1's [Exported requirements](1-resource-model.md#exported-requirements) to ensure it is not overlooked across document boundaries.
+The two pairing rows live here because the flow definition is the only document that references both sides: its `user_schema` pins the schema revision and its `sso_providers[].id` names the connection. Connection-side checks flag a key unknown to *every* referencing schema; partial per-pair overlap is legitimate, since a connection may map a superset. Both rows are provisional pending schema-keyed validation ([area 1](1-resource-model.md#open-points)). Cross-resource rules are implemented twice, in `validate.ts` and the Go server; the Go analog of `xAuthMethodsReader` is tracked in area 1's [Exported requirements](1-resource-model.md#exported-requirements).
 
 ## Related
 

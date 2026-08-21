@@ -2,22 +2,9 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 3 of 6 (see [`README.md`](README.md))
+> **Area:** 3 of 4 (see [`README.md`](README.md))
 
 This document defines how a user signs up and signs in using external identity providers like Google or GitHub, detailing the OAuth2/OIDC redirect ceremony, identity resolution, and all available recovery paths.
-
-## Imported Requirements
-
-What [`1-resource-model.md`](1-resource-model.md#exported-requirements) and [`2-auth-method-selection.md`](2-auth-method-selection.md) expect this area to answer:
-
-- [x] **Attempt binds a connection revision at attempt-start:** The `state` record carries the exact connection revision ID, and the callback phase strictly reads that pinned revision.
-- [ ] **Client secret at token exchange:** Open dependency. The overall secret lifecycle remains undesigned (see [area 1](1-resource-model.md#secrets-and-environments)). The ceremony assumes a valid secret value is obtainable at exchange time.
-- [ ] **Linking coverage rule:** Handed off. Epic 851 excludes account linking, and the corresponding policy fields have been omitted from the schema. The security analysis is documented in area 1's [Linking safety](1-resource-model.md#linking-safety) section.
-- [x] **Fail closed on missing verification:** An absent verification claim evaluates as unverified.
-- [x] **Truthiness evaluation:** Strictly boolean `true` or string `"true"` evaluate as verified; all other values evaluate as unverified.
-- [x] **`is_auto_update` protection:** `is_auto_update` consults `verified_claims` to prevent silently overwriting a verified property with an unverified value.
-
-*Pending elsewhere:* Release bundle name-to-revision mappings (ADR 035 amendment), the CRUD API slug surface, and the Go server validator mirror.
 
 ## The Ceremony
 
@@ -44,7 +31,7 @@ Because external identity providers require exact-match redirect URIs, the path 
 
 While the shape is finalized, both structural halves depend on pending architecture:
 
-- **Origin Resolution:** The origin relies on the environment's declared issuer (`issuer` / `issuer_pattern`, typed in [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments); ADR 035 defers per-environment value shape to a follow-up ADR). Environments remain unimplemented: no Go or API types exist. Currently, only the local development origin can be derived (via the dev-port setting). Multi-environment derivation will land under issue [#534](https://github.com/zitadel/nextgen/issues/534) (part of [#529](https://github.com/zitadel/nextgen/issues/529)). Note that pattern environments using `issuer_pattern` can never produce an exact URI, so social sign-in cannot work there; area 2 grades the conflict a warning because exact environments can coexist in the same project, and the error-grade check is deploying a social-login flow to a pattern environment, which lands with #534's environment persistence.
+- **Origin Resolution:** The origin relies on the environment's declared issuer (`issuer` / `issuer_pattern`, typed in [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments); ADR 035 defers per-environment value shape to a follow-up ADR). Environments remain unimplemented: no Go or API types exist. Currently, only the local development origin can be derived (via the dev-port setting). Multi-environment derivation will land under issue [#534](https://github.com/zitadel/nextgen/issues/534) (part of [#529](https://github.com/zitadel/nextgen/issues/529)). Note that pattern environments using `issuer_pattern` can never produce an exact URI, and providers refuse a `redirect_uri` they do not have registered, so no ceremony can complete there. The release still deploys; the engine hides the providers at render ([Constraints & Edge Cases](#constraints--edge-cases)), and the plan warns (area 2). Whether pattern environments can ever offer social sign-in is open ([Open Points](#open-points)).
 - **Server Routing:** The route does not exist yet. The `/__nextgen` path serves as a client-side proxy prefix, but the server currently mounts no handlers under it. The callback requires the proxy to forward the path and a dedicated server route to receive it, alongside any necessary prefix-rewriting logic.
 
 ### The `state` Record
@@ -82,11 +69,7 @@ The callback phase executes six sequential steps in order, failing closed on err
     - **Rejection Criteria:** Absent, `null`, empty, boolean, object, or array subjects immediately reject the attempt.
     - **Connection Keying:** The `connection` half of the key requires a revision-stable identity (an open item exported to the CRUD API).
 
-> **Porting note:** Steps 3 and 5 do not fall out of the `zitadel/zitadel` providers. Each has to be added on top:
->
-> * **Signing algorithms (step 3):** `rp.NewRelyingPartyOIDC` takes the accepted algorithms from the provider's own discovery document ([`relying_party.go#L264`](https://github.com/zitadel/oidc/blob/v3.47.5/pkg/client/rp/relying_party.go#L264)), leaving the set under provider control. The fixed asymmetric allowlist is what closes the HS256 downgrade path.
-> * **Nonce (step 3):** `BeginAuth` sends no `nonce` ([`oidc.go#L143-L166`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oidc/oidc.go#L143-L166)). The `nonce` carried in the state record is what binds the `id_token` to one authorize request, so the engine must mint and echo it.
-> * **Truthiness (step 5):** the `zitadel/oidc` `Bool` type rejects an unrecognized claim value as a parse error ([`userinfo.go#L20-L30`](https://github.com/zitadel/oidc/blob/v3.47.5/pkg/oidc/userinfo.go#L20-L30)), failing the whole userinfo decode. The imported fail-closed and truthiness requirements need that one claim to degrade to unverified instead.
+> **Porting note:** Steps 3 and 5 do not fall out of the `zitadel/zitadel` providers: they take signing algorithms from the provider's discovery document, send no `nonce`, and fail the whole userinfo decode on an unrecognized boolean. Each has to be added on top.
 
 ### Server-Side Fetch Policy
 
@@ -114,11 +97,12 @@ Under `creation: auto` (the default), the engine **creates the account immediate
 * **Fallback Behavior:** If a required property is missing, execution degrades to `user_not_found` → data collection, prefilled with what did arrive. This is the epic's new-user journey: the user provides only what the provider did not return.
 * **Disabled:** `creation: disabled` routes `user_not_found` to an authored error step instead, so the provider signs in existing users only. The deferred `auto_only` fails closed on incomplete claims rather than collecting ([area 1](1-resource-model.md#provisioning)).
 * **Static Warnings:** The plan phase warns when a pairing makes the gate statically dead (see [validator rules](1-resource-model.md#validator-rules)).
-* **Verification Gating (deferred):** A second condition joins the check when `x-verify` returns to the dialect: every required property carrying `x-verify` must also arrive verified (per Step 5 of Callback Processing), otherwise the attempt degrades to collection. A required `givenName` then needs only a non-empty value, whereas a required `email` with `x-verify` must also arrive verified. `x-verify` was removed as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); this gate is its first consumer, and no schema can carry it today, so 851 cannot enforce verification on either creation path and does not claim to. Enforcement becomes real per schema, when an author marks a property `x-verify`; committed connections do not change. See [Engine Work](#engine-work) and the dependency note in [`1-resource-model.md`](1-resource-model.md#linking-safety).
+* **Verification Gating (deferred):** A second condition joins the check when `x-verify` returns to the dialect: every required property carrying `x-verify` must also arrive verified (per Step 5 of Callback Processing), otherwise the attempt degrades to collection. A required `givenName` then needs only a non-empty value, whereas a required `email` with `x-verify` must also arrive verified. `x-verify` was removed as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); this gate is its first consumer, and no schema can carry it today, so 851 cannot enforce verification on either creation path and does not claim to. Enforcement becomes real per schema, when an author marks a property `x-verify`; committed connections do not change. See the dependency note in [`1-resource-model.md`](1-resource-model.md#linking-safety).
 
 ### Constraints & Edge Cases
 
 - **Cross-Schema Identities:** Known-subject resolution assumes the user belongs to the flow's pinned schema. Resolving an identity arriving through a flow pinned to a *different* schema remains an open question. Until it is settled, 851 fails closed: when the resolved user's schema differs from the flow's pin, the attempt ends in the flow-level error surface (value-free, logged for diagnostics) rather than half-adopting either schema; the open point below owns the real resolution rules.
+- **Pattern Environments:** When the environment is declared by `issuer_pattern`, the engine renders a step carrying `sso_providers` without its provider buttons, because no exact callback URI exists to offer. It records a diagnostic naming the step and the environment ("provider hidden: pattern environment has no exact callback"), so a reviewer who expects the button on a preview deploy can find out why. An attempt submitted anyway is refused at submission, before any authorize URL is built, so no `redirect_uri` is ever composed from a pattern-matched host; it ends in the flow-level error surface, value-free, logged. Social sign-in is tested in development and on any exact environment; a team that wants it on a deployed review target declares one with a fixed domain.
 - **Unresolvable Provider:** An attempt whose slug does not resolve to a live connection at attempt start ends in the flow-level error surface, value-free, logged. Reachable through the API path, a connection deleted while a flow still offers it; the deletion question (area 1, [Open Points](1-resource-model.md#open-points)) decides how rare that is, not whether this line is needed, since a page rendered before the delete can still submit.
 - **No Auto-Linking in 851:** Linking policy fields are omitted from the current schema. All account-linking semantics are deferred to the dedicated account-linking specification.
 - **Validation Rule:** Steps containing `sso_providers` **must** explicitly route all three outcomes (`callback`, `user_not_found`, and `user_already_exists`) to prevent flow dead-ends (validator rule in [`2-auth-method-selection.md`](2-auth-method-selection.md); today only `transitions.callback` is enforced).
@@ -135,14 +119,7 @@ The schema author determines which fields the collection step renders, while the
 * **User Edits:** Prefilled fields remain editable. Per-property editability rules (`x-editable`) were removed from the dialect as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); until the annotation returns with the collection-step implementation, editability is uniform.
 * **Verification Loss on Edit:** Editing a prefilled value immediately revokes its verified status. Because the provider only vouches for its own returned data, modified inputs must re-enter the standard verification pipeline (`x-verify`). This prevents users from replacing a verified prefilled email with an arbitrary address while retaining the verified flag.
 
-### Wire Contract Compatibility
-
-**No wire changes are required.** The existing API contract already supports prefilled data delivery:
-
-* `api/openapi/components/flows/field.yaml` defines `value` (*"Pre-filled value (e.g., an identifier carried over from a pivot)"*).
-* `FlowField.Value` is already implemented in `internal/domain/flow_field_resolver.go`.
-
-The only new requirement is having the engine populate `FlowField.Value` directly from mapped claims upon a successful SSO callback, acting as a second producer for an existing field.
+* **No Wire Change:** `api/openapi/components/flows/field.yaml` already defines `value` for prefilled fields; the engine populates it from mapped claims after a successful callback, a second producer for an existing field.
 
 ## The Resolved External Identity
 
@@ -210,34 +187,11 @@ Failures surface directly as errors on the originating step and never trigger a 
 | Failure Scenario | Error Surface | Recovery Mechanism |
 | :--- | :--- | :--- |
 | **User cancels / provider denies (`access_denied`)** | Originating step with a localized `text_key` error. | The step remains rendered, allowing the user to retry or select another offered authentication method. |
-| **Provider configuration error (invalid client, bad scope)** | Originating step with a generic `text_key` error. | Details are written to server logs and the test journey (area 6); tenant-side misconfigurations are hidden from the end user. |
+| **Provider configuration error (invalid client, bad scope)** | Originating step with a generic `text_key` error. | Details are written to the server log; tenant-side misconfigurations are hidden from the end user. |
 | **State expired, unknown, or reused** | Flow-level error with a restart route. | Restarts the flow entirely, as the originating flow session may no longer exist. |
 | **Binding cookie absent or mismatched** | Flow-level error with a restart route. | The callback's `state` is consumed: the authorization code arrived with this request, so the original tab could never complete the ceremony anyway. The user restarts from the flow. |
 | **Code exchange / `userinfo` failure** | Originating step with a generic error. | The user can retry; detailed error diagnostics are written to server logs. |
 | **Verification shortfall** | Handled via normal resolution branches. | Handled automatically by resolution rules; the user never sees technical errors referencing claims. |
-
-## Rendering
-
-The current rendering architecture has no built-in knowledge of SSO. The `<zl-sso-providers>` references in prior design documents are illustrative examples rather than implemented components. Closing this gap requires updates across five distinct areas:
-
-* **`<zl-sso-providers>` Atom:** Must be created in `packages/components`. It needs to render one button per provider entry, use `template` as a brand/logo hint, and submit `{action: "sso", sso_provider_id}`.
-* **Liquid Templates:** All six shipped templates (the five branding designs under `packages/config/defaults/branding/*/login.liquid` and `default.liquid` in the orchestrator) currently contain no SSO markup. Each requires a conditional block (`{% if sso_providers.size > 0 %}`).
-* **Provider Icons:** `zl-icon` currently lacks Google and GitHub glyphs, meaning the `template` hint has no matching icon assets to resolve against.
-* **Locale Keys:** Translation keys must be added for button labels (e.g., `login.sso.continue_with`), alongside copy for conflict-step and error states.
-* **`sso-redirect` Handling:** Because `sso-redirect` is engine-emitted rather than authored, the orchestrator must be updated to recognize steps carrying a `redirect_url` and execute browser navigation accordingly.
-
-## Engine Work
-
-| Feature / Component | Current Implementation State |
-| :--- | :--- |
-| **`sso` Submission Handling** | Stubbed at `flow_state_machine.go:331` (replaces the `ErrFlowUnsupported` branch). |
-| **`state` Record Store & Callback Route** | Unimplemented (nothing exists). |
-| **Connection Fetch Egress Policy** | Unimplemented. Owned by [#928](https://github.com/zitadel/nextgen/issues/928) as a blocking dependency of 851 (see [Server-Side Fetch Policy](#server-side-fetch-policy)). |
-| **Protocol Engines** | OIDC discovery/code exchange and explicit-endpoint OAuth2 are available in `zitadel/zitadel` ([`oidc`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oidc), [`oauth`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oauth)), but completely absent in `nextgen`. |
-| **`github_primary_email` Strategy & Registry** | Design stage only (see reference implementation in [`github/session.go#L46-L112`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/github/session.go#L46-L112)). |
-| **`create_user_with_sso` (`on_success`)** | Referenced in documentation; currently unimplemented. |
-| **Claims Mapping & Creation Gate** | Design stage only (covers claims-to-properties mapping, the completeness gate, and verification evaluation into diagnostics; verification gating and `is_auto_update` guards wait for `x-verify`). |
-| **Per-Property Verification (`x-verify`)** | Unimplemented end to end. [#901](https://github.com/zitadel/nextgen/pull/901) removed the annotation from the dialect as unread; re-adding it lands with this work. `user_attributes` exists as bare key/value pairs without verification flags, blocking creation-time verification tracking, `is_auto_update` downgrade guards, and edit-drops-verification logic. |
 
 ## Exported Requirements
 
@@ -248,13 +202,15 @@ The current rendering architecture has no built-in knowledge of SSO. The `<zl-ss
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |
-| **Failure-Details Channel:** Details are written to server logs and the test journey (area 6); tenant-side misconfigurations are hidden from the end user. | Test journey (Area 6) |
+| **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`template` as the brand hint) that submits `{action: "sso", sso_provider_id}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
+| **Failure-Details Channel:** Details are written to the server log; tenant-side misconfigurations are hidden from the end user. | Engine; the login UI shows the generic error |
 
 ## Open Points
 
 * **Cross-Schema Subject Resolution:** Identity links are `(connection, subject)` pairings, which are schema-agnostic, but users belong to specific schemas and flows pin one schema revision. The rule is undecided for a known subject whose user belongs to a schema different from the active flow's pin.
     * *Candidate Rules:* Per-schema identity spaces (requires per-schema uniqueness, which `x-unique` lacks), a global hard-block error, or failing closed until decided.
-    * *Ownership & Scope:* Belongs to the identity-link data model (requiring a revision-stable connection identity and schema *lineage* tracking). 851 fails closed ([Constraints & Edge Cases](#constraints--edge-cases)), which is a dead end for the person signing in. Reachable in 851 once a second schema enables the same connection through area 5's Sign-in methods picker. The concrete two-schema case is recorded in area 1's [Linking Safety](1-resource-model.md#linking-safety); the product decision is listed in the [README](README.md#product-decisions).
+    * *Ownership & Scope:* Belongs to the identity-link data model (requiring a revision-stable connection identity and schema *lineage* tracking). 851 fails closed ([Constraints & Edge Cases](#constraints--edge-cases)), which is a dead end for the person signing in. Reachable in 851 once a second schema enables the same connection through the Sign-in methods journey's schema picker (area 4, [Post-Claim Re-entry](4-cli-provider-setup.md#post-claim-re-entry)). The concrete two-schema case is recorded in area 1's [Linking Safety](1-resource-model.md#linking-safety); the product decision is listed in the [README](README.md#product-decisions).
+* **Social Sign-in in Pattern Environments:** Open, and not 851's to decide. Providers accept only registered, exact redirect URIs, so a dynamic preview origin can never be one, and the callback lives on the app origin by platform decision. Any approach would need a fixed callback host registered with the provider that hands the browser back to the originating origin, and that design carries two hard constraints: it must forward `code` and `state` rather than exchange the code, because the `__Host-` binding cookie lives on the originating origin and only that origin's callback route can check it; and it must hand back only to the origin in the single-use `state` record, never to any origin that merely matches the pattern, since a shared-host pattern such as `*.vercel.app` matches strangers' deployments too. Whether that is worth building, and whether the pattern allowlist is strong enough to mint such a record, belongs to the platform's environment and origin design ([`configuration-surface.md`](../platform/configuration-surface.md#environments), [#534](https://github.com/zitadel/nextgen/issues/534)). Until decided, pattern environments render without providers ([Constraints & Edge Cases](#constraints--edge-cases)).
 * **State Storage Shape:** Deciding between storing state fields directly on the attempt versus maintaining a dedicated table. Consumption must be atomic to handle concurrent duplicate callbacks safely (one succeeds while the second receives a reused-state error). `zitadel/zitadel` does not solve this: `SucceedIDPIntent` reads the intent and then pushes the succeeded event with no expected-sequence guard ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199)), and a pending state carries no TTL, since `maxIdPIntentLifetime` bounds only the succeeded intent token ([`idp_intent_model.go#L51-L56`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent_model.go#L51-L56)). Because minting is unauthenticated (any visitor on the login page can submit an SSO step), the chosen shape must also make it cheap to bound pending records per flow and rate-limit minting.
 * **Multi-Tab Behavior:** Defining rules for parallel SSO submissions initiated from a single flow (whether the last-minted state invalidates prior states or both remain valid until consumed). The binding cookie shares this decision: one named `__Host-` cookie holds a single value per host, so a second tab's ceremony overwrites the first tab's nonce and fails it at callback; per-attempt cookie names versus accepting the overwrite must be settled together with the state rule.
 * **`sso-redirect` Step Shape:** Confirming whether `{name, redirect_url}` (sketched in example 4) serves as the official wire contract or if the redirect URL should be folded directly into the submission response payload. The return leg is settled in [The `state` Record](#the-state-record): the record carries the return target and the callback route consumes it, never reading a destination from callback input.

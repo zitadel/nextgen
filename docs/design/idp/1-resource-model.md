@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 1 of 6 (see [`README.md`](README.md))
+> **Area:** 1 of 4 (see [`README.md`](README.md))
 
 An Identity Provider (IdP) connection is a tenant-owned configuration file that defines how Zitadel interacts with external authentication providers (such as Google or GitHub).
 
@@ -34,7 +34,7 @@ A connection operates similarly to a flow definition within the Zitadel GitOps s
 | Validation                                                | Schema checks single-file rules; a separate validator handles cross-file rules.                                           |
 | Protocol details live in a nested `oidc` / `oauth2` block | New protocols add a block instead of restructuring committed files                                                        |
 | `slug` is the identity                                    | User schemas and flow definitions reference connections by slug, so revisions never invalidate references                 |
-| Revisioned on the server                                  | In-flight attempts, rollback, and audit need immutable revisions. The CLI syncer is the `mutable` kind, not `revisioned`: the server mints each revision under a unique connection id ([area 4](4-cli-provider-setup.md#the-idpsyncer-component)) |
+| Revisioned on the server                                  | In-flight attempts, rollback, and audit need immutable revisions. The CLI syncer is the `mutable` kind, not `revisioned`: the server mints each revision under a unique connection id ([area 4](4-cli-provider-setup.md#preview-and-apply)) |
 | `claim_mapping`                                           | Driven by properties in a tenant-defined user schema; mapping is data, not code.                                          |
 | Environment Secrets                                       | The secret values are not configured in the connection file. How the value reaches a deployed engine is an open question; with environments ([#534](https://github.com/zitadel/nextgen/issues/534)) it blocks provider sign-in outside development ([Secrets and Environments](#secrets-and-environments)) |
 | Vendor Configurations                                    | Vendor differences are treated as data, not hardcoded branches; see [Vendor knowledge is data](#vendor-knowledge-is-data) |
@@ -44,35 +44,7 @@ A connection operates similarly to a flow definition within the Zitadel GitOps s
 Most vendor-specific implementation is configuration. The model prioritizes configuration for data, named strategies for behavior.
 
 ### Context
-zitadel/zitadel implements each vendor as a Go package. Most of that code is
-configuration written in Go.
-
-| Provider | What is actually vendor-specific |
-|---|---|
-| [Google](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/google/google.go) | issuer, `prompt=select_account`, username falls back to email |
-| [GitLab](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/gitlab/gitlab.go) | endpoints |
-| [Zitadel](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/zitadel/zitadel.go) | issuer |
-| [AzureAD](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/azuread/azuread.go) | tenant-templated URLs, forced scopes, claim mapping |
-| [GitHub](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/github/github.go) | endpoints, userinfo mapping, private-email fetch |
-| [Apple](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/apple/apple.go) | `form_post` response mode, signed client secret |
-
-The packages sit on five protocol engines: [`oidc`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oidc),
-[`oauth`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oauth), [`jwt`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/jwt), [`saml`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/saml),
-[`ldap`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/ldap).
-
-Across all six vendors, only three things are behaviour rather than data:
-
-1. GitHub fetches `/user/emails` when the profile email is private, and keeps only a
-   `primary && verified` address; reference implementation:
-   * the trigger and scope check: [`session.go#L46-L67`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/github/session.go#L46-L67) 
-   * the fetch and the `Primary && Verified` filter: [`session.go#L96-L112`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/github/session.go#L96-L112)
-   * the `/emails` suffix: [`github.go#L20`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/github/github.go#L20)
-2. Apple signs its own client secret (an ES256 JWT, minted at construction,
-   [`apple.go#L30`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/apple/apple.go#L30), with a one-hour expiry, so a future
-   implementation caches and refreshes; the signer is
-   [`apple.go#L45-L67`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/apple/apple.go#L45-L67)).
-3. Apple uses `response_mode=form_post`, which turns the callback into a POST
-   ([`apple.go#L34`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/apple/apple.go#L34)).
+zitadel/zitadel implements each vendor as a Go package, and most of that code is configuration written in Go: issuers, endpoints, forced scopes, claim mappings. Across its six vendors only three things are behaviour rather than data: GitHub fetches `/user/emails` when the profile email is private and keeps the `primary && verified` address; Apple signs its own client secret (an ES256 JWT with a one-hour expiry, so an implementation caches and refreshes); Apple uses `response_mode=form_post`, which turns the callback into a POST.
 
 ### Proposal
 So the proposal is: **configuration for everything data-shaped, named strategies for the rest.**
@@ -115,506 +87,15 @@ the architectural boundary stays intact.
 Every new behavior is isolated to one registry entry and one enum value,
 ensuring that each new vendor is always implemented as pure configuration data.
 
-**Provider plumbing differences dictate a few specific configuration fields:**
-
-* `token_endpoint_auth_method`: Providers differ on authentication methods (`client_secret_basic` vs. `client_secret_post`). 
-While the schema defaults to `client_secret_basic`, scaffolded files hardcode the provider's actual requirement (e.g., GitHub pins `client_secret_post`).
-
-* `pkce_enabled`: This manages PKCE support. For example, GitHub's OAuth flow historically ignores PKCE parameters, 
-making `true` harmless but ineffective. However, if a provider actively rejects these parameters, 
-it requires an explicit `false`.
-
-**Rule of thumb:** Always verify these configuration pins against the live provider before shipping the defaults. 
-A wrong pin will pass validation but fail at the first sign-in.
-
 ## Example
 
-Setup scaffolds one file per selected provider.
+Setup scaffolds one file per selected provider: [`google.json`](schemas/google.json) (OIDC, discovery supplies the endpoints) and [`github.json`](schemas/github.json) (OAuth2, no discovery, endpoints explicit). Both store env var references, never secret values, and both carry a `claim_mapping` generated from the active user schema.
 
-<details open>
-<summary><code>.zitadel/idps/google.json</code> - OIDC, discovery supplies the endpoints</summary>
-
-```jsonc
-// .zitadel/idps/google.json - OIDC: discovery supplies the endpoints
-{
-  "$schema": "../meta/idp-connection.json",
-  "slug": "google",
-  "protocol": "oidc",
-  "template": "google",
-  "display_name": "Google",
-  "subject_claim": "sub",
-  "claim_mapping": {
-    "email": "email",
-    "givenName": "given_name",
-    "familyName": "family_name"
-  },
-  "verified_claims": {
-    "email": "email_verified"
-  },
-  "provisioning": {
-    "creation": "auto"
-  },
-  "oidc": {
-    "issuer": "https://accounts.google.com",
-    "client_id": "1234-abc.apps.googleusercontent.com",
-    "client_secret_env": "GOOGLE_CLIENT_SECRET",
-    "scopes": [
-      "openid",
-      "profile",
-      "email"
-    ],
-    "static_authorize_parameters": {
-      "prompt": "select_account"
-    }
-  }
-}
-```
-
-</details>
-
-<details open>
-<summary><code>.zitadel/idps/github.json</code> - OAuth2, endpoints explicit</summary>
-
-```jsonc
-// .zitadel/idps/github.json - OAuth2: no discovery, endpoints explicit
-{
-  "$schema": "../meta/idp-connection.json",
-  "slug": "github",
-  "protocol": "oauth2",
-  "template": "github",
-  "display_name": "GitHub",
-  "subject_claim": "id",
-  "claim_mapping": {
-    "email": "email",
-    "givenName": "name"
-  },
-  "verified_claims": {
-    "email": "$supplementary_fetch"
-  },
-  "provisioning": {
-    "creation": "auto"
-  },
-  "oauth2": {
-    "authorization_endpoint": "https://github.com/login/oauth/authorize",
-    "token_endpoint": "https://github.com/login/oauth/access_token",
-    "userinfo_endpoint": "https://api.github.com/user",
-    "client_id": "Iv1.abc123",
-    "client_secret_env": "GITHUB_CLIENT_SECRET",
-    "token_endpoint_auth_method": "client_secret_post",
-    "scopes": [
-      "read:user",
-      "user:email"
-    ],
-    "supplementary_fetch": "github_primary_email"
-  }
-}
-```
-
-</details>
-
-Key observations from these example connection configurations:
-- **Endpoint Resolution:** Google uses OIDC discovery (requiring only the issuer), 
-though explicit overrides like `jwks_uri` are supported for providers without a `.well-known` document. 
-GitHub uses OAuth2, which lacks discovery, requiring all three endpoints to be explicit.
-- **Secret Management:** Configurations store env var references (e.g., `GOOGLE_CLIENT_SECRET`), not values. 
-Values live in `.env.local` during dev. How production environments resolve their values is the undesigned secret lifecycle;
-see [Secrets and environments](#secrets-and-environments).
-- **Schema-Driven Mapping:** `claim_mapping` generates dynamically from the active user schema. 
-Nothing is assumed to exist (including `email`), and to prevent validation errors, 
-the generator only maps defined properties.
-- **Verification Sources:** `verified_claims` defines the source of truth. 
-Google uses an explicit claim (`email_verified`), whereas GitHub defers to the strategy execution by mapping 
-`"email": "$supplementary_fetch"`.
-- **Editor Tooling:** `$schema` just points to `.zitadel/meta/` for IDE autocomplete; the platform ignores it.
-
-Tracking is handled by `state.json`, which uses `id`, `hash`, and `previousId`, 
-with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
+Tracking is handled by `state.json`, which uses `id`, `hash`, and `previousId`, with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
 
 ## The connection schema
 
-<details open>
-<summary><code>idp-connection.json</code> - the full schema</summary>
-
-```jsonc
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "IdentityProviderConnection",
-  "type": "object",
-  "required": [
-    "slug",
-    "protocol",
-    "display_name"
-  ],
-  "additionalProperties": false,
-  "properties": {
-    "$schema": {
-      "type": "string",
-      "description": "Editor affordance: path or URL of this schema so editors validate and autocomplete the file (scaffolded connection files point at `.zitadel/meta/idp-connection.json`). Ignored by the platform."
-    },
-    "slug": {
-      "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9_-]*$",
-      "maxLength": 64,
-      "description": "Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps (sso_providers[].id). Unique within the Project.",
-      "examples": [
-        "google",
-        "github",
-        "corp_idp"
-      ]
-    },
-    "protocol": {
-      "type": "string",
-      "enum": [
-        "oidc",
-        "oauth2"
-      ],
-      "description": "Selects which protocol block is required and which engine handles the connection. Closed: every value has a server implementation."
-    },
-    "template": {
-      "type": "string",
-      "examples": [
-        "google",
-        "github",
-        "okta"
-      ],
-      "description": "Names the catalog entry this file was scaffolded from. Keys vendor knowledge only: glyphs and button branding, the setup scan/match, and catalog claim tables. Carries no protocol behavior: conduct comes only from the protocol blocks."
-    },
-    "display_name": {
-      "type": "string",
-      "maxLength": 256,
-      "description": "Shown to the user on the sign-in button."
-    },
-    "subject_claim": {
-      "type": "string",
-      "description": "Claim carrying the provider's stable subject identifier. Optional for OIDC (the engine uses `sub` per spec; override where `sub` is pairwise, e.g. Entra `oid`). Required for OAuth2 \u2014 no `sub` guarantee."
-    },
-    "claim_mapping": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "string",
-        "pattern": "^[^$]"
-      },
-      "description": "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. May name properties only some schemas define; unmatched entries are ignored per schema."
-    },
-    "verified_claims": {
-      "type": "object",
-      "additionalProperties": {
-        "anyOf": [
-          {
-            "const": true
-          },
-          {
-            "const": "$supplementary_fetch"
-          },
-          {
-            "type": "string",
-            "pattern": "^[^$]"
-          }
-        ]
-      },
-      "description": "Maps a verifiable user-schema property to its verification source: a claim name (read the claim), the literal `true` (trust this provider unconditionally), or the `$`-pointer `\"$supplementary_fetch\"` (verified by the selected supplementary_fetch strategy per its contract - e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries values, not verification state.",
-      "examples": [
-        {
-          "email": "email_verified"
-        },
-        {
-          "email": true
-        },
-        {
-          "email": "$supplementary_fetch"
-        }
-      ]
-    },
-    "provisioning": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "How far this provider's data is trusted. `creation` names what happens to an unknown subject: `disabled` never creates a user, `auto` creates one without a collection step when the claims satisfy every required property and otherwise stops to collect what is missing. Verification gating joins that check when `x-verify` returns to the dialect. Deferred, all additive: the `auto_only` value (complete claims or fail closed), linking policy (`is_linking_allowed`, `auto_linking`) with the account-linking journey, and `is_auto_update` with per-property verification state.",
-      "properties": {
-        "creation": {
-          "type": "string",
-          "enum": [
-            "disabled",
-            "auto"
-          ],
-          "default": "auto"
-        }
-      }
-    },
-    "oidc": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or to serve a provider that exposes no .well-known document.",
-      "required": [
-        "issuer",
-        "client_id",
-        "client_secret_env",
-        "scopes"
-      ],
-      "properties": {
-        "issuer": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Discovery base. Endpoints are resolved from its .well-known document unless overridden below."
-        },
-        "jwks_uri": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Overrides the JWKS endpoint from discovery. Required in practice when the provider exposes no .well-known document, since ID tokens cannot otherwise be validated."
-        },
-        "id_token_mapping": {
-          "type": "boolean",
-          "default": false,
-          "description": "Read user claims from the id_token instead of the userinfo endpoint, for providers that populate only the former."
-        },
-        "authorization_endpoint": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Overrides discovery."
-        },
-        "token_endpoint": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Overrides discovery."
-        },
-        "userinfo_endpoint": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Overrides discovery."
-        },
-        "client_id": {
-          "type": "string",
-          "maxLength": 512
-        },
-        "client_secret_env": {
-          "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-          "description": "Name of the environment variable holding the client secret. The value itself never appears in configuration."
-        },
-        "token_endpoint_auth_method": {
-          "type": "string",
-          "enum": [
-            "client_secret_basic",
-            "client_secret_post"
-          ],
-          "default": "client_secret_basic",
-          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
-        },
-        "scopes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true,
-          "minItems": 1,
-          "contains": {
-            "const": "openid"
-          },
-          "default": [
-            "openid",
-            "profile",
-            "email"
-          ],
-          "description": "Must contain `openid` - without it the provider returns no id_token and the connection is not OIDC. Enforced by `required` + `contains`; the `default` is a UI-prefill hint only - validators never inject it, so an omitted `scopes` is rejected regardless."
-        },
-        "pkce_enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship."
-        },
-        "static_authorize_parameters": {
-          "type": "object",
-          "propertyNames": {
-            "not": {
-              "enum": [
-                "client_id",
-                "redirect_uri",
-                "response_type",
-                "scope",
-                "state",
-                "nonce",
-                "code_challenge",
-                "code_challenge_method"
-              ]
-            }
-          },
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding."
-        }
-      }
-    },
-    "oauth2": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "OAuth 2.0 connection details. No discovery exists, so all three endpoints are stated explicitly.",
-      "required": [
-        "authorization_endpoint",
-        "token_endpoint",
-        "userinfo_endpoint",
-        "client_id",
-        "client_secret_env"
-      ],
-      "properties": {
-        "authorization_endpoint": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Where the user is sent to authorize."
-        },
-        "token_endpoint": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Where the authorization code is exchanged."
-        },
-        "userinfo_endpoint": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)([:/]|$)",
-          "description": "Where the authenticated user's profile is fetched."
-        },
-        "client_id": {
-          "type": "string",
-          "maxLength": 512
-        },
-        "client_secret_env": {
-          "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-          "description": "Name of the environment variable holding the client secret. The value itself never appears in configuration."
-        },
-        "token_endpoint_auth_method": {
-          "type": "string",
-          "enum": [
-            "client_secret_basic",
-            "client_secret_post"
-          ],
-          "default": "client_secret_basic",
-          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
-        },
-        "scopes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true,
-          "description": "Provider-specific; OAuth 2.0 defines no universal scope."
-        },
-        "pkce_enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship."
-        },
-        "static_authorize_parameters": {
-          "type": "object",
-          "propertyNames": {
-            "not": {
-              "enum": [
-                "client_id",
-                "redirect_uri",
-                "response_type",
-                "scope",
-                "state",
-                "nonce",
-                "code_challenge",
-                "code_challenge_method"
-              ]
-            }
-          },
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding."
-        },
-        "supplementary_fetch": {
-          "type": "string",
-          "enum": [
-            "github_primary_email"
-          ],
-          "description": "Provider-specific follow-up call after userinfo, implemented in the engine. Closed: every value is implemented behaviour. New values are non-breaking."
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "supplementary_fetch": {
-                "const": "github_primary_email"
-              }
-            },
-            "required": [
-              "supplementary_fetch"
-            ]
-          },
-          "then": {
-            "required": [
-              "scopes"
-            ],
-            "properties": {
-              "scopes": {
-                "contains": {
-                  "const": "user:email"
-                }
-              }
-            }
-          }
-        }
-      ]
-    }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "protocol": {
-            "const": "oidc"
-          }
-        },
-        "required": [
-          "protocol"
-        ]
-      },
-      "then": {
-        "required": [
-          "oidc"
-        ],
-        "properties": {
-          "oauth2": false
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "protocol": {
-            "const": "oauth2"
-          }
-        },
-        "required": [
-          "protocol"
-        ]
-      },
-      "then": {
-        "required": [
-          "oauth2",
-          "subject_claim"
-        ],
-        "properties": {
-          "oidc": false
-        }
-      }
-    }
-  ]
-}
-```
-
-</details>
-
+The full draft: [`schemas/idp-connection.json`](schemas/idp-connection.json).
 How to read the schema:
 
 - **Root vs. Protocol Blocks:** The root level defines universal requirements: identity (`slug`, `protocol`, `template`, `display_name`), resolution (`subject_claim`, `claim_mapping`, `verified_claims`), and trust (`provisioning`). Protocol-specific plumbing is isolated inside nested blocks.
@@ -706,13 +187,12 @@ Epic 851 does not include account linking. The linking fields are excluded from 
 - **Username matching limitations:** Username matching has no verification equivalent. Subject-based matching is the only strongly secure variant.
 - **Subject matching is not schema-aware:** A single connection can serve several schemas, so one person's Google account can legitimately back both a Customers user and an Employees user. The link key `(connection, subject)` carries no schema, a user row carries exactly one (`users.schema_url`, `internal/storage/dialect/postgres/migration/sql/000004_users.sql:5`), and a flow definition names exactly one (`user_schema`, `api/openapi/components/flows/flow-definition.yaml:26`). A subject lookup can therefore return a record the active flow's schema does not own. Linking must settle whether identity spaces are per schema or per project before it can match on subject at all; the open question lives in [area 3](3-social-login-flow.md#open-points).
 
-The `verified_claims` field itself stays in the 851 schema. Its 851 reader is diagnostics: the callback evaluates each entry into the resolved identity's verification results, which the test journey reports (area 6). Gating creation on those results and persisting them on the user both return with `x-verify`, as does the deferred `is_auto_update`. Keeping the field now means the committed connection shape does not change when they do.
+The `verified_claims` field itself stays in the 851 schema. Its 851 reader is diagnostics: the callback evaluates each entry into the resolved identity's verification results, which the server log carries. Gating creation on those results and persisting them on the user both return with `x-verify`, as does the deferred `is_auto_update`. Keeping the field now means the committed connection shape does not change when they do.
 
 **The `x-verify` Dependency:**
 `x-verify` no longer exists in the dialect. [#901](https://github.com/zitadel/nextgen/pull/901) removed it (together with `x-editable`, `x-sensitive`, and `x-mfa`) because nothing read it, stating the removed annotations "can be re-added once they become required". [`user-property.json`](../../../packages/config/meta-schemas/user-property.json) today carries only `x-unique`, `x-claim`, and `x-audit`. This design is the first consumer: every `x-verify` reference in these documents describes the returning annotation, not the shipped dialect.
 
-The annotation returns with the engine work that first reads it, the way `x-audit` returned with its emitter (#808). The step 5 gate evaluation ([area 3](3-social-login-flow.md#callback-processing)) needs only the annotation and the attempt. Recording the result at creation, the `is_auto_update` downgrade guard, and dropping verification on edit also need per-property state tracking, which does not exist either (`user_attributes` stores bare key/value pairs; listed as engine work in [area 3](3-social-login-flow.md#engine-work)). On return, the free-form `string` value should tighten to an enum of implemented methods, per the same nothing-without-implementation rule that governs [deferred and cut fields](#deferred-and-cut-fields). The two validator rules below that pair `verified_claims` with `x-verify` activate when it returns. That dependency is why `is_auto_update` itself is deferred rather than shipped as a settable no-op (see [deferred and cut fields](#deferred-and-cut-fields)).
-
+The annotation returns with the engine work that first reads it, the way `x-audit` returned with its emitter (#808). The step 5 gate evaluation ([area 3](3-social-login-flow.md#callback-processing)) needs only the annotation and the attempt. Recording the result at creation, the `is_auto_update` downgrade guard, and dropping verification on edit also need per-property state tracking, which does not exist either (`user_attributes` stores bare key/value pairs). On return, the free-form `string` value should tighten to an enum of implemented methods, per the same nothing-without-implementation rule that governs [deferred and cut fields](#deferred-and-cut-fields). The two validator rules below that pair `verified_claims` with `x-verify` activate when it returns. That dependency is why `is_auto_update` itself is deferred rather than shipped as a settable no-op (see [deferred and cut fields](#deferred-and-cut-fields)).
 
 ## Validator Rules
 
@@ -739,8 +219,6 @@ These are cross-file and state-dependent rules that a single-file JSON schema ca
 | **Leaked Secret** | Warning | A secret-shaped key is found inside `static_authorize_parameters`. This value would be committed to source control and appended to the public authorize URL. Warning, not Error, because the detection is heuristic; the definite cases already error (`client_secret` via Literal Secret, engine-owned keys via Reserved Authorize Parameter). |
 | **Reserved Authorize Parameter** | Error | A `static_authorize_parameters` key names an engine-owned protocol parameter (`client_id`, `redirect_uri`, `response_type`, `scope`, `state`, `nonce`, `code_challenge`, `code_challenge_method`). The engine composes these itself; a config override of `state` or `nonce` would silently defeat CSRF and token binding. The schema's `propertyNames` already rejects the keys; this rule restates the failure with a friendly message (like Literal Secret). |
 | **Cleartext Endpoint** | Error | An endpoint URL (`issuer`, `jwks_uri`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`) is not `https://`. The schema `pattern` already rejects it, with a `http://localhost` / `http://127.0.0.1` carve-out for local development; this rule restates the failure with a friendly message. |
-
-**The Unreferenced-Connection Guard:** This specific guard is crucial for the scaffolding experience. A freshly scaffolded connection starts with zero referencing schemas. Without this rule, every default mapping target would immediately trigger an "unknown target" error. Instead, the validator allows superset keys to exist, but will throw a warning on the initial validation run if a key is completely unknown to *every* schema in the entire working tree. This catches obvious typos early, and the stricter error rules take over as soon as a schema actually references the connection.
 
 ## Immutability and Revisions
 
@@ -825,7 +303,7 @@ The risk of breaking changes is exactly why unimplemented values are excluded fr
 
 ## Exported Requirements
 
-Behaviors this design relies on but does not implement. Each later area opens with a checklist saying which of these it answers.
+Behaviors this design relies on but does not implement.
 
 | Requirement | Owed By |
 | :--- | :--- |
@@ -846,7 +324,7 @@ Behaviors this design relies on but does not implement. Each later area opens wi
 ## Open Points
 
 - **`scaffoldedFrom` tracking:** We propose adding this optional string to `ResourceEntry` to record which shipped default originally generated a file. It acts as the merge base for upgrading scaffolded defaults later. It is cheap to record now but impossible to reconstruct later. The recommendation is to record it now and defer utilizing it until needed.
-- **The secret lifecycle:** The actual mechanics of the secret lifecycle (the store, the set-surface, the engine join, and rotation) are owned by the deferred secret-store specification. This document only contributes the structural constraints and the security pushback outlined in the section above. That ownership covers production. Development cannot wait for the spec: the local runtime inherits only the CLI process environment ([`binary.ts:70`](../../../apps/cli/src/lib/local-server/binary.ts)) or two fixed docker `--env` values ([`docker.ts:35-38`](../../../apps/cli/src/lib/local-server/docker.ts)), so `.env.local` never reaches the engine and no configured provider can complete a token exchange. Wiring the development join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under the same never-upstream invariant; area 4 owns it in [Work Items](4-cli-provider-setup.md#work-items).
+- **The secret lifecycle:** The actual mechanics of the secret lifecycle (the store, the set-surface, the engine join, and rotation) are owned by the deferred secret-store specification. This document only contributes the structural constraints and the security pushback outlined in the section above. That ownership covers production. Development cannot wait for the spec: the local runtime inherits only the CLI process environment ([`binary.ts:70`](../../../apps/cli/src/lib/local-server/binary.ts)) or two fixed docker `--env` values ([`docker.ts:35-38`](../../../apps/cli/src/lib/local-server/docker.ts)), so `.env.local` never reaches the engine and no configured provider can complete a token exchange. Wiring the development join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under the same never-upstream invariant; area 4 owns it ([Exported Requirements](4-cli-provider-setup.md#exported-requirements)).
 - **Imperative runtime disable:** We need a way to imperatively disable an IdP at runtime (e.g., `zitadel idp disable google --env prod`). This mechanism must be per-environment, execute in seconds, and remain immune to config rollbacks. Because of these requirements, it must be specified as part of the runtime surface, never as a configuration field.
 - **Deletion semantics:** We must decide between a "refuse-while-pinned" approach (which requires a grace window for in-flight attempts) or a "tombstoning" approach. Decided with the CRUD API design.
 - **Deletion must not break a live flow:** Flows and schemas reference a connection by slug, and nothing in the design refuses a delete while a flow references the slug, so a live login page could render a button whose attempt cannot start. Either the delete is refused while a live flow's pinned schema lists the slug (needs the cross-resource reader, scoped to live pins, or nothing is ever deletable), or the engine hides a provider whose slug no longer resolves when it renders the step and the attempt fails closed ([area 3](3-social-login-flow.md#constraints--edge-cases)). Holds under either deletion model.

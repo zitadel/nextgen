@@ -5,20 +5,14 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
-// Verification receipt for the IdP design docs (docs/design/idp/): extracts
-// the draft connection schema and its example files straight from the
-// markdown and runs the accept/reject matrix the docs claim was "mechanically
-// verified". Nothing here ships — the schema is a design draft — but the
-// docs lean on these results for security-relevant rules (verified_claims
-// value classes, protocol arms, scope requirements),
-// so the receipt must be checkable from the repo, not a session scratchpad.
-// Covers 1-resource-model.md, 2-auth-method-selection.md, 4-cli-provider-setup.md,
-// 5-post-claim-menu.md, and 6-test-sign-in.md;
-// 3-social-login-flow.md embeds no validatable JSON blocks, but its cross-doc
-// rows are pinned as quotes (areas 3<->4, 4<->5, and {3,4,5}<->6)
-// so sibling rewrites fail loudly.
-// When the schema lands as a real meta-schema file, point this test at it
-// and delete the extraction.
+// Verification receipt for the IdP design docs (docs/design/idp/): loads the
+// draft connection schema, its example files, the sso-auth-method schema, and
+// the scaffolded flow from docs/design/idp/schemas/ and runs the accept/reject
+// matrix the docs claim was "mechanically verified". Nothing here ships, the
+// schema is a design draft, but the docs lean on these results for
+// security-relevant rules (verified_claims value classes, protocol arms,
+// scope requirements), so the receipt must be checkable from the repo.
+// When the schema lands as a real meta-schema file, point this test at it.
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const resourceModel = readFileSync(
@@ -37,39 +31,17 @@ const socialLoginFlow = readFileSync(
   join(repoRoot, "docs/design/idp/3-social-login-flow.md"),
   "utf8",
 );
-const postClaimMenu = readFileSync(
-  join(repoRoot, "docs/design/idp/5-post-claim-menu.md"),
-  "utf8",
-);
-const testSignIn = readFileSync(
-  join(repoRoot, "docs/design/idp/6-test-sign-in.md"),
-  "utf8",
-);
 
-function extractJson(markdown: string, pattern: RegExp): unknown {
-  const match = markdown.match(pattern);
-  if (!match?.[1]) {
-    throw new Error(`design-doc block not found: ${pattern}`);
-  }
-  return JSON.parse(match[1]) as unknown;
-}
-
-const connectionSchema = extractJson(
-  resourceModel,
-  /```jsonc\n(\{\n {2}"\$schema": "https:\/\/json-schema\.org[\s\S]*?\n\})\n```/,
-) as Record<string, unknown>;
-const googleExample = extractJson(
-  resourceModel,
-  /```jsonc\n\/\/ \.zitadel\/idps\/google\.json[^\n]*\n(\{[\s\S]*?\n\})\n```/,
-);
-const githubExample = extractJson(
-  resourceModel,
-  /```jsonc\n\/\/ \.zitadel\/idps\/github\.json[^\n]*\n(\{[\s\S]*?\n\})\n```/,
-);
-const ssoAuthMethodSchema = extractJson(
-  authMethodSelection,
-  /```jsonc\n\/\/ packages\/config\/meta-schemas\/sso-auth-method\.json\n(\{[\s\S]*?\n\})\n```/,
-);
+const schemasDir = join(repoRoot, "docs/design/idp/schemas");
+const loadJson = (name: string) =>
+  JSON.parse(readFileSync(join(schemasDir, name), "utf8")) as Record<
+    string,
+    unknown
+  >;
+const connectionSchema = loadJson("idp-connection.json");
+const googleExample = loadJson("google.json");
+const githubExample = loadJson("github.json");
+const ssoAuthMethodSchema = loadJson("sso-auth-method.json");
 
 const ajv = () => new Ajv2020({ strict: false, validateFormats: false });
 const validateConnection = ajv().compile(connectionSchema);
@@ -275,35 +247,7 @@ describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () 
   });
 });
 
-describe("end-to-end flow step (2-auth-method-selection.md · End to end)", () => {
-  const raw = authMethodSelection.match(
-    /```jsonc\n\/\/ \.zitadel\/flows\/customers-login\.json[^\n]*\n(\{[\s\S]*?\n\})\n```/,
-  )?.[1];
-  if (!raw) throw new Error("end-to-end customers-login.json block not found");
-  const step = JSON.parse(raw.replace(/\/\*[\s\S]*?\*\//g, "")) as {
-    sso_providers: { id: string }[];
-  };
-
-  it("validates against the shipped flow meta-schema's Step definition", () => {
-    const flowMeta = JSON.parse(
-      readFileSync(join(repoRoot, "packages/config/meta-schemas/flow-definition.json"), "utf8"),
-    ) as object;
-    const validateStep = ajv()
-      .addSchema(flowMeta, "flow-def")
-      .compile({ $ref: "flow-def#/$defs/Step" });
-    expect(validateStep(step)).toBe(true);
-  });
-
-  it("its provider id is area 1's connection slug, like the area 4 scaffold", () => {
-    expect(step.sso_providers.map((p) => p.id)).toEqual([(googleExample as { slug: string }).slug]);
-  });
-});
-
-describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () => {
-  const raw = providerSetup.match(
-    /```jsonc\n\/\/ \.zitadel\/flows\/default-login\.json[^\n]*\n(\{[\s\S]*?\n\})\n```/,
-  )?.[1];
-  if (!raw) throw new Error("scaffolded default-login.json block not found");
+describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   type ScaffoldStep = {
     name: string;
     fields?: string[];
@@ -312,7 +256,7 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
     sso_providers?: Array<{ id: string }>;
     transitions?: Record<string, { target: string; action?: string; purpose?: string }>;
   };
-  const flow = JSON.parse(raw.replace(/\/\*[\s\S]*?\*\//g, "")) as {
+  const flow = loadJson("default-login.scaffold.json") as unknown as {
     purposes: Record<string, string>;
     steps: ScaffoldStep[];
   };
@@ -376,11 +320,10 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
     expect((googleExample as { slug: string }).slug).toBe("google");
   });
 
-  it("stripping the marked deltas yields the shipped default exactly", () => {
-    // The doc marks every SSO delta with an inline comment; reversing those
-    // deltas must reproduce packages/config/defaults/default-login.json, so
-    // an unmarked drift from the shipped default goes red.
-    expect(raw.match(/\/\* (?:added(?: step)?|was "password") \*\//g)).toHaveLength(9);
+  it("reversing the SSO deltas yields the shipped default exactly", () => {
+    // Reversing the deltas area 4 documents must reproduce
+    // packages/config/defaults/default-login.json, so any other drift from
+    // the shipped default goes red.
     const stripped = JSON.parse(JSON.stringify(flow)) as typeof flow;
     stripped.steps = stripped.steps.filter(
       (s) => s.name !== "register-sso" && s.name !== "sso-conflict",
@@ -396,90 +339,6 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
       readFileSync(join(repoRoot, "packages/config/defaults/default-login.json"), "utf8"),
     ) as unknown;
     expect(stripped).toEqual(shipped);
-  });
-});
-
-describe("sibling quotes pinned verbatim (4-cli-provider-setup.md)", () => {
-  // Sibling rewrites broke area 4's quotes three times while this suite
-  // stayed green; containment (whitespace-collapsed) makes the next drift a
-  // red test naming both files.
-  const squash = (s: string) => s.replace(/\s+/g, " ");
-  it.each([
-    [
-      "callback URI surface row (area 3)",
-      socialLoginFlow,
-      "**Callback URI Surface:** Expose `{origin}/__nextgen/idp/callback` in the setup journey and per environment.",
-    ],
-    [
-      "flow scaffolding row (area 3)",
-      socialLoginFlow,
-      "**Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default) and the conflict step with its login route.",
-    ],
-    [
-      "register-step topology open point (area 2)",
-      authMethodSelection,
-      "both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision",
-    ],
-    [
-      "resolved-identity lifetime (area 3)",
-      socialLoginFlow,
-      "an ephemeral object attached directly to the attempt that dies when the attempt completes or expires",
-    ],
-  ])("%s appears in the source doc and area 4", (_name, source, quote) => {
-    expect(squash(source)).toContain(quote);
-    expect(squash(providerSetup)).toContain(quote);
-  });
-
-  it("the #flow-architecture-decisions heading exists (siblings deep-link it)", () => {
-    // Quotes above pin cross-doc text; this pins the one in-doc anchor the
-    // siblings link to, so a heading rename goes red instead of silently 404ing.
-    expect(providerSetup).toContain("\n### Flow Architecture Decisions\n");
-  });
-});
-
-describe("sibling quotes pinned verbatim (5-post-claim-menu.md)", () => {
-  // Same discipline as area 4's pins: area 5 imports three area-4 rows by
-  // quote, so a reword on either side must name both files.
-  const squash = (s: string) => s.replace(/\s+/g, " ");
-  it.each([
-    [
-      "re-enterable sub-journey row (area 4)",
-      'Callable behind the "Sign-in methods" interface with the reuse branch as default mode.',
-    ],
-    [
-      "multi-schema reuse open point (area 4)",
-      "Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the Area 5 post-claim menu.",
-    ],
-    [
-      "skip-for-now destination row (area 4)",
-      "The setup sub-journey's skip path hands the dropped provider to a concrete menu target; the final summary names it.",
-    ],
-  ])("%s appears in the source doc and area 5", (_name, quote) => {
-    expect(squash(providerSetup)).toContain(quote);
-    expect(squash(postClaimMenu)).toContain(quote);
-  });
-
-  it("the provider-setup anchors area 5 deep-links exist", () => {
-    expect(providerSetup).toContain("\n## The Sub-journey\n");
-    expect(providerSetup).toContain("\n## Create or Reuse\n");
-  });
-});
-
-describe("skipped envelope (5-post-claim-menu.md · Non-interactive)", () => {
-  // The doc's one JSON block: the non-interactive skip envelope. Pin the
-  // wire fields the CLI contract names, so an envelope reshape goes red.
-  const envelope = extractJson(
-    postClaimMenu,
-    /```json\n(\{[\s\S]*?"status": "skipped"[\s\S]*?\n\})\n```/,
-  ) as Record<string, unknown> & { next_commands: string[] };
-
-  it("carries the meta trio, the skip reason, and recovery commands", () => {
-    expect(envelope["cli_version"]).toBeTypeOf("string");
-    expect(envelope["command"]).toBe("menu");
-    expect(envelope["source"]).toBeTypeOf("string");
-    expect(envelope["status"]).toBe("skipped");
-    expect(envelope["reason"]).toBe("non-interactive");
-    expect(envelope.next_commands.length).toBeGreaterThan(0);
   });
 });
 
@@ -554,125 +413,6 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
   });
 });
 
-describe("verdict catalog (6-test-sign-in.md)", () => {
-  // Area 6's classification table and JSON examples must agree with the
-  // closed catalog they draw from; a code renamed in one place and not the
-  // other goes red here.
-  const catalog = extractJson(
-    testSignIn,
-    /```jsonc\n\/\/ test-sign-in verdict and reason-code catalog\n(\{[\s\S]*?\n\})\n```/,
-  ) as {
-    verdicts: string[];
-    milestones: string[];
-    reason_codes: string[];
-    cli_reasons: string[];
-  };
-  const event = extractJson(
-    testSignIn,
-    /```jsonc\n\/\/ idp-attempt diagnostic event\n(\{[\s\S]*?\n\})\n```/,
-  ) as { reason_code: string };
-  const envelope = extractJson(
-    testSignIn,
-    /```jsonc\n\/\/ test sign-in failure envelope\n(\{[\s\S]*?\n\})\n```/,
-  ) as {
-    code: string;
-    details: { verdict: string; reason_code: string; last_milestone: string; milestones: string[] };
-  };
-
-  it("every verdict, milestone, and reason code is used in prose", () => {
-    for (const name of [
-      ...catalog.verdicts,
-      ...catalog.milestones,
-      ...catalog.reason_codes,
-      ...catalog.cli_reasons,
-    ]) {
-      expect(testSignIn, name).toContain(`\`${name}\``);
-    }
-  });
-
-  it("the classification table covers every failure reason code", () => {
-    const start = testSignIn.indexOf("| Signal | Verdict |");
-    const end = testSignIn.indexOf("\n## ", start);
-    const table = testSignIn.slice(start, end);
-    for (const code of [...catalog.reason_codes, ...catalog.cli_reasons]) {
-      expect(table, code).toContain(`\`${code}\``);
-    }
-  });
-
-  it("the classification table's verdict column stays inside the catalog", () => {
-    // Reverse direction of the coverage test: a code invented in the table
-    // but absent from the catalog must go red too. Scoped to the Verdict
-    // column because the Signal and note columns legitimately name wire
-    // values and config fields. `provider_error` is the echoed envelope
-    // field, not a code.
-    const start = testSignIn.indexOf("| Signal | Verdict |");
-    const end = testSignIn.indexOf("\n## ", start);
-    const rows = testSignIn
-      .slice(start, end)
-      .split("\n")
-      .slice(2)
-      .filter((line) => line.startsWith("|"));
-    expect(rows.length).toBeGreaterThan(0);
-    const known = new Set([
-      ...catalog.verdicts,
-      ...catalog.milestones,
-      ...catalog.reason_codes,
-      ...catalog.cli_reasons,
-      "provider_error",
-    ]);
-    for (const row of rows) {
-      const verdictCell = row.split("|")[2] ?? "";
-      for (const [, token] of verdictCell.matchAll(/`([a-z0-9_]+)`/g)) {
-        expect(known.has(token!), `${token} escaped the catalog`).toBe(true);
-      }
-    }
-  });
-
-  it("the JSON examples use catalog values only", () => {
-    expect(catalog.reason_codes).toContain(event.reason_code);
-    expect(catalog.verdicts).toContain(envelope.details.verdict);
-    expect([...catalog.reason_codes, ...catalog.cli_reasons]).toContain(
-      envelope.details.reason_code,
-    );
-    expect(catalog.milestones).toContain(envelope.details.last_milestone);
-    for (const milestone of envelope.details.milestones) {
-      expect(catalog.milestones).toContain(milestone);
-    }
-    expect(envelope.code).toBe("E_TEST_FAILED");
-  });
-});
-
-describe("sibling quotes pinned verbatim (6-test-sign-in.md)", () => {
-  // Area 6 imports one row each from areas 3 and 4 and two from area 5; a
-  // reword on either side must name both files.
-  const squash = (s: string) => s.replace(/\s+/g, " ");
-  it.each([
-    [
-      "failure-details row (area 3)",
-      socialLoginFlow,
-      "Details are written to server logs and the test journey (area 6); tenant-side misconfigurations are hidden from the end user.",
-    ],
-    [
-      "test journey handoff row (area 4)",
-      providerSetup,
-      "Provides execution target for exit copy; applying changes is never presented as working sign-in.",
-    ],
-    [
-      "test journey surface row (area 5)",
-      postClaimMenu,
-      'Exit copy (or a menu row) hands off to the test journey; CLI avoids asserting that auth "works".',
-    ],
-    [
-      "e2e strategy row (area 5)",
-      postClaimMenu,
-      "e2e coverage belongs to `apps/cli-journey-e2e`; Area 6 settles the strategy.",
-    ],
-  ])("%s appears in the source doc and area 6", (_name, source, quote) => {
-    expect(squash(source)).toContain(quote);
-    expect(squash(testSignIn)).toContain(quote);
-  });
-});
-
 describe("dialect dependency (x-verify removed in #901)", () => {
   // Doc 1's dependency note claims the dialect carries exactly x-unique,
   // x-claim, and x-audit today. Assert that against the real file, so any
@@ -708,8 +448,6 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
     "2-auth-method-selection.md": authMethodSelection,
     "3-social-login-flow.md": socialLoginFlow,
     "4-cli-provider-setup.md": providerSetup,
-    "5-post-claim-menu.md": postClaimMenu,
-    "6-test-sign-in.md": testSignIn,
   };
   const slugs = (doc: string) =>
     new Set(
