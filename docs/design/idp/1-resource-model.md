@@ -115,7 +115,7 @@ How to read the schema:
 
 | `creation` | Legacy bits | Unknown subject |
 | :--- | :--- | :--- |
-| `disabled` | allowed=false, auto=false | `user_not_found` routes to an authored error step. The provider signs in existing users only. |
+| `disabled` | allowed=false, auto=false | `identity_unknown` routes to an authored error step. The provider signs in existing users only. |
 | `auto` (default) | allowed=true, auto=true | Claims cover every required property: the user is created without a form. Otherwise the collection step, prefilled with what arrived. The epic's new-user journey. |
 
 Two further states exist behind the bits; neither ships in 851:
@@ -211,7 +211,7 @@ These are cross-file and state-dependent rules that a single-file JSON schema ca
 | **Missing `x-verify` Method** | Warning | A `verified_claims` key points to a property that lacks an `x-verify` method (verification with nowhere to land). Activates when `x-verify` returns (see the dependency note under [Linking Safety](#linking-safety)).                                                                                                       |
 | **Invalid Strategy Pointer** | Error | `"$supplementary_fetch"` is used without selecting a strategy, or the selected strategy's contract does not verify that specific property.                                                                              |
 | **Inert Connection** | Warning | The connection is referenced by zero schemas. No flow can offer it, making it completely inert.                                                                                                                         |
-| **Impossible Registration** | Warning | A flow registration step offers this provider, but `creation` is `disabled`. The user will never be able to successfully sign up. With `disabled`, `user_not_found` must route to an error step; with `auto`, to a collection or offer-register step.                                                                               |
+| **Impossible Registration** | Warning | A flow registration step offers this provider, but `creation` is `disabled`. The user will never be able to successfully sign up. With `disabled`, `identity_unknown` must route to an error step; with `auto`, to a collection step.                                                                               |
 | **Impossible Auto-Creation (Data)** | Warning | `creation` is `auto`, but a referencing schema requires a property that the `claim_mapping` does not target. Every sign-in will stop to collect the missing data.                                               |
 | **Impossible Auto-Creation (Verification)**| Warning | `creation` is `auto`, but a referencing schema requires an `x-verify` property that lacks a `verified_claims` entry. Absent entries evaluate as unverified, meaning the auto-creation condition can never pass. Activates when `x-verify` returns. |
 | **Missing Env Vars** | Error / Warning | Referenced environment variables are missing from the local environment. Interactive journeys and test preflight raise `E_CREDENTIAL_MISSING` as an error (the developer is present to fix it). Batch `plan` only warns, so one IdP file cannot force secrets into every CI pipeline; the authoritative presence check is the server's, at deploy time (see [Upstream Security Pushback](#upstream-security-pushback)). Shipped `assertEnvRefs` hard-fails `plan` for schemas and flows today, so the batch relaxation is a deliberate change. |

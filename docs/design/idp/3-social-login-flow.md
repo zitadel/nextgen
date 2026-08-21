@@ -82,20 +82,29 @@ Local development instances may relax the loopback rejection so `http://localhos
 
 ## Resolution Branches
 
-A single `transitions.callback` cannot route returning users and new users to different locations. Therefore, resolution fires one of three outcomes from the shipped vocabulary. Because this mapping remains consistent across all execution contexts, shared-entry steps work without modification:
+A single `transitions.callback` cannot route returning users and new users to different locations, so resolution fires one of three outcomes. Two are shipped; the third, `identity_unknown`, is new and fires only from ceremonies.
 
-| Resolution State | Outcome Fired | Typical Route Target |
+**Why `identity_unknown` is needed:**
+*   **Why not `user_not_found`:** A typed email and an SSO ceremony can both resolve on the same step, and a transition key has one target. If a ceremony's unknown subject fired `user_not_found`, the key would have to keep its typed-email target (`register`), and the unknown SSO user would land on the generic register step and run the ceremony again.
+*   **The split:** `identity_unknown` routes the unknown SSO user straight to the data collection step, while `user_not_found` keeps its route for typed emails.
+*   **Engine behavior:** ADR 017 anticipates this extension for ceremonies (`credential_unknown` is the passkey analogue). When it fires, the engine flips `CurrentPurpose` from `login` to `register`, as it does for `user_not_found` ([ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md#note-sso)).
+
+Because this mapping is the same in every execution context, shared-entry steps work without modification.
+
+### The Three Outcomes
+
+| Resolution State | Outcome Fired | Routing & Engine Behavior |
 | :--- | :--- | :--- |
-| **Known subject** | `callback` | **Done** (Authenticated). The engine applies `is_auto_update` with downgrade guards. Identity is pinned strictly to `(connection, subject)`, never claims, preventing profile edits from forking accounts. An auto-update write that would violate `x-unique` is dropped for that property; sign-in proceeds and the skip surfaces in diagnostics as the property name only. Conflict vocabulary stays reserved for unknown subjects. |
-| **Unknown subject** | `user_not_found` | **Data collection step** (register flows) or an **offer-register step** (login flows). Under `creation: disabled`, an **authored error step**. |
-| **Unknown subject with unique-property collision** | `user_already_exists` | **Conflict resolution step**. The engine binds the attempt to the colliding account, so a password or passkey submit on that step authenticates that account (the same binding `register → password` relies on for a typed collision; here the value comes from the mapped claim). The credential must still be correct, so this adds no oracle beyond the enumeration note below. |
+| **Known subject** | `callback` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, never claims, so profile edits cannot fork accounts. 851 writes nothing to the user on sign-in; refreshing properties from claims is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
+| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold), from either entry. Under `creation: disabled`, an authored error step instead. |
+| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, the same binding `register → password` relies on for a typed collision, here keyed by the mapped claim value. A password or passkey submit on that step authenticates that account. The credential must still be correct, so this adds no oracle beyond the enumeration note below. |
 
 ### Creation Without Collection (`creation: auto`)
 
 Under `creation: auto` (the default), the engine **creates the account immediately without pausing for collection** and fires `callback` as a newly authenticated user, provided the mapped claims supply every required property in the schema.
 
-* **Fallback Behavior:** If a required property is missing, execution degrades to `user_not_found` → data collection, prefilled with what did arrive. This is the epic's new-user journey: the user provides only what the provider did not return.
-* **Disabled:** `creation: disabled` routes `user_not_found` to an authored error step instead, so the provider signs in existing users only. The deferred `auto_only` fails closed on incomplete claims rather than collecting ([area 1](1-resource-model.md#provisioning)).
+* **Fallback Behavior:** If a required property is missing, execution degrades to `identity_unknown` → data collection, prefilled with what did arrive. This is the epic's new-user journey: the user provides only what the provider did not return.
+* **Disabled:** `creation: disabled` routes `identity_unknown` to an authored error step instead, so the provider signs in existing users only. The deferred `auto_only` fails closed on incomplete claims rather than collecting ([area 1](1-resource-model.md#provisioning)).
 * **Static Warnings:** The plan phase warns when a pairing makes the gate statically dead (see [validator rules](1-resource-model.md#validator-rules)).
 * **Verification Gating (deferred):** A second condition joins the check when `x-verify` returns to the dialect: every required property carrying `x-verify` must also arrive verified (per Step 5 of Callback Processing), otherwise the attempt degrades to collection. A required `givenName` then needs only a non-empty value, whereas a required `email` with `x-verify` must also arrive verified. `x-verify` was removed as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); this gate is its first consumer, and no schema can carry it today, so 851 cannot enforce verification on either creation path and does not claim to. Enforcement becomes real per schema, when an author marks a property `x-verify`; committed connections do not change. See the dependency note in [`1-resource-model.md`](1-resource-model.md#linking-safety).
 
@@ -105,7 +114,7 @@ Under `creation: auto` (the default), the engine **creates the account immediate
 - **Pattern Environments:** When the environment is declared by `issuer_pattern`, the engine renders a step carrying `sso_providers` without its provider buttons, because no exact callback URI exists to offer. It records a diagnostic naming the step and the environment ("provider hidden: pattern environment has no exact callback"), so a reviewer who expects the button on a preview deploy can find out why. An attempt submitted anyway is refused at submission, before any authorize URL is built, so no `redirect_uri` is ever composed from a pattern-matched host; it ends in the flow-level error surface, value-free, logged. Social sign-in is tested in development and on any exact environment; a team that wants it on a deployed review target declares one with a fixed domain.
 - **Unresolvable Provider:** An attempt whose slug does not resolve to a live connection at attempt start ends in the flow-level error surface, value-free, logged. Reachable through the API path, a connection deleted while a flow still offers it; the deletion question (area 1, [Open Points](1-resource-model.md#open-points)) decides how rare that is, not whether this line is needed, since a page rendered before the delete can still submit.
 - **No Auto-Linking in 851:** Linking policy fields are omitted from the current schema. All account-linking semantics are deferred to the dedicated account-linking specification.
-- **Validation Rule:** Steps containing `sso_providers` **must** explicitly route all three outcomes (`callback`, `user_not_found`, and `user_already_exists`) to prevent flow dead-ends (validator rule in [`2-auth-method-selection.md`](2-auth-method-selection.md); today only `transitions.callback` is enforced).
+- **Validation Rule:** Steps containing `sso_providers` **must** explicitly route all three outcomes (`callback`, `identity_unknown`, and `user_already_exists`) to prevent flow dead-ends (validator rule in [`2-auth-method-selection.md`](2-auth-method-selection.md); today only `transitions.callback` is enforced).
 
 ## New Users: Prefill and Confirm
 

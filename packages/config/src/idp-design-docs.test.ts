@@ -286,10 +286,14 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     const ssoSteps = flow.steps.filter((s) => s.sso_providers);
     expect(ssoSteps.map((s) => s.name)).toEqual(["identifier", "register", "sso-conflict"]);
     for (const step of ssoSteps) {
-      for (const outcome of ["callback", "user_not_found", "user_already_exists"]) {
+      for (const outcome of ["callback", "identity_unknown", "user_already_exists"]) {
         expect(step.transitions?.[outcome], `${step.name} routes ${outcome}`).toBeDefined();
       }
+      expect(step.transitions!["identity_unknown"]!.target).toBe("register-sso");
     }
+    // user_not_found stays the typed-email outcome with the shipped target.
+    expect(ssoSteps[0]!.transitions!["user_not_found"]).toEqual({ target: "register" });
+    expect(ssoSteps[1]!.transitions!["user_not_found"]).toBeUndefined();
   });
 
   it("both firing points reach sso-conflict, whose sign-in re-purposes to login's entry; no pivot anywhere", () => {
@@ -330,10 +334,11 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     );
     for (const step of stripped.steps) delete step.sso_providers;
     const byName = new Map(stripped.steps.map((s) => [s.name, s]));
-    delete byName.get("identifier")!.transitions!["callback"];
-    delete byName.get("identifier")!.transitions!["user_already_exists"];
-    delete byName.get("register")!.transitions!["callback"];
-    delete byName.get("register")!.transitions!["user_not_found"];
+    for (const name of ["identifier", "register"]) {
+      for (const outcome of ["callback", "identity_unknown", "user_already_exists"]) {
+        delete byName.get(name)!.transitions![outcome];
+      }
+    }
     byName.get("register")!.transitions!["user_already_exists"] = { target: "password" };
     const shipped = JSON.parse(
       readFileSync(join(repoRoot, "packages/config/defaults/default-login.json"), "utf8"),

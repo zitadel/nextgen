@@ -191,9 +191,9 @@ The flow topology rests on five decisions:
 The shipped default configuration (`packages/config/defaults/default-login.json`) handles both login and registration within a single definition. By attaching `sso_providers` to both entry steps, we satisfy Area 3's purpose-independent outcome mapping. This prevents unnecessary definition forks and resolves the register-step topology [open point from Area 2](2-auth-method-selection.md#open-points).
 
 #### 2. The Three-Outcome Rule for SSO Steps
-Every step carrying `sso_providers` must explicitly handle three outcomes: `callback`, `user_not_found`, and `user_already_exists`.
-*   **Identifier Step:** The `user_not_found` outcome targets the `register` step (acting as an offer to register). The `callback` and `user_already_exists` keys function as SSO-only routes.
-*   **Register Step:** The engine flips `CurrentPurpose` upon bouncing from the identifier step ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)). Typed resolution fires `user_not_found` only under login dispatch and `user_already_exists` only under register dispatch, and `register` always runs under register purpose after the bounce, so typed input on `register` can only fire `user_already_exists`. This makes `register.user_not_found` an SSO-only route.
+Every step carrying `sso_providers` must explicitly handle three outcomes: `callback`, `identity_unknown`, and `user_already_exists`. The first two are SSO-only routes; `user_already_exists` is shared with typed collisions, which is what decision 5 is about.
+*   **`identity_unknown` → `register-sso`** on every step, so an unknown user reaches the collection step after one ceremony whether they started on the sign-in or the register page ([area 3](3-social-login-flow.md#resolution-branches)). The engine flips `CurrentPurpose` to `register` on the way.
+*   **`user_not_found` is untouched.** It stays the typed-email outcome with the shipped default's target, `identifier.user_not_found → register`. The scaffold adds no `user_not_found` to `register`: after the bounce that step runs under register purpose, where typed input can only fire `user_already_exists` ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)).
 
 #### 3. The SSO Collection Step (`register-sso`)
 Modeled after `register-password`, this step finalizes external identity provisioning.
@@ -207,7 +207,7 @@ This is a comprehensive recovery step presented under "account exists" messaging
 *   **SSO Outcomes:** Carrying `sso_providers` puts the step under the three-outcome rule:
     *   `callback` routes to `done`: the user signed in with a provider already linked to that account.
     *   `user_already_exists` targets the step itself: clicking the colliding provider again re-runs the ceremony and resolves identically, so the step re-renders with the same options. The copy is written to be seen more than once.
-    *   `user_not_found` routes to `register`: reachable only if the provider returns a different, unknown email (the user switched provider accounts mid-loop).
+    *   `identity_unknown` routes to `register-sso`: reachable only if the provider returns a different, unknown subject (the user switched provider accounts mid-loop).
     *   A wrong password re-renders the step with an error and no transition ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)); `user_already_exists` comes from identifier resolution, never from the password field.
 *   **Navigation Fallback:** Includes a secondary `sign_in` action targeting `identifier` (`{ "target": "identifier", "purpose": "login" }`) so the user can back out and use a different account.
 *   **Transition Logic:** Standard in-definition navigation is used. If a tenant separates login and register into distinct definitions, the transition updates to `"action": "switch"` targeting the login definition (dropping `purpose`). The `pivot` action is never scaffolded.
@@ -218,9 +218,8 @@ The `register.user_already_exists` outcome is retargeted from the `password` ste
 *   **The Benefit:** Because `sso-conflict` offers all methods, a typed-email user with a password still recovers in one step, preserving the efficiency of the shipped default.
 *   **State Preservation:** The fallback routing back to `identifier` preserves input field values across step boundaries ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)).
 
-#### UX Trade-offs & Identity Lifecycle
+#### Identity Lifecycle
 
-- **Double-Redirect on Login Sign-Up:** `identifier.user_not_found` retains its target (`register`) so typed-email users are not routed into `create_user_with_sso`. An unknown SSO user starting on the sign-in page lands on `register` (email prefilled) and clicks the provider button a second time to reach `register-sso`. This applies only when the provider did not return every required property; a complete profile is created on the first ceremony and goes `callback → done` from `identifier` ([area 3](3-social-login-flow.md#creation-without-collection-creation-auto)). Register-entry sign-ups require only one ceremony.
 - **Identity Lifetime Boundary:** Area 3 keeps the resolved external identity "an ephemeral object attached directly to the attempt that dies when the attempt completes or expires". The scaffold never persists it, so crossing the conflict step boundary means the sign-in path re-runs the provider ceremony rather than reusing a resolved identity.
 
 The complete target, the shipped default plus `google`; diff it against `packages/config/defaults/default-login.json` for the delta: [`schemas/default-login.scaffold.json`](schemas/default-login.scaffold.json).
@@ -268,6 +267,7 @@ If a selected provider is specified without a Client ID, setup halts prior to re
 | **Error Codes** | `E_CREDENTIAL_MISSING` (acquire a value locally, distinct from `E_VALIDATION`: edit the file) and `E_CANCELLED` (a cancellation signal distinct from `E_VALIDATION`, required by a menu loop that returns to its parent on cancel). | CLI error union |
 | **Dev-Runtime Secret Join** | At local-runtime spawn the CLI resolves the connection's declared env refs from `.env.local` and injects them into the engine process environment, so the engine's name-to-value join works at token exchange. Development only, downstream of everything diffed or printed. Production delivery stays with area 1's deferred secret-store spec. | CLI local runtime |
 | **`create_user_with_sso`** | Meta-schema enum value plus the engine handler from area 3. | Flow meta-schema / Engine |
+| **`identity_unknown`** | New reserved outcome, fired by ceremony resolution for an unknown subject; joins the reserved-key list in the `transitions` description, the validator's three-outcome rule, and ADR 017's flip table (`login` → `register`). | Flow meta-schema / Engine / Validator |
 
 ## Open Points
 

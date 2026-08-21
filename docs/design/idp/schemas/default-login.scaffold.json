@@ -59,6 +59,9 @@
         },
         "user_already_exists": {
           "target": "sso-conflict"
+        },
+        "identity_unknown": {
+          "target": "register-sso"
         }
       }
     },
@@ -136,11 +139,11 @@
         "callback": {
           "target": "done"
         },
-        "user_not_found": {
-          "target": "register-sso"
-        },
         "user_already_exists": {
           "target": "sso-conflict"
+        },
+        "identity_unknown": {
+          "target": "register-sso"
         }
       }
     },
@@ -232,15 +235,15 @@
         "callback": {
           "target": "done"
         },
-        "user_not_found": {
-          "target": "register"
-        },
         "user_already_exists": {
           "target": "sso-conflict"
         },
         "sign_in": {
           "target": "identifier",
           "purpose": "login"
+        },
+        "identity_unknown": {
+          "target": "register-sso"
         }
       }
     },
