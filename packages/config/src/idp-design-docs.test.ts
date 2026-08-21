@@ -223,7 +223,7 @@ describe("sso-auth-method schema (docs/design/idp/2-auth-method-selection.md)", 
   it.each<[string, object, boolean]>([
     ["enabled with providers", { enabled: true, providers: ["google"] }, true],
     ["disabled alone (migration)", { enabled: false }, true],
-    ["disabled with list retained (off-switch)", { enabled: false, providers: ["google"] }, true],
+    ["disabled with list (rejected)", { enabled: false, providers: ["google"] }, false],
     ["enabled without providers", { enabled: true }, false],
     ["enabled with empty providers", { enabled: true, providers: [] }, false],
     ["providers without enabled", { providers: ["google"] }, false],

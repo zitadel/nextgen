@@ -119,6 +119,7 @@ Under `creation: auto` (the default), the engine **creates the account immediate
 ### Constraints & Edge Cases
 
 - **Cross-Schema Identities:** Known-subject resolution assumes the user belongs to the flow's pinned schema. Resolving an identity arriving through a flow pinned to a *different* schema remains an open question. Until it is settled, 851 fails closed: when the resolved user's schema differs from the flow's pin, the attempt ends in the flow-level error surface (value-free, logged for diagnostics) rather than half-adopting either schema; the open point below owns the real resolution rules.
+- **Unresolvable Provider:** An attempt whose slug does not resolve to a live connection at attempt start ends in the flow-level error surface, value-free, logged. Reachable through the API path, a connection deleted while a flow still offers it; the deletion question (area 1, [Open Points](1-resource-model.md#open-points)) decides how rare that is, not whether this line is needed, since a page rendered before the delete can still submit.
 - **No Auto-Linking in 851:** Linking policy fields are omitted from the current schema. All account-linking semantics are deferred to the dedicated account-linking specification.
 - **Validation Rule:** Steps containing `sso_providers` **must** explicitly route all three outcomes (`callback`, `user_not_found`, and `user_already_exists`) to prevent flow dead-ends (validator rule in [`2-auth-method-selection.md`](2-auth-method-selection.md); today only `transitions.callback` is enforced).
 

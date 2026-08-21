@@ -67,16 +67,31 @@ We explicitly list SSO providers in the user schema rather than relying on a gen
 - **Avoiding Cascading Revisions:** Schemas do not have stable names; they are identified by revision IDs. If a connection referenced schemas, every schema edit would force a new connection revision, requiring complex `FlowRepin`-style rewrite mechanisms. Instead, connections use stable `slug`s specifically so they can be safely referenced by revision-named resources (like schemas) without triggering a cascade.
 - **Lookup Efficiency:** The system frequently asks, *"Which providers does this schema offer?"* (for UI and post-claim rendering). By storing the list in the schema, this becomes a fast, direct read from a document those views already hold. If the connection held the list instead, every UI render would have to scan every connection in the Project and match brittle revision IDs. The reverse question, *"Which schemas reference this connection?"*, is only asked infrequently during plan validation, making it perfectly acceptable for the validator to compute it by scanning the working tree.
 
+### What Each State Means
+
+Three files can name a provider, and the same provider can be in any of four states for a user type. Each has one customer-facing meaning:
+
+| State | Customer sees | Validator |
+| :--- | :--- | :--- |
+| Connection file exists, listed by no schema | Nothing. The credentials are kept; no user type can use the provider. | Inert Connection, warning ([area 1](1-resource-model.md#validator-rules)) |
+| Listed in `sso.providers`, offered in no flow | The Console and the post-claim menu show the provider as a method of this user type; no login page offers it. Allowed, not wired yet, the same state `password.enabled: true` without a password field is in today. | Dead capability, warning |
+| Listed and offered in a flow step | The button, on that page. | the cross-checks below |
+| Removed from `sso.providers`, or `sso.enabled: false` | This user type no longer uses the provider. Every flow that still offers it is an error until its step drops it. | Flow enables SSO, Provider ID validity, errors |
+
+A disabled slot is always written `{"enabled": false}` with no `providers` array. Disabling while keeping the list is rejected by the schema ([below](#providers-and-enabled-must-agree)), so there is no state that reads as paused but behaves as removed. Whether `enabled: false` should instead mean paused, flows untouched and the button hidden at render, is a question about every authentication method, not only `sso`; it is recorded in the [README](README.md#product-decisions).
+
+Removing a provider by hand is a two-file edit, and the plan says so: a flow pins a schema revision, so the schema edit re-pins every flow on it, and a flow that still offers the provider fails the plan before anything is applied (`apps/cli/src/lib/sync/flow-validation.ts`). Production keeps the old revisions. The Sign-in methods picker makes both edits in one step ([area 5](5-post-claim-menu.md#adding-and-removing-methods)).
+
 ### Schema Location for `providers`
 
 Because `auth-method.json` is referenced (`$ref`) by all five authentication slots, simply adding `providers` to it would allow nonsensical configurations like `password.providers`. To solve this, we introduce a new `sso-auth-method.json` schema that extends the base definition. The main `auth-methods.json` schema then specifically points its `sso` slot to this new file. This cleanly aligns with our existing structural patterns (such as the split between `user-property.json` and `property-name.json`) and matches how `meta-schemas.ts` enumerates files for publishing.
 
-### Conditional Requirement: `providers`
+### `providers` and `enabled` Must Agree
 
-The `providers` array is strictly required and must be non-empty **only when SSO is enabled**.
+The `providers` array is required and non-empty when SSO is enabled, and absent when it is not.
 
 - **Avoiding the "Absent-Means-All" Footgun:** If an omitted array defaulted to "allow all," adding a new GitHub connection for one specific schema would silently activate it across *every* schema where `sso.enabled: true`. This directly violates the rule that simply creating a provider connection does not make it universally available.
-- **Tied to `enabled: true`:** The requirement is conditional. If a schema turns SSO off (but doesn't delete its list), or if a generator blindly emits all five slots as `{"enabled": false}`, the configuration remains perfectly valid without naming any providers.
+- **Disabled carries no `providers` array:** A generator that emits all five slots as `{"enabled": false}` stays valid. A disabled slot that still carries a list is rejected, so `enabled` and the list never disagree about whether the user type uses social sign-in ([What Each State Means](#what-each-state-means)).
 
 <details open>
 <summary><code>packages/config/meta-schemas/sso-auth-method.json</code></summary>
@@ -129,6 +144,13 @@ The `providers` array is strictly required and must be non-empty **only when SSO
         "required": [
           "providers"
         ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "providers"
+          ]
+        }
       }
     }
   ]
@@ -140,10 +162,10 @@ The `providers` array is strictly required and must be non-empty **only when SSO
 The `enabled` field remains strictly required, matching the behavior of the other four authentication methods.
 
 - **Migration friendly:** A bare `{"enabled": false}` object is perfectly valid. This allows an existing schema to introduce the `sso` slot before it actually defines any providers.
-- **State preservation:** A disabled SSO entry can safely retain its `providers` list, making it convenient to toggle SSO back on in the future.
+- **No dormant list:** Turning SSO off drops the list. Git keeps the old one; the file does not carry a state that looks paused and behaves as removed.
 - **Multi-file impact:** Disabling SSO is never a single-file edit. If you set `enabled: false` on the schema, but a flow still actively offers those providers, the validator will immediately flag it as an error.
 
-These exact schema constraints (specifically that `{"enabled": false}` is valid for migrations, and that `enabled: true` paired with an empty or missing `providers` list is rejected) are verified in [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts).
+These exact schema constraints (specifically that `{"enabled": false}` is valid for migrations, that `enabled: false` with a list is rejected, and that `enabled: true` paired with an empty or missing `providers` list is rejected) are verified in [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts).
 
 ### Referencing by Slug, Not ID
 
