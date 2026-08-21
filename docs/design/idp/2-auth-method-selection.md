@@ -14,7 +14,7 @@ Enabling a social provider for a user schema isn't a single toggle. It requires 
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: [{id, name, template}]` | Supported. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
+| **Flow step** | `sso_providers: [{id, name, template}]` | Accepted by the meta-schema and validator; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
 
 Each authentication method surfaces differently within a flow, meaning there is no uniform rendering mechanism across the board:
 
@@ -141,6 +141,6 @@ The two pairing rows live here because the flow definition is the only document 
 - [`1-resource-model.md`](1-resource-model.md) (area 1)
 - [ADR 020](../../adrs/020-credentials-out-of-user-schema.md) (`x-auth-methods` as policy input)
 - `packages/config/meta-schemas/auth-methods.json`, `auth-method.json`
-- `packages/config/src/validate.ts` (`authMethodEnabled`, `resolveFieldChallenge`, `AUTH_METHOD_PREFIX`)
+- `packages/config/src/validate.ts` (`validateFlowDefinition`, `RESERVED_OUTCOMES`, `PURPOSE_FLIP_TARGETS`; internal `authMethodEnabled`, `resolveFieldChallenge`, `AUTH_METHOD_PREFIX`)
 - `packages/config/defaults/default-login.json` (step shapes)
 - `api/openapi/endpoints/schemas/flow-definition.json` (`SSOProvider`)

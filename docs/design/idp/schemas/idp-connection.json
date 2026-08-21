@@ -200,7 +200,10 @@
                 "state",
                 "nonce",
                 "code_challenge",
-                "code_challenge_method"
+                "code_challenge_method",
+                "response_mode",
+                "request",
+                "request_uri"
               ]
             }
           },
@@ -284,7 +287,10 @@
                 "state",
                 "nonce",
                 "code_challenge",
-                "code_challenge_method"
+                "code_challenge_method",
+                "response_mode",
+                "request",
+                "request_uri"
               ]
             }
           },

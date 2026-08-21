@@ -15,6 +15,10 @@ import { describe, expect, it } from "vitest";
 // When the schema lands as a real meta-schema file, point this test at it.
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const readme = readFileSync(
+  join(repoRoot, "docs/design/idp/README.md"),
+  "utf8",
+);
 const resourceModel = readFileSync(
   join(repoRoot, "docs/design/idp/1-resource-model.md"),
   "utf8",
@@ -449,6 +453,7 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
   // [text](N-doc.md#fragment) and in-doc [text](#fragment) must hit a real
   // heading under GitHub's slugging, or the link 404s silently.
   const docs: Record<string, string> = {
+    "README.md": readme,
     "1-resource-model.md": resourceModel,
     "2-auth-method-selection.md": authMethodSelection,
     "3-social-login-flow.md": socialLoginFlow,
@@ -463,7 +468,7 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
   const headings = new Map(Object.entries(docs).map(([name, text]) => [name, slugs(text)]));
 
   it.each(Object.keys(docs))("%s", (name) => {
-    const links = [...docs[name]!.matchAll(/\]\((?:([1-9][a-z-]*\.md))?#([\w-]+)\)/g)];
+    const links = [...docs[name]!.matchAll(/\]\((?:([1-9][a-z-]*\.md|README\.md))?#([\w-]+)\)/g)];
     for (const [, file, fragment] of links) {
       expect(
         headings.get(file ?? name)!.has(fragment!),

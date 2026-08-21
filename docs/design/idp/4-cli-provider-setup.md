@@ -119,7 +119,7 @@ In 851 the journey captures one client id and one secret, for development, the o
 
 #### Safety & Security Gates
 
-* **Gitignore Safety Gate:** Secret values are written to `.env.local` only if verified as untracked and gitignored via `git check-ignore`. If verification fails, only the stub is written and manual setup instructions are printed.
+* **Gitignore Safety Gate:** Secret values are written to `.env.local` only if verified as untracked and gitignored via `git check-ignore` (new: `merge-env` writes without the check today). If verification fails, only the stub is written and manual setup instructions are printed.
 * **CLI Safety:** Secret values are never exposed in process arguments (`argv`); no `--client-secret` flag exists.
 * **No-Clobber Behavior:** `merge-env` will not overwrite existing keys. Re-running with a new secret prompts: *"already set in `.env.local`, edit it there"*.
 
@@ -199,7 +199,7 @@ The complete target, the shipped default plus `google`; diff it against `package
 
 The epic requires connection configurations to be visible in the plan preview while explicitly separating application from verification: applying changes is never presented as proof that sign-in works.
 
-* **Mutable, not revisioned:** the connection id is stable and the server revises under it (`PUT /idps/{id}`), so a hash change is an update, never a new outer id. References are by slug, so nothing re-pins.
+* **Mutable, not revisioned:** the connection id is stable and the server revises under it (a revise call on the CRUD API, undesigned), so a hash change is an update, never a new outer id. References are by slug, so nothing re-pins.
 * **Validation before upload:** the syncer runs the meta-schema and the validator rules from areas 1 and 2, with the [`E_CREDENTIAL_MISSING`](#missing-credentials) split for unresolved env refs.
 * **Secret-free previews:** previews display only the variable name (`client_secret_env`). Update previews show a field diff once a read endpoint exists.
 * **Delete:** a local file delete schedules a platform delete; what the server does with it is the open deletion question (area 1, Open Points).
@@ -220,7 +220,7 @@ In non-interactive mode (triggered by non-TTY `stdin`/`stdout` or explicit `--js
 A missing client id on the create path halts setup before writing ([Missing Credentials](#missing-credentials)). The `E_VALIDATION` envelope carries the console URL and callback URI in `hint` and the flag to pass in `next_commands`.
 
 * **No Secret Flag:** Secrets cannot be passed via CLI flags. Deferred capture is the default non-interactive behavior.
-* **Missing Secret Handling:** If the secret is absent from `process.env` and local environment files (`.env.local`, `.env`), the output envelope includes a warning naming the missing variable alongside remediation steps in `data.next_actions`.
+* **Missing Secret Handling:** If the secret is absent from `process.env` and local environment files (`.env.local`, `.env`; new: `plan` reads `process.env` only today, `apps/cli/src/lib/oclif/base.ts`), the output envelope includes a warning naming the missing variable alongside remediation steps in `data.next_actions`.
 * **Structured Payload (`data.idps`):** Mirrors the interactive announce step per provider: slug, template, callback URI per environment, excluded environments with the declaration kind as reason, console URL, `client_secret_env`, and whether the secret is present. Exclusions are structured so agents can tell a declaration-level exclusion from an unconfigured environment without parsing terminal text.
 
 ## Exported Requirements
@@ -236,13 +236,12 @@ A missing client id on the create path halts setup before writing ([Missing Cred
 | **Error Codes** | `E_CREDENTIAL_MISSING` (acquire a value locally, distinct from `E_VALIDATION`: edit the file) and `E_CANCELLED` (a cancellation signal distinct from `E_VALIDATION`, required by a menu loop that returns to its parent on cancel). | CLI error union |
 | **Dev-Runtime Secret Join** | At local-runtime spawn the CLI resolves the connection's declared env refs from `.env.local` and injects them into the engine process environment, so the engine's name-to-value join works at token exchange. Development only, downstream of everything diffed or printed. Production delivery stays with area 1's deferred secret-store spec. | CLI local runtime |
 | **`create_user_with_sso`** | Meta-schema enum value plus the engine handler from area 3. | Flow meta-schema / Engine |
-| **`identity_unknown`** | New reserved outcome, fired by ceremony resolution for an unknown subject; joins the reserved-key list in the `transitions` description, the validator's three-outcome rule, and ADR 017's flip table (`login` → `register`). | Flow meta-schema / Engine / Validator |
+| **`identity_unknown`** | New reserved outcome, fired by ceremony resolution for an unknown subject; joins the reserved-key list and the flip table (`login` → `register`) at every enumeration site: `RESERVED_OUTCOMES` and `PURPOSE_FLIP_TARGETS` (`packages/config/src/validate.ts`), `reservedOutcomes` and `purposeFlipTargets` (`internal/domain/flow_definition_validator.go`), `applyOutcomeFlip` (`internal/domain/flow_state_machine.go`), the `transitions` description in `flow-definition.json`, the validator's three-outcome rule, and an amendment to ADR 017's SSO note ([area 3](3-social-login-flow.md#resolution-branches)). | Flow meta-schema / Engine / Validator / ADR 017 |
 
 ## Open Points
 
 * **Flag Spelling & Multi-Select Wiring:** Settles `--auth-methods` and per-provider flag names with Area 2 generator recomposition, fixing the contract (Client IDs supplied by flag, secrets strictly excluded from argv).
 * **Prefilled Console Deep-Links:** Evaluating prefilled query params (name, homepage, callback URL) for provider consoles (supported by GitHub, unsupported by Google).
-* **`issuer_pattern` Shape Reconciliation:** The CLI seeds `issuer_pattern` as an array holding the exact development origin while the platform contract types it as a wildcard string and puts exact origins under `issuer`; pending reconciliation the journey excludes by declaration kind and prints that as the reason ([`configuration-surface.md`, `zitadel.json`](../platform/configuration-surface.md#zitadeljson--the-root); [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments)).
 * **`scaffoldedFrom` Provenance:** Pending Area 1's specification for recording provenance data on generated connection resources.
 * **Secret Rotation UX:** Defining explicit rotation workflows beyond existing no-clobber behavior in `.env.local` (deferred to Area 1 secret-store spec).
 
