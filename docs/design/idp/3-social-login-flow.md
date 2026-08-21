@@ -158,7 +158,7 @@ The resolved external identity is read by four key mechanisms:
 
 ## Conflict Resolution Flow
 
-Scoped by the epic: a safe recovery route, no automatic linking, no dead end.
+Scoped by the epic: a safe recovery route, without introducing automatic linking or leaving the user at a dead end.
 
 ```
 user_already_exists → authored step: "an account with this email already exists"

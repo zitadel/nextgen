@@ -76,6 +76,8 @@ causing typos or unshipped strategies to fail at validation; the verified-proper
 
 Setup scaffolds one file per selected provider: [`google.json`](schemas/google.json) (OIDC, discovery supplies the endpoints) and [`github.json`](schemas/github.json) (OAuth2, no discovery, endpoints explicit). Both store env var references, never secret values, and both carry a `claim_mapping` generated from the active user schema.
 
+Tracking is handled by `state.json`, which uses `id`, `hash`, and `previousId`, with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
+
 ## The connection schema
 
 The full draft: [`schemas/idp-connection.json`](schemas/idp-connection.json).
@@ -109,6 +111,8 @@ Two further states exist behind the bits; neither ships in 851:
 Neither shipped value enforces verification in 851; that arrives with `x-verify`. The complete logic is under the [resolution branches](3-social-login-flow.md#resolution-branches) in area 3.
 
 **A ceiling, not a policy.** The connection states how far this provider's data is trusted, which varies by provider. Whether a given user type may sign up at all is a property of the user type, owned by authentication method settings ([#898](https://github.com/zitadel/nextgen/issues/898)). That policy may narrow the connection's value (a Google connection at `auto` serving Customers at `auto` and Employees at `disabled`), never widen it; the effective rule is the intersection, as #898 states. The connection is the only layer that exists in 851. Recorded under [Product decisions](README.md#product-decisions).
+
+*Note:* The legacy flags that governed account linking (`is_linking_allowed`, `auto_linking`) have been removed from this initial release. See [Linking safety](#linking-safety) for details.
 
 ### Deferred and Cut Fields
 
