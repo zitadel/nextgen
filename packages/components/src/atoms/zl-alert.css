@@ -1,0 +1,91 @@
+/* Styles for `<zl-alert>` — shadow host rules first, then the painted surface. */
+
+:host {
+  display: block;
+}
+
+/* The shadcn `Alert`. The login frames use its `default` variant even for a
+   failed sign-in: the surface stays neutral and the icon carries the meaning,
+   rather than the whole block turning red. `destructive` remains available for
+   surfaces that do want that weight. */
+.zr-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--zl-spacing-2);
+  padding-block: var(--zl-spacing-3);
+  padding-inline: var(--zl-spacing-4);
+  background: var(--zl-muted);
+  color: var(--zl-foreground);
+  border: 1px solid var(--zl-border);
+  border-radius: var(--zl-radius-lg);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+}
+/* The glyph is optically centred on the title's first line, not on the box. */
+.zr-alert__icon {
+  flex-shrink: 0;
+  padding-block-start: var(--zl-spacing-0-5);
+  color: currentColor;
+}
+.zr-alert__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-0-5);
+}
+.zr-alert__title {
+  font-family: var(--zl-font-family-heading);
+  color: var(--zl-foreground);
+}
+.zr-alert__message {
+  margin: 0;
+  color: var(--zl-muted-foreground);
+}
+/* With no title the message is the alert's own voice, so it takes the
+   foreground rather than the muted supporting tone. */
+.zr-alert:not(:has(.zr-alert__title)) .zr-alert__message {
+  color: var(--zl-foreground);
+}
+
+.zr-alert--error {
+  color: var(--zl-destructive);
+}
+.zr-alert--error .zr-alert__title {
+  color: var(--zl-destructive);
+}
+.zr-alert--success .zr-alert__icon {
+  color: var(--zl-success);
+}
+.zr-alert--warning .zr-alert__icon,
+.zr-alert--info .zr-alert__icon {
+  color: var(--zl-muted-foreground);
+}
+
+.zr-alert__close {
+  all: unset;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zl-spacing-6);
+  height: var(--zl-spacing-6);
+  border-radius: var(--zl-radius-md);
+  color: var(--zl-muted-foreground);
+  cursor: pointer;
+  transition: background-color var(--zl-duration-fast) var(--zl-easing-standard);
+}
+.zr-alert__close .zr-icon {
+  --zl-icon-size: var(--zl-spacing-4);
+  width: var(--zl-spacing-4);
+  height: var(--zl-spacing-4);
+}
+.zr-alert__close:hover {
+  background: var(--zl-accent);
+  color: var(--zl-accent-foreground);
+}
+.zr-alert__close:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}

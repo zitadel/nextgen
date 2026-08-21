@@ -141,12 +141,12 @@ fixtures:
 
 | Surface | Moon command | What it gives you |
 | --- | --- | --- |
-| **Storybook** | `moon run storybook:dev` ([:6006](http://localhost:6006)) | The workbench for both the Lit atoms and the paired React components, plus the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
+| **Storybook** | `moon run storybook:dev` ([:6006](http://localhost:6006)) | The workbench for the Lit atoms and the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
 | **demo-next** | `moon run api-mock:start` + `moon run demo-next:dev` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
 | **demo-nuxt** | mock on `:8080`, then `moon run demo-nuxt:dev` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
-Storybook consumes the built `@zitadel/components` / `@zitadel/ui-react`
-artifacts, so rebuild after source changes (`moon run components:build`) or
+Storybook consumes the built `@zitadel/components` artifact, so rebuild
+after source changes (`moon run components:build`) or
 keep the Storybook dev server running — its tasks depend on the relevant
 build tasks.
 
@@ -190,7 +190,7 @@ embedding app wins:
 zitadel-login {
   --zl-color-text-primary-white: #101828;
   --zl-color-surface-default-primary-gray: #ffffff;
-  --zl-radius-m: 0.25rem;
+  --zl-radius-md: 0.25rem;
 }
 ```
 
@@ -363,7 +363,7 @@ packages/components/
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects
 ```
 
-The interactive workbench (atoms, paired React, and the `<zitadel-login>`
+The interactive workbench (the atoms and the `<zitadel-login>`
 orchestrator) lives in [`apps/storybook`](../../apps/storybook/README.md).
 
 ## Develop
@@ -379,7 +379,7 @@ corepack pnpm install
 
 # --- Workbench ---
 
-# Storybook: atoms, paired React, and the <zitadel-login> orchestrator
+# Storybook: the atoms and the <zitadel-login> orchestrator
 moon run storybook:dev
 # → http://localhost:6006
 

@@ -1,8 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
 
-import pageShellHost from "@zitadel/shared-component-styles/lit/page-shell-host.css?inline";
-import pageShellSurface from "@zitadel/shared-component-styles/page-shell.css?inline";
+import pageShellStyles from "./zl-page-shell.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
@@ -13,27 +12,15 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  * dark background, vertical centring, responsive padding, and footer
  * attribution slot.
  *
- * Spec lineage (file `xkvBjkOJ8ENuHdTGZHXezK`):
- *   - 2xl frames (1536 × 960), e.g. sign-up `6593:141741`, passkey
- *     `6594:630`, signed-in `6596:132844`. The outer wrapper uses
- *     `py-[52px]` (vertical padding) with `p-[16px]` (spacing-03) on
- *     the inner Form container, giving 52px / 16px at 2xl.
+ * Figma values, from the sign-in / sign-up / passkey-upsell frames:
  *
- * Per-state Figma values:
- *
- *   background  surface.default-black (#0f0f11)
- *   color       text.primary-white (#f4f4f6) inherited
- *   min-height  100vh — anchors footer to the viewport bottom even on
- *               short cards
- *   padding @md+   padding-block 52px, padding-inline 16px (matches
- *               Figma 2xl wrapper). 52px isn't a token; use raw value.
- *   padding @xs (< 48rem)
- *               padding-block 32px (spacing-05), padding-inline 16px
- *               (spacing-03) — tighter so the card breathes on
- *               narrow phones.
- *   gap         24px (spacing-04) between header / main / footer slots
- *   footer      min-height 1.5rem to reserve room for the attribution
- *               pill even when the slot is empty (prevents jitter).
+ *   background  --zl-background
+ *   color       --zl-foreground, inherited
+ *   min-height  100vh — anchors the trustmark to the viewport bottom even
+ *               behind a short card
+ *   padding     40px at the desktop frame (1280 wide), 24px below 48rem —
+ *               the mobile frame is 360 wide around a 312 card
+ *   gap         24px between header / main / footer slots (card → trustmark)
  *
  * All of the above is page chrome. In widget mode (`data-widget`, stamped
  * by the orchestrators whenever their `variant` is not `page`) the shell
@@ -46,7 +33,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 export class ZlPageShell extends LitElement {
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(pageShellHost, pageShellSurface),
+    ...surfaceStyles(pageShellStyles),
   ];
 
   override render() {

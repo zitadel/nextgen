@@ -1,0 +1,183 @@
+/* Styles for `<zl-checkbox>` — shadow host rules first, then the painted surface. */
+
+/* Lit-only: <zl-checkbox> host box model. Surface rules live in checkbox.css. */
+:host {
+  display: inline-flex;
+}
+:host([disabled]) {
+  cursor: not-allowed;
+}
+
+/* Shared surface for `<zl-checkbox>` / `<Checkbox>`. Lit-only rules: lit/checkbox-host.css */
+/* Figma masters: 8UjCXw8yemgljmbkWGrSfE / Checkbox 4387:460 · Checkbox / With Label 6634:1868 */
+/*
+ * Figma models the two checked states as a `style` variant (Outline = unchecked,
+ * Filled = checked) and the three interaction states (Hovered / Focused / Pressed)
+ * as a 32px circular halo behind the 16px box. Here checked is the real
+ * `:checked` input and the interaction states are real pseudo-classes
+ * (`:hover`, `:focus-visible`, `:active`); the `[data-state]` hooks are
+ * preview-only so the playground/stories can paint the full Figma matrix
+ * statically (they are not product API). Disabled is the `--disabled` modifier.
+ */
+/* Column wrapper: the checkbox row plus an optional inline error stacked below
+   (mirrors `.zr-field`'s root -> error layout). */
+.zr-checkbox-field {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--zl-spacing-1);
+}
+
+.zr-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  font-family: var(--zl-font-family-sans);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.zr-checkbox--disabled {
+  cursor: not-allowed;
+}
+
+/* Native control: visually hidden but focusable and form-associated. */
+.zr-checkbox__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.zr-checkbox__box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--zl-spacing-4);
+  height: var(--zl-spacing-4);
+}
+/* 32px circular hover/focus/pressed halo, painted behind the box face. */
+.zr-checkbox__box::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--zl-spacing-8);
+  height: var(--zl-spacing-8);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--zl-popover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--zl-duration-fast)
+    var(--zl-easing-standard);
+}
+
+.zr-checkbox__face {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zl-spacing-4);
+  height: var(--zl-spacing-4);
+  border: 1px solid var(--zl-input);
+  border-radius: var(--zl-radius-xs);
+  background: transparent;
+  transition:
+    border-color var(--zl-duration-fast) var(--zl-easing-standard),
+    background-color var(--zl-duration-fast) var(--zl-easing-standard);
+}
+
+.zr-checkbox__check {
+  display: inline-flex;
+  color: var(--zl-primary-foreground);
+  opacity: 0;
+}
+
+.zr-checkbox__label {
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-foreground);
+}
+
+/* Checked: the box fills with `primary` and the check takes its foreground —
+   the same pair the primary button uses. */
+.zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-primary);
+  background: var(--zl-primary);
+}
+.zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__check {
+  opacity: 1;
+}
+
+/* Halo on hover / focus / pressed. */
+.zr-checkbox:not(.zr-checkbox--disabled):hover .zr-checkbox__box::before,
+.zr-checkbox:not(.zr-checkbox--disabled):active .zr-checkbox__box::before,
+.zr-checkbox__input:focus-visible + .zr-checkbox__box::before,
+.zr-checkbox[data-state="hovered"] .zr-checkbox__box::before,
+.zr-checkbox[data-state="focused"] .zr-checkbox__box::before,
+.zr-checkbox[data-state="pressed"] .zr-checkbox__box::before {
+  opacity: 1;
+}
+
+/* Hover — the edge (and, when checked, the fill) drop to the muted tone. */
+.zr-checkbox:not(.zr-checkbox--disabled):hover .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox[data-state="hovered"] .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-muted-foreground);
+}
+.zr-checkbox:not(.zr-checkbox--disabled):hover .zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox[data-state="hovered"] .zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-muted-foreground);
+  background: var(--zl-muted-foreground);
+}
+
+/* Focus + pressed — the edge (and, when checked, the fill) take `primary`. */
+.zr-checkbox__input:focus-visible:not(:checked) + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox:not(.zr-checkbox--disabled):active .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox[data-state="focused"] .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox[data-state="pressed"] .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-primary);
+}
+.zr-checkbox__input:focus-visible:checked + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox:not(.zr-checkbox--disabled):active .zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox[data-state="focused"] .zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__face,
+.zr-checkbox[data-state="pressed"] .zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-primary);
+  background: var(--zl-primary);
+}
+.zr-checkbox__input:focus-visible + .zr-checkbox__box .zr-checkbox__face {
+  outline: none;
+}
+
+/* Disabled — muted edge (unchecked) / fill (checked), no halo, muted label. */
+.zr-checkbox--disabled .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-muted-foreground);
+}
+.zr-checkbox--disabled .zr-checkbox__input:checked + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-muted-foreground);
+  background: var(--zl-muted-foreground);
+}
+.zr-checkbox--disabled .zr-checkbox__label {
+  color: var(--zl-muted-foreground);
+}
+
+/* Invalid — red box edge (unchecked) so the error is visible on the control. */
+.zr-checkbox--invalid .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-destructive);
+}
+
+/* Inline error message under the checkbox row (mirrors .zr-field__error). */
+.zr-checkbox__error {
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-destructive);
+}

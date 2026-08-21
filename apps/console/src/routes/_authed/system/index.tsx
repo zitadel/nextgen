@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Alert } from "@zitadel/ui-react";
+import { CircleCheck } from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { api } from "../../../api/zitadel";
 import { Page } from "../../../components/layout";
@@ -19,8 +21,12 @@ function SystemHealth() {
   return (
     <Page>
       <PageHeader title="System" description="Server health" />
-      <Alert severity="success" heading="Healthy">
-        The Zitadel server is responding to health checks.
+      {/* `default` rather than a success variant: the design system's Alert ships
+          `default` and `destructive` only, and the check glyph carries the state. */}
+      <Alert>
+        <CircleCheck aria-hidden />
+        <AlertTitle>Healthy</AlertTitle>
+        <AlertDescription>The Zitadel server is responding to health checks.</AlertDescription>
       </Alert>
     </Page>
   );

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Pill } from "@zitadel/ui-react";
+
+import { StatusBadge } from "@/components/status-badge";
 
 import { api } from "../../../api/zitadel";
 import { getConsoleProjectId } from "../../../runtime/runtime";
@@ -46,9 +47,7 @@ function FlowDefinitionsList() {
           },
           {
             header: "Status",
-            cell: (definition) => (
-              <Pill tone={definition.status === "active" ? "success" : "neutral"}>{definition.status}</Pill>
-            ),
+            cell: (definition) => <StatusBadge status={definition.status} />,
           },
           { header: "Created", cell: (definition) => definition.created_at },
         ]}

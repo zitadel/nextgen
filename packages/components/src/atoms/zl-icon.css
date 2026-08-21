@@ -1,0 +1,42 @@
+/* Styles for `<zl-icon>` — shadow host rules first, then the painted surface. */
+
+/* Lit-only: <zl-icon> defers box metrics to inner .zr-icon. */
+:host {
+  display: contents;
+  color: inherit;
+}
+
+/* Shared surface for `<zl-icon>` / `<Icon>`. Lit-only rules: lit/icon-host.css */
+.zr-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zl-icon-size, 1.5rem);
+  height: var(--zl-icon-size, 1.5rem);
+}
+.zr-icon--16 {
+  --zl-icon-size: 1rem;
+}
+.zr-icon--24 {
+  --zl-icon-size: 1.5rem;
+}
+.zr-icon--tone-error {
+  color: var(--zl-destructive);
+}
+.zr-icon--tone-success {
+  color: var(--zl-success);
+}
+.zr-icon--tone-disabled {
+  color: var(--zl-muted-foreground);
+}
+.zr-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.zr-icon--spin svg {
+  animation: zr-icon-spin 800ms linear infinite;
+}
+@keyframes zr-icon-spin {
+  to { transform: rotate(360deg); }
+}

@@ -22,12 +22,6 @@
       "path": "./packages/sdk-next"
     },
     {
-      "path": "./packages/ui-react"
-    },
-    {
-      "path": "./packages/shared-component-styles"
-    },
-    {
       "path": "./apps/cli"
     },
     {

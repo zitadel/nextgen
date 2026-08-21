@@ -1,5 +1,4 @@
 ---
-"@zitadel/shared-component-styles": patch
 "@zitadel/components": patch
 ---
 

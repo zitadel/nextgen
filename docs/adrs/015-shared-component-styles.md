@@ -1,6 +1,10 @@
 # ADR 015: Shared component styles for paired Lit/React components
 
-> **Status:** Accepted — 2026-05-20
+> **Status:** Superseded by [ADR 055](./055-lit-only-login-surface.md) — 2026-05-20
+
+> With no React pair left to share with, the surface/host split had nothing to
+> reconcile: each atom's CSS now lives beside it as
+> `packages/components/src/atoms/zl-<atom>.css`.
 
 ## Context
 

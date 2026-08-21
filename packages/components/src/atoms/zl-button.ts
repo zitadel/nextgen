@@ -2,8 +2,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import buttonHost from "@zitadel/shared-component-styles/lit/button-host.css?inline";
-import buttonSurface from "@zitadel/shared-component-styles/button.css?inline";
+import buttonStyles from "./zl-button.css?inline";
 
 import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
@@ -76,7 +75,7 @@ export class ZlButton extends LitElement {
 
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(buttonHost, buttonSurface),
+    ...surfaceStyles(buttonStyles),
   ];
 
   @property({ reflect: true }) accessor hierarchy: "primary" | "secondary" | "text" = "primary";
