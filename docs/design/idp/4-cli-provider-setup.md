@@ -398,7 +398,7 @@ Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutabl
 
 * **`validate()`:** Evaluates against the meta-schema and validator rules from Areas 1 and 2, executing `assertEnvRefs` with the [`E_CREDENTIAL_MISSING`](#missing-credentials) split.
 * **`create()` / `update()`:** `create()` posts `POST /idps`; `update()` publishes a new immutable revision under the unique connection id via `PUT /idps/{id}`. Both depend on the CRUD API landing. Until it exists, journey file generation, validation, and `plan` previews function independently.
-* **`delete()`:** Calls `DELETE /idps/{id}`. Deletion is settled as tombstoning, so a local file delete schedules a platform delete unconditionally.
+* **`delete()`:** Calls `DELETE /idps/{id}`. A local file delete schedules a platform delete; what the server does with it is the open deletion question (area 1, Open Points).
 
 ### Execution Handoff
 

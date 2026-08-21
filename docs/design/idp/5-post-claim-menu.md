@@ -251,7 +251,7 @@ Updates to existing CLI hints to drive menu discovery:
 - **Pre-claim / Local Menus:** Potential future variants for uninitialized directories or local-dev (currently fall back to help).
 - **Environment Selection:** Adding environment prompting into Preview/Apply when multi-environment support lands (#534).
 - **Project-name Caching:** Investigating if live `getProject` reads make the menu initialization feel slow.
-- **Inert Connections:** Deletion semantics are settled as tombstoning; what remains open is only the local UX: whether removing the last provider should prompt to delete the connection file.
+- **Inert Connections:** Deletion semantics are open (area 1, Open Points); the local UX question is separate: whether removing the last provider should prompt to delete the connection file.
 
 ## Related
 
