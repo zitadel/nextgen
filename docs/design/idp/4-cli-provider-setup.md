@@ -109,14 +109,14 @@ Following Area 1's principle that "vendor knowledge is data," the catalog is a b
 | Field | Purpose & Usage |
 | :--- | :--- |
 | **Protocol Block**<br>*(endpoints/issuer, pins, scopes, `supplementary_fetch`, `verified_claims` defaults)* | Populates connection files based on Area 1's test-verified examples, injecting the prompted `client_id` and the intersection of the claim table with the active schema (`claim_mapping`). |
-| **Claim Table**<br>*(schema property concept → provider claim name)* | Drives `claim_mapping` generation by intersecting its rows with schema properties, ensuring the generator only emits mapping targets relevant to the selected use case. |
+| **Claim Table**<br>*(schema property name → provider claim name)* | Authored per provider, like the rest of the catalog entry, not derived: each row pairs one of our property names with the provider's documented claim, cross-checked against zitadel/zitadel's provider packages. At scaffold the rows whose key the active schema defines become the connection's `claim_mapping`. |
 | **Display Name & `template`** | Populates `sso_providers` step entries and CLI console output. |
 | **Console URL & Docs URL** | Surfaced during the announce step and within error envelopes. |
 | **Callback Guidance**<br>*(multi-URI client vs. app-per-environment)* | Surfaced during the announce step to guide developer app registration. |
 
 ### Mapping Defaults
 
-The default slug matches the catalog key. For the default schema, `email` is mapped across both providers; use-case properties (`givenName`, `familyName`) are added whenever present in both the target schema and the provider's claim table (GitHub has no `familyName` source, and its `givenName` maps to the full-name `name` claim; see area 1's claim-mapping caveat).
+The default slug matches the catalog key. For the default schema, `email` is mapped across both providers; use-case properties (`givenName`, `familyName`) are added whenever present in both the target schema and the provider's claim table (GitHub has no `familyName` source, and its `givenName` maps to the full-name `name` claim; see area 1's claim-mapping caveat). Properties the claim table does not know stay unmapped. The setup summary names the schema's required properties that got no mapping, so the tenant can add rows or accept that the collection step asks for them.
 
 ## Credential Capture
 
