@@ -80,16 +80,43 @@ umbrella for both kinds, and `policyRef` (which kind of control does it referenc
 - **Con:** two files to understand instead of one.
 - **Con:** a new failure mode — an unresolvable handle. It must fail at publish.
 
-### Option C — A block in `zitadel.json`
+### Option C — One file per method, project-wide, no reference
 
-- **Pro:** no new resource kind.
-- **Con:** `zitadel.json` is local project configuration, not a published resource, so
-  it cannot be pinned in a release or promoted between environments.
+```
+.zitadel/policies/password.json
+.zitadel/policies/passkey.json
+```
+
+The schema declares only availability; the file for that method applies to the whole
+project.
+
+- **Pro:** nothing to reference and nothing to resolve.
+- **Pro:** one obvious place per method.
+- **Con:** no divergence. Admins and customers cannot have different password rules,
+  which is the case that motivates a separate resource at all.
+- **Con:** adding a per-schema override later turns this into Option B anyway, with a
+  resolution order to explain.
+
+### Option D — One file for everything
+
+```json
+// .zitadel/policies.json
+{ "password": { "minLength": 10 }, "passkey": { "userVerification": "required" } }
+```
+
+- **Pro:** smallest footprint — one file, one revision, one diff for a security review.
+- **Con:** a single resource whose revision churns on unrelated edits.
+- **Con:** no way to reference one method's rules individually or reuse them.
+- **Con:** same lack of divergence as Option C.
 
 **Decision: Option B.** It is the only option that lets different user types have
 different rules while keeping one rule in one place, and it matches the second branch
 of #899's open decision — configuration has its own owner and *applies to* users of a
 schema, rather than being owned by the schema.
+
+Options C and D are strictly simpler and forfeit only per-user-type divergence. If the
+milestone must be smaller, D is the cheapest thing that could work, and B remains
+reachable from it by adding an optional reference.
 
 ## Decision 2 — One resource kind or two?
 
@@ -120,29 +147,6 @@ them at authoring time is honest. Option A is defensible if the milestone must b
 smaller; it is reachable back from B, and B is not reachable back from A without a
 breaking move.
 
-## Decision 3 — How is a control bound?
-
-### Option A — Project-wide, no reference
-
-- **Pro:** nothing to reference, nothing to resolve.
-- **Con:** admins and customers cannot have different password rules, which is the
-  case that motivates the resource.
-
-### Option B — Explicit reference only
-
-- **Pro:** always unambiguous.
-- **Con:** a single-schema project must write a reference to say nothing interesting.
-
-### Option C — Built-in default plus optional reference (chosen)
-
-- **Pro:** a schema that says nothing gets a documented built-in default, so the
-  simple project stays simple.
-- **Pro:** a schema that needs to differ names a policy.
-- **Con:** two resolution paths to document.
-
-**Decision: Option C.** #899 requires every control to define its behaviour when no
-explicit configuration exists; a built-in default is that definition.
-
 ## Consequences
 
 - The resource is revisioned-immutable from the start and travels in the ADR 035
@@ -151,12 +155,19 @@ explicit configuration exists; a built-in default is that definition.
   release validation, not at authentication time.
 - Availability of a method stays in `x-auth-methods` — it is a setting and it is
   already there. Only behaviour moves out.
+- A schema that names no policy gets a documented built-in default, so a
+  single-schema project never has to write a reference to say nothing interesting.
+  #899 requires every control to define its behaviour when no explicit configuration
+  exists, and the built-in default is that definition.
 
 ## Open
 
 - How a user schema declares that a user type may use a given identity provider. It
   is a setting under this vocabulary, it is undefined today, and both #898 and
-  [#851](https://github.com/zitadel/nextgen/issues/851) depend on it.
+  [#851](https://github.com/zitadel/nextgen/issues/851) depend on it. Today
+  `x-auth-methods` accepts only `password`, `passkey`, `magic_link`, `sso` and `otp`,
+  under `additionalProperties: false` — so a per-provider key such as `idp-google`
+  does not validate.
 - When a promoted change becomes effective for users who already exist. Raising a
   minimum password length does not say what happens to shorter passwords already in
   use. #899 requires every control to answer this.
