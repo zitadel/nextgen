@@ -28,6 +28,16 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// BeginUserPasskeyRegistration invokes beginUserPasskeyRegistration operation.
+	//
+	// Starts a WebAuthn registration ceremony for the user and returns the
+	// creation options for `navigator.credentials.create()`. Complete the
+	// ceremony with `POST /users/{user_id}/passkeys/{registration_id}` within
+	// five minutes. Credentials already registered for the user are excluded
+	// automatically.
+	//
+	// POST /users/{user_id}/passkeys
+	BeginUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error)
 	// CompleteClaim invokes completeClaim operation.
 	//
 	// Called by the browser after the developer authenticates on the claim page.
@@ -195,6 +205,16 @@ type Invoker interface {
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
+	// FinishUserPasskeyRegistration invokes finishUserPasskeyRegistration operation.
+	//
+	// Verifies the attestation against the ceremony started by
+	// `POST /users/{user_id}/passkeys` and persists the new credential. A
+	// rejected attestation counts against the ceremony's failure budget and the
+	// ceremony stays open for a retry; an expired or unknown ceremony surfaces
+	// as `att.stale_challenge`.
+	//
+	// POST /users/{user_id}/passkeys/{registration_id}
+	FinishUserPasskeyRegistration(ctx context.Context, request *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (FinishUserPasskeyRegistrationRes, error)
 	// GetAuthAttempt invokes getAuthAttempt operation.
 	//
 	// Polls the current state of an authentication attempt.
@@ -538,6 +558,151 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
+}
+
+// BeginUserPasskeyRegistration invokes beginUserPasskeyRegistration operation.
+//
+// Starts a WebAuthn registration ceremony for the user and returns the
+// creation options for `navigator.credentials.create()`. Complete the
+// ceremony with `POST /users/{user_id}/passkeys/{registration_id}` within
+// five minutes. Credentials already registered for the user are excluded
+// automatically.
+//
+// POST /users/{user_id}/passkeys
+func (c *Client) BeginUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error) {
+	res, err := c.sendBeginUserPasskeyRegistration(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (res BeginUserPasskeyRegistrationRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("beginUserPasskeyRegistration"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/users/{user_id}/passkeys"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, BeginUserPasskeyRegistrationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/users/"
+	{
+		// Encode "user_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "user_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.UserID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/passkeys"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeBeginUserPasskeyRegistrationRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, BeginUserPasskeyRegistrationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeBeginUserPasskeyRegistrationResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
 }
 
 // CompleteClaim invokes completeClaim operation.
@@ -2546,6 +2711,160 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 
 	stage = "DecodeResponse"
 	result, err := decodeExchangeHandoffResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// FinishUserPasskeyRegistration invokes finishUserPasskeyRegistration operation.
+//
+// Verifies the attestation against the ceremony started by
+// `POST /users/{user_id}/passkeys` and persists the new credential. A
+// rejected attestation counts against the ceremony's failure budget and the
+// ceremony stays open for a retry; an expired or unknown ceremony surfaces
+// as `att.stale_challenge`.
+//
+// POST /users/{user_id}/passkeys/{registration_id}
+func (c *Client) FinishUserPasskeyRegistration(ctx context.Context, request *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (FinishUserPasskeyRegistrationRes, error) {
+	res, err := c.sendFinishUserPasskeyRegistration(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendFinishUserPasskeyRegistration(ctx context.Context, request *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (res FinishUserPasskeyRegistrationRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("finishUserPasskeyRegistration"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/users/{user_id}/passkeys/{registration_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, FinishUserPasskeyRegistrationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [4]string
+	pathParts[0] = "/users/"
+	{
+		// Encode "user_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "user_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.UserID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/passkeys/"
+	{
+		// Encode "registration_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "registration_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.RegistrationID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[3] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeFinishUserPasskeyRegistrationRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, FinishUserPasskeyRegistrationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeFinishUserPasskeyRegistrationResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

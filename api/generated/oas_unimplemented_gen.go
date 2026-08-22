@@ -13,6 +13,19 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
+//
+// Starts a WebAuthn registration ceremony for the user and returns the
+// creation options for `navigator.credentials.create()`. Complete the
+// ceremony with `POST /users/{user_id}/passkeys/{registration_id}` within
+// five minutes. Credentials already registered for the user are excluded
+// automatically.
+//
+// POST /users/{user_id}/passkeys
+func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, req *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (r BeginUserPasskeyRegistrationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CompleteClaim implements completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
@@ -222,6 +235,19 @@ func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUse
 //
 // POST /sessions/exchange
 func (UnimplementedHandler) ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (r ExchangeHandoffRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// FinishUserPasskeyRegistration implements finishUserPasskeyRegistration operation.
+//
+// Verifies the attestation against the ceremony started by
+// `POST /users/{user_id}/passkeys` and persists the new credential. A
+// rejected attestation counts against the ceremony's failure budget and the
+// ceremony stays open for a retry; an expired or unknown ceremony surfaces
+// as `att.stale_challenge`.
+//
+// POST /users/{user_id}/passkeys/{registration_id}
+func (UnimplementedHandler) FinishUserPasskeyRegistration(ctx context.Context, req *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (r FinishUserPasskeyRegistrationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -16,6 +16,86 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
+// BeginUserPasskeyRegistrationParams is parameters of beginUserPasskeyRegistration operation.
+type BeginUserPasskeyRegistrationParams struct {
+	UserID UserID
+}
+
+func unpackBeginUserPasskeyRegistrationParams(packed middleware.Parameters) (params BeginUserPasskeyRegistrationParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
+	return params
+}
+
+func decodeBeginUserPasskeyRegistrationParams(args [1]string, argsEscaped bool, r *http.Request) (params BeginUserPasskeyRegistrationParams, _ error) {
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // CompleteClaimParams is parameters of completeClaim operation.
 type CompleteClaimParams struct {
 	ProjectID ProjectID
@@ -1016,6 +1096,139 @@ func decodeExchangeHandoffParams(args [0]string, argsEscaped bool, r *http.Reque
 		return params, &ogenerrors.DecodeParamError{
 			Name: "Idempotency-Key",
 			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// FinishUserPasskeyRegistrationParams is parameters of finishUserPasskeyRegistration operation.
+type FinishUserPasskeyRegistrationParams struct {
+	UserID         UserID
+	RegistrationID string
+}
+
+func unpackFinishUserPasskeyRegistrationParams(packed middleware.Parameters) (params FinishUserPasskeyRegistrationParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "registration_id",
+			In:   "path",
+		}
+		params.RegistrationID = packed[key].(string)
+	}
+	return params
+}
+
+func decodeFinishUserPasskeyRegistrationParams(args [2]string, argsEscaped bool, r *http.Request) (params FinishUserPasskeyRegistrationParams, _ error) {
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: registration_id.
+	if err := func() error {
+		param := args[1]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[1])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "registration_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.RegistrationID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "registration_id",
+			In:   "path",
 			Err:  err,
 		}
 	}

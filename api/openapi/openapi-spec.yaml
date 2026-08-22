@@ -59,6 +59,8 @@ paths:
     $ref: endpoints/users/by_id/methods.yaml
   /users/{user_id}/passkeys:
     $ref: endpoints/users/by_id/passkeys/methods.yaml
+  /users/{user_id}/passkeys/{registration_id}:
+    $ref: endpoints/users/by_id/passkeys/by_id/methods.yaml
   /users/{user_id}/password:
     $ref: endpoints/users/by_id/password/methods.yaml
   /users/{user_id}/teams:
