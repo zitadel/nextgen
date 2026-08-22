@@ -14,10 +14,6 @@ type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
 }
 
-type FlowPasskeyUserCreater interface {
-	CreateProvisionalUser(ctx context.Context, userID string, state *FlowState) error
-}
-
 // ManifestForOnSuccess returns the credential kinds a mutation establishes.
 // Dispatch (verify-vs-skip) and the validator (upstream-collects check)
 // both read this table.

@@ -271,10 +271,11 @@ func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 //
 // With a pinned user factor the enrollment targets that user (requestedUserID
 // must match when set) and the ceremony is not provisional. Without one the
-// ceremony is provisional: the user row is created when the attestation is
-// verified. A non-empty requestedUserID is honored there so a re-issued
-// challenge keeps the previously minted user handle; an empty one signals the
-// caller to mint a fresh handle.
+// ceremony is provisional as far as the attempt can tell: the caller must
+// refine a non-empty requestedUserID against the user store, since it is
+// either a previously minted handle on a re-issued challenge (still
+// provisional) or an existing user pinned only in flow state (not
+// provisional). An empty handle signals the caller to mint a fresh one.
 func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string) (userID string, provisional bool, err error) {
 	if err := a.PrepareChallenge(AuthCheckTypePasskeyRegistration); err != nil {
 		return "", false, err

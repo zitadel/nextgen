@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -64,12 +65,6 @@ type AuthAttemptService interface {
 	//
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error)
-
-	// RegisterCreatedUser registers a newly-created user's ID as a verified user
-	// factor directly on the auth attempt, bypassing the challenge/proof cycle.
-	// Used after on_success: create_user and passkey registration so the session
-	// receives user_id after exchange.
-	RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error
 }
 
 // ---- Input types -------------------------------------------------------------
@@ -393,28 +388,6 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 	return attempt, nil
 }
 
-// RegisterCreatedUser registers a newly-created user's ID as a verified user
-// factor on the auth attempt without a challenge/proof cycle. It issues a
-// synthetic user challenge and immediately marks it succeeded so the exchange
-// can promote the user_id to the session.
-func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
-	if err != nil {
-		return err
-	}
-	challenge := &domain.AuthChallengeUser{}
-	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
-			return err
-		}
-		factor := &domain.AuthFactorUser{UserID: userID}
-		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID()); err != nil {
-			return err
-		}
-		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
-	})
-}
-
 func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, succeeded bool) error {
 	eventType := domain.EventTypeAuthCheckFailed
 	if succeeded {
@@ -433,6 +406,35 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.A
 			AuthAttemptID: attempt.ID,
 		},
 	})
+}
+
+const passkeyRegistrationDefaultUsername = "Passkey account"
+
+// passkeyRegistrationLabels normalizes the browser-visible labels for a
+// registration ceremony: a neutral default when no identifier was collected,
+// and the username doubling as display name when only it is known.
+func passkeyRegistrationLabels(username, displayName string) (string, string) {
+	username = strings.TrimSpace(username)
+	displayName = strings.TrimSpace(displayName)
+	if username == "" {
+		return passkeyRegistrationDefaultUsername, ""
+	}
+	if displayName == "" {
+		displayName = username
+	}
+	return username, displayName
+}
+
+func parseOrigins(raw []string) ([]url.URL, error) {
+	origins := make([]url.URL, 0, len(raw))
+	for _, o := range raw {
+		u, err := url.Parse(o)
+		if err != nil {
+			return nil, fmt.Errorf("parse origin %q: %w", o, err)
+		}
+		origins = append(origins, *u)
+	}
+	return origins, nil
 }
 
 // buildChallenge constructs the challenge for the given check type.
@@ -472,6 +474,22 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 		userID, provisional, err := attempt.PreparePasskeyRegistrationChallenge(typ.UserID)
 		if err != nil {
 			return nil, err
+		}
+		if provisional && userID != "" {
+			// No user factor is pinned but the caller supplied a handle: either
+			// an existing user (e.g. enrollment right after a discoverable
+			// passkey login, which pins no user check row) or a previously
+			// minted handle on a re-issued provisional challenge. The user row
+			// decides which.
+			_, err := s.stmts.Statements().GetUser(ctx, database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), attempt.ProjectID),
+				database.Equal(database.Col(domain.UserFieldID), userID),
+			), UserQueryOptions{})
+			if err == nil {
+				provisional = false
+			} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+				return nil, domain.ErrInternal(err).WithMessage("failed to resolve registration user")
+			}
 		}
 		if userID == "" {
 			userID, err = s.stmts.Statements().NewManagedID(string(domain.PrefixUser))

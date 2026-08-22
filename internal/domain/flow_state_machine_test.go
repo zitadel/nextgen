@@ -38,14 +38,12 @@ func findAction(actions []domain.FlowAction, name string) (domain.FlowAction, bo
 // registry + handlers + state machine, sharing the fakes the test
 // inspects after a run.
 type flowTestWorld struct {
-	mock                 *gomock.Controller
-	hasher               *cryptomock.MockHasher
-	authAttemptService   *domainmock.MockFlowAuthAttemptService
-	passkeyRegService    *domainmock.MockFlowPasskeyRegistrationService
-	schemaResolver       *domainmock.MockSchemaResolver
-	createUser           *domainmock.MockFlowOnSuccessHandler
-	createUserForPasskey *domainmock.MockFlowPasskeyUserCreater
-	sm                   *domain.FlowStateMachineRuntime
+	mock               *gomock.Controller
+	hasher             *cryptomock.MockHasher
+	authAttemptService *domainmock.MockFlowAuthAttemptService
+	schemaResolver     *domainmock.MockSchemaResolver
+	createUser         *domainmock.MockFlowOnSuccessHandler
+	sm                 *domain.FlowStateMachineRuntime
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
@@ -61,9 +59,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
 	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
-	passkeyRegService := domainmock.NewMockFlowPasskeyRegistrationService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
-	createUserForPasskey := domainmock.NewMockFlowPasskeyUserCreater(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -74,21 +70,17 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		schemaStore,
 		resolver,
 		createUser,
-		createUserForPasskey,
 		authAttemptService,
-		passkeyRegService,
 		now,
 	)
 
 	return &flowTestWorld{
-		mock:                 mock,
-		hasher:               hasher,
-		schemaResolver:       schemaResolver,
-		authAttemptService:   authAttemptService,
-		passkeyRegService:    passkeyRegService,
-		createUser:           createUser,
-		createUserForPasskey: createUserForPasskey,
-		sm:                   sm,
+		mock:               mock,
+		hasher:             hasher,
+		schemaResolver:     schemaResolver,
+		authAttemptService: authAttemptService,
+		createUser:         createUser,
+		sm:                 sm,
 	}
 }
 
@@ -219,11 +211,6 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 				in.State.CollectedData.AuthMethods.Password == password
 		})).
 		Return(domain.FlowOnSuccessResult{UserID: userID}, nil)
-	w.authAttemptService.EXPECT().
-		RegisterCreatedUser(gomock.Any(), gomock.Cond(func(in domain.FlowRegisterCreatedUserInput) bool {
-			return in.UserID == userID
-		})).
-		Times(1)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
 		Return(domain.FlowHandoffOutput{
@@ -562,7 +549,6 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Any()).
 		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
-	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 
 	def := signupDefinition()
 	// Mutate the submit transition to point at a non-existent step.
@@ -601,7 +587,6 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Any()).
 		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
-	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 
 	def := signupDefinition()
 
@@ -1634,7 +1619,6 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 			return in.State.CollectedData.UserData["email"] == email
 		})).
 		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
-	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
 		Return(domain.FlowHandoffOutput{
@@ -1728,7 +1712,6 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 			return in.State.CollectedData.UserData["email"] == email
 		})).
 		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
-	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
 		Return(domain.FlowHandoffOutput{
@@ -1955,24 +1938,22 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.createUserForPasskey.EXPECT().
-		CreateProvisionalUser(gomock.Any(), userID, gomock.Any()).
-		Times(1)
-	w.passkeyRegService.EXPECT().
+	w.authAttemptService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Empty(t, in.UserID)
+			return assert.Equal(t, "attempt-1", in.AttemptID) && assert.Empty(t, in.UserID)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
 			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
-	w.passkeyRegService.EXPECT().
+	w.authAttemptService.EXPECT().
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
-			return assert.Equal(t, challengeID, in.ChallengeID) &&
+			return assert.Equal(t, "attempt-1", in.AttemptID) &&
+				assert.Equal(t, userID, in.UserID) &&
+				assert.Equal(t, challengeID, in.ChallengeID) &&
 				assert.Equal(t, proof, string(in.Attestation))
 		}))
-	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
 		Return(domain.FlowHandoffOutput{
@@ -2029,15 +2010,16 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.passkeyRegService.EXPECT().
+	w.authAttemptService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
 			return assert.Equal(t, userID, in.UserID)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
+			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
-	w.passkeyRegService.EXPECT().
+	w.authAttemptService.EXPECT().
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
 			return assert.Equal(t, challengeID, in.ChallengeID) &&
 				assert.Equal(t, proof, string(in.Attestation))
@@ -2076,9 +2058,9 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 }
 
 // TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID verifies that
-// when no user is identified yet (passkey-only registration path), the passkey
-// service mints a provisional user ID (returned on the issue output) and the
-// state machine stores it for the verify phase.
+// when no user is identified yet (passkey-only registration path), the attempt
+// service mints a provisional user handle (returned on the issue output) and
+// the state machine stores it for the verify phase.
 func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	t.Parallel()
 	const challengeID = "reg-1"
@@ -2088,7 +2070,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.passkeyRegService.EXPECT().
+	w.authAttemptService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
 			return assert.Empty(t, in.UserID) &&
 				assert.Empty(t, in.Username) &&
@@ -2115,7 +2097,6 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)
 	assert.Equal(t, userID, issued.State.CollectedData.UserID)
-	assert.True(t, issued.State.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey)
 }
 
 func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDisplay(t *testing.T) {
@@ -2138,7 +2119,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDispl
 				assert.Equal(t, email, in.Value)
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
-	w.passkeyRegService.EXPECT().
+	w.authAttemptService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
 			return assert.Empty(t, in.UserID) &&
 				assert.Equal(t, email, in.Username) &&
@@ -2627,7 +2608,6 @@ func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Any()).
 		Return(domain.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil)
-	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any()).Times(1)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
 		Return(domain.FlowHandoffOutput{Token: "handoff_01TEST", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
@@ -3201,7 +3181,6 @@ func TestFlowStateMachine_Process_RegistrationCompletesAfterNavSwitch(t *testing
 			return in.State.CollectedData.UserData["email"] == email
 		})).
 		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
-	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
 		Return(domain.FlowHandoffOutput{
@@ -3305,8 +3284,8 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	require.NoError(t, err)
 	require.Equal(t, "identifier", back.State.CurrentStep)
 
-	// "Sign up" must start register mode fresh: no resolved user, no
-	// collected credential material, no provisional passkey marker.
+	// "Sign up" must start register mode fresh: no resolved user and no
+	// collected credential material.
 	toRegister, err := w.sm.Process(t.Context(), def, back.State, domain.FlowSubmitInput{
 		Action: "register",
 	})
@@ -3318,7 +3297,6 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	assert.Empty(t, toRegister.State.CollectedData.UserID,
 		"the login-resolved user must not survive a declared re-purpose")
 	assert.Empty(t, toRegister.State.CollectedData.AuthMethods.Password)
-	assert.False(t, toRegister.State.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey)
 
 	// Re-identifying the same existing email in register mode routes
 	// through user_already_exists into password verification.
