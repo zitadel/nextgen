@@ -473,6 +473,13 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 		if err != nil {
 			return nil, err
 		}
+		// A provisional handle becomes a user id at verification, so it must
+		// be server-minted: keep a caller-supplied handle only when it matches
+		// the attempt's own in-flight provisional ceremony (a re-issued
+		// challenge); any other handle is replaced by a fresh mint.
+		if provisional && userID != "" && !attempt.HasProvisionalRegistrationHandle(userID) {
+			userID = ""
+		}
 		if userID == "" {
 			userID, err = s.stmts.Statements().NewManagedID(string(domain.PrefixUser))
 			if err != nil {
