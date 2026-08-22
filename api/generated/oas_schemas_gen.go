@@ -6063,6 +6063,61 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type ClaimNoPersonalTeam struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimNoPersonalTeamDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimNoPersonalTeam) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimNoPersonalTeam) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimNoPersonalTeam) GetDetails() OptClaimNoPersonalTeamDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimNoPersonalTeam) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimNoPersonalTeam) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimNoPersonalTeam) SetDetails(val OptClaimNoPersonalTeamDetails) {
+	s.Details = val
+}
+
+func (*ClaimNoPersonalTeam) completeClaimRes() {}
+
+// Additional error-specific context.
+type ClaimNoPersonalTeamDetails map[string]jx.Raw
+
+func (s *ClaimNoPersonalTeamDetails) init() ClaimNoPersonalTeamDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // A completed claim. Carries the owning team, when the claim landed, and the
 // dashboard where it can be managed, so a generated client can rely on those
 // fields being present whenever `status` is `completed`.
@@ -21264,6 +21319,52 @@ func (o OptChallengeResponsePayload) Get() (v ChallengeResponsePayload, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptChallengeResponsePayload) Or(d ChallengeResponsePayload) ChallengeResponsePayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimNoPersonalTeamDetails returns new OptClaimNoPersonalTeamDetails with value set to v.
+func NewOptClaimNoPersonalTeamDetails(v ClaimNoPersonalTeamDetails) OptClaimNoPersonalTeamDetails {
+	return OptClaimNoPersonalTeamDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimNoPersonalTeamDetails is optional ClaimNoPersonalTeamDetails.
+type OptClaimNoPersonalTeamDetails struct {
+	Value ClaimNoPersonalTeamDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimNoPersonalTeamDetails was set.
+func (o OptClaimNoPersonalTeamDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimNoPersonalTeamDetails) Reset() {
+	var v ClaimNoPersonalTeamDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimNoPersonalTeamDetails) SetTo(v ClaimNoPersonalTeamDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimNoPersonalTeamDetails) Get() (v ClaimNoPersonalTeamDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimNoPersonalTeamDetails) Or(d ClaimNoPersonalTeamDetails) ClaimNoPersonalTeamDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

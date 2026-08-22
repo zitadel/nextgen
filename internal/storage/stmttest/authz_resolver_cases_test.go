@@ -324,18 +324,10 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			assert.False(t, allowed)
 		})
 
-		t.Run("check ttu membership shortcut expired tupleset deny", func(t *testing.T) {
-			u := "user_ttu_exp_" + uniqueSuffix(t)
-			team := "team_ttu_exp_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
-			a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())
-			past := time.Now().Add(-time.Hour)
-			a.ExpiresAt = &past
-			createOwningTeamGrant(t, d.stmts, a)
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
-			assert.False(t, allowed)
-		})
+		// An expired project.team tupleset row is unrepresentable: the schema
+		// CHECK forbids expires_at on owning-team grants (ADR 054 §2, pinned in
+		// TestClaimStatements_OwningTeamGrant). The resolver's expiry filter
+		// stays covered by "check ttu general expired source grant deny".
 
 		t.Run("check ttu membership shortcut revoked tupleset deny", func(t *testing.T) {
 			u := "user_ttu_rev_" + uniqueSuffix(t)
