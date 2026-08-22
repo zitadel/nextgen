@@ -272,9 +272,11 @@ func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 // With a pinned user factor the enrollment targets that user (requestedUserID
 // must match when set) and the ceremony is not provisional. Without one the
 // ceremony is provisional: the user row is created when the attestation is
-// verified. A non-empty requestedUserID is honored there so a re-issued
-// challenge keeps the previously minted user handle; an empty one signals the
-// caller to mint a fresh handle.
+// verified. A non-empty requestedUserID is passed through for the caller to
+// vet — the service keeps it only when
+// [AuthAttempt.HasProvisionalRegistrationHandle] confirms it is the handle of
+// the attempt's own in-flight ceremony (a re-issued challenge), and mints a
+// fresh handle otherwise, so a caller-chosen id never becomes a user id.
 func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string) (userID string, provisional bool, err error) {
 	if err := a.PrepareChallenge(AuthCheckTypePasskeyRegistration); err != nil {
 		return "", false, err
@@ -287,6 +289,20 @@ func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string
 		return userCheck.UserID, false, nil
 	}
 	return requestedUserID, true, nil
+}
+
+// HasProvisionalRegistrationHandle reports whether the attempt's current
+// registration challenge is provisional and carries the given user handle.
+// This is the only situation in which a caller-supplied handle is known to be
+// server-minted, so a re-issued challenge may keep it; any other unknown
+// handle must be replaced by a fresh mint, never adopted.
+func (a *AuthAttempt) HasProvisionalRegistrationHandle(userID string) bool {
+	challenge, ok := a.ChallengeByType(AuthCheckTypePasskeyRegistration)
+	if !ok {
+		return false
+	}
+	registration, ok := challenge.(*AuthChallengePasskeyRegistration)
+	return ok && registration.Provisional && registration.UserID == userID
 }
 
 // SetUserChallenge registers a new user challenge on the attempt, replacing any existing challenge of the same type.
