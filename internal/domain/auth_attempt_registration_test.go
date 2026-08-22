@@ -79,6 +79,35 @@ func TestAuthAttempt_PreparePasskeyRegistrationChallenge(t *testing.T) {
 	})
 }
 
+func TestAuthAttempt_HasProvisionalRegistrationHandle(t *testing.T) {
+	newChallenge := func(userID string, provisional bool) *domain.AuthChallengePasskeyRegistration {
+		challenge := domain.SetAuthChallengePasskeyRegistration("ch-reg-1", time.Now(), time.Time{}, 0)
+		challenge.UserID = userID
+		challenge.Provisional = provisional
+		return challenge
+	}
+
+	t.Run("matches the in-flight provisional handle", func(t *testing.T) {
+		attempt := &domain.AuthAttempt{Checks: []domain.AuthCheck{newChallenge("user_minted01", true)}}
+		assert.True(t, attempt.HasProvisionalRegistrationHandle("user_minted01"))
+	})
+
+	t.Run("rejects a different handle", func(t *testing.T) {
+		attempt := &domain.AuthAttempt{Checks: []domain.AuthCheck{newChallenge("user_minted01", true)}}
+		assert.False(t, attempt.HasProvisionalRegistrationHandle("user_other"))
+	})
+
+	t.Run("rejects a non-provisional ceremony's handle", func(t *testing.T) {
+		attempt := &domain.AuthAttempt{Checks: []domain.AuthCheck{newChallenge("user-1", false)}}
+		assert.False(t, attempt.HasProvisionalRegistrationHandle("user-1"))
+	})
+
+	t.Run("rejects when no registration challenge exists", func(t *testing.T) {
+		attempt := &domain.AuthAttempt{}
+		assert.False(t, attempt.HasProvisionalRegistrationHandle("user_minted01"))
+	})
+}
+
 func TestAuthAttempt_PreparePasskeyRegistrationVerification(t *testing.T) {
 	newRegistrationAttempt := func(challengedAt time.Time) (*domain.AuthAttempt, *domain.AuthChallengePasskeyRegistration) {
 		challenge := domain.SetAuthChallengePasskeyRegistration("ch-reg-1", challengedAt, time.Time{}, 0)
