@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"net/url"
 	"testing"
 	"time"
@@ -232,6 +233,12 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 	t.Run("provisional creates user, credential, and factors in one transaction", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAllStatements(ctrl)
+		var events []*domain.Event
+		stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+				events = append(events, ev)
+				return nil
+			}).AnyTimes()
 		attempt, options := registrationChallengeAttempt(t, "user_minted01", true, time.Now())
 		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(attempt, nil)
 
@@ -293,6 +300,26 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 		assert.Equal(t, "user_minted01", gotUser.(*domain.AuthFactorUser).UserID)
 		_, ok = got.FactorByType(domain.AuthCheckTypePasskeyRegistration)
 		assert.True(t, ok)
+
+		// The credential row's identity rides on the factor.
+		assert.Equal(t, "upk_test01", registration.PasskeyID)
+		assert.Equal(t, "Work laptop", registration.Name)
+
+		// The directly-set user factor emits its own check-succeeded event.
+		var userCheckEvents int
+		for _, ev := range events {
+			if ev.EventType != domain.EventTypeAuthCheckSucceeded {
+				continue
+			}
+			var payload domain.AuthCheckPayload
+			require.NoError(t, json.Unmarshal(ev.Payload, &payload))
+			if payload.CheckID == "ch-user-1" {
+				userCheckEvents++
+				assert.Equal(t, domain.AuthCheckTypeUser.String(), payload.CheckType)
+				assert.Equal(t, "att-1", payload.AuthAttemptID)
+			}
+		}
+		assert.Equal(t, 1, userCheckEvents, "the user factor must emit exactly one auth.check.succeeded event")
 	})
 
 	t.Run("existing user skips the create-user actions", func(t *testing.T) {

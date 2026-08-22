@@ -250,8 +250,13 @@ func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessio
 		}
 	}
 	for _, c := range last {
-		if _, err := ss.db.Update(ctx, buildStatement(`DELETE FROM checks WHERE project_id = @p1 AND session_id = @p2 AND type = @p3 AND id <> @p4`, projectID, sessionID, int64(c.Type), c.ID).statement()); err != nil {
-			return err
+		// Prune every losing row in the winner's class, not just its exact
+		// type: an enrollment row and a login row compete for the same
+		// passkey slot on the session.
+		for _, typ := range v2session.ClassMembers(c.Type) {
+			if _, err := ss.db.Update(ctx, buildStatement(`DELETE FROM checks WHERE project_id = @p1 AND session_id = @p2 AND type = @p3 AND id <> @p4`, projectID, sessionID, int64(typ), c.ID).statement()); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
