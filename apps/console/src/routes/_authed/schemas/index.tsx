@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
+import { describeError } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
 import {
   type UserSchema,
@@ -63,10 +64,12 @@ function SchemasScreen() {
   const [extra, setExtra] = useState<ReturnType<typeof toSchemaRow>[]>([]);
   const [nextPageToken, setNextPageToken] = useState(loaded.nextPageToken);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     setExtra([]);
     setNextPageToken(loaded.nextPageToken);
+    setLoadError(undefined);
   }, [loaded]);
 
   // The loader hands back a new object on every invalidation, so its identity
@@ -83,6 +86,7 @@ function SchemasScreen() {
     if (!nextPageToken || loadingMore) return;
     const generation = loaded;
     setLoadingMore(true);
+    setLoadError(undefined);
     try {
       const page = await api.listSchemas({
         project_id: getConsoleProjectId(),
@@ -92,6 +96,13 @@ function SchemasScreen() {
       if (loadedRef.current !== generation) return;
       setExtra((current) => [...current, ...page.schemas.map(toSchemaRow)]);
       setNextPageToken(page.next_page_token ?? undefined);
+    } catch (cause) {
+      // The caller fires-and-forgets, and a route error boundary cannot catch
+      // an event handler's rejection — surface it here. The page token is
+      // untouched, so the button stays and retries the same page.
+      if (loadedRef.current === generation) {
+        setLoadError(describeError(cause, "Could not load more schemas."));
+      }
     } finally {
       setLoadingMore(false);
     }
@@ -118,6 +129,11 @@ function SchemasScreen() {
           schemas.map((entry) => <SchemaRow key={entry.id} {...entry} />)
         )}
       </Card>
+      {loadError && (
+        <p role="alert" className="text-destructive mt-3 text-sm">
+          {loadError}
+        </p>
+      )}
       {/* D5: `Load more` rather than pagination controls — its presence means
           there is more, its absence means the directory is complete. */}
       {nextPageToken && (

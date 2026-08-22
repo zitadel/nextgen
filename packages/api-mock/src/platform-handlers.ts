@@ -57,6 +57,7 @@ import {
   InitClaimParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListSchemasQueryParams,
   ListUsersQueryParams,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
@@ -694,27 +695,28 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      const url = new URL(request.url);
-      const projectId = url.searchParams.get("project_id");
-      if (!projectId) {
-        return HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
-          status: 400,
-        });
+      // Same `limit` coercion caveat as `GET /users` above: URLs carry strings
+      // and the generated zod does not coerce, so out-of-range limits are
+      // rejected by the schema (1-100) rather than silently normalised.
+      const { limit, ...rest } = queryRecord(request);
+      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
+      if (!query.ok) {
+        return query.response;
       }
-      const objectTypeFilter = url.searchParams.get("object_type") ?? undefined;
       const records = [...store.schemas.values()]
-        .filter((r) => r.projectId === projectId)
-        .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
+        .filter((r) => r.projectId === query.data.project_id)
+        .filter((r) => !query.data.object_type || r.objectType === query.data.object_type)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       // The real cursor is opaque; the mock's is the next start index. A token
       // it never minted is rejected with req.invalid, like the real server.
-      const start = Number(url.searchParams.get("page_token") ?? "0");
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
       if (!Number.isInteger(start) || start < 0) {
         return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
       }
-      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? "20") || 20, 1), 100);
-      const page = records.slice(start, start + limit);
-      const next = start + limit < records.length ? String(start + limit) : undefined;
+      const page = records.slice(start, start + query.data.limit);
+      const next =
+        start + query.data.limit < records.length ? String(start + query.data.limit) : undefined;
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,

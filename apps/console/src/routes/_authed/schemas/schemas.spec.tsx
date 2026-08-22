@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -207,6 +207,91 @@ describe("user schemas list", () => {
     expect(asked).toBe("tok_2");
     // No token came back, so there is nothing left to offer.
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("surfaces a failed page load and keeps the button for a retry", async () => {
+    // `loadMore` runs from an event handler, so a route error boundary never
+    // sees its rejection — the screen has to catch and show it itself.
+    let failNextPage = true;
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        if (!token) {
+          return HttpResponse.json({
+            schemas: [envelope("sch_business", BUSINESS)],
+            next_page_token: "tok_2",
+          });
+        }
+        if (failNextPage) {
+          failNextPage = false;
+          return HttpResponse.json(
+            { code: "internal", message: "boom" },
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json({ schemas: [envelope("sch_deep", DEEP)] });
+      }),
+    );
+    await renderAt("/schemas");
+    await screen.findByRole("link", { name: "Business" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    // The token was not consumed, so the same click retries the same page —
+    // and a success clears the error.
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("link", { name: "Deep" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("drops a page that lands after the list was invalidated underneath it", async () => {
+    // A route invalidation resets to a fresh first page. A `Load more` still
+    // in flight answers a question about the replaced list — appending it
+    // would re-add rows the server no longer returns.
+    let releaseSecondPage!: () => void;
+    const secondPageSent = new Promise<void>((resolve) => {
+      releaseSecondPage = resolve;
+    });
+    let firstPageCalls = 0;
+
+    server.use(
+      http.get(SCHEMAS_URL, async ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        if (token) {
+          await secondPageSent;
+          return HttpResponse.json({ schemas: [envelope("sch_stale", DEEP)] });
+        }
+        firstPageCalls += 1;
+        return HttpResponse.json({
+          schemas: [envelope(`sch_page1_${firstPageCalls}`, BUSINESS)],
+          next_page_token: "tok_2",
+        });
+      }),
+    );
+
+    const router = await renderAt("/schemas");
+    await screen.findByText("sch_page1_1");
+
+    // Start the fetch, then invalidate before letting it answer.
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    // `act` so the router's own state settles inside the test rather than
+    // warning about an unwrapped update.
+    await act(async () => {
+      await router.invalidate();
+    });
+    await screen.findByText("sch_page1_2");
+
+    releaseSecondPage();
+
+    // Wait for a positive signal that the in-flight page was handled — the
+    // button re-enables in `loadMore`'s `finally`. Asserting the stale row is
+    // absent without this passes before the response has even landed.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled());
+
+    // The in-flight page is discarded rather than appended to the new list.
+    expect(screen.queryByText("sch_stale")).not.toBeInTheDocument();
+    expect(screen.getByText("sch_page1_2")).toBeInTheDocument();
   });
 
   it("renders one list request and no per-row document fetches", async () => {
