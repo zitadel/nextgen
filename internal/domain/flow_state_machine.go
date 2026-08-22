@@ -845,10 +845,36 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
 			if errors.Is(err, ErrUserAlreadyExists()) {
-				// The provisional user's identifier is taken: same routing as
-				// the identifier dispatch — the step's user_already_exists
-				// transition (or a step error when none is declared).
+				// The provisional user's identifier is taken: route like the
+				// identifier dispatch does. That path pins the existing user
+				// on the attempt before routing — and the downstream password
+				// step requires a persisted user factor — so re-resolve the
+				// collected identifier here to land in the same state.
 				clearUserBoundState(state)
+				name, value, ok := fieldValueByChallenge(passkeyResolved, state.CollectedData.UserData, FlowFieldChallengeIdentifier)
+				if !ok {
+					if visited, verr := r.resolveVisitedFields(pc); verr == nil {
+						name, value, ok = fieldValueByChallenge(visited, state.CollectedData.UserData, FlowFieldChallengeIdentifier)
+					}
+				}
+				if ok {
+					userID, rerr := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
+						ProjectID:     state.ProjectID,
+						AttemptID:     state.AuthAttemptID,
+						AttributeName: name,
+						Value:         value,
+					})
+					switch {
+					case rerr == nil:
+						recordResolvedUser(state, userID)
+					case !errors.Is(rerr, ErrAuthAttemptProofRejected(nil)):
+						return passkeyPhaseResult{}, fmt.Errorf("flow state machine: resolve conflicting user: %w", rerr)
+					default:
+						// A rejected identifier means the conflicting user
+						// vanished again; route anyway and let the next step
+						// re-collect.
+					}
+				}
 				return passkeyPhaseResult{handled: true, outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
 			}
 			if err != nil {

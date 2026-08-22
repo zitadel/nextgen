@@ -209,9 +209,13 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 		assert.Equal(t, registration.UserID, *stored.UserID)
 		factors := sessionFactorsByType(stored)
 		require.Contains(t, factors, domain.AuthCheckTypeUser)
-		require.Contains(t, factors, domain.AuthCheckTypePasskeyRegistration,
-			"a completed enrollment must merge into the session as a passkey-class factor")
-		assert.False(t, factors[domain.AuthCheckTypePasskeyRegistration].GetLastVerifiedAt().IsZero())
+		require.Contains(t, factors, domain.AuthCheckTypePasskey,
+			"a completed enrollment must merge into the session as a passkey factor")
+		passkeyFactor, ok := factors[domain.AuthCheckTypePasskey].(*domain.AuthFactorPasskey)
+		require.True(t, ok)
+		assert.Equal(t, registration.UserID, passkeyFactor.UserID)
+		assert.NotEmpty(t, passkeyFactor.CredentialID)
+		assert.False(t, passkeyFactor.GetLastVerifiedAt().IsZero())
 	})
 
 	t.Run("password_signup_session_carries_user_and_password_factors", func(t *testing.T) {
