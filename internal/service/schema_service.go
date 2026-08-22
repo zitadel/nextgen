@@ -24,6 +24,18 @@ type CreateSchemaByURLInput struct {
 	URL       url.URL
 }
 
+type ListSchemasInput struct {
+	ProjectID  string
+	ObjectType string
+	PageToken  string
+	Limit      int
+}
+
+type ListSchemasOutput struct {
+	Items         []*domain.JSONSchema
+	NextPageToken string
+}
+
 // ---- Secondary ports -------------------------------------------------------------
 
 type SchemaService struct {
@@ -123,23 +135,29 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]*domain.JSONSchema, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
-		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
 	}
-	if objectType != "" {
+	if input.ObjectType != "" {
 		filters = append(filters,
-			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), input.ObjectType),
 		)
 	}
-
-	// TODO: implement pagination
 
 	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.And(filters...),
 		Pagination: database.Page[domain.JSONSchemaField]{
+			Limit:  uint32(normalizeLimit(input.Limit)),
+			Cursor: []byte(input.PageToken),
 			OrderBy: database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
+				// url is the resource id and, with project_id fixed by the
+				// filter, makes the order total so page boundaries cannot
+				// skip or repeat rows sharing a created_at.
+				Columns: []database.Column[domain.JSONSchemaField]{
+					database.Col(domain.JSONSchemaFieldCreatedAt),
+					database.Col(domain.JSONSchemaFieldURL),
+				},
 				Direction: database.OrderDesc,
 			},
 		},
@@ -148,5 +166,8 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType s
 		return nil, mapListError(err, "failed to list schemas")
 	}
 
-	return result.Items, nil
+	return &ListSchemasOutput{
+		Items:         result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
 }

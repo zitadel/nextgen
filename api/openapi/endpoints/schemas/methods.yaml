@@ -85,7 +85,7 @@ get:
     - Schemas
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/offset.yaml
+    - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
     - name: object_type
       in: query

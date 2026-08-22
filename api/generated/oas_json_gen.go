@@ -34794,10 +34794,17 @@ func (s *ListSchemasResponse) encodeFields(e *jx.Encoder) {
 		}
 		e.ArrEnd()
 	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfListSchemasResponse = [1]string{
+var jsonFieldsNameOfListSchemasResponse = [2]string{
 	0: "schemas",
+	1: "next_page_token",
 }
 
 // Decode decodes ListSchemasResponse from json.
@@ -34826,6 +34833,16 @@ func (s *ListSchemasResponse) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"schemas\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
 			}
 		default:
 			return d.Skip()
