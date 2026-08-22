@@ -58,16 +58,11 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 		return nil, err
 	}
 
-	apiSchema := api.UserSchema{}
-	err = apiSchema.UnmarshalJSON(schema.Schema)
+	apiSchema, err := domainSchemaToApiSchema(schema)
 	if err != nil {
 		return nil, err
 	}
-
-	return &api.GetSchemaByIdOK{
-		Type:       api.UserSchemaGetSchemaByIdOK,
-		UserSchema: apiSchema,
-	}, nil
+	return apiSchema, nil
 }
 
 func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
@@ -85,16 +80,31 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 		return nil, err
 	}
 
-	resp := make(api.ListSchemasResponse, len(schemas))
-
+	resp := api.ListSchemasResponse{Schemas: make([]api.Schema, len(schemas))}
 	for i, schema := range schemas {
-		resp[i] = api.ListSchemasResponseItem{
-			ID:        schema.URL,
-			CreatedAt: schema.CreatedAt,
+		apiSchema, err := domainSchemaToApiSchema(schema)
+		if err != nil {
+			return nil, err
 		}
+		resp.Schemas[i] = *apiSchema
 	}
 
 	return &resp, nil
+}
+
+// domainSchemaToApiSchema wraps the stored customer-authored document in the
+// server-owned envelope; every schema read goes through it.
+func domainSchemaToApiSchema(schema *domain.JSONSchema) (*api.Schema, error) {
+	document := api.UserSchema{}
+	if err := document.UnmarshalJSON(schema.Schema); err != nil {
+		return nil, err
+	}
+
+	return &api.Schema{
+		ID:       schema.URL,
+		Schema:   api.NewUserSchemaSchemaDocument(document),
+		Metadata: api.SchemaMetadata{CreatedAt: schema.CreatedAt},
+	}, nil
 }
 
 // ------------------ Errors ---------------

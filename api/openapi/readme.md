@@ -50,7 +50,8 @@ This API uses **cursor-based pagination** (`page_token` / `next_page_token`), no
 - Treat `page_token` as opaque — do not attempt to decode or construct it.
 
 > **Note:** `GET /schemas` currently accepts both the legacy `offset` parameter
-> and `page_token`, but its response is a bare array with no `next_page_token`.
+> and `page_token`, but implements neither and its response carries no
+> `next_page_token` yet.
 > It does not yet implement a complete pagination convention and should be normalized.
 > New list endpoints must use cursor-based pagination — see `POST /sessions/query` as the reference implementation.
 

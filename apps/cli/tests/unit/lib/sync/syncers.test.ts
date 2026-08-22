@@ -90,7 +90,11 @@ describe("SchemaSyncer", () => {
         return HttpResponse.json({ id: "schema-id-1" }, { status: 201 });
       }),
       http.get(`${BASE}/schemas/schema-id-1`, () =>
-        HttpResponse.json({ kind: "user-schema", version: 1 }),
+        HttpResponse.json({
+          id: "schema-id-1",
+          schema: { kind: "user-schema", version: 1 },
+          metadata: { created_at: "2026-01-01T00:00:00Z" },
+        }),
       ),
     );
     const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
@@ -99,7 +103,8 @@ describe("SchemaSyncer", () => {
     const result = await schema.create(data);
 
     expect(result.id).toBe("schema-id-1");
-    // The stored body comes from the follow-up fetch, feeding write-back.
+    // The stored body comes from the follow-up fetch, feeding write-back —
+    // the document unwrapped from the envelope, never the envelope itself.
     expect(result.canonical).toEqual({ kind: "user-schema", version: 1 });
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
     expect(receivedBody).toEqual(data);
@@ -138,7 +143,11 @@ describe("SchemaSyncer", () => {
     server.use(
       http.get(`${BASE}/schemas/schema-id-1`, ({ request }) => {
         receivedUrl = request.url;
-        return HttpResponse.json({ kind: "user-schema", version: 1 });
+        return HttpResponse.json({
+          id: "schema-id-1",
+          schema: { kind: "user-schema", version: 1 },
+          metadata: { created_at: "2026-01-01T00:00:00Z" },
+        });
       }),
     );
     const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
