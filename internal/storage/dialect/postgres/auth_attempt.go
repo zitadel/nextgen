@@ -49,6 +49,14 @@ const setAuthAttemptChallengeStmt = `INSERT INTO zitadel_nextgen.checks` +
 	` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
 	` RETURNING id, last_challenged_at`
 
+const setAuthAttemptFactorStmt = `INSERT INTO zitadel_nextgen.checks` +
+	` (project_id, auth_attempt_id, type, id, last_verified_at, factor_payload)` +
+	` VALUES ($1, $2, $3, $4, NOW(), $5::JSONB)` +
+	` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET` +
+	` last_verified_at = NOW(), factor_payload = EXCLUDED.factor_payload,` +
+	` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+	` RETURNING id, last_verified_at`
+
 const authAttemptChallengeSucceededStmt = `UPDATE zitadel_nextgen.checks` +
 	` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $5` +
@@ -317,6 +325,28 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	challenge.SetFailureCount(0)
 	challenge.SetLastFailedAt(time.Time{})
 	return nil
+}
+
+// SetAuthAttemptFactor implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	payload, err := authattempt.MarshalPayloadJSON(factor.Payload())
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
+	}
+	var checkID string
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return "", err
+	}
+	var id string
+	var lastVerifiedAt time.Time
+	err = as.client.QueryRow(ctx, setAuthAttemptFactorStmt,
+		projectID, authAttemptID, factor.Type(), checkID, payload).
+		Scan(&id, &lastVerifiedAt)
+	if err != nil {
+		return "", wrapError(err)
+	}
+	factor.SetLastVerifiedAt(lastVerifiedAt)
+	return id, nil
 }
 
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].

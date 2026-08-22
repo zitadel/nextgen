@@ -207,6 +207,12 @@ type AuthAttemptStatements interface {
 	DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error
 	HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error
 	SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
+	// SetAuthAttemptFactor upserts a verified factor directly, without a
+	// challenge/proof cycle: the caller has already established the fact by
+	// other means (e.g. the user row was just created in the same transaction).
+	// An existing check row of the same type is overwritten and its challenge
+	// state cleared. Returns the check row's id for audit emits.
+	SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 }

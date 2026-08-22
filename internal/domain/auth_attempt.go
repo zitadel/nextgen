@@ -90,6 +90,11 @@ type AuthAttempt struct {
 
 const AuthAttemptTTL = 15 * time.Minute
 
+// PasskeyRegistrationChallengeTTL bounds the registration ceremony: the
+// attestation must come back within this window even though the attempt
+// itself lives longer.
+const PasskeyRegistrationChallengeTTL = 5 * time.Minute
+
 type AuthAttemptOption func(*AuthAttempt)
 
 // WithSession sets the session ID and copies existing factors from the session to the attempt.
@@ -259,6 +264,31 @@ func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 	return userCheck.UserID, nil
 }
 
+// PreparePasskeyRegistrationChallenge validates that a passkey registration
+// challenge can be issued and resolves the user handle for the ceremony.
+// Unlike password, no prior user factor is required: registration is how a
+// user comes to exist in the first place.
+//
+// With a pinned user factor the enrollment targets that user (requestedUserID
+// must match when set) and the ceremony is not provisional. Without one the
+// ceremony is provisional: the user row is created when the attestation is
+// verified. A non-empty requestedUserID is honored there so a re-issued
+// challenge keeps the previously minted user handle; an empty one signals the
+// caller to mint a fresh handle.
+func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string) (userID string, provisional bool, err error) {
+	if err := a.PrepareChallenge(AuthCheckTypePasskeyRegistration); err != nil {
+		return "", false, err
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if ok {
+		if requestedUserID != "" && requestedUserID != userCheck.UserID {
+			return "", false, ErrAuthAttemptInvalidRequest().WithMessage("The registration user must match the authenticated user.")
+		}
+		return userCheck.UserID, false, nil
+	}
+	return requestedUserID, true, nil
+}
+
 // SetUserChallenge registers a new user challenge on the attempt, replacing any existing challenge of the same type.
 func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
 	challenge := &AuthChallengeUser{}
@@ -276,6 +306,16 @@ func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
 func (a *AuthAttempt) SetPasskeyChallenge(passkeyChallenge *PasskeyChallenge) *AuthChallengePasskey {
 	challenge := &AuthChallengePasskey{
 		PasskeyChallenge: passkeyChallenge,
+	}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+// SetPasskeyRegistrationChallenge registers a new passkey registration challenge on the attempt, replacing any existing challenge of the same type.
+func (a *AuthAttempt) SetPasskeyRegistrationChallenge(registrationChallenge *PasskeyRegistrationChallenge, provisional bool) *AuthChallengePasskeyRegistration {
+	challenge := &AuthChallengePasskeyRegistration{
+		PasskeyRegistrationChallenge: registrationChallenge,
+		Provisional:                  provisional,
 	}
 	a.SetCheck(challenge)
 	return challenge
@@ -353,6 +393,25 @@ func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChalle
 	return challenge, userCheck, nil
 }
 
+// PreparePasskeyRegistrationVerification validates that a registration proof
+// can be submitted. Beyond the generic checks it enforces the ceremony's own
+// window ([PasskeyRegistrationChallengeTTL]), which is tighter than the
+// attempt TTL.
+func (a *AuthAttempt) PreparePasskeyRegistrationVerification(challengeID string) (*AuthChallengePasskeyRegistration, error) {
+	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePasskeyRegistration)
+	if err != nil {
+		return nil, err
+	}
+	registrationChallenge, ok := challenge.(*AuthChallengePasskeyRegistration)
+	if !ok {
+		return nil, ErrAuthAttemptInvalidRequest()
+	}
+	if time.Since(registrationChallenge.GetLastChallengedAt()) > PasskeyRegistrationChallengeTTL {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	return registrationChallenge, nil
+}
+
 // SetUserFactor registers a verified user factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 	factor := &AuthFactorUser{
@@ -365,6 +424,20 @@ func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 // SetPasswordFactor registers a verified password factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
 	factor := &AuthFactorPassword{}
+	a.SetCheck(factor)
+	return factor
+}
+
+// SetPasskeyRegistrationFactor records a completed passkey enrollment as a
+// verified factor on the attempt, replacing the registration challenge.
+func (a *AuthAttempt) SetPasskeyRegistrationFactor(passkey *CreateUserPasskey) *AuthFactorPasskeyRegistration {
+	factor := &AuthFactorPasskeyRegistration{
+		UserVerified:   passkey.UserVerified,
+		UserID:         passkey.UserID,
+		CredentialID:   passkey.CredentialID,
+		BackupEligible: passkey.BackupEligible,
+		BackupState:    passkey.BackupState,
+	}
 	a.SetCheck(factor)
 	return factor
 }

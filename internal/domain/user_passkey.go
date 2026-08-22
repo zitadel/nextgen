@@ -349,6 +349,7 @@ func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestat
 		AttestationType: &attestationType,
 		Transports:      transports,
 		SignCount:       int64(credential.Authenticator.SignCount),
+		UserVerified:    credential.Flags.UserVerified,
 		BackupEligible:  credential.Flags.BackupEligible,
 		BackupState:     credential.Flags.BackupState,
 		Name:            name,

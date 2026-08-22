@@ -138,6 +138,25 @@ func DecodeAuthChecks(
 			}
 			checks = append(checks, passkeyCheck)
 		}
+	case domain.AuthCheckTypePasskeyRegistration:
+		if !verifiedAt.IsZero() {
+			registrationFactor := domain.SetAuthFactorPasskeyRegistration(verifiedAt)
+			if len(factor) > 0 {
+				if err := json.Unmarshal(factor, registrationFactor); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal passkey registration auth check factor payload: %w", err)
+				}
+			}
+			checks = append(checks, registrationFactor)
+		}
+		if !lastChallengedAt.IsZero() {
+			registrationCheck := domain.SetAuthChallengePasskeyRegistration(id, lastChallengedAt, lastFailedAt, failureCount)
+			if len(challenge) > 0 {
+				if err := json.Unmarshal(challenge, registrationCheck); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal passkey registration auth check challenge payload: %w", err)
+				}
+			}
+			checks = append(checks, registrationCheck)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported auth check type %v", checkType)
 	}

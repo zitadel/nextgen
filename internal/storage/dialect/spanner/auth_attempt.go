@@ -35,6 +35,12 @@ const (
 	insertAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0, NULL)` +
 		` THEN RETURN id`
+	updateAuthAttemptFactorStmt = `UPDATE checks SET last_verified_at = @p4, factor_payload = @p5, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+		` WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3` +
+		` THEN RETURN id`
+	insertAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_verified_at, factor_payload, failure_count)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0)` +
+		` THEN RETURN id`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = @p1, failure_count = failure_count + 1` +
@@ -330,6 +336,47 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	challenge.SetFailureCount(0)
 	challenge.SetLastFailedAt(time.Time{})
 	return nil
+}
+
+// SetAuthAttemptFactor implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
+	}
+
+	var returnedID string
+	scanCheckID := func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&returnedID)
+		})
+		return err
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		update := buildStatement(updateAuthAttemptFactorStmt,
+			projectID, authAttemptID, int64(factor.Type()), now, encodeSpannerJSONPtr(payloadStr)).statement()
+		err := tx.Write(ctx, update, scanCheckID)
+		if err == nil {
+			return nil
+		}
+		var noRow *database.NoRowFoundError
+		if !errors.As(err, &noRow) {
+			return err
+		}
+		checkID := ""
+		if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+			return err
+		}
+		insert := buildStatement(insertAuthAttemptFactorStmt,
+			projectID, authAttemptID, int64(factor.Type()), checkID, now, encodeSpannerJSONPtr(payloadStr)).statement()
+		return tx.Write(ctx, insert, scanCheckID)
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to set factor: %w", err)
+	}
+	factor.SetLastVerifiedAt(now)
+	return returnedID, nil
 }
 
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].
