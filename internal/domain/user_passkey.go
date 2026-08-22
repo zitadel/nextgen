@@ -407,6 +407,11 @@ func EncodePasskeyCredentialID(id []byte) string {
 	return base64.RawURLEncoding.EncodeToString(id)
 }
 
+// DecodePasskeyCredentialID reverses [EncodePasskeyCredentialID].
+func DecodePasskeyCredentialID(s string) []byte {
+	return decodeCredentialID(s)
+}
+
 // decodeCredentialID reverses the base64url encoding used when storing a
 // credential ID. Falls back to a raw byte cast for legacy ASCII test fixtures.
 func decodeCredentialID(s string) []byte {

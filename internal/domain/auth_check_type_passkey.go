@@ -92,6 +92,11 @@ type AuthFactorPasskeyRegistration struct {
 	CredentialID   string
 	BackupEligible bool
 	BackupState    bool
+	// PasskeyID and Name identify the persisted credential row, so callers of
+	// the verify transaction can answer with the created passkey without a
+	// read-back that could fail after the ceremony is already consumed.
+	PasskeyID string
+	Name      string
 	authFactor
 }
 

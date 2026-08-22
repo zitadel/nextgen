@@ -496,7 +496,10 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 		username, displayName := passkeyRegistrationLabels(typ.Username, typ.DisplayName)
 		registrationChallenge, err := domain.CreatePasskeyRegistrationChallenge(userID, username, displayName, passkeys, typ.RPID, typ.RPOrigins)
 		if err != nil {
-			return nil, err
+			// The WebAuthn library rejects malformed relying-party
+			// configuration (empty rp id, bad origins) — caller input, not a
+			// server fault.
+			return nil, domain.ErrAuthAttemptInvalidRequest().WithParent(err).WithMessage("invalid relying-party configuration")
 		}
 		return attempt.SetPasskeyRegistrationChallenge(registrationChallenge, provisional), nil
 
@@ -616,7 +619,27 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			if err := stmts.CreateUserPasskey(ctx, newPasskey); err != nil {
 				return fmt.Errorf("passkey registration: store credential: %w", err)
 			}
-			if _, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, userFactor); err != nil {
+			// The credential row's identity rides on the factor so the caller
+			// can answer from the verify result without a read-back.
+			factor.PasskeyID = newPasskey.ID
+			factor.Name = newPasskey.Name
+			userCheckID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, userFactor)
+			if err != nil {
+				return err
+			}
+			if err := audit.Emit(ctx, stmts, audit.EmitSpec{
+				Type:       domain.EventTypeAuthCheckSucceeded,
+				Category:   domain.EventCategoryAuth,
+				ProjectID:  attempt.ProjectID,
+				EntityType: "check",
+				EntityID:   userCheckID,
+				SessionID:  attempt.SessionID,
+				Payload: domain.AuthCheckPayload{
+					CheckID:       userCheckID,
+					CheckType:     userFactor.Type().String(),
+					AuthAttemptID: attempt.ID,
+				},
+			}); err != nil {
 				return err
 			}
 			return audit.Emit(ctx, stmts, audit.EmitSpec{

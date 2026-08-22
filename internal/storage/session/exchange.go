@@ -50,20 +50,60 @@ func ValidateHandoffAttempt(attempt *domain.AuthAttempt) error {
 	return nil
 }
 
+// FactorClass maps a check type to the class it competes in on a session.
+// Passkey enrollment proves the same thing an assertion does for that
+// credential, so registration and login share the passkey class; every other
+// type is its own class.
+func FactorClass(t domain.AuthCheckType) domain.AuthCheckType {
+	if t == domain.AuthCheckTypePasskeyRegistration {
+		return domain.AuthCheckTypePasskey
+	}
+	return t
+}
+
+// ClassMembers lists the check types competing in t's class, for loser cleanup
+// after a promotion.
+func ClassMembers(t domain.AuthCheckType) []domain.AuthCheckType {
+	if FactorClass(t) == domain.AuthCheckTypePasskey {
+		return []domain.AuthCheckType{domain.AuthCheckTypePasskey, domain.AuthCheckTypePasskeyRegistration}
+	}
+	return []domain.AuthCheckType{t}
+}
+
 // PickLastVerifiedByType merges attempt and session verified checks, keeping the
-// newest LastVerifiedAt per AuthCheckType (attempt wins ties that are strictly after).
+// newest LastVerifiedAt per factor class (attempt wins ties that are strictly after).
 func PickLastVerifiedByType(attemptChecks, sessionChecks []StoredCheck) map[domain.AuthCheckType]StoredCheck {
 	out := map[domain.AuthCheckType]StoredCheck{}
 	for _, c := range sessionChecks {
-		out[c.Type] = c
+		out[FactorClass(c.Type)] = c
 	}
 	for _, c := range attemptChecks {
-		existing, ok := out[c.Type]
+		existing, ok := out[FactorClass(c.Type)]
 		if !ok || c.LastVerifiedAt.After(existing.LastVerifiedAt) {
-			out[c.Type] = c
+			out[FactorClass(c.Type)] = c
 		}
 	}
 	return out
+}
+
+// NormalizeSessionFactor maps a promoted enrollment factor to the passkey
+// class. Sessions record HOW the user authenticated; the ceremony-level
+// distinction between registering and asserting a credential stays on the
+// attempt.
+func NormalizeSessionFactor(check domain.AuthCheck) domain.AuthCheck {
+	registration, ok := check.(*domain.AuthFactorPasskeyRegistration)
+	if !ok {
+		return check
+	}
+	passkey := &domain.AuthFactorPasskey{
+		UserVerified:   registration.UserVerified,
+		UserID:         registration.UserID,
+		CredentialID:   domain.DecodePasskeyCredentialID(registration.CredentialID),
+		BackupEligible: registration.BackupEligible,
+		BackupState:    registration.BackupState,
+	}
+	passkey.SetLastVerifiedAt(registration.GetLastVerifiedAt())
+	return passkey
 }
 
 // UserAgentFromStoredInfo reconstructs a UserAgent from the user_agents.info map.
@@ -78,15 +118,22 @@ func UserAgentFromStoredInfo(info map[string]any) *domain.UserAgent {
 	return ua
 }
 
-// AppendFactor replaces an existing factor of the same type or appends a new one.
+// AppendFactor replaces an existing factor of the same class or appends a new
+// one. Factors are normalized on the way in ([NormalizeSessionFactor]), so a
+// promoted enrollment lands as a passkey factor and never coexists with a
+// login factor for the same class.
 func AppendFactor(sess *domain.Session, factor domain.AuthFactor) {
+	normalized, ok := NormalizeSessionFactor(factor).(domain.AuthFactor)
+	if !ok {
+		return
+	}
 	for i, f := range sess.Factors {
-		if f.Type() == factor.Type() {
-			sess.Factors[i] = factor
+		if FactorClass(f.Type()) == FactorClass(normalized.Type()) {
+			sess.Factors[i] = normalized
 			return
 		}
 	}
-	sess.Factors = append(sess.Factors, factor)
+	sess.Factors = append(sess.Factors, normalized)
 }
 
 // DecodeAuthChecks builds domain auth checks from a stored checks row.
