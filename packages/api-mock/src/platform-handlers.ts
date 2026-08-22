@@ -706,12 +706,22 @@ export function setupPlatformHandlers() {
         .filter((r) => r.projectId === projectId)
         .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      // The real cursor is opaque; the mock's is the next start index. A token
+      // it never minted is rejected with req.invalid, like the real server.
+      const start = Number(url.searchParams.get("page_token") ?? "0");
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? "20") || 20, 1), 100);
+      const page = records.slice(start, start + limit);
+      const next = start + limit < records.length ? String(start + limit) : undefined;
       const responseBody: ListSchemas200 = {
-        schemas: records.map((r) => ({
+        schemas: page.map((r) => ({
           id: r.id,
           schema: r.body,
           metadata: { created_at: r.createdAt },
         })),
+        ...(next === undefined ? {} : { next_page_token: next }),
       };
       return HttpResponse.json(responseBody);
     }),

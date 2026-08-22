@@ -50,10 +50,20 @@ export default class SchemasList extends BaseCommand {
     });
 
     const objectType = flags["object-type"];
-    const { schemas: revisions } = await client.listSchemas({
-      project_id: secret.project_id,
-      object_type: objectType,
-    });
+    // The command shows the full revision history, so it drains the
+    // cursor-paginated list at the max page size.
+    const revisions: ListSchemas200SchemasItem[] = [];
+    let pageToken: string | undefined;
+    do {
+      const page = await client.listSchemas({
+        project_id: secret.project_id,
+        object_type: objectType,
+        limit: 100,
+        ...(pageToken === undefined ? {} : { page_token: pageToken }),
+      });
+      revisions.push(...page.schemas);
+      pageToken = page.next_page_token ?? undefined;
+    } while (pageToken);
 
     // The envelope's row shape is a contract; project it explicitly so a field
     // added to the API later cannot leak into stdout.

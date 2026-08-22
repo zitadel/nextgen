@@ -180,6 +180,35 @@ describe("user schemas list", () => {
     expect(screen.queryByRole("button", { name: /^Add/ })).not.toBeInTheDocument();
   });
 
+  it("loads the next page on demand and stops offering when there is none", async () => {
+    // `GET /schemas` is cursor-paginated (#924): the directory walks
+    // `next_page_token` with a `Load more` button, users-screen style.
+    let asked: string | null = null;
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        asked = token;
+        return token
+          ? HttpResponse.json({ schemas: [envelope("sch_deep", DEEP)] })
+          : HttpResponse.json({
+              schemas: [envelope("sch_business", BUSINESS)],
+              next_page_token: "tok_2",
+            });
+      }),
+    );
+    await renderAt("/schemas");
+
+    expect(await screen.findByRole("link", { name: "Business" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    // The second page is appended, not swapped in.
+    expect(await screen.findByRole("link", { name: "Deep" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Business" })).toBeInTheDocument();
+    expect(asked).toBe("tok_2");
+    // No token came back, so there is nothing left to offer.
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
   it("renders one list request and no per-row document fetches", async () => {
     // The whole point of the envelope (#921): the directory renders from
     // `GET /schemas` alone. `serveList` registers no by-id handler, so this

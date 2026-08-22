@@ -124,7 +124,19 @@ function AddUserForm({
     void (async () => {
       try {
         const projectId = getConsoleProjectId();
-        const listed = (await api.listSchemas({ project_id: projectId })).schemas;
+        // The picker needs every schema, so it drains the cursor-paginated
+        // list rather than showing whatever fits in one page.
+        const listed: Awaited<ReturnType<typeof api.listSchemas>>["schemas"] = [];
+        let pageToken: string | undefined;
+        do {
+          const page = await api.listSchemas({
+            project_id: projectId,
+            limit: 100,
+            ...(pageToken === undefined ? {} : { page_token: pageToken }),
+          });
+          listed.push(...page.schemas);
+          pageToken = page.next_page_token ?? undefined;
+        } while (pageToken);
         const options = listed.map((entry) => {
           const schema = entry.schema as UserSchema;
           return {
