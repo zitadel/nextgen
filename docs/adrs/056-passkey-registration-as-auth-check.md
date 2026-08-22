@@ -58,7 +58,11 @@ attempt; the parallel stack is deleted.
    the enrollment target. Without one, a caller-supplied handle is checked
    against the user store: an existing row means enrollment for that user
    (e.g. right after a discoverable passkey login, which pins no user check
-   row), a missing row means the ceremony creates the user at finish.
+   row). A missing row means the ceremony creates the user at finish — and
+   because that handle becomes a user id, it must be server-minted: it is
+   kept only when it matches the attempt's own in-flight provisional
+   ceremony (a re-issued challenge); any other unknown handle is replaced by
+   a fresh mint, so a caller-chosen id never becomes a user id.
 6. **The flow port merges into `FlowAuthAttemptService`.** This supersedes the
    "intentionally separate" rationale on the deleted
    `FlowPasskeyRegistrationService`: enrollment and verification are distinct

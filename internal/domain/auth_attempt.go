@@ -272,10 +272,12 @@ func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 // With a pinned user factor the enrollment targets that user (requestedUserID
 // must match when set) and the ceremony is not provisional. Without one the
 // ceremony is provisional as far as the attempt can tell: the caller must
-// refine a non-empty requestedUserID against the user store, since it is
-// either a previously minted handle on a re-issued challenge (still
-// provisional) or an existing user pinned only in flow state (not
-// provisional). An empty handle signals the caller to mint a fresh one.
+// vet a non-empty requestedUserID, since it is either an existing user pinned
+// only in flow state (not provisional) or a previously minted handle on a
+// re-issued challenge — confirmed via
+// [AuthAttempt.HasProvisionalRegistrationHandle]. Any other handle must be
+// replaced by a fresh mint, so a caller-chosen id never becomes a user id.
+// An empty handle signals the caller to mint a fresh one.
 func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string) (userID string, provisional bool, err error) {
 	if err := a.PrepareChallenge(AuthCheckTypePasskeyRegistration); err != nil {
 		return "", false, err
@@ -288,6 +290,20 @@ func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string
 		return userCheck.UserID, false, nil
 	}
 	return requestedUserID, true, nil
+}
+
+// HasProvisionalRegistrationHandle reports whether the attempt's current
+// registration challenge is provisional and carries the given user handle.
+// This is the only situation in which a caller-supplied handle is known to be
+// server-minted, so a re-issued challenge may keep it; any other unknown
+// handle must be replaced by a fresh mint, never adopted.
+func (a *AuthAttempt) HasProvisionalRegistrationHandle(userID string) bool {
+	challenge, ok := a.ChallengeByType(AuthCheckTypePasskeyRegistration)
+	if !ok {
+		return false
+	}
+	registration, ok := challenge.(*AuthChallengePasskeyRegistration)
+	return ok && registration.Provisional && registration.UserID == userID
 }
 
 // SetUserChallenge registers a new user challenge on the attempt, replacing any existing challenge of the same type.

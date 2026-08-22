@@ -15,6 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func passkeyTestOrigins(t *testing.T) []url.URL {
@@ -133,6 +134,75 @@ func TestAuthAttemptService_IssueChallenge_PasskeyRegistration(t *testing.T) {
 		assert.False(t, registration.Provisional)
 		assert.Equal(t, passkeyUserID, registration.UserID)
 		assert.Len(t, registration.ExcludeIDs, 1)
+	})
+
+	t.Run("caller-chosen handle for a fresh ceremony is replaced by a mint", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").
+			Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+		stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, database.NewNoRowFoundError(nil))
+		stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_minted01", nil)
+		stmts.EXPECT().SetAuthAttemptChallenge(gomock.Any(), "proj", "att-1", gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, _ string, ch domain.AuthChallenge) error {
+				ch.SetID("ch-reg-1")
+				ch.SetLastChallengedAt(time.Now())
+				return nil
+			})
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
+		attempt, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+			ProjectID: "proj",
+			AttemptID: "att-1",
+			Challenge: service.PasskeyRegistrationChallenge{
+				UserID:    "user_attacker_chosen",
+				RPID:      passkeyRPID,
+				RPOrigins: passkeyTestOrigins(t),
+			},
+		})
+		require.NoError(t, err)
+
+		check, ok := attempt.ChallengeByType(domain.AuthCheckTypePasskeyRegistration)
+		require.True(t, ok)
+		registration := check.(*domain.AuthChallengePasskeyRegistration)
+		assert.True(t, registration.Provisional)
+		assert.Equal(t, "user_minted01", registration.UserID,
+			"a caller-chosen handle must never become the ceremony's user id")
+	})
+
+	t.Run("re-issue keeps the in-flight provisional handle", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		priorAttempt, _ := registrationChallengeAttempt(t, "user_minted01", true, time.Now())
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(priorAttempt, nil)
+		stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, database.NewNoRowFoundError(nil))
+		// No NewManagedID expectation: the prior ceremony's handle is kept.
+		stmts.EXPECT().SetAuthAttemptChallenge(gomock.Any(), "proj", "att-1", gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, _ string, ch domain.AuthChallenge) error {
+				ch.SetID("ch-reg-2")
+				ch.SetLastChallengedAt(time.Now())
+				return nil
+			})
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
+		attempt, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+			ProjectID: "proj",
+			AttemptID: "att-1",
+			Challenge: service.PasskeyRegistrationChallenge{
+				UserID:    "user_minted01",
+				RPID:      passkeyRPID,
+				RPOrigins: passkeyTestOrigins(t),
+			},
+		})
+		require.NoError(t, err)
+
+		check, ok := attempt.ChallengeByType(domain.AuthCheckTypePasskeyRegistration)
+		require.True(t, ok)
+		registration := check.(*domain.AuthChallengePasskeyRegistration)
+		assert.True(t, registration.Provisional)
+		assert.Equal(t, "user_minted01", registration.UserID)
 	})
 
 	t.Run("pinned user rejects a mismatching requested user", func(t *testing.T) {

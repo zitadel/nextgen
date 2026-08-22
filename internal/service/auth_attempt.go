@@ -489,6 +489,11 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 				provisional = false
 			} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 				return nil, domain.ErrInternal(err).WithMessage("failed to resolve registration user")
+			} else if !attempt.HasProvisionalRegistrationHandle(userID) {
+				// A provisional handle becomes a user id at verification, so it
+				// must be server-minted: an unknown handle that is not the
+				// attempt's own in-flight ceremony is replaced by a fresh mint.
+				userID = ""
 			}
 		}
 		if userID == "" {
