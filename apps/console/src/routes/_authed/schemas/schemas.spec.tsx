@@ -72,7 +72,16 @@ function envelope(id: string, doc: object) {
   return { id, schema: doc, metadata: { created_at: CREATED_AT } };
 }
 
-/** `GET /schemas` plus `GET /schemas/{id}` for one document. */
+/**
+ * `GET /schemas` only: the list carries the documents, so the directory must
+ * not fetch anything else — a reintroduced per-row `GET /schemas/{id}` has no
+ * handler here and fails the spec.
+ */
+function serveList(...rows: Array<{ id: string; schema: object; metadata: object }>) {
+  server.use(http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: rows })));
+}
+
+/** The detail screen's pair: the list for navigation, the document by id. */
 function serveBusiness() {
   server.use(
     http.get(SCHEMAS_URL, () =>
@@ -96,7 +105,7 @@ async function renderAt(path: string) {
 
 describe("user schemas list", () => {
   it("shows the schema name, its attributes and its enabled sign-in methods", async () => {
-    serveBusiness();
+    serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
 
     expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
@@ -115,23 +124,20 @@ describe("user schemas list", () => {
 
   it("joins the enabled methods in a stable order", async () => {
     // Alphabetical by annotation key, so the chip does not reshuffle between
-    // loads — `GET /schemas/{id}` serialises from a Go map and its key order is
-    // randomised. It is not a claim about which method is offered first: that
-    // is the flow's, from the order of its step's actions.
+    // loads — the document arrives serialised from a Go map and its key order
+    // is randomised. It is not a claim about which method is offered first:
+    // that is the flow's, from the order of its step's actions.
     const both = {
       ...BUSINESS,
       "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
     };
-    server.use(
-      http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [envelope("sch_both", both)] })),
-      http.get(`${SCHEMAS_URL}/sch_both`, () => HttpResponse.json(envelope("sch_both", both))),
-    );
+    serveList(envelope("sch_both", both));
     await renderAt("/schemas");
     expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
   });
 
   it("identifies a schema by its id and creation date (D10)", async () => {
-    serveBusiness();
+    serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
     await screen.findByRole("link", { name: "Business" });
 
@@ -154,7 +160,7 @@ describe("user schemas list", () => {
     // The design system's note on `Schema Row`: the row is the click target and
     // hover is the affordance, so a stretched link covers it — one focusable
     // control, still keyboard- and middle-click-navigable.
-    serveBusiness();
+    serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
 
     const link = await screen.findByRole("link", { name: "Business" });
@@ -163,7 +169,7 @@ describe("user schemas list", () => {
   });
 
   it("offers no way to create, edit or delete a schema (D0b)", async () => {
-    serveBusiness();
+    serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
     await screen.findByRole("link", { name: "Business" });
 
@@ -174,17 +180,20 @@ describe("user schemas list", () => {
     expect(screen.queryByRole("button", { name: /^Add/ })).not.toBeInTheDocument();
   });
 
-  it("still lists a schema whose document cannot be read", async () => {
-    // The name and chips come from the document, so a 500 on one of them must
-    // cost that row's detail, not the screen.
+  it("renders one list request and no per-row document fetches", async () => {
+    // The whole point of the envelope (#921): the directory renders from
+    // `GET /schemas` alone. `serveList` registers no by-id handler, so this
+    // also fails if a per-row fetch sneaks back in.
+    const listCalls = vi.fn();
     server.use(
-      http.get(SCHEMAS_URL, () =>
-        HttpResponse.json({ schemas: [envelope("sch_broken", {})] }),
-      ),
-      http.get(`${SCHEMAS_URL}/sch_broken`, () => new HttpResponse(null, { status: 500 })),
+      http.get(SCHEMAS_URL, () => {
+        listCalls();
+        return HttpResponse.json({ schemas: [envelope("sch_business", BUSINESS)] });
+      }),
     );
     await renderAt("/schemas");
-    expect(await screen.findByRole("link", { name: "sch_broken" })).toBeInTheDocument();
+    await screen.findByRole("link", { name: "Business" });
+    expect(listCalls).toHaveBeenCalledTimes(1);
   });
 });
 

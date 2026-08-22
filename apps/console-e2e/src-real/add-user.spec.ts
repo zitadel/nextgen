@@ -31,9 +31,9 @@ async function openDrawer(page: Page, user: { email: string; password: string })
   await page.getByRole("button", { name: "Add", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
-  // Two fetches gate the form: the drawer shows "Loading schemas…" until the
-  // list resolves, and fields mount only once the selected schema's definition
-  // arrives. Locator actions auto-wait through both, but one-shot reads
+  // One fetch gates the form: the drawer shows "Loading schemas…" until the
+  // list — which carries each schema's document (#921) — resolves and the
+  // fields mount. Locator actions auto-wait through it, but one-shot reads
   // (`renderedFields`) and raw key presses don't — so only hand tests a drawer
   // whose form is actually on screen.
   await expect(drawer.locator('input[data-slot="input"]').first()).toBeVisible();
