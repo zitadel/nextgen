@@ -40776,6 +40776,7 @@ type VerifyChallengeProofErrorResponse struct {
 	EvtInvalid          EvtInvalid
 	Internal            Internal
 	ReqInvalid          ReqInvalid
+	UserInvalid         UserInvalid
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -40794,6 +40795,7 @@ const (
 	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
 	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
 	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
+	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -40849,6 +40851,11 @@ func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether VerifyChallengeProofErrorResponse is ReqInvalid.
 func (s VerifyChallengeProofErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidVerifyChallengeProofErrorResponse
+}
+
+// IsUserInvalid reports whether VerifyChallengeProofErrorResponse is UserInvalid.
+func (s VerifyChallengeProofErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidVerifyChallengeProofErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets VerifyChallengeProofErrorResponse to AttAlreadyHandedOff.
@@ -41079,6 +41086,27 @@ func (s VerifyChallengeProofErrorResponse) GetReqInvalid() (v ReqInvalid, ok boo
 func NewReqInvalidVerifyChallengeProofErrorResponse(v ReqInvalid) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserInvalid sets VerifyChallengeProofErrorResponse to UserInvalid.
+func (s *VerifyChallengeProofErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidVerifyChallengeProofErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if VerifyChallengeProofErrorResponse is UserInvalid.
+func (s VerifyChallengeProofErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserInvalid.
+func NewUserInvalidVerifyChallengeProofErrorResponse(v UserInvalid) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserInvalid(v)
 	return s
 }
 
