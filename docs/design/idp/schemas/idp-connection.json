@@ -203,14 +203,16 @@
                 "code_challenge_method",
                 "response_mode",
                 "request",
-                "request_uri"
+                "request_uri",
+                "client_secret",
+                "client_assertion"
               ]
             }
           },
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding."
+          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected by the same guard: values here are committed to git and appended to the public authorize URL, so a credential pasted one level too deep leaks twice."
         }
       }
     },
@@ -290,14 +292,16 @@
                 "code_challenge_method",
                 "response_mode",
                 "request",
-                "request_uri"
+                "request_uri",
+                "client_secret",
+                "client_assertion"
               ]
             }
           },
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding."
+          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected by the same guard: values here are committed to git and appended to the public authorize URL, so a credential pasted one level too deep leaks twice."
         },
         "supplementary_fetch": {
           "type": "string",

@@ -4,11 +4,14 @@
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
 > **Area:** 2 of 4 (see [`README.md`](README.md))
 
-This document defines how a user schema declares which external identity providers (like Google or GitHub) its users are permitted to sign in with, and how that configuration is wired into the login flow.
+This document defines how a user schema declares which external identity
+providers (like Google or GitHub) its users are permitted to sign in with, and
+how that configuration is wired into the login flow.
 
 ## The Three-Way Linkage
 
-Enabling a social provider for a user schema isn't a single toggle. It requires three distinct artifacts to align perfectly:
+Enabling a social provider for a user schema isn't a single toggle.
+It requires three distinct artifacts to align perfectly:
 
 | Artifact | Carries | Current State |
 | :--- | :--- | :--- |
@@ -16,7 +19,8 @@ Enabling a social provider for a user schema isn't a single toggle. It requires 
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
 | **Flow step** | `sso_providers: [{id, name, template}]` | Accepted by the meta-schema and validator; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
 
-Each authentication method surfaces differently within a flow, meaning there is no uniform rendering mechanism across the board:
+Each authentication method surfaces differently within a flow, meaning there is
+no uniform rendering mechanism across the board:
 
 ```text
 password → a field:      fields: ["x-auth-methods#password"]      // "only password is field-shaped today"
@@ -26,13 +30,25 @@ sso      → its own slot: sso_providers: [...] + transitions.callback
 
 ## Principle: Capability vs. Usage
 
-We enforce a strict separation between what is permitted and what is actually used:
+We enforce a strict separation between what is permitted and what is actually
+used:
 
-> **Schema declares capability · flow declares usage · validator enforces consistency.**
+> **Schema declares capability · flow declares usage · validator enforces
+> consistency.**
 
-For example, a password's presence in a flow is **not** automatically derived from the schema. The schema grants the capability (`password.enabled: true`), but the flow must independently declare its usage (`fields: ["x-auth-methods#password"]`). The `validateFlowDefinition` function then cross-checks the two using `authMethodEnabled` (which mirrors the Go server's `xAuthMethodsReader.IsEnabled`).
+For example, a password's presence in a flow is **not** automatically derived
+from the schema.
+The schema grants the capability (`password.enabled: true`), but the flow must
+independently declare its usage (`fields: ["x-auth-methods#password"]`).
+The `validateFlowDefinition` function then cross-checks the two using
+`authMethodEnabled` (which mirrors the Go server's
+`xAuthMethodsReader.IsEnabled`).
 
-SSO strictly follows this same pattern. Rather than dynamically injecting `sso_providers` at apply time, the CLI explicitly **scaffolds** the flow edit. This guarantees that the configuration file remains transparent and safely hand-editable.
+SSO strictly follows this same pattern.
+Rather than dynamically injecting `sso_providers` at apply time, the CLI
+explicitly **scaffolds** the flow edit.
+This guarantees that the configuration file remains transparent and safely
+hand-editable.
 
 ## Decision: Providers are Referenced in the User Schema
 
@@ -51,19 +67,37 @@ SSO strictly follows this same pattern. Rather than dynamically injecting `sso_p
 }
 ```
 
-We explicitly list SSO providers in the user schema rather than relying on a generic `sso.enabled` toggle, and rather than having the connection reference the schema.
+We explicitly list SSO providers in the user schema rather than relying on a
+generic `sso.enabled` toggle, and rather than having the connection reference
+the schema.
 
 **Why we rejected a generic `sso.enabled` toggle:**
-- **Peers of password and passkey:** The epic frames Google and GitHub as answers to "how should these users sign in?", a property of the schema.
-- **UI Visibility:** Both the post-claim journey and the Console need to display exactly which authentication methods a schema supports. A generic `sso.enabled` flag would only allow them to render a vague "SSO: on".
+- **Peers of password and passkey:** The epic frames Google and GitHub as
+  answers to "how should these users sign in?", a property of the schema.
+- **UI Visibility:** Both the post-claim journey and the Console need to display
+  exactly which authentication methods a schema supports.
+  A generic `sso.enabled` flag would only allow them to render a vague "SSO:
+  on".
 
 **Why we rejected having the connection list its schemas:**
-- **Avoiding Cascading Revisions:** Schemas do not have stable names; they are identified by revision IDs. If a connection referenced schemas, every schema edit would force a new connection revision, requiring complex `FlowRepin`-style rewrite mechanisms. Instead, connections use stable `slug`s specifically so they can be safely referenced by revision-named resources (like schemas) without triggering a cascade.
-- **Lookup Efficiency:** "Which providers does this schema offer?" is asked on every UI and post-claim render, and the schema is a document those views already hold. The reverse question is asked only at plan time, where scanning the working tree is fine.
+- **Avoiding Cascading Revisions:** Schemas do not have stable names; they are
+  identified by revision IDs.
+  If a connection referenced schemas, every schema edit would force a new
+  connection revision, requiring complex `FlowRepin`-style rewrite mechanisms.
+  Instead, connections use stable `slug`s specifically so they can be safely
+  referenced by revision-named resources (like schemas) without triggering a
+  cascade.
+- **Lookup Efficiency:** "Which providers does this schema offer?" is asked on
+  every UI and post-claim render, and the schema is a document those views
+  already hold.
+  The reverse question is asked only at plan time, where scanning the working
+  tree is fine.
 
 ### What Each State Means
 
-Three files can name a provider, and the same provider can be in any of four states for a user type. Each has one customer-facing meaning:
+Three files can name a provider, and the same provider can be in any of four
+states for a user type.
+Each has one customer-facing meaning:
 
 | State | Customer sees | Validator |
 | :--- | :--- | :--- |
@@ -72,32 +106,82 @@ Three files can name a provider, and the same provider can be in any of four sta
 | Listed and offered in a flow step | The button, on that page. | the cross-checks below |
 | Removed from `sso.providers`, or `sso.enabled: false` | This user type no longer uses the provider. Every flow that still offers it is an error until its step drops it. | Flow enables SSO, Provider ID validity, errors |
 
-A disabled slot is always written `{"enabled": false}` with no `providers` array. Disabling while keeping the list is rejected by the schema ([below](#providers-and-enabled-must-agree)), so there is no state that reads as paused but behaves as removed. Whether `enabled: false` should instead mean paused, flows untouched and the button hidden at render, is a question about every authentication method, not only `sso`; it is recorded in the [README](README.md#product-decisions).
+A disabled slot is always written `{"enabled": false}` with no `providers`
+array.
+Disabling while keeping the list is rejected by the schema
+([below](#providers-and-enabled-must-agree)), so there is no state that reads as
+paused but behaves as removed.
+Whether `enabled: false` should instead mean paused, flows untouched and the
+button hidden at render, is a question about every authentication method, not
+only `sso`; it is recorded in the [README](README.md#product-decisions).
 
-Removing a provider by hand is a two-file edit, and the plan says so: a flow pins a schema revision, so the schema edit re-pins every flow on it, and a flow that still offers the provider fails the plan before anything is applied (`apps/cli/src/lib/sync/flow-validation.ts`). Production keeps the old revisions. The Sign-in methods journey makes both edits in one step (area 4, [Post-Claim Re-entry](4-cli-provider-setup.md#post-claim-re-entry)): it removes the slug from `sso.providers` and from every step's `sso_providers`; an emptied list becomes `{"enabled": false}`; an emptied step drops its SSO-only transitions, the now-unreachable `register-sso` and `sso-conflict` steps, and the `user_already_exists` retarget. At least one method stays selected. That guards an empty method set, not existing users: removing a method strands users who hold only it, SSO or not, and the journey cannot see them ([README](README.md#product-decisions)). Deselecting never deletes the connection file or the credentials; an unused connection is area 1's inert-connection warning, and whether removing the last provider should offer to delete the file is open.
+Removing a provider by hand is a two-file edit, and the plan says so: a flow
+pins a schema revision, so the schema edit re-pins every flow on it, and a flow
+that still offers the provider fails the plan before anything is applied
+(`apps/cli/src/lib/sync/flow-validation.ts`).
+Production keeps the old revisions.
+The Sign-in methods journey makes both edits in one step (area 4,
+[Post-Claim Re-entry](4-cli-provider-setup.md#post-claim-re-entry)): it removes
+the slug from `sso.providers` and from every step's `sso_providers`; an emptied
+list becomes `{"enabled": false}`; an emptied step drops its SSO-only
+transitions, the now-unreachable `register-sso` and `sso-conflict` steps, and
+the `user_already_exists` retarget.
+At least one method stays selected.
+That guards an empty method set, not existing users: removing a method strands
+users who hold only it, SSO or not, and the journey cannot see them
+([README](README.md#product-decisions)).
+Deselecting never deletes the connection file or the credentials; an unused
+connection is area 1's inert-connection warning, and whether removing the last
+provider should offer to delete the file is open.
 
 ### Schema Location for `providers`
 
-Because `auth-method.json` is referenced (`$ref`) by all five authentication slots, simply adding `providers` to it would allow nonsensical configurations like `password.providers`. To solve this, we introduce a new `sso-auth-method.json` schema that extends the base definition. The main `auth-methods.json` schema then specifically points its `sso` slot to this new file. Same split as `user-property.json` / `property-name.json`.
+Because `auth-method.json` is referenced (`$ref`) by all five authentication
+slots, simply adding `providers` to it would allow nonsensical configurations
+like `password.providers`.
+To solve this, we introduce a new `sso-auth-method.json` schema that extends the
+base definition.
+The main `auth-methods.json` schema then specifically points its `sso` slot to
+this new file.
+Same split as `user-property.json` / `property-name.json`.
 
 ### `providers` and `enabled` Must Agree
 
-The `providers` array is required and non-empty when SSO is enabled, and absent when it is not.
+The `providers` array is required and non-empty when SSO is enabled, and absent
+when it is not.
 
-- **Avoiding the "Absent-Means-All" Footgun:** If an omitted array defaulted to "allow all," adding a new GitHub connection for one specific schema would silently activate it across *every* schema where `sso.enabled: true`. This directly violates the rule that simply creating a provider connection does not make it universally available.
-- **Disabled carries no `providers` array:** A generator that emits all five slots as `{"enabled": false}` stays valid. A disabled slot that still carries a list is rejected, so `enabled` and the list never disagree about whether the user type uses social sign-in ([What Each State Means](#what-each-state-means)).
+- **Avoiding the "Absent-Means-All" Footgun:** If an omitted array defaulted to
+  "allow all," adding a new GitHub connection for one specific schema would
+  silently activate it across *every* schema where `sso.enabled: true`.
+  This directly violates the rule that simply creating a provider connection
+  does not make it universally available.
+- **Disabled carries no `providers` array:** A generator that emits all five
+  slots as `{"enabled": false}` stays valid.
+  A disabled slot that still carries a list is rejected, so `enabled` and the
+  list never disagree about whether the user type uses social sign-in
+  ([What Each State Means](#what-each-state-means)).
 
 The draft: [`schemas/sso-auth-method.json`](schemas/sso-auth-method.json).
 
-The `enabled` field remains strictly required, matching the behavior of the other four authentication methods.
+The `enabled` field remains strictly required, matching the behavior of the
+other four authentication methods.
 
-- **Migration friendly:** A bare `{"enabled": false}` object is perfectly valid. This allows an existing schema to introduce the `sso` slot before it actually defines any providers.
+- **Migration friendly:** A bare `{"enabled": false}` object is perfectly valid.
+  This allows an existing schema to introduce the `sso` slot before it actually
+  defines any providers.
 
-These exact schema constraints (specifically that `{"enabled": false}` is valid for migrations, that `enabled: false` with a list is rejected, and that `enabled: true` paired with an empty or missing `providers` list is rejected) are verified in [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts).
+These exact schema constraints (specifically that `{"enabled": false}` is valid
+for migrations, that `enabled: false` with a list is rejected, and that
+`enabled: true` paired with an empty or missing `providers` list is rejected)
+are verified in
+[`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts).
 
 ## Validation Rules
 
-The validation model strictly follows the established password precedent: the flow declares usage, and the validator checks that the schema explicitly enables it (emitting an error like *`step "…": "password" is not an enabled authentication method`* if it fails).
+The validation model strictly follows the established password precedent: the
+flow declares usage, and the validator checks that the schema explicitly enables
+it (emitting an error like
+*`step "…": "password" is not an enabled authentication method`* if it fails).
 
 | Rule / Condition | Status & Impact |
 | :--- | :--- |
@@ -116,16 +200,33 @@ The validation model strictly follows the established password precedent: the fl
 
 ### Deliberate Exclusions from Validation
 
-The validator deliberately **does not** cross-check `sso_providers[].name` or `sso_providers[].template` against the connection file.
+The validator deliberately **does not** cross-check `sso_providers[].name` or
+`sso_providers[].template` against the connection file.
 
-`name` is display copy, often localized client-side, and `template` a rendering hint; a flow may override both. Only `id` (the slug) must resolve.
+`name` is display copy, often localized client-side, and `template` a rendering
+hint; a flow may override both.
+Only `id` (the slug) must resolve.
 
 ## Open Points
 
-- **Generators around a method set:** `sign-in-preset.ts` is a single-select over two presets that drives both the schema and the flow generator, with the use case applied as a post-transform. The epic needs a multi-select over four methods (passkey pre-selected, Google and GitHub flagged as needing setup). Recomposing the generators around a method set instead of a preset is the main CLI work in this area and is not designed yet.
-- **Breaking schema migrations:** Switching to `sso-auth-method.json` is a breaking change for one specific schema state: any payload containing `sso: {"enabled": true}` without a `providers` array. While this was valid under the legacy `auth-method.json`, it fails the new conditional validation. Existing stored schema revisions are immutable and unaffected, but attempting to re-publish or edit an affected schema body will trigger a validation error until a non-empty `providers` list is added or the `sso` block is removed. Schemas omitting the `sso` entry entirely remain unaffected.
+- **Generators around a method set:** `sign-in-preset.ts` is a single-select
+  over two presets that drives both the schema and the flow generator, with the
+  use case applied as a post-transform.
+  The epic needs a multi-select over four methods (passkey pre-selected, Google
+  and GitHub flagged as needing setup).
+  Recomposing the generators around a method set instead of a preset is the main
+  CLI work in this area and is not designed yet.
+- **Breaking schema migrations:** Switching to `sso-auth-method.json` is a
+  breaking change for one specific schema state: any payload containing
+  `sso: {"enabled": true}` without a `providers` array.
+  While this was valid under the legacy `auth-method.json`, it fails the new
+  conditional validation.
+  Existing stored schema revisions are immutable and unaffected, but attempting
+  to re-publish or edit an affected schema body will trigger a validation error
+  until a non-empty `providers` list is added or the `sso` block is removed.
+  Schemas omitting the `sso` entry entirely remain unaffected.
 
-## Exported Requirements
+## Dependencies
 
 | Requirement | Owed By |
 | :--- | :--- |
@@ -134,13 +235,25 @@ The validator deliberately **does not** cross-check `sso_providers[].name` or `s
 | **Register-step topology:** "both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision" ([Open Points](#open-points)). | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: shared entry step) |
 | **Runtime example alignment:** `components/flows/sso-provider.yaml` shows an instance-suffixed `id: google-1`; `SSOProvider.id` is the connection slug, and the runtime example must say so before the engine reads it. | Flow API docs |
 
-The two pairing rows live here because the flow definition is the only document that references both sides: its `user_schema` pins the schema revision and its `sso_providers[].id` names the connection. Connection-side checks flag a key unknown to *every* referencing schema; partial per-pair overlap is legitimate, since a connection may map a superset. Both rows are provisional pending schema-keyed validation ([area 1](1-resource-model.md#open-points)). Cross-resource rules are implemented twice, in `validate.ts` and the Go server; the Go analog of `xAuthMethodsReader` is tracked in area 1's [Exported requirements](1-resource-model.md#exported-requirements).
+The two pairing rows live here because the flow definition is the only document
+that references both sides: its `user_schema` pins the schema revision and its
+`sso_providers[].id` names the connection.
+Connection-side checks flag a key unknown to *every* referencing schema; partial
+per-pair overlap is legitimate, since a connection may map a superset.
+Both rows are provisional pending schema-keyed validation
+([area 1](1-resource-model.md#open-points)).
+Cross-resource rules are implemented twice, in `validate.ts` and the Go server;
+the Go analog of `xAuthMethodsReader` is tracked in area 1's
+[Dependencies](1-resource-model.md#dependencies).
 
 ## Related
 
 - [`1-resource-model.md`](1-resource-model.md) (area 1)
-- [ADR 020](../../adrs/020-credentials-out-of-user-schema.md) (`x-auth-methods` as policy input)
+- [ADR 020](../../adrs/020-credentials-out-of-user-schema.md) (`x-auth-methods`
+  as policy input)
 - `packages/config/meta-schemas/auth-methods.json`, `auth-method.json`
-- `packages/config/src/validate.ts` (`validateFlowDefinition`, `RESERVED_OUTCOMES`, `PURPOSE_FLIP_TARGETS`; internal `authMethodEnabled`, `resolveFieldChallenge`, `AUTH_METHOD_PREFIX`)
+- `packages/config/src/validate.ts` (`validateFlowDefinition`,
+  `RESERVED_OUTCOMES`, `PURPOSE_FLIP_TARGETS`; internal `authMethodEnabled`,
+  `resolveFieldChallenge`, `AUTH_METHOD_PREFIX`)
 - `packages/config/defaults/default-login.json` (step shapes)
 - `api/openapi/endpoints/schemas/flow-definition.json` (`SSOProvider`)

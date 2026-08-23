@@ -112,6 +112,8 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["static param prompt allowed", { ...root, protocol: "oidc", oidc: { ...oidcBlock, static_authorize_parameters: { prompt: "select_account" } } }, true],
   ["static param reserved (state)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, static_authorize_parameters: { state: "x" } } }, false],
   ["static param reserved (redirect_uri)", { ...oauth2, oauth2: { ...oauth2Block, static_authorize_parameters: { redirect_uri: "https://evil.example" } } }, false],
+  ["static param client_secret", { ...root, protocol: "oidc", oidc: { ...oidcBlock, static_authorize_parameters: { client_secret: "leak" } } }, false],
+  ["static param client_assertion", { ...oauth2, oauth2: { ...oauth2Block, static_authorize_parameters: { client_assertion: "eyJhbGc" } } }, false],
   // TLS on endpoint URLs (pattern; localhost carve-out for dev)
   ["http issuer rejected", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://accounts.google.com" } }, false],
   ["http localhost issuer allowed (dev)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://localhost:8080" } }, true],
