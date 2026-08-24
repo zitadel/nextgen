@@ -1,6 +1,5 @@
 ---
 "@zitadel/components": minor
-"@zitadel/ui-react": minor
 ---
 
 Add the `Checkbox` and `Select` atoms in both renderers, and render the

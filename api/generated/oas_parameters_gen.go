@@ -3657,8 +3657,8 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 type ListSchemasParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Number of items to skip before returning results.
-	Offset OptInt `json:",omitempty,omitzero"`
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results.
 	// Obtain this value from `next_page_token` in the previous response.
 	// Omit to start from the beginning.
@@ -3666,6 +3666,14 @@ type ListSchemasParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The type of object of the schema to filter by.
 	ObjectType OptString `json:",omitempty,omitzero"`
+	// The kind of schema to filter by, read from the stored document's
+	// `kind` property.
+	// `schema-url` is not a kind: it discriminates the create request body,
+	// not a stored schema. A schema registered by URL is stored as whatever
+	// document the URL served, and declares its own kind.
+	// A schema stored without its document being parsed has no kind that
+	// could be read, and is excluded from every filtered result.
+	Kind OptListSchemasKind `json:",omitempty,omitzero"`
 }
 
 func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasParams) {
@@ -3678,11 +3686,11 @@ func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasPa
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "offset",
+			Name: "limit",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.Offset = v.(OptInt)
+			params.Limit = v.(OptLimit)
 		}
 	}
 	{
@@ -3701,6 +3709,15 @@ func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasPa
 		}
 		if v, ok := packed[key]; ok {
 			params.ObjectType = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "kind",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Kind = v.(OptListSchemasKind)
 		}
 	}
 	return params
@@ -3759,58 +3776,55 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 			Err:  err,
 		}
 	}
-	// Set default value for query: offset.
+	// Set default value for query: limit.
 	{
-		val := int(0)
-		params.Offset.SetTo(val)
+		val := int(20)
+		params.Limit.SetTo(Limit(val))
 	}
-	// Decode query: offset.
+	// Decode query: limit.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "offset",
+			Name:    "limit",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotOffsetVal int
+				var paramsDotLimitVal Limit
 				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
+					var paramsDotLimitValVal int
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToInt(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotLimitValVal = c
+						return nil
+					}(); err != nil {
 						return err
 					}
-
-					c, err := conv.ToInt(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotOffsetVal = c
+					paramsDotLimitVal = Limit(paramsDotLimitValVal)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.Offset.SetTo(paramsDotOffsetVal)
+				params.Limit.SetTo(paramsDotLimitVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.Offset.Get(); ok {
+				if value, ok := params.Limit.Get(); ok {
 					if err := func() error {
-						if err := (validate.Int{
-							MinSet:        true,
-							Min:           0,
-							MaxSet:        false,
-							Max:           0,
-							MinExclusive:  false,
-							MaxExclusive:  false,
-							MultipleOfSet: false,
-							MultipleOf:    0,
-							Pattern:       nil,
-						}).Validate(int64(value)); err != nil {
-							return errors.Wrap(err, "int")
+						if err := value.Validate(); err != nil {
+							return err
 						}
 						return nil
 					}(); err != nil {
@@ -3825,7 +3839,7 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "offset",
+			Name: "limit",
 			In:   "query",
 			Err:  err,
 		}
@@ -3942,6 +3956,62 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "object_type",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: kind.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "kind",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotKindVal ListSchemasKind
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotKindVal = ListSchemasKind(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Kind.SetTo(paramsDotKindVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Kind.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "kind",
 			In:   "query",
 			Err:  err,
 		}

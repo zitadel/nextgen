@@ -98,7 +98,13 @@ describe("materializeSetupResources", () => {
     };
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      getSchemaById: vi.fn().mockResolvedValue(canonical),
+      // `GET /schemas/{id}` serves the `{id, schema, metadata}` envelope;
+      // write-back must unwrap the document before it reaches disk.
+      getSchemaById: vi.fn().mockResolvedValue({
+        id: "sch_01KWHF",
+        schema: canonical,
+        metadata: { created_at: "2026-01-01T00:00:00Z" },
+      }),
       createFlowDefinition: vi.fn().mockResolvedValue({
         id: "flow_01KWHG",
         status: "active",

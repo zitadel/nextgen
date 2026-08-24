@@ -1,0 +1,125 @@
+/* Styles for `<zl-button>` — shadow host rules first, then the painted surface. */
+
+:host {
+  display: inline-flex;
+}
+:host([block]) {
+  display: flex;
+  width: 100%;
+}
+/* A slotted <zl-icon> is a light-DOM child of the host, not of .zr-btn, so it
+   can't inherit from the inner button — give the host the same foreground. */
+:host([hierarchy="primary"]) {
+  color: var(--zl-primary-foreground);
+}
+:host([hierarchy="secondary"]) {
+  color: var(--zl-secondary-foreground);
+}
+:host([hierarchy="text"]) {
+  color: var(--zl-foreground);
+}
+:host([disabled]) {
+  color: var(--zl-muted-foreground);
+}
+::slotted([slot="leading"]),
+::slotted([slot="trailing"]) {
+  display: inline-flex;
+  align-items: center;
+}
+.zr-btn .spinner {
+  display: inline-flex;
+}
+
+:where(.zr-btn) {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zl-spacing-1-5);
+  /* shadcn's documented default (`px-4`), not the 10px the login frames
+     resolve to: every button on those frames is full-width, so their inline
+     padding never renders and would only mis-size a hugging button elsewhere. */
+  padding-inline: var(--zl-spacing-4);
+  padding-block: var(--zl-spacing-2);
+  border: 1px solid transparent;
+  border-radius: var(--zl-radius-md);
+  font-family: var(--zl-font-family-sans);
+  font-weight: var(--zl-font-weight-medium);
+  text-align: center;
+  white-space: nowrap;
+  transition:
+    background-color var(--zl-duration-fast) var(--zl-easing-standard),
+    color var(--zl-duration-fast) var(--zl-easing-standard),
+    border-color var(--zl-duration-fast) var(--zl-easing-standard);
+}
+.zr-btn--block {
+  display: flex;
+  width: 100%;
+}
+.zr-btn--medium {
+  height: var(--zl-spacing-9);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+}
+.zr-btn--small {
+  height: var(--zl-spacing-8);
+  padding-inline: var(--zl-spacing-3);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+}
+.zr-btn:focus-visible,
+.zr-btn[data-state="focused"] {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}
+
+.zr-btn--primary {
+  background: var(--zl-primary);
+  color: var(--zl-primary-foreground);
+}
+.zr-btn--secondary {
+  background: var(--zl-secondary);
+  color: var(--zl-secondary-foreground);
+}
+.zr-btn--text {
+  background: transparent;
+  color: var(--zl-foreground);
+}
+
+/* shadcn expresses button hover as an opacity shift on the same fill rather
+   than a second colour, so there is no `primary-hover` token to reach for.
+   `color-mix` reproduces it — but toward `background`, not `transparent`:
+   an alpha fill lets the surface behind it through, and a label chosen for
+   contrast against the solid fill stops being legible against the blend. */
+.zr-btn--primary:hover:not(:disabled),
+.zr-btn--primary[data-state="hovered"]:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-primary) 90%, var(--zl-background));
+}
+.zr-btn--secondary:hover:not(:disabled),
+.zr-btn--secondary[data-state="hovered"]:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-secondary) 80%, var(--zl-foreground));
+}
+.zr-btn--text:hover:not(:disabled),
+.zr-btn--text[data-state="hovered"]:not(:disabled) {
+  background: var(--zl-accent);
+  color: var(--zl-accent-foreground);
+}
+
+.zr-btn--primary:active:not(:disabled),
+.zr-btn--primary[data-state="pressed"]:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-primary) 80%, var(--zl-background));
+}
+.zr-btn--secondary:active:not(:disabled),
+.zr-btn--secondary[data-state="pressed"]:not(:disabled),
+.zr-btn--text:active:not(:disabled),
+.zr-btn--text[data-state="pressed"]:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-accent) 80%, var(--zl-foreground));
+}
+
+.zr-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

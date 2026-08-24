@@ -19,10 +19,12 @@ SELECT
     'team_' || inst_id AS name
 FROM generate_series(1, 10) AS s(inst_id);
 
-INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload)
+-- The payload is an empty document, so it declares no kind.
+INSERT INTO zitadel_nextgen.json_schemas (project_id, url, kind, payload)
 SELECT
     p.id AS project_id,
     './user.schema.json',
+    'unknown',
     '{}' ::json
 FROM zitadel_nextgen.projects p;
 

@@ -1,0 +1,48 @@
+/* Styles for `<zl-pill>` — shadow host rules first, then the painted surface. */
+
+:host {
+  display: inline-flex;
+}
+
+/* The shadcn `Badge`. `h-5` is the design system's own height, with the 1px
+   border inside it — left to hug, the same padding and line-height render 22px. */
+.zr-pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zl-spacing-1);
+  height: var(--zl-spacing-5);
+  padding-block: var(--zl-spacing-0-5);
+  padding-inline: var(--zl-spacing-2);
+  border: 1px solid transparent;
+  border-radius: var(--zl-radius-full);
+  background: var(--zl-secondary);
+  color: var(--zl-secondary-foreground);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-xs-size);
+  line-height: var(--zl-text-xs-leading);
+  font-weight: var(--zl-font-weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.zr-pill--success {
+  background: color-mix(in srgb, var(--zl-success) 15%, transparent);
+  color: var(--zl-success);
+}
+.zr-pill--error {
+  background: color-mix(in srgb, var(--zl-destructive) 15%, transparent);
+  color: var(--zl-destructive);
+}
+.zr-pill--outline {
+  background: transparent;
+  border-color: var(--zl-border);
+  color: var(--zl-foreground);
+}
+a.zr-pill:hover {
+  background: color-mix(in srgb, var(--zl-secondary) 80%, transparent);
+}
+a.zr-pill:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}

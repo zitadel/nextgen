@@ -270,6 +270,15 @@ func TestClaimStatements_OwningTeamGrant(t *testing.T) {
 			assert.ErrorIs(t, err, new(database.NoRowFoundError), "revoked grant no longer claims")
 		})
 
+		t.Run("owning grant with expiry rejected", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			asgn := domain.NewClaimTeamAssignment(projectID, "team-exp-"+uniqueSuffix(t))
+			expiresAt := time.Now().Add(time.Hour)
+			asgn.ExpiresAt = &expiresAt
+			assert.ErrorIs(t, d.stmts.CreateAuthzAssignment(t.Context(), asgn), new(database.CheckError),
+				"an expiring owning-team grant must fail the schema CHECK (ADR 054 §2)")
+		})
+
 		t.Run("one active owning team per project", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),

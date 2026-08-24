@@ -31,8 +31,10 @@ import type {
   GetFlowDefinition200,
   GetProject200,
   GetSchemaById200,
+  GetSchemaById200Schema,
   InitClaim201,
   ListFlowDefinitions200,
+  ListSchemas200,
   ListFlowDefinitions200FlowDefinitionsItem,
   UpdateFlowDefinition200,
 } from "@zitadel/api/generated/model";
@@ -183,15 +185,16 @@ type FlowDefinitionRecord = {
 
 /**
  * Server-side metadata wrapped around the schema body so the mock can answer
- * `POST /schemas` (returns id), `GET /schemas/:id` (returns body), and
- * `GET /schemas` (list — id + createdAt, filterable by object_type).
+ * `POST /schemas` (returns id) and, for `GET /schemas/:id` and `GET /schemas`,
+ * build the `{id, schema, metadata}` envelope around the stored document
+ * (list filterable by object_type).
  */
 type SchemaRecord = {
   id: string;
   projectId: string;
   objectType?: string;
   createdAt: string;
-  body: GetSchemaById200;
+  body: GetSchemaById200Schema;
 };
 
 /**
@@ -277,8 +280,8 @@ function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200Fl
   };
 }
 
-function defaultHumanUserSchema(): GetSchemaById200 {
-  return getDefaultHumanUserSchema() as unknown as GetSchemaById200;
+function defaultHumanUserSchema(): GetSchemaById200Schema {
+  return getDefaultHumanUserSchema() as unknown as GetSchemaById200Schema;
 }
 
 function seedDefaultProjectResources(projectID: string, createdAt: string): void {
@@ -304,7 +307,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   });
 }
 
-function schemaObjectType(body: GetSchemaById200): string | undefined {
+function schemaObjectType(body: GetSchemaById200Schema): string | undefined {
   const value = (body as unknown as { objectType?: unknown }).objectType;
   return typeof value === "string" ? value : undefined;
 }
@@ -677,7 +680,7 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const schemaBody = raw as unknown as GetSchemaById200;
+      const schemaBody = raw as unknown as GetSchemaById200Schema;
       const id = `sch_${shortId()}`;
       store.schemas.set(id, {
         id,
@@ -703,9 +706,14 @@ export function setupPlatformHandlers() {
         .filter((r) => r.projectId === projectId)
         .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      return HttpResponse.json(
-        records.map((r) => ({ id: r.id, created_at: r.createdAt })),
-      );
+      const responseBody: ListSchemas200 = {
+        schemas: records.map((r) => ({
+          id: r.id,
+          schema: r.body,
+          metadata: { created_at: r.createdAt },
+        })),
+      };
+      return HttpResponse.json(responseBody);
     }),
 
     http.get("*/schemas/:id", ({ params, request }) => {
@@ -724,7 +732,12 @@ export function setupPlatformHandlers() {
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      return HttpResponse.json(record.body);
+      const responseBody: GetSchemaById200 = {
+        id: record.id,
+        schema: record.body,
+        metadata: { created_at: record.createdAt },
+      };
+      return HttpResponse.json(responseBody);
     }),
 
     http.delete("*/schemas/:id", ({ params, request }) => {

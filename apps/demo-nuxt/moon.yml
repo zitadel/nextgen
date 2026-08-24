@@ -6,7 +6,6 @@ dependsOn:
   - "components"
   - "design-tokens"
   - "sdk-nuxt"
-  - "shared-component-styles"
 
 tasks:
   lint:

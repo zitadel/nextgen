@@ -72,7 +72,6 @@ export function nuxtConfigEdit(opts: {
     for (const dep of [
       "@zitadel/api",
       "@zitadel/components",
-      "@zitadel/shared-component-styles",
       "@zitadel/design-tokens",
     ]) {
       if (ensureArrayItem(build, "transpile", dep)) {

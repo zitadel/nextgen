@@ -44,7 +44,7 @@ describe("schemas list", () => {
   it("returns an empty payload with a helpful message when no revisions exist", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get("*/schemas", () => HttpResponse.json([])),
+      http.get("*/schemas", () => HttpResponse.json({ schemas: [] })),
     );
 
     const res = await runCliForTest([
@@ -79,10 +79,20 @@ describe("schemas list", () => {
         const url = new URL(request.url);
         expect(url.searchParams.get("project_id")).toBe("proj_test");
         expect(url.searchParams.get("object_type")).toBe("human-user");
-        return HttpResponse.json([
-          { id: "sch_02", created_at: "2026-07-02T00:00:00Z" },
-          { id: "sch_01", created_at: "2026-06-01T00:00:00Z" },
-        ]);
+        return HttpResponse.json({
+          schemas: [
+            {
+              id: "sch_02",
+              schema: { kind: "user-schema" },
+              metadata: { created_at: "2026-07-02T00:00:00Z" },
+            },
+            {
+              id: "sch_01",
+              schema: { kind: "user-schema" },
+              metadata: { created_at: "2026-06-01T00:00:00Z" },
+            },
+          ],
+        });
       }),
     );
 
@@ -109,8 +119,9 @@ describe("schemas list", () => {
     };
     expect(json.status).toBe("ok");
     expect(json.data.count).toBe(2);
-    // Envelope rows are snake_case like the rest of the data contract,
-    // even though the server response is camelCase.
+    // Rows stay the flat `{id, created_at}` stdout contract even though the
+    // wire response nests the timestamp in `metadata` and carries the full
+    // document.
     expect(json.data.revisions).toEqual([
       { id: "sch_02", created_at: "2026-07-02T00:00:00Z" },
       { id: "sch_01", created_at: "2026-06-01T00:00:00Z" },
@@ -125,7 +136,11 @@ describe("schemas list", () => {
     server.use(
       http.get("*/schemas/:id", ({ request }) => {
         receivedPath = new URL(request.url).pathname;
-        return HttpResponse.json({ kind: "user-schema" });
+        return HttpResponse.json({
+          id: urlId,
+          schema: { kind: "user-schema" },
+          metadata: { created_at: "2026-06-01T00:00:00Z" },
+        });
       }),
     );
     const client = createZitadelClient({ baseUrl: "https://api.zitadel.cloud" });
@@ -133,6 +148,7 @@ describe("schemas list", () => {
     const body = await fetchSchemaRevision(client, urlId);
 
     expect(receivedPath).toBe(`/schemas/${encodeURIComponent(urlId)}`);
+    // The revision body is the customer document unwrapped from the envelope.
     expect(body).toEqual({ kind: "user-schema" });
   });
 });

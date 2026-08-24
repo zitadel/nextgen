@@ -23,6 +23,7 @@
  *   POST   /projects/:id/claim/init   — mint a claim challenge
  *   GET    /projects/:id/claim/status — poll a claim challenge
  *   POST   /schemas                   — create user schema
+ *   GET    /schemas                   — list user schemas
  *   GET    /schemas/:id               — fetch user schema
  *   DELETE /schemas/:id               — delete user schema
  *   POST   /flow_definitions          — create flow definition

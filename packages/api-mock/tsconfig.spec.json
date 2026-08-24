@@ -8,7 +8,7 @@
     "module": "esnext",
     "moduleResolution": "bundler"
   },
-  "include": ["vitest.config.ts", "src/**/*.spec.ts"],
+  "include": ["src/**/*.spec.ts"],
   "references": [
     {
       "path": "./tsconfig.lib.json"

@@ -12,7 +12,7 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  * The base token sheet ships both modes (`:host` / `:host([data-theme=…])`
  * after the selector rewrite in `branding-to-tokens`), and the orchestrator
  * stamps the resolved mode on its own host element. Regression guard: the
- * atom-facing `--zl-color-*` tokens once lived only in the dark block, so
+ * atom-facing tokens once lived only in the dark block, so
  * `data-theme="light"` resolved correctly while every surface stayed dark —
  * asserting the attribute alone would not have caught that.
  */
@@ -33,19 +33,27 @@ const identifierStep: CreateFlow201 = {
 };
 
 /** Perceived lightness of a `rgb(r, g, b)` string, 0 (black) – 255 (white). */
+/**
+ * 0–255 channels from any colour Chrome hands back. `rgb()` already uses that
+ * range, but a computed `color-mix()` serialises as `color(srgb r g b)` with
+ * 0–1 channels — read naively, every mixed colour reads as near-black and a
+ * contrast assertion fails for a reason that has nothing to do with the design.
+ */
+function channels(color: string): [number, number, number] {
+  const scale = color.startsWith("color(") ? 255 : 1;
+  const parts = (color.match(/[\d.]+/g) ?? ["0", "0", "0"]).slice(0, 3);
+  return parts.map((part) => Number(part) * scale) as [number, number, number];
+}
+
 function luminance(color: string): number {
-  const [r, g, b] = (color.match(/\d+/g) ?? ["0", "0", "0"]).map(Number) as [
-    number,
-    number,
-    number,
-  ];
+  const [r, g, b] = channels(color);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** WCAG relative luminance of a `rgb(r, g, b)` string. */
+/** WCAG relative luminance. */
 function relativeLuminance(color: string): number {
-  const [r, g, b] = (color.match(/[\d.]+/g) ?? ["0", "0", "0"]).slice(0, 3).map((part) => {
-    const channel = Number(part) / 255;
+  const [r, g, b] = channels(color).map((value) => {
+    const channel = value / 255;
     return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
   }) as [number, number, number];
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -133,14 +141,13 @@ describe("<zitadel-login> theming (chromium)", () => {
     });
     expect(element.dataset.theme).toBe("light");
 
-    // Page surface becomes light and primary text becomes dark — the tokens
-    // the atoms actually consume, not just the shadcn namespace.
-    expect(tokenValue(element, "--zl-color-surface-default-black")).toBe("#f4f4f6");
-    expect(tokenValue(element, "--zl-color-text-primary-white")).toBe("#0f0f11");
+    // Page surface becomes light and primary text becomes dark.
+    expect(tokenValue(element, "--zl-background")).toBe("#fafafa");
+    expect(tokenValue(element, "--zl-foreground")).toBe("#0a0a0a");
     // The card sits above the page, as in dark mode.
-    expect(tokenValue(element, "--zl-color-surface-default-primary-gray")).toBe("#ffffff");
-    // A focus ring the colour of dark-mode text would be invisible here.
-    expect(tokenValue(element, "--zl-focus-color")).toBe("#0f0f11");
+    expect(tokenValue(element, "--zl-card")).toBe("#ffffff");
+    // A focus ring the colour of the dark-mode ring would be invisible here.
+    expect(tokenValue(element, "--zl-ring")).toBe("#a3a3a3");
 
     // And it reaches real pixels: the page shell paints light.
     const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
@@ -202,31 +209,29 @@ describe("<zitadel-login> theming (chromium)", () => {
   }
 
   /**
-   * The attribution pill painted its sheen from hardcoded dark literals, so
-   * it stayed a dark slab on a light page whatever the theme resolved to.
-   * The gradient stops are tokens now; assert the painted stops follow.
+   * The trustmark painted itself from hardcoded dark literals, so it stayed a
+   * dark slab on a light page whatever the theme resolved to. It is plain text
+   * on the `foreground` role now, and the logotype inherits that colour.
    */
-  it("theme=light lightens the attribution pill's gradient", async () => {
+  it("theme=light darkens the trustmark so it reads on a light page", async () => {
     const element = await mount((el) => {
       el.theme = "light";
       el.variant = "page";
     });
-    const pill = element.shadowRoot?.querySelector("zl-pill") as HTMLElement;
-    const surface = pill.shadowRoot?.querySelector(".zr-pill") as HTMLElement;
-    const style = getComputedStyle(surface);
+    const mark = element.shadowRoot?.querySelector(".zl-trustmark__mark") as HTMLElement;
+    expect(mark).toBeTruthy();
+    const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
+    const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
 
-    // Both stops sit on the light end of the ramp, so the pill reads as a
-    // light chip and its dark text stays legible. Chrome serialises a
-    // `color-mix()` result as `color(srgb r g b / a)` with 0–1 channels.
-    const stops = style.backgroundImage.match(/color\(srgb[^)]*\)|rgba?\([^)]*\)/g) ?? [];
-    expect(stops.length).toBeGreaterThanOrEqual(2);
-    for (const stop of stops) {
-      const scale = stop.startsWith("color(") ? 255 : 1;
-      const channels = (stop.match(/[\d.]+/g) ?? []).slice(0, 3);
-      const rgb = `rgb(${channels.map((channel) => Math.round(Number(channel) * scale)).join(", ")})`;
-      expect(luminance(rgb), `${stop} in ${style.backgroundImage}`).toBeGreaterThan(150);
-    }
-    expect(contrast(style.backgroundColor, style.color)).toBeGreaterThanOrEqual(4.5);
+    const style = getComputedStyle(mark);
+    expect(luminance(style.color)).toBeLessThan(100);
+    expect(contrast(getComputedStyle(surface).backgroundColor, style.color)).toBeGreaterThanOrEqual(
+      4.5,
+    );
+    // `fill="currentColor"` on the logotype, so the mark's colour carries it.
+    const logotype = mark.querySelector(".zl-trustmark__logotype-svg") as SVGElement;
+    expect(logotype).toBeTruthy();
+    expect(getComputedStyle(logotype).fill).toBe(style.color);
   });
 
   /**
@@ -267,8 +272,8 @@ describe("<zitadel-login> theming (chromium)", () => {
       el.variant = "page";
     });
     expect(element.dataset.theme).toBe("dark");
-    expect(tokenValue(element, "--zl-color-surface-default-black")).toBe("#0f0f11");
-    expect(tokenValue(element, "--zl-color-text-primary-white")).toBe("#f4f4f6");
+    expect(tokenValue(element, "--zl-background")).toBe("#050505");
+    expect(tokenValue(element, "--zl-foreground")).toBe("#fafafa");
     const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);

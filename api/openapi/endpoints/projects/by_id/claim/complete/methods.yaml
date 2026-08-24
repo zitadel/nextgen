@@ -41,6 +41,14 @@ post:
         application/json:
           schema:
             $ref: ../../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: |
+        The session user has no active personal team in the platform project,
+        so there is no team to attach the claimed project to.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
     '404':
       description: Challenge not found.
       content:

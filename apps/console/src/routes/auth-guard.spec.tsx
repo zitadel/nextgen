@@ -53,7 +53,7 @@ vi.mock("@zitadel/sdk-react", () => ({
  * landed. A path pattern rather than an absolute URL: this spec imports the
  * router statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
  */
-const server = setupServer(http.get("*/api/schemas", () => HttpResponse.json([])));
+const server = setupServer(http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })));
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterAll(() => server.close());

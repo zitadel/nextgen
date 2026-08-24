@@ -3,7 +3,10 @@ import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
-import type { ListSchemas200Item } from "@zitadel/api/generated/model";
+import type {
+  GetSchemaById200,
+  ListSchemas200SchemasItem,
+} from "@zitadel/api/generated/model";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { environmentSchema } from "../../lib/environment";
@@ -47,14 +50,17 @@ export default class SchemasList extends BaseCommand {
     });
 
     const objectType = flags["object-type"];
-    const revisions = await client.listSchemas({
+    const { schemas: revisions } = await client.listSchemas({
       project_id: secret.project_id,
       object_type: objectType,
     });
 
     // The envelope's row shape is a contract; project it explicitly so a field
     // added to the API later cannot leak into stdout.
-    const revisionRows = revisions.map((r) => ({ id: r.id, created_at: r.created_at }));
+    const revisionRows = revisions.map((r) => ({
+      id: r.id,
+      created_at: r.metadata.created_at,
+    }));
 
     if (revisions.length === 0) {
       const message = `No revisions found for objectType "${objectType}".`;
@@ -83,7 +89,7 @@ export default class SchemasList extends BaseCommand {
       message: `Revisions of objectType "${objectType}" (newest first)`,
       options: revisions.map((r, idx) => ({
         value: r.id,
-        label: `${r.created_at}   ${r.id}${idx === 0 ? "   (latest)" : ""}`,
+        label: `${r.metadata.created_at}   ${r.id}${idx === 0 ? "   (latest)" : ""}`,
       })),
     });
     if (isCancel(picked)) {
@@ -124,15 +130,24 @@ export default class SchemasList extends BaseCommand {
  */
 export async function fetchSchemaRevision(client: ZitadelClient, id: string): Promise<unknown> {
   // Flat-by-id: authz resolves the project from RSI; no project_id query.
-  return client.getSchemaById(encodeURIComponent(id));
+  // The response is the `{id, schema, metadata}` envelope; the revision body
+  // callers want is the customer-authored document inside it.
+  const body = (await client.getSchemaById(encodeURIComponent(id))) as GetSchemaById200;
+  return body.schema;
 }
 
-function renderTable(objectType: string, revisions: ReadonlyArray<ListSchemas200Item>): string {
+function renderTable(
+  objectType: string,
+  revisions: ReadonlyArray<ListSchemas200SchemasItem>,
+): string {
   const header = `Revisions of objectType "${objectType}" (${revisions.length}, newest first)`;
   const idCol = Math.max("id".length, ...revisions.map((r) => r.id.length));
-  const createdCol = Math.max("created_at".length, ...revisions.map((r) => r.created_at.length));
+  const createdCol = Math.max(
+    "created_at".length,
+    ...revisions.map((r) => r.metadata.created_at.length),
+  );
   const rows = revisions.map(
-    (r) => `${r.created_at.padEnd(createdCol)}  ${r.id.padEnd(idCol)}`,
+    (r) => `${r.metadata.created_at.padEnd(createdCol)}  ${r.id.padEnd(idCol)}`,
   );
   return [
     header,

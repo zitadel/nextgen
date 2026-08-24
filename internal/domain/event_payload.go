@@ -105,6 +105,26 @@ type ClaimCompletedPayload struct {
 	TeamID string `json:"team_id,omitempty"`
 }
 
+// SchemaCreatedPayload is the allowlisted snapshot for schema.created. The
+// document itself is omitted — it is customer-authored and unbounded, and the
+// event's entity_id already identifies which schema this was.
+type SchemaCreatedPayload struct {
+	Kind       string `json:"kind,omitempty"`
+	ObjectType string `json:"object_type,omitempty"`
+}
+
+// SchemaCreatedPayloadSnapshot builds the schema.created payload.
+func SchemaCreatedPayloadSnapshot(schema *JSONSchema) SchemaCreatedPayload {
+	if schema == nil {
+		return SchemaCreatedPayload{}
+	}
+	payload := SchemaCreatedPayload{Kind: schema.Kind.String()}
+	if schema.ObjectType != nil {
+		payload.ObjectType = *schema.ObjectType
+	}
+	return payload
+}
+
 // FlowdefPayload is shared by flowdef.created (snapshot) and flowdef.updated (delta).
 // Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {

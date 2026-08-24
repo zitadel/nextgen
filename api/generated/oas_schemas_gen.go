@@ -6063,6 +6063,61 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type ClaimNoPersonalTeam struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimNoPersonalTeamDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimNoPersonalTeam) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimNoPersonalTeam) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimNoPersonalTeam) GetDetails() OptClaimNoPersonalTeamDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimNoPersonalTeam) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimNoPersonalTeam) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimNoPersonalTeam) SetDetails(val OptClaimNoPersonalTeamDetails) {
+	s.Details = val
+}
+
+func (*ClaimNoPersonalTeam) completeClaimRes() {}
+
+// Additional error-specific context.
+type ClaimNoPersonalTeamDetails map[string]jx.Raw
+
+func (s *ClaimNoPersonalTeamDetails) init() ClaimNoPersonalTeamDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // A completed claim. Carries the owning team, when the claim landed, and the
 // dashboard where it can be managed, so a generated client can rely on those
 // fields being present whenever `status` is `completed`.
@@ -17360,46 +17415,6 @@ type GetSchemaByIdNotFound ErrorDetails
 
 func (*GetSchemaByIdNotFound) getSchemaByIdRes() {}
 
-// GetSchemaByIdOK represents sum type.
-type GetSchemaByIdOK struct {
-	Type       GetSchemaByIdOKType // switch on this field
-	UserSchema UserSchema
-}
-
-// GetSchemaByIdOKType is oneOf type of GetSchemaByIdOK.
-type GetSchemaByIdOKType string
-
-// Possible values for GetSchemaByIdOKType.
-const (
-	UserSchemaGetSchemaByIdOK GetSchemaByIdOKType = "user-schema"
-)
-
-// IsUserSchema reports whether GetSchemaByIdOK is UserSchema.
-func (s GetSchemaByIdOK) IsUserSchema() bool { return s.Type == UserSchemaGetSchemaByIdOK }
-
-// SetUserSchema sets GetSchemaByIdOK to UserSchema.
-func (s *GetSchemaByIdOK) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaGetSchemaByIdOK
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if GetSchemaByIdOK is UserSchema.
-func (s GetSchemaByIdOK) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
-		return v, false
-	}
-	return s.UserSchema, true
-}
-
-// NewUserSchemaGetSchemaByIdOK returns new GetSchemaByIdOK from UserSchema.
-func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
-	var s GetSchemaByIdOK
-	s.SetUserSchema(v)
-	return s
-}
-
-func (*GetSchemaByIdOK) getSchemaByIdRes() {}
-
 // GetSessionErrorResponse represents sum type.
 type GetSessionErrorResponse struct {
 	Type                 GetSessionErrorResponseType // switch on this field
@@ -18809,35 +18824,70 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
-type ListSchemasResponse []ListSchemasResponseItem
+type ListSchemasKind string
+
+const (
+	ListSchemasKindUserSchema ListSchemasKind = "user-schema"
+)
+
+// AllValues returns all ListSchemasKind values.
+func (ListSchemasKind) AllValues() []ListSchemasKind {
+	return []ListSchemasKind{
+		ListSchemasKindUserSchema,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListSchemasKind) MarshalText() ([]byte, error) {
+	switch s {
+	case ListSchemasKindUserSchema:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListSchemasKind) UnmarshalText(data []byte) error {
+	switch ListSchemasKind(data) {
+	case ListSchemasKindUserSchema:
+		*s = ListSchemasKindUserSchema
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// List of schemas, newest first.
+// Ref: #
+type ListSchemasResponse struct {
+	Schemas []Schema `json:"schemas"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetSchemas returns the value of Schemas.
+func (s *ListSchemasResponse) GetSchemas() []Schema {
+	return s.Schemas
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListSchemasResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetSchemas sets the value of Schemas.
+func (s *ListSchemasResponse) SetSchemas(val []Schema) {
+	s.Schemas = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListSchemasResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
 
 func (*ListSchemasResponse) listSchemasRes() {}
-
-type ListSchemasResponseItem struct {
-	// The unique identifier for this schema.
-	ID        string    `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// GetID returns the value of ID.
-func (s *ListSchemasResponseItem) GetID() string {
-	return s.ID
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *ListSchemasResponseItem) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// SetID sets the value of ID.
-func (s *ListSchemasResponseItem) SetID(val string) {
-	s.ID = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *ListSchemasResponseItem) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
 
 type ListUserPasskeysBadRequest ErrorDetails
 
@@ -21264,6 +21314,52 @@ func (o OptChallengeResponsePayload) Get() (v ChallengeResponsePayload, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptChallengeResponsePayload) Or(d ChallengeResponsePayload) ChallengeResponsePayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimNoPersonalTeamDetails returns new OptClaimNoPersonalTeamDetails with value set to v.
+func NewOptClaimNoPersonalTeamDetails(v ClaimNoPersonalTeamDetails) OptClaimNoPersonalTeamDetails {
+	return OptClaimNoPersonalTeamDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimNoPersonalTeamDetails is optional ClaimNoPersonalTeamDetails.
+type OptClaimNoPersonalTeamDetails struct {
+	Value ClaimNoPersonalTeamDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimNoPersonalTeamDetails was set.
+func (o OptClaimNoPersonalTeamDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimNoPersonalTeamDetails) Reset() {
+	var v ClaimNoPersonalTeamDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimNoPersonalTeamDetails) SetTo(v ClaimNoPersonalTeamDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimNoPersonalTeamDetails) Get() (v ClaimNoPersonalTeamDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimNoPersonalTeamDetails) Or(d ClaimNoPersonalTeamDetails) ClaimNoPersonalTeamDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -24024,6 +24120,52 @@ func (o OptListFlowDefinitionsPurpose) Get() (v ListFlowDefinitionsPurpose, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListFlowDefinitionsPurpose) Or(d ListFlowDefinitionsPurpose) ListFlowDefinitionsPurpose {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListSchemasKind returns new OptListSchemasKind with value set to v.
+func NewOptListSchemasKind(v ListSchemasKind) OptListSchemasKind {
+	return OptListSchemasKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListSchemasKind is optional ListSchemasKind.
+type OptListSchemasKind struct {
+	Value ListSchemasKind
+	Set   bool
+}
+
+// IsSet returns true if OptListSchemasKind was set.
+func (o OptListSchemasKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListSchemasKind) Reset() {
+	var v ListSchemasKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListSchemasKind) SetTo(v ListSchemasKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListSchemasKind) Get() (v ListSchemasKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListSchemasKind) Or(d ListSchemasKind) ListSchemasKind {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -33868,6 +34010,55 @@ func (s *SchNotFoundDetails) init() SchNotFoundDetails {
 	return m
 }
 
+// A schema resource: the server-owned envelope around a customer-authored
+// JSON Schema document.
+// `schema` is the customer-authored document, served verbatim: its keys and
+// contents are defined entirely by its author. The rest of the object — `id`,
+// `metadata` — is the server-owned envelope. Keeping the two apart means the
+// document may declare any property (including `id` or `metadata`) without
+// colliding with the envelope, and the resource `id` stays distinguishable
+// from the document's own `$id`.
+// Ref: #
+type Schema struct {
+	// The resource id: the server-minted `sch_*` identifier, or the
+	// customer-supplied `$id` URI when the document declared one at creation.
+	ID       string         `json:"id"`
+	Schema   SchemaDocument `json:"schema"`
+	Metadata SchemaMetadata `json:"metadata"`
+}
+
+// GetID returns the value of ID.
+func (s *Schema) GetID() string {
+	return s.ID
+}
+
+// GetSchema returns the value of Schema.
+func (s *Schema) GetSchema() SchemaDocument {
+	return s.Schema
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *Schema) GetMetadata() SchemaMetadata {
+	return s.Metadata
+}
+
+// SetID sets the value of ID.
+func (s *Schema) SetID(val string) {
+	s.ID = val
+}
+
+// SetSchema sets the value of Schema.
+func (s *Schema) SetSchema(val SchemaDocument) {
+	s.Schema = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *Schema) SetMetadata(val SchemaMetadata) {
+	s.Metadata = val
+}
+
+func (*Schema) getSchemaByIdRes() {}
+
 // Merged schema.
 // Ref: #
 type SchemaCreatedEvent struct {
@@ -33910,7 +34101,7 @@ type SchemaCreatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptSchemaCreatedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload             `json:"payload"`
+	Payload  SchemaCreatedPayload          `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -34019,7 +34210,7 @@ func (s *SchemaCreatedEvent) GetMetadata() OptSchemaCreatedEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *SchemaCreatedEvent) GetPayload() EmptyEventPayload {
+func (s *SchemaCreatedEvent) GetPayload() SchemaCreatedPayload {
 	return s.Payload
 }
 
@@ -34129,7 +34320,7 @@ func (s *SchemaCreatedEvent) SetMetadata(val OptSchemaCreatedEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *SchemaCreatedEvent) SetPayload(val EmptyEventPayload) {
+func (s *SchemaCreatedEvent) SetPayload(val SchemaCreatedPayload) {
 	s.Payload = val
 }
 
@@ -34324,6 +34515,95 @@ func (s *SchemaCreatedEventMetadata) init() SchemaCreatedEventMetadata {
 		*s = m
 	}
 	return m
+}
+
+// Allowlisted fields for `schema.created`. The schema document itself is
+// omitted — it is customer-authored and unbounded, and the event's `entity_id`
+// already identifies which schema was created.
+// Ref: #
+type SchemaCreatedPayload struct {
+	// The kind the stored document declares. `unknown` when the schema was
+	// persisted without its document being parsed.
+	Kind OptString `json:"kind"`
+	// The customer-chosen object type the schema describes. Absent when the
+	// document declares none.
+	ObjectType OptString `json:"object_type"`
+}
+
+// GetKind returns the value of Kind.
+func (s *SchemaCreatedPayload) GetKind() OptString {
+	return s.Kind
+}
+
+// GetObjectType returns the value of ObjectType.
+func (s *SchemaCreatedPayload) GetObjectType() OptString {
+	return s.ObjectType
+}
+
+// SetKind sets the value of Kind.
+func (s *SchemaCreatedPayload) SetKind(val OptString) {
+	s.Kind = val
+}
+
+// SetObjectType sets the value of ObjectType.
+func (s *SchemaCreatedPayload) SetObjectType(val OptString) {
+	s.ObjectType = val
+}
+
+// The customer-authored JSON Schema document, served verbatim.
+// Ref: #
+// SchemaDocument represents sum type.
+type SchemaDocument struct {
+	Type       SchemaDocumentType // switch on this field
+	UserSchema UserSchema
+}
+
+// SchemaDocumentType is oneOf type of SchemaDocument.
+type SchemaDocumentType string
+
+// Possible values for SchemaDocumentType.
+const (
+	UserSchemaSchemaDocument SchemaDocumentType = "user-schema"
+)
+
+// IsUserSchema reports whether SchemaDocument is UserSchema.
+func (s SchemaDocument) IsUserSchema() bool { return s.Type == UserSchemaSchemaDocument }
+
+// SetUserSchema sets SchemaDocument to UserSchema.
+func (s *SchemaDocument) SetUserSchema(v UserSchema) {
+	s.Type = UserSchemaSchemaDocument
+	s.UserSchema = v
+}
+
+// GetUserSchema returns UserSchema and true boolean if SchemaDocument is UserSchema.
+func (s SchemaDocument) GetUserSchema() (v UserSchema, ok bool) {
+	if !s.IsUserSchema() {
+		return v, false
+	}
+	return s.UserSchema, true
+}
+
+// NewUserSchemaSchemaDocument returns new SchemaDocument from UserSchema.
+func NewUserSchemaSchemaDocument(v UserSchema) SchemaDocument {
+	var s SchemaDocument
+	s.SetUserSchema(v)
+	return s
+}
+
+// Ref: #
+type SchemaMetadata struct {
+	// The time when the schema was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *SchemaMetadata) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *SchemaMetadata) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
 }
 
 type SchemaURI url.URL

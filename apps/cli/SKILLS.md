@@ -136,7 +136,7 @@ the CLI's help layer, not the envelope.
   custom properties on the element to bridge the app's look through the
   widget's shadow DOM (fonts `--zl-font-family-heading`/`-sans`, radii
   `--zl-radius-*`, primary CTA `--zl-primary`/`--zl-primary-foreground`,
-  link color `--zl-color-text-link`); the `suppress-header` attribute
+  link color `--zl-link`); the `suppress-header` attribute
   (wrapper prop `suppressHeader`) visually hides the widget's own heading
   block when the page already carries one, keeping it in the accessibility
   tree. Split-family designs collapse their brand pane by container width —

@@ -1,0 +1,69 @@
+/* Styles for `<zl-card>` — shadow host rules first, then the painted surface. */
+
+:host {
+  display: block;
+  width: 100%;
+  max-width: var(--zl-container-auth-card);
+  margin-inline: auto;
+}
+.zr-card ::slotted([slot="header"]),
+.zr-card ::slotted([slot="footer"]) {
+  margin: 0;
+}
+
+/* suppress-header (stamped by the orchestrator / bound by zitadel-session):
+   pull the header region out of the flex flow so the card keeps no blank
+   header band, while the slotted heading stays in the accessibility tree —
+   screen-reader-only, not display:none. */
+:host([data-suppress-header]) .zr-card__header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.zr-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-6);
+  /* Inline padding lives on the regions, not here: the card is the element a
+     full-bleed region (a divider, a banner) would need to reach the edge of. */
+  padding-block: var(--zl-spacing-6);
+  background: var(--zl-card);
+  color: var(--zl-card-foreground);
+  border: 1px solid var(--zl-border);
+  border-radius: var(--zl-radius-xl);
+  box-shadow: var(--zl-shadow-sm);
+}
+.zr-card__header,
+.zr-card__body,
+.zr-card__footer {
+  padding-inline: var(--zl-spacing-6);
+}
+.zr-card__header,
+.zr-card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-1-5);
+}
+/* Slots stay mounted even when nothing is projected into them; an empty region
+   would otherwise still claim a `gap`. */
+.zr-card__region--empty {
+  display: none;
+}
+/* The gap between a card's field group and its action group. Groups set their
+   own tighter internal gaps — see `.zl-field-group` / `.zl-card-actions` in
+   the orchestrator's layout-chrome.css. */
+.zr-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-7);
+}
+.zr-card--compact {
+  gap: var(--zl-spacing-4);
+}

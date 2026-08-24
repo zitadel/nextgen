@@ -20,12 +20,7 @@ get:
       content:
         application/json:
           schema:
-            oneOf:
-              - $ref: ../user-schema.yaml
-            discriminator:
-              propertyName: kind
-              mapping:
-                user-schema: ../user-schema.yaml
+            $ref: ../schema.yaml
     '400':
       description: The provided input was not valid
       content:

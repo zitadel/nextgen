@@ -83,12 +83,16 @@ describe("users screen", () => {
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
         HttpResponse.json({
-          title: "Business",
-          required: ["email"],
-          properties: {
-            email: { type: "string", format: "email" },
-            companyName: { type: "string", title: "Company name" },
+          id: "sch_business",
+          schema: {
+            title: "Business",
+            required: ["email"],
+            properties: {
+              email: { type: "string", format: "email" },
+              companyName: { type: "string", title: "Company name" },
+            },
           },
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
         }),
       ),
     );
@@ -121,10 +125,14 @@ describe("users screen", () => {
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
         HttpResponse.json({
-          properties: {
-            email: { type: "string", format: "email" },
-            companyName: { type: "string", title: "Company name" },
+          id: "sch_business",
+          schema: {
+            properties: {
+              email: { type: "string", format: "email" },
+              companyName: { type: "string", title: "Company name" },
+            },
           },
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
         }),
       ),
     );

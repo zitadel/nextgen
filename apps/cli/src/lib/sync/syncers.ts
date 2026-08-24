@@ -147,8 +147,12 @@ class SchemaSyncer implements ResourceSyncer {
 
   async fetch(id: string): Promise<object> {
     // Flat-by-id: authz resolves the project from RSI; no project_id query.
-    const body = await this.client.getSchemaById(encodeURIComponent(id));
-    return body as unknown as GetSchemaById200;
+    // The response is the `{id, schema, metadata}` envelope; only the
+    // customer-authored document is written back to `.zitadel/schemas/`.
+    const body = (await this.client.getSchemaById(
+      encodeURIComponent(id),
+    )) as unknown as GetSchemaById200;
+    return body.schema;
   }
 }
 
