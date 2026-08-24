@@ -312,6 +312,32 @@ function schemaObjectType(body: GetSchemaById200Schema): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function schemaKind(body: GetSchemaById200Schema): string | undefined {
+  const value = (body as unknown as { kind?: unknown }).kind;
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * `revisions=latest` keeps the newest revision of each `objectType`. Takes the
+ * list already sorted newest-first, so the first record of an `objectType` is
+ * the one to keep. A record without an `objectType` is a revision of nothing
+ * and is kept rather than grouped — matching the server's anti-join, which
+ * cannot correlate a NULL either.
+ */
+function latestSchemaRevisions(newestFirst: SchemaRecord[]): SchemaRecord[] {
+  const seen = new Set<string>();
+  return newestFirst.filter((r) => {
+    if (r.objectType === undefined) {
+      return true;
+    }
+    if (seen.has(r.objectType)) {
+      return false;
+    }
+    seen.add(r.objectType);
+    return true;
+  });
+}
+
 function schemaID(id: string): string {
   try {
     return decodeURIComponent(id);
@@ -702,10 +728,16 @@ export function setupPlatformHandlers() {
         });
       }
       const objectTypeFilter = url.searchParams.get("object_type") ?? undefined;
-      const records = [...store.schemas.values()]
+      const kindFilter = url.searchParams.get("kind") ?? undefined;
+      const matching = [...store.schemas.values()]
         .filter((r) => r.projectId === projectId)
         .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
+        .filter((r) => !kindFilter || schemaKind(r.body) === kindFilter)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      const records =
+        url.searchParams.get("revisions") === "latest"
+          ? latestSchemaRevisions(matching)
+          : matching;
       const responseBody: ListSchemas200 = {
         schemas: records.map((r) => ({
           id: r.id,

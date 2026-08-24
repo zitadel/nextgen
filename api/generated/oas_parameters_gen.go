@@ -3666,6 +3666,16 @@ type ListSchemasParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The type of object of the schema to filter by.
 	ObjectType OptString `json:",omitempty,omitzero"`
+	// Which revisions to return. Schemas are immutable and versioned by URL,
+	// so editing one mints a new row sharing its `objectType`.
+	// `all` (the default) returns every revision — the full history an
+	// export, an audit or a GitOps diff needs. `latest` returns the newest
+	// revision of each `objectType`, which is one row per schema.
+	// A schema stored without an `objectType` is a revision of nothing, and
+	// is returned by both.
+	// A `page_token` is bound to the mode it was issued in and is rejected by
+	// the other.
+	Revisions OptListSchemasRevisions `json:",omitempty,omitzero"`
 	// The kind of schema to filter by, read from the stored document's
 	// `kind` property.
 	// `schema-url` is not a kind: it discriminates the create request body,
@@ -3709,6 +3719,15 @@ func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasPa
 		}
 		if v, ok := packed[key]; ok {
 			params.ObjectType = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "revisions",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Revisions = v.(OptListSchemasRevisions)
 		}
 	}
 	{
@@ -3956,6 +3975,67 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "object_type",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Set default value for query: revisions.
+	{
+		val := ListSchemasRevisions("all")
+		params.Revisions.SetTo(val)
+	}
+	// Decode query: revisions.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "revisions",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotRevisionsVal ListSchemasRevisions
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotRevisionsVal = ListSchemasRevisions(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Revisions.SetTo(paramsDotRevisionsVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Revisions.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "revisions",
 			In:   "query",
 			Err:  err,
 		}

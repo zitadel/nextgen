@@ -20,6 +20,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error {
 			return sqlite.HardDeleteTeam(ctx, pool, projectID, teamID)
 		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error {
+			return sqlite.InsertJSONSchemaAt(ctx, pool, projectID, url, objectType, createdAt)
+		},
 		sqlite.SchemaColumnNullability(),
 		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
 			return sqlite.LiveColumnNullability(ctx, pool)

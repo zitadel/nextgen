@@ -3970,6 +3970,17 @@ func (s *ListSchemasResponse) Validate() error {
 	return nil
 }
 
+func (s ListSchemasRevisions) Validate() error {
+	switch s {
+	case "all":
+		return nil
+	case "latest":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *ListUserPasskeysResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

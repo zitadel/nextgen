@@ -17,6 +17,19 @@ VALUES (?, ?, ?, ?, ?, ?) RETURNING project_id, url, object_type, kind, created_
 	deleteByIDJSONSchemaStmt = `DELETE FROM json_schemas WHERE project_id = ? AND url = ?`
 
 	jsonSchemaQuery = `SELECT project_id, url, object_type, kind, created_at, payload FROM json_schemas`
+
+	// latestRevisionPerObjectType keeps only the newest revision of each
+	// object_type. It is an anti-join rather than `created_at = (SELECT MAX(…))`
+	// because the correlation on a NULL object_type is NULL either way: MAX then
+	// yields NULL and the row is filtered out, while NOT EXISTS passes it
+	// through, which is what a row that is a revision of nothing deserves.
+	//
+	// The uniqueness of (project_id, object_type, created_at) makes created_at a
+	// total order within an object_type, so no tiebreak belongs in here.
+	latestRevisionPerObjectType = `NOT EXISTS (SELECT 1 FROM json_schemas AS newer` +
+		` WHERE newer.project_id = json_schemas.project_id` +
+		` AND newer.object_type = json_schemas.object_type` +
+		` AND newer.created_at > json_schemas.created_at)`
 )
 
 type jsonSchemaStatements struct{ statement }
@@ -88,9 +101,14 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 }
 
 // ListJSONSchemas implements [service.JSONSchemaStatements].
-func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+	var conjuncts []string
+	if opts.LatestRevisionPerObjectType {
+		conjuncts = append(conjuncts, latestRevisionPerObjectType)
+	}
+
 	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url"); err != nil {
+	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url", conjuncts...); err != nil {
 		return nil, err
 	}
 	rows, err := js.client.Query(ctx, compiler.String(), compiler.args...)

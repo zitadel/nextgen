@@ -18889,6 +18889,47 @@ func (s *ListSchemasResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*ListSchemasResponse) listSchemasRes() {}
 
+type ListSchemasRevisions string
+
+const (
+	ListSchemasRevisionsAll    ListSchemasRevisions = "all"
+	ListSchemasRevisionsLatest ListSchemasRevisions = "latest"
+)
+
+// AllValues returns all ListSchemasRevisions values.
+func (ListSchemasRevisions) AllValues() []ListSchemasRevisions {
+	return []ListSchemasRevisions{
+		ListSchemasRevisionsAll,
+		ListSchemasRevisionsLatest,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListSchemasRevisions) MarshalText() ([]byte, error) {
+	switch s {
+	case ListSchemasRevisionsAll:
+		return []byte(s), nil
+	case ListSchemasRevisionsLatest:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListSchemasRevisions) UnmarshalText(data []byte) error {
+	switch ListSchemasRevisions(data) {
+	case ListSchemasRevisionsAll:
+		*s = ListSchemasRevisionsAll
+		return nil
+	case ListSchemasRevisionsLatest:
+		*s = ListSchemasRevisionsLatest
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type ListUserPasskeysBadRequest ErrorDetails
 
 func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
@@ -24166,6 +24207,52 @@ func (o OptListSchemasKind) Get() (v ListSchemasKind, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListSchemasKind) Or(d ListSchemasKind) ListSchemasKind {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListSchemasRevisions returns new OptListSchemasRevisions with value set to v.
+func NewOptListSchemasRevisions(v ListSchemasRevisions) OptListSchemasRevisions {
+	return OptListSchemasRevisions{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListSchemasRevisions is optional ListSchemasRevisions.
+type OptListSchemasRevisions struct {
+	Value ListSchemasRevisions
+	Set   bool
+}
+
+// IsSet returns true if OptListSchemasRevisions was set.
+func (o OptListSchemasRevisions) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListSchemasRevisions) Reset() {
+	var v ListSchemasRevisions
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListSchemasRevisions) SetTo(v ListSchemasRevisions) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListSchemasRevisions) Get() (v ListSchemasRevisions, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListSchemasRevisions) Or(d ListSchemasRevisions) ListSchemasRevisions {
 	if v, ok := o.Get(); ok {
 		return v
 	}
