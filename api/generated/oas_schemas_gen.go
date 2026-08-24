@@ -18807,6 +18807,9 @@ func (s *ListSchemasKind) UnmarshalText(data []byte) error {
 // Ref: #
 type ListSchemasResponse struct {
 	Schemas []Schema `json:"schemas"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetSchemas returns the value of Schemas.
@@ -18814,9 +18817,19 @@ func (s *ListSchemasResponse) GetSchemas() []Schema {
 	return s.Schemas
 }
 
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListSchemasResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
 // SetSchemas sets the value of Schemas.
 func (s *ListSchemasResponse) SetSchemas(val []Schema) {
 	s.Schemas = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListSchemasResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
 }
 
 func (*ListSchemasResponse) listSchemasRes() {}

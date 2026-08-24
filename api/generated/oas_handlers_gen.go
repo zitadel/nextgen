@@ -6897,9 +6897,9 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "offset",
+					Name: "limit",
 					In:   "query",
-				}: params.Offset,
+				}: params.Limit,
 				{
 					Name: "page_token",
 					In:   "query",
