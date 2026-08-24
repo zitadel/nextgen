@@ -516,10 +516,13 @@ type UserStatementsLookup struct {
 	Pool StatementPool
 }
 
+// GetByAttributes resolves a login identifier, so it matches only uniquely
+// registered values: an equal value in a non-unique property of another user
+// must not make the lookup ambiguous and reject the sign-in.
 func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
 	return l.Pool.Statements().GetUser(ctx,
 		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
-		UserQueryOptions{Attributes: attrs},
+		UserQueryOptions{Attributes: attrs, UniqueAttributesOnly: true},
 	)
 }
 
