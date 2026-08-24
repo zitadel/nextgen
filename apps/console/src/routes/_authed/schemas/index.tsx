@@ -28,7 +28,14 @@ export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { nav: { label: "User schemas", order: 1, parent: "/users" } },
   loader: async () => {
     const projectId = getConsoleProjectId();
-    const page = await api.listSchemas({ project_id: projectId, limit: PAGE_SIZE });
+    // `kind` scopes the list to user schemas. The screen is titled `User
+    // schemas` and only knows how to render one, so this is the contract the
+    // rows already assume rather than a new restriction.
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      limit: PAGE_SIZE,
+    });
     return {
       schemas: page.schemas.map(toSchemaRow),
       nextPageToken: page.next_page_token ?? undefined,
@@ -88,8 +95,11 @@ function SchemasScreen() {
     setLoadingMore(true);
     setLoadError(undefined);
     try {
+      // Same `kind` as the loader: the cursor only pins the ordering, so a
+      // filter drift between pages would silently page over a different set.
       const page = await api.listSchemas({
         project_id: getConsoleProjectId(),
+        kind: "user-schema",
         limit: PAGE_SIZE,
         page_token: nextPageToken,
       });

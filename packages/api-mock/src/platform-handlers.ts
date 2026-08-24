@@ -707,6 +707,11 @@ export function setupPlatformHandlers() {
       const records = [...store.schemas.values()]
         .filter((r) => r.projectId === query.data.project_id)
         .filter((r) => !query.data.object_type || r.objectType === query.data.object_type)
+        // Like the real server, `kind` is read from the stored document; a
+        // document without one matches no filtered result.
+        .filter(
+          (r) => !query.data.kind || (r.body as { kind?: string }).kind === query.data.kind,
+        )
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       // The real cursor is opaque; the mock's is the next start index. A token
       // it never minted is rejected with req.invalid, like the real server.

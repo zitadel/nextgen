@@ -49,7 +49,7 @@ same TX (shared `request_id`).
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
-| **Schema** | _(none — identity is `entity_id`)_ | Schema document body |
+| **Schema** | `kind`, `object_type` | Schema document body |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
@@ -116,7 +116,7 @@ tracked below.
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
 | Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | delta of allowlisted fields that changed |
 | Flow definition delete | `flowdef.deleted` | `admin` | `flow_definition` | _(empty)_ |
-| JSON schema create | `schema.created` | `admin` | `json_schema` | _(empty; identity is `entity_id`)_ |
+| JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |

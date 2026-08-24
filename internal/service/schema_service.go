@@ -27,8 +27,12 @@ type CreateSchemaByURLInput struct {
 type ListSchemasInput struct {
 	ProjectID  string
 	ObjectType string
-	PageToken  string
-	Limit      int
+	// Kind is nil when the caller did not filter by one. It is a pointer rather
+	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
+	// it cannot double as "no filter".
+	Kind      *domain.JSONSchemaKind
+	PageToken string
+	Limit     int
 }
 
 type ListSchemasOutput struct {
@@ -89,7 +93,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 			ProjectID:  model.ProjectID,
 			EntityType: "json_schema",
 			EntityID:   model.URL,
-			Payload:    struct{}{},
+			Payload:    domain.SchemaCreatedPayloadSnapshot(model),
 		})
 	})
 	if err != nil {
@@ -142,6 +146,14 @@ func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput)
 	if input.ObjectType != "" {
 		filters = append(filters,
 			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), input.ObjectType),
+		)
+	}
+	// Schemas persisted without their document being parsed — ingested by URL,
+	// or a $ref target pulled in during resolution (#812) — are stored as
+	// domain.JSONSchemaKindUnknown, which no filterable kind matches.
+	if input.Kind != nil {
+		filters = append(filters,
+			database.Equal(database.Col(domain.JSONSchemaFieldKind), input.Kind.String()),
 		)
 	}
 

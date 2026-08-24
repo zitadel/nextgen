@@ -362,3 +362,68 @@ func TestBrandingCreate_EventPayloadURLs(t *testing.T) {
 	assert.Empty(t, payload.FontURL, "font_url is not writable yet; omit when empty")
 	assert.NotContains(t, string(gotEvent.Payload), "liquid")
 }
+
+// The seeded default human user schema declares its kind, so the audit event
+// records it rather than an empty payload.
+func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	masterKey := cryptomock.NewMockCrypter(ctrl)
+	keyService := servicemocks.NewMockKeyService(ctrl)
+	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return tx(ctx, statementer)
+		},
+	).AnyTimes()
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+
+	var events []*domain.Event
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, ev *domain.Event) error {
+			events = append(events, ev)
+			return nil
+		},
+	).AnyTimes()
+
+	statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, p *domain.Project) error {
+			p.ID = "proj_schema_kind"
+			return nil
+		},
+	)
+	masterKey.EXPECT().Encrypt(gomock.Any())
+	masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
+	statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
+	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
+	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
+	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
+	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
+	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
+
+	const baseURL = "https://example.com/api/schemas"
+	schemaValidator, err := domain.NewSchemaValidator(baseURL)
+	require.NoError(t, err)
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
+
+	_, err = svc.Create(middleware.WithRequestIDContext(t.Context(), "req_kind"), "Acme", nil, true)
+	require.NoError(t, err)
+
+	var created *domain.Event
+	for _, ev := range events {
+		if ev.EventType == domain.EventTypeSchemaCreated {
+			created = ev
+			break
+		}
+	}
+	require.NotNil(t, created, "expected schema.created event")
+
+	var payload domain.SchemaCreatedPayload
+	require.NoError(t, json.Unmarshal(created.Payload, &payload))
+	assert.Equal(t, domain.JSONSchemaKindUserSchema.String(), payload.Kind)
+	assert.Equal(t, "human-user", payload.ObjectType)
+}
