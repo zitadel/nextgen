@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,7 @@ func TestFromContext_Empty(t *testing.T) {
 	assert.Equal(t, domain.EventCategoryEntity, ev.Category)
 	assert.Equal(t, "direct", ev.DelegationType)
 	assert.Empty(t, ev.ProjectID)
+	assert.Equal(t, json.RawMessage("{}"), ev.Metadata)
 }
 
 func TestFromContext_WithActor(t *testing.T) {

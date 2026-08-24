@@ -65,6 +65,12 @@ renamed. If origins become patchable later, the update delta includes the
 Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
 `client_id`, `token_id`, `actor_id`, `entity_id`.
 
+Path A `request.api` may also carry observed requestor context on metadata
+(`ip`, `user_agent`, `origin` under `client`). Join Path B mutations to that
+snapshot via `request_id`. Exported events enable offline SIEM rules; they
+are not inputs to the live risk evaluator
+([bot-detection.md](../flowengine/bot-detection.md)).
+
 - Auth attempt `entity_id` ↔ check payload `auth_attempt_id`.
 - Session after handoff: `session_id` **column** (set via `EmitSpec.SessionID`;
   not duplicated in attempt payloads).
