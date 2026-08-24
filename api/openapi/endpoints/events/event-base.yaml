@@ -108,6 +108,4 @@ properties:
       - type: string
       - type: 'null'
   metadata:
-    description: Additional emit-time metadata (already redacted).
-    type: object
-    additionalProperties: true
+    $ref: ../../components/schemas/event-metadata.yaml

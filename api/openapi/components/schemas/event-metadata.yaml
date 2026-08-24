@@ -1,0 +1,27 @@
+type: object
+description: |
+  Emit-time metadata, already redacted at write. Path A request.api may
+  set client with observed requestor context for SIEM join on request_id.
+  Not a live risk-evaluator input (ADR 019). Untrusted client-supplied
+  correlation belongs in client_hints if ever accepted; parent_span_id
+  is reserved for OTEL export projection.
+additionalProperties: false
+properties:
+  client:
+    description: |
+      Observed HTTP requestor context on Path A request.api only.
+      Path B events omit this object. Join via request_id.
+    type: object
+    additionalProperties: false
+    properties:
+      ip:
+        type: string
+        description: |
+          Client IP from the first X-Forwarded-For hop or RemoteAddr.
+          Proxy-dependent (see https://github.com/zitadel/nextgen/issues/802).
+      user_agent:
+        type: string
+        description: Observed User-Agent header. Spoofable.
+      origin:
+        type: string
+        description: Origin header, or Host when Origin is absent.

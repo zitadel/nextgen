@@ -96,3 +96,51 @@ func TestEventToAPI_RequestAPI(t *testing.T) {
 	assert.Equal(t, api.RequestAPIPayloadMethodGET, v.Payload.Method)
 	assert.EqualValues(t, 200, v.Payload.Status)
 }
+
+func TestEventToAPI_RequestAPIClientMetadata(t *testing.T) {
+	t.Parallel()
+	payload, err := json.Marshal(domain.RequestAPIPayload{
+		OperationID:   "listEvents",
+		Method:        "GET",
+		RouteTemplate: "/events",
+		Status:        200,
+		DurationMs:    12,
+	})
+	require.NoError(t, err)
+	meta, err := json.Marshal(domain.EventMetadata{
+		Client: &domain.EventClientMetadata{
+			IP:        "203.0.113.9",
+			UserAgent: "Mozilla/5.0 (test)",
+			Origin:    "https://app.example.com",
+		},
+	})
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	got, err := eventToAPI(&domain.Event{
+		ID:         "evt_req",
+		ProjectID:  "proj_1",
+		EventType:  domain.EventTypeRequestAPI,
+		Category:   domain.EventCategoryRequest,
+		OccurredAt: now,
+		CreatedAt:  now,
+		ClientID:   "app_1",
+		Payload:    payload,
+		Metadata:   meta,
+	})
+	require.NoError(t, err)
+	v, ok := got.GetRequestAPIEvent()
+	require.True(t, ok)
+	md, ok := v.Metadata.Get()
+	require.True(t, ok)
+	client, ok := md.Client.Get()
+	require.True(t, ok)
+	ip, ok := client.IP.Get()
+	require.True(t, ok)
+	assert.Equal(t, "203.0.113.9", ip)
+	ua, ok := client.UserAgent.Get()
+	require.True(t, ok)
+	assert.Equal(t, "Mozilla/5.0 (test)", ua)
+	origin, ok := client.Origin.Get()
+	require.True(t, ok)
+	assert.Equal(t, "https://app.example.com", origin)
+}
