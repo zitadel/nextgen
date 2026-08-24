@@ -14,7 +14,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func TestRequestEventMiddleware_WaitCoversHandlerDuration(t *testing.T) {
+func startPathA(t *testing.T) (*channelInserter, *RequestBuffer) {
+	t.Helper()
 	ins := &channelInserter{}
 	buf := NewRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 1,
@@ -22,6 +23,20 @@ func TestRequestEventMiddleware_WaitCoversHandlerDuration(t *testing.T) {
 		MaxAge:    time.Hour,
 	})
 	t.Cleanup(buf.Close)
+	return ins, buf
+}
+
+func stampProject(projectID string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ac, ok := ActorSlotFromContext(r.Context()); ok {
+			ac.ProjectID = projectID
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+}
+
+func TestRequestEventMiddleware_WaitCoversHandlerDuration(t *testing.T) {
+	ins, buf := startPathA(t)
 
 	h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ac, ok := ActorSlotFromContext(r.Context())
@@ -41,13 +56,7 @@ func TestRequestEventMiddleware_WaitCoversHandlerDuration(t *testing.T) {
 }
 
 func TestRequestEventMiddleware_SkipsMissingProjectID(t *testing.T) {
-	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize: 1,
-		Capacity:  10,
-		MaxAge:    time.Hour,
-	})
-	t.Cleanup(buf.Close)
+	ins, buf := startPathA(t)
 
 	h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -56,16 +65,11 @@ func TestRequestEventMiddleware_SkipsMissingProjectID(t *testing.T) {
 	time.Sleep(40 * time.Millisecond)
 	assert.Equal(t, uint64(0), buf.Flushed())
 	assert.Equal(t, 0, buf.Len())
+	assert.Equal(t, 0, ins.count())
 }
 
 func TestRequestEventMiddleware_EmitsWhenProjectIDWithoutAuth(t *testing.T) {
-	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize: 1,
-		Capacity:  10,
-		MaxAge:    time.Hour,
-	})
-	t.Cleanup(buf.Close)
+	ins, buf := startPathA(t)
 
 	h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ac, ok := ActorSlotFromContext(r.Context())
@@ -91,21 +95,8 @@ func TestRequestEventMiddleware_EmitsWhenProjectIDWithoutAuth(t *testing.T) {
 }
 
 func TestRequestEventMiddleware_ClientMetadataFromUserAgentAndOrigin(t *testing.T) {
-	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize: 1,
-		Capacity:  10,
-		MaxAge:    time.Hour,
-	})
-	t.Cleanup(buf.Close)
-
-	inner := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ac, ok := ActorSlotFromContext(r.Context())
-		require.True(t, ok)
-		ac.ProjectID = "proj_1"
-		w.WriteHeader(http.StatusOK)
-	}))
-	h := middleware.WithUserAgentMiddleware(inner)
+	ins, buf := startPathA(t)
+	h := middleware.WithUserAgentMiddleware(WithRequestEventMiddleware(buf, stampProject("proj_1")))
 
 	req := httptest.NewRequest(http.MethodPost, "/users", nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (test)")
@@ -125,23 +116,12 @@ func TestRequestEventMiddleware_ClientMetadataFromUserAgentAndOrigin(t *testing.
 	assert.Equal(t, "https://app.example.com", meta.Client.Origin)
 }
 
-func TestRequestEventMiddleware_OriginFallsBackToHost(t *testing.T) {
-	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize: 1,
-		Capacity:  10,
-		MaxAge:    time.Hour,
-	})
-	t.Cleanup(buf.Close)
-
-	h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ac, ok := ActorSlotFromContext(r.Context())
-		require.True(t, ok)
-		ac.ProjectID = "proj_1"
-		w.WriteHeader(http.StatusOK)
-	}))
+func TestRequestEventMiddleware_OmitsOriginWhenHeaderMissing(t *testing.T) {
+	ins, buf := startPathA(t)
+	h := WithRequestEventMiddleware(buf, stampProject("proj_1"))
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)
 	req.Host = "console.example.test"
+	req.Header.Set("User-Agent", "Mozilla/5.0 (test)")
 	req.Header.Del("Origin")
 	h.ServeHTTP(httptest.NewRecorder(), req)
 
@@ -152,28 +132,14 @@ func TestRequestEventMiddleware_OriginFallsBackToHost(t *testing.T) {
 	var meta domain.EventMetadata
 	require.NoError(t, json.Unmarshal(ins.events[0].Metadata, &meta))
 	require.NotNil(t, meta.Client)
-	assert.Equal(t, "console.example.test", meta.Client.Origin)
-	assert.Empty(t, meta.Client.IP)
-	assert.Empty(t, meta.Client.UserAgent)
+	assert.Equal(t, "Mozilla/5.0 (test)", meta.Client.UserAgent)
+	assert.Empty(t, meta.Client.Origin)
 }
 
 func TestRequestEventMiddleware_EmptyClientStaysEmptyObject(t *testing.T) {
-	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize: 1,
-		Capacity:  10,
-		MaxAge:    time.Hour,
-	})
-	t.Cleanup(buf.Close)
-
-	h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ac, ok := ActorSlotFromContext(r.Context())
-		require.True(t, ok)
-		ac.ProjectID = "proj_1"
-		w.WriteHeader(http.StatusOK)
-	}))
+	ins, buf := startPathA(t)
+	h := WithRequestEventMiddleware(buf, stampProject("proj_1"))
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)
-	req.Host = ""
 	req.Header.Del("Origin")
 	req.Header.Del("User-Agent")
 	h.ServeHTTP(httptest.NewRecorder(), req)

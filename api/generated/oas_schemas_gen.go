@@ -10788,15 +10788,13 @@ func NewUserDeletedEventEvent(v UserDeletedEvent) Event {
 func (*Event) getEventRes() {}
 
 // Emit-time metadata, already redacted at write. Path A request.api may
-// set client with observed requestor context for SIEM join on request_id.
-// Not a live risk-evaluator input (ADR 019). Untrusted client-supplied
-// correlation belongs in client_hints if ever accepted; parent_span_id
-// is reserved for OTEL export projection.
+// set client (ip, user_agent, origin) for SIEM join on request_id. Not a
+// live risk-evaluator input.
 // Ref: #
 type EventMetadata struct {
 	// Observed HTTP requestor context on Path A request.api only.
-	// Path B events omit this object. Join via request_id.
-	Client OptEventMetadataClient `json:"client"`
+	Client          OptEventMetadataClient `json:"client"`
+	AdditionalProps EventMetadataAdditional
 }
 
 // GetClient returns the value of Client.
@@ -10804,20 +10802,39 @@ func (s *EventMetadata) GetClient() OptEventMetadataClient {
 	return s.Client
 }
 
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *EventMetadata) GetAdditionalProps() EventMetadataAdditional {
+	return s.AdditionalProps
+}
+
 // SetClient sets the value of Client.
 func (s *EventMetadata) SetClient(val OptEventMetadataClient) {
 	s.Client = val
 }
 
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *EventMetadata) SetAdditionalProps(val EventMetadataAdditional) {
+	s.AdditionalProps = val
+}
+
+type EventMetadataAdditional map[string]jx.Raw
+
+func (s *EventMetadataAdditional) init() EventMetadataAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Observed HTTP requestor context on Path A request.api only.
-// Path B events omit this object. Join via request_id.
 type EventMetadataClient struct {
 	// Client IP from the first X-Forwarded-For hop or RemoteAddr.
-	// Proxy-dependent (see https://github.com/zitadel/nextgen/issues/802).
 	IP OptString `json:"ip"`
-	// Observed User-Agent header. Spoofable.
+	// Observed User-Agent header.
 	UserAgent OptString `json:"user_agent"`
-	// Origin header, or Host when Origin is absent.
+	// Origin header when present.
 	Origin OptString `json:"origin"`
 }
 

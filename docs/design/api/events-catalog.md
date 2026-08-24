@@ -83,9 +83,6 @@ are not inputs to the live risk evaluator
 |---------|--------------|------------|---------|
 | HTTP handler completes and `project_id` is known | `request.api` | `request` | `operation_id`, `method`, `route_template`, `status`, `duration_ms` |
 
-Path A metadata may include observed requestor `ip`, `user_agent`, and
-`origin` (under `client`). Path B metadata stays empty; join via `request_id`.
-
 `occurred_at` is request **start** so a `request_id` group sorts
 `request.api` first, then in-TX Path B mutations. `created_at` is flush time.
 Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`

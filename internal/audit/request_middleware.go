@@ -1,7 +1,6 @@
 package audit
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -82,35 +81,24 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ev := FromContext(WithActorContext(r.Context(), *ac), domain.EventTypeRequestAPI, domain.EventCategoryRequest)
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
-		ev.Metadata = clientMetadataFromRequest(r)
+		if c := clientFromRequest(r); c != nil {
+			if meta, err := events.MarshalPayload(domain.EventMetadata{Client: c}); err == nil {
+				ev.Metadata = meta
+			}
+		}
 		buf.EnqueueSince(ev, start)
 	})
 }
 
-// clientMetadataFromRequest builds Path A metadata.client from the User-Agent
-// middleware snapshot plus Origin (Host fallback). Empty keys are omitted.
-// Path B must not call this — FromContext leaves metadata as {}.
-func clientMetadataFromRequest(r *http.Request) json.RawMessage {
-	client := domain.EventClientMetadata{}
-	if ua, ok := middleware.UserAgentFromContext(r.Context()); ok && ua != nil {
-		client.IP = ua.IP
-		if ua.Info != nil {
-			if s, ok := ua.Info["user_agent"].(string); ok {
-				client.UserAgent = s
-			}
-		}
+func clientFromRequest(r *http.Request) *domain.EventClientMetadata {
+	var c domain.EventClientMetadata
+	if ua, ok := middleware.UserAgentFromContext(r.Context()); ok {
+		c.IP = ua.IP
 	}
-	if origin := r.Header.Get("Origin"); origin != "" {
-		client.Origin = origin
-	} else if r.Host != "" {
-		client.Origin = r.Host
+	c.UserAgent = r.UserAgent()
+	c.Origin = r.Header.Get("Origin")
+	if c == (domain.EventClientMetadata{}) {
+		return nil
 	}
-	if client.IP == "" && client.UserAgent == "" && client.Origin == "" {
-		return json.RawMessage("{}")
-	}
-	raw, err := events.MarshalPayload(domain.EventMetadata{Client: &client})
-	if err != nil {
-		return json.RawMessage("{}")
-	}
-	return raw
+	return &c
 }

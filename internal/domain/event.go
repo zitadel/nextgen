@@ -113,15 +113,14 @@ type Event struct {
 	OccurredAtWait time.Duration
 }
 
-// EventClientMetadata is observed HTTP requestor context on Path A
-// request.api (ADR 048). Omit empty keys. Not a list-filter dimension.
+// EventClientMetadata is Path A requestor context on events.metadata.client.
 type EventClientMetadata struct {
 	IP        string `json:"ip,omitempty"`
 	UserAgent string `json:"user_agent,omitempty"`
 	Origin    string `json:"origin,omitempty"`
 }
 
-// EventMetadata is the typed events.metadata object.
+// EventMetadata is the events.metadata JSON object.
 type EventMetadata struct {
 	Client *EventClientMetadata `json:"client,omitempty"`
 }
