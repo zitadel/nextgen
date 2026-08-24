@@ -374,12 +374,12 @@ func TestSchemaKindFilter(t *testing.T) {
 	require.IsType(t, &api.CreateSchemaResponse{}, created, helpers.MustMarshal(t, created))
 	createdID := created.(*api.CreateSchemaResponse).ID
 
-	list := func(t *testing.T, params api.ListSchemasParams) api.ListSchemasResponse {
+	list := func(t *testing.T, params api.ListSchemasParams) []api.Schema {
 		t.Helper()
 		resp, err := client.ListSchemas(t.Context(), params)
 		require.NoError(t, err)
 		require.IsType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp))
-		return *(resp.(*api.ListSchemasResponse))
+		return resp.(*api.ListSchemasResponse).Schemas
 	}
 
 	base := api.ListSchemasParams{
