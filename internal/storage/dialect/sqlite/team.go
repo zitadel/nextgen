@@ -30,6 +30,16 @@ WHERE project_id = ? AND lifecycle_owner_team_id = ? AND status <> ?`
 WHERE project_id = ? AND status <> ?
   AND user_id IN (SELECT id FROM users WHERE project_id = ? AND lifecycle_owner_team_id = ?)`
 
+	// Deactivating owned users must revoke their access immediately (ADR 024):
+	// their tokens and sessions go in the same transaction as the status flip.
+	revokeOwnedUsersTokensStmt = `DELETE FROM tokens
+WHERE project_id = ?
+  AND user_id IN (SELECT id FROM users WHERE project_id = ? AND lifecycle_owner_team_id = ?)`
+
+	revokeOwnedUsersSessionsStmt = `DELETE FROM sessions
+WHERE project_id = ?
+  AND user_id IN (SELECT id FROM users WHERE project_id = ? AND lifecycle_owner_team_id = ?)`
+
 	getTeamQuery = `SELECT project_id, id, name, status, created_at, updated_at FROM teams`
 )
 
@@ -153,6 +163,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 			{deactivateTeamMembershipsStmt, []any{membershipRemoved, now, projectID, id, membershipRemoved}},
 			{deactivateTeamOwnedUsersStmt, []any{userDeactivated, now, projectID, id, userDeactivated}},
 			{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, now, projectID, membershipRemoved, projectID, id}},
+			{revokeOwnedUsersTokensStmt, []any{projectID, projectID, id}},
+			{revokeOwnedUsersSessionsStmt, []any{projectID, projectID, id}},
 		} {
 			if _, err := tx.Exec(ctx, step.sql, step.args...); err != nil {
 				return wrapError(err)

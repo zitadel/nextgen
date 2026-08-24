@@ -40,6 +40,24 @@ WHERE project_id = @p2 AND status <> @p1
     SELECT id FROM users
     WHERE project_id = @p3 AND lifecycle_owner_team_id = @p4
   )`
+
+	// Deactivating owned users must revoke their access immediately (ADR 024):
+	// their tokens and sessions go in the same transaction as the status flip.
+	revokeOwnedUsersTokensStmt = `
+DELETE FROM tokens
+WHERE project_id = @p1
+  AND user_id IN (
+    SELECT id FROM users
+    WHERE project_id = @p2 AND lifecycle_owner_team_id = @p3
+  )`
+
+	revokeOwnedUsersSessionsStmt = `
+DELETE FROM sessions
+WHERE project_id = @p1
+  AND user_id IN (
+    SELECT id FROM users
+    WHERE project_id = @p2 AND lifecycle_owner_team_id = @p3
+  )`
 )
 
 var teamColumns = []string{
@@ -164,6 +182,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 			{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
 			{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
 			{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
+			{revokeOwnedUsersTokensStmt, []any{projectID, projectID, id}},
+			{revokeOwnedUsersSessionsStmt, []any{projectID, projectID, id}},
 		} {
 			if _, err := tx.Update(ctx, buildStatement(step.sql, step.args...).statement()); err != nil {
 				return err

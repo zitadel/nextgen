@@ -767,3 +767,105 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
 	})
 }
+
+// discoverableChallengeAttempt returns an attempt carrying only an issued
+// discoverable (usernameless) passkey challenge, plus the signed assertion
+// whose user handle resolves the user.
+func (f passkeyFixture) discoverableChallengeAttempt(t *testing.T, challengeID string) (*domain.AuthAttempt, []byte) {
+	t.Helper()
+
+	challenge, err := domain.CreatePasskeyChallenge("", nil, "preferred", passkeyRPID, f.origins)
+	require.NoError(t, err)
+	check := domain.SetAuthChallengePasskey(challengeID, time.Now(), time.Time{}, 0)
+	check.PasskeyChallenge = challenge
+
+	attempt := &domain.AuthAttempt{
+		ProjectID: "proj",
+		ID:        "att-1",
+		Checks:    []domain.AuthCheck{check},
+	}
+
+	rawChallenge, err := base64.RawURLEncoding.DecodeString(challenge.Challenge)
+	require.NoError(t, err)
+	assertion := virtualwebauthn.CreateAssertionResponse(f.rp, f.auth, f.cred, virtualwebauthn.AssertionOptions{
+		Challenge:      rawChallenge,
+		RelyingPartyID: challenge.RPID,
+	})
+	return attempt, []byte(assertion)
+}
+
+func TestAuthAttemptService_VerifyPasskeyProof_Discoverable(t *testing.T) {
+	// The discoverable path never went through the identifier lookup, so its
+	// user read must carry the active-status guard (#553).
+	activeUserFilter := database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), "proj"),
+		database.Equal(database.Col(domain.UserFieldID), passkeyUserID),
+		database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+	)
+
+	t.Run("binds an active user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newPasskeyFixture(t)
+		attempt, assertion := f.discoverableChallengeAttempt(t, "ch-1")
+
+		var succeededFactor domain.AuthFactor
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
+			succeededFactor = factor
+			return nil
+		})
+		expectListUserPasskeys(stmts, []*domain.UserPasskey{f.passkey})
+		stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, filter database.Filter[domain.UserField], _ service.UserQueryOptions) (*domain.User, error) {
+				assert.Equal(t, activeUserFilter, filter)
+				return &domain.User{ProjectID: "proj", ID: passkeyUserID}, nil
+			})
+		stmts.EXPECT().UpdateUserPasskey(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID:   "proj",
+			AttemptID:   "att-1",
+			ChallengeID: "ch-1",
+			Proof:       service.PasskeyProof{AssertionResponse: assertion},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.IsType(t, &domain.AuthFactorPasskey{}, succeededFactor)
+		assert.Equal(t, passkeyUserID, succeededFactor.(*domain.AuthFactorPasskey).UserID)
+	})
+
+	t.Run("rejects a non-active user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newPasskeyFixture(t)
+		attempt, assertion := f.discoverableChallengeAttempt(t, "ch-1")
+
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		expectListUserPasskeys(stmts, []*domain.UserPasskey{f.passkey})
+		// The assertion itself verifies; the status gate must still reject,
+		// with the same error an invalid assertion gets.
+		stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, filter database.Filter[domain.UserField], _ service.UserQueryOptions) (*domain.User, error) {
+				assert.Equal(t, activeUserFilter, filter)
+				return nil, database.NewNoRowFoundError(nil)
+			})
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
+		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID:   "proj",
+			AttemptID:   "att-1",
+			ChallengeID: "ch-1",
+			Proof:       service.PasskeyProof{AssertionResponse: assertion},
+		})
+
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+	})
+}

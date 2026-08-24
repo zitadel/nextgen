@@ -133,6 +133,8 @@ func TestSessionService_Exchange(t *testing.T) {
 	cfg := sessionConfigForTest()
 	idempotencyKey := "retry-1"
 	exchangedSession := &domain.Session{ProjectID: "proj", ID: "sess"}
+	exchangedUserID := "user-1"
+	userBoundSession := &domain.Session{ProjectID: "proj", ID: "sess", UserID: &exchangedUserID}
 	overrideTTL := 2 * time.Hour
 	invalidZero := time.Duration(0)
 	invalidAboveMax := cfg.MaxTTL + time.Second
@@ -143,9 +145,33 @@ func TestSessionService_Exchange(t *testing.T) {
 		wantTTL    time.Duration
 		repoResult *domain.Session
 		repoErr    error
+		userResult *domain.User
+		userErr    error
 		want       *domain.Session
 		wantErr    error
 	}{
+		{
+			name: "mints for an active user",
+			input: service.ExchangeInput{
+				ProjectID:    "proj",
+				HandoffToken: "handoff-token",
+			},
+			wantTTL:    cfg.DefaultTTL,
+			repoResult: userBoundSession,
+			userResult: &domain.User{ProjectID: "proj", ID: exchangedUserID},
+			want:       userBoundSession,
+		},
+		{
+			name: "rejects a user deactivated between verify and exchange",
+			input: service.ExchangeInput{
+				ProjectID:    "proj",
+				HandoffToken: "handoff-token",
+			},
+			wantTTL:    cfg.DefaultTTL,
+			repoResult: userBoundSession,
+			userErr:    database.NewNoRowFoundError(nil),
+			wantErr:    domain.ErrSessionInvalidHandoffToken(),
+		},
 		{
 			name: "returns exchanged session with default ttl",
 			input: service.ExchangeInput{
@@ -233,6 +259,19 @@ func TestSessionService_Exchange(t *testing.T) {
 							t.Fatalf("Exchange ttl = %v, want %v", gotTTL, tt.wantTTL)
 						}
 						return tt.repoResult, tt.repoErr
+					})
+			}
+			if tt.userResult != nil || tt.userErr != nil {
+				statements.EXPECT().
+					GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, filter database.Filter[domain.UserField], _ service.UserQueryOptions) (*domain.User, error) {
+						// The mint gate must require the active status (#553).
+						assert.Equal(t, database.And(
+							database.Equal(database.Col(domain.UserFieldProjectID), tt.input.ProjectID),
+							database.Equal(database.Col(domain.UserFieldID), *tt.repoResult.UserID),
+							database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+						), filter)
+						return tt.userResult, tt.userErr
 					})
 			}
 

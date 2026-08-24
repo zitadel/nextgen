@@ -42,6 +42,13 @@ WHERE project_id = ? AND user_id = ? AND status <> ?`
 
 	deleteUserMembershipsStmt = `DELETE FROM team_memberships WHERE project_id = ? AND user_id = ?`
 
+	// Deactivation must revoke access immediately (ADR 024): tokens and
+	// sessions are deleted in the same transaction that flips the status.
+	// Hard delete needs no equivalent — the user FK cascades take them.
+	revokeUserTokensStmt = `DELETE FROM tokens WHERE project_id = ? AND user_id = ?`
+
+	revokeUserSessionsStmt = `DELETE FROM sessions WHERE project_id = ? AND user_id = ?`
+
 	deleteUserStmt = `DELETE FROM users WHERE project_id = ? AND id = ?`
 
 	userExistsStmt = `SELECT EXISTS (SELECT 1 FROM users WHERE project_id = ? AND id = ?)`
@@ -224,6 +231,12 @@ func (us userStatements) DeactivateUser(ctx context.Context, projectID, userID s
 			domain.MembershipStatusRemoved.String(), now, projectID, userID,
 			domain.MembershipStatusRemoved.String(),
 		); err != nil {
+			return wrapError(err)
+		}
+		if _, err = tx.Exec(ctx, revokeUserTokensStmt, projectID, userID); err != nil {
+			return wrapError(err)
+		}
+		if _, err = tx.Exec(ctx, revokeUserSessionsStmt, projectID, userID); err != nil {
 			return wrapError(err)
 		}
 		edges := newAuthzMembershipEdgeStatements(tx)

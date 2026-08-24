@@ -92,6 +92,19 @@ DELETE FROM zitadel_nextgen.team_memberships
 WHERE project_id = $1 AND user_id = $2
 `
 
+	// Deactivation must revoke access immediately (ADR 024): tokens and
+	// sessions are deleted in the same transaction that flips the status.
+	// Hard delete needs no equivalent — the user FK cascades take them.
+	revokeUserTokensStmt = `
+DELETE FROM zitadel_nextgen.tokens
+WHERE project_id = $1 AND user_id = $2
+`
+
+	revokeUserSessionsStmt = `
+DELETE FROM zitadel_nextgen.sessions
+WHERE project_id = $1 AND user_id = $2
+`
+
 	deleteUserStmt = `
 DELETE FROM zitadel_nextgen.users
 WHERE project_id = $1 AND id = $2
@@ -277,6 +290,12 @@ func (us userStatements) DeactivateUser(ctx context.Context, projectID, userID s
 			return wrapError(pgx.ErrNoRows)
 		}
 		if _, err = tx.Exec(ctx, deactivateUserMembershipsStmt, domain.MembershipStatusRemoved.String(), projectID, userID); err != nil {
+			return wrapError(err)
+		}
+		if _, err = tx.Exec(ctx, revokeUserTokensStmt, projectID, userID); err != nil {
+			return wrapError(err)
+		}
+		if _, err = tx.Exec(ctx, revokeUserSessionsStmt, projectID, userID); err != nil {
 			return wrapError(err)
 		}
 		edges := newAuthzMembershipEdgeStatements(tx)

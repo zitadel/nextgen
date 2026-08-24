@@ -129,6 +129,22 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 		if err != nil {
 			return err
 		}
+		// The attempt behind the handoff token was verified earlier; the user
+		// may have been deactivated in between, and revocation only sweeps
+		// sessions that already exist. Gate the mint on an active user so a
+		// deactivation cannot race an in-flight login (#553).
+		if session.UserID != nil && *session.UserID != "" {
+			if _, err := tx.Statements().GetUser(ctx, database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.UserFieldID), *session.UserID),
+				database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+			), UserQueryOptions{}); err != nil {
+				if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+					return domain.ErrSessionInvalidHandoffToken()
+				}
+				return fmt.Errorf("failed to check the session user status: %w", err)
+			}
+		}
 		if err := emitSessionEstablished(ctx, tx.Statements(), session); err != nil {
 			return err
 		}

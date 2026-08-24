@@ -193,7 +193,16 @@ func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) err
 
 func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
-		Filter: database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+			// A pending_purge user is awaiting deletion by the cleanup job, so
+			// reads treat it as already gone (matches the team guard).
+			database.Or(
+				database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+				database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusSuspended.String()),
+				database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusDeactivated.String()),
+			),
+		),
 		Pagination: database.Page[domain.UserField]{
 			Limit:  uint32(normalizeLimit(input.Limit)),
 			Cursor: []byte(input.PageToken),
@@ -313,6 +322,11 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 			return nil, domain.ErrUserNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+	// A pending_purge user is awaiting deletion by the cleanup job, so reads
+	// treat it as already gone (matches the team guard).
+	if user.Metadata.Status == domain.UserStatusPendingPurge {
+		return nil, domain.ErrUserNotFound()
 	}
 
 	return user, nil
@@ -517,8 +531,14 @@ type UserStatementsLookup struct {
 }
 
 func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
+	// Login resolution requires an active user (#553): a suspended,
+	// deactivated, or pending_purge identity must not resolve, and must be
+	// indistinguishable from an unknown login name.
 	return l.Pool.Statements().GetUser(ctx,
-		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+		),
 		UserQueryOptions{Attributes: attrs},
 	)
 }

@@ -497,6 +497,17 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		// the attempt so the subject is pinned and the session/handoff carries the user id. For an
 		// identified login the user factor is already present and unchanged.
 		if userFactor == nil && verification.UserID != "" {
+			// The assertion never touched the users row, so this is the one
+			// login path that skips the active-status check in the identifier
+			// lookup. Require an active user here too (#553), with the same
+			// generic rejection.
+			if _, err := s.stmts.Statements().GetUser(ctx, database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), attempt.ProjectID),
+				database.Equal(database.Col(domain.UserFieldID), verification.UserID),
+				database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+			), UserQueryOptions{}); err != nil {
+				return passkeyChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
+			}
 			attempt.SetUserFactor(&domain.User{ID: verification.UserID})
 		}
 		// Use the verified user as the source of truth: it is set for both identified and

@@ -422,3 +422,82 @@ func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
 		assert.ElementsMatch(t, []string{activeID}, ids(userBound), "live and user_id IS NOT NULL")
 	})
 }
+
+// exchangeUserSession seeds a session bound to userID (with its session token)
+// through the attempt→handoff→exchange pipeline.
+func exchangeUserSession(t *testing.T, stmts service.AllStatements, projectID, userID string) *domain.Session {
+	t.Helper()
+	plain, _ := handoffCompletedAttemptWithUser(t, stmts, projectID, userID)
+	session, err := stmts.ExchangeSession(t.Context(), projectID, plain, nil, time.Hour)
+	require.NoError(t, err)
+	require.NotEmpty(t, session.TokenID)
+	require.NotNil(t, session.UserID)
+	t.Cleanup(func() {
+		_ = stmts.DeleteSessionByID(context.Background(), projectID, session.ID)
+	})
+	return session
+}
+
+func TestUserStatements_DeactivateRevokesSessionsAndTokens(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		user := newTestUser(t, projectID, schemaURL, "user-deact-"+uniqueSuffix(t), "deact@example.com", "Deactivated User")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+
+		session := exchangeUserSession(t, d.stmts, projectID, user.ID)
+		// A personal access token is user-bound without a session; it must go too.
+		pat := &domain.Token{
+			ProjectID: projectID,
+			UserID:    user.ID,
+			Type:      domain.TokenTypePersonalAccessToken,
+			Scope:     []string{},
+		}
+		require.NoError(t, d.stmts.CreateToken(t.Context(), pat))
+		t.Cleanup(func() {
+			_ = d.stmts.DeleteTokenByID(context.Background(), projectID, pat.TokenID)
+		})
+
+		require.NoError(t, d.stmts.DeactivateUser(t.Context(), projectID, user.ID))
+
+		_, err := d.stmts.GetSessionByID(t.Context(), projectID, session.ID)
+		assert.True(t, errors.Is(err, domain.ErrSessionNotFound()), "session should be revoked on deactivate: %v", err)
+		_, err = d.stmts.GetTokenByID(t.Context(), projectID, session.TokenID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "session token should be revoked on deactivate")
+		_, err = d.stmts.GetTokenByID(t.Context(), projectID, pat.TokenID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "personal access token should be revoked on deactivate")
+	})
+}
+
+func TestTeamStatements_DeactivateRevokesOwnedUsersSessionsAndTokens(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		ownerTeamID := "team-deact-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, ownerTeamID)))
+
+		teamOwned := newTestUser(t, projectID, schemaURL, "usr-owned-"+ownerTeamID, "owned-sess@example.com", "Owned")
+		teamOwned.LifecycleOwnerTeamID = &ownerTeamID
+		require.NoError(t, d.stmts.CreateUser(t.Context(), teamOwned))
+		selfOwned := newTestUser(t, projectID, schemaURL, "usr-self-"+ownerTeamID, "self-sess@example.com", "Self")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), selfOwned))
+		require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+			ProjectID: projectID, TeamID: ownerTeamID, UserID: selfOwned.ID, Status: domain.MembershipStatusActive,
+		}))
+
+		ownedSession := exchangeUserSession(t, d.stmts, projectID, teamOwned.ID)
+		selfSession := exchangeUserSession(t, d.stmts, projectID, selfOwned.ID)
+
+		_, err := d.stmts.DeactivateTeam(t.Context(), projectID, ownerTeamID)
+		require.NoError(t, err)
+
+		_, err = d.stmts.GetSessionByID(t.Context(), projectID, ownedSession.ID)
+		assert.True(t, errors.Is(err, domain.ErrSessionNotFound()), "owned user's session should be revoked with the team: %v", err)
+		_, err = d.stmts.GetTokenByID(t.Context(), projectID, ownedSession.TokenID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "owned user's token should be revoked with the team")
+
+		// A self-owned member only loses the roster, not their own access.
+		_, err = d.stmts.GetSessionByID(t.Context(), projectID, selfSession.ID)
+		assert.NoError(t, err, "self-owned member's session must survive team deactivation")
+		_, err = d.stmts.GetTokenByID(t.Context(), projectID, selfSession.TokenID)
+		assert.NoError(t, err, "self-owned member's token must survive team deactivation")
+	})
+}

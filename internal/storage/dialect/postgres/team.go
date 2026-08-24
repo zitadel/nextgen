@@ -39,6 +39,24 @@ WHERE project_id = $2 AND status <> $1
     SELECT id FROM zitadel_nextgen.users
     WHERE project_id = $3 AND lifecycle_owner_team_id = $4
   )`
+
+	// Deactivating owned users must revoke their access immediately (ADR 024):
+	// their tokens and sessions go in the same transaction as the status flip.
+	revokeOwnedUsersTokensStmt = `
+DELETE FROM zitadel_nextgen.tokens
+WHERE project_id = $1
+  AND user_id IN (
+    SELECT id FROM zitadel_nextgen.users
+    WHERE project_id = $2 AND lifecycle_owner_team_id = $3
+  )`
+
+	revokeOwnedUsersSessionsStmt = `
+DELETE FROM zitadel_nextgen.sessions
+WHERE project_id = $1
+  AND user_id IN (
+    SELECT id FROM zitadel_nextgen.users
+    WHERE project_id = $2 AND lifecycle_owner_team_id = $3
+  )`
 )
 
 type teamStatements struct{ statement }
@@ -166,6 +184,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 			{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
 			{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
 			{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
+			{revokeOwnedUsersTokensStmt, []any{projectID, projectID, id}},
+			{revokeOwnedUsersSessionsStmt, []any{projectID, projectID, id}},
 		} {
 			if _, err := tx.Exec(ctx, step.sql, step.args...); err != nil {
 				return wrapError(err)

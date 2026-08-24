@@ -392,7 +392,8 @@ function userStatus(user: Record<string, unknown>): string | undefined {
  * as live controls that did nothing:
  *
  *   - `Edit user` — no `PATCH`/`PUT /users/{user_id}` endpoint (#693)
- *   - `Deactivate` — no `status` field and no lifecycle endpoint (#553)
+ *   - `Deactivate` — no lifecycle endpoint (#962; the `status` field landed
+ *     with #721, and #553 made deactivation actually lock the user out)
  *   - `Reset password` — `PUT /users/{user_id}/password` exists, but the screen
  *     that would collect the new password does not; the menu item alone had
  *     nothing behind it
