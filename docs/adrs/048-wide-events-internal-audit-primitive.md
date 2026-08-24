@@ -265,8 +265,8 @@ into a **RequestContext** middleware:
   AuthGate did not run. Probes (`healthz` / `readyz` / `livez`) leave
   `project_id` empty and are skipped.
 - Path A `request.api` may set `metadata.client` (`ip`, `user_agent`, `origin`)
-  from the User-Agent middleware (IP) and the `User-Agent` / `Origin` headers.
-  That is observed requestor context for **export-time SIEM join** on
+  from the User-Agent middleware (IP) and length-capped `User-Agent` / `Origin`
+  headers. That is observed requestor context for **export-time SIEM join** on
   `request_id`. Live bot/fraud decisions stay
   [ADR 019](019-captcha-gate-and-bot-signals.md); do not read event metadata as
   a risk-evaluator signal. Path B metadata stays `{}`.

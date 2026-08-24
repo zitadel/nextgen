@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,6 +135,26 @@ func TestRequestEventMiddleware_OmitsOriginWhenHeaderMissing(t *testing.T) {
 	require.NotNil(t, meta.Client)
 	assert.Equal(t, "Mozilla/5.0 (test)", meta.Client.UserAgent)
 	assert.Empty(t, meta.Client.Origin)
+}
+
+func TestRequestEventMiddleware_TruncatesOversizedClientHeaders(t *testing.T) {
+	ins, buf := startPathA(t)
+	h := WithRequestEventMiddleware(buf, stampProject("proj_1"))
+	req := httptest.NewRequest(http.MethodGet, "/flow", nil)
+	req.Header.Set("User-Agent", strings.Repeat("a", maxEventUserAgentBytes-1)+"☃"+strings.Repeat("x", 2048))
+	req.Header.Set("Origin", strings.Repeat("b", maxEventOriginBytes+2048))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
+	ins.mu.Lock()
+	defer ins.mu.Unlock()
+	require.Len(t, ins.events, 1)
+	require.Less(t, len(ins.events[0].Metadata), 2048)
+	var meta domain.EventMetadata
+	require.NoError(t, json.Unmarshal(ins.events[0].Metadata, &meta))
+	require.NotNil(t, meta.Client)
+	assert.Equal(t, strings.Repeat("a", maxEventUserAgentBytes-1), meta.Client.UserAgent)
+	assert.Equal(t, strings.Repeat("b", maxEventOriginBytes), meta.Client.Origin)
 }
 
 func TestRequestEventMiddleware_EmptyClientStaysEmptyObject(t *testing.T) {
