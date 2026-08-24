@@ -188,7 +188,10 @@ CREATE TABLE zitadel_nextgen.authz_assignments (
     CHECK (
         (delegation_id IS NULL AND grantor_id IS NULL)
         OR (delegation_id IS NOT NULL AND grantor_id IS NOT NULL)
-    )
+    ),
+    -- ADR 054 §2: ownership never lapses — an owning-team grant carries no
+    -- expiry; it ends only by explicit transfer or revocation.
+    CHECK (NOT (object_type = 'project' AND relation = 'team' AND expires_at IS NOT NULL))
 );
 
 CREATE INDEX idx_authz_assignments_principal_project
