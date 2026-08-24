@@ -4,6 +4,7 @@ CREATE TABLE zitadel_nextgen.json_schemas (
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
     , url         TEXT COLLATE "C" NOT NULL
     , object_type TEXT COLLATE "C"
+    , kind        TEXT COLLATE "C" NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , payload    JSON        NOT NULL
 

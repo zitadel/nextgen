@@ -124,7 +124,8 @@ function AddUserForm({
     void (async () => {
       try {
         const projectId = getConsoleProjectId();
-        const listed = (await api.listSchemas({ project_id: projectId })).schemas;
+        const listed = (await api.listSchemas({ project_id: projectId, kind: "user-schema" }))
+          .schemas;
         const options = listed.map((entry) => {
           const schema = entry.schema as UserSchema;
           return {

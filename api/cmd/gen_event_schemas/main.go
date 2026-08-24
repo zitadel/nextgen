@@ -52,7 +52,7 @@ var payloadByEventType = map[string]string{
 	"flowdef.updated": "flowdef-payload.yaml",
 	"flowdef.deleted": "empty-event-payload.yaml",
 
-	"schema.created": "empty-event-payload.yaml",
+	"schema.created": "schema-created-payload.yaml",
 
 	"branding.created": "branding-created-payload.yaml",
 

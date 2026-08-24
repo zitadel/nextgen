@@ -519,3 +519,44 @@ func TestNewJSONSchema_Metadata(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
 	})
 }
+
+func TestNewJSONSchema_Kind(t *testing.T) {
+	const projectID = "proj-1"
+
+	tests := []struct {
+		name   string
+		schema string
+		want   domain.JSONSchemaKind
+	}{
+		{
+			name:   "declared kind is read from the document",
+			schema: `{"type":"object","kind":"user-schema"}`,
+			want:   domain.JSONSchemaKindUserSchema,
+		},
+		{
+			// The meta-schema requires kind and rejects the document, but
+			// NewJSONSchema runs first and still has to store something.
+			name:   "absent kind is unknown",
+			schema: `{"type":"object"}`,
+			want:   domain.JSONSchemaKindUnknown,
+		},
+		{
+			name:   "unrecognised kind is unknown rather than stored verbatim",
+			schema: `{"type":"object","kind":"not-a-kind"}`,
+			want:   domain.JSONSchemaKindUnknown,
+		},
+		{
+			name:   "non-string kind is unknown",
+			schema: `{"type":"object","kind":42}`,
+			want:   domain.JSONSchemaKindUnknown,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			schema, err := domain.NewJSONSchema(projectID, []byte(tc.schema))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, schema.Kind)
+		})
+	}
+}

@@ -36,6 +36,7 @@ CREATE TABLE json_schemas (
     project_id  TEXT    NOT NULL,
     url         TEXT    NOT NULL,
     object_type TEXT,
+    kind        TEXT    NOT NULL,
     created_at  INTEGER NOT NULL,
     payload     TEXT    NOT NULL,
     PRIMARY KEY (project_id, url),

@@ -3666,6 +3666,14 @@ type ListSchemasParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The type of object of the schema to filter by.
 	ObjectType OptString `json:",omitempty,omitzero"`
+	// The kind of schema to filter by, read from the stored document's
+	// `kind` property.
+	// `schema-url` is not a kind: it discriminates the create request body,
+	// not a stored schema. A schema registered by URL is stored as whatever
+	// document the URL served, and declares its own kind.
+	// A schema stored without its document being parsed has no kind that
+	// could be read, and is excluded from every filtered result.
+	Kind OptListSchemasKind `json:",omitempty,omitzero"`
 }
 
 func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasParams) {
@@ -3701,6 +3709,15 @@ func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasPa
 		}
 		if v, ok := packed[key]; ok {
 			params.ObjectType = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "kind",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Kind = v.(OptListSchemasKind)
 		}
 	}
 	return params
@@ -3942,6 +3959,62 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "object_type",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: kind.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "kind",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotKindVal ListSchemasKind
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotKindVal = ListSchemasKind(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Kind.SetTo(paramsDotKindVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Kind.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "kind",
 			In:   "query",
 			Err:  err,
 		}

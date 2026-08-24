@@ -77,7 +77,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 			ProjectID:  model.ProjectID,
 			EntityType: "json_schema",
 			EntityID:   model.URL,
-			Payload:    struct{}{},
+			Payload:    domain.SchemaCreatedPayloadSnapshot(model),
 		})
 	})
 	if err != nil {
@@ -123,13 +123,24 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]*domain.JSONSchema, error) {
+// kind is nil when the caller did not filter by one. It is a pointer rather
+// than a zero value because JSONSchemaKindUnknown is a real stored kind, so it
+// cannot double as "no filter".
+func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, kind *domain.JSONSchemaKind, offset int, token string) ([]*domain.JSONSchema, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
 	}
 	if objectType != "" {
 		filters = append(filters,
 			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+		)
+	}
+	// Schemas persisted without their document being parsed — ingested by URL,
+	// or a $ref target pulled in during resolution (#812) — are stored as
+	// domain.JSONSchemaKindUnknown, which no filterable kind matches.
+	if kind != nil {
+		filters = append(filters,
+			database.Equal(database.Col(domain.JSONSchemaFieldKind), kind.String()),
 		)
 	}
 
