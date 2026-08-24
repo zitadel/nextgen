@@ -112,7 +112,7 @@ func (h *Handler) FinishUserPasskeyRegistration(ctx context.Context, req *api.Fi
 	}
 
 	factor, ok := domain.CheckAs[*domain.AuthFactorPasskeyRegistration](verified, domain.AuthCheckTypePasskeyRegistration)
-	if !ok {
+	if !ok || factor.PasskeyID == "" {
 		return nil, domain.ErrInternal(nil).WithMessage("registration factor missing after verify")
 	}
 
@@ -120,22 +120,13 @@ func (h *Handler) FinishUserPasskeyRegistration(ctx context.Context, req *api.Fi
 	// further purpose. A leftover row ages out with the attempt TTL.
 	_ = h.pool.Statements().DeleteAuthAttemptByID(ctx, projectID, attempt.ID)
 
-	// Resolve the created credential row for the response.
-	passkeys, _, err := h.userService.ListPasskeys(ctx, service.ListPasskeysInput{
-		ProjectID: projectID,
-		UserID:    string(params.UserID),
-	})
-	if err != nil {
-		return nil, err
-	}
-	for _, key := range passkeys {
-		if key.CredentialID == factor.CredentialID {
-			return &api.FinishUserPasskeyRegistrationResponse{
-				ID:        key.ID,
-				Name:      key.Name,
-				CreatedAt: key.CreatedAt,
-			}, nil
-		}
-	}
-	return nil, domain.ErrInternal(nil).WithMessage("registered credential not found after verify")
+	// The verify transaction carries the created row's identity on the
+	// factor, so the response needs no read-back that could fail after the
+	// ceremony is already consumed. The factor's verification time is the
+	// same transaction's commit clock as the row's created_at.
+	return &api.FinishUserPasskeyRegistrationResponse{
+		ID:        factor.PasskeyID,
+		Name:      factor.Name,
+		CreatedAt: factor.GetLastVerifiedAt(),
+	}, nil
 }

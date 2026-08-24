@@ -11,6 +11,7 @@ additionalProperties: false
 properties:
   rp_id:
     type: string
+    minLength: 1
     description: Relying Party ID the credential is scoped to.
     example: example.com
   rp_origins:

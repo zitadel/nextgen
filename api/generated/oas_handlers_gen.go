@@ -3144,8 +3144,9 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 // Verifies the attestation against the ceremony started by
 // `POST /users/{user_id}/passkeys` and persists the new credential. A
 // rejected attestation counts against the ceremony's failure budget and the
-// ceremony stays open for a retry; an expired or unknown ceremony surfaces
-// as `att.stale_challenge`.
+// ceremony stays open for a retry. An expired ceremony surfaces as
+// `att.stale_challenge`; an unknown or already-consumed registration id
+// surfaces as `att.not_found`.
 //
 // POST /users/{user_id}/passkeys/{registration_id}
 func (s *Server) handleFinishUserPasskeyRegistrationRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
