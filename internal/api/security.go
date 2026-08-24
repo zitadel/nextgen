@@ -48,9 +48,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		// the durable principal for sk_proj grants (survives rotate/claim).
 		PrincipalID: payload.ProjectID,
 	}
-	// Only the claim operations read SecretHash (init stores it, status
-	// compares it); skip the hash for every other bearer-authenticated request.
-	if operationName == api.InitClaimOperation || operationName == api.GetClaimStatusOperation {
+	if secretHashOperations[operationName] {
 		scope.SecretHash = domain.HashSecret(t.Token)
 	}
 
@@ -93,6 +91,15 @@ var sessionCookieOperations = map[api.OperationName]bool{
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
 // cookie-secured operations in api/openapi.
 const sessionUnauthorizedMessage = "Missing or invalid session token."
+
+// secretHashOperations lists the operations whose handlers read
+// ScopeContext.SecretHash: claim init stores it, claim status compares it
+// (ADR 046 §3). An operation missing here gets an empty hash and the claim
+// service answers 403, so a new claim leg must be added to this map.
+var secretHashOperations = map[api.OperationName]bool{
+	api.InitClaimOperation:      true,
+	api.GetClaimStatusOperation: true,
+}
 
 type sessionTokenKey struct{}
 

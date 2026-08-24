@@ -326,8 +326,12 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 
 		// An expired project.team tupleset row is unrepresentable: the schema
 		// CHECK forbids expires_at on owning-team grants (ADR 054 §2, pinned in
-		// TestClaimStatements_OwningTeamGrant). The resolver's expiry filter
-		// stays covered by "check ttu general expired source grant deny".
+		// TestClaimStatements_OwningTeamGrant). writeFullTTUExists still
+		// filters tupleset-row expiry, but that branch is now deliberately
+		// untested: it only becomes reachable through a custom catalog whose
+		// TTU tupleset is not project.team, and the system catalog has no such
+		// relation. "check ttu general expired source grant deny" below covers
+		// source-grant expiry, not the tupleset row.
 
 		t.Run("check ttu membership shortcut revoked tupleset deny", func(t *testing.T) {
 			u := "user_ttu_rev_" + uniqueSuffix(t)
