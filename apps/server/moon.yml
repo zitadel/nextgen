@@ -187,6 +187,10 @@ tasks:
       - "./..."
     inputs:
       - "@group(serverInputs)"
+      # The target instance changes what actually runs (emulator vs real
+      # Spanner), so it must change the task hash: without it, the real-instance
+      # CI step replays the emulator lane's cached result (and vice versa).
+      - "$ZITADEL_TEST_SPANNER_INSTANCE"
     options:
       runFromWorkspaceRoot: true
       # Invoked by the CI Spanner emulator step.
