@@ -16,6 +16,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -33,7 +34,7 @@ import {
 import { type ThemePreference, useTheme } from "../../theme";
 import { ContextSwitcher } from "./ContextSwitcher";
 import { ZitadelLogo } from "./icons";
-import { useNavItems } from "./use-nav-items";
+import { useNavItems, useSettingsNavItems } from "./use-nav-items";
 
 /**
  * Console shell built on shadcn's `Sidebar` block (the "Sidebar 08." Figma
@@ -192,19 +193,55 @@ function SettingsHeader() {
 }
 
 /**
- * Settings nav — empty today, and that is the honest state.
+ * The settings group heading — `Sidebar / SidebarGroupLabel` in the frames
+ * (`1602:28329`): the overline face, 12px uppercase with 0.72px tracking. The
+ * component's own defaults carry the rest (32px row, `sidebar-foreground`/70).
+ */
+const GROUP_LABEL = "font-serif tracking-[0.72px] uppercase";
+
+/**
+ * Settings nav — the grouped list the settings frames draw (`ACCOUNT` /
+ * `WORKSPACE`, Figma `1568:97804`). Entries attach the same way Portal's do —
+ * `staticData.nav` on the route — with `nav.section` naming the group.
  *
- * The design groups it as `PERSONAL` (Profile) and `WORKSPACE` (Teams,
- * Members). None of those screens exists: Profile needs a call that updates a
- * user (#693) and the two workspace rows need a team reference on the user read
- * responses (#735). A group heading with nothing under it advertises a section
- * that is not there, so the headings arrive with their first row.
- *
- * When they land they attach the same way Portal's do — `staticData.nav` on the
- * route — plus whatever distinguishes the two views in `NavMeta`.
+ * A group appears with its first built row and not before: a heading over
+ * nothing advertises a section that is not there (the same argument that
+ * removed the portal's disabled rows). `WORKSPACE / Members` is design-only
+ * today — `GET /users/{id}/teams` now exists, so #735 no longer blocks it, but
+ * the screen is unbuilt.
  */
 function SettingsNav() {
-  return null;
+  const groups = useSettingsNavItems();
+  const matchRoute = useMatchRoute();
+
+  return (
+    <div role="navigation" aria-label="Settings">
+      {groups.map(({ section, label, items }) => (
+        <SidebarGroup key={section}>
+          <SidebarGroupLabel className={GROUP_LABEL}>{label}</SidebarGroupLabel>
+          <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
+            {items.map((item) => {
+              const Icon = item.nav.icon;
+              return (
+                <SidebarMenuItem key={item.nav.label}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={!!matchRoute({ to: item.to, fuzzy: true })}
+                    tooltip={item.nav.label}
+                  >
+                    <Link to={item.to} title={item.nav.label}>
+                      {Icon && <Icon aria-hidden />}
+                      <span>{item.nav.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+      ))}
+    </div>
+  );
 }
 
 /** Portal nav: the flat list, with `User schemas` nested under `Users`. */
@@ -352,7 +389,9 @@ function ContextBar() {
     <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
         {/* Desktop only — mobile keeps the persistent Sidebar 07. icon rail. */}
-        {state === "expanded" && <SidebarTrigger className="hidden text-foreground md:inline-flex" />}
+        {state === "expanded" && (
+          <SidebarTrigger className="hidden text-foreground md:inline-flex" />
+        )}
         <ContextSwitcher />
       </div>
       <ThemeToggle />
