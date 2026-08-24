@@ -6,7 +6,6 @@ dependsOn:
   - "api"
   - "design-tokens"
   - "sdk-react"
-  - "ui-react"
 
 tasks:
   lint:
@@ -15,7 +14,6 @@ tasks:
       - "api:generate"
       - "design-tokens:build"
       - "sdk-react:build"
-      - "ui-react:build"
 
   typecheck:
     command: "corepack pnpm run typecheck"
@@ -23,7 +21,6 @@ tasks:
       - "api:build"
       - "design-tokens:build"
       - "sdk-react:build"
-      - "ui-react:build"
 
   build:
     command: "corepack pnpm run build"
@@ -31,7 +28,6 @@ tasks:
       - "api:build"
       - "design-tokens:build"
       - "sdk-react:build"
-      - "ui-react:build"
     outputs:
       - "/internal/staticui/console/dist/**/*"
 
@@ -41,7 +37,6 @@ tasks:
       - "api:build-release"
       - "design-tokens:build"
       - "sdk-react:build"
-      - "ui-react:build"
     outputs:
       - "/internal/staticui/console/dist/**/*"
     options:

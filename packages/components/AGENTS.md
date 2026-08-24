@@ -235,9 +235,8 @@ the relevant build tasks so CI is safe; manual loops need a fresh
 ### Workbench
 
 The interactive workbench is [`apps/storybook`](../../apps/storybook/README.md)
-(`moon run storybook:dev`, `:6006`): the Lit atoms, the paired React
-components, and the `<zitadel-login>` orchestrator (MSW via
-`msw-storybook-addon`). It loads the built `dist/`, so rebuild after source
+(`moon run storybook:dev`, `:6006`): the Lit atoms and the
+`<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`). It loads the built `dist/`, so rebuild after source
 changes (`moon run components:build`) — the Storybook tasks depend on it.
 
 ## Build

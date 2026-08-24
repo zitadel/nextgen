@@ -184,7 +184,13 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, helpers.MustMarshal(t, resp))
+			if assert.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp)) {
+				schema := resp.(*api.Schema)
+				assert.Equal(t, schemaID, schema.ID)
+				assert.False(t, schema.Metadata.CreatedAt.IsZero())
+				_, ok := schema.Schema.GetUserSchema()
+				assert.True(t, ok, "envelope should carry the user-schema document")
+			}
 		})
 	})
 
@@ -305,12 +311,21 @@ func TestSchemaRevisions(t *testing.T) {
 			)
 			require.NoError(t, err)
 			if assert.IsType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp)) {
-				list := *(resp.(*api.ListSchemasResponse))
+				list := resp.(*api.ListSchemasResponse).Schemas
 				// ensure all revisions are present
 				assert.Len(t, list, len(tc.schemaRevisions))
 
 				// ensure list endpoint is LIFO and latest items match
 				assert.Equal(t, list[0].ID, lastCreatedID)
+
+				// every row carries the full document alongside the envelope
+				for _, item := range list {
+					doc, ok := item.Schema.GetUserSchema()
+					if assert.True(t, ok, "list row should carry the user-schema document") {
+						assert.Equal(t, tc.objectType, doc.ObjectType.Value)
+					}
+					assert.False(t, item.Metadata.CreatedAt.IsZero())
+				}
 			}
 		})
 	}

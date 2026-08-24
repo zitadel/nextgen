@@ -1,7 +1,0 @@
-/* Lit-only: <zl-select> host box model. Surface rules live in select.css. */
-:host {
-  display: block;
-}
-:host([disabled]) {
-  cursor: not-allowed;
-}

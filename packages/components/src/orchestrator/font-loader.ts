@@ -43,6 +43,20 @@ const DEFAULT_LINK_ID = "zl-default-font-link";
 export const DEFAULT_BRAND_FONT_HREF =
   "https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap";
 
+/**
+ * Only the body face is loaded here.
+ *
+ * The design draws card titles, field labels and alert titles in APK Futural,
+ * a licensed display face. First-party surfaces declare it themselves and point
+ * `--zl-font-family-heading` at it — see `apps/login-ui/src/styles.css` and
+ * `apps/console/src/styles.css`. An embedded widget runs on a customer's own
+ * origin, so serving them the binary from here is a licensing question rather
+ * than an engineering one, and it is not answered yet. Until it is, embedded
+ * headings fall through the token's stack to Arimo, which is what the stack is
+ * for. A host page that has licensed the face can opt in today by declaring an
+ * `@font-face` and setting `--zl-font-family-heading` on the element.
+ */
+
 /** Per-document, per-link-id map of each owner's desired href. */
 const registries = new WeakMap<Document, Map<string, Map<ShadowRoot, string>>>();
 

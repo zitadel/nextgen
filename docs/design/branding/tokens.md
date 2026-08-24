@@ -149,9 +149,10 @@ Names are **stable**. Once an atom consumes a token, renaming it is a breaking c
 | Token                      | Purpose                           |
 | -------------------------- | --------------------------------- |
 | `--zl-radius-sm`           | Small controls (checkboxes, tags) |
-| `--zl-radius-md`           | Inputs, buttons, cards by default |
-| `--zl-radius-lg`           | Large surfaces                    |
-| `--zl-radius-full`         | Circular (avatars, pill buttons)  |
+| `--zl-radius-md`           | Inputs and buttons                |
+| `--zl-radius-lg`           | Alerts                            |
+| `--zl-radius-xl`           | The auth card                     |
+| `--zl-radius-full`         | Circular (avatars, badges)        |
 | `--zl-border-width`        | Default 1px                       |
 | `--zl-border-width-strong` | Emphasised borders (focus, error) |
 
@@ -221,10 +222,9 @@ If the structured branding extension in [`schema.md`](schema.md) is adopted, it 
 
 ```
 branding.shape.radius: "lg"
-  → --zl-radius-sm: 0.375rem
-    --zl-radius-md: 0.75rem
-    --zl-radius-lg: 1rem
-    --zl-radius-full: 9999px
+  → --zl-radius-md: 0.75rem
+    --zl-radius-lg: 0.9375rem
+    --zl-radius-xl: 1.3125rem
 ```
 
 Preset-to-token tables ship in the component package, not in tenant JSON, so `lg` means the same everywhere.

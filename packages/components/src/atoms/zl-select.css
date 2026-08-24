@@ -1,0 +1,214 @@
+/* Styles for `<zl-select>` — shadow host rules first, then the painted surface. */
+
+/* Lit-only: <zl-select> host box model. Surface rules live in select.css. */
+:host {
+  display: block;
+}
+:host([disabled]) {
+  cursor: not-allowed;
+}
+
+/* Shared surface for `<zl-select>` / `<Select>`. Lit-only rules: lit/select-host.css */
+/* Figma masters: 8UjCXw8yemgljmbkWGrSfE / Dropdown 4397:4816 · Items 4397:4098 */
+/*
+ * A select-only combobox: a button trigger (`.zr-select__trigger`) that opens a
+ * `role="listbox"` popup (`.zr-select__listbox`). The trigger mirrors the text
+ * field box (border, radius, 40px, hover/focus border tokens); the popup options
+ * use the Figma "Items" states — hover/keyboard-active paint the 10% white wash,
+ * the chosen row gets the `surface/default-primary-gray` fill plus a check glyph.
+ */
+.zr-select {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--zl-spacing-2);
+  font-family: var(--zl-font-family-sans);
+}
+
+.zr-select__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zl-spacing-1);
+  font-size: var(--zl-text-sm-size);
+  font-weight: var(--zl-font-weight-medium);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-foreground);
+}
+.zr-select__required {
+  color: var(--zl-destructive);
+}
+.zr-select--disabled .zr-select__label {
+  color: var(--zl-muted-foreground);
+}
+
+/* Positioning context for the absolutely-placed native control + popup. */
+.zr-select__field {
+  position: relative;
+}
+
+/*
+ * Native control: visually hidden but focusable, form-associated, and the
+ * accessibility + automation surface (Playwright `selectOption`, the
+ * chrome-devtools a11y snapshot, screen readers, password managers). Overlaid
+ * on the field so keyboard focus paints the trigger via `:focus-within`;
+ * `pointer-events: none` lets mouse clicks fall through to the styled trigger
+ * and custom popup. Never use `display:none`/`visibility:hidden` here — those
+ * would drop it from the tab order and the accessibility tree.
+ */
+.zr-select__native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.zr-select__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  width: 100%;
+  height: var(--zl-spacing-9);
+  padding-block: var(--zl-spacing-2);
+  padding-inline: var(--zl-spacing-4);
+  margin: 0;
+  border-radius: var(--zl-radius-sm);
+  border: 1px solid var(--zl-input);
+  background: transparent;
+  color: var(--zl-foreground);
+  font-family: inherit;
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color var(--zl-duration-fast) var(--zl-easing-standard),
+    background-color var(--zl-duration-fast) var(--zl-easing-standard);
+}
+.zr-select__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--zl-foreground);
+}
+.zr-select__value--placeholder {
+  color: var(--zl-muted-foreground);
+}
+.zr-select__icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--zl-muted-foreground);
+  transition: transform var(--zl-duration-fast)
+    var(--zl-easing-standard);
+}
+.zr-select--open .zr-select__icon {
+  transform: rotate(180deg);
+}
+
+/* Hover — match the text field box. */
+.zr-select:not(.zr-select--disabled):not(.zr-select--open) .zr-select__trigger:hover {
+  border-color: var(--zl-ring);
+  background-color: color-mix(in srgb, var(--zl-foreground) 10%, transparent);
+}
+/* Focus / open — single white border, no outer ring (Figma Focused). Focus
+ * lives on the visually-hidden native control, so paint the trigger via the
+ * field's :focus-within rather than the trigger's own :focus. */
+.zr-select:not(.zr-select--disabled) .zr-select__field:focus-within .zr-select__trigger,
+.zr-select--open .zr-select__trigger {
+  border-color: var(--zl-ring);
+  outline: none;
+}
+.zr-select--disabled .zr-select__trigger {
+  border-color: var(--zl-input);
+  color: var(--zl-muted-foreground);
+  cursor: not-allowed;
+}
+.zr-select--disabled .zr-select__value--placeholder {
+  color: var(--zl-muted-foreground);
+}
+
+/* Invalid — red edge, matching the text field's error box. Holds on focus too. */
+.zr-select--invalid .zr-select__trigger,
+.zr-select--invalid .zr-select__field:focus-within .zr-select__trigger {
+  border-color: var(--zl-destructive);
+}
+
+/* Inline error message under the field (mirrors .zr-field__error). */
+.zr-select__error {
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-destructive);
+}
+
+.zr-select__listbox {
+  position: absolute;
+  top: calc(100% + var(--zl-spacing-2));
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 15rem;
+  overflow-y: auto;
+  border-radius: var(--zl-radius-sm);
+  border: 1px solid var(--zl-input);
+  background: var(--zl-background);
+}
+.zr-select__listbox[hidden] {
+  display: none;
+}
+
+.zr-select__option {
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  height: var(--zl-spacing-9);
+  padding-block: var(--zl-spacing-2);
+  padding-inline: var(--zl-spacing-4);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-foreground);
+  cursor: pointer;
+}
+.zr-select__option-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.zr-select__option-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--zl-foreground);
+  opacity: 0;
+}
+
+/* Hover / pointer-active — 10% white wash (Figma "Hovered"). The styled popup
+ * is a pointer-only visual layer (`aria-hidden`), so its option state lives on
+ * `data-*` hooks, not ARIA (the native <select> owns the real a11y state). */
+.zr-select__option:not([data-disabled]):hover,
+.zr-select__option[data-active]:not([data-disabled]) {
+  background-color: color-mix(in srgb, var(--zl-foreground) 10%, transparent);
+}
+/* Selected — solid fill + visible check (Figma "Selected"). */
+.zr-select__option[data-selected] {
+  background-color: var(--zl-popover);
+}
+.zr-select__option[data-selected] .zr-select__option-check {
+  opacity: 1;
+}
+.zr-select__option[data-disabled] {
+  color: var(--zl-muted-foreground);
+  cursor: not-allowed;
+}

@@ -26,31 +26,17 @@ export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { nav: { label: "User schemas", order: 1, parent: "/users" } },
   loader: async () => {
     const projectId = getConsoleProjectId();
-    // `GET /schemas` returns `{ id, created_at }` and nothing else, so the
-    // row's name, attributes and sign-in methods all have to come from each
-    // document. The list is configuration and stays small (~20, decisions log
-    // D0a/D7), so fetching them together is cheap and there is no pagination
-    // to interleave with.
     // `kind` scopes the list to user schemas. The screen is titled `User
     // schemas` and only knows how to render one, so this is the contract the
     // rows already assume rather than a new restriction.
-    const entries = await api.listSchemas({ project_id: projectId, kind: "user-schema" });
-    const documents = await Promise.all(
-      entries.map(async (entry) => {
-        try {
-          return (await api.getSchemaById(entry.id)) as UserSchema;
-        } catch {
-          // One unreadable document costs its row's detail, not the screen.
-          return undefined;
-        }
-      }),
-    );
+    const entries = (await api.listSchemas({ project_id: projectId, kind: "user-schema" }))
+      .schemas;
     // Mapped rather than spread so the wire's `created_at` stops at the loader
     // and the row keeps the console's camelCase.
-    return entries.map((entry, index) => ({
+    return entries.map((entry) => ({
       id: entry.id,
-      createdAt: entry.created_at,
-      schema: documents[index],
+      createdAt: entry.metadata.created_at,
+      schema: entry.schema as UserSchema,
     }));
   },
   component: SchemasScreen,
@@ -109,19 +95,17 @@ function SchemaRow({
 }: {
   id: string;
   createdAt: string;
-  schema: UserSchema | undefined;
+  schema: UserSchema;
 }) {
-  const name = schema ? schemaDisplayName(schema, id) : id;
-  const attributes = schema ? schemaProperties(schema).map((property) => property.key) : [];
+  const name = schemaDisplayName(schema, id);
+  const attributes = schemaProperties(schema).map((property) => property.key);
   // "Passkey + Password" reads off the document's own `x-auth-methods`. The
   // annotation says which methods the user type supports; the order they are
   // offered in belongs to the flow, not to the schema.
-  const signIn = schema
-    ? schemaAuthMethods(schema)
-        .filter((method) => method.enabled)
-        .map((method) => method.label)
-        .join(" + ")
-    : "";
+  const signIn = schemaAuthMethods(schema)
+    .filter((method) => method.enabled)
+    .map((method) => method.label)
+    .join(" + ");
 
   return (
     <div className="group relative flex flex-col gap-4 border-b border-border px-6 py-3.5 last:border-b-0 hover:bg-accent lg:flex-row lg:items-center lg:gap-6">

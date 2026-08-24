@@ -124,20 +124,17 @@ function AddUserForm({
     void (async () => {
       try {
         const projectId = getConsoleProjectId();
-        const listed = await api.listSchemas({ project_id: projectId, kind: "user-schema" });
-        // `listSchemas` returns only `{ id, created_at }`, so each schema's
-        // document — the properties this form renders — needs its own fetch.
-        const options = await Promise.all(
-          listed.map(async (entry) => {
-            const schema = (await api.getSchemaById(entry.id)) as UserSchema;
-            return {
-              id: entry.id,
-              schema,
-              name: schemaDisplayName(schema, entry.id),
-              summary: schemaFieldSummary(schema),
-            } satisfies SchemaOption;
-          }),
-        );
+        const listed = (await api.listSchemas({ project_id: projectId, kind: "user-schema" }))
+          .schemas;
+        const options = listed.map((entry) => {
+          const schema = entry.schema as UserSchema;
+          return {
+            id: entry.id,
+            schema,
+            name: schemaDisplayName(schema, entry.id),
+            summary: schemaFieldSummary(schema),
+          } satisfies SchemaOption;
+        });
         if (cancelled) return;
         setSchemas(options);
         // Projects are a secondary concern: a failure here must not block user

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/url"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -23,11 +22,6 @@ type CreateSchemaByURLInput struct {
 	ProjectID string
 	TeamID    string
 	URL       url.URL
-}
-
-type ListSchemasOutputItem struct {
-	ID        string
-	CreatedAt time.Time
 }
 
 // ---- Secondary ports -------------------------------------------------------------
@@ -132,7 +126,7 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 // kind is nil when the caller did not filter by one. It is a pointer rather
 // than a zero value because JSONSchemaKindUnknown is a real stored kind, so it
 // cannot double as "no filter".
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, kind *domain.JSONSchemaKind, offset int, token string) ([]ListSchemasOutputItem, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, kind *domain.JSONSchemaKind, offset int, token string) ([]*domain.JSONSchema, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
 	}
@@ -165,14 +159,5 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType s
 		return nil, mapListError(err, "failed to list schemas")
 	}
 
-	// TODO: make list not return the entire schema, just the fields we want
-	output := make([]ListSchemasOutputItem, len(result.Items))
-	for i, schema := range result.Items {
-		output[i] = ListSchemasOutputItem{
-			ID:        schema.URL,
-			CreatedAt: schema.CreatedAt,
-		}
-	}
-
-	return output, nil
+	return result.Items, nil
 }

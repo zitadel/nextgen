@@ -325,7 +325,7 @@ describe("syncTokens against real figma-export/", () => {
     expect(Object.keys(out.themed.syntax!)).toHaveLength(6);
 
     // The gradient stops that back the hand-written gradients in apps/console
-    // AppShell, shared-component-styles/pill.css and layout-chrome.css.
+    // AppShell, the atoms' zl-pill.css and layout-chrome.css.
     expect(out.themed.gradient!["red-start"]).toEqual({ dark: "#f25543", light: "#f25543" });
     expect(out.themed.gradient!["base-end"]).toEqual({ dark: "#0f0f11", light: "#fafafa" });
     expect(out.themed.gradient!["lavender-start"]).toEqual({ dark: "#bba5e4", light: "#bba5e4" });

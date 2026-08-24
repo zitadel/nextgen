@@ -65,7 +65,7 @@ export class ZitadelSession extends ZitadelSurface {
         font-weight: 700;
         line-height: 2.5rem;
         letter-spacing: -0.02em;
-        color: ${t.color.text.primaryWhite};
+        color: ${t.theme.foreground};
         text-align: left;
       }
       .identity {
@@ -74,7 +74,7 @@ export class ZitadelSession extends ZitadelSurface {
         font-size: 0.875rem;
         line-height: 1.25rem;
         font-weight: 400;
-        color: ${t.color.text.secondaryGray};
+        color: ${t.theme.mutedForeground};
         text-align: left;
         overflow-wrap: anywhere;
       }
@@ -82,7 +82,7 @@ export class ZitadelSession extends ZitadelSurface {
         margin: 0;
         font-size: 0.875rem;
         line-height: 1.25rem;
-        color: ${t.color.text.error};
+        color: ${t.theme.destructive};
       }
       /* suppress-header: visually hidden, kept in the accessibility tree. */
       .title.sr-only {

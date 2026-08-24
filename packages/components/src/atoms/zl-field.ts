@@ -5,8 +5,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
-import fieldHost from "@zitadel/shared-component-styles/lit/text-field-host.css?inline";
-import fieldSurface from "@zitadel/shared-component-styles/text-field.css?inline";
+import fieldStyles from "./zl-field.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { hookName } from "../internal/hook-name.js";
@@ -27,19 +26,18 @@ export type ZlFieldType = CreateFlow201StepFieldsItemType;
 export type ZlFieldInputDetail = { name: string; value: string };
 
 /**
- * Atom: `<zl-field>` — labelled input bound to a step `field`. Visual
- * spec lineage:
- *   - design-system master variant set: node `4390:1404` (file
- *     `8UjCXw8yemgljmbkWGrSfE`) — Enabled / Hovered / Focused / Filled /
- *     Disabled / Error / Success / Password forgot
+ * Atom: `<zl-field>` — labelled input bound to a step `field`. The shadcn
+ * `Field` + `Input` pair, re-skinned with our tokens.
  *
- * Per-state Figma values (master `4390:1404`):
- *
- *   Layout
- *     root         flex-column, gap=8px (spacing-02)
- *     label row    optional "Forgot password?" link (#bba5e4, 14/20)
- *     input-wrap   40px, padding 8/16, trailing icon at right 15px
- *     trailing     cross (clear) | alert-circle (error) | check (success)
+ *   root         flex column, 12px gap
+ *   label row    label, plus an optional right-aligned "Forgot your password?"
+ *                link — the design puts it here rather than under the control
+ *   input        36px tall, 10px/4px padding, `--zl-radius-md`, a
+ *                `--zl-input` edge over `--zl-input-fill`
+ *   focus        the edge takes `--zl-ring` and a 3px ring sits outside it
+ *   trailing     cross (clear) | alert-circle (error) | check (success)
+ *   description  14/20 in `--zl-muted-foreground`, the size the sign-up
+ *                frame's password hint uses
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
  */
@@ -54,7 +52,7 @@ export class ZlField extends LitElement {
 
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(fieldHost, fieldSurface),
+    ...surfaceStyles(fieldStyles),
   ];
 
   /**
@@ -83,6 +81,16 @@ export class ZlField extends LitElement {
     undefined;
   @property({ attribute: "forgot-password-label" }) accessor forgotPasswordLabel =
     "Forgot password?";
+  /**
+   * Flow action the forgot-password link runs. Set it and the link stops being
+   * a navigation and becomes a step transition, emitting `zl-submit` like a
+   * button does — the orchestrator's click delegation can't reach it, because
+   * an event crossing this shadow boundary retargets to the host and its
+   * `[data-action]` lookup finds nothing.
+   */
+  @property({ attribute: "forgot-password-action" }) accessor forgotPasswordAction:
+    | string
+    | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
   @property({ type: Boolean }) accessor required = false;
   @property({ type: Boolean, reflect: true }) accessor disabled = false;
@@ -232,7 +240,11 @@ export class ZlField extends LitElement {
               ? html`<span class="zr-field__required" aria-hidden="true">*</span>`
               : null}
           </label>
-          <a class="zr-field__link" part="forgot-link" href=${this.forgotPasswordHref}
+          <a
+            class="zr-field__link"
+            part="forgot-link"
+            href=${this.forgotPasswordHref}
+            @click=${this.onForgotPasswordClick}
             >${this.forgotPasswordLabel}</a
           >
         </div>
@@ -312,6 +324,17 @@ export class ZlField extends LitElement {
     this.syncFormState();
     this.dispatchNativeInput();
     this.inputEl?.focus();
+  };
+
+  /**
+   * With no `forgot-password-action` the link is a plain navigation and this
+   * does nothing — a tenant pointing it at their own recovery page still gets
+   * an ordinary anchor, middle-click and all.
+   */
+  private onForgotPasswordClick = (event: MouseEvent): void => {
+    if (!this.forgotPasswordAction) return;
+    event.preventDefault();
+    emit<{ action: string | null }>(this, "zl-submit", { action: this.forgotPasswordAction });
   };
 
   private handleInput = (event: Event): void => {
@@ -403,6 +426,7 @@ export const zlFieldManifest: AtomManifest = {
     "success",
     "forgot-password-href",
     "forgot-password-label",
+    "forgot-password-action",
     "trailing-icon",
   ],
   parts: [
@@ -419,7 +443,7 @@ export const zlFieldManifest: AtomManifest = {
     "error",
   ],
   slots: ["prefix", "suffix", "help"],
-  events: ["zl-input"],
+  events: ["zl-input", "zl-submit"],
 } as const;
 
 declare global {

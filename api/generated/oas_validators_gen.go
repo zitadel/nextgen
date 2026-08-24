@@ -3676,18 +3676,6 @@ func (s GateKind) Validate() error {
 	}
 }
 
-func (s GetSchemaByIdOK) Validate() error {
-	switch s.Type {
-	case UserSchemaGetSchemaByIdOK:
-		if err := s.UserSchema.Validate(); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
-}
-
 func (s *IdentifierFactorPayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -3942,10 +3930,42 @@ func (s ListSchemasKind) Validate() error {
 	}
 }
 
-func (s ListSchemasResponse) Validate() error {
-	alias := ([]ListSchemasResponseItem)(s)
-	if alias == nil {
-		return errors.New("nil is invalid value")
+func (s *ListSchemasResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Schemas == nil {
+			return errors.New("nil is invalid value")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Schemas {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "schemas",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -5390,6 +5410,29 @@ func (s RequestAPIPayloadMethod) Validate() error {
 	}
 }
 
+func (s *Schema) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Schema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "schema",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *SchemaCreatedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -5506,6 +5549,18 @@ func (s SchemaCreatedEventDelegationType) Validate() error {
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s SchemaDocument) Validate() error {
+	switch s.Type {
+	case UserSchemaSchemaDocument:
+		if err := s.UserSchema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
 	}
 }
 

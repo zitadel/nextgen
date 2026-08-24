@@ -298,7 +298,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("The passkey prompt was closed before completing.");
     expect(result).toContain('action="setup"');
     expect(result).not.toContain("invalid");
@@ -324,7 +324,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("This passkey could not be verified");
     expect(result).not.toContain("error.passkey_invalid");
   });
@@ -350,7 +350,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("The new passkey could not be verified");
     expect(result).not.toContain("error.passkey_registration_invalid");
   });
@@ -463,9 +463,9 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('autocomplete="email"');
     expect(result).toContain('autocomplete="current-password"');
-    expect(result).toContain('class="zl-card-forgot"');
-    expect(result).toContain('data-action="recover"');
-    expect(result).not.toContain("forgot-password-href");
+    expect(result).toContain('forgot-password-action="recover"');
+    expect(result).toContain("forgot-password-href");
+    expect(result).not.toContain('class="zl-card-forgot"');
     expect(result).toContain('label="Sign in"');
     expect(result).not.toContain('label="Continue"');
     const passkeyButtons =
@@ -526,8 +526,7 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("Wrong email or password.");
     expect(result).toContain('name="password"');
     expect(result).toContain("invalid");
-    expect(result).not.toContain('<zl-alert severity="error">Wrong email');
-    expect(result).not.toContain('<zl-alert severity="error"');
+    expect(result).not.toContain("<zl-alert data-zl-step-error");
   });
 
   it("renders sign-in server error (6594:125237): heading + body alert, fields unchanged", () => {
@@ -593,7 +592,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("Use YYYY-MM-DD.");
     expect(result).toContain("An account with this email already exists");
     expect(result).not.toContain("forgot-password-href");
-    expect(result).not.toContain('<zl-alert severity="error">An account');
+    expect(result).not.toContain("<zl-alert data-zl-step-error");
     expect(result).not.toContain("forgot-password-href");
     expect(result).not.toContain('data-action="sign_in"');
     expect(result).not.toContain('class="zl-card-nav"');

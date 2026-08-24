@@ -4,8 +4,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
-import checkboxHost from "@zitadel/shared-component-styles/lit/checkbox-host.css?inline";
-import checkboxSurface from "@zitadel/shared-component-styles/checkbox.css?inline";
+import checkboxStyles from "./zl-checkbox.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { nextUid } from "../internal/unique-id.js";
@@ -50,7 +49,7 @@ export class ZlCheckbox extends LitElement {
 
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(checkboxHost, checkboxSurface),
+    ...surfaceStyles(checkboxStyles),
   ];
 
   /**

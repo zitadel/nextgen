@@ -74,7 +74,7 @@ async function columnsForUsers(users: Record<string, unknown>[]): Promise<Schema
   const schemas = await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        return (await api.getSchemaById(id)) as UserSchema;
+        return (await api.getSchemaById(id)).schema as UserSchema;
       } catch {
         // One unreadable schema costs its columns, not the screen. The rows
         // still render from the fallback below.

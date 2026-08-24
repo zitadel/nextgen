@@ -16,12 +16,12 @@
 :host {
   display: block;
   background: transparent;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
 }
 :host([variant="page"]) {
   min-height: 100%;
-  background: var(--zl-color-surface-default-black, #0f0f11);
+  background: var(--zl-background);
 }
 /* A branding asset whose URL is well-formed but dead otherwise renders as a
    0×0 <img> — a silent hole in the design. `asset-fallback.ts` stamps this
@@ -60,29 +60,98 @@ img[data-zl-asset-broken] {
 .zl-attribution[hidden] {
   display: none;
 }
-/* Card header typography — Figma "Desktop/Headings/Small" + "Body Small
-   Regular" pattern shared by sign-in (6593:141740), passkey upsell
-   (6594:89142 / 6594:12796), and signed-in (6596:132845). Templates
-   slot raw <h1>/<p> elements into <zl-card>, which keeps them in the
-   light DOM where the orchestrator's stylesheet can reach them — the
-   atom intentionally doesn't dictate typography. */
+
+/* The trustmark: "Secured with" beside the logotype, at body size. It is not a
+   chip — the design reserves the chip beside it for the session badge. */
+.zl-trustmark {
+  flex-wrap: wrap;
+  gap: var(--zl-spacing-2-5);
+}
+.zl-trustmark__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-foreground);
+  text-decoration: none;
+}
+.zl-trustmark__mark:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.zl-trustmark__mark:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+  border-radius: var(--zl-radius-sm);
+}
+.zl-trustmark__logotype {
+  display: block;
+  flex-shrink: 0;
+  width: 65px;
+  height: 16px;
+  line-height: 0;
+}
+.zl-trustmark__logotype-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Card header typography. Templates slot raw <h1>/<p> elements into
+   <zl-card>, which keeps them in the light DOM where this stylesheet can
+   reach them — the atom intentionally doesn't dictate typography.
+
+   `line-height: 1` on the title is the design's, not an oversight: the header
+   is a single line whose 6px gap to the description does the separating, so
+   leading above the cap height only pads the top of the card. */
+/* Brand mark above the card, from `branding.logo_url`. Bounded the way the
+   split pane's mark is (`img.zl-split__compact`): a tenant asset carries no
+   intrinsic size the layout can trust, and an SVG with only a viewBox stretches
+   to fill whatever box it lands in — which here is the full page width. */
+.zl-card-logo {
+  width: auto;
+  max-width: min(12rem, 60%);
+  max-height: var(--zl-card-logo-max-height, 2.5rem);
+  object-fit: contain;
+}
 .zl-card-title {
   margin: 0;
-  font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 2.5rem;
-  letter-spacing: -0.02em;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-heading);
+  font-size: var(--zl-text-xl-size);
+  font-weight: var(--zl-font-weight-medium);
+  line-height: 1;
+  color: var(--zl-card-foreground);
   text-align: left;
 }
 .zl-card-subtitle {
   margin: 0;
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  font-weight: 400;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
+}
+
+/* The two groups the card body holds. The card spaces them 28px apart; each
+   packs its own members tighter. Explicit wrappers rather than sibling
+   selectors, so an ejected template composes them on purpose. */
+.zl-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-7);
+}
+/* A step can declare no fields at all — the passkey upsell is title, copy and
+   two buttons. The wrapper still renders, and an empty flex item would keep
+   claiming the card's 28px gap. `:has(*)` rather than `:empty` because Liquid
+   leaves whitespace text nodes behind, which `:empty` counts. */
+.zl-field-group:not(:has(*)) {
+  display: none;
+}
+.zl-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
 }
 /* suppress-header: the host asked for the heading block to be visually
    hidden (its page already carries one). Stamped by the orchestrator on the
@@ -100,15 +169,16 @@ img[data-zl-asset-broken] {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-/* Figma 6593:141989 / 6594:12882 — left-aligned in Field+CTAs (x=0, items-start). */
+/* The sign-in <-> sign-up switcher, centred beneath the actions. The design
+   gives the link no colour of its own — the underline is what marks it. */
 .zl-card-nav {
   margin: 0;
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  font-size: 1rem;
-  line-height: 1.5rem;
-  font-weight: 400;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
-  text-align: left;
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
+  text-align: center;
 }
 .zl-card-nav__link {
   display: inline;
@@ -118,21 +188,27 @@ img[data-zl-asset-broken] {
   background: transparent;
   font: inherit;
   line-height: inherit;
-  color: var(--zl-color-text-link, var(--zl-color-icon-default-purple, #bba5e4));
-  text-decoration: none;
+  color: var(--zl-link);
+  text-decoration: underline;
+  text-underline-offset: 4px;
   cursor: pointer;
 }
+/* The switcher's underline is how the design marks it, so hover lifts the link
+   out of the muted line it sits in rather than taking the underline away. */
 .zl-card-nav__link:hover {
-  text-decoration: underline;
+  color: var(--zl-foreground);
 }
 .zl-card-nav__link:focus-visible {
-  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
-  outline-offset: var(--zl-focus-offset, 2px);
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
 }
-/* Figma 6593:141989 — forgot password row (left-aligned, before CTAs). */
+/* Forgot-password is no longer a row of its own: the design sits it on the
+   password field's label row, so `<zl-field>` renders it (see its
+   `forgot-password-*` attributes). These rules remain for templates ejected
+   before that move, which still emit the standalone paragraph. */
 .zl-card-forgot {
   margin: 0;
-  text-align: left;
+  text-align: right;
 }
 .zl-card-forgot__link {
   display: inline;
@@ -140,20 +216,23 @@ img[data-zl-asset-broken] {
   padding: 0;
   border: none;
   background: transparent;
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  font-size: 1rem;
-  line-height: 1.5rem;
-  font-weight: 400;
-  color: var(--zl-color-text-link, var(--zl-color-icon-default-purple, #bba5e4));
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-link);
   text-decoration: none;
+  text-underline-offset: 4px;
   cursor: pointer;
 }
+/* Matches the field-level affordance in `zl-field.css`: the design draws
+   forgot-password as plain text, and the underline is the hover. */
 .zl-card-forgot__link:hover {
   text-decoration: underline;
 }
 .zl-card-forgot__link:focus-visible {
-  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
-  outline-offset: var(--zl-focus-offset, 2px);
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
 }
 /* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
    Consumed by the ejectable templates in @zitadel/config under
@@ -170,15 +249,24 @@ img[data-zl-asset-broken] {
      available width, and the attribution row below mirrors the same tracks
      to line the badge up under the form pane. */
   width: 100%;
-  gap: var(--zl-spacing-05, 2rem);
+  gap: var(--zl-spacing-8);
 }
+/* The block padding is what decides whether the pane reads as a peer of the
+   form card or as the thing the page is built around. The card is 384 wide and
+   roughly 342 tall on the sign-in step, so 3.25rem a side on top of the
+   placeholder's own footprint put the pane 200px past it — the grid centres the
+   card in that row and the attribution then sits a long way under it. 2rem
+   keeps the panes visually separated at the width they meet without the brand
+   side dictating the page height. Spacing tokens, not pixels: the branding
+   density knob writes `--zl-spacing-4` / `--zl-spacing-8`, so a compact tenant
+   tightens this pane along with everything else. */
 .zl-split__brand {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--zl-spacing-04, 1.5rem);
-  padding: 52px 16px;
+  gap: var(--zl-spacing-6);
+  padding: var(--zl-spacing-8) var(--zl-spacing-4);
 }
 /* A width cap alone leaves the height open: a portrait lockup clamped to 16rem
    wide still resolves whatever height its ratio asks for (a 500×2000 mark
@@ -214,12 +302,13 @@ img[data-zl-asset-broken] {
 }
 .zl-split__logo:has(+ .zl-split__hero) + .zl-split__hero {
   max-height: min(
-    var(--zl-split-hero-max-height, 27.5rem),
+    var(--zl-split-hero-max-height, 22.5rem),
     max(
       6rem,
       calc(
-        100vh - 104px - 6.5rem - 2.5rem - var(--zl-spacing-04, 1.5rem) -
-          var(--zl-spacing-04, 1.5rem) - var(--zl-split-logo-max-height, 8rem)
+        100vh - 104px - var(--zl-spacing-8) - var(--zl-spacing-8) -
+          2.5rem - var(--zl-spacing-6) - var(--zl-spacing-6) -
+          var(--zl-split-logo-max-height, 8rem)
       )
     )
   );
@@ -233,14 +322,14 @@ img[data-zl-asset-broken] {
    attribution below the fold. Pinning the width hands the excess to
    `object-fit` instead of the layout: a wide banner is untouched (its height
    never reaches the cap) and a tall or square one is cropped. The cap is the
-   `.zl-split__placeholder` footprint (22rem at 4 / 5), so a hero never claims
+   `.zl-split__placeholder` footprint (18rem at 4 / 5), so a hero never claims
    more vertical space than the panel it replaces, with a viewport term for
    short screens. Tenants whose design wants a taller pane raise
    `--zl-split-hero-max-height` from the template root. */
 .zl-split__hero {
   width: 100%;
-  max-height: var(--zl-split-hero-max-height, min(27.5rem, 60vh));
-  border-radius: var(--zl-radius-m, 0.75rem);
+  max-height: var(--zl-split-hero-max-height, min(22.5rem, 60vh));
+  border-radius: var(--zl-radius-lg);
   object-fit: cover;
 }
 /* No-asset default for the brand pane: a token-gradient panel (same visual
@@ -249,26 +338,33 @@ img[data-zl-asset-broken] {
    the whole design as a lonely off-centre card. The templates swap it for
    the real assets the moment one is set. */
 .zl-split__placeholder {
-  width: min(22rem, 85%);
+  width: min(18rem, 85%);
   aspect-ratio: 4 / 5;
-  border-radius: var(--zl-radius-m, 0.75rem);
+  border-radius: var(--zl-radius-lg);
   background:
     radial-gradient(
       120% 120% at 18% 12%,
-      var(--zl-color-icon-default-purple, #bba5e4) 0%,
+      var(--zl-gradient-lavender-start) 0%,
       transparent 60%
     ),
     radial-gradient(
       130% 130% at 85% 92%,
-      var(--zl-color-icon-default-pink, #f48aa0) 0%,
+      var(--zl-gradient-rose-start) 0%,
       transparent 60%
     ),
-    var(--zl-color-surface-default-primary-gray, #252528);
+    var(--zl-card);
 }
+/* A column at every width, not just the collapsed one: the trustmark is a
+   member of this pane (see the anchor in the split templates), and stacking it
+   under the card is what puts it the same 24px away that the centred design
+   gives it. On wide viewports the compact mark is hidden, so the column holds
+   the card and the trustmark alone. */
 .zl-split__form {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--zl-spacing-6);
   padding: 16px;
 }
 /* Condensed brand header inside the form pane. Hidden on wide viewports
@@ -296,7 +392,7 @@ img.zl-split__compact--hero {
   max-height: 6rem;
   max-width: 100%;
   width: 100%;
-  border-radius: var(--zl-radius-m, 0.75rem);
+  border-radius: var(--zl-radius-lg);
   object-fit: cover;
 }
 .zl-split--right .zl-split__brand {
@@ -305,22 +401,24 @@ img.zl-split__compact--hero {
 .zl-split--right .zl-split__form {
   order: 1;
 }
-/* The shell footer spans both split panes, so a centred attribution pill
-   lands under the pane seam instead of under the form. Mirror the split's
-   tracks (same custom property, same gap, same width) on the attribution
-   row and park the pill in the form column; `:has` keys it to the template
-   actually rendering a split so centred/minimal keep the plain centring. */
-zl-page-shell:has(.zl-split) .zl-attribution {
+/* Only for a template with no attribution anchor — an ejected split from
+   before the mark moved into the form column, which still slots it into the
+   shell footer. That footer spans both panes, so a centred mark lands under the
+   pane seam: mirror the split's tracks (same custom property, same gap, same
+   width) on the footer row and park the mark in the form column. `:has` keys it
+   to the template actually rendering a split, so centred/minimal keep the plain
+   centring. */
+zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution {
   width: 100%;
   display: grid;
   grid-template-columns: var(--zl-split-columns, minmax(0, 1fr) minmax(0, 1fr));
-  gap: var(--zl-spacing-05, 2rem);
+  gap: var(--zl-spacing-8);
 }
-zl-page-shell:has(.zl-split) .zl-attribution > * {
+zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution > * {
   grid-column: 2;
   justify-self: center;
 }
-zl-page-shell:has(.zl-split--right) .zl-attribution > * {
+zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution > * {
   grid-column: 1;
 }
 /* Container query, not media query: keyed to the mount's inline size so a
@@ -334,19 +432,15 @@ zl-page-shell:has(.zl-split--right) .zl-attribution > * {
   .zl-split__brand {
     display: var(--zl-split-brand-mobile, none);
   }
-  .zl-split__form {
-    flex-direction: column;
-    gap: var(--zl-spacing-04, 1.5rem);
-  }
   .zl-split__compact {
     display: block;
   }
   /* Collapsed split is a single column — the badge recentres with it. */
-  zl-page-shell:has(.zl-split) .zl-attribution {
+  zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution {
     grid-template-columns: minmax(0, 1fr);
   }
   zl-page-shell:has(.zl-split) .zl-attribution > *,
-  zl-page-shell:has(.zl-split--right) .zl-attribution > * {
+  zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution > * {
     grid-column: 1;
   }
 }
@@ -360,19 +454,19 @@ zl-page-shell:has(.zl-split--right) .zl-attribution > * {
   width: 100%;
   max-width: 34rem;
   text-align: left;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
 }
 .zl-hero__nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--zl-spacing-05, 2rem);
+  margin-bottom: var(--zl-spacing-8);
 }
 .zl-hero__brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--zl-spacing-02, 0.5rem);
+  gap: var(--zl-spacing-2);
   font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -384,11 +478,11 @@ zl-page-shell:has(.zl-split--right) .zl-attribution > * {
   display: inline-flex;
   width: 1.75rem;
   height: 1.75rem;
-  border-radius: var(--zl-radius-s, 0.5rem);
+  border-radius: var(--zl-radius-md);
   background: linear-gradient(
     135deg,
-    var(--zl-color-icon-default-purple, #bba5e4),
-    var(--zl-color-icon-default-pink, #f48aa0)
+    var(--zl-gradient-lavender-start),
+    var(--zl-gradient-rose-start)
   );
 }
 /* Text fallback for the mobile compact header when no logo_url is set
@@ -403,13 +497,13 @@ zl-page-shell:has(.zl-split--right) .zl-attribution > * {
   font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
+  color: var(--zl-foreground);
 }
 .zl-hero__nav-links {
   display: flex;
-  gap: var(--zl-spacing-04, 1.5rem);
+  gap: var(--zl-spacing-6);
   font-size: 0.9375rem;
-  color: var(--zl-color-text-secondary-gray, #bfbfcf);
+  color: var(--zl-muted-foreground);
 }
 .zl-hero__nav-links a {
   color: inherit;
@@ -419,56 +513,56 @@ zl-page-shell:has(.zl-split--right) .zl-attribution > * {
   text-decoration: underline;
 }
 .zl-hero__eyebrow {
-  margin: 0 0 var(--zl-spacing-03, 1rem);
+  margin: 0 0 var(--zl-spacing-4);
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--zl-color-text-subtitle-purple, #bba5e4);
+  color: var(--zl-muted-foreground);
 }
 .zl-hero__headline {
-  margin: 0 0 var(--zl-spacing-03, 1rem);
-  font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
+  margin: 0 0 var(--zl-spacing-4);
+  font-family: var(--zl-font-family-heading);
   font-size: 2.75rem;
   line-height: 1.1;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .zl-hero__sub {
-  margin: 0 0 var(--zl-spacing-05, 2rem);
+  margin: 0 0 var(--zl-spacing-8);
   max-width: 30rem;
   font-size: 1.0625rem;
   line-height: 1.6;
-  color: var(--zl-color-text-secondary-gray, #bfbfcf);
+  color: var(--zl-muted-foreground);
 }
 .zl-hero__bullets {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-spacing-02, 0.5rem);
-  margin: 0 0 var(--zl-spacing-05, 2rem);
+  gap: var(--zl-spacing-2);
+  margin: 0 0 var(--zl-spacing-8);
   padding: 0;
   list-style: none;
 }
 .zl-hero__bullets li {
   display: flex;
   align-items: center;
-  gap: var(--zl-spacing-02, 0.5rem);
+  gap: var(--zl-spacing-2);
   font-size: 1rem;
 }
 .zl-hero__bullets li::before {
   content: "✓";
-  color: var(--zl-color-icon-default-purple, #bba5e4);
+  color: var(--zl-success);
   font-weight: 700;
 }
 .zl-hero__footnote {
   margin: 0;
-  padding-top: var(--zl-spacing-04, 1.5rem);
-  border-top: 1px solid var(--zl-color-border-default-black, #252528);
+  padding-top: var(--zl-spacing-6);
+  border-top: 1px solid var(--zl-border);
   font-size: 0.8125rem;
-  color: var(--zl-color-text-disabled, #686883);
+  color: var(--zl-muted-foreground);
 }
 .zl-hero__footnote strong {
-  color: var(--zl-color-text-secondary-gray, #bfbfcf);
+  color: var(--zl-muted-foreground);
   font-weight: 600;
 }
 /* Minimal-design chrome (`minimal`): fields straight on the page, no card.
@@ -481,7 +575,7 @@ zl-page-shell:has(.zl-split--right) .zl-attribution > * {
 .zl-minimal {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-spacing-04, 1.5rem);
+  gap: var(--zl-spacing-6);
   width: min(24rem, 100%);
   margin-inline: auto;
 }
