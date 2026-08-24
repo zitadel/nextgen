@@ -86,6 +86,17 @@ func TestSchemaService_ListSchemas(t *testing.T) {
 			result: &database.ListResult[*domain.JSONSchema]{},
 		},
 		{
+			name: "kind filter applied",
+			input: service.ListSchemasInput{
+				ProjectID: "proj_a",
+				Kind:      ptr(domain.JSONSchemaKindUserSchema),
+			},
+			wantOpts: listSchemasOpts(20, "",
+				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
+			),
+			result: &database.ListResult[*domain.JSONSchema]{},
+		},
+		{
 			name:     "limit clamped to max",
 			input:    service.ListSchemasInput{ProjectID: "proj_a", Limit: 500},
 			wantOpts: listSchemasOpts(100, ""),

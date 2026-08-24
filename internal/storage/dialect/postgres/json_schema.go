@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
-const createJSONSchemaStmt = `INSERT INTO zitadel_nextgen.json_schemas (project_id, url, object_type, payload) VALUES ($1, $2, $3, $4) RETURNING project_id, url, object_type, created_at, payload`
+const createJSONSchemaStmt = `INSERT INTO zitadel_nextgen.json_schemas (project_id, url, object_type, kind, payload) VALUES ($1, $2, $3, $4, $5) RETURNING project_id, url, object_type, kind, created_at, payload`
 
 type jsonSchemaStatements struct{ statement }
 
@@ -29,10 +29,16 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		return err
 	}
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
-		if err := tx.QueryRow(ctx, createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Schema).
-			Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.CreatedAt, &schema.Schema); err != nil {
+		var kind string
+		if err := tx.QueryRow(ctx, createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind.String(), schema.Schema).
+			Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema); err != nil {
 			return wrapError(err)
 		}
+		parsedKind, err := domain.JSONSchemaKindString(kind)
+		if err != nil {
+			return wrapError(err)
+		}
+		schema.Kind = parsedKind
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
 	})
@@ -55,7 +61,7 @@ func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, project
 	})
 }
 
-const jsonSchemaQuery = "SELECT project_id, url, object_type, created_at, payload FROM zitadel_nextgen.json_schemas"
+const jsonSchemaQuery = "SELECT project_id, url, object_type, kind, created_at, payload FROM zitadel_nextgen.json_schemas"
 
 // GetJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
@@ -112,9 +118,15 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 
 func (js jsonSchemaStatements) scanJSONSchema(row pgx.CollectableRow) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
-	if err := row.Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.CreatedAt, &schema.Schema); err != nil {
+	var kind string
+	if err := row.Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema); err != nil {
 		return nil, err
 	}
+	parsedKind, err := domain.JSONSchemaKindString(kind)
+	if err != nil {
+		return nil, err
+	}
+	schema.Kind = parsedKind
 	return schema, nil
 }
 
@@ -141,5 +153,10 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 		SQLName:  "created_at",
 		Accessor: func(s *domain.JSONSchema) any { return s.CreatedAt },
 		Coerce:   database.CoerceTime,
+	},
+	domain.JSONSchemaFieldKind: {
+		SQLName:  "kind",
+		Accessor: func(s *domain.JSONSchema) any { return s.Kind.String() },
+		Coerce:   database.CoerceString,
 	},
 })

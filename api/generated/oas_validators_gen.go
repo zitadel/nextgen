@@ -3921,6 +3921,15 @@ func (s ListFlowDefinitionsPurpose) Validate() error {
 	}
 }
 
+func (s ListSchemasKind) Validate() error {
+	switch s {
+	case "user-schema":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *ListSchemasResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

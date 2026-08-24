@@ -5631,6 +5631,23 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "kind" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "kind",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Kind.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"

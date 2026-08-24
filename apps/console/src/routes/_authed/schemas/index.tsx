@@ -26,7 +26,11 @@ export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { nav: { label: "User schemas", order: 1, parent: "/users" } },
   loader: async () => {
     const projectId = getConsoleProjectId();
-    const entries = (await api.listSchemas({ project_id: projectId })).schemas;
+    // `kind` scopes the list to user schemas. The screen is titled `User
+    // schemas` and only knows how to render one, so this is the contract the
+    // rows already assume rather than a new restriction.
+    const entries = (await api.listSchemas({ project_id: projectId, kind: "user-schema" }))
+      .schemas;
     // Mapped rather than spread so the wire's `created_at` stops at the loader
     // and the row keeps the console's camelCase.
     return entries.map((entry) => ({
