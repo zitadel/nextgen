@@ -318,6 +318,22 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
 }
 
 /**
+ * `created_at DESC, id DESC`, the order the server lists in. The comparator has
+ * to be a total order: `createdAt` is millisecond-resolution here, so two
+ * schemas can share one, and a tie that resolved arbitrarily would let
+ * `revisions=latest` pick a different revision from one call to the next.
+ */
+function compareSchemasNewestFirst(a: SchemaRecord, b: SchemaRecord): number {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt < b.createdAt ? 1 : -1;
+  }
+  if (a.id === b.id) {
+    return 0;
+  }
+  return a.id < b.id ? 1 : -1;
+}
+
+/**
  * `revisions=latest` keeps the newest revision of each `objectType`. Takes the
  * list already sorted newest-first, so the first record of an `objectType` is
  * the one to keep. A record without an `objectType` is a revision of nothing
@@ -732,12 +748,17 @@ export function setupPlatformHandlers() {
       const matching = [...store.schemas.values()]
         .filter((r) => r.projectId === projectId)
         .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
-        .filter((r) => !kindFilter || schemaKind(r.body) === kindFilter)
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      const records =
+        .sort(compareSchemasNewestFirst);
+      // The server's anti-join repeats none of the caller's filters, and only
+      // object_type can correlate a suppressing row — so narrowing by
+      // object_type before selecting the latest is equivalent, while narrowing
+      // by kind is not: a newer revision of another kind still supersedes an
+      // older one, and the schema drops out of a kind-filtered result entirely.
+      const current =
         url.searchParams.get("revisions") === "latest"
           ? latestSchemaRevisions(matching)
           : matching;
+      const records = current.filter((r) => !kindFilter || schemaKind(r.body) === kindFilter);
       const responseBody: ListSchemas200 = {
         schemas: records.map((r) => ({
           id: r.id,
