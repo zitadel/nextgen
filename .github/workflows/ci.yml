@@ -119,15 +119,16 @@ jobs:
       # from before #795 (kept unwired there, removal tracked in #793).
       #
       # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
-      # if:; secrets stay only in with:. Unset var / forks → emulator step.
+      # if:; WIF auth uses the existing GCP_WIF_* repo variables (the pre-#795
+      # secrets were rotated away). Unset var / forks → emulator step.
       # Auth hard-fails if the var is set but WIF is broken (no silent fallback).
       - name: Authenticate to Google Cloud (Spanner test instance)
         id: spanner-auth
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
 
       - name: Run Go integration tests (spanner emulator)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.spanner-auth.outcome != 'success' }}
