@@ -33,9 +33,6 @@
   ],
   "references": [
     {
-      "path": "../shared-component-styles/tsconfig.lib.json"
-    },
-    {
       "path": "../api-mock/tsconfig.lib.json"
     },
     {

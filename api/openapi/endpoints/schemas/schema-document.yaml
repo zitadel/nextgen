@@ -1,0 +1,8 @@
+title: SchemaDocument
+description: The customer-authored JSON Schema document, served verbatim.
+oneOf:
+  - $ref: user-schema.yaml
+discriminator:
+  propertyName: kind
+  mapping:
+    user-schema: user-schema.yaml

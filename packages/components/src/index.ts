@@ -21,6 +21,8 @@ export {
   ZlPill,
   ZlSelect,
   type IconName,
+  type IconSize,
+  type IconTone,
   type ZlCheckboxChangeDetail,
   type ZlFieldType,
   type ZlSelectOption,
@@ -37,6 +39,17 @@ export {
 } from "./atoms/index.js";
 
 export { manifestRegistry, findManifest, listKnownTags, type AtomManifest } from "./manifests.js";
+
+/**
+ * The "Secured with Zitadel" trustmark markup. Exported because the orchestrator
+ * injects it into the page shell's footer rather than the shell rendering it, so
+ * a shell shown outside a flow (Storybook, a tenant preview) has no other way to
+ * paint the real chrome.
+ */
+export {
+  ZITADEL_ATTRIBUTION_LOGOTYPE_SVG,
+  zitadelTrustmarkInnerHtml,
+} from "./internal/attribution-markup.js";
 
 export { tokens, cssVars, type Tokens, type CssVars } from "./tokens/index.js";
 export { baseHostStyles, focusVisibleStyles, t } from "./styles/index.js";

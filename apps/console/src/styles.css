@@ -8,10 +8,6 @@
    those standard names so shadcn/ui components drop in unchanged. */
 @import "@zitadel/design-tokens/css/shadcn.css";
 
-/* Still required while sessions/projects/flow-definitions/system/boundaries
-   compose `@zitadel/ui-react` atoms. Drop when those call sites migrate to shadcn. */
-@import "@zitadel/ui-react/styles.css";
-
 /* Self-hosted Arimo — the design's body typeface (`font-sans`). */
 @import "@fontsource/arimo/400.css";
 @import "@fontsource/arimo/500.css";

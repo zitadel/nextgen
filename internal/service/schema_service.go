@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/url"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -25,9 +24,20 @@ type CreateSchemaByURLInput struct {
 	URL       url.URL
 }
 
-type ListSchemasOutputItem struct {
-	ID        string
-	CreatedAt time.Time
+type ListSchemasInput struct {
+	ProjectID  string
+	ObjectType string
+	// Kind is nil when the caller did not filter by one. It is a pointer rather
+	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
+	// it cannot double as "no filter".
+	Kind      *domain.JSONSchemaKind
+	PageToken string
+	Limit     int
+}
+
+type ListSchemasOutput struct {
+	Items         []*domain.JSONSchema
+	NextPageToken string
 }
 
 // ---- Secondary ports -------------------------------------------------------------
@@ -83,7 +93,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 			ProjectID:  model.ProjectID,
 			EntityType: "json_schema",
 			EntityID:   model.URL,
-			Payload:    struct{}{},
+			Payload:    domain.SchemaCreatedPayloadSnapshot(model),
 		})
 	})
 	if err != nil {
@@ -129,23 +139,37 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]ListSchemasOutputItem, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
-		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
 	}
-	if objectType != "" {
+	if input.ObjectType != "" {
 		filters = append(filters,
-			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), input.ObjectType),
 		)
 	}
-
-	// TODO: implement pagination
+	// Schemas persisted without their document being parsed — ingested by URL,
+	// or a $ref target pulled in during resolution (#812) — are stored as
+	// domain.JSONSchemaKindUnknown, which no filterable kind matches.
+	if input.Kind != nil {
+		filters = append(filters,
+			database.Equal(database.Col(domain.JSONSchemaFieldKind), input.Kind.String()),
+		)
+	}
 
 	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.And(filters...),
 		Pagination: database.Page[domain.JSONSchemaField]{
+			Limit:  uint32(normalizeLimit(input.Limit)),
+			Cursor: []byte(input.PageToken),
 			OrderBy: database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
+				// url is the resource id and, with project_id fixed by the
+				// filter, makes the order total so page boundaries cannot
+				// skip or repeat rows sharing a created_at.
+				Columns: []database.Column[domain.JSONSchemaField]{
+					database.Col(domain.JSONSchemaFieldCreatedAt),
+					database.Col(domain.JSONSchemaFieldURL),
+				},
 				Direction: database.OrderDesc,
 			},
 		},
@@ -154,14 +178,8 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType s
 		return nil, mapListError(err, "failed to list schemas")
 	}
 
-	// TODO: make list not return the entire schema, just the fields we want
-	output := make([]ListSchemasOutputItem, len(result.Items))
-	for i, schema := range result.Items {
-		output[i] = ListSchemasOutputItem{
-			ID:        schema.URL,
-			CreatedAt: schema.CreatedAt,
-		}
-	}
-
-	return output, nil
+	return &ListSchemasOutput{
+		Items:         result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
 }

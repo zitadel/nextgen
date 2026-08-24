@@ -47,7 +47,7 @@ export const Route = createFileRoute("/_authed/users/$userId")({
       schemaId
         ? api
             .getSchemaById(schemaId)
-            .then((value) => value as UserSchema)
+            .then((value) => value.schema as UserSchema)
             .catch(() => undefined)
         : Promise.resolve(undefined),
       api

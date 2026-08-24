@@ -513,7 +513,7 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	listResp, err := client.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListSchemasResponse{}, listResp, helpers.MustMarshal(t, listResp))
-	require.Empty(t, *listResp.(*api.ListSchemasResponse))
+	require.Empty(t, listResp.(*api.ListSchemasResponse).Schemas)
 
 	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)

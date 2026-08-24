@@ -24,11 +24,18 @@ import splitTemplate from "../../../packages/config/defaults/branding/split/logi
 const INTER_FONT_URL =
   "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap";
 
+/**
+ * The logo assets are named for their *ink*, not for the surface they sit on:
+ * `zitadel-logo-light.svg` is the white wordmark (for dark surfaces) and
+ * `zitadel-logo-dark.svg` is the near-black one (for light surfaces). Pairing
+ * them the other way round renders an invisible logo, which reads as a broken
+ * layout rather than as a fixture picking the wrong file.
+ */
 export const brandingPresets = {
   centered: {
     layout: "centered",
     font_url: INTER_FONT_URL,
-    logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
+    logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
     palette: {
       primary: "#4A90D9",
       on_primary: "#FFFFFF",
@@ -66,7 +73,7 @@ export const brandingPresets = {
   dark: {
     layout: "centered",
     font_url: INTER_FONT_URL,
-    logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
+    logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
     palette: {
       primary: "#7C9CFF",
       on_primary: "#0A0A0A",
@@ -88,7 +95,7 @@ export const brandingPresets = {
   "split-template": {
     layout: "split",
     liquid_template: splitTemplate,
-    logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
+    logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
     hero_url:
       "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?auto=format&fit=crop&w=1280&q=60",
   } satisfies Branding,

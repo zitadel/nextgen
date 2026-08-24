@@ -4488,7 +4488,7 @@ func decodeGetSchemaByIdResponse(resp *http.Response) (res GetSchemaByIdRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetSchemaByIdOK
+			var response Schema
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

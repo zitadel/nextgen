@@ -11,7 +11,7 @@ widths), and emits three artifacts consumers can rely on:
 | CSS variables        | `@zitadel/design-tokens/css/tokens.css` | Lit atoms, orchestrator chrome, tenant CSS              |
 | Tailwind v4 `@theme` | `@zitadel/design-tokens/css/tailwind.css` | Consumers that want the `--*-zl-*` / `bg-zl-*` utilities |
 | shadcn bridge        | `@zitadel/design-tokens/css/shadcn.css` | `apps/console` (unprefixed `bg-background`, …)          |
-| Typed TS constants   | `@zitadel/design-tokens`              | Paired React components in `packages/ui-react`, any TS consumer |
+| Typed TS constants   | `@zitadel/design-tokens`              | The Lit atoms' `t` bridge in `packages/components`, any TS consumer |
 
 Every token is namespaced with `--zl-*` (and `--*-zl-*` in the Tailwind
 block) so it never collides with consumer tokens.
@@ -25,7 +25,7 @@ incrementally rather than in one breaking change:
 
 | System | Var shape | Source | Status |
 | --- | --- | --- | --- |
-| Legacy | `--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`, `--zl-spacing-*`, `--zl-radius-*` | `src/legacy.tokens.json` (frozen) | being migrated away from |
+| Legacy | `--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`, `--zl-spacing-*` | `src/legacy.tokens.json` (frozen) | being migrated away from |
 | shadcn | `--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`, `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*` | designer DTCG export (`figma-export/`) | the target surface |
 | Themed groups | `--zl-syntax-*`, `--zl-gradient-*` | designer DTCG export (`figma-export/`) | additive |
 

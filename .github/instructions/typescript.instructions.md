@@ -9,7 +9,7 @@ This is a pnpm ESM workspace using Node from `.nvmrc`, the pnpm version from
 Canonical scoped sources: [`packages/AGENTS.md`](../../packages/AGENTS.md)
 (SDK export stability, peer-dependency rules, the mixed build tooling and why),
 plus the per-package `AGENTS.md` files (components, design-tokens,
-shared-component-styles, testing, api-mock) and
+testing, api-mock) and
 [`apps/console/AGENTS.md`](../../apps/console/AGENTS.md) for console UI.
 Review pointers on top:
 

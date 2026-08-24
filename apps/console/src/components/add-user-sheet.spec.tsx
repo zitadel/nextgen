@@ -55,13 +55,16 @@ function stubSchemas(
   server.use(
     http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
     http.post(PROJECTS_QUERY_URL, () => HttpResponse.json({ projects })),
+    // The list carries the documents (#921), so the sheet needs no per-schema
+    // stubs — a reintroduced `GET /schemas/{id}` has no handler here.
     http.get(SCHEMAS_URL, () =>
-      HttpResponse.json(
-        Object.keys(schemas).map((id) => ({ id, created_at: "2026-07-01T00:00:00Z" })),
-      ),
-    ),
-    ...Object.entries(schemas).map(([id, body]) =>
-      http.get(`${SCHEMAS_URL}/${id}`, () => HttpResponse.json(body)),
+      HttpResponse.json({
+        schemas: Object.entries(schemas).map(([id, body]) => ({
+          id,
+          schema: body,
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
+        })),
+      }),
     ),
   );
 }

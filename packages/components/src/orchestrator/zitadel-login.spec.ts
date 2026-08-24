@@ -23,6 +23,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
+import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
@@ -1325,9 +1326,15 @@ describe("<zitadel-login> against the typed Flow API", () => {
   it("keeps an explicitly dismissed banner away through the next loading render", async () => {
     const element = await mountWithStepErrorBanner(host, "user_not_found");
 
-    const closeButton = element.shadowRoot
-      ?.querySelector("zl-alert[data-zl-step-error]")
-      ?.shadowRoot?.querySelector<HTMLButtonElement>('[part="close"]');
+    // The shipped templates render the design's non-dismissible alert, so the
+    // close control has to be opted into here — as a tenant template opting
+    // into `dismissible` would. What is under test is the orchestrator holding
+    // the dismissal across the next render, not who renders the control.
+    const banner = element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-error]");
+    expect(banner).toBeTruthy();
+    banner?.setAttribute("dismissible", "");
+    await banner?.updateComplete;
+    const closeButton = banner?.shadowRoot?.querySelector<HTMLButtonElement>('[part="close"]');
     expect(closeButton).toBeTruthy();
     closeButton?.click();
     expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();

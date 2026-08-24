@@ -1,4 +1,0 @@
-/* Lit-only: <zl-alert> host + slot reset. */
-:host {
-  display: block;
-}

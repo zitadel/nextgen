@@ -184,7 +184,13 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, helpers.MustMarshal(t, resp))
+			if assert.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp)) {
+				schema := resp.(*api.Schema)
+				assert.Equal(t, schemaID, schema.ID)
+				assert.False(t, schema.Metadata.CreatedAt.IsZero())
+				_, ok := schema.Schema.GetUserSchema()
+				assert.True(t, ok, "envelope should carry the user-schema document")
+			}
 		})
 	})
 
@@ -305,13 +311,90 @@ func TestSchemaRevisions(t *testing.T) {
 			)
 			require.NoError(t, err)
 			if assert.IsType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp)) {
-				list := *(resp.(*api.ListSchemasResponse))
+				list := resp.(*api.ListSchemasResponse).Schemas
 				// ensure all revisions are present
 				assert.Len(t, list, len(tc.schemaRevisions))
 
 				// ensure list endpoint is LIFO and latest items match
 				assert.Equal(t, list[0].ID, lastCreatedID)
+
+				// every row carries the full document alongside the envelope
+				for _, item := range list {
+					doc, ok := item.Schema.GetUserSchema()
+					if assert.True(t, ok, "list row should carry the user-schema document") {
+						assert.Equal(t, tc.objectType, doc.ObjectType.Value)
+					}
+					assert.False(t, item.Metadata.CreatedAt.IsZero())
+				}
 			}
 		})
 	}
+}
+
+// A schema created through the posted-body path records the `kind` its document
+// declares, and listing by that kind returns it. The exclusion half of the
+// contract — a different kind, and an unparsed schema stored as `unknown` — is
+// proven in stmttest, where a schema can be written directly; the API cannot
+// produce either, because `kind` is an enum of one and the create path always
+// populates it.
+func TestSchemaKindFilter(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	objectType := "kind-filter-" + strings.ToLower(helpers.ProjectName())
+	sch := api.UserSchema{}
+	require.NoError(t, sch.UnmarshalJSON([]byte(fmt.Sprintf(
+		`{
+          "title": "kind filter",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "objectType": %q,
+          "metaSchema": "%s/user-schema.json",
+          "kind": "user-schema",
+          "type": "object",
+          "x-auth-methods": {
+            "password": { "enabled": true }
+          },
+          "properties": {
+            "givenName": { "type": "string" }
+          }
+        }`, objectType, helpers.BuiltinSchemaBaseURL))))
+
+	created, err := client.CreateSchema(
+		t.Context(),
+		api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
+		api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+	)
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateSchemaResponse{}, created, helpers.MustMarshal(t, created))
+	createdID := created.(*api.CreateSchemaResponse).ID
+
+	list := func(t *testing.T, params api.ListSchemasParams) []api.Schema {
+		t.Helper()
+		resp, err := client.ListSchemas(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.ListSchemasResponse).Schemas
+	}
+
+	base := api.ListSchemasParams{
+		ProjectID:  api.ProjectID(project.ID),
+		ObjectType: api.OptString{Value: objectType, Set: true},
+	}
+
+	withKind := base
+	withKind.Kind = api.OptListSchemasKind{Value: api.ListSchemasKindUserSchema, Set: true}
+
+	filtered := list(t, withKind)
+	require.Len(t, filtered, 1)
+	assert.Equal(t, createdID, filtered[0].ID)
+
+	// The kind filter neither drops the schema nor adds anything to it: the same
+	// query without a kind returns the same single row.
+	assert.Len(t, list(t, base), 1)
 }

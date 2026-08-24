@@ -8,7 +8,7 @@ consumes.
 
 | # | Vocabulary | Example names | Where | Emitted |
 | - | --- | --- | --- | --- |
-| 1 | **Legacy login** | `--zl-color-surface-default-black`, `--zl-color-text-button-*`, `--zl-color-gray-*` | `packages/shared-component-styles/*` (paired Lit+React atoms; themed light+dark since ADR-014 §5 was amended — names still encode their dark appearance) | yes — frozen in `src/legacy.tokens.json` |
+| 1 | **Legacy login** | `--zl-color-surface-default-black`, `--zl-color-text-button-*`, `--zl-color-gray-*` | `packages/components/src/atoms/*.css` (the Lit atoms; themed light+dark since ADR-014 §5 was amended — names still encode their dark appearance) | yes — frozen in `src/legacy.tokens.json` |
 | 2 | **shadcn** (target) | `--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`, … | `apps/console/**` via `css/shadcn.css` | yes — from `figma-export/`, themed light+dark |
 | 3 | **Old console semantic** | `--zl-color-surface-base/raised/subtle`, `--zl-color-text-primary/secondary` | retired WIP | **no** — not preserved |
 
@@ -32,7 +32,7 @@ embed in customer pages.
 Light `background` is `#fafafa` (neutral.50); `card` / `popover` stay `#ffffff`
 so elevated surfaces contrast against the canvas.
 
-## Legacy → shadcn (for `shared-component-styles`, a later job)
+## Legacy → shadcn (for the Lit atoms)
 
 | Legacy | shadcn |
 | --- | --- |

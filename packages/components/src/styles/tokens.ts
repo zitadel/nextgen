@@ -5,14 +5,14 @@ import { unsafeCSS, type CSSResult } from "lit";
  * Lit-friendly token bridge.
  *
  * `@zitadel/design-tokens` exports two parallel trees:
- *   - `tokens.color.text.primaryWhite === "#f4f4f6"` (resolved values)
- *   - `cssVars.color.text.primaryWhite === "var(--zl-color-text-primary-white)"`
+ *   - `tokens.theme.foreground === "#fafafa"` (resolved values)
+ *   - `cssVars.theme.foreground === "var(--zl-foreground)"`
  *
  * Atom CSS authored with Lit's `css` tagged template needs `CSSResult`
  * fragments, not raw strings. This module wraps the cssVars tree in
  * `unsafeCSS` once so every atom can write:
  *
- *     css`background: ${t.color.surface.defaultBlack};`
+ *     css`background: ${t.theme.background};`
  *
  * The cssVars tree itself never changes shape outside of a design-tokens
  * rebuild, so the `unsafeCSS` calls are constant and safe.
