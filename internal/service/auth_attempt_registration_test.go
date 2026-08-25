@@ -349,7 +349,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser: func(string) []service.UserAction { return []service.UserAction{createUser} },
+				CreateUser:          func(string) []service.UserAction { return []service.UserAction{createUser} },
 			},
 		})
 		require.NoError(t, err)
@@ -412,7 +412,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser: func(string) []service.UserAction { return []service.UserAction{createUser} },
+				CreateUser:          func(string) []service.UserAction { return []service.UserAction{createUser} },
 			},
 		})
 		assert.ErrorIs(t, err, domain.ErrUserInvalid())
@@ -435,7 +435,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser: func(string) []service.UserAction { return []service.UserAction{createUser} },
+				CreateUser:          func(string) []service.UserAction { return []service.UserAction{createUser} },
 			},
 		})
 		assert.ErrorIs(t, err, domain.ErrUserAlreadyExists())
