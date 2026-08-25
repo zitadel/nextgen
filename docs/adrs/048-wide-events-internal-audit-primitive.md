@@ -264,6 +264,12 @@ into a **RequestContext** middleware:
   Path B `FromContext` copies `request_id` from the HTTP middleware even when
   AuthGate did not run. Probes (`healthz` / `readyz` / `livez`) leave
   `project_id` empty and are skipped.
+- Path A `request.api` may set `metadata.client` (`ip`, `user_agent`, `origin`)
+  from the User-Agent middleware (IP) and length-capped `User-Agent` / `Origin`
+  headers. That is observed requestor context for **export-time SIEM join** on
+  `request_id`. Live bot/fraud decisions stay
+  [ADR 019](019-captcha-gate-and-bot-signals.md); do not read event metadata as
+  a risk-evaluator signal. Path B metadata stays `{}`.
 - Response header `X-Request-Id` echoes the assigned `request_id`.
 
 **Durability (batched insert, DB clock):** Request-wide events are **not**

@@ -45,6 +45,10 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
               RiskResult and decides
 ```
 
+Do not read stored event metadata or `GET /events` as a risk-evaluator
+signal. Path A `request.api` requestor context is best-effort audit export
+for SIEM join on `request_id`, not a request-time input.
+
 ### Platform / edge signals
 
 Apps deployed behind an edge platform (e.g. Cloudflare, Vercel, Netlify) often already
