@@ -11,6 +11,7 @@
   "properties": {
     "$schema": {
       "type": "string",
+      "minLength": 1,
       "description": "Editor affordance: path or URL of this schema so editors validate and autocomplete the file (scaffolded connection files point at `.zitadel/meta/idp-connection.json`). Ignored by the platform."
     },
     "slug": {
@@ -43,11 +44,13 @@
     },
     "display_name": {
       "type": "string",
+      "minLength": 1,
       "maxLength": 256,
       "description": "Shown to the user on the sign-in button."
     },
     "subject_claim": {
       "type": "string",
+      "minLength": 1,
       "description": "Claim carrying the provider's stable subject identifier. Optional for OIDC (the engine uses `sub` per spec; override where `sub` is pairwise, e.g. Entra `oid`). Required for OAuth2 \u2014 no `sub` guarantee."
     },
     "claim_mapping": {
@@ -170,7 +173,8 @@
         "scopes": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "uniqueItems": true,
           "minItems": 1,
@@ -192,6 +196,7 @@
         "static_authorize_parameters": {
           "type": "object",
           "propertyNames": {
+            "minLength": 1,
             "not": {
               "enum": [
                 "client_id",
@@ -269,7 +274,8 @@
         "scopes": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "uniqueItems": true,
           "description": "Provider-specific; OAuth 2.0 defines no universal scope."
@@ -282,6 +288,7 @@
         "static_authorize_parameters": {
           "type": "object",
           "propertyNames": {
+            "minLength": 1,
             "not": {
               "enum": [
                 "client_id",
