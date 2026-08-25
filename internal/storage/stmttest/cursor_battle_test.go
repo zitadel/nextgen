@@ -5,6 +5,7 @@ package stmttest
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/go-jose/go-jose/v4"
@@ -303,15 +304,18 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 func battleJSONSchemas(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
+	created := make([]*domain.JSONSchema, 0, 5)
 	want := make([]string, 0, 5)
 	for i := range 5 {
-		url := "https://example.com/schemas/battle-" + uniqueSuffix(t) + "-" + string(rune('a'+i))
-		require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+		schema := &domain.JSONSchema{
 			ProjectID: projectID,
-			URL:       url,
+			URL:       "https://example.com/schemas/battle-" + uniqueSuffix(t) + "-" + string(rune('a'+i)),
 			Schema:    []byte(`{"type":"object"}`),
-		}))
+		}
+		require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), schema))
+		url := schema.URL
 		t.Cleanup(func() { _ = d.stmts.DeleteJSONSchemaByID(context.Background(), projectID, url) })
+		created = append(created, schema)
 		want = append(want, url)
 	}
 	filter := database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID)
@@ -325,6 +329,36 @@ func battleJSONSchemas(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(s *domain.JSONSchema) string { return s.URL }, 2)
+
+	// SchemaService.ListSchemas pages by (created_at, url); url breaks
+	// created_at ties. Expected order comes from the timestamps the dialect
+	// scanned back at insert, so it holds whether or not they collide (the
+	// generic tie-at-the-boundary property is runListCursorTie's).
+	t.Run("created_at_url_order", func(t *testing.T) {
+		byCreated := slices.Clone(created)
+		slices.SortFunc(byCreated, func(a, b *domain.JSONSchema) int {
+			if c := a.CreatedAt.Compare(b.CreatedAt); c != 0 {
+				return c
+			}
+			return strings.Compare(a.URL, b.URL)
+		})
+		wantByCreated := make([]string, 0, len(byCreated))
+		for _, schema := range byCreated {
+			wantByCreated = append(wantByCreated, schema.URL)
+		}
+		orderCreatedAsc := database.OrderBy[domain.JSONSchemaField]{
+			Columns: []database.Column[domain.JSONSchemaField]{
+				database.Col(domain.JSONSchemaFieldCreatedAt),
+				database.Col(domain.JSONSchemaFieldURL),
+			},
+			Direction: database.OrderAsc,
+		}
+		drainIncarnation(t, wantByCreated, orderCreatedAsc, func(page database.Page[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+			return d.stmts.ListJSONSchemas(unfilteredListCtx(t), &database.ListOptions[domain.JSONSchemaField]{
+				Filter: filter, Pagination: page,
+			})
+		}, func(s *domain.JSONSchema) string { return s.URL }, 2)
+	})
 }
 
 func battleEncryptionKeys(t *testing.T, d dialect) {

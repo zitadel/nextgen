@@ -52,7 +52,13 @@ function stub({
 } = {}) {
   server.use(
     http.get(`${USERS_URL}/${USER_ID}`, () => HttpResponse.json(user)),
-    http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS)),
+    http.get(`${SCHEMAS_URL}/sch_business`, () =>
+      HttpResponse.json({
+        id: "sch_business",
+        schema: BUSINESS,
+        metadata: { created_at: "2026-07-01T00:00:00Z" },
+      }),
+    ),
     http.get(`${USERS_URL}/${USER_ID}/passkeys`, () =>
       passkeysStatus === 200
         ? HttpResponse.json({ passkeys })
@@ -99,12 +105,16 @@ describe("user detail", () => {
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
         HttpResponse.json({
-          title: "Business",
-          properties: {
-            email: { type: "string", format: "email" },
-            headcount: { type: "integer", title: "Headcount" },
-            verified: { type: "boolean", title: "Verified" },
+          id: "sch_business",
+          schema: {
+            title: "Business",
+            properties: {
+              email: { type: "string", format: "email" },
+              headcount: { type: "integer", title: "Headcount" },
+              verified: { type: "boolean", title: "Verified" },
+            },
           },
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
         }),
       ),
       http.get(`${USERS_URL}/${USER_ID}/passkeys`, () => HttpResponse.json({ passkeys: [] })),

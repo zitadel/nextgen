@@ -49,7 +49,7 @@ same TX (shared `request_id`).
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
-| **Schema** | _(none — identity is `entity_id`)_ | Schema document body |
+| **Schema** | `kind`, `object_type` | Schema document body |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
@@ -64,6 +64,12 @@ renamed. If origins become patchable later, the update delta includes the
 
 Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
 `client_id`, `token_id`, `actor_id`, `entity_id`.
+
+Path A `request.api` may also carry observed requestor context on metadata
+(`ip`, `user_agent`, `origin` under `client`). Join Path B mutations to that
+snapshot via `request_id`. Exported events enable offline SIEM rules; they
+are not inputs to the live risk evaluator
+([bot-detection.md](../flowengine/bot-detection.md)).
 
 - Auth attempt `entity_id` ↔ check payload `auth_attempt_id`.
 - Session after handoff: `session_id` **column** (set via `EmitSpec.SessionID`;
@@ -116,7 +122,7 @@ tracked below.
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
 | Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | delta of allowlisted fields that changed |
 | Flow definition delete | `flowdef.deleted` | `admin` | `flow_definition` | _(empty)_ |
-| JSON schema create | `schema.created` | `admin` | `json_schema` | _(empty; identity is `entity_id`)_ |
+| JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |

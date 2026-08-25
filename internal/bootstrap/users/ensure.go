@@ -74,9 +74,12 @@ func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, tea
 }
 
 func ensureJSONSchema(ctx context.Context, stmts service.AllStatements, projectID, schemaURL string) error {
+	// The placeholder document is empty, so it declares no kind and is not a
+	// user schema — listing by kind must not surface it.
 	err := stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
+		Kind:      domain.JSONSchemaKindUnknown,
 		Schema:    []byte("{}"),
 	})
 	if err != nil {

@@ -5,7 +5,6 @@ package integration_test
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -285,9 +284,8 @@ func TestClaimExpiredChallenge(t *testing.T) {
 	secret := harness.ProjectSecret(t, project)
 
 	plain := "ch_" + helpers.RandString(16)
-	sum := sha256.Sum256([]byte(secret))
 	challenge, err := domain.NewClaimChallenge(domain.HashClaimChallengeToken(plain), project.ID,
-		hex.EncodeToString(sum[:]), time.Now().Add(-time.Minute))
+		domain.HashSecret(secret), time.Now().Add(-time.Minute))
 	require.NoError(t, err)
 	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateChallenge(t.Context(), challenge))
 
@@ -311,6 +309,42 @@ func TestClaimExpiredChallenge(t *testing.T) {
 		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.ProjClaimExpired{}, completeResp, helpers.MustMarshal(t, completeResp))
+}
+
+// TestCompleteClaimNoPersonalTeam: the session user is authenticated but has
+// no team membership at all, so there is no personal team to attach the
+// project to — 403 with code claim.no_personal_team. Reachable until #527
+// auto-creates the personal team at registration.
+func TestCompleteClaimNoPersonalTeam(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+	initOK := mustInitClaim(t, client, project.ID)
+
+	// A platform user without any team: created with no initial membership,
+	// unlike CreateUserWithTeam.
+	userID := "user_" + helpers.RandString(8)
+	emailAttr, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+		ProjectID:  harness.EnsurePlatformProject(t).ID,
+		SchemaURL:  apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL),
+		ID:         userID,
+		Attributes: domain.CreateAttributes{*emailAttr},
+	}))
+
+	client.SetSessionToken(platformSessionCookie(t, userID).Value)
+	resp, err := client.CompleteClaim(t.Context(),
+		&api.CompleteClaimRequest{ChallengeID: initOK.ChallengeID},
+		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.ClaimNoPersonalTeam{}, resp, helpers.MustMarshal(t, resp))
+	assert.Equal(t, "claim.no_personal_team", resp.(*api.ClaimNoPersonalTeam).GetCode())
 }
 
 // TestClaimStatusBearerMismatch: a valid project.write bearer for the same

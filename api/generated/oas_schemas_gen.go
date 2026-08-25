@@ -570,10 +570,9 @@ type AuthAttemptCreatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthAttemptCreatedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload                  `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -677,7 +676,7 @@ func (s *AuthAttemptCreatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthAttemptCreatedEvent) GetMetadata() OptAuthAttemptCreatedEventMetadata {
+func (s *AuthAttemptCreatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -787,7 +786,7 @@ func (s *AuthAttemptCreatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthAttemptCreatedEvent) SetMetadata(val OptAuthAttemptCreatedEventMetadata) {
+func (s *AuthAttemptCreatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -977,18 +976,6 @@ func (s *AuthAttemptCreatedEventDelegationType) UnmarshalText(data []byte) error
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthAttemptCreatedEventMetadata map[string]jx.Raw
-
-func (s *AuthAttemptCreatedEventMetadata) init() AuthAttemptCreatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type AuthAttemptHandedOffEvent struct {
@@ -1028,10 +1015,9 @@ type AuthAttemptHandedOffEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthAttemptHandedOffEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload                    `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -1135,7 +1121,7 @@ func (s *AuthAttemptHandedOffEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthAttemptHandedOffEvent) GetMetadata() OptAuthAttemptHandedOffEventMetadata {
+func (s *AuthAttemptHandedOffEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -1245,7 +1231,7 @@ func (s *AuthAttemptHandedOffEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthAttemptHandedOffEvent) SetMetadata(val OptAuthAttemptHandedOffEventMetadata) {
+func (s *AuthAttemptHandedOffEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -1433,18 +1419,6 @@ func (s *AuthAttemptHandedOffEventDelegationType) UnmarshalText(data []byte) err
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type AuthAttemptHandedOffEventMetadata map[string]jx.Raw
-
-func (s *AuthAttemptHandedOffEventMetadata) init() AuthAttemptHandedOffEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // The current state of an authentication attempt.
@@ -1693,10 +1667,9 @@ type AuthCheckFailedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthCheckFailedEventMetadata `json:"metadata"`
-	Payload  AuthCheckPayload                `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  AuthCheckPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -1800,7 +1773,7 @@ func (s *AuthCheckFailedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthCheckFailedEvent) GetMetadata() OptAuthCheckFailedEventMetadata {
+func (s *AuthCheckFailedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -1910,7 +1883,7 @@ func (s *AuthCheckFailedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthCheckFailedEvent) SetMetadata(val OptAuthCheckFailedEventMetadata) {
+func (s *AuthCheckFailedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -2100,18 +2073,6 @@ func (s *AuthCheckFailedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthCheckFailedEventMetadata map[string]jx.Raw
-
-func (s *AuthCheckFailedEventMetadata) init() AuthCheckFailedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Payload for `auth.check.failed` / `auth.check.succeeded`.
 // `auth_attempt_id` joins the check to its attempt for SIEM correlation.
 // Ref: #
@@ -2190,10 +2151,9 @@ type AuthCheckSucceededEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthCheckSucceededEventMetadata `json:"metadata"`
-	Payload  AuthCheckPayload                   `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  AuthCheckPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -2297,7 +2257,7 @@ func (s *AuthCheckSucceededEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthCheckSucceededEvent) GetMetadata() OptAuthCheckSucceededEventMetadata {
+func (s *AuthCheckSucceededEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -2407,7 +2367,7 @@ func (s *AuthCheckSucceededEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthCheckSucceededEvent) SetMetadata(val OptAuthCheckSucceededEventMetadata) {
+func (s *AuthCheckSucceededEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -2597,18 +2557,6 @@ func (s *AuthCheckSucceededEventDelegationType) UnmarshalText(data []byte) error
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthCheckSucceededEventMetadata map[string]jx.Raw
-
-func (s *AuthCheckSucceededEventMetadata) init() AuthCheckSucceededEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type AuthFactorPasskeyEnrolledEvent struct {
@@ -2648,10 +2596,9 @@ type AuthFactorPasskeyEnrolledEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthFactorPasskeyEnrolledEventMetadata `json:"metadata"`
-	Payload  AuthFactorPayload                         `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  AuthFactorPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -2755,7 +2702,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthFactorPasskeyEnrolledEvent) GetMetadata() OptAuthFactorPasskeyEnrolledEventMetadata {
+func (s *AuthFactorPasskeyEnrolledEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -2865,7 +2812,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthFactorPasskeyEnrolledEvent) SetMetadata(val OptAuthFactorPasskeyEnrolledEventMetadata) {
+func (s *AuthFactorPasskeyEnrolledEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -3055,18 +3002,6 @@ func (s *AuthFactorPasskeyEnrolledEventDelegationType) UnmarshalText(data []byte
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthFactorPasskeyEnrolledEventMetadata map[string]jx.Raw
-
-func (s *AuthFactorPasskeyEnrolledEventMetadata) init() AuthFactorPasskeyEnrolledEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type AuthFactorPasswordSetEvent struct {
@@ -3106,10 +3041,9 @@ type AuthFactorPasswordSetEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthFactorPasswordSetEventMetadata `json:"metadata"`
-	Payload  AuthFactorPayload                     `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  AuthFactorPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -3213,7 +3147,7 @@ func (s *AuthFactorPasswordSetEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthFactorPasswordSetEvent) GetMetadata() OptAuthFactorPasswordSetEventMetadata {
+func (s *AuthFactorPasswordSetEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -3323,7 +3257,7 @@ func (s *AuthFactorPasswordSetEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthFactorPasswordSetEvent) SetMetadata(val OptAuthFactorPasswordSetEventMetadata) {
+func (s *AuthFactorPasswordSetEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -3513,18 +3447,6 @@ func (s *AuthFactorPasswordSetEventDelegationType) UnmarshalText(data []byte) er
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthFactorPasswordSetEventMetadata map[string]jx.Raw
-
-func (s *AuthFactorPasswordSetEventMetadata) init() AuthFactorPasswordSetEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Payload for `auth.factor.*` events.
 // Ref: #
 type AuthFactorPayload struct {
@@ -3667,10 +3589,9 @@ type AuthTokenIssuedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthTokenIssuedEventMetadata `json:"metadata"`
-	Payload  AuthTokenIssuedPayload          `json:"payload"`
+	FlowID   OptNilString           `json:"flow_id"`
+	Metadata OptEventMetadata       `json:"metadata"`
+	Payload  AuthTokenIssuedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -3774,7 +3695,7 @@ func (s *AuthTokenIssuedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthTokenIssuedEvent) GetMetadata() OptAuthTokenIssuedEventMetadata {
+func (s *AuthTokenIssuedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -3884,7 +3805,7 @@ func (s *AuthTokenIssuedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthTokenIssuedEvent) SetMetadata(val OptAuthTokenIssuedEventMetadata) {
+func (s *AuthTokenIssuedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -4074,18 +3995,6 @@ func (s *AuthTokenIssuedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthTokenIssuedEventMetadata map[string]jx.Raw
-
-func (s *AuthTokenIssuedEventMetadata) init() AuthTokenIssuedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Payload for `auth.token.issued` events.
 // Ref: #
 type AuthTokenIssuedPayload struct {
@@ -4141,10 +4050,9 @@ type AuthTokenRevokedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthTokenRevokedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload                `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -4248,7 +4156,7 @@ func (s *AuthTokenRevokedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthTokenRevokedEvent) GetMetadata() OptAuthTokenRevokedEventMetadata {
+func (s *AuthTokenRevokedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -4358,7 +4266,7 @@ func (s *AuthTokenRevokedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthTokenRevokedEvent) SetMetadata(val OptAuthTokenRevokedEventMetadata) {
+func (s *AuthTokenRevokedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -4548,18 +4456,6 @@ func (s *AuthTokenRevokedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthTokenRevokedEventMetadata map[string]jx.Raw
-
-func (s *AuthTokenRevokedEventMetadata) init() AuthTokenRevokedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type AuthUnauthorized struct {
@@ -4683,10 +4579,9 @@ type AuthzGrantedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptAuthzGrantedEventMetadata `json:"metadata"`
-	Payload  AuthzGrantedPayload          `json:"payload"`
+	FlowID   OptNilString        `json:"flow_id"`
+	Metadata OptEventMetadata    `json:"metadata"`
+	Payload  AuthzGrantedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -4790,7 +4685,7 @@ func (s *AuthzGrantedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *AuthzGrantedEvent) GetMetadata() OptAuthzGrantedEventMetadata {
+func (s *AuthzGrantedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -4900,7 +4795,7 @@ func (s *AuthzGrantedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *AuthzGrantedEvent) SetMetadata(val OptAuthzGrantedEventMetadata) {
+func (s *AuthzGrantedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -5090,18 +4985,6 @@ func (s *AuthzGrantedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type AuthzGrantedEventMetadata map[string]jx.Raw
-
-func (s *AuthzGrantedEventMetadata) init() AuthzGrantedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Payload for `authz.granted` events.
 // Ref: #
 type AuthzGrantedPayload struct {
@@ -5261,10 +5144,9 @@ type BrandingCreatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptBrandingCreatedEventMetadata `json:"metadata"`
-	Payload  BrandingCreatedPayload          `json:"payload"`
+	FlowID   OptNilString           `json:"flow_id"`
+	Metadata OptEventMetadata       `json:"metadata"`
+	Payload  BrandingCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -5368,7 +5250,7 @@ func (s *BrandingCreatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *BrandingCreatedEvent) GetMetadata() OptBrandingCreatedEventMetadata {
+func (s *BrandingCreatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -5478,7 +5360,7 @@ func (s *BrandingCreatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *BrandingCreatedEvent) SetMetadata(val OptBrandingCreatedEventMetadata) {
+func (s *BrandingCreatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -5666,18 +5548,6 @@ func (s *BrandingCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type BrandingCreatedEventMetadata map[string]jx.Raw
-
-func (s *BrandingCreatedEventMetadata) init() BrandingCreatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Allowlisted fields for `branding.created`. Omits `liquid_template`.
@@ -6061,6 +5931,61 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type ClaimNoPersonalTeam struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimNoPersonalTeamDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimNoPersonalTeam) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimNoPersonalTeam) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimNoPersonalTeam) GetDetails() OptClaimNoPersonalTeamDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimNoPersonalTeam) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimNoPersonalTeam) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimNoPersonalTeam) SetDetails(val OptClaimNoPersonalTeamDetails) {
+	s.Details = val
+}
+
+func (*ClaimNoPersonalTeam) completeClaimRes() {}
+
+// Additional error-specific context.
+type ClaimNoPersonalTeamDetails map[string]jx.Raw
+
+func (s *ClaimNoPersonalTeamDetails) init() ClaimNoPersonalTeamDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // A completed claim. Carries the owning team, when the claim landed, and the
@@ -10862,6 +10787,87 @@ func NewUserDeletedEventEvent(v UserDeletedEvent) Event {
 
 func (*Event) getEventRes() {}
 
+// Emit-time metadata, already redacted at write. Path A request.api may
+// set client (ip, user_agent, origin) for SIEM join on request_id. Not a
+// live risk-evaluator input.
+// Ref: #
+type EventMetadata struct {
+	// Observed HTTP requestor context on Path A request.api only.
+	Client          OptEventMetadataClient `json:"client"`
+	AdditionalProps EventMetadataAdditional
+}
+
+// GetClient returns the value of Client.
+func (s *EventMetadata) GetClient() OptEventMetadataClient {
+	return s.Client
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *EventMetadata) GetAdditionalProps() EventMetadataAdditional {
+	return s.AdditionalProps
+}
+
+// SetClient sets the value of Client.
+func (s *EventMetadata) SetClient(val OptEventMetadataClient) {
+	s.Client = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *EventMetadata) SetAdditionalProps(val EventMetadataAdditional) {
+	s.AdditionalProps = val
+}
+
+type EventMetadataAdditional map[string]jx.Raw
+
+func (s *EventMetadataAdditional) init() EventMetadataAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Observed HTTP requestor context on Path A request.api only.
+type EventMetadataClient struct {
+	// Client IP from the first X-Forwarded-For hop or RemoteAddr.
+	IP OptString `json:"ip"`
+	// Observed User-Agent header.
+	UserAgent OptString `json:"user_agent"`
+	// Origin header when present.
+	Origin OptString `json:"origin"`
+}
+
+// GetIP returns the value of IP.
+func (s *EventMetadataClient) GetIP() OptString {
+	return s.IP
+}
+
+// GetUserAgent returns the value of UserAgent.
+func (s *EventMetadataClient) GetUserAgent() OptString {
+	return s.UserAgent
+}
+
+// GetOrigin returns the value of Origin.
+func (s *EventMetadataClient) GetOrigin() OptString {
+	return s.Origin
+}
+
+// SetIP sets the value of IP.
+func (s *EventMetadataClient) SetIP(val OptString) {
+	s.IP = val
+}
+
+// SetUserAgent sets the value of UserAgent.
+func (s *EventMetadataClient) SetUserAgent(val OptString) {
+	s.UserAgent = val
+}
+
+// SetOrigin sets the value of Origin.
+func (s *EventMetadataClient) SetOrigin(val OptString) {
+	s.Origin = val
+}
+
 // Merged schema.
 // Ref: #
 type EvtInvalid struct {
@@ -14010,10 +14016,9 @@ type FlowdefCreatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptFlowdefCreatedEventMetadata `json:"metadata"`
-	Payload  FlowdefPayload                 `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  FlowdefPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -14117,7 +14122,7 @@ func (s *FlowdefCreatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *FlowdefCreatedEvent) GetMetadata() OptFlowdefCreatedEventMetadata {
+func (s *FlowdefCreatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -14227,7 +14232,7 @@ func (s *FlowdefCreatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *FlowdefCreatedEvent) SetMetadata(val OptFlowdefCreatedEventMetadata) {
+func (s *FlowdefCreatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -14417,18 +14422,6 @@ func (s *FlowdefCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type FlowdefCreatedEventMetadata map[string]jx.Raw
-
-func (s *FlowdefCreatedEventMetadata) init() FlowdefCreatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type FlowdefDeletedEvent struct {
@@ -14468,10 +14461,9 @@ type FlowdefDeletedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptFlowdefDeletedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload              `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -14575,7 +14567,7 @@ func (s *FlowdefDeletedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *FlowdefDeletedEvent) GetMetadata() OptFlowdefDeletedEventMetadata {
+func (s *FlowdefDeletedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -14685,7 +14677,7 @@ func (s *FlowdefDeletedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *FlowdefDeletedEvent) SetMetadata(val OptFlowdefDeletedEventMetadata) {
+func (s *FlowdefDeletedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -14873,18 +14865,6 @@ func (s *FlowdefDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type FlowdefDeletedEventMetadata map[string]jx.Raw
-
-func (s *FlowdefDeletedEventMetadata) init() FlowdefDeletedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Merged schema.
@@ -15447,10 +15427,9 @@ type FlowdefUpdatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptFlowdefUpdatedEventMetadata `json:"metadata"`
-	Payload  FlowdefPayload                 `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  FlowdefPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -15554,7 +15533,7 @@ func (s *FlowdefUpdatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *FlowdefUpdatedEvent) GetMetadata() OptFlowdefUpdatedEventMetadata {
+func (s *FlowdefUpdatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -15664,7 +15643,7 @@ func (s *FlowdefUpdatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *FlowdefUpdatedEvent) SetMetadata(val OptFlowdefUpdatedEventMetadata) {
+func (s *FlowdefUpdatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -15852,18 +15831,6 @@ func (s *FlowdefUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type FlowdefUpdatedEventMetadata map[string]jx.Raw
-
-func (s *FlowdefUpdatedEventMetadata) init() FlowdefUpdatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // A security challenge that must be satisfied before this step's submission
@@ -17360,46 +17327,6 @@ type GetSchemaByIdNotFound ErrorDetails
 
 func (*GetSchemaByIdNotFound) getSchemaByIdRes() {}
 
-// GetSchemaByIdOK represents sum type.
-type GetSchemaByIdOK struct {
-	Type       GetSchemaByIdOKType // switch on this field
-	UserSchema UserSchema
-}
-
-// GetSchemaByIdOKType is oneOf type of GetSchemaByIdOK.
-type GetSchemaByIdOKType string
-
-// Possible values for GetSchemaByIdOKType.
-const (
-	UserSchemaGetSchemaByIdOK GetSchemaByIdOKType = "user-schema"
-)
-
-// IsUserSchema reports whether GetSchemaByIdOK is UserSchema.
-func (s GetSchemaByIdOK) IsUserSchema() bool { return s.Type == UserSchemaGetSchemaByIdOK }
-
-// SetUserSchema sets GetSchemaByIdOK to UserSchema.
-func (s *GetSchemaByIdOK) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaGetSchemaByIdOK
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if GetSchemaByIdOK is UserSchema.
-func (s GetSchemaByIdOK) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
-		return v, false
-	}
-	return s.UserSchema, true
-}
-
-// NewUserSchemaGetSchemaByIdOK returns new GetSchemaByIdOK from UserSchema.
-func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
-	var s GetSchemaByIdOK
-	s.SetUserSchema(v)
-	return s
-}
-
-func (*GetSchemaByIdOK) getSchemaByIdRes() {}
-
 // GetSessionErrorResponse represents sum type.
 type GetSessionErrorResponse struct {
 	Type                 GetSessionErrorResponseType // switch on this field
@@ -18809,35 +18736,70 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
-type ListSchemasResponse []ListSchemasResponseItem
+type ListSchemasKind string
+
+const (
+	ListSchemasKindUserSchema ListSchemasKind = "user-schema"
+)
+
+// AllValues returns all ListSchemasKind values.
+func (ListSchemasKind) AllValues() []ListSchemasKind {
+	return []ListSchemasKind{
+		ListSchemasKindUserSchema,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListSchemasKind) MarshalText() ([]byte, error) {
+	switch s {
+	case ListSchemasKindUserSchema:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListSchemasKind) UnmarshalText(data []byte) error {
+	switch ListSchemasKind(data) {
+	case ListSchemasKindUserSchema:
+		*s = ListSchemasKindUserSchema
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// List of schemas, newest first.
+// Ref: #
+type ListSchemasResponse struct {
+	Schemas []Schema `json:"schemas"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetSchemas returns the value of Schemas.
+func (s *ListSchemasResponse) GetSchemas() []Schema {
+	return s.Schemas
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListSchemasResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetSchemas sets the value of Schemas.
+func (s *ListSchemasResponse) SetSchemas(val []Schema) {
+	s.Schemas = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListSchemasResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
 
 func (*ListSchemasResponse) listSchemasRes() {}
-
-type ListSchemasResponseItem struct {
-	// The unique identifier for this schema.
-	ID        string    `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// GetID returns the value of ID.
-func (s *ListSchemasResponseItem) GetID() string {
-	return s.ID
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *ListSchemasResponseItem) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// SetID sets the value of ID.
-func (s *ListSchemasResponseItem) SetID(val string) {
-	s.ID = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *ListSchemasResponseItem) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
 
 type ListUserPasskeysBadRequest ErrorDetails
 
@@ -20074,52 +20036,6 @@ func (o OptAuthAttemptCreatedEventDelegationType) Or(d AuthAttemptCreatedEventDe
 	return d
 }
 
-// NewOptAuthAttemptCreatedEventMetadata returns new OptAuthAttemptCreatedEventMetadata with value set to v.
-func NewOptAuthAttemptCreatedEventMetadata(v AuthAttemptCreatedEventMetadata) OptAuthAttemptCreatedEventMetadata {
-	return OptAuthAttemptCreatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthAttemptCreatedEventMetadata is optional AuthAttemptCreatedEventMetadata.
-type OptAuthAttemptCreatedEventMetadata struct {
-	Value AuthAttemptCreatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthAttemptCreatedEventMetadata was set.
-func (o OptAuthAttemptCreatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthAttemptCreatedEventMetadata) Reset() {
-	var v AuthAttemptCreatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthAttemptCreatedEventMetadata) SetTo(v AuthAttemptCreatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthAttemptCreatedEventMetadata) Get() (v AuthAttemptCreatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthAttemptCreatedEventMetadata) Or(d AuthAttemptCreatedEventMetadata) AuthAttemptCreatedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptAuthAttemptHandedOffEventDelegationType returns new OptAuthAttemptHandedOffEventDelegationType with value set to v.
 func NewOptAuthAttemptHandedOffEventDelegationType(v AuthAttemptHandedOffEventDelegationType) OptAuthAttemptHandedOffEventDelegationType {
 	return OptAuthAttemptHandedOffEventDelegationType{
@@ -20160,52 +20076,6 @@ func (o OptAuthAttemptHandedOffEventDelegationType) Get() (v AuthAttemptHandedOf
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthAttemptHandedOffEventDelegationType) Or(d AuthAttemptHandedOffEventDelegationType) AuthAttemptHandedOffEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptAuthAttemptHandedOffEventMetadata returns new OptAuthAttemptHandedOffEventMetadata with value set to v.
-func NewOptAuthAttemptHandedOffEventMetadata(v AuthAttemptHandedOffEventMetadata) OptAuthAttemptHandedOffEventMetadata {
-	return OptAuthAttemptHandedOffEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthAttemptHandedOffEventMetadata is optional AuthAttemptHandedOffEventMetadata.
-type OptAuthAttemptHandedOffEventMetadata struct {
-	Value AuthAttemptHandedOffEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthAttemptHandedOffEventMetadata was set.
-func (o OptAuthAttemptHandedOffEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthAttemptHandedOffEventMetadata) Reset() {
-	var v AuthAttemptHandedOffEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthAttemptHandedOffEventMetadata) SetTo(v AuthAttemptHandedOffEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthAttemptHandedOffEventMetadata) Get() (v AuthAttemptHandedOffEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthAttemptHandedOffEventMetadata) Or(d AuthAttemptHandedOffEventMetadata) AuthAttemptHandedOffEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -20258,52 +20128,6 @@ func (o OptAuthCheckFailedEventDelegationType) Or(d AuthCheckFailedEventDelegati
 	return d
 }
 
-// NewOptAuthCheckFailedEventMetadata returns new OptAuthCheckFailedEventMetadata with value set to v.
-func NewOptAuthCheckFailedEventMetadata(v AuthCheckFailedEventMetadata) OptAuthCheckFailedEventMetadata {
-	return OptAuthCheckFailedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthCheckFailedEventMetadata is optional AuthCheckFailedEventMetadata.
-type OptAuthCheckFailedEventMetadata struct {
-	Value AuthCheckFailedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthCheckFailedEventMetadata was set.
-func (o OptAuthCheckFailedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthCheckFailedEventMetadata) Reset() {
-	var v AuthCheckFailedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthCheckFailedEventMetadata) SetTo(v AuthCheckFailedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthCheckFailedEventMetadata) Get() (v AuthCheckFailedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthCheckFailedEventMetadata) Or(d AuthCheckFailedEventMetadata) AuthCheckFailedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptAuthCheckSucceededEventDelegationType returns new OptAuthCheckSucceededEventDelegationType with value set to v.
 func NewOptAuthCheckSucceededEventDelegationType(v AuthCheckSucceededEventDelegationType) OptAuthCheckSucceededEventDelegationType {
 	return OptAuthCheckSucceededEventDelegationType{
@@ -20344,52 +20168,6 @@ func (o OptAuthCheckSucceededEventDelegationType) Get() (v AuthCheckSucceededEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthCheckSucceededEventDelegationType) Or(d AuthCheckSucceededEventDelegationType) AuthCheckSucceededEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptAuthCheckSucceededEventMetadata returns new OptAuthCheckSucceededEventMetadata with value set to v.
-func NewOptAuthCheckSucceededEventMetadata(v AuthCheckSucceededEventMetadata) OptAuthCheckSucceededEventMetadata {
-	return OptAuthCheckSucceededEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthCheckSucceededEventMetadata is optional AuthCheckSucceededEventMetadata.
-type OptAuthCheckSucceededEventMetadata struct {
-	Value AuthCheckSucceededEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthCheckSucceededEventMetadata was set.
-func (o OptAuthCheckSucceededEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthCheckSucceededEventMetadata) Reset() {
-	var v AuthCheckSucceededEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthCheckSucceededEventMetadata) SetTo(v AuthCheckSucceededEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthCheckSucceededEventMetadata) Get() (v AuthCheckSucceededEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthCheckSucceededEventMetadata) Or(d AuthCheckSucceededEventMetadata) AuthCheckSucceededEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -20442,52 +20220,6 @@ func (o OptAuthFactorPasskeyEnrolledEventDelegationType) Or(d AuthFactorPasskeyE
 	return d
 }
 
-// NewOptAuthFactorPasskeyEnrolledEventMetadata returns new OptAuthFactorPasskeyEnrolledEventMetadata with value set to v.
-func NewOptAuthFactorPasskeyEnrolledEventMetadata(v AuthFactorPasskeyEnrolledEventMetadata) OptAuthFactorPasskeyEnrolledEventMetadata {
-	return OptAuthFactorPasskeyEnrolledEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthFactorPasskeyEnrolledEventMetadata is optional AuthFactorPasskeyEnrolledEventMetadata.
-type OptAuthFactorPasskeyEnrolledEventMetadata struct {
-	Value AuthFactorPasskeyEnrolledEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthFactorPasskeyEnrolledEventMetadata was set.
-func (o OptAuthFactorPasskeyEnrolledEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthFactorPasskeyEnrolledEventMetadata) Reset() {
-	var v AuthFactorPasskeyEnrolledEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthFactorPasskeyEnrolledEventMetadata) SetTo(v AuthFactorPasskeyEnrolledEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthFactorPasskeyEnrolledEventMetadata) Get() (v AuthFactorPasskeyEnrolledEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthFactorPasskeyEnrolledEventMetadata) Or(d AuthFactorPasskeyEnrolledEventMetadata) AuthFactorPasskeyEnrolledEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptAuthFactorPasswordSetEventDelegationType returns new OptAuthFactorPasswordSetEventDelegationType with value set to v.
 func NewOptAuthFactorPasswordSetEventDelegationType(v AuthFactorPasswordSetEventDelegationType) OptAuthFactorPasswordSetEventDelegationType {
 	return OptAuthFactorPasswordSetEventDelegationType{
@@ -20528,52 +20260,6 @@ func (o OptAuthFactorPasswordSetEventDelegationType) Get() (v AuthFactorPassword
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthFactorPasswordSetEventDelegationType) Or(d AuthFactorPasswordSetEventDelegationType) AuthFactorPasswordSetEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptAuthFactorPasswordSetEventMetadata returns new OptAuthFactorPasswordSetEventMetadata with value set to v.
-func NewOptAuthFactorPasswordSetEventMetadata(v AuthFactorPasswordSetEventMetadata) OptAuthFactorPasswordSetEventMetadata {
-	return OptAuthFactorPasswordSetEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthFactorPasswordSetEventMetadata is optional AuthFactorPasswordSetEventMetadata.
-type OptAuthFactorPasswordSetEventMetadata struct {
-	Value AuthFactorPasswordSetEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthFactorPasswordSetEventMetadata was set.
-func (o OptAuthFactorPasswordSetEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthFactorPasswordSetEventMetadata) Reset() {
-	var v AuthFactorPasswordSetEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthFactorPasswordSetEventMetadata) SetTo(v AuthFactorPasswordSetEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthFactorPasswordSetEventMetadata) Get() (v AuthFactorPasswordSetEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthFactorPasswordSetEventMetadata) Or(d AuthFactorPasswordSetEventMetadata) AuthFactorPasswordSetEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -20672,52 +20358,6 @@ func (o OptAuthTokenIssuedEventDelegationType) Or(d AuthTokenIssuedEventDelegati
 	return d
 }
 
-// NewOptAuthTokenIssuedEventMetadata returns new OptAuthTokenIssuedEventMetadata with value set to v.
-func NewOptAuthTokenIssuedEventMetadata(v AuthTokenIssuedEventMetadata) OptAuthTokenIssuedEventMetadata {
-	return OptAuthTokenIssuedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthTokenIssuedEventMetadata is optional AuthTokenIssuedEventMetadata.
-type OptAuthTokenIssuedEventMetadata struct {
-	Value AuthTokenIssuedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthTokenIssuedEventMetadata was set.
-func (o OptAuthTokenIssuedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthTokenIssuedEventMetadata) Reset() {
-	var v AuthTokenIssuedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthTokenIssuedEventMetadata) SetTo(v AuthTokenIssuedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthTokenIssuedEventMetadata) Get() (v AuthTokenIssuedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthTokenIssuedEventMetadata) Or(d AuthTokenIssuedEventMetadata) AuthTokenIssuedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptAuthTokenRevokedEventDelegationType returns new OptAuthTokenRevokedEventDelegationType with value set to v.
 func NewOptAuthTokenRevokedEventDelegationType(v AuthTokenRevokedEventDelegationType) OptAuthTokenRevokedEventDelegationType {
 	return OptAuthTokenRevokedEventDelegationType{
@@ -20758,52 +20398,6 @@ func (o OptAuthTokenRevokedEventDelegationType) Get() (v AuthTokenRevokedEventDe
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthTokenRevokedEventDelegationType) Or(d AuthTokenRevokedEventDelegationType) AuthTokenRevokedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptAuthTokenRevokedEventMetadata returns new OptAuthTokenRevokedEventMetadata with value set to v.
-func NewOptAuthTokenRevokedEventMetadata(v AuthTokenRevokedEventMetadata) OptAuthTokenRevokedEventMetadata {
-	return OptAuthTokenRevokedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthTokenRevokedEventMetadata is optional AuthTokenRevokedEventMetadata.
-type OptAuthTokenRevokedEventMetadata struct {
-	Value AuthTokenRevokedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthTokenRevokedEventMetadata was set.
-func (o OptAuthTokenRevokedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthTokenRevokedEventMetadata) Reset() {
-	var v AuthTokenRevokedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthTokenRevokedEventMetadata) SetTo(v AuthTokenRevokedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthTokenRevokedEventMetadata) Get() (v AuthTokenRevokedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthTokenRevokedEventMetadata) Or(d AuthTokenRevokedEventMetadata) AuthTokenRevokedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -20896,52 +20490,6 @@ func (o OptAuthzGrantedEventDelegationType) Get() (v AuthzGrantedEventDelegation
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthzGrantedEventDelegationType) Or(d AuthzGrantedEventDelegationType) AuthzGrantedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptAuthzGrantedEventMetadata returns new OptAuthzGrantedEventMetadata with value set to v.
-func NewOptAuthzGrantedEventMetadata(v AuthzGrantedEventMetadata) OptAuthzGrantedEventMetadata {
-	return OptAuthzGrantedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAuthzGrantedEventMetadata is optional AuthzGrantedEventMetadata.
-type OptAuthzGrantedEventMetadata struct {
-	Value AuthzGrantedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptAuthzGrantedEventMetadata was set.
-func (o OptAuthzGrantedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAuthzGrantedEventMetadata) Reset() {
-	var v AuthzGrantedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAuthzGrantedEventMetadata) SetTo(v AuthzGrantedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAuthzGrantedEventMetadata) Get() (v AuthzGrantedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAuthzGrantedEventMetadata) Or(d AuthzGrantedEventMetadata) AuthzGrantedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -21086,52 +20634,6 @@ func (o OptBrandingCreatedEventDelegationType) Or(d BrandingCreatedEventDelegati
 	return d
 }
 
-// NewOptBrandingCreatedEventMetadata returns new OptBrandingCreatedEventMetadata with value set to v.
-func NewOptBrandingCreatedEventMetadata(v BrandingCreatedEventMetadata) OptBrandingCreatedEventMetadata {
-	return OptBrandingCreatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptBrandingCreatedEventMetadata is optional BrandingCreatedEventMetadata.
-type OptBrandingCreatedEventMetadata struct {
-	Value BrandingCreatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptBrandingCreatedEventMetadata was set.
-func (o OptBrandingCreatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptBrandingCreatedEventMetadata) Reset() {
-	var v BrandingCreatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptBrandingCreatedEventMetadata) SetTo(v BrandingCreatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptBrandingCreatedEventMetadata) Get() (v BrandingCreatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptBrandingCreatedEventMetadata) Or(d BrandingCreatedEventMetadata) BrandingCreatedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptBrandingLayout returns new OptBrandingLayout with value set to v.
 func NewOptBrandingLayout(v BrandingLayout) OptBrandingLayout {
 	return OptBrandingLayout{
@@ -21264,6 +20766,52 @@ func (o OptChallengeResponsePayload) Get() (v ChallengeResponsePayload, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptChallengeResponsePayload) Or(d ChallengeResponsePayload) ChallengeResponsePayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimNoPersonalTeamDetails returns new OptClaimNoPersonalTeamDetails with value set to v.
+func NewOptClaimNoPersonalTeamDetails(v ClaimNoPersonalTeamDetails) OptClaimNoPersonalTeamDetails {
+	return OptClaimNoPersonalTeamDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimNoPersonalTeamDetails is optional ClaimNoPersonalTeamDetails.
+type OptClaimNoPersonalTeamDetails struct {
+	Value ClaimNoPersonalTeamDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimNoPersonalTeamDetails was set.
+func (o OptClaimNoPersonalTeamDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimNoPersonalTeamDetails) Reset() {
+	var v ClaimNoPersonalTeamDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimNoPersonalTeamDetails) SetTo(v ClaimNoPersonalTeamDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimNoPersonalTeamDetails) Get() (v ClaimNoPersonalTeamDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimNoPersonalTeamDetails) Or(d ClaimNoPersonalTeamDetails) ClaimNoPersonalTeamDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -21678,6 +21226,98 @@ func (o OptErrorDetailsDetails) Get() (v ErrorDetailsDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptErrorDetailsDetails) Or(d ErrorDetailsDetails) ErrorDetailsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEventMetadata returns new OptEventMetadata with value set to v.
+func NewOptEventMetadata(v EventMetadata) OptEventMetadata {
+	return OptEventMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEventMetadata is optional EventMetadata.
+type OptEventMetadata struct {
+	Value EventMetadata
+	Set   bool
+}
+
+// IsSet returns true if OptEventMetadata was set.
+func (o OptEventMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEventMetadata) Reset() {
+	var v EventMetadata
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEventMetadata) SetTo(v EventMetadata) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEventMetadata) Get() (v EventMetadata, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEventMetadata) Or(d EventMetadata) EventMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEventMetadataClient returns new OptEventMetadataClient with value set to v.
+func NewOptEventMetadataClient(v EventMetadataClient) OptEventMetadataClient {
+	return OptEventMetadataClient{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEventMetadataClient is optional EventMetadataClient.
+type OptEventMetadataClient struct {
+	Value EventMetadataClient
+	Set   bool
+}
+
+// IsSet returns true if OptEventMetadataClient was set.
+func (o OptEventMetadataClient) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEventMetadataClient) Reset() {
+	var v EventMetadataClient
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEventMetadataClient) SetTo(v EventMetadataClient) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEventMetadataClient) Get() (v EventMetadataClient, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEventMetadataClient) Or(d EventMetadataClient) EventMetadataClient {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -22972,52 +22612,6 @@ func (o OptFlowdefCreatedEventDelegationType) Or(d FlowdefCreatedEventDelegation
 	return d
 }
 
-// NewOptFlowdefCreatedEventMetadata returns new OptFlowdefCreatedEventMetadata with value set to v.
-func NewOptFlowdefCreatedEventMetadata(v FlowdefCreatedEventMetadata) OptFlowdefCreatedEventMetadata {
-	return OptFlowdefCreatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowdefCreatedEventMetadata is optional FlowdefCreatedEventMetadata.
-type OptFlowdefCreatedEventMetadata struct {
-	Value FlowdefCreatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptFlowdefCreatedEventMetadata was set.
-func (o OptFlowdefCreatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowdefCreatedEventMetadata) Reset() {
-	var v FlowdefCreatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowdefCreatedEventMetadata) SetTo(v FlowdefCreatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowdefCreatedEventMetadata) Get() (v FlowdefCreatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowdefCreatedEventMetadata) Or(d FlowdefCreatedEventMetadata) FlowdefCreatedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptFlowdefDeletedEventDelegationType returns new OptFlowdefDeletedEventDelegationType with value set to v.
 func NewOptFlowdefDeletedEventDelegationType(v FlowdefDeletedEventDelegationType) OptFlowdefDeletedEventDelegationType {
 	return OptFlowdefDeletedEventDelegationType{
@@ -23058,52 +22652,6 @@ func (o OptFlowdefDeletedEventDelegationType) Get() (v FlowdefDeletedEventDelega
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowdefDeletedEventDelegationType) Or(d FlowdefDeletedEventDelegationType) FlowdefDeletedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowdefDeletedEventMetadata returns new OptFlowdefDeletedEventMetadata with value set to v.
-func NewOptFlowdefDeletedEventMetadata(v FlowdefDeletedEventMetadata) OptFlowdefDeletedEventMetadata {
-	return OptFlowdefDeletedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowdefDeletedEventMetadata is optional FlowdefDeletedEventMetadata.
-type OptFlowdefDeletedEventMetadata struct {
-	Value FlowdefDeletedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptFlowdefDeletedEventMetadata was set.
-func (o OptFlowdefDeletedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowdefDeletedEventMetadata) Reset() {
-	var v FlowdefDeletedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowdefDeletedEventMetadata) SetTo(v FlowdefDeletedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowdefDeletedEventMetadata) Get() (v FlowdefDeletedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowdefDeletedEventMetadata) Or(d FlowdefDeletedEventMetadata) FlowdefDeletedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -23616,52 +23164,6 @@ func (o OptFlowdefUpdatedEventDelegationType) Or(d FlowdefUpdatedEventDelegation
 	return d
 }
 
-// NewOptFlowdefUpdatedEventMetadata returns new OptFlowdefUpdatedEventMetadata with value set to v.
-func NewOptFlowdefUpdatedEventMetadata(v FlowdefUpdatedEventMetadata) OptFlowdefUpdatedEventMetadata {
-	return OptFlowdefUpdatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowdefUpdatedEventMetadata is optional FlowdefUpdatedEventMetadata.
-type OptFlowdefUpdatedEventMetadata struct {
-	Value FlowdefUpdatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptFlowdefUpdatedEventMetadata was set.
-func (o OptFlowdefUpdatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowdefUpdatedEventMetadata) Reset() {
-	var v FlowdefUpdatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowdefUpdatedEventMetadata) SetTo(v FlowdefUpdatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowdefUpdatedEventMetadata) Get() (v FlowdefUpdatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowdefUpdatedEventMetadata) Or(d FlowdefUpdatedEventMetadata) FlowdefUpdatedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptGateConfig returns new OptGateConfig with value set to v.
 func NewOptGateConfig(v GateConfig) OptGateConfig {
 	return OptGateConfig{
@@ -24024,6 +23526,52 @@ func (o OptListFlowDefinitionsPurpose) Get() (v ListFlowDefinitionsPurpose, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListFlowDefinitionsPurpose) Or(d ListFlowDefinitionsPurpose) ListFlowDefinitionsPurpose {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListSchemasKind returns new OptListSchemasKind with value set to v.
+func NewOptListSchemasKind(v ListSchemasKind) OptListSchemasKind {
+	return OptListSchemasKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListSchemasKind is optional ListSchemasKind.
+type OptListSchemasKind struct {
+	Value ListSchemasKind
+	Set   bool
+}
+
+// IsSet returns true if OptListSchemasKind was set.
+func (o OptListSchemasKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListSchemasKind) Reset() {
+	var v ListSchemasKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListSchemasKind) SetTo(v ListSchemasKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListSchemasKind) Get() (v ListSchemasKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListSchemasKind) Or(d ListSchemasKind) ListSchemasKind {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -26804,52 +26352,6 @@ func (o OptProjectCreatedEventDelegationType) Or(d ProjectCreatedEventDelegation
 	return d
 }
 
-// NewOptProjectCreatedEventMetadata returns new OptProjectCreatedEventMetadata with value set to v.
-func NewOptProjectCreatedEventMetadata(v ProjectCreatedEventMetadata) OptProjectCreatedEventMetadata {
-	return OptProjectCreatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjectCreatedEventMetadata is optional ProjectCreatedEventMetadata.
-type OptProjectCreatedEventMetadata struct {
-	Value ProjectCreatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptProjectCreatedEventMetadata was set.
-func (o OptProjectCreatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjectCreatedEventMetadata) Reset() {
-	var v ProjectCreatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjectCreatedEventMetadata) SetTo(v ProjectCreatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjectCreatedEventMetadata) Get() (v ProjectCreatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjectCreatedEventMetadata) Or(d ProjectCreatedEventMetadata) ProjectCreatedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptProjectDeletedEventDelegationType returns new OptProjectDeletedEventDelegationType with value set to v.
 func NewOptProjectDeletedEventDelegationType(v ProjectDeletedEventDelegationType) OptProjectDeletedEventDelegationType {
 	return OptProjectDeletedEventDelegationType{
@@ -26896,52 +26398,6 @@ func (o OptProjectDeletedEventDelegationType) Or(d ProjectDeletedEventDelegation
 	return d
 }
 
-// NewOptProjectDeletedEventMetadata returns new OptProjectDeletedEventMetadata with value set to v.
-func NewOptProjectDeletedEventMetadata(v ProjectDeletedEventMetadata) OptProjectDeletedEventMetadata {
-	return OptProjectDeletedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjectDeletedEventMetadata is optional ProjectDeletedEventMetadata.
-type OptProjectDeletedEventMetadata struct {
-	Value ProjectDeletedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptProjectDeletedEventMetadata was set.
-func (o OptProjectDeletedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjectDeletedEventMetadata) Reset() {
-	var v ProjectDeletedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjectDeletedEventMetadata) SetTo(v ProjectDeletedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjectDeletedEventMetadata) Get() (v ProjectDeletedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjectDeletedEventMetadata) Or(d ProjectDeletedEventMetadata) ProjectDeletedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptProjectUpdatedEventDelegationType returns new OptProjectUpdatedEventDelegationType with value set to v.
 func NewOptProjectUpdatedEventDelegationType(v ProjectUpdatedEventDelegationType) OptProjectUpdatedEventDelegationType {
 	return OptProjectUpdatedEventDelegationType{
@@ -26982,52 +26438,6 @@ func (o OptProjectUpdatedEventDelegationType) Get() (v ProjectUpdatedEventDelega
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjectUpdatedEventDelegationType) Or(d ProjectUpdatedEventDelegationType) ProjectUpdatedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptProjectUpdatedEventMetadata returns new OptProjectUpdatedEventMetadata with value set to v.
-func NewOptProjectUpdatedEventMetadata(v ProjectUpdatedEventMetadata) OptProjectUpdatedEventMetadata {
-	return OptProjectUpdatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjectUpdatedEventMetadata is optional ProjectUpdatedEventMetadata.
-type OptProjectUpdatedEventMetadata struct {
-	Value ProjectUpdatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptProjectUpdatedEventMetadata was set.
-func (o OptProjectUpdatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjectUpdatedEventMetadata) Reset() {
-	var v ProjectUpdatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjectUpdatedEventMetadata) SetTo(v ProjectUpdatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjectUpdatedEventMetadata) Get() (v ProjectUpdatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjectUpdatedEventMetadata) Or(d ProjectUpdatedEventMetadata) ProjectUpdatedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -27264,52 +26674,6 @@ func (o OptRequestAPIEventDelegationType) Or(d RequestAPIEventDelegationType) Re
 	return d
 }
 
-// NewOptRequestAPIEventMetadata returns new OptRequestAPIEventMetadata with value set to v.
-func NewOptRequestAPIEventMetadata(v RequestAPIEventMetadata) OptRequestAPIEventMetadata {
-	return OptRequestAPIEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptRequestAPIEventMetadata is optional RequestAPIEventMetadata.
-type OptRequestAPIEventMetadata struct {
-	Value RequestAPIEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptRequestAPIEventMetadata was set.
-func (o OptRequestAPIEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptRequestAPIEventMetadata) Reset() {
-	var v RequestAPIEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptRequestAPIEventMetadata) SetTo(v RequestAPIEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptRequestAPIEventMetadata) Get() (v RequestAPIEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptRequestAPIEventMetadata) Or(d RequestAPIEventMetadata) RequestAPIEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptSchInvalidRequestDetails returns new OptSchInvalidRequestDetails with value set to v.
 func NewOptSchInvalidRequestDetails(v SchInvalidRequestDetails) OptSchInvalidRequestDetails {
 	return OptSchInvalidRequestDetails{
@@ -27442,52 +26806,6 @@ func (o OptSchemaCreatedEventDelegationType) Get() (v SchemaCreatedEventDelegati
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSchemaCreatedEventDelegationType) Or(d SchemaCreatedEventDelegationType) SchemaCreatedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptSchemaCreatedEventMetadata returns new OptSchemaCreatedEventMetadata with value set to v.
-func NewOptSchemaCreatedEventMetadata(v SchemaCreatedEventMetadata) OptSchemaCreatedEventMetadata {
-	return OptSchemaCreatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptSchemaCreatedEventMetadata is optional SchemaCreatedEventMetadata.
-type OptSchemaCreatedEventMetadata struct {
-	Value SchemaCreatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptSchemaCreatedEventMetadata was set.
-func (o OptSchemaCreatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptSchemaCreatedEventMetadata) Reset() {
-	var v SchemaCreatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptSchemaCreatedEventMetadata) SetTo(v SchemaCreatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptSchemaCreatedEventMetadata) Get() (v SchemaCreatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptSchemaCreatedEventMetadata) Or(d SchemaCreatedEventMetadata) SchemaCreatedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -27908,52 +27226,6 @@ func (o OptSessionDeletedEventDelegationType) Or(d SessionDeletedEventDelegation
 	return d
 }
 
-// NewOptSessionDeletedEventMetadata returns new OptSessionDeletedEventMetadata with value set to v.
-func NewOptSessionDeletedEventMetadata(v SessionDeletedEventMetadata) OptSessionDeletedEventMetadata {
-	return OptSessionDeletedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptSessionDeletedEventMetadata is optional SessionDeletedEventMetadata.
-type OptSessionDeletedEventMetadata struct {
-	Value SessionDeletedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptSessionDeletedEventMetadata was set.
-func (o OptSessionDeletedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptSessionDeletedEventMetadata) Reset() {
-	var v SessionDeletedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptSessionDeletedEventMetadata) SetTo(v SessionDeletedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptSessionDeletedEventMetadata) Get() (v SessionDeletedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptSessionDeletedEventMetadata) Or(d SessionDeletedEventMetadata) SessionDeletedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptSessionEstablishedEventDelegationType returns new OptSessionEstablishedEventDelegationType with value set to v.
 func NewOptSessionEstablishedEventDelegationType(v SessionEstablishedEventDelegationType) OptSessionEstablishedEventDelegationType {
 	return OptSessionEstablishedEventDelegationType{
@@ -27994,52 +27266,6 @@ func (o OptSessionEstablishedEventDelegationType) Get() (v SessionEstablishedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSessionEstablishedEventDelegationType) Or(d SessionEstablishedEventDelegationType) SessionEstablishedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptSessionEstablishedEventMetadata returns new OptSessionEstablishedEventMetadata with value set to v.
-func NewOptSessionEstablishedEventMetadata(v SessionEstablishedEventMetadata) OptSessionEstablishedEventMetadata {
-	return OptSessionEstablishedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptSessionEstablishedEventMetadata is optional SessionEstablishedEventMetadata.
-type OptSessionEstablishedEventMetadata struct {
-	Value SessionEstablishedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptSessionEstablishedEventMetadata was set.
-func (o OptSessionEstablishedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptSessionEstablishedEventMetadata) Reset() {
-	var v SessionEstablishedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptSessionEstablishedEventMetadata) SetTo(v SessionEstablishedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptSessionEstablishedEventMetadata) Get() (v SessionEstablishedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptSessionEstablishedEventMetadata) Or(d SessionEstablishedEventMetadata) SessionEstablishedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -28184,52 +27410,6 @@ func (o OptTeamCreatedEventDelegationType) Or(d TeamCreatedEventDelegationType) 
 	return d
 }
 
-// NewOptTeamCreatedEventMetadata returns new OptTeamCreatedEventMetadata with value set to v.
-func NewOptTeamCreatedEventMetadata(v TeamCreatedEventMetadata) OptTeamCreatedEventMetadata {
-	return OptTeamCreatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptTeamCreatedEventMetadata is optional TeamCreatedEventMetadata.
-type OptTeamCreatedEventMetadata struct {
-	Value TeamCreatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptTeamCreatedEventMetadata was set.
-func (o OptTeamCreatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptTeamCreatedEventMetadata) Reset() {
-	var v TeamCreatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptTeamCreatedEventMetadata) SetTo(v TeamCreatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptTeamCreatedEventMetadata) Get() (v TeamCreatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptTeamCreatedEventMetadata) Or(d TeamCreatedEventMetadata) TeamCreatedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptTeamDeactivatedEventDelegationType returns new OptTeamDeactivatedEventDelegationType with value set to v.
 func NewOptTeamDeactivatedEventDelegationType(v TeamDeactivatedEventDelegationType) OptTeamDeactivatedEventDelegationType {
 	return OptTeamDeactivatedEventDelegationType{
@@ -28270,52 +27450,6 @@ func (o OptTeamDeactivatedEventDelegationType) Get() (v TeamDeactivatedEventDele
 
 // Or returns value if set, or given parameter if does not.
 func (o OptTeamDeactivatedEventDelegationType) Or(d TeamDeactivatedEventDelegationType) TeamDeactivatedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptTeamDeactivatedEventMetadata returns new OptTeamDeactivatedEventMetadata with value set to v.
-func NewOptTeamDeactivatedEventMetadata(v TeamDeactivatedEventMetadata) OptTeamDeactivatedEventMetadata {
-	return OptTeamDeactivatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptTeamDeactivatedEventMetadata is optional TeamDeactivatedEventMetadata.
-type OptTeamDeactivatedEventMetadata struct {
-	Value TeamDeactivatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptTeamDeactivatedEventMetadata was set.
-func (o OptTeamDeactivatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptTeamDeactivatedEventMetadata) Reset() {
-	var v TeamDeactivatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptTeamDeactivatedEventMetadata) SetTo(v TeamDeactivatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptTeamDeactivatedEventMetadata) Get() (v TeamDeactivatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptTeamDeactivatedEventMetadata) Or(d TeamDeactivatedEventMetadata) TeamDeactivatedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -28408,52 +27542,6 @@ func (o OptTeamUpdatedEventDelegationType) Get() (v TeamUpdatedEventDelegationTy
 
 // Or returns value if set, or given parameter if does not.
 func (o OptTeamUpdatedEventDelegationType) Or(d TeamUpdatedEventDelegationType) TeamUpdatedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptTeamUpdatedEventMetadata returns new OptTeamUpdatedEventMetadata with value set to v.
-func NewOptTeamUpdatedEventMetadata(v TeamUpdatedEventMetadata) OptTeamUpdatedEventMetadata {
-	return OptTeamUpdatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptTeamUpdatedEventMetadata is optional TeamUpdatedEventMetadata.
-type OptTeamUpdatedEventMetadata struct {
-	Value TeamUpdatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptTeamUpdatedEventMetadata was set.
-func (o OptTeamUpdatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptTeamUpdatedEventMetadata) Reset() {
-	var v TeamUpdatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptTeamUpdatedEventMetadata) SetTo(v TeamUpdatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptTeamUpdatedEventMetadata) Get() (v TeamUpdatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptTeamUpdatedEventMetadata) Or(d TeamUpdatedEventMetadata) TeamUpdatedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -28736,52 +27824,6 @@ func (o OptUserCreateFailedEventDelegationType) Or(d UserCreateFailedEventDelega
 	return d
 }
 
-// NewOptUserCreateFailedEventMetadata returns new OptUserCreateFailedEventMetadata with value set to v.
-func NewOptUserCreateFailedEventMetadata(v UserCreateFailedEventMetadata) OptUserCreateFailedEventMetadata {
-	return OptUserCreateFailedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserCreateFailedEventMetadata is optional UserCreateFailedEventMetadata.
-type OptUserCreateFailedEventMetadata struct {
-	Value UserCreateFailedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptUserCreateFailedEventMetadata was set.
-func (o OptUserCreateFailedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserCreateFailedEventMetadata) Reset() {
-	var v UserCreateFailedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserCreateFailedEventMetadata) SetTo(v UserCreateFailedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserCreateFailedEventMetadata) Get() (v UserCreateFailedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserCreateFailedEventMetadata) Or(d UserCreateFailedEventMetadata) UserCreateFailedEventMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptUserCreatedEventDelegationType returns new OptUserCreatedEventDelegationType with value set to v.
 func NewOptUserCreatedEventDelegationType(v UserCreatedEventDelegationType) OptUserCreatedEventDelegationType {
 	return OptUserCreatedEventDelegationType{
@@ -28822,52 +27864,6 @@ func (o OptUserCreatedEventDelegationType) Get() (v UserCreatedEventDelegationTy
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserCreatedEventDelegationType) Or(d UserCreatedEventDelegationType) UserCreatedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptUserCreatedEventMetadata returns new OptUserCreatedEventMetadata with value set to v.
-func NewOptUserCreatedEventMetadata(v UserCreatedEventMetadata) OptUserCreatedEventMetadata {
-	return OptUserCreatedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserCreatedEventMetadata is optional UserCreatedEventMetadata.
-type OptUserCreatedEventMetadata struct {
-	Value UserCreatedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptUserCreatedEventMetadata was set.
-func (o OptUserCreatedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserCreatedEventMetadata) Reset() {
-	var v UserCreatedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserCreatedEventMetadata) SetTo(v UserCreatedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserCreatedEventMetadata) Get() (v UserCreatedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserCreatedEventMetadata) Or(d UserCreatedEventMetadata) UserCreatedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -28960,52 +27956,6 @@ func (o OptUserDeletedEventDelegationType) Get() (v UserDeletedEventDelegationTy
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserDeletedEventDelegationType) Or(d UserDeletedEventDelegationType) UserDeletedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptUserDeletedEventMetadata returns new OptUserDeletedEventMetadata with value set to v.
-func NewOptUserDeletedEventMetadata(v UserDeletedEventMetadata) OptUserDeletedEventMetadata {
-	return OptUserDeletedEventMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserDeletedEventMetadata is optional UserDeletedEventMetadata.
-type OptUserDeletedEventMetadata struct {
-	Value UserDeletedEventMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptUserDeletedEventMetadata was set.
-func (o OptUserDeletedEventMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserDeletedEventMetadata) Reset() {
-	var v UserDeletedEventMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserDeletedEventMetadata) SetTo(v UserDeletedEventMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserDeletedEventMetadata) Get() (v UserDeletedEventMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserDeletedEventMetadata) Or(d UserDeletedEventMetadata) UserDeletedEventMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -30257,10 +29207,9 @@ type ProjectCreatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptProjectCreatedEventMetadata `json:"metadata"`
-	Payload  ProjectPayload                 `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  ProjectPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -30364,7 +29313,7 @@ func (s *ProjectCreatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *ProjectCreatedEvent) GetMetadata() OptProjectCreatedEventMetadata {
+func (s *ProjectCreatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -30474,7 +29423,7 @@ func (s *ProjectCreatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *ProjectCreatedEvent) SetMetadata(val OptProjectCreatedEventMetadata) {
+func (s *ProjectCreatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -30664,18 +29613,6 @@ func (s *ProjectCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type ProjectCreatedEventMetadata map[string]jx.Raw
-
-func (s *ProjectCreatedEventMetadata) init() ProjectCreatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type ProjectDeletedEvent struct {
@@ -30715,10 +29652,9 @@ type ProjectDeletedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptProjectDeletedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload              `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -30822,7 +29758,7 @@ func (s *ProjectDeletedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *ProjectDeletedEvent) GetMetadata() OptProjectDeletedEventMetadata {
+func (s *ProjectDeletedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -30932,7 +29868,7 @@ func (s *ProjectDeletedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *ProjectDeletedEvent) SetMetadata(val OptProjectDeletedEventMetadata) {
+func (s *ProjectDeletedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -31122,18 +30058,6 @@ func (s *ProjectDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type ProjectDeletedEventMetadata map[string]jx.Raw
-
-func (s *ProjectDeletedEventMetadata) init() ProjectDeletedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 type ProjectID string
 
 // Shared allowlisted fields for `project.created` (full snapshot) and
@@ -31271,10 +30195,9 @@ type ProjectUpdatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptProjectUpdatedEventMetadata `json:"metadata"`
-	Payload  ProjectPayload                 `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  ProjectPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -31378,7 +30301,7 @@ func (s *ProjectUpdatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *ProjectUpdatedEvent) GetMetadata() OptProjectUpdatedEventMetadata {
+func (s *ProjectUpdatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -31488,7 +30411,7 @@ func (s *ProjectUpdatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *ProjectUpdatedEvent) SetMetadata(val OptProjectUpdatedEventMetadata) {
+func (s *ProjectUpdatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -31676,18 +30599,6 @@ func (s *ProjectUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type ProjectUpdatedEventMetadata map[string]jx.Raw
-
-func (s *ProjectUpdatedEventMetadata) init() ProjectUpdatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 type QueryProjectsBadRequest ErrorDetails
@@ -32746,10 +31657,9 @@ type RequestAPIEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptRequestAPIEventMetadata `json:"metadata"`
-	Payload  RequestAPIPayload          `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  RequestAPIPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -32853,7 +31763,7 @@ func (s *RequestAPIEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *RequestAPIEvent) GetMetadata() OptRequestAPIEventMetadata {
+func (s *RequestAPIEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -32963,7 +31873,7 @@ func (s *RequestAPIEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *RequestAPIEvent) SetMetadata(val OptRequestAPIEventMetadata) {
+func (s *RequestAPIEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -33151,18 +32061,6 @@ func (s *RequestAPIEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type RequestAPIEventMetadata map[string]jx.Raw
-
-func (s *RequestAPIEventMetadata) init() RequestAPIEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Payload for `request.api` events.
@@ -33868,6 +32766,55 @@ func (s *SchNotFoundDetails) init() SchNotFoundDetails {
 	return m
 }
 
+// A schema resource: the server-owned envelope around a customer-authored
+// JSON Schema document.
+// `schema` is the customer-authored document, served verbatim: its keys and
+// contents are defined entirely by its author. The rest of the object — `id`,
+// `metadata` — is the server-owned envelope. Keeping the two apart means the
+// document may declare any property (including `id` or `metadata`) without
+// colliding with the envelope, and the resource `id` stays distinguishable
+// from the document's own `$id`.
+// Ref: #
+type Schema struct {
+	// The resource id: the server-minted `sch_*` identifier, or the
+	// customer-supplied `$id` URI when the document declared one at creation.
+	ID       string         `json:"id"`
+	Schema   SchemaDocument `json:"schema"`
+	Metadata SchemaMetadata `json:"metadata"`
+}
+
+// GetID returns the value of ID.
+func (s *Schema) GetID() string {
+	return s.ID
+}
+
+// GetSchema returns the value of Schema.
+func (s *Schema) GetSchema() SchemaDocument {
+	return s.Schema
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *Schema) GetMetadata() SchemaMetadata {
+	return s.Metadata
+}
+
+// SetID sets the value of ID.
+func (s *Schema) SetID(val string) {
+	s.ID = val
+}
+
+// SetSchema sets the value of Schema.
+func (s *Schema) SetSchema(val SchemaDocument) {
+	s.Schema = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *Schema) SetMetadata(val SchemaMetadata) {
+	s.Metadata = val
+}
+
+func (*Schema) getSchemaByIdRes() {}
+
 // Merged schema.
 // Ref: #
 type SchemaCreatedEvent struct {
@@ -33907,10 +32854,9 @@ type SchemaCreatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptSchemaCreatedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload             `json:"payload"`
+	FlowID   OptNilString         `json:"flow_id"`
+	Metadata OptEventMetadata     `json:"metadata"`
+	Payload  SchemaCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -34014,12 +32960,12 @@ func (s *SchemaCreatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *SchemaCreatedEvent) GetMetadata() OptSchemaCreatedEventMetadata {
+func (s *SchemaCreatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
 // GetPayload returns the value of Payload.
-func (s *SchemaCreatedEvent) GetPayload() EmptyEventPayload {
+func (s *SchemaCreatedEvent) GetPayload() SchemaCreatedPayload {
 	return s.Payload
 }
 
@@ -34124,12 +33070,12 @@ func (s *SchemaCreatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *SchemaCreatedEvent) SetMetadata(val OptSchemaCreatedEventMetadata) {
+func (s *SchemaCreatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
 // SetPayload sets the value of Payload.
-func (s *SchemaCreatedEvent) SetPayload(val EmptyEventPayload) {
+func (s *SchemaCreatedEvent) SetPayload(val SchemaCreatedPayload) {
 	s.Payload = val
 }
 
@@ -34314,16 +33260,93 @@ func (s *SchemaCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type SchemaCreatedEventMetadata map[string]jx.Raw
+// Allowlisted fields for `schema.created`. The schema document itself is
+// omitted — it is customer-authored and unbounded, and the event's `entity_id`
+// already identifies which schema was created.
+// Ref: #
+type SchemaCreatedPayload struct {
+	// The kind the stored document declares. `unknown` when the schema was
+	// persisted without its document being parsed.
+	Kind OptString `json:"kind"`
+	// The customer-chosen object type the schema describes. Absent when the
+	// document declares none.
+	ObjectType OptString `json:"object_type"`
+}
 
-func (s *SchemaCreatedEventMetadata) init() SchemaCreatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
+// GetKind returns the value of Kind.
+func (s *SchemaCreatedPayload) GetKind() OptString {
+	return s.Kind
+}
+
+// GetObjectType returns the value of ObjectType.
+func (s *SchemaCreatedPayload) GetObjectType() OptString {
+	return s.ObjectType
+}
+
+// SetKind sets the value of Kind.
+func (s *SchemaCreatedPayload) SetKind(val OptString) {
+	s.Kind = val
+}
+
+// SetObjectType sets the value of ObjectType.
+func (s *SchemaCreatedPayload) SetObjectType(val OptString) {
+	s.ObjectType = val
+}
+
+// The customer-authored JSON Schema document, served verbatim.
+// Ref: #
+// SchemaDocument represents sum type.
+type SchemaDocument struct {
+	Type       SchemaDocumentType // switch on this field
+	UserSchema UserSchema
+}
+
+// SchemaDocumentType is oneOf type of SchemaDocument.
+type SchemaDocumentType string
+
+// Possible values for SchemaDocumentType.
+const (
+	UserSchemaSchemaDocument SchemaDocumentType = "user-schema"
+)
+
+// IsUserSchema reports whether SchemaDocument is UserSchema.
+func (s SchemaDocument) IsUserSchema() bool { return s.Type == UserSchemaSchemaDocument }
+
+// SetUserSchema sets SchemaDocument to UserSchema.
+func (s *SchemaDocument) SetUserSchema(v UserSchema) {
+	s.Type = UserSchemaSchemaDocument
+	s.UserSchema = v
+}
+
+// GetUserSchema returns UserSchema and true boolean if SchemaDocument is UserSchema.
+func (s SchemaDocument) GetUserSchema() (v UserSchema, ok bool) {
+	if !s.IsUserSchema() {
+		return v, false
 	}
-	return m
+	return s.UserSchema, true
+}
+
+// NewUserSchemaSchemaDocument returns new SchemaDocument from UserSchema.
+func NewUserSchemaSchemaDocument(v UserSchema) SchemaDocument {
+	var s SchemaDocument
+	s.SetUserSchema(v)
+	return s
+}
+
+// Ref: #
+type SchemaMetadata struct {
+	// The time when the schema was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *SchemaMetadata) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *SchemaMetadata) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
 }
 
 type SchemaURI url.URL
@@ -34796,10 +33819,9 @@ type SessionDeletedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptSessionDeletedEventMetadata `json:"metadata"`
-	Payload  SessionDeletedPayload          `json:"payload"`
+	FlowID   OptNilString          `json:"flow_id"`
+	Metadata OptEventMetadata      `json:"metadata"`
+	Payload  SessionDeletedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -34903,7 +33925,7 @@ func (s *SessionDeletedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *SessionDeletedEvent) GetMetadata() OptSessionDeletedEventMetadata {
+func (s *SessionDeletedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -35013,7 +34035,7 @@ func (s *SessionDeletedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *SessionDeletedEvent) SetMetadata(val OptSessionDeletedEventMetadata) {
+func (s *SessionDeletedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -35203,18 +34225,6 @@ func (s *SessionDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type SessionDeletedEventMetadata map[string]jx.Raw
-
-func (s *SessionDeletedEventMetadata) init() SessionDeletedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Payload for `session.deleted` events.
 // Ref: #
 type SessionDeletedPayload struct {
@@ -35270,10 +34280,9 @@ type SessionEstablishedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptSessionEstablishedEventMetadata `json:"metadata"`
-	Payload  SessionEstablishedPayload          `json:"payload"`
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  SessionEstablishedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -35377,7 +34386,7 @@ func (s *SessionEstablishedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *SessionEstablishedEvent) GetMetadata() OptSessionEstablishedEventMetadata {
+func (s *SessionEstablishedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -35487,7 +34496,7 @@ func (s *SessionEstablishedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *SessionEstablishedEvent) SetMetadata(val OptSessionEstablishedEventMetadata) {
+func (s *SessionEstablishedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -35675,18 +34684,6 @@ func (s *SessionEstablishedEventDelegationType) UnmarshalText(data []byte) error
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type SessionEstablishedEventMetadata map[string]jx.Raw
-
-func (s *SessionEstablishedEventMetadata) init() SessionEstablishedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Payload for `session.established` events.
@@ -37522,10 +36519,9 @@ type TeamCreatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptTeamCreatedEventMetadata `json:"metadata"`
-	Payload  TeamPayload                 `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  TeamPayload      `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -37629,7 +36625,7 @@ func (s *TeamCreatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *TeamCreatedEvent) GetMetadata() OptTeamCreatedEventMetadata {
+func (s *TeamCreatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -37739,7 +36735,7 @@ func (s *TeamCreatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *TeamCreatedEvent) SetMetadata(val OptTeamCreatedEventMetadata) {
+func (s *TeamCreatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -37929,18 +36925,6 @@ func (s *TeamCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type TeamCreatedEventMetadata map[string]jx.Raw
-
-func (s *TeamCreatedEventMetadata) init() TeamCreatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type TeamDeactivatedEvent struct {
@@ -37980,10 +36964,9 @@ type TeamDeactivatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptTeamDeactivatedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload               `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -38087,7 +37070,7 @@ func (s *TeamDeactivatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *TeamDeactivatedEvent) GetMetadata() OptTeamDeactivatedEventMetadata {
+func (s *TeamDeactivatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -38197,7 +37180,7 @@ func (s *TeamDeactivatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *TeamDeactivatedEvent) SetMetadata(val OptTeamDeactivatedEventMetadata) {
+func (s *TeamDeactivatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -38385,18 +37368,6 @@ func (s *TeamDeactivatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type TeamDeactivatedEventMetadata map[string]jx.Raw
-
-func (s *TeamDeactivatedEventMetadata) init() TeamDeactivatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Field to filter or sort teams by.
@@ -38622,10 +37593,9 @@ type TeamUpdatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptTeamUpdatedEventMetadata `json:"metadata"`
-	Payload  TeamPayload                 `json:"payload"`
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  TeamPayload      `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -38729,7 +37699,7 @@ func (s *TeamUpdatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *TeamUpdatedEvent) GetMetadata() OptTeamUpdatedEventMetadata {
+func (s *TeamUpdatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -38839,7 +37809,7 @@ func (s *TeamUpdatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *TeamUpdatedEvent) SetMetadata(val OptTeamUpdatedEventMetadata) {
+func (s *TeamUpdatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -39027,18 +37997,6 @@ func (s *TeamUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type TeamUpdatedEventMetadata map[string]jx.Raw
-
-func (s *TeamUpdatedEventMetadata) init() TeamUpdatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Merged schema.
@@ -39792,10 +38750,9 @@ type UserCreateFailedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptUserCreateFailedEventMetadata `json:"metadata"`
-	Payload  UserCreateFailedPayload          `json:"payload"`
+	FlowID   OptNilString            `json:"flow_id"`
+	Metadata OptEventMetadata        `json:"metadata"`
+	Payload  UserCreateFailedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -39899,7 +38856,7 @@ func (s *UserCreateFailedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *UserCreateFailedEvent) GetMetadata() OptUserCreateFailedEventMetadata {
+func (s *UserCreateFailedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -40009,7 +38966,7 @@ func (s *UserCreateFailedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *UserCreateFailedEvent) SetMetadata(val OptUserCreateFailedEventMetadata) {
+func (s *UserCreateFailedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -40199,18 +39156,6 @@ func (s *UserCreateFailedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type UserCreateFailedEventMetadata map[string]jx.Raw
-
-func (s *UserCreateFailedEventMetadata) init() UserCreateFailedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Payload for `user.create.failed` events.
 // Ref: #
 type UserCreateFailedPayload struct {
@@ -40266,10 +39211,9 @@ type UserCreatedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptUserCreatedEventMetadata `json:"metadata"`
-	Payload  UserCreatedPayload          `json:"payload"`
+	FlowID   OptNilString       `json:"flow_id"`
+	Metadata OptEventMetadata   `json:"metadata"`
+	Payload  UserCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -40373,7 +39317,7 @@ func (s *UserCreatedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *UserCreatedEvent) GetMetadata() OptUserCreatedEventMetadata {
+func (s *UserCreatedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -40483,7 +39427,7 @@ func (s *UserCreatedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *UserCreatedEvent) SetMetadata(val OptUserCreatedEventMetadata) {
+func (s *UserCreatedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -40673,18 +39617,6 @@ func (s *UserCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Additional emit-time metadata (already redacted).
-type UserCreatedEventMetadata map[string]jx.Raw
-
-func (s *UserCreatedEventMetadata) init() UserCreatedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Payload for `user.created`. Identity is `entity_id`; attribute values
 // appear only for schema fields marked `x-audit`.
 // Ref: #
@@ -40774,10 +39706,9 @@ type UserDeletedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID OptNilString `json:"flow_id"`
-	// Additional emit-time metadata (already redacted).
-	Metadata OptUserDeletedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload           `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -40881,7 +39812,7 @@ func (s *UserDeletedEvent) GetFlowID() OptNilString {
 }
 
 // GetMetadata returns the value of Metadata.
-func (s *UserDeletedEvent) GetMetadata() OptUserDeletedEventMetadata {
+func (s *UserDeletedEvent) GetMetadata() OptEventMetadata {
 	return s.Metadata
 }
 
@@ -40991,7 +39922,7 @@ func (s *UserDeletedEvent) SetFlowID(val OptNilString) {
 }
 
 // SetMetadata sets the value of Metadata.
-func (s *UserDeletedEvent) SetMetadata(val OptUserDeletedEventMetadata) {
+func (s *UserDeletedEvent) SetMetadata(val OptEventMetadata) {
 	s.Metadata = val
 }
 
@@ -41179,18 +40110,6 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Additional emit-time metadata (already redacted).
-type UserDeletedEventMetadata map[string]jx.Raw
-
-func (s *UserDeletedEventMetadata) init() UserDeletedEventMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 type UserID string
