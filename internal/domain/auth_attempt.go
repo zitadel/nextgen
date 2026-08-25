@@ -151,9 +151,11 @@ func (a *AuthAttempt) ExpiresAt() time.Time {
 }
 
 // IsCompleted returns true if all required checks are verified successfully.
+// Matching is by factor class, so a completed passkey enrollment satisfies a
+// required passkey check.
 func (a *AuthAttempt) IsCompleted() bool {
 	for _, requiredCheck := range a.RequiredChecks {
-		_, ok := a.FactorByType(requiredCheck)
+		_, ok := a.FactorByClass(requiredCheck)
 		if !ok {
 			return false
 		}
@@ -164,6 +166,18 @@ func (a *AuthAttempt) IsCompleted() bool {
 // IsHandedOff returns true if a handoff token has been generated.
 func (a *AuthAttempt) IsHandedOff() bool {
 	return a.HandoffToken != nil
+}
+
+// FactorByClass returns a verified factor whose type competes in typ's class
+// (see [AuthCheckType.Class]), if one exists on the attempt.
+func (a *AuthAttempt) FactorByClass(typ AuthCheckType) (AuthFactor, bool) {
+	for _, check := range a.Checks {
+		factor, ok := check.(AuthFactor)
+		if ok && factor.Type().Class() == typ.Class() {
+			return factor, true
+		}
+	}
+	return nil, false
 }
 
 // FactorByType returns the verified factor of the given type, if it exists on the attempt.
@@ -412,7 +426,12 @@ func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChalle
 // PreparePasskeyRegistrationVerification validates that a registration proof
 // can be submitted. Beyond the generic checks it enforces the ceremony's own
 // window ([PasskeyRegistrationChallengeTTL]), which is tighter than the
-// attempt TTL.
+// attempt TTL, and that the attempt's user state still matches what the
+// challenge was issued for: an authentication that happened after the issue
+// supersedes the ceremony. Without this, a provisional attestation could
+// create a second user on an attempt that meanwhile authenticated user A —
+// overwriting the user check A→H while A's other factors survive, so the
+// handoff would mint a session for H carrying factors verified against A.
 func (a *AuthAttempt) PreparePasskeyRegistrationVerification(challengeID string) (*AuthChallengePasskeyRegistration, error) {
 	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePasskeyRegistration)
 	if err != nil {
@@ -423,6 +442,13 @@ func (a *AuthAttempt) PreparePasskeyRegistrationVerification(challengeID string)
 		return nil, ErrAuthAttemptInvalidRequest()
 	}
 	if time.Since(registrationChallenge.GetLastChallengedAt()) > PasskeyRegistrationChallengeTTL {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	userCheck, hasUserFactor := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if registrationChallenge.Provisional && hasUserFactor {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	if !registrationChallenge.Provisional && hasUserFactor && userCheck.UserID != registrationChallenge.UserID {
 		return nil, ErrAuthAttemptStaleChallenge()
 	}
 	return registrationChallenge, nil

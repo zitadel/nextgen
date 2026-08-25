@@ -94,6 +94,67 @@ func TestAuthAttemptStatements_PasskeyRegistrationRoundTrip(t *testing.T) {
 	})
 }
 
+// TestSessionExchange_PasskeyClassPruning drives two exchanges into the same
+// session — one carrying a passkey login factor, one a passkey enrollment —
+// in both orders, and asserts the session ends up with exactly one
+// passkey-class factor: the newer one, normalized to a passkey factor. This
+// exercises the class-wide loser pruning in every dialect's ApplyExchange.
+func TestSessionExchange_PasskeyClassPruning(t *testing.T) {
+	newLoginFactor := func(credentialID string) domain.AuthCheck {
+		return &domain.AuthFactorPasskey{UserID: "user-1", CredentialID: []byte(credentialID)}
+	}
+	newEnrollmentFactor := func(credentialID string) domain.AuthCheck {
+		return &domain.AuthFactorPasskeyRegistration{
+			UserID:       "user-1",
+			CredentialID: domain.EncodePasskeyCredentialID([]byte(credentialID)),
+		}
+	}
+
+	run := func(t *testing.T, stmts service.AllStatements, first, second domain.AuthCheck, wantCredentialID string) {
+		t.Helper()
+		projectID := ensureProject(t, stmts)
+
+		firstToken, _ := handoffCompletedAttempt(t, stmts, projectID, func(a *domain.AuthAttempt) {
+			a.RequiredChecks = nil
+			a.Checks = []domain.AuthCheck{first}
+		})
+		sess, err := stmts.ExchangeSession(t.Context(), projectID, firstToken, nil, time.Hour)
+		require.NoError(t, err)
+
+		// Distinct verification timestamps so newest-wins is unambiguous.
+		time.Sleep(50 * time.Millisecond)
+
+		secondToken, _ := handoffCompletedAttempt(t, stmts, projectID, func(a *domain.AuthAttempt) {
+			a.RequiredChecks = nil
+			a.SessionID = &sess.ID
+			a.Checks = []domain.AuthCheck{second}
+		})
+		upgraded, err := stmts.ExchangeSession(t.Context(), projectID, secondToken, nil, time.Hour)
+		require.NoError(t, err)
+		require.Equal(t, sess.ID, upgraded.ID)
+
+		var passkeyFactors []*domain.AuthFactorPasskey
+		for _, factor := range upgraded.Factors {
+			require.NotEqual(t, domain.AuthCheckTypePasskeyRegistration, factor.Type(),
+				"a session must never surface the enrollment type")
+			if passkey, ok := factor.(*domain.AuthFactorPasskey); ok {
+				passkeyFactors = append(passkeyFactors, passkey)
+			}
+		}
+		require.Len(t, passkeyFactors, 1, "login and enrollment compete for one passkey slot")
+		assert.Equal(t, []byte(wantCredentialID), passkeyFactors[0].CredentialID)
+	}
+
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("enrollment_after_login_wins_the_slot", func(t *testing.T) {
+			run(t, d.stmts, newLoginFactor("cred-login"), newEnrollmentFactor("cred-enroll"), "cred-enroll")
+		})
+		t.Run("login_after_enrollment_wins_the_slot", func(t *testing.T) {
+			run(t, d.stmts, newEnrollmentFactor("cred-enroll"), newLoginFactor("cred-login"), "cred-login")
+		})
+	})
+}
+
 func TestAuthAttemptStatements_SetAuthAttemptFactor(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("inserts_a_fresh_verified_factor", func(t *testing.T) {
