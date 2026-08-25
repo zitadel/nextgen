@@ -1,7 +1,6 @@
 # Provider Setup Sub-Journey
 
 > **Status:** Planning notes  
-> **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
 > **Area:** 4 of 4 (see [`README.md`](README.md))
 
 This CLI journey turns a selected provider (e.g., "Google") into configuration
@@ -30,8 +29,9 @@ A single journey unit powers two distinct callers:
 ## The Sub-journey
 
 The journey is one more setup prompt.
-It only collects answers, added to setup's answers as an `idp` slice.
-Setup's execution phase writes the files, as it does for every other answer.
+It only collects input, stored as an `idp` slice beside the rest of setup's
+collected state.
+Setup's execution phase writes the files, as it does for every other prompt.
 
 ### Interactive Prompt Workflow
 
@@ -49,11 +49,12 @@ For each selected provider:
 
 1. **Announce:** What the provider requires, the exact callback URI per
    environment, and the console URL from the [catalog](#the-provider-catalog).
-2. **Offer the Browser:** Opens the console URL, guarded like the claim journey:
-   skipped when non-interactive or when `--no-open` is passed.
-   The prompt then waits while the developer creates the application
-   provider-side.
-3. **Reuse or Create:** Evaluates connection handling [below](#create-or-reuse).
+2. **Offer the Browser:** Opens the console URL. As in the claim journey, this
+   is skipped when the run is non-interactive or `--no-open` is passed.
+   The prompt then waits while the developer creates the application at the
+   provider.
+3. **Reuse or Create:** Decides whether to reuse an existing connection file or
+   create a new one ([Create or Reuse](#create-or-reuse)).
 4. **Client ID:** Prompts with a text input, checking only that the input is
    non-empty.
    The CLI does not know vendor id formats.
@@ -70,11 +71,19 @@ For each selected provider:
 ### Key Rules
 
 * **Skip vs. Cancel:** Cancel aborts setup.
-  The sub-journey additionally provides a "skip for now" option: the provider is
-  dropped from method selection, no files are scaffolded for it, setup continues
-  uninterrupted, and the final summary says to add it later through the Sign-in
-  methods journey.
-  Scaffolded files are never written with placeholder credentials.
+  The sub-journey also offers "skip for now".
+  A skipped provider is dropped from method selection and no files are
+  scaffolded for it.
+  Setup continues, and the final summary points to the Sign-in methods journey
+  for adding the provider later.
+* **JSON output (`data.idps`):** under `--json` the journey contributes an
+  `idps` entry to the result envelope's command payload
+  (`apps/cli/src/lib/oclif/types.ts`), mirroring the announce step per provider:
+  slug, template, callback URI per environment, excluded environments with the
+  declaration kind as reason, console URL, `client_secret_env`, and whether the
+  secret is present.
+  Exclusions are structured so agents can tell a declaration-level exclusion
+  from an unconfigured environment without parsing terminal text.
 
 ### Post-Claim Re-entry
 
@@ -83,26 +92,34 @@ After claim, the same sub-journey runs behind the Sign-in methods journey.
 * **Reuse is the default mode:** an existing connection for the catalog key is
   reused ([Create or Reuse](#create-or-reuse)); create is the fallback.
 * **Schema picker:** with several files under `.zitadel/schemas/`, the journey
-  asks which schema the methods apply to, seeded from that schema's current
-  `x-auth-methods`.
-  A provider selected for a second schema extends the connection's
-  `claim_mapping` by intersection instead of duplicating the connection; this is
-  the path that activates multi-schema reuse.
-* **Edits in place:** the generator owns `x-auth-methods` and the flow scaffold
+  asks which schema the methods apply to.
+  The prompt is preselected from the chosen schema's current `x-auth-methods`.
+  Selecting a provider for a second schema reuses the same connection instead of
+  duplicating it.
+  The `claim_mapping` gains the catalog claim-table rows whose key the second
+  schema defines ([Catalog Schema](#catalog-schema)).
+* **Edits in place:** re-runs touch files the developer may have edited by
+  hand.
+  The schema and flow generator from method selection
+  ([area 2](2-auth-method-selection.md#open-points)) owns specific regions of
+  them. In the schema that is `x-auth-methods`; in the flow it is the scaffold
   delta (`sso_providers` arrays, the `register-sso` and `sso-conflict` steps,
   the `user_already_exists` retarget, the conflict step's password field and
   passkey action).
-  It edits an owned region only when its current value equals what the scaffold
-  expects; on any other value it writes nothing and points to manual editing.
-  Removal is the inverse of the scaffold (area 2,
-  [What Each State Means](2-auth-method-selection.md#what-each-state-means)).
+  The generator rewrites an owned region only while it still holds exactly what
+  the scaffold produces.
+  A hand-edited region is not merged; that region is left untouched and the
+  journey points to manual editing.
+  Deselecting a provider removes exactly what the scaffold added, under the same
+  guard (area 2,
+  [Provider States](2-auth-method-selection.md#provider-states)).
 * **Working tree, not applied state:** the journey reads and edits the working
   tree; a file whose hash differs from the last-applied record in
   `.zitadel/state.json` is shown as having local changes not yet applied.
   A provider shows as configured when its connection file exists, nothing more;
   only a completed test run says it works.
 * **Skip destination:** a provider skipped during setup is added later through
-  this journey; the setup summary says so.
+  this journey.
 
 ## Callback URIs
 
@@ -112,8 +129,8 @@ flow ID.
 The journey's role is strictly to derive and surface these copyable URIs per
 environment.
 The development origin is `http://localhost:{port}` from the setup port,
-persisted as `environments.development.issuer` in `zitadel.json`; re-entrant
-runs read it back.
+persisted as `environments.development.issuer` in the repo-root `zitadel.json`.
+A later run reads the stored issuer instead of asking for the port again.
 
 ### Multi-Environment Evaluation
 
@@ -139,16 +156,31 @@ preview       excluded: declared by issuer_pattern, not an exact issuer
 
 ## The Provider Catalog
 
-Following Area 1's principle that "vendor knowledge is data," the catalog is a
-table bundled in `packages/config`, so scaffolding works offline.
-Epic 851 ships two entries: `google` and `github`.
+Following Area 1's principle that
+["vendor knowledge is data"](1-resource-model.md#vendor-knowledge-is-data), the
+catalog is a table bundled in `packages/config`, so scaffolding works offline.
+Epic 851 includes two entries: `google` and `github`.
+[`schemas/catalog.json`](schemas/catalog.json) is an example of the full table.
+
+Not in the table:
+
+- `client_id` is prompted.
+- The default slug is the entry's key (`google`, `github`).
+- `client_secret_env` is derived from the slug (e.g., `GOOGLE_CLIENT_SECRET`).
+- `provisioning` is a scaffold default rather than vendor knowledge.
+
+The bundled table ages with the installed CLI, so a vendor change reaches new
+scaffolds only through a package upgrade.
+The risk stops at scaffold time.
+The written file is tenant-editable, Google's endpoints resolve through
+discovery at runtime, and the server validates every deploy.
 
 ### Catalog Schema
 
 | Field | Purpose & Usage |
 | :--- | :--- |
-| **Protocol Block**<br>*(endpoints/issuer, pins, scopes, `supplementary_fetch`, `verified_claims` defaults)* | Populates connection files based on Area 1's test-verified examples, injecting the prompted `client_id` and the intersection of the claim table with the active schema (`claim_mapping`). |
-| **Claim Table**<br>*(schema property name → provider claim name)* | Authored per provider, like the rest of the catalog entry, not derived: each row pairs one of our property names with the provider's documented claim, cross-checked against zitadel/zitadel's provider packages. At scaffold the rows whose key the active schema defines become the connection's `claim_mapping`. |
+| **Protocol Block**<br>*(endpoints/issuer, `static_authorize_parameters`, `token_endpoint_auth_method`, scopes, `supplementary_fetch`, `verified_claims` defaults)* | Populates the connection file from Area 1's test-verified examples. The prompted `client_id` is filled in; `claim_mapping` is derived from the claim table (next row). |
+| **Claim Table**<br>*(schema property name → provider claim name)* | Authored per provider, like the rest of the catalog entry, not derived: each row pairs a schema property name with the provider's documented claim, cross-checked against zitadel/zitadel's provider packages. At scaffold the rows whose key the active schema defines become the connection's `claim_mapping`. |
 | **Display Name & `template`** | Populates `sso_providers` step entries and CLI console output. |
 | **Console URL & Docs URL** | Surfaced during the announce step and within error envelopes. |
 | **Callback Guidance**<br>*(multi-URI client vs. app-per-environment)* | Surfaced during the announce step to guide developer app registration. |
@@ -168,21 +200,24 @@ the tenant can add rows or accept that the collection step asks for them.
 ## Credential Capture
 
 Credentials are per environment; the connection is not.
-The connection file carries references: `client_secret_env` is always a variable
-name, and `client_id` is a `${VAR}` reference when it differs per environment
+The connection file carries references.
+`client_secret_env` is always a variable name, and `client_id` becomes a
+`${VAR}` reference when it differs per environment
 (area 1, [Open Points](1-resource-model.md#open-points)).
-One revision is promoted unchanged and each environment supplies its own values.
-Which values differ is vendor policy: a GitHub OAuth App accepts one callback
-URL, so GitHub needs one app per origin and a `${GITHUB_CLIENT_ID}` per
-environment; a Google client accepts several redirect URIs, so one literal
-client id can serve them all.
+The same revision is promoted to every environment unchanged; each environment
+fills the references with its own values.
+Vendor policy decides which values differ.
+A GitHub OAuth App accepts one callback URL, so GitHub needs one app per origin
+and a `${GITHUB_CLIENT_ID}` per environment.
+A Google client accepts several redirect URIs, so one literal client id serves
+every environment.
 
-In 851 the journey captures one client id and one secret, for development, the
+In 851 the journey captures one client id and one secret for development, the
 only environment that exists ([README](README.md#scope-for-851)).
-Further environments add values, not connection edits, once
-[#534](https://github.com/zitadel/nextgen/issues/534) defines them, the secret
-store holds their secrets, and `${VAR}` resolution at the engine makes a
-reference client id usable.
+Adding an environment later means adding values, not editing the connection.
+That depends on [#534](https://github.com/zitadel/nextgen/issues/534) defining
+environments, the secret store holding per-environment secrets, and the engine
+resolving `${VAR}` in the client id.
 
 ### Client ID Rules
 
@@ -190,6 +225,8 @@ reference client id usable.
   `${GOOGLE_CLIENT_ID}`, from prompt or flag.
   References reach the engine unresolved and are resolved per environment (area
   1's syntax).
+- **Flags:** Provider-specific flags (e.g., `--google-client-id`,
+  `--github-client-id`) skip the interactive prompts.
 - **Stubbing:** Referenced environment variable names are automatically stubbed
   into `.env.example`.
 
@@ -214,6 +251,7 @@ reference client id usable.
   are printed.
 * **CLI Safety:** Secret values are never exposed in process arguments (`argv`);
   no `--client-secret` flag exists.
+  Deferred capture is the default non-interactive behavior.
 * **No-Clobber Behavior:** `merge-env` will not overwrite existing keys.
   Re-running with a new secret prompts: *"already set in `.env.local`, edit it
   there"*.
@@ -224,20 +262,28 @@ Missing credentials fall into two distinct execution states:
 
 ### Missing Client ID (Capture-Time)
 - **Interactive:** The prompt pauses and waits for user input.
-- **Non-Interactive:** Fails immediately with an error before writing resources
-  when a create is required; a scan match needs no client id and follows the
-  reuse rule ([Create or Reuse](#create-or-reuse)).
+- **Non-Interactive:** Fails with `E_VALIDATION` before writing resources when a
+  create is required.
+  The envelope carries the console URL and callback URI in `hint` and the flag
+  to pass in `next_commands`.
+  A scan match needs no client id and follows the reuse rule
+  ([Create or Reuse](#create-or-reuse)).
 - **Environment Reference:** Passing a `${VAR}` reference defers evaluation to
   plan-time presence checks via `E_CREDENTIAL_MISSING`.
 
-### Missing Secret Value (Plan/Apply-Time)
-- **Error code `E_CREDENTIAL_MISSING`:** the `hint` names the variable and
-  `.env.local` and says to re-run `plan`
+### Missing Secret Value
+- **At setup, a missing value only warns.** If the secret is absent from
+  `process.env` and local environment files (`.env.local`, `.env`; new: `plan`
+  reads `process.env` only today, `apps/cli/src/lib/oclif/base.ts`), the
+  non-interactive output envelope includes a warning naming the variable with
+  remediation steps in `data.next_actions`.
+- **At plan/apply it errors.** `E_CREDENTIAL_MISSING`; the `hint` names the
+  variable and `.env.local` and says to re-run `plan`
   ([Dependencies](#dependencies)).
 
 ## Create or Reuse
 
-The setup sub-journey connects existing OAuth applications or creates new ones
+The setup sub-journey reuses an existing connection file or creates a new one,
 without duplicating connections across re-runs.
 
 ### Scan & Match Logic
@@ -248,10 +294,11 @@ without duplicating connections across re-runs.
   `https://github.com/login/oauth/authorize`).
   Endpoints take precedence if `template` conflicts.
 * **Single Hit (Reuse):** Displays slug and `client_id` for interactive
-  confirmation; non-interactive executions auto-reuse when no client id was
-  supplied (reuse writes no new resource, so the Missing Client ID rule does not
-  engage) or when the supplied id matches the stored `client_id`; a mismatch
-  fails with `E_VALIDATION` naming both ids.
+  confirmation.
+  A non-interactive run auto-reuses when no client id was supplied; the Missing
+  Client ID rule applies to creates only, and reuse writes no new resource.
+  It also auto-reuses when the supplied id matches the stored `client_id`.
+  A mismatch fails with `E_VALIDATION` naming both ids.
   Extends the connection's `claim_mapping` to the active schema, without
   touching existing secrets.
   Re-checks credential presence so missing local values yield
@@ -278,32 +325,30 @@ Selecting `google` on the default scaffold touches the following target files:
 | **`.env.example`, `.env.local`** | Variable stub and local secret value. |
 | **`.zitadel/state.json`** | Connection state entry. |
 
-The flow topology rests on five decisions:
-
 ### Flow Architecture Decisions
 
 #### 1. Shared Entry for Login and Registration
 The shipped default (`packages/config/defaults/default-login.json`) handles
 login and registration in one definition.
-`sso_providers` goes on both entry steps, which settles the register-step
-[open point from Area 2](2-auth-method-selection.md#open-points).
+`sso_providers` goes on both entry steps, which settles area 2's register-step
+topology [dependency](2-auth-method-selection.md#dependencies).
 
 #### 2. The Three-Outcome Rule for SSO Steps
 Every step carrying `sso_providers` must explicitly handle three outcomes:
 `callback`, `identity_unknown`, and `user_already_exists`.
 The first two are SSO-only routes; `user_already_exists` is shared with typed
-collisions, which is what decision 5 is about.
+collisions ([decision 5](#5-retargeting-registration-collisions)).
 *   **`identity_unknown` → `register-sso`** on every step, so an unknown user
     reaches the collection step after one ceremony whether they started on the
     sign-in or the register page
     ([area 3](3-social-login-flow.md#resolution-branches)).
     The engine flips `CurrentPurpose` to `register` on the way.
 *   **`user_not_found` is untouched.**
-    It stays the typed-email outcome with the shipped default's target,
-    `identifier.user_not_found → register`.
-    The scaffold adds no `user_not_found` to `register`: after the bounce that
-    step runs under register purpose, where typed input can only fire
-    `user_already_exists`
+    The shipped default already routes it, `identifier.user_not_found →
+    register`, and the scaffold keeps that transition as it is.
+    The `register` step needs no `user_not_found` route of its own.
+    It runs under register purpose, where finding no user is the normal case,
+    and a typed submission can only fire `user_already_exists`
     ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)).
 
 #### 3. The SSO Collection Step (`register-sso`)
@@ -324,8 +369,7 @@ This is a comprehensive recovery step presented under "account exists"
 messaging.
 Because the system cannot know which methods the colliding account possesses, it
 offers every method the schema enables: the password field, the passkey action,
-and the SSO provider buttons; they follow the schema's method set
-([Post-Claim Re-entry](#post-claim-re-entry)).
+and the SSO provider buttons.
 The engine binds the attempt to the colliding account.
 *   **SSO Outcomes:** Carrying `sso_providers` puts the step under the
     three-outcome rule:
@@ -334,21 +378,21 @@ The engine binds the attempt to the colliding account.
     *   `user_already_exists` targets the step itself: clicking the colliding
         provider again re-runs the ceremony and resolves identically, so the
         step re-renders with the same options.
-        The copy is written to be seen more than once.
     *   `identity_unknown` routes to `register-sso`: reachable only if the
         provider returns a different, unknown subject (the user switched
         provider accounts mid-loop).
     *   A wrong password re-renders the step with an error and no transition
         ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine));
-        `user_already_exists` comes from identifier resolution, never from the
-        password field.
+        `user_already_exists` comes from identifier resolution.
 *   **Navigation Fallback:** Includes a secondary `sign_in` action targeting
     `identifier` (`{ "target": "identifier", "purpose": "login" }`) so the user
     can back out and use a different account.
 *   **Transition Logic:** In-definition navigation.
     A tenant with separate login and register definitions uses
     `"action": "switch"` instead (dropping `purpose`).
-    Never `pivot`.
+    `pivot` is not used, as it would return the authenticated user to the
+    conflict step
+    ([area 3](3-social-login-flow.md#navigation-mechanics-switch-vs-pivot)).
 
 #### 5. Retargeting Registration Collisions
 The `register.user_already_exists` outcome is retargeted from the `password`
@@ -384,41 +428,6 @@ never presented as proof that sign-in works.
 * **Verification Separation:** final summaries and `next_commands` hand off to
   the test sign-in command (ticket work).
   Status copy uses "applied" and never claims sign-in is "working".
-
-## Non-interactive Contract
-
-In non-interactive mode (triggered by non-TTY `stdin`/`stdout` or explicit
-`--json` flags), CLI flags supply setup answers.
-Method selection flags belong to Area 2's surface area.
-
-### Client ID Flags
-
-* **Flag Syntax:** Provider-specific flags (e.g., `--google-client-id`,
-  `--github-client-id`) skip the interactive prompts.
-* **Value Types:** Flags accept either literal strings or environment variable
-  references (e.g., `'${GOOGLE_CLIENT_ID}'`).
-  Passing a variable reference defers presence validation to `plan`.
-
-### Missing Client ID Validation
-
-A missing client id on the create path halts setup before writing
-([Missing Credentials](#missing-credentials)).
-The `E_VALIDATION` envelope carries the console URL and callback URI in `hint`
-and the flag to pass in `next_commands`.
-
-* **No Secret Flag:** Secrets cannot be passed via CLI flags.
-  Deferred capture is the default non-interactive behavior.
-* **Missing Secret Handling:** If the secret is absent from `process.env` and
-  local environment files (`.env.local`, `.env`; new: `plan` reads `process.env`
-  only today, `apps/cli/src/lib/oclif/base.ts`), the output envelope includes a
-  warning naming the missing variable alongside remediation steps in
-  `data.next_actions`.
-* **Structured Payload (`data.idps`):** Mirrors the interactive announce step
-  per provider: slug, template, callback URI per environment, excluded
-  environments with the declaration kind as reason, console URL,
-  `client_secret_env`, and whether the secret is present.
-  Exclusions are structured so agents can tell a declaration-level exclusion
-  from an unconfigured environment without parsing terminal text.
 
 ## Dependencies
 

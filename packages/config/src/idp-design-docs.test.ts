@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -477,5 +477,74 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
         `${name} links ${file ?? "(self)"}#${fragment}`,
       ).toBe(true);
     }
+  });
+
+  // Relative links must also point at files that exist (example schemas like
+  // schemas/catalog.json included), or the doc 404s just as silently.
+  it("relative file links resolve", () => {
+    const docsDir = join(repoRoot, "docs/design/idp");
+    for (const [name, text] of Object.entries(docs)) {
+      const targets = [...text.matchAll(/\]\(([^)]+)\)/g)]
+        .map((m) => m[1]!)
+        .filter((t) => !/^https?:|^#|^mailto:/.test(t))
+        .map((t) => t.split("#")[0]!)
+        .filter(Boolean);
+      for (const target of targets) {
+        expect(existsSync(join(docsDir, target)), `${name} links ${target}`).toBe(true);
+      }
+    }
+  });
+});
+
+describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", () => {
+  // catalog.json restates the vendor facts of the example connections; this
+  // pins the two files together so an edit to one fails until the other moves.
+  const catalog = loadJson("catalog.json") as Record<
+    string,
+    {
+      display_name: string;
+      template: string;
+      protocol_block: {
+        protocol: "oidc" | "oauth2";
+        subject_claim: string;
+        verified_claims: Record<string, unknown>;
+      } & Record<string, unknown>;
+      claim_table: Record<string, string>;
+    }
+  >;
+
+  // The derivation the doc states: slug = entry key, client_secret_env =
+  // upper-cased key + _CLIENT_SECRET, client_id prompted (taken from the
+  // example), provisioning = scaffold default.
+  const scaffold = (key: string, clientId: string) => {
+    const entry = catalog[key]!;
+    const { protocol, subject_claim, verified_claims, ...blocks } =
+      entry.protocol_block;
+    return {
+      slug: key,
+      protocol,
+      template: entry.template,
+      display_name: entry.display_name,
+      subject_claim,
+      claim_mapping: entry.claim_table,
+      verified_claims,
+      provisioning: { creation: "auto" },
+      [protocol]: {
+        ...(blocks[protocol] as Record<string, unknown>),
+        client_id: clientId,
+        client_secret_env: `${key.toUpperCase()}_CLIENT_SECRET`,
+      },
+    };
+  };
+
+  it.each<[string, Record<string, unknown>]>([
+    ["google", googleExample],
+    ["github", githubExample],
+  ])("entry %s scaffolds the example connection verbatim", (key, example) => {
+    const { $schema: _, ...expected } = example;
+    const protocol = catalog[key]!.protocol_block.protocol;
+    const clientId = (expected[protocol] as Record<string, unknown>)
+      .client_id as string;
+    expect(scaffold(key, clientId)).toEqual(expected);
   });
 });

@@ -1,6 +1,7 @@
 # IdP Resource Model
 
-> **Status:** Planning notes 
+> **Status:** Planning notes  
+> **Area:** 1 of 4 (see [`README.md`](README.md))
 
 An Identity Provider (IdP) connection is a tenant-owned configuration file that
 defines how Zitadel interacts with external authentication providers (such as
@@ -9,7 +10,8 @@ lifecycle of these connection files.
 
 **Note on vocabulary:**  
 Commands `plan` and `apply` will be replaced by `deploy/promote/status/pull`
-(see [#542](https://github.com/zitadel/nextgen/issues/542)).
+(see [#542](https://github.com/zitadel/nextgen/issues/542),
+[#541](https://github.com/zitadel/nextgen/issues/541)).
 Read "at plan" as "at validation" and "at apply" as "at deployment".
 
 ## IdP Connection Shape
@@ -47,7 +49,7 @@ schemas and flow steps.
 ### Context
 zitadel/zitadel implements each vendor as a Go package, and most of that code is
 configuration written in Go: issuers, endpoints, forced scopes, claim mappings.
-Across its six vendors only three things are behaviour rather than data: 
+Across its vendors only three things are behaviour rather than data: 
 - GitHub fetches `/user/emails` when the profile email is private and retains the
 `primary && verified` address
 - Apple signs its own client secret (an ES256 JWT
@@ -58,8 +60,7 @@ with a one-hour expiry, so an implementation caches and refreshes)
 So the proposal is: **configuration for everything data-shaped, named strategies
 for the rest.**
 
-Some providers require custom actions during sign-in, which we call
-**strategies**.
+Some providers require custom actions during sign-in, called **strategies**.
 The server implements the logic for each strategy and maintains it in a
 **registry**, which is a mapping of unique names to their specific implementations.
 A connection activates one of these extra steps simply by referencing its
@@ -147,7 +148,8 @@ How to read the schema:
   in both blocks) carries a `pattern` requiring `https://`, with an exception
   for local development (`http://localhost` and `http://127.0.0.1`).
   OIDC requires TLS on these endpoints, and every one of them handles codes,
-  tokens, or key material; `format: "uri"` alone would enforce nothing.
+  tokens, or key material; `format: "uri"` alone is an annotation and would not
+  reject an `http://` URL.
 - **PKCE and claim source:** Both protocol blocks carry `pkce_enabled` (default
   `true`; set `false` only for a provider whose token endpoint rejects the
   parameters).
@@ -219,7 +221,7 @@ non-breaking changes.
 | `response_mode` (`form_post`) | When Apple is scoped (the current 851 callback supports GET only). |
 | `dynamic_authorize_parameters` | Once a design exists for sourcing runtime values in the authorize URL. |
 | `is_linking_allowed`, `auto_linking` | When the deferred account-linking journey is designed and implemented. |
-| `creation: auto_only` | When the engine has the fail-closed branch for incomplete claims ([Provisioning](#provisioning)). Additive enum value. |
+| `creation: auto_only` | When the engine has the error branch for incomplete claims ([Provisioning](#provisioning)). Additive enum value. |
 | `is_auto_update` | When per-property verification state exists |
 | `enabled` | **Not planned.** An unlisted connection is already inert. Furthermore, a config flag is a poor mechanism for an emergency disable (due to release latency, and rollbacks would inadvertently re-enable it). Imperative runtime disabling remains an open point. |
 | `kind`, `audience`, `default_schema` | **Cut completely.** No identified use case or need. |
@@ -294,7 +296,7 @@ A typo in a plain claim name fails silently (claim names are provider-controlled
 and unchecked at plan time); a typo in a `$` value fails hard.
 One slip is out of reach of the schema: `"true"` in quotes is a claim name, not
 the boolean, so the engine looks for a claim named `true`, finds none, and
-fails closed.
+evaluates the property as unverified on every attempt.
 Any string is a valid claim name, so the schema cannot reject it; the validator
 warns on the literal `"true"` and `"false"` instead.
 
@@ -390,7 +392,7 @@ provisional (see [Open points](#open-points)).
 | **Unreferenced Typo Guard** | Warning | The connection is not referenced by any schema, and a mapping target or verification key is unknown to *every* schema in the working tree.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **Missing `x-verify` Method** | Warning | A `verified_claims` key points to a property that lacks an `x-verify` method (verification with nowhere to land). Activates when `x-verify` returns (see the dependency note under [Linking Safety](#linking-safety)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **Invalid Strategy Pointer** | Error | `"$supplementary_fetch"` with no strategy selected, or a strategy that does not verify the mapped claim. The key is a property name and the contract lists claim names, so the check maps the key through `claim_mapping` first: with `github_primary_email`, `emailAddress` → `email` passes and `givenName` → `name` fails. A key with no `claim_mapping` entry cannot resolve and is an error. Server-side only: the contracts live in the server's registry, so the CLI does not run this check at plan and the error surfaces at apply.                                                                                                                                                                                                |
-| **Literal `"true"` Source** | Warning | A `verified_claims` source is the quoted string `"true"` or `"false"`. Any string is a valid claim name, so the schema cannot reject it, but the engine would look for a claim by that name, find none, and fail closed. The boolean `true` is the trust-the-provider form. |
+| **Literal `"true"` Source** | Warning | A `verified_claims` source is the quoted string `"true"` or `"false"`. Any string is a valid claim name, so the schema cannot reject it, but the engine would look for a claim by that name, find none, and evaluate the property as unverified on every attempt. The boolean `true` is the trust-the-provider form. |
 | **Inert Connection** | Warning | The connection is referenced by zero schemas. No flow can offer it, making it completely inert.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **Impossible Registration** | Warning | A flow registration step offers this provider, but `creation` is `disabled`. The user will never be able to successfully sign up. With `disabled`, `identity_unknown` must route to an error step; with `auto`, to a collection step, which the engine uses only for sign-ins that cannot auto-create.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **Impossible Auto-Creation (Data)** | Warning | `creation` is `auto`, but a referencing schema requires a property that the `claim_mapping` does not target. Every sign-in will stop to collect the missing data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -643,8 +645,8 @@ Behaviors this design relies on but does not implement.
   [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under
   the same never-upstream invariant; area 4 owns it
   ([Dependencies](4-cli-provider-setup.md#dependencies)).
-- **Imperative runtime disable:** We need a way to imperatively disable an IdP
-  at runtime (e.g., `zitadel idp disable google --env prod`).
+- **Imperative runtime disable:** A way to disable an IdP imperatively at
+  runtime is still needed (e.g., `zitadel idp disable google --env prod`).
   This mechanism must be per-environment, execute in seconds, and remain immune
   to config rollbacks.
   Because of these requirements, it must be specified as part of the runtime
@@ -652,8 +654,8 @@ Behaviors this design relies on but does not implement.
   Attempts pin a revision at start
   ([Immutability and Revisions](#immutability-and-revisions)), so the disable is
   checked again at callback; otherwise it takes effect only for new attempts.
-- **Deletion semantics:** We must decide between a "refuse-while-pinned"
-  approach (which requires a grace window for in-flight attempts) or a
+- **Deletion semantics:** A choice must be made between a "refuse-while-pinned"
+  approach (which requires a grace window for in-flight attempts) and a
   "tombstoning" approach.
   Decided with the CRUD API design.
 - **Deletion must not break a live flow:** Flows and schemas reference a
@@ -663,7 +665,7 @@ Behaviors this design relies on but does not implement.
   Either the delete is refused while a live flow's pinned schema lists the slug
   (needs the cross-resource reader, scoped to live pins, or nothing is ever
   deletable), or the engine hides a provider whose slug no longer resolves when
-  it renders the step and the attempt fails closed
+  it renders the step, and an in-flight attempt ends in error
   ([area 3](3-social-login-flow.md#constraints--edge-cases)).
   Neither the refuse-while-pinned nor the tombstoning model answers this: both
   govern in-flight attempts, not flow references to the slug.
@@ -677,7 +679,7 @@ Behaviors this design relies on but does not implement.
   could, because a typo and a key meant for another schema look alike.
   The CLI sees every referencing schema and applies both rules.
   A connection body names no schema, so the server has nothing to check the keys
-  against at create; the error-grade half lands at flow-definition writes, the
+  against at create; the error-grade half runs at flow-definition writes, the
   only document naming both a schema revision and a connection slug, and the
   warning-grade half is CLI-only.
   A 1:1 rule (one connection per schema) would allow error-grade checks

@@ -1,7 +1,6 @@
 # Social Login Flow
 
 > **Status:** Planning notes  
-> **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
 > **Area:** 3 of 4 (see [`README.md`](README.md))
 
 This document defines how a user signs up and signs in using external identity
@@ -45,7 +44,7 @@ architecture:
   Environments persist under
   [#534](https://github.com/zitadel/nextgen/issues/534) (part of the
   [#529](https://github.com/zitadel/nextgen/issues/529) releases epic); deriving
-  a callback origin per environment follows it.
+  a callback origin per environment depends on it.
 - **Server Routing:** The route does not exist yet.
   The `/__nextgen` path serves as a client-side proxy prefix, but the server
   currently mounts no handlers under it.
@@ -58,9 +57,9 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
 
 | Field | Purpose |
 | :--- | :--- |
-| **Flow / Attempt ID** | Provides correlation, serving as the sole link from the callback back to the active ceremony. |
+| **Flow / Attempt ID** | Provides correlation, serving as the sole link from the callback back to the in-flight attempt. |
 | **Provider Slug + Connection Revision ID** | Enforces revision binding at attempt-start, ensuring the callback phase never re-resolves the slug. |
-| **Browser Binding Nonce** | A `__Host-` cookie nonce set during the `sso-redirect` step. The callback must originate from the browser that initiated the ceremony to prevent login CSRF attacks (where an attacker completes their own ceremony inside a victim's browser). The attributes are part of the contract: the `__Host-` prefix requires `Secure` and `Path=/` and forbids `Domain`; `HttpOnly` must be set explicitly (the prefix does not imply it), and it must be `SameSite=Lax` because the callback arrives as a cross-site top-level GET; `Strict` would drop the cookie on exactly that navigation and fail every ceremony (the shipped `_zflow` cookie is `Strict`, so its settings cannot be copied). `Secure` on `http://localhost` holds in Chrome and Firefox, not Safari; the shipped `_zflow` cookie lets `Secure` follow the request scheme for that reason (`internal/api/flow.go`), which a `__Host-` cookie cannot. On an `http://` development origin the binding cookie therefore drops the `__Host-` prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and `SameSite=Lax`; on every `https://` origin the prefix is required. |
+| **Browser Binding Nonce** | A `__Host-` cookie nonce set during the `sso-redirect` step. The callback must originate from the browser that initiated the attempt, preventing login CSRF (an attacker completing their own attempt inside a victim's browser). The cookie attributes are part of the contract ([below](#the-binding-cookie)). |
 | **PKCE Verifier** | Present when the connection enables PKCE (`pkce_enabled`, the default); the challenge is always `S256` when sent. A connection may set `pkce_enabled: false` only for a provider whose token endpoint rejects the parameters ([area 1](1-resource-model.md#the-connection-schema)); binding then rests on `state` and, for OIDC, `nonce`. |
 | **OIDC `nonce`** | Echoed in the `id_token` to bind the issued token strictly to this authorize request. |
 | **Expiry** | Sets a bounded time window for the external leg, inheriting the attempt's overall TTL. |
@@ -72,6 +71,22 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
 > (example 4) must never ship to production.
 > Production `state` values are minted from a CSPRNG with at least 128 bits of
 > entropy, and the PKCE challenge method is `S256`.
+
+#### The Binding Cookie
+
+- **`__Host-` prefix:** requires `Secure` and `Path=/` and forbids `Domain`.
+- **`HttpOnly`:** set explicitly; the prefix does not imply it.
+- **`SameSite=Lax`:** the callback arrives as a cross-site top-level GET.
+  `Strict` would drop the cookie on exactly that navigation and fail every
+  attempt.
+  The shipped `_zflow` cookie is `Strict`, so its settings cannot be copied.
+- **Development on `http://`:** Safari rejects `Secure` on `http://localhost`
+  (Chrome and Firefox accept it).
+  The shipped `_zflow` cookie lets `Secure` follow the request scheme for that
+  reason (`internal/api/flow.go`), which a `__Host-` cookie cannot.
+  On an `http://` development origin the binding cookie therefore drops the
+  `__Host-` prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and
+  `SameSite=Lax`; on every `https://` origin the prefix is required.
 
 The engine owns the protocol parameters of the authorize request: `client_id`,
 `redirect_uri`, `response_type`, `scope`, `state`, `nonce`, `code_challenge`,
@@ -85,8 +100,8 @@ the engine anyway it drops the configured value and keeps its own.
 
 ## Callback Processing
 
-The callback phase executes six sequential steps in order, failing closed on
-error:
+The callback phase executes six sequential steps in order; an error at any step
+ends the attempt:
 
 1. **State:** An unknown, expired, or already-consumed `state` parameter
    triggers a flow-level error with a restart route (bypassing step transitions,
@@ -94,19 +109,22 @@ error:
 2. **Code Exchange:** Performed at the connection's token endpoint and
    authenticated per `token_endpoint_auth_method`.
    *(Note: Resolving the secret value remains an open dependency).*
-3. **ID Token Validation (OIDC):** Verifies the signature using keys from
-   discovery metadata or the connection's `jwks_uri` (failing if neither yields
-   keys).
-   Only asymmetric algorithms from a fixed allowlist are accepted; `none` and
-   the HMAC family are rejected outright (an HS256 token is signed with the
-   client secret, a classic downgrade path).
-   Validates `iss`, `aud` (client ID, checking `azp` when multiple audiences are
-   present), `exp` with bounded clock skew, and `nonce` from the state record.
-   Discovery, when used, must return an `issuer` equal to the configured one
-   (OIDC Discovery 4.3); discovery and JWKS documents are cached with a bounded
-   TTL and refetched at most once per attempt on an unknown `kid`.
-   This runtime check enforces that a `jwks_uri` is required when discovery
-   documents are absent, which the schema cannot express.
+3. **ID Token Validation (OIDC):**
+    - **Signature:** verified with keys from discovery metadata or the
+      connection's `jwks_uri`; fails if neither yields keys.
+      This runtime check enforces that a `jwks_uri` is required when discovery
+      documents are absent, which the schema cannot express.
+    - **Algorithms:** asymmetric only, from a fixed allowlist; `none` and the
+      HMAC family are rejected.
+      `none` is unsigned, and HS256 signs with the shared client secret, so
+      anyone holding the secret can forge a token.
+    - **Claims:** validates `iss`, `aud` (client ID, checking `azp` when
+      multiple audiences are present), `exp` with bounded clock skew, and
+      `nonce` from the state record.
+    - **Discovery:** when used, must return an `issuer` equal to the configured
+      one (OIDC Discovery 4.3).
+      Discovery and JWKS documents are cached with a bounded TTL and refetched
+      at most once per attempt on an unknown `kid`.
 4. **Claims Extraction:** Extracted from `id_token` when `id_token_mapping` is
    set; otherwise from `userinfo`.
    For OIDC, a `userinfo` response whose `sub` does not exactly match the
@@ -127,34 +145,43 @@ error:
       [Invalid Strategy Pointer](1-resource-model.md#validator-rules) rule.
 6. **Identity Resolution:** Looks up `(connection, external_subject)` where the
    stored subject is strictly a string:
-    - **Numeric Coercion:** JSON numbers explicitly coerce to their exact
-      decimal string (e.g., GitHub numeric IDs) to prevent duplicate identities
-      like `12345` vs `"12345"`.
-      The decode must preserve the raw token (`json.Number`), never pass through
-      float64: the legacy mapper's `FormatFloat` path
+    - **Numeric Coercion:** a provider may send the subject as a JSON number
+      (GitHub's `id`).
+      It is converted to its exact decimal string, so `12345` and `"12345"`
+      resolve to one identity.
+      The decoder reads the number as raw text (`json.Number`), never as
+      `float64`: a float holds 53 bits, larger ids round, and two distinct
+      subjects that round to the same string would merge into one account.
+      The legacy mapper's `FormatFloat` path
       ([`oauth/mapper.go#L35-L47`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oauth/mapper.go#L35-L47))
-      rounds ids above 2^53, and two distinct subjects that round to the same
-      string would merge into one account.
+      has exactly this flaw.
     - **Rejection Criteria:** Absent, `null`, empty, boolean, object, or array
       subjects immediately reject the attempt.
     - **Connection Keying:** The `connection` half of the key requires a
       revision-stable identity (an open item exported to the CRUD API).
 
-> **Porting note:** Steps 3 and 5 do not fall out of the `zitadel/zitadel`
-> providers: they take signing algorithms from the provider's discovery
-> document, send no `nonce`, and fail the whole userinfo decode on an
-> unrecognized boolean.
-> Each has to be added on top.
+> **Porting note:** Two behaviors in steps 3 and 5 cannot be lifted from the
+> `zitadel/zitadel` providers.
+>
+> - **`nonce`:** the legacy provider never sends or verifies one
+>   ([`oidc/oidc.go#L143-L166`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oidc/oidc.go#L143-L166)).
+> - **Unrecognized verification values:** step 5 evaluates them as unverified;
+>   the legacy userinfo decode fails the whole fetch instead (`oidc.Bool`
+>   accepts only `true`/`false`, as boolean or string, and errors on anything
+>   else).
+>
+> The algorithm allowlist does fall out: legacy's verifier defaults to
+> `RS256, ES256, PS256`, rejecting `none` and HMAC.
 
 ### Server-Side Fetch Policy
 
 Every URL the engine fetches for a connection is tenant-authored (discovery,
 `jwks_uri`, token, userinfo, strategy fetch); on shared infrastructure that is a
 server-side request forgery surface.
-The guard is generic, webhooks and actions need the same one, so egress policy
-is its own epic ([#928](https://github.com/zitadel/nextgen/issues/928)), which
-owns the deny mechanics and an operator allowlist mode.
-This area consumes it and carries two constraints into it:
+Webhooks and actions need the same guard, so egress policy is its own epic
+([#928](https://github.com/zitadel/nextgen/issues/928)).
+#928 owns the deny mechanics and an operator allowlist mode.
+This area consumes the policy and carries two constraints into it:
 
 - **Blocking for 851.**
   The callback processor fetches discovery, JWKS, token, userinfo, and the
@@ -167,10 +194,10 @@ This area consumes it and carries two constraints into it:
   instance-internal headers.
 - **Not configurable per connection.**
   The connection schema carries no egress fields.
-  Operator-level configuration is the epic's question.
+  Whether and how operators configure the policy belongs to the epic.
 
 Local development instances may relax the loopback rejection so
-`http://localhost` providers work, matching the schema's TLS carve-out
+`http://localhost` providers work, matching the schema's TLS exception
 ([area 1](1-resource-model.md#the-connection-schema)).
 
 ## Resolution Branches
@@ -178,14 +205,16 @@ Local development instances may relax the loopback rejection so
 A single `transitions.callback` cannot route returning users and new users to
 different locations, so resolution fires one of three outcomes.
 Two are shipped; the third, `identity_unknown`, is new and fires only from
-ceremonies.
+SSO resolution, never from a typed identifier.
 
 **Why `identity_unknown` is needed:**
-*   **Why not `user_not_found`:** A typed email and an SSO ceremony can both
-    resolve on the same step, and a transition key has one target.
-    If a ceremony's unknown subject fired `user_not_found`, the key would have
-    to keep its typed-email target (`register`), and the unknown SSO user would
-    land on the generic register step and run the ceremony again.
+*   **Why not `user_not_found`:** A shared entry step hosts both the typed
+    email field and the SSO buttons, and a transition key allows one target.
+    Reusing `user_not_found` for an unknown SSO subject would demand two
+    targets from the same key: the generic `register` step for a typed email,
+    the collection step for SSO.
+    The key would have to keep its typed-email target, sending the unknown SSO
+    user to the register step to start the ceremony over.
 *   **The split:** `identity_unknown` routes the unknown SSO user straight to
     the data collection step, while `user_not_found` keeps its route for typed
     emails.
@@ -195,22 +224,27 @@ ceremonies.
     ([ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md#note-sso)),
     which expected ceremonies to reuse `user_not_found` and to add
     `user_link_required` for linking; 851 adds `identity_unknown` for the
-    shared-step reason above and no linking outcome.
+    shared-step reason above, and `user_link_required` is not added, since
+    linking is out of scope ([area 1](1-resource-model.md#linking-safety)).
     The ADR's deferred passkey outcome (`credential_unknown`) has the same
     shape.
     ADR 017 needs an amendment, exported in
     [area 4](4-cli-provider-setup.md#dependencies).
 
-Because this mapping is the same in every execution context, shared-entry steps
-work without modification.
+An unknown subject resolves identically from either entry step: same outcome,
+same resulting purpose.
 
 ### The Three Outcomes
 
+When callback processing completes, identity resolution fires exactly one of
+three outcomes on the step that started the ceremony, and the step's authored
+transitions route it:
+
 | Resolution State | Outcome Fired | Routing & Engine Behavior |
 | :--- | :--- | :--- |
-| **Known subject** | `callback` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, never claims, so profile edits cannot fork accounts. 851 writes nothing to the user on sign-in; refreshing properties from claims is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
-| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold), from either entry. Under `creation: disabled`, an authored error step instead. |
-| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, the same binding `register → password` relies on for a typed collision, here keyed by the mapped claim value. A password or passkey submit on that step authenticates that account and shares the `password` step's throttling and lockout; the step widens who reaches the prompt, not how many tries they get. The credential must still be correct, so this adds no oracle beyond the enumeration note below. |
+| **Known subject** | `callback` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
+| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, it targets an authored error step instead. |
+| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
 
@@ -224,22 +258,22 @@ the schema.
   This is the epic's new-user journey: the user provides only what the provider
   did not return.
 * **Unverified Identifiers:** A required property with a non-empty `x-unique`
-  scope that arrives unverified (Step 5 of Callback Processing) does not
-  auto-create: the attempt degrades to collection and the value is treated as
-  user-typed.
-  That is parity with typed sign-up, not verification: typed sign-up verifies
-  nothing today
-  ([`capabilities.md`, Missing](../flowengine/capabilities.md#missing)), so the
-  gate removes the provider's shortcut past collection and nothing more until
-  email verification lands.
-  The catalog defaults pass (`email_verified` for Google, `$supplementary_fetch`
-  for GitHub); a Google account with `email_verified: false` collects instead.
-  Without this gate an attacker's unverified claim to a victim's email creates
-  the account first, and the victim meets the conflict step at their own
-  sign-up.
+  scope that arrives unverified (Step 5 of Callback Processing) degrades the
+  attempt to collection, and the value is treated as user-typed.
+  * This is parity with typed sign-up, not verification. Typed sign-up does not
+    verify identifiers today
+    ([`capabilities.md`, Missing](../flowengine/capabilities.md#missing)), so
+    until email verification exists the gate only removes the provider's
+    shortcut past collection.
+  * The catalog defaults pass (`email_verified` for Google,
+    `$supplementary_fetch` for GitHub); a Google account with
+    `email_verified: false` collects instead.
+  * Without this gate an attacker's unverified claim to a victim's email
+    creates the account first, and the victim meets the conflict step at their
+    own sign-up.
 * **Disabled:** `creation: disabled` routes `identity_unknown` to an authored
   error step instead, so the provider signs in existing users only.
-  The deferred `auto_only` fails closed on incomplete claims rather than
+  The deferred `auto_only` errors on incomplete claims rather than
   collecting ([area 1](1-resource-model.md#provisioning)).
 * **Static Warnings:** The plan phase warns when a pairing makes the gate
   statically dead (see [validator rules](1-resource-model.md#validator-rules)).
@@ -261,20 +295,20 @@ the schema.
   to the flow's pinned schema.
   Resolving an identity arriving through a flow pinned to a *different* schema
   remains an open question.
-  Until it is settled, 851 fails closed: when the resolved user's schema differs
-  from the flow's pin, the attempt ends in the flow-level error surface
-  (value-free, logged for diagnostics) rather than half-adopting either schema;
-  the open point below owns the real resolution rules.
+  Until it is settled, when the resolved user's schema differs from the flow's
+  pinned schema, the attempt ends in the flow-level error surface instead of
+  adopting either schema partway. The error shows no resolved values; the details go to
+  the server log. The real resolution rules are the open point below.
 - **Pattern Environments:** Under an `issuer_pattern` environment the engine
   renders a step carrying `sso_providers` without its provider buttons and
   records a diagnostic naming the step and the environment.
-  A submission anyway is refused before any authorize URL is built and ends in
-  the flow-level error surface, value-free, logged.
+  A submission that arrives anyway is refused before any authorize URL is built
+  and ends in the flow-level error surface.
 - **Unresolvable Provider:** An attempt whose slug does not resolve to a live
-  connection at attempt start ends in the flow-level error surface, value-free,
-  logged.
-  Reachable through the API path: a connection deleted while a flow still offers
-  it, since a page rendered before the delete can still submit.
+  connection at attempt start ends in the flow-level error surface.
+  This is reachable through the API path when a connection is deleted while a
+  flow still offers it, because a page rendered before the delete can still
+  submit.
 - **No Auto-Linking in 851:** Linking policy fields are omitted from the current
   schema.
   All account-linking semantics are deferred to the dedicated account-linking
@@ -300,8 +334,8 @@ multiple identity providers.
   configured in `claim_mapping`.
 * **Required Fields:** Required schema properties that arrive empty must be
   manually completed by the user.
-* **Optional Fields:** Omitted optional provider claims block nothing and are
-  silently skipped.
+* **Optional Fields:** An omitted optional provider claim is silently skipped
+  and does not block the step.
 * **User Edits:** Prefilled fields are editable.
   `x-editable` was removed in
   [#901](https://github.com/zitadel/nextgen/pull/901) and returns with the
@@ -314,14 +348,13 @@ multiple identity providers.
   arbitrary address while retaining the verified flag.
 
 * **No Wire Change:** `api/openapi/components/flows/field.yaml` already defines
-  `value` for prefilled fields; the engine populates it from mapped claims after
-  a successful callback, a second producer for an existing field.
+  `value` for prefilled fields. After a successful callback the engine fills it
+  from mapped claims.
 
 ## The Resolved External Identity
 
 Following a successful callback, the engine holds the **resolved external
-identity**: an ephemeral object attached directly to the attempt that dies when
-the attempt completes or expires.
+identity**: an ephemeral object attached directly to the attempt.
 
 ### Payload Structure
 
@@ -365,6 +398,15 @@ user_already_exists → authored step: "an account with this email already exist
   → user authenticates with existing factors → continues to the app
 ```
 
+* **Account binding:** The engine binds the attempt to the colliding account.
+  `register → password` uses the same binding when a typed value collides; here
+  the key is the mapped claim value.
+* **Credential check:** A password or passkey submit on the conflict step
+  authenticates the colliding account. Throttling and lockout policies are
+  shared with the `password` step. The credential must still be correct; what
+  the step confirms about account existence is covered by the enumeration note
+  below.
+
 ### Navigation Mechanics: `switch` vs. `pivot`
 
 * **Why `switch` is required:** `pivot` pushes the login flow and auto-pops back
@@ -376,7 +418,6 @@ user_already_exists → authored step: "an account with this email already exist
   definition to switch to, so the scaffold uses in-definition navigation
   re-purposed to login
   ([`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions)).
-  `pivot` is never used.
 
 ### Trigger Points
 
@@ -389,7 +430,8 @@ and the flow must route both:
    into a conflicting value (matching standard registration submission
    semantics).
 
-The authored conflict transition must be explicitly attached to both steps.
+Both the entry step and the collection step carry the `user_already_exists`
+transition.
 
 > **Enumeration Note:** The conflict step and the `user_already_exists` outcome
 > behind it confirm to the person completing the ceremony that an account with
@@ -400,27 +442,25 @@ The authored conflict transition must be explicitly attached to both steps.
 > social sign-in adds no oracle beyond that baseline, and a generic failure
 > instead would leave the account's legitimate owner at exactly the dead end the
 > epic forbids.
-> The probe is also priced higher than form-based enumeration: the attacker must
-> complete a real provider authentication per attempt.
+> The probe also costs more than form-based enumeration, because each attempt
+> requires a real authentication at the provider.
 
-### Identity Lifecycle & Deferred Linking Seam
+### Identity Lifecycle
 
 * **Account linking is out of scope:** The verified external identity is
   **discarded at the conflict boundary**.
   No user record is created, no email-based linking is attempted, and the user
   receives a clear explanation without reaching a dead end.
   The identity dies with the attempt, and every later sign-in through that
-  provider repeats the conflict until the linking journey ships.
-* **Seam for Deferred Account Linking:** The deferred journey will attach at the
-  resolved external identity object; nothing else about that journey is designed
-  here.
-  As a consequence, 851 requires the `create_user_with_sso` `on_success`
-  handler, but does **not** implement or require `link_sso`.
+  provider repeats the conflict until the linking journey is implemented.
 
 ## Failures and Recovery
 
-Failures surface directly as errors on the originating step and never trigger a
-step transition, keeping the outcome vocabulary strictly bounded.
+Failures never trigger a step transition, keeping the outcome vocabulary
+strictly bounded.
+Most surface as errors on the originating step; state and binding-cookie
+failures surface as a flow-level error with a restart route, since the
+originating flow session may no longer exist.
 Per the epic's security and UX principles, failures provide a clear explanation
 and recovery route without exposing internal technical details to the end user.
 
@@ -451,14 +491,15 @@ and recovery route without exposing internal technical details to the end user.
   `(connection, subject)` pairings, which are schema-agnostic, but users belong
   to specific schemas and flows pin one schema revision.
   The rule is undecided for a known subject whose user belongs to a schema
-  different from the active flow's pin.
+  other than the one the active flow pins.
     * *Candidate Rules:* Per-schema identity spaces (requires per-schema
-      uniqueness, which `x-unique` lacks), a global hard-block error, or failing
-      closed until decided.
+      uniqueness, which `x-unique` lacks), a global hard-block error, or
+      erroring until decided.
     * *Ownership & Scope:* Belongs to the identity-link data model (requiring a
       revision-stable connection identity and schema *lineage* tracking).
-      851 fails closed ([Constraints & Edge Cases](#constraints--edge-cases)),
-      which is a dead end for the person signing in.
+      In 851 the mismatch ends the attempt in the flow-level error surface
+      ([Constraints & Edge Cases](#constraints--edge-cases)), which is a dead
+      end for the person signing in.
       Reachable in 851 once a second schema enables the same connection through
       the Sign-in methods journey's schema picker (area 4,
       [Post-Claim Re-entry](4-cli-provider-setup.md#post-claim-re-entry)).
