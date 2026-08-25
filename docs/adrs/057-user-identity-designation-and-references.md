@@ -10,7 +10,9 @@
 > (hard-coded user attributes on UI and API); reframes
 > [#869](https://github.com/zitadel/nextgen/issues/869) (session list identity).
 >
-> **Amends** [ADR 052](052-user-envelope-and-attributes.md) — the user
+> **Amends** [ADR 052](052-user-envelope-and-attributes.md) and extends
+> [ADR 008](008-users-eav-store.md) — uniqueness gains normalized value
+> comparison (§4a); the user
 > envelope gains derived, read-only identity fields (`identifier`,
 > `identifier_property`, `display`, §3a). Builds on
 > [ADR 048](048-wide-events-internal-audit-primitive.md) (audit events).
@@ -156,6 +158,36 @@ A single resolution port hydrates refs: `(project_id, user_ids) → refs`, one
 batched attribute query per page. List endpoints must not resolve per row.
 Missing users are simply absent from the result — their refs degrade to
 `user_id`, and the rest of the page is unaffected.
+
+### 4a. Uniqueness compares normalized values
+
+`x-unique` comparison is **normalized by default**: string values are
+Unicode case-folded before hashing, so `Alice@example.com` and
+`alice@example.com` are one unique value, register once, and resolve to the
+same user regardless of typed casing. Non-string values are unaffected. A
+property whose values are case-sensitive by nature (external IDs, codes)
+opts out per property: `x-unique` widens from a scope string to also accept
+an object form — `"x-unique": {"scope": "project", "compare": "exact"}` —
+with the string shorthand meaning normalized comparison.
+Trimming is not normalization — schemas reject
+padded input through validation (`pattern`/`format`) instead of silently
+mutating it.
+
+This is a single comparison function shared by the uniqueness constraint,
+the unique-attributes registry hash, and every identifier resolution
+lookup. It cannot be split: normalizing only lookups lets two casings of
+one address register as distinct "unique" values and then makes every
+lookup ambiguous; normalizing only writes leaves sign-ins failing on
+casing. The stored attribute keeps its original casing for display.
+
+Today the hash is computed over the raw JSON encoding, making uniqueness
+case-sensitive — a duplicate-account generator for emails (the industry
+lesson: AWS Cognito shipped case-sensitive usernames, then had to bolt on a
+setting and flip the default). Nothing is stored in production yet, so the
+comparison function is a code change now and a backfill-with-latent-
+collisions later. Extends [ADR 008](008-users-eav-store.md)'s uniqueness
+enforcement; oxidel's ADR-016 normalizes all unique values the same way
+(lowercase), without the per-property opt-out.
 
 ### 5. Identifier resolution in auth attempts
 
