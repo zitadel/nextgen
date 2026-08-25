@@ -134,11 +134,18 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.spanner-auth.outcome != 'success' }}
         run: moon run server:test-spanner
 
+      # Scoped to the one package the benchmark needs: attempt 9 showed each
+      # package burns its whole 10m go-test budget inside spanner/migration
+      # (goose WithIsolateDDL = one UpdateDatabaseDdl LRO per statement on real
+      # Spanner; instant on the emulator). One package = one migration pass,
+      # and the victim test plus the row-creating tests around it all live in
+      # integration_test. Direct go invocation so the timeout can be raised
+      # without touching the shared moon task.
       - name: Run Go integration tests (spanner test instance)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.spanner-auth.outcome == 'success' }}
         env:
           ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
-        run: moon run server:test-spanner
+        run: go test -v -count=1 -tags spanner_integration -timeout 45m ./internal/api/integration_test/
 
       - name: Run Go integration tests (sqlite)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
