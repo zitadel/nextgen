@@ -26,6 +26,14 @@ const (
 	//
 	// The uniqueness of (project_id, object_type, created_at) makes created_at a
 	// total order within an object_type, so no tiebreak belongs in here.
+	//
+	// The sub-query deliberately carries no authz predicate, so "newest" is the
+	// newest revision that exists rather than the newest the caller may read: a
+	// caller granted only a superseded revision sees it under revisions=all and
+	// sees nothing for that object type under revisions=latest. Which revision
+	// is current is a property of the object type, not of the reader, and
+	// returning a replaced revision as the current one would have callers write
+	// against a schema their peers have already moved off.
 	latestRevisionPerObjectType = `NOT EXISTS (SELECT 1 FROM json_schemas AS newer` +
 		` WHERE newer.project_id = json_schemas.project_id` +
 		` AND newer.object_type = json_schemas.object_type` +
