@@ -215,26 +215,27 @@ func (a *FlowAuthAttemptAdapter) IssuePasskeyRegistrationChallenge(ctx context.C
 }
 
 // SubmitPasskeyRegistration verifies the attestation against the challenge
-// identified by ChallengeID. The create-user action rides along; the attempt
-// service applies it inside the verify transaction only when the persisted
-// challenge is provisional.
+// identified by ChallengeID. The create-user factory rides along; the attempt
+// service invokes it with the persisted challenge's authoritative user handle,
+// and only when that challenge is provisional.
 func (a *FlowAuthAttemptAdapter) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
-	createUser := NewCreateUserAction(
-		CreateUserInput{
-			ProjectID:  in.ProjectID,
-			SchemaURL:  in.UserSchemaURL,
-			Attributes: in.UserAttributes,
-			ID:         in.UserID,
-		},
-		a.schemaStore,
-	)
 	_, err := a.attempts.VerifyProof(ctx, VerifyProofInput{
 		ProjectID:   in.ProjectID,
 		AttemptID:   in.AttemptID,
 		ChallengeID: in.ChallengeID,
 		Proof: PasskeyRegistrationProof{
 			AttestationResponse: in.Attestation,
-			CreateUser:          []UserAction{createUser},
+			CreateUser: func(userID string) []UserAction {
+				return []UserAction{NewCreateUserAction(
+					CreateUserInput{
+						ProjectID:  in.ProjectID,
+						SchemaURL:  in.UserSchemaURL,
+						Attributes: in.UserAttributes,
+						ID:         userID,
+					},
+					a.schemaStore,
+				)}
+			},
 		},
 	})
 	return err

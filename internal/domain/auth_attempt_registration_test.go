@@ -150,6 +150,84 @@ func TestAuthAttempt_PreparePasskeyRegistrationVerification(t *testing.T) {
 		_, err := attempt.PreparePasskeyRegistrationVerification("ch-pw-1")
 		assert.ErrorIs(t, err, domain.ErrAuthAttemptInvalidRequest())
 	})
+
+	t.Run("provisional ceremony is superseded by a later authentication", func(t *testing.T) {
+		// Issue provisional, then authenticate user A on the same attempt:
+		// completing the ceremony would create a second user and overwrite
+		// A's user check while A's other factors survive.
+		challenge := domain.SetAuthChallengePasskeyRegistration("ch-reg-1", time.Now(), time.Time{}, 0)
+		challenge.UserID = "user_prov01"
+		challenge.Provisional = true
+		attempt := &domain.AuthAttempt{
+			ProjectID: "proj", ID: "att-1",
+			Checks: []domain.AuthCheck{
+				challenge,
+				&domain.AuthFactorUser{UserID: "user-a"},
+				&domain.AuthFactorPassword{},
+			},
+		}
+
+		_, err := attempt.PreparePasskeyRegistrationVerification("ch-reg-1")
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptStaleChallenge())
+	})
+
+	t.Run("pinned user changing after issue supersedes the ceremony", func(t *testing.T) {
+		challenge := domain.SetAuthChallengePasskeyRegistration("ch-reg-1", time.Now(), time.Time{}, 0)
+		challenge.UserID = "user-a"
+		challenge.Provisional = false
+		attempt := &domain.AuthAttempt{
+			ProjectID: "proj", ID: "att-1",
+			Checks: []domain.AuthCheck{
+				challenge,
+				&domain.AuthFactorUser{UserID: "user-b"},
+			},
+		}
+
+		_, err := attempt.PreparePasskeyRegistrationVerification("ch-reg-1")
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptStaleChallenge())
+	})
+
+	t.Run("matching pinned user stays valid", func(t *testing.T) {
+		challenge := domain.SetAuthChallengePasskeyRegistration("ch-reg-1", time.Now(), time.Time{}, 0)
+		challenge.UserID = "user-a"
+		challenge.Provisional = false
+		attempt := &domain.AuthAttempt{
+			ProjectID: "proj", ID: "att-1",
+			Checks: []domain.AuthCheck{
+				challenge,
+				&domain.AuthFactorUser{UserID: "user-a"},
+			},
+		}
+
+		got, err := attempt.PreparePasskeyRegistrationVerification("ch-reg-1")
+		require.NoError(t, err)
+		assert.Same(t, challenge, got)
+	})
+}
+
+func TestAuthCheckType_Class(t *testing.T) {
+	assert.Equal(t, domain.AuthCheckTypePasskey, domain.AuthCheckTypePasskeyRegistration.Class())
+	assert.Equal(t, domain.AuthCheckTypePasskey, domain.AuthCheckTypePasskey.Class())
+	assert.Equal(t, domain.AuthCheckTypeUser, domain.AuthCheckTypeUser.Class())
+	assert.Equal(t, domain.AuthCheckTypePassword, domain.AuthCheckTypePassword.Class())
+}
+
+func TestAuthAttempt_IsCompleted_EnrollmentSatisfiesPasskeyClass(t *testing.T) {
+	attempt := &domain.AuthAttempt{
+		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePasskey},
+		Checks: []domain.AuthCheck{
+			&domain.AuthFactorUser{UserID: "user-1"},
+			&domain.AuthFactorPasskeyRegistration{UserID: "user-1", CredentialID: "cred-1"},
+		},
+	}
+	assert.True(t, attempt.IsCompleted(),
+		"a completed enrollment must satisfy a required passkey check")
+
+	incomplete := &domain.AuthAttempt{
+		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePasskey},
+		Checks:         []domain.AuthCheck{&domain.AuthFactorPassword{}},
+	}
+	assert.False(t, incomplete.IsCompleted())
 }
 
 func TestAuthAttempt_SetPasskeyRegistrationFactor(t *testing.T) {
