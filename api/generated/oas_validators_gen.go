@@ -5821,6 +5821,8 @@ func (s SessionFilterField) Validate() error {
 		return nil
 	case "state":
 		return nil
+	case "team_id":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

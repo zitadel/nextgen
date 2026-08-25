@@ -422,3 +422,91 @@ func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
 		assert.ElementsMatch(t, []string{activeID}, ids(userBound), "live and user_id IS NOT NULL")
 	})
 }
+
+// TestSessionStatements_List_TeamFilter exercises the team filter, which is
+// not a column: a session joins a team through its bound user's roster
+// membership (ADR 056). One session matches every team its user is on, a
+// session with no user matches none, and a removed membership stops matching.
+func TestSessionStatements_List_TeamFilter(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		newTeam := func(label string) string {
+			teamID := "team-" + label + "-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+			return teamID
+		}
+		newUser := func(label string) string {
+			userID := "usr-" + label + "-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateUser(t.Context(),
+				newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Team Filter "+label)))
+			t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
+			return userID
+		}
+		join := func(teamID, userID string, status domain.MembershipStatus) {
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID, TeamID: teamID, UserID: userID, Status: status,
+			}))
+		}
+
+		teamA, teamB, teamC := newTeam("a"), newTeam("b"), newTeam("c")
+
+		// One user on two teams, to prove a single project-scoped session
+		// surfaces under every team its user belongs to.
+		multiUser := newUser("multi")
+		join(teamA, multiUser, domain.MembershipStatusActive)
+		join(teamB, multiUser, domain.MembershipStatusPending)
+		multiSessionID := createTwoCheckSession(t, d.stmts, projectID, multiUser).ID
+
+		soloUser := newUser("solo")
+		join(teamC, soloUser, domain.MembershipStatusActive)
+		soloSessionID := createTwoCheckSession(t, d.stmts, projectID, soloUser).ID
+
+		// An anonymous session has no user, so it can reach no membership row.
+		anonymous, err := domain.NewSession(projectID, nil)
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.CreateSession(t.Context(), anonymous))
+		t.Cleanup(func() { _ = d.stmts.DeleteSessionByID(context.Background(), projectID, anonymous.ID) })
+
+		ctx := t.Context()
+		listTeam := func(t *testing.T, teamID string) []string {
+			t.Helper()
+			result, err := d.stmts.ListSessions(ctx, &database.ListOptions[domain.SessionField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
+					database.CorrelatedEqual(database.Col(domain.SessionFieldTeamID), teamID),
+				),
+				Pagination: database.Page[domain.SessionField]{
+					OrderBy: database.OrderBy[domain.SessionField]{
+						Columns: []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)},
+					},
+				},
+			})
+			require.NoError(t, err)
+			out := make([]string, 0, len(result.Items))
+			for _, session := range result.Items {
+				out = append(out, session.ID)
+			}
+			return out
+		}
+
+		assert.Equal(t, []string{multiSessionID}, listTeam(t, teamA), "active membership matches")
+		assert.Equal(t, []string{multiSessionID}, listTeam(t, teamB), "the same session also surfaces under the user's other team, on a pending membership")
+		assert.Equal(t, []string{soloSessionID}, listTeam(t, teamC), "a team only sees its own members' sessions")
+		assert.Empty(t, listTeam(t, "team-does-not-exist"), "an unknown team matches nothing")
+
+		for _, teamID := range []string{teamA, teamB, teamC} {
+			assert.NotContains(t, listTeam(t, teamID), anonymous.ID, "a session with no user belongs to no team")
+		}
+
+		// inactive stays on the roster: a suspended member's live session must
+		// remain visible to the team.
+		require.NoError(t, d.stmts.UpdateTeamMembershipStatus(ctx, projectID, teamA, multiUser, domain.MembershipStatusInactive))
+		assert.Equal(t, []string{multiSessionID}, listTeam(t, teamA), "inactive membership still matches")
+
+		// removed is history, not roster.
+		require.NoError(t, d.stmts.UpdateTeamMembershipStatus(ctx, projectID, teamA, multiUser, domain.MembershipStatusRemoved))
+		assert.Empty(t, listTeam(t, teamA), "a removed membership stops matching")
+		assert.Equal(t, []string{multiSessionID}, listTeam(t, teamB), "removal from one team leaves the others untouched")
+	})
+}

@@ -34794,6 +34794,10 @@ func (s *SessionEstablishedPayload) SetUserID(val OptString) {
 // - `user_id`: user id
 // - `state`: one of `building`, `active`, `expired`. State is computed at read
 // time, so a session expiring mid-request can match `active` but return `expired`.
+// - `team_id`: team id. Matches the sessions of the users on that team's roster.
+// A session is project-scoped and is not bound to a team, so one session
+// matches every team its user belongs to, and a session with no user matches
+// no team. Only `equals` is supported.
 // Ref: #
 type SessionFilterField string
 
@@ -34801,6 +34805,7 @@ const (
 	SessionFilterFieldCreatedAt SessionFilterField = "created_at"
 	SessionFilterFieldUserID    SessionFilterField = "user_id"
 	SessionFilterFieldState     SessionFilterField = "state"
+	SessionFilterFieldTeamID    SessionFilterField = "team_id"
 )
 
 // AllValues returns all SessionFilterField values.
@@ -34809,6 +34814,7 @@ func (SessionFilterField) AllValues() []SessionFilterField {
 		SessionFilterFieldCreatedAt,
 		SessionFilterFieldUserID,
 		SessionFilterFieldState,
+		SessionFilterFieldTeamID,
 	}
 }
 
@@ -34820,6 +34826,8 @@ func (s SessionFilterField) MarshalText() ([]byte, error) {
 	case SessionFilterFieldUserID:
 		return []byte(s), nil
 	case SessionFilterFieldState:
+		return []byte(s), nil
+	case SessionFilterFieldTeamID:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -34837,6 +34845,9 @@ func (s *SessionFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case SessionFilterFieldState:
 		*s = SessionFilterFieldState
+		return nil
+	case SessionFilterFieldTeamID:
+		*s = SessionFilterFieldTeamID
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

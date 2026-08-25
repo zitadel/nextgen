@@ -5,7 +5,12 @@ description: |
   - `user_id`: user id
   - `state`: one of `building`, `active`, `expired`. State is computed at read
     time, so a session expiring mid-request can match `active` but return `expired`.
+  - `team_id`: team id. Matches the sessions of the users on that team's roster.
+    A session is project-scoped and is not bound to a team, so one session
+    matches every team its user belongs to, and a session with no user matches
+    no team. Only `equals` is supported.
 enum:
   - created_at
   - user_id
   - state
+  - team_id

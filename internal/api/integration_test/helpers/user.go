@@ -33,13 +33,22 @@ func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
 func (h *Harness) CreateUserWithTeam(t *testing.T, projectID string) string {
 	t.Helper()
 
+	userID, _ := h.CreateUserWithTeamID(t, projectID)
+	return userID
+}
+
+// CreateUserWithTeamID is [Harness.CreateUserWithTeam] for callers that also
+// need the team the user was seeded into.
+func (h *Harness) CreateUserWithTeamID(t *testing.T, projectID string) (userID, teamID string) {
+	t.Helper()
+
 	team, err := h.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: projectID,
 		Name:      TeamName(),
 	})
 	require.NoError(t, err)
 
-	userID := "user_" + RandString(8)
+	userID = "user_" + RandString(8)
 	emailAttr, err := domain.NewCreateAttribute("email", RandString(8)+"@example.com", domain.AttributeUniquenessProject)
 	require.NoError(t, err)
 	require.NoError(t, h.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
@@ -49,7 +58,7 @@ func (h *Harness) CreateUserWithTeam(t *testing.T, projectID string) string {
 		InitialMembershipTeamID: &team.ID,
 		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
-	return userID
+	return userID, team.ID
 }
 
 // UserFixture exposes UserStatements helpers for integration tests.

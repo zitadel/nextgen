@@ -26,7 +26,7 @@ func TestQuerySessions(t *testing.T) {
 
 	building := harness.CreateSession(t, project.ID, time.Hour)
 	expired := harness.CreateSession(t, project.ID, time.Nanosecond)
-	userID := harness.CreateUserWithTeam(t, project.ID)
+	userID, teamID := harness.CreateUserWithTeamID(t, project.ID)
 	active := harness.CreateActiveSession(t, project.ID, userID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -119,6 +119,28 @@ func TestQuerySessions(t *testing.T) {
 		}).Sessions
 		require.Len(t, sessions, 1, helpers.MustMarshal(t, sessions))
 		assert.Equal(t, active.ID, string(sessions[0].SessionID))
+	})
+
+	// A session is project-scoped and carries no team; it joins one through its
+	// user's roster membership (ADR 056). The two anonymous sessions have no
+	// user, so they belong to no team.
+	t.Run("filter by team_id", func(t *testing.T) {
+		teamFilter := func(id string) *api.QuerySessionsRequest {
+			return &api.QuerySessionsRequest{
+				Filter: []api.QuerySessionsRequestFilterItem{{
+					Field:     api.SessionFilterFieldTeamID,
+					Operation: api.FilterOperationEquals,
+					Value:     api.NewOptFilterValue(api.NewStringFilterValue(id)),
+				}},
+			}
+		}
+
+		sessions := querySessions(t, teamFilter(teamID)).Sessions
+		require.Len(t, sessions, 1, helpers.MustMarshal(t, sessions))
+		assert.Equal(t, active.ID, string(sessions[0].SessionID))
+
+		other := querySessions(t, teamFilter("team_does_not_exist")).Sessions
+		assert.Empty(t, other, helpers.MustMarshal(t, other))
 	})
 
 	t.Run("filter by created_at", func(t *testing.T) {

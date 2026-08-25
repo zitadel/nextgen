@@ -55349,6 +55349,8 @@ func (s *SessionFilterField) Decode(d *jx.Decoder) error {
 		*s = SessionFilterFieldUserID
 	case SessionFilterFieldState:
 		*s = SessionFilterFieldState
+	case SessionFilterFieldTeamID:
+		*s = SessionFilterFieldTeamID
 	default:
 		*s = SessionFilterField(v)
 	}

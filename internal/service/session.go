@@ -15,6 +15,7 @@ const (
 	sessionFieldCreatedAt = "created_at"
 	sessionFieldUserID    = "user_id"
 	sessionFieldState     = "state"
+	sessionFieldTeamID    = "team_id"
 
 	sessionStateBuilding = "building"
 	sessionStateActive   = "active"
@@ -250,8 +251,36 @@ func sessionFilter(f Filter, now time.Time) (database.Filter[domain.SessionField
 			return nil, err
 		}
 		return sessionStateFilter(f.Operation, value, now)
+	case sessionFieldTeamID:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return sessionTeamFilter(f.Operation, value)
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
+	}
+}
+
+// sessionTeamFilter expresses team membership, which is not stored on the
+// session: a session belongs to a team through its bound user's roster
+// membership (ADR 056). A session with no user belongs to no team, and one
+// session matches every team its user is on.
+//
+// It does not reuse [stringFilter]: the storage binding is a correlated
+// sub-query taking exactly one team id, so the substring operations that
+// helper maps onto LIKE have nothing to match against.
+func sessionTeamFilter(op, teamID string) (database.Filter[domain.SessionField], error) {
+	switch op {
+	case filterOpEquals:
+		return database.CorrelatedEqual(database.Col(domain.SessionFieldTeamID), teamID), nil
+	case filterOpNotEquals:
+		// todo (muhlemmer): update when the operation is supported
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains, filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
 	}
 }
 

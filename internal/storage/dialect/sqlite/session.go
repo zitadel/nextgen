@@ -499,4 +499,17 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 		SQLName:  "EXISTS (SELECT 1 FROM checks vc WHERE vc.project_id = s.project_id AND vc.session_id = s.id AND vc.last_verified_at IS NOT NULL)",
 		Computed: true,
 	},
+	// Not a column: a correlated EXISTS over the session user's roster
+	// memberships (ADR 056), split so the filter binds the team id inline.
+	// All three key columns are equality-bound, so this is a point lookup on
+	// team_memberships' primary key. A session with user_id NULL never
+	// matches: the correlation compares to NULL and EXISTS is false.
+	domain.SessionFieldTeamID: {
+		SQLName: `EXISTS (SELECT 1 FROM team_memberships tm
+	WHERE tm.project_id = s.project_id AND tm.user_id = s.user_id
+	  AND tm.status IN ('pending', 'active', 'inactive')
+	  AND tm.team_id = `,
+		SQLSuffix: ")",
+		Computed:  true,
+	},
 })

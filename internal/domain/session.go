@@ -196,4 +196,9 @@ const (
 	// whether the session has verified factors, the test State() uses to
 	// separate building from active. Filter only; not sortable.
 	SessionFieldHasVerifiedFactors
+	// SessionFieldTeamID is computed, not stored: a session belongs to a team
+	// through its bound user's roster membership (ADR 056). A session with no
+	// user belongs to no team. One session matches every team its user is on,
+	// so it is filter only; not sortable.
+	SessionFieldTeamID
 )

@@ -348,6 +348,34 @@ func TestCompileCompareFilterBoolEqual(t *testing.T) {
 	assert.Empty(t, args)
 }
 
+func TestCompileCorrelatedFilterBindsValueInline(t *testing.T) {
+	t.Parallel()
+
+	teamID := database.Col(domain.SessionFieldTeamID)
+
+	sql, args := compileFilterOnly(t, database.CorrelatedEqual(teamID, "team_01H"), sessionSchema)
+	assert.Equal(t,
+		sessionSchema.SQLName(teamID)+"$1"+sessionSchema.SQLSuffix(teamID),
+		sql,
+		"the bound value must land between SQLName and SQLSuffix",
+	)
+	require.Len(t, args, 1)
+	assert.Equal(t, "team_01H", args[0])
+
+	// Placeholder numbering must keep counting across the surrounding filters,
+	// so the correlated predicate composes like any other.
+	sql, args = compileFilterOnly(t, database.And(
+		database.Equal(database.Col(domain.SessionFieldProjectID), "proj_01H"),
+		database.CorrelatedEqual(teamID, "team_01H"),
+	), sessionSchema)
+	assert.Equal(t,
+		"(s.project_id = $1 AND "+sessionSchema.SQLName(teamID)+"$2"+sessionSchema.SQLSuffix(teamID)+")",
+		sql,
+	)
+	require.Len(t, args, 2)
+	assert.Equal(t, []any{"proj_01H", "team_01H"}, args)
+}
+
 func TestCompileCompareFilterTuple(t *testing.T) {
 	t.Parallel()
 
