@@ -23012,6 +23012,22 @@ func (s FinishUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) 
 				}
 			}
 		}
+	case UserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.already_exists")
+		{
+			s := s.UserAlreadyExists
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserInvalidFinishUserPasskeyRegistrationErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
@@ -23119,6 +23135,9 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 				case "req.invalid":
 					s.Type = ReqInvalidFinishUserPasskeyRegistrationErrorResponse
 					found = true
+				case "user.already_exists":
+					s.Type = UserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse
+					found = true
 				case "user.invalid":
 					s.Type = UserInvalidFinishUserPasskeyRegistrationErrorResponse
 					found = true
@@ -23184,6 +23203,10 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 		}
 	case ReqInvalidFinishUserPasskeyRegistrationErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.UserAlreadyExists.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidFinishUserPasskeyRegistrationErrorResponse:
