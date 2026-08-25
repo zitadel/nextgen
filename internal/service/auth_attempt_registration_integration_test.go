@@ -187,7 +187,9 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			ChallengeID: registration.GetID(),
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          []service.UserAction{newRegistrationCreateUserAction(t, projectID, registration.UserID, "signup@example.com")},
+				CreateUser: func(userID string) []service.UserAction {
+					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "signup@example.com")}
+				},
 			},
 		})
 		require.NoError(t, err)
