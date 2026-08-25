@@ -80,17 +80,15 @@ func requiredFactorsToAPI(checks []domain.AuthCheckType) []api.FactorMethod {
 	return factors
 }
 
+// checkTypeToAPI maps a check type's class to its wire method: enrollment is
+// passkey-class on the wire, the distinct check type is internal bookkeeping.
 func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
-	switch check {
+	switch check.Class() {
 	case domain.AuthCheckTypeUser:
 		return api.FactorMethodIdentifier
 	case domain.AuthCheckTypePassword:
 		return api.FactorMethodPassword
 	case domain.AuthCheckTypePasskey:
-		return api.FactorMethodPasskey
-	case domain.AuthCheckTypePasskeyRegistration:
-		// Enrollment is passkey-class on the wire; the distinct check type is
-		// internal bookkeeping.
 		return api.FactorMethodPasskey
 	default:
 		return ""

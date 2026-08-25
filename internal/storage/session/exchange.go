@@ -50,24 +50,16 @@ func ValidateHandoffAttempt(attempt *domain.AuthAttempt) error {
 	return nil
 }
 
-// FactorClass maps a check type to the class it competes in on a session.
-// Passkey enrollment proves the same thing an assertion does for that
-// credential, so registration and login share the passkey class; every other
-// type is its own class.
-func FactorClass(t domain.AuthCheckType) domain.AuthCheckType {
-	if t == domain.AuthCheckTypePasskeyRegistration {
-		return domain.AuthCheckTypePasskey
-	}
-	return t
-}
-
-// ClassMembers lists the check types competing in t's class, for loser cleanup
-// after a promotion.
+// ClassMembers lists the check types competing in t's class (see
+// [domain.AuthCheckType.Class]), for loser cleanup after a promotion.
 func ClassMembers(t domain.AuthCheckType) []domain.AuthCheckType {
-	if FactorClass(t) == domain.AuthCheckTypePasskey {
-		return []domain.AuthCheckType{domain.AuthCheckTypePasskey, domain.AuthCheckTypePasskeyRegistration}
+	members := make([]domain.AuthCheckType, 0, 2)
+	for _, v := range domain.AuthCheckTypeValues() {
+		if v.Class() == t.Class() {
+			members = append(members, v)
+		}
 	}
-	return []domain.AuthCheckType{t}
+	return members
 }
 
 // PickLastVerifiedByType merges attempt and session verified checks, keeping the
@@ -75,12 +67,12 @@ func ClassMembers(t domain.AuthCheckType) []domain.AuthCheckType {
 func PickLastVerifiedByType(attemptChecks, sessionChecks []StoredCheck) map[domain.AuthCheckType]StoredCheck {
 	out := map[domain.AuthCheckType]StoredCheck{}
 	for _, c := range sessionChecks {
-		out[FactorClass(c.Type)] = c
+		out[c.Type.Class()] = c
 	}
 	for _, c := range attemptChecks {
-		existing, ok := out[FactorClass(c.Type)]
+		existing, ok := out[c.Type.Class()]
 		if !ok || c.LastVerifiedAt.After(existing.LastVerifiedAt) {
-			out[FactorClass(c.Type)] = c
+			out[c.Type.Class()] = c
 		}
 	}
 	return out
@@ -128,7 +120,7 @@ func AppendFactor(sess *domain.Session, factor domain.AuthFactor) {
 		return
 	}
 	for i, f := range sess.Factors {
-		if FactorClass(f.Type()) == FactorClass(normalized.Type()) {
+		if f.Type().Class() == normalized.Type().Class() {
 			sess.Factors[i] = normalized
 			return
 		}

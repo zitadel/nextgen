@@ -111,7 +111,7 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
 				Name:                "Work laptop",
-				CreateUser:          []service.UserAction{newRegistrationCreateUserAction(t, projectID, registration.UserID, "alice@example.com")},
+				CreateUser: func(userID string) []service.UserAction { return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "alice@example.com")} },
 			},
 		})
 		require.NoError(t, err)
@@ -155,7 +155,7 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			ChallengeID: registration.GetID(),
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          []service.UserAction{newRegistrationCreateUserAction(t, projectID, registration.UserID, "taken@example.com")},
+				CreateUser: func(userID string) []service.UserAction { return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "taken@example.com")} },
 			},
 		})
 		require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
@@ -302,7 +302,7 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			ChallengeID: registration.GetID(),
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          []service.UserAction{newRegistrationCreateUserAction(t, projectID, registration.UserID, "retry@example.com")},
+				CreateUser: func(userID string) []service.UserAction { return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "retry@example.com")} },
 			},
 		})
 		require.NoError(t, err)
