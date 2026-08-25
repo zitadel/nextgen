@@ -401,3 +401,29 @@ func TestUserStatements_GetUser_UniqueAttributesOnly(t *testing.T) {
 		assert.Equal(t, owner.ID, got.ID)
 	})
 }
+
+func TestUserStatements_UniqueAttributes_CaseInsensitive(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		owner := newTestUser(t, projectID, schemaURL, "user_case_owner", "Alice@Example.com", "Alice")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), owner))
+
+		// The same address in a different casing is the same unique value.
+		dup := newTestUser(t, projectID, schemaURL, "user_case_dup", "alice@example.com", "Impostor")
+		err := d.stmts.CreateUser(t.Context(), dup)
+		var uniqueErr *database.UniqueError
+		require.ErrorAs(t, err, &uniqueErr)
+
+		// Resolution matches regardless of the typed casing.
+		got, err := d.stmts.GetUser(t.Context(),
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			service.UserQueryOptions{
+				Attributes:           []domain.Attribute{{Key: "email", Value: "ALICE@EXAMPLE.COM"}},
+				UniqueAttributesOnly: true,
+			},
+		)
+		require.NoError(t, err)
+		assert.Equal(t, owner.ID, got.ID)
+	})
+}

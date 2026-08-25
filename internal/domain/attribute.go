@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/text/cases"
+
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
@@ -105,8 +107,7 @@ type CreateAttribute struct {
 }
 
 func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness) (*CreateAttribute, error) {
-	raw, err := json.Marshal(value)
-	if err != nil {
+	if _, err := json.Marshal(value); err != nil {
 		return nil, fmt.Errorf("failed to marshal attribute value: %w", err)
 	}
 	attr := &CreateAttribute{
@@ -115,9 +116,30 @@ func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness)
 		UniqueScope: unique,
 	}
 	if unique != AttributeUniquenessUnspecified {
-		attr.ValueHash = sha256.Sum256(raw)
+		hash, err := UniqueValueHash(value)
+		if err != nil {
+			return nil, err
+		}
+		attr.ValueHash = hash
 	}
 	return attr, nil
+}
+
+// UniqueValueHash is the one comparison function behind attribute uniqueness:
+// the unique-attributes registry stores it and identifier resolution looks it
+// up, so both always agree on what counts as the same value (ADR 057 §4a).
+// String values are Unicode case-folded before hashing — Alice@Example.com
+// and alice@example.com are one unique value — while the attribute itself
+// keeps its original casing. Non-string values hash as encoded.
+func UniqueValueHash(value any) ([sha256.Size]byte, error) {
+	if s, ok := value.(string); ok {
+		value = cases.Fold().String(s)
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return [sha256.Size]byte{}, fmt.Errorf("failed to marshal attribute value: %w", err)
+	}
+	return sha256.Sum256(raw), nil
 }
 
 type CreateAttributes []CreateAttribute

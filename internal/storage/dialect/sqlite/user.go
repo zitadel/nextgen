@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -162,7 +161,10 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		}
 		writeConjunct(&compiler, &hasWhere)
 		if opts.UniqueAttributesOnly {
-			hash := sha256.Sum256(raw)
+			hash, err := domain.UniqueValueHash(a.Value)
+			if err != nil {
+				return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+			}
 			compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
 			compiler.WriteArg(string(a.Key))
 			compiler.WriteString(" AND ua.value_hash = ")
