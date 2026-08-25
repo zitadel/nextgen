@@ -45,8 +45,8 @@ func HardDeleteTeam(ctx context.Context, pool database.Pool, projectID, teamID s
 }
 
 // InsertJSONSchemaAt inserts a json_schemas row at an exact created_at.
-// CreateJSONSchema takes the timestamp from the database, so a test that needs
-// two revisions to collide has to write the row itself.
+// CreateJSONSchema never accepts a caller-supplied created_at, so a test that
+// needs two revisions to collide has to write the row itself.
 func InsertJSONSchemaAt(ctx context.Context, pool database.Pool, projectID, url string, objectType *string, createdAt time.Time) error {
 	p, ok := pool.(*Pool)
 	if !ok {

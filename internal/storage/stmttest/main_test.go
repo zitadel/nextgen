@@ -51,8 +51,8 @@ type dialect struct {
 	seedTiedProjects func(ctx context.Context, ids []string, createdAt time.Time) error
 	hardDeleteTeam   func(ctx context.Context, projectID, teamID string) error
 	// insertJSONSchemaAt writes a json_schemas row at an exact created_at, which
-	// CreateJSONSchema cannot: every dialect takes that timestamp from the
-	// database.
+	// CreateJSONSchema never accepts from a caller: Postgres and Spanner default
+	// the column in the database, SQLite stamps it in Go.
 	insertJSONSchemaAt func(ctx context.Context, projectID, url string, objectType *string, createdAt time.Time) error
 	schemaNullability  []schematest.ColumnNullability
 	liveNullability    func(ctx context.Context) (map[string]map[string]bool, error)
