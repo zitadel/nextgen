@@ -15,6 +15,7 @@ content:
         - $ref: '../../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../../../components/schemas/errors/user-already_exists.yaml'
         - $ref: '../../../../../components/schemas/errors/user-invalid.yaml'
       discriminator:
         propertyName: code
@@ -30,6 +31,7 @@ content:
           evt.invalid: '../../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../../../components/schemas/errors/req-invalid.yaml'
+          user.already_exists: '../../../../../components/schemas/errors/user-already_exists.yaml'
           user.invalid: '../../../../../components/schemas/errors/user-invalid.yaml'
     examples:
       att.already_handed_off:
@@ -87,6 +89,11 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      user.already_exists:
+        summary: user.already_exists
+        value:
+          code: user.already_exists
+          message: 'a user already exists with the given unique attributes'
       user.invalid:
         summary: user.invalid
         value:

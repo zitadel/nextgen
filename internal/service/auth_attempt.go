@@ -188,10 +188,13 @@ type PasskeyRegistrationProof struct {
 	// when empty, a name is derived from the credential itself
 	// ([domain.GeneratePasskeyCredentialName]).
 	Name string
-	// CreateUser actions are applied inside the success transaction when the
-	// challenge is provisional (the user row does not exist yet), so user
-	// creation, credential persistence, and check success land atomically.
-	CreateUser []UserAction
+	// CreateUser, when set, builds the actions that create the ceremony's
+	// user inside the success transaction, so user creation, credential
+	// persistence, and check success land atomically. The service invokes it
+	// with the stored challenge's authoritative user handle — a caller cannot
+	// create a row under a different id than the credential binds to. Only
+	// consulted for provisional ceremonies.
+	CreateUser func(userID string) []UserAction
 }
 
 func (PasskeyRegistrationProof) proofCheckType() domain.AuthCheckType {
@@ -351,6 +354,13 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
 	})
 	if err != nil {
+		// A provisional registration's create-user action can lose the
+		// uniqueness race inside the transaction. Surfacing the stable code
+		// explicitly also puts user.already_exists into the generated error
+		// unions: erroranalysis cannot look into the txExtra closure.
+		if errors.Is(err, domain.ErrUserAlreadyExists()) {
+			return nil, domain.ErrUserAlreadyExists().WithParent(err)
+		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
@@ -599,21 +609,29 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		// The stored challenge is authoritative for the credential's owner.
 		newPasskey.ProjectID = attempt.ProjectID
 		newPasskey.UserID = registrationChallenge.UserID
-		if registrationChallenge.Provisional {
-			for _, action := range p.CreateUser {
+		var createActions []UserAction
+		if registrationChallenge.Provisional && p.CreateUser != nil {
+			// The factory receives the challenge's handle, so the created row
+			// cannot diverge from the user the credential binds to.
+			createActions = p.CreateUser(registrationChallenge.UserID)
+			for _, action := range createActions {
 				if err := action.Prepare(ctx); err != nil {
 					return nil, nil, nil, err
 				}
 			}
 		}
+		// Captured before the in-memory pin below: writing the user check
+		// without a proof is only legitimate when no user factor exists yet
+		// (provisional sign-up, or enrollment for a user pinned in flow state
+		// only). Re-enrolling on an authenticated attempt must not rewrite
+		// the proof-backed user check or emit a synthetic check event.
+		_, hadUserFactor := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
 		factor := attempt.SetPasskeyRegistrationFactor(newPasskey)
 		userFactor := attempt.SetUserFactor(&domain.User{ID: registrationChallenge.UserID})
 		txExtra := func(ctx context.Context, stmts AllStatements) error {
-			if registrationChallenge.Provisional {
-				for _, action := range p.CreateUser {
-					if err := action.Apply(ctx, stmts); err != nil {
-						return err
-					}
+			for _, action := range createActions {
+				if err := action.Apply(ctx, stmts); err != nil {
+					return err
 				}
 			}
 			if err := stmts.CreateUserPasskey(ctx, newPasskey); err != nil {
@@ -623,24 +641,26 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			// can answer from the verify result without a read-back.
 			factor.PasskeyID = newPasskey.ID
 			factor.Name = newPasskey.Name
-			userCheckID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, userFactor)
-			if err != nil {
-				return err
-			}
-			if err := audit.Emit(ctx, stmts, audit.EmitSpec{
-				Type:       domain.EventTypeAuthCheckSucceeded,
-				Category:   domain.EventCategoryAuth,
-				ProjectID:  attempt.ProjectID,
-				EntityType: "check",
-				EntityID:   userCheckID,
-				SessionID:  attempt.SessionID,
-				Payload: domain.AuthCheckPayload{
-					CheckID:       userCheckID,
-					CheckType:     userFactor.Type().String(),
-					AuthAttemptID: attempt.ID,
-				},
-			}); err != nil {
-				return err
+			if !hadUserFactor {
+				userCheckID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, userFactor)
+				if err != nil {
+					return err
+				}
+				if err := audit.Emit(ctx, stmts, audit.EmitSpec{
+					Type:       domain.EventTypeAuthCheckSucceeded,
+					Category:   domain.EventCategoryAuth,
+					ProjectID:  attempt.ProjectID,
+					EntityType: "check",
+					EntityID:   userCheckID,
+					SessionID:  attempt.SessionID,
+					Payload: domain.AuthCheckPayload{
+						CheckID:       userCheckID,
+						CheckType:     userFactor.Type().String(),
+						AuthAttemptID: attempt.ID,
+					},
+				}); err != nil {
+					return err
+				}
 			}
 			return audit.Emit(ctx, stmts, audit.EmitSpec{
 				Type:       domain.EventTypeAuthFactorPasskeyEnrolled,

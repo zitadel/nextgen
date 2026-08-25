@@ -64869,6 +64869,22 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserAlreadyExistsVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.already_exists")
+		{
+			s := s.UserAlreadyExists
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserInvalidVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
@@ -64944,6 +64960,9 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidVerifyChallengeProofErrorResponse
 					found = true
+				case "user.already_exists":
+					s.Type = UserAlreadyExistsVerifyChallengeProofErrorResponse
+					found = true
 				case "user.invalid":
 					s.Type = UserInvalidVerifyChallengeProofErrorResponse
 					found = true
@@ -65003,6 +65022,10 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidVerifyChallengeProofErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserAlreadyExistsVerifyChallengeProofErrorResponse:
+		if err := s.UserAlreadyExists.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidVerifyChallengeProofErrorResponse:

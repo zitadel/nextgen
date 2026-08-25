@@ -270,7 +270,11 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
 				Name:                "Work laptop",
-				CreateUser:          []service.UserAction{createUser},
+				CreateUser: func(userID string) []service.UserAction {
+					assert.Equal(t, "user_minted01", userID,
+						"the factory must receive the challenge's authoritative handle")
+					return []service.UserAction{createUser}
+				},
 			},
 		})
 		require.NoError(t, err)
@@ -331,7 +335,8 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 				createdPasskey = p
 				return nil
 			})
-		stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), "proj", "att-1", gomock.Any()).Return("ch-user-1", nil)
+		// No SetAuthAttemptFactor expectation: the user factor is proof-backed
+		// and must not be rewritten (nor re-emitted) by an enrollment.
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), "proj", "att-1", gomock.Any(), "ch-reg-1").Return(nil)
 
 		// No Prepare/Apply expectations: applying it would fail the test.
@@ -344,7 +349,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          []service.UserAction{createUser},
+				CreateUser: func(string) []service.UserAction { return []service.UserAction{createUser} },
 			},
 		})
 		require.NoError(t, err)
@@ -407,7 +412,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          []service.UserAction{createUser},
+				CreateUser: func(string) []service.UserAction { return []service.UserAction{createUser} },
 			},
 		})
 		assert.ErrorIs(t, err, domain.ErrUserInvalid())
@@ -430,7 +435,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          []service.UserAction{createUser},
+				CreateUser: func(string) []service.UserAction { return []service.UserAction{createUser} },
 			},
 		})
 		assert.ErrorIs(t, err, domain.ErrUserAlreadyExists())

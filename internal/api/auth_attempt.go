@@ -178,16 +178,35 @@ func challengeToAPI(challenge domain.AuthChallenge) *api.ChallengeResponse {
 }
 
 func challengePayloadToAPI(check domain.AuthChallenge) api.OptChallengeResponsePayload {
-	if passkey, ok := check.(*domain.AuthChallengePasskey); ok {
+	switch challenge := check.(type) {
+	case *domain.AuthChallengePasskey:
 		return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
 			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
 			PasskeyChallengePayload: api.PasskeyChallengePayload{
 				PublicKey: api.PasskeyChallengePayloadPublicKey{
-					Challenge:          passkey.Challenge,
-					AllowedCredentials: allowedCredentialsToAPI(passkey.AllowedCredentialIDs),
-					UserVerification:   userVerificationToAPI(passkey.UserVerification),
+					Challenge:          challenge.Challenge,
+					AllowedCredentials: allowedCredentialsToAPI(challenge.AllowedCredentialIDs),
+					UserVerification:   userVerificationToAPI(challenge.UserVerification),
 					RpID: api.OptString{
-						Value: passkey.RPID,
+						Value: challenge.RPID,
+						Set:   true,
+					},
+				},
+			},
+		})
+	case *domain.AuthChallengePasskeyRegistration:
+		// A pending enrollment renders in the passkey payload shape with the
+		// fields both ceremonies share (challenge, rp id). The full creation
+		// options are not modeled here: the payload union discriminates by
+		// method and `passkey` is taken by the assertion shape — the flow
+		// step and the management begin endpoint carry the real options.
+		return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
+			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
+			PasskeyChallengePayload: api.PasskeyChallengePayload{
+				PublicKey: api.PasskeyChallengePayloadPublicKey{
+					Challenge: challenge.Challenge,
+					RpID: api.OptString{
+						Value: challenge.RPID,
 						Set:   true,
 					},
 				},
