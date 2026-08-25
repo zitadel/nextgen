@@ -23,7 +23,7 @@ wherever a resource links a user. No fixed property names anywhere.
 
 ### 1. `x-identifier` — the designated identifier
 
-A schema-root keyword naming one top-level property:
+A schema-root keyword naming one leaf property:
 
 ```json
 {
@@ -63,7 +63,6 @@ Validation (at schema create/update):
   discovery step, a team-scoped auth attempt), `x-unique: "team"` properties
   become admissible here; that relaxation amends this ADR without breaking
   it.
-- The property must not be `x-sensitive`.
 - **Conditional requirement:** a schema that enables an auth method needing
   identifier-first dispatch — today `x-auth-methods.password.enabled: true` —
   must designate an identifier. Password verification is unreachable without
@@ -73,15 +72,15 @@ Validation (at schema create/update):
 
 ### 2. `x-display` — the display designation
 
-A schema-root keyword: an ordered list of leaf property names (nested leaves
-addressed by their attribute path, as in §1) whose values, joined with a
-space, render the user's friendly display name.
+A schema-root keyword: an ordered list of property paths — leaf properties,
+nested ones addressed by their attribute path as in §1 — whose values,
+joined with a space, render the user's friendly display name.
 
 ```json
 { "x-display": ["givenName", "surname"] }
 ```
 
-No uniqueness requirement. `x-sensitive` properties are barred. Optional; a
+No uniqueness requirement. Optional; a
 schema without it simply has no display name and falls back to the identifier.
 This replaces the invisible convention (`name`, `givenName`/`given_name` +
 `familyName`/`family_name`) that today decides whether a UI shows a name or a
@@ -221,11 +220,20 @@ the shared notification address from ever touching resolution.
   `session.read` shows session refs, a future `grant.read` shows grant refs.
   No additional `user.read` requirement — this retires the question
   [#869](https://github.com/zitadel/nextgen/issues/869) parked, generically.
+  Designation is also the sensitivity decision: a schema author must not
+  designate a value they consider secret. (The former `x-sensitive`
+  annotation was removed as unread in
+  [#901](https://github.com/zitadel/nextgen/pull/901); if a sensitivity
+  marker returns, it must bar designation.)
 - The identifier **used at authentication** is audit data, not display data.
   It belongs in wide-event payloads at emit time
   ([ADR 048](048-wide-events-internal-audit-primitive.md)) — snapshot
   semantics in the one place snapshots are wanted. Session responses do not
-  carry it.
+  carry it. Recording the value follows the `x-audit` contract
+  ([#901](https://github.com/zitadel/nextgen/pull/901)): audit payloads are
+  deny-by-default, so the used identifier's value appears in the event only
+  when the property carries `x-audit: true` — otherwise the payload names
+  the property, not the value.
 
 ### 7. Convention retired, defaults updated
 
@@ -324,12 +332,17 @@ Harder / to do:
   `api/openapi/endpoints/schemas/`), plus validator, flow resolver
   (identifier fields restricted to designated properties), and the shipped
   defaults.
+- The designation rules exceed what the user meta JSON Schema can express —
+  cross-referencing that the named property exists, its uniqueness scope,
+  the conditional requirement, and the redesignation conflict scan — so they
+  land as Go-side schema validation, the same pattern the flow-definition
+  validator already uses.
 - `/sessions/me` is a breaking wire change for `<zitadel-session>` and the
   console shell; `@zitadel/api-mock` session fixtures must be diffed and
   updated in lockstep (its AGENTS.md parity rule).
-- Existing stored schemas are validated on write only; a schema predating the
-  keywords keeps working (no designation → `user_id`-only refs) until next
-  edited, when the conditional requirement in §1 applies.
+- No schema migration: nothing is stored in production yet, so the keywords
+  land together with the updated defaults and the §1 validation applies to
+  every schema write from the start.
 
 Revisit later:
 
