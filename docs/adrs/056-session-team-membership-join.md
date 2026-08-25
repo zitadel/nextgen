@@ -67,9 +67,10 @@ Rules:
 
 ### Data model
 
-**No schema change.** `team_memberships` already carries everything the join
-needs, keyed `(project_id, team_id, user_id)` with the roster `status`
-([ADR 024](024-user-team-lifecycle-ownership.md)).
+**No new tables or columns.** `team_memberships` already carries everything the
+join needs, keyed `(project_id, team_id, user_id)` with the roster `status`
+([ADR 024](024-user-team-lifecycle-ownership.md)). Two indexes were added on
+`sessions` for the read path — see Performance below; they change no shape.
 
 The filter compiles to a correlated `EXISTS` in the session list's inner
 sub-query, where the alias `s` is the raw `sessions` table:
@@ -85,9 +86,11 @@ WHERE s.project_id = $1
 ORDER BY … LIMIT …
 ```
 
-All three key columns are equality-bound, so this is a point lookup on
-`team_memberships`' primary key — not an index scan, and not a materialized team
-list. `s.user_id IS NULL` makes the correlation NULL, so `EXISTS` is false and
+All three key columns are equality-bound, so the planner does not evaluate this
+per session row: it rewrites the correlated `EXISTS` into a semi-join, resolves
+the team side with **one** index scan on `team_memberships`' primary key, and
+joins that against `sessions` (see Performance below for the measured plans).
+`s.user_id IS NULL` makes the correlation NULL, so `EXISTS` is false and
 anonymous sessions fall out with no special case.
 
 `team_id` is **filter only**. A session matches many teams and a team matches
@@ -121,6 +124,64 @@ one behavior rather than three.
 `team_id` stays a first-class `database.Filter`: it ANDs with the project scope,
 the `state` predicate and the keyset cursor with no special handling, and
 `ListSessions`' signature is untouched.
+
+## Performance
+
+Measured on PostgreSQL 18.3 against seeded data at three scales (20k / 200k / 2M
+sessions per project, plus an equal-sized decoy project so the `project_id`
+predicate has something to exclude). Team sizes deliberately skewed: one team
+holding 40% of users, one at 1%, one with 3 members. Median of three warm runs,
+`EXPLAIN (ANALYZE, BUFFERS)` on the statement captured from the server log while
+`ListSessions` actually ran.
+
+**The team filter is not what costs.** Before any index work, filtering by team
+cost the same as not filtering at all — both were dominated by the same thing:
+`sessions` carried only `PRIMARY KEY (project_id, id)` and the partial unique
+index on `token_id`, so **every** page of `POST /sessions/query` scanned and
+sorted a project's whole session table before applying `LIMIT`.
+
+| 2M sessions, first page of 20 | no index | with 000018 |
+|---|---:|---:|
+| no filter (baseline) | 130 ms | 0.33 ms |
+| team filter, 40%-of-project team | 215 ms | 1.7 ms |
+| team filter, 1% team | 142 ms | 8.1 ms |
+| team filter, 3-member team | 141 ms | 0.38 ms |
+| team filter + `state=active` | 112 ms | 31 ms |
+| team filter, cursor at page 50 | 149 ms | 6.1 ms |
+
+Migration `000018_sessions_sort_index` (and its Spanner/SQLite peers) therefore
+adds **two** indexes, and both are load-bearing because they cover opposite
+selectivities of this filter:
+
+- `(project_id, created_at, id)` serves the default sort. Alone, it is a large
+  win for the unfiltered list and for teams holding much of the project.
+- `(project_id, user_id)` lets a *selective* team drive from `team_memberships`
+  into `sessions`. Without it, the sort index alone makes a 3-member team
+  **worse than no index at all** — 1158 ms against the pre-index 141 ms, because
+  the walk in `created_at` order crosses most of the table before it collects 20
+  matching rows. With both, that case is 0.38 ms.
+
+Two findings worth carrying forward:
+
+- **Combining `team_id` with `state` was the worst case by far.** Both compile to
+  correlated `EXISTS`, and at one scale the planner joined the two semi-join
+  sources *to each other* before touching `sessions` — 8M intermediate rows and
+  40M buffer hits for a 10.5 s query returning nothing. The membership index
+  removes it (10502 ms → 5 ms), but the shape is worth remembering: two computed
+  `EXISTS` predicates on one list can produce a plan neither one produces alone.
+- **One case regresses.** A team holding ~40% of a 200k-session project goes from
+  30 ms to 47 ms, because the planner drives from membership into sessions and
+  materializes 72k rows before the top-N sort (it estimates 151). Raising the
+  statistics target on `team_memberships.team_id` does not change it. It is
+  bounded, it does not reproduce at 2M, and it is the price of the 3300× win on
+  selective teams — but it is a real cost, recorded here rather than smoothed over.
+
+`sessionSortField` also allows sorting by `user_id`; `(project_id, user_id)`
+serves that too, so no third index was added.
+
+Prepared statements were checked separately: pgx executes this through its
+statement cache, and the plan stays stable and fast (~0.1 ms) past the sixth
+execution where PostgreSQL may switch to a generic plan.
 
 ## Revocation scope — project level only
 

@@ -443,9 +443,11 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 	},
 	// Not a column: a correlated EXISTS over the session user's roster
 	// memberships (ADR 056), split so the filter binds the team id inline.
-	// All three key columns are equality-bound, so this is a point lookup on
-	// team_memberships' primary key. A session with user_id NULL never
-	// matches: the correlation compares to NULL and EXISTS is false.
+	// All three key columns are equality-bound, so the planner resolves the
+	// team side with one index scan on team_memberships' primary key and
+	// joins it as a semi-join — not one lookup per session row. A session
+	// with user_id NULL never matches: the correlation compares to NULL and
+	// EXISTS is false.
 	domain.SessionFieldTeamID: {
 		SQLName: `EXISTS (SELECT 1 FROM zitadel_nextgen.team_memberships tm
 	WHERE tm.project_id = s.project_id AND tm.user_id = s.user_id
