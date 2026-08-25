@@ -669,24 +669,42 @@ Behaviors this design relies on but does not implement.
   ([area 3](3-social-login-flow.md#constraints--edge-cases)).
   Neither the refuse-while-pinned nor the tombstoning model answers this: both
   govern in-flight attempts, not flow references to the slug.
-- **Schema-keyed validation:** The epic requires that one connection can support
-  multiple user schemas, so a connection's `claim_mapping` and `verified_claims`
-  may name properties of several schemas (the superset model).
-  What remains undecided is how strictly those fields can be checked.
-  Example: one Google connection used by Customers (`email`, `firstName`) and
-  Employees (`email`, `department`) maps all three; a misspelt `department`
-  errors only when no referencing schema owns the key and warns when another one
-  could, because a typo and a key meant for another schema look alike.
-  The CLI sees every referencing schema and applies both rules.
-  A connection body names no schema, so the server has nothing to check the keys
-  against at create; the error-grade half runs at flow-definition writes, the
-  only document naming both a schema revision and a connection slug, and the
+- **Schema-keyed validation:** One connection may serve several user schemas,
+  so `claim_mapping` and `verified_claims` may name properties of several
+  schemas (the superset model).
+  How strictly those keys can be checked is open, because a typo and a key
+  meant for another schema look alike to the validator.
+  Example: a Google connection serving Customers (`email`, `firstName`) and
+  Employees (`email`, `department`) legitimately maps all three, so a key that
+  only some referencing schemas define can only warn; a key that none defines
+  is an error.
+  The CLI sees every referencing schema and applies both rules; the server sees
+  none during connection creation, so the error-grade half runs during
+  flow-definition writes (as a flow definition is the only document that
+  references both a schema revision and a connection slug) and the
   warning-grade half is CLI-only.
   A 1:1 rule (one connection per schema) would allow error-grade checks
-  everywhere and would make identity resolution schema-specific by construction,
-  but it contradicts the epic's criterion and duplicates connection config and
+  everywhere, but it contradicts the epic and duplicates connection config and
   credentials per schema.
   The validator rules record the superset status quo.
+- **Catalog claims schemas:** The provider side of a mapping row is unchecked
+  at plan time.
+  The validator verifies that a `claim_mapping` key names a schema property,
+  but any string passes as the claim-name value, because nothing records which
+  claims a provider emits.
+  A typo'd value fails silently at runtime.
+  The claim is never found, so the property stays unmapped, and a typo'd
+  `verified_claims` source evaluates as unverified on every attempt.
+  The knowledge to catch this already exists.
+  The area 4 catalog carries each vendor's claim table, and strategy registry
+  entries declare their emitted claims.
+  Promoting that knowledge to a small claims schema per catalog entry would let
+  the plan warn on a claim name `google` or `github` is not known to emit.
+  A warning, not an error, because extra scopes can unlock claims the catalog
+  does not list.
+  Custom providers have no catalog entry and keep today's unchecked behavior.
+  It is also the base for any future typed or expression mapping.
+  Not 851 work.
 - **The CRUD API itself:** Currently, no IdP API exists.
   Building the endpoints, generated client, and handlers represents the largest
   pending work item in this domain.
