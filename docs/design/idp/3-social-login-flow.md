@@ -243,7 +243,7 @@ transitions route it:
 | Resolution State | Outcome Fired | Routing & Engine Behavior |
 | :--- | :--- | :--- |
 | **Known subject** | `callback` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
-| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, it targets an authored error step instead. |
+| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, the outcome does not fire; the unknown subject fails as an error on the originating step ([Failures and Recovery](#failures-and-recovery)), because a step may offer providers with different `creation` values while `identity_unknown` has one authored target. |
 | **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
@@ -471,6 +471,7 @@ and recovery route without exposing internal technical details to the end user.
 | **State expired, unknown, or reused** | Flow-level error with a restart route. | Restarts the flow entirely, as the originating flow session may no longer exist. |
 | **Binding cookie absent or mismatched** | Flow-level error with a restart route. | The callback's `state` is consumed: the authorization code arrived with this request, so the original tab could never complete the ceremony anyway. The user restarts from the flow. |
 | **Code exchange / `userinfo` failure** | Originating step with a generic error. | The user can retry; detailed error diagnostics are written to server logs. |
+| **Unknown subject under `creation: disabled`** | Originating step with a localized `text_key` error. | The provider signs in existing users only. The step remains rendered; the user signs in with an existing account or picks another offered method. |
 | **Verification shortfall** | Handled via normal resolution branches. | Handled automatically by resolution rules; the user never sees technical errors referencing claims. |
 
 ## Dependencies

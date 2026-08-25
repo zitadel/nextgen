@@ -32,17 +32,18 @@ schemas and flow steps.
 
 ## Key Decisions
 
-| Decision | Why                                                                                                                                                                                                                                                                                                                  |
-| --- |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Files under `.zitadel/idps/` | Maintains consistent GitOps surface area.                                                                                                                                                                                                                                                                            |
-| Based on Zitadel-defined JSON Schema | Same pattern as `flow-definition.json`                                                                                                                                                                                                                                                                               |
-| Validation | Schema checks single-file rules; a separate validator handles cross-file rules.                                                                                                                                                                                                                                      |
-| Protocol details live in a nested `oidc` / `oauth2` block | New protocols add a block instead of restructuring committed files                                                                                                                                                                                                                                                   |
-| `slug` is the identity | User schemas and flow definitions reference connections by slug, so revisions never invalidate references                                                                                                                                                                                                            |
+| Decision | Why                                                                                                                                                                                                                                                                                                                    |
+| --- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Files under `.zitadel/idps/` | Maintains consistent GitOps surface area.                                                                                                                                                                                                                                                                              |
+| Based on Zitadel-defined JSON Schema | Same pattern as `flow-definition.json`                                                                                                                                                                                                                                                                                 |
+| Validation | Schema checks single-file rules; a separate validator handles cross-file rules.                                                                                                                                                                                                                                        |
+| Protocol details live in a nested `oidc` / `oauth2` block | New protocols add a block instead of restructuring committed files                                                                                                                                                                                                                                                     |
+| `slug` is the identity | User schemas and flow definitions reference connections by slug, so revisions never invalidate references                                                                                                                                                                                                              |
+| `template` names the catalog entry | The field reads as a scaffold-source pointer; behavior comes only from the protocol blocks ([area 4](4-cli-provider-setup.md#catalog-schema)).                                                                                                                                                                         |
 | Revisioned on the server | In-flight attempts, rollback, and audit need immutable revisions. The CLI syncer is `mutable: true, revisioned: false`, like the flow syncer (`ResourceSyncer`, `apps/cli/src/lib/sync/types.ts`): the server mints each revision under the stable connection id ([area 4](4-cli-provider-setup.md#preview-and-apply)) |
-| `claim_mapping` | Derived based on properties in a tenant-defined user schema                                                                                                                                                                                                                                                          |
-| Environment Secrets | The secret values are not configured in the connection file. How the value reaches a deployed engine is an open question; with environments ([#534](https://github.com/zitadel/nextgen/issues/534)) it blocks provider sign-in outside development setup ([Secrets and Environments](#secrets-and-environments))     |
-| Vendor Configurations | Vendor differences are treated as data; see [Vendor knowledge is data](#vendor-knowledge-is-data)                                                                                                                                                                                                                    |
+| `claim_mapping` | Derived based on properties in a tenant-defined user schema                                                                                                                                                                                                                                                            |
+| Environment Secrets | The secret values are not configured in the connection file. How the value reaches a deployed engine is an open question; with environments ([#534](https://github.com/zitadel/nextgen/issues/534)) it blocks provider sign-in outside development setup ([Secrets and Environments](#secrets-and-environments))       |
+| Vendor Configurations | Vendor differences are treated as data; see [Vendor knowledge is data](#vendor-knowledge-is-data)                                                                                                                                                                                                                      |
 
 ## Vendor knowledge is data
 
@@ -142,8 +143,10 @@ How to read the schema:
   Because the schema objects are strict and no `client_secret` property exists,
   pasting a raw secret triggers an immediate validation error.
 - **Editor and UI Affordances:** The `format: "uri"` rule is just an annotation
-  for editor linting (per Draft 2020-12), and `template` is simply a UI
-  rendering hint (for logos and brand colors).
+  for editor linting (per Draft 2020-12).
+  `template` names the catalog entry the file was scaffolded from and keys
+  vendor knowledge only (glyphs and button branding, the setup scan/match, and
+  catalog claim tables); it carries no protocol behavior.
 - **TLS Required:** Every endpoint URL (`issuer`, `jwks_uri`, and the endpoints
   in both blocks) carries a `pattern` requiring `https://`, with an exception
   for local development (`http://localhost` and `http://127.0.0.1`).
@@ -172,7 +175,7 @@ This design names the states instead.
 
 | `creation` | Legacy bits | Unknown subject                                                                                                                                                                                                                          |
 | :--- | :--- |:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `disabled` | allowed=false, auto=false | `identity_unknown` routes to an authored error step. The provider signs in existing users only.                                                                                                                                          |
+| `disabled` | allowed=false, auto=false | The provider signs in existing users only. An unknown subject fails as an error on the originating step; `identity_unknown` does not fire, as a step may offer providers with different `creation` values ([area 3](3-social-login-flow.md#the-three-outcomes)). |
 | `auto` (default) | allowed=true, auto=true | The user is created automatically when claim mapping resolves all the required user fields. Otherwise the collection step is shown for manual creation, prefilled with the known fields from claim mapping.|
 
 In the case of `auto`, the user is not created if a required `x-unique` property arrives as unverified. 

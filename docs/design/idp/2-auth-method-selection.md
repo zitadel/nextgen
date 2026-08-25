@@ -16,7 +16,7 @@ It requires three distinct artifacts to align perfectly:
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: [{id, name, template}]` | Accepted by the meta-schema and validator; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
+| **Flow step** | `sso_providers: [{id, name, template}]`, where `id` is the connection slug | Accepted by the meta-schema and validator; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
 
 Each authentication method surfaces differently within a flow, meaning there is
 no uniform rendering mechanism across the board:
