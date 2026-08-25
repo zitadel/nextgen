@@ -51,7 +51,7 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 				Columns: []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
 			},
 		},
-	})
+	}, service.JSONSchemaQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, schemaURL, listed.Items[0].URL)

@@ -264,7 +264,9 @@ type Handler interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetSchemaById implements getSchemaById operation.
 	//
-	// Get a schema by its ID. This will return the default revision of the schema.
+	// Get a schema by its ID. A schema ID identifies one immutable revision, so
+	// this returns exactly that revision. To find the current revision of an
+	// object type, list with `revisions=latest`.
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)

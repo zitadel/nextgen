@@ -3521,18 +3521,18 @@ func (c *MockAllStatementsListFlowDefinitionsCall) DoAndReturn(f func(context.Co
 }
 
 // ListJSONSchemas mocks base method.
-func (m *MockAllStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+func (m *MockAllStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListJSONSchemas", ctx, filter)
+	ret := m.ctrl.Call(m, "ListJSONSchemas", ctx, filter, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.JSONSchema])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListJSONSchemas indicates an expected call of ListJSONSchemas.
-func (mr *MockAllStatementsMockRecorder) ListJSONSchemas(ctx, filter any) *MockAllStatementsListJSONSchemasCall {
+func (mr *MockAllStatementsMockRecorder) ListJSONSchemas(ctx, filter, opts any) *MockAllStatementsListJSONSchemasCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJSONSchemas", reflect.TypeOf((*MockAllStatements)(nil).ListJSONSchemas), ctx, filter)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJSONSchemas", reflect.TypeOf((*MockAllStatements)(nil).ListJSONSchemas), ctx, filter, opts)
 	return &MockAllStatementsListJSONSchemasCall{Call: call}
 }
 
@@ -3548,13 +3548,13 @@ func (c *MockAllStatementsListJSONSchemasCall) Return(arg0 *database.ListResult[
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListJSONSchemasCall) Do(f func(context.Context, *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error)) *MockAllStatementsListJSONSchemasCall {
+func (c *MockAllStatementsListJSONSchemasCall) Do(f func(context.Context, *database.ListOptions[domain.JSONSchemaField], service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)) *MockAllStatementsListJSONSchemasCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListJSONSchemasCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error)) *MockAllStatementsListJSONSchemasCall {
+func (c *MockAllStatementsListJSONSchemasCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.JSONSchemaField], service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)) *MockAllStatementsListJSONSchemasCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5743,18 +5743,18 @@ func (c *MockJSONSchemaStatementsIsStatementsCall) DoAndReturn(f func()) *MockJS
 }
 
 // ListJSONSchemas mocks base method.
-func (m *MockJSONSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+func (m *MockJSONSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListJSONSchemas", ctx, filter)
+	ret := m.ctrl.Call(m, "ListJSONSchemas", ctx, filter, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.JSONSchema])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListJSONSchemas indicates an expected call of ListJSONSchemas.
-func (mr *MockJSONSchemaStatementsMockRecorder) ListJSONSchemas(ctx, filter any) *MockJSONSchemaStatementsListJSONSchemasCall {
+func (mr *MockJSONSchemaStatementsMockRecorder) ListJSONSchemas(ctx, filter, opts any) *MockJSONSchemaStatementsListJSONSchemasCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJSONSchemas", reflect.TypeOf((*MockJSONSchemaStatements)(nil).ListJSONSchemas), ctx, filter)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJSONSchemas", reflect.TypeOf((*MockJSONSchemaStatements)(nil).ListJSONSchemas), ctx, filter, opts)
 	return &MockJSONSchemaStatementsListJSONSchemasCall{Call: call}
 }
 
@@ -5770,13 +5770,13 @@ func (c *MockJSONSchemaStatementsListJSONSchemasCall) Return(arg0 *database.List
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockJSONSchemaStatementsListJSONSchemasCall) Do(f func(context.Context, *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error)) *MockJSONSchemaStatementsListJSONSchemasCall {
+func (c *MockJSONSchemaStatementsListJSONSchemasCall) Do(f func(context.Context, *database.ListOptions[domain.JSONSchemaField], service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)) *MockJSONSchemaStatementsListJSONSchemasCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJSONSchemaStatementsListJSONSchemasCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error)) *MockJSONSchemaStatementsListJSONSchemasCall {
+func (c *MockJSONSchemaStatementsListJSONSchemasCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.JSONSchemaField], service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)) *MockJSONSchemaStatementsListJSONSchemasCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

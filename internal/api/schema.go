@@ -82,11 +82,12 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 	}
 
 	schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
-		ProjectID:  string(params.ProjectID),
-		ObjectType: params.ObjectType.Value,
-		Kind:       kind,
-		PageToken:  string(params.PageToken.Value),
-		Limit:      int(params.Limit.Value),
+		ProjectID:                   string(params.ProjectID),
+		ObjectType:                  params.ObjectType.Value,
+		Kind:                        kind,
+		LatestRevisionPerObjectType: params.Revisions.Value == api.ListSchemasRevisionsLatest,
+		PageToken:                   string(params.PageToken.Value),
+		Limit:                       int(params.Limit.Value),
 	})
 	if err != nil {
 		return nil, err
@@ -128,7 +129,8 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrJSONSchemaNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrJSONSchemaAlreadyExists().Code:
+	case domain.ErrJSONSchemaAlreadyExists().Code,
+		domain.ErrJSONSchemaRevisionConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrJSONSchemaInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)

@@ -124,8 +124,16 @@ function AddUserForm({
     void (async () => {
       try {
         const projectId = getConsoleProjectId();
-        const listed = (await api.listSchemas({ project_id: projectId, kind: "user-schema" }))
-          .schemas;
+        // One option per schema, not per edit: a superseded revision is not
+        // something a new user should be created against, and offering the same
+        // schema once per revision reads as duplicates.
+        const listed = (
+          await api.listSchemas({
+            project_id: projectId,
+            kind: "user-schema",
+            revisions: "latest",
+          })
+        ).schemas;
         const options = listed.map((entry) => {
           const schema = entry.schema as UserSchema;
           return {

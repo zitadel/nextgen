@@ -54,6 +54,14 @@ func ErrJSONSchemaAlreadyExists() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
 }
 
+// ErrJSONSchemaRevisionConflict reports that another revision of the same
+// object type already holds this creation timestamp. Which of the two is the
+// latest would be undecidable, so the loser is rejected and the caller can
+// simply retry.
+func ErrJSONSchemaRevisionConflict() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("revision_conflict"), "another revision of the same object type was created at the same instant", nil, nil)
+}
+
 func ErrJSONSchemaPermissionDenied() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("permission_denied"), "the schema management API requires the project secret", nil, nil)
 }

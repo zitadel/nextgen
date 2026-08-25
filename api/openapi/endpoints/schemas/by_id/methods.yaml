@@ -1,7 +1,10 @@
 get:
   operationId: getSchemaById
   summary: Get schema by ID
-  description: Get a schema by its ID. This will return the default revision of the schema.
+  description: |
+    Get a schema by its ID. A schema ID identifies one immutable revision, so
+    this returns exactly that revision. To find the current revision of an
+    object type, list with `revisions=latest`.
   tags:
     - Schemas
   security:

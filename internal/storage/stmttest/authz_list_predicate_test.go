@@ -154,3 +154,64 @@ func TestAuthzListUsers_RequiresFilter(t *testing.T) {
 		require.ErrorIs(t, err, authz.ErrListFilterRequired)
 	})
 }
+
+// TestAuthzListPredicate_JSONSchemasLatestRevision pins what revisions=latest
+// means under a partial grant. The anti-join in ListJSONSchemas asks whether a
+// newer revision exists, not whether the caller may read it, so a caller
+// granted only the superseded revision gets it under revisions=all and gets
+// nothing for that object type under revisions=latest.
+//
+// Nothing in the product produces that state today: schemas register in RSI
+// without a team, so the team-scoped and constraint-team branches never match
+// one, and no service path mints a resource-scoped assignment. The grant here
+// is written straight to storage so the choice is pinned before per-schema
+// grants make it reachable.
+func TestAuthzListPredicate_JSONSchemasLatestRevision(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, userSchemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		objectType := "authz-latest-" + suffix
+
+		older := createJSONSchemaRevision(t, d.stmts, projectID, "https://example.com/schemas/"+objectType+"-v1", &objectType)
+		createJSONSchemaRevision(t, d.stmts, projectID, "https://example.com/schemas/"+objectType+"-v2", &objectType)
+
+		principal := "usr-schema-viewer-" + suffix
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, userSchemaURL, principal, principal+"@example.com", "Schema Viewer")))
+
+		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+			newTestAssignment(projectID, "asgn-"+suffix, domain.AuthzPrincipalTypeUser, principal, "project", "viewer", domain.NewResourceAssignmentScope(older.URL))))
+
+		ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+				ObjectType: "project", Relation: "viewer",
+			},
+			ResourceKind: domain.ResourceKindSchema,
+		})
+		// Narrowed to this object type: only a row sharing it can correlate in
+		// the anti-join, so the filter cannot change which revision survives.
+		list := func(opts service.JSONSchemaQueryOptions) []string {
+			t.Helper()
+			res, err := d.stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+					database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+				),
+			}, opts)
+			require.NoError(t, err)
+			urls := make([]string, 0, len(res.Items))
+			for _, item := range res.Items {
+				urls = append(urls, item.URL)
+			}
+			return urls
+		}
+
+		assert.Equal(t, []string{older.URL}, list(service.JSONSchemaQueryOptions{}),
+			"the grant covers the older revision only")
+		assert.Empty(t, list(service.JSONSchemaQueryOptions{LatestRevisionPerObjectType: true}),
+			"the newer revision suppresses the older one even though the caller cannot read it")
+	})
+}
