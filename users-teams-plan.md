@@ -374,7 +374,10 @@ to readable teams.
 ## 5. Docs
 
 - **`docs/adrs/056-expanding-embedded-objects.md`** — new ADR recording the
-  `expand` pattern itself (§8). Add its row to `docs/adrs/README.md`.
+  `expand` pattern itself (§8), plus its row in `docs/adrs/README.md`. Both
+  ship **inside PR 5**, the PR that introduces expansion. No standalone docs
+  PR: the ADR and the mechanism it describes land together or the ADR
+  documents something that does not exist yet.
 - `docs/design/api/resource-map.md:97` — replace the `GET /users` line with
   `POST /users/query`.
 - `docs/design/api/system-permission-catalog.md:170` — `user.read` row becomes
@@ -422,4 +425,10 @@ Drafted at `docs/adrs/056-expanding-embedded-objects.md`. It records the
 pattern generally — opt-in `expand`, closed enum, absent-vs-empty, hard cap
 with a truncation flag, hydrate-never-join, and a paginated sub-resource as the
 escape hatch — so the next resource that wants an embedded child does not
-re-litigate it. Lands with PR 5.
+re-litigate it.
+
+It is committed on the planning branch only as a draft. Its real home is
+**PR 5**: the ADR, the `expand` field, the dialect hydrates and the roster gate
+are one reviewable unit. Reviewers judge the rule and the first use of it at
+the same time, which is the only point at which the rule can still be argued
+down cheaply.
