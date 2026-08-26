@@ -561,6 +561,8 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.ProjectID, actual.ProjectID)
 		assert.Equal(t, expected.FlowDefinition, actual.FlowDefinition)
+		assert.False(t, actual.CreatedAt.IsZero())
+		assert.False(t, actual.UpdatedAt.IsZero())
 	case *api.CreateFlowDefinitionBadRequest:
 		require.IsType(t, &api.CreateFlowDefinitionBadRequest{}, got, helpers.MustMarshal(t, got))
 		actual := got.(*api.CreateFlowDefinitionBadRequest)
@@ -959,19 +961,10 @@ func TestListFlowDefinitions(t *testing.T) {
 					assert.Equal(t, flowDef.ProjectID, actualFlowDefsMap[name].ProjectID)
 					continue
 				}
-				got := actualFlowDefsMap[name]
-				// A directory row renders last-changed, so the list's own
-				// timestamps have to be real.
-				assert.False(t, got.CreatedAt.IsZero())
-				assert.False(t, got.UpdatedAt.IsZero())
-				// The create response they are compared against carries zero
-				// timestamps: CreateFlowDefinition writes NOW() without reading
-				// it back, on every dialect. Everything else must match, because
-				// the list and the by-id read describe a flow definition the
-				// same way (#939) — document, purposes, audience and steps.
-				want := flowDef
-				want.CreatedAt, want.UpdatedAt = got.CreatedAt, got.UpdatedAt
-				assert.Equal(t, want, got)
+				// The list and the by-id read describe a flow definition the
+				// same way (#939): document, purposes, audience, steps and
+				// timestamps all match the create response.
+				assert.Equal(t, flowDef, actualFlowDefsMap[name])
 			}
 		})
 	}
