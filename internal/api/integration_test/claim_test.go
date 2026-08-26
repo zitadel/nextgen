@@ -157,7 +157,7 @@ func TestClaimHappyPath(t *testing.T) {
 		FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, helpers.MustMarshal(t, defResp))
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
 	createResp, err := platClient.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(platform.ID),

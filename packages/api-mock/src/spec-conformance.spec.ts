@@ -24,7 +24,7 @@
  * `id`, or out-of-spec routes):
  *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
- *   - POST /flow_definitions            → flow detail envelope
+ *   - POST /flow_definitions            → flow-definition-response envelope
  *
  * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
  * the user POSTed verbatim, so the response shape depends on the request
@@ -334,7 +334,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    // POST 201 and GET 200 share the `flow-definition-detail-response`
+    // POST 201 and GET 200 share the `flow-definition-response`
     // envelope per the spec, so the GET response zod schema validates both.
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });

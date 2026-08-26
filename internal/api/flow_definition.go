@@ -53,7 +53,7 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	if err != nil {
 		return nil, err
 	}
-	respDefinitions := make([]api.FlowDefinitionDetailResponse, 0, len(listed.Items))
+	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(listed.Items))
 	for _, def := range listed.Items {
 		respDefinitions = append(respDefinitions, *flowDefinitionResponse(def))
 	}
@@ -278,7 +278,7 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 
 /* domain to API response converters */
 
-func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionDetailResponse {
+func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{
@@ -289,7 +289,7 @@ func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefi
 	}
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
-	return &api.FlowDefinitionDetailResponse{
+	return &api.FlowDefinitionResponse{
 		ID:        flowDefinition.ID,
 		ProjectID: flowDefinition.ProjectID,
 		FlowDefinition: api.FlowDefinition{

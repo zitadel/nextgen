@@ -27,7 +27,7 @@ export const USER_PROPERTY_DEFAULTS: Readonly<Record<string, boolean>> = {
 };
 
 /**
- * Keys of the flow-definition detail envelope. `fetch` in the flow syncer
+ * Keys of the flow-definition response envelope. `fetch` in the flow syncer
  * already unwraps the envelope; stripping them here as well makes the
  * normalizer safe on raw detail responses.
  */

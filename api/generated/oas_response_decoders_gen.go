@@ -764,7 +764,7 @@ func decodeCreateFlowDefinitionResponse(resp *http.Response) (res CreateFlowDefi
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowDefinitionDetailResponse
+			var response FlowDefinitionResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -3298,7 +3298,7 @@ func decodeGetFlowDefinitionResponse(resp *http.Response) (res GetFlowDefinition
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowDefinitionDetailResponse
+			var response FlowDefinitionResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8205,7 +8205,7 @@ func decodeUpdateFlowDefinitionResponse(resp *http.Response) (res UpdateFlowDefi
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowDefinitionDetailResponse
+			var response FlowDefinitionResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

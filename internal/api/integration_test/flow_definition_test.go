@@ -76,7 +76,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 		{
 			name: "flow definition created successfully",
 			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", userSchemaURI)),
-			wantResp: &api.FlowDefinitionDetailResponse{
+			wantResp: &api.FlowDefinitionResponse{
 				ProjectID: project.ID,
 				FlowDefinition: api.FlowDefinition{
 					Name:       "login-flow",
@@ -317,8 +317,8 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", userSchemaURI)),
 	)
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
-	loginFlowDef := createResp.(*api.FlowDefinitionDetailResponse)
+	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	loginFlowDef := createResp.(*api.FlowDefinitionResponse)
 
 	multiPurposeResp, err := client.CreateFlowDefinition(
 		t.Context(),
@@ -332,8 +332,8 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		}()),
 	)
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, multiPurposeResp, helpers.MustMarshal(t, multiPurposeResp))
-	loginRegisterFlowDef := multiPurposeResp.(*api.FlowDefinitionDetailResponse)
+	require.IsType(t, &api.FlowDefinitionResponse{}, multiPurposeResp, helpers.MustMarshal(t, multiPurposeResp))
+	loginRegisterFlowDef := multiPurposeResp.(*api.FlowDefinitionResponse)
 
 	tests := []struct {
 		name     string
@@ -352,7 +352,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ID: loginFlowDef.ID},
-			wantResp: &api.FlowDefinitionDetailResponse{
+			wantResp: &api.FlowDefinitionResponse{
 				ID:        loginFlowDef.ID,
 				ProjectID: project.ID,
 				FlowDefinition: api.FlowDefinition{
@@ -429,7 +429,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
-			wantResp: &api.FlowDefinitionDetailResponse{
+			wantResp: &api.FlowDefinitionResponse{
 				ID:        loginRegisterFlowDef.ID,
 				ProjectID: project.ID,
 				FlowDefinition: api.FlowDefinition{
@@ -554,9 +554,9 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 	}
 
 	switch expected := want.(type) {
-	case *api.FlowDefinitionDetailResponse:
-		require.IsType(t, &api.FlowDefinitionDetailResponse{}, got, helpers.MustMarshal(t, got))
-		actual := got.(*api.FlowDefinitionDetailResponse)
+	case *api.FlowDefinitionResponse:
+		require.IsType(t, &api.FlowDefinitionResponse{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.FlowDefinitionResponse)
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.ProjectID, actual.ProjectID)
@@ -694,8 +694,8 @@ func TestGetFlowDefinition(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
-	flowDef := createResp.(*api.FlowDefinitionDetailResponse)
+	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	flowDef := createResp.(*api.FlowDefinitionResponse)
 
 	tests := []struct {
 		name     string
@@ -790,8 +790,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp1, helpers.MustMarshal(t, resp1))
-	flowDef1 := resp1.(*api.FlowDefinitionDetailResponse)
+	require.IsType(t, &api.FlowDefinitionResponse{}, resp1, helpers.MustMarshal(t, resp1))
+	flowDef1 := resp1.(*api.FlowDefinitionResponse)
 
 	//harness.SetProjectSecretOnApiClient(t, client, project2) // TODO CHECK
 	resp2, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
@@ -811,8 +811,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp2, helpers.MustMarshal(t, resp2))
-	flowDef2 := resp2.(*api.FlowDefinitionDetailResponse)
+	require.IsType(t, &api.FlowDefinitionResponse{}, resp2, helpers.MustMarshal(t, resp2))
+	flowDef2 := resp2.(*api.FlowDefinitionResponse)
 
 	harness.SetProjectSecretOnApiClient(t, client, project2)
 	resp3, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
@@ -832,8 +832,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp3, helpers.MustMarshal(t, resp3))
-	flowDef3 := resp3.(*api.FlowDefinitionDetailResponse)
+	require.IsType(t, &api.FlowDefinitionResponse{}, resp3, helpers.MustMarshal(t, resp3))
+	flowDef3 := resp3.(*api.FlowDefinitionResponse)
 
 	tests := []struct {
 		name     string
@@ -848,7 +848,7 @@ func TestListFlowDefinitions(t *testing.T) {
 				ProjectID: api.ProjectID(project1.ID),
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionDetailResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
 					{
 						FlowDefinition: api.FlowDefinition{Name: "default-login"},
 						ProjectID:      project1.ID,
@@ -865,7 +865,7 @@ func TestListFlowDefinitions(t *testing.T) {
 				ProjectID: api.ProjectID(project2.ID),
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionDetailResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
 					{
 						FlowDefinition: api.FlowDefinition{Name: "default-login"},
 						ProjectID:      project2.ID,
@@ -885,7 +885,7 @@ func TestListFlowDefinitions(t *testing.T) {
 				},
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionDetailResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
 					*flowDef2,
 				},
 			},
@@ -901,7 +901,7 @@ func TestListFlowDefinitions(t *testing.T) {
 				},
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionDetailResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
 					{
 						FlowDefinition: api.FlowDefinition{Name: "default-login"},
 						ProjectID:      project1.ID,
@@ -917,7 +917,7 @@ func TestListFlowDefinitions(t *testing.T) {
 				ProjectID: api.ProjectID(project3.ID),
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionDetailResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
 					{
 						FlowDefinition: api.FlowDefinition{Name: "default-login"},
 						ProjectID:      project3.ID,
@@ -946,7 +946,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			actual := resp.(*api.FlowDefinitionListResponse)
 
 			assert.Equal(t, len(expected.FlowDefinitions), len(actual.FlowDefinitions))
-			actualFlowDefsMap := make(map[string]api.FlowDefinitionDetailResponse, len(actual.FlowDefinitions))
+			actualFlowDefsMap := make(map[string]api.FlowDefinitionResponse, len(actual.FlowDefinitions))
 			for _, flowDef := range actual.FlowDefinitions {
 				actualFlowDefsMap[flowDef.FlowDefinition.Name] = flowDef
 			}
@@ -1030,10 +1030,10 @@ func TestDeleteFlowDefinition(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	assert.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	assert.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
 
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
-	flowDef := createResp.(*api.FlowDefinitionDetailResponse)
+	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	flowDef := createResp.(*api.FlowDefinitionResponse)
 
 	tests := []struct {
 		name     string

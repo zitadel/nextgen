@@ -5,7 +5,7 @@ properties:
   flow_definitions:
     type: array
     items:
-      $ref: flow-definition-detail-response.yaml
+      $ref: flow-definition-response.yaml
   next_page_token:
     description: The token to retrieve the next page of results. Absent if there are no more results.
     oneOf:

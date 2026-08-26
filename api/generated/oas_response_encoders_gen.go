@@ -374,7 +374,7 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 
 func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *FlowDefinitionDetailResponse:
+	case *FlowDefinitionResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -1597,7 +1597,7 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 
 func encodeGetFlowDefinitionResponse(response GetFlowDefinitionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *FlowDefinitionDetailResponse:
+	case *FlowDefinitionResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -3952,7 +3952,7 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 
 func encodeUpdateFlowDefinitionResponse(response UpdateFlowDefinitionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *FlowDefinitionDetailResponse:
+	case *FlowDefinitionResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

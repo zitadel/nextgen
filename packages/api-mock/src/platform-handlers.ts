@@ -169,7 +169,7 @@ type ProjectRecord = {
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
- * `flow-definition-detail-response` per the OpenAPI contract.
+ * `flow-definition-response` per the OpenAPI contract.
  */
 type FlowDefinitionRecord = {
   id: string;
@@ -246,14 +246,14 @@ function bearerToken(request: Request): string {
 }
 
 /**
- * Build a `flow-definition-detail-response` envelope around a stored body, as
- * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * Build a `flow-definition-response` envelope around a stored body, as
+ * specified by `api/openapi/components/flows/flow-definition-response.yaml`.
  * Every read serves this — list included, which is the point of #939.
  * The Go server unconditionally echoes an `audience` (empty `{}` when the
  * stored flow has none — `internal/api/flow_definition.go`); mirror that so
  * consumers exercise the same wire shape the live server produces.
  */
-function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
+function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
     id: r.id,
     project_id: r.projectId,
@@ -831,7 +831,7 @@ export function setupPlatformHandlers() {
         body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
-      const responseBody: CreateFlowDefinition201 = flowDetailResponse(record);
+      const responseBody: CreateFlowDefinition201 = flowResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
@@ -848,7 +848,7 @@ export function setupPlatformHandlers() {
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()]
           .filter((record) => record.projectId === query.data.project_id)
-          .map(flowDetailResponse),
+          .map(flowResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
@@ -870,7 +870,7 @@ export function setupPlatformHandlers() {
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
+      const responseBody: GetFlowDefinition200 = flowResponse(record);
       const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
@@ -910,7 +910,7 @@ export function setupPlatformHandlers() {
       record.status =
         typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
       record.updatedAt = nowIso();
-      const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
+      const responseBody: UpdateFlowDefinition200 = flowResponse(record);
       const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;

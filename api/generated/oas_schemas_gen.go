@@ -12319,79 +12319,14 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 }
 
 // Ref: #
-type FlowDefinitionDetailResponse struct {
-	// Unique identifier for the flow definition.
-	ID string `json:"id"`
-	// Identifier of the project this flow definition belongs to.
-	ProjectID      string         `json:"project_id"`
-	FlowDefinition FlowDefinition `json:"flow_definition"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-}
-
-// GetID returns the value of ID.
-func (s *FlowDefinitionDetailResponse) GetID() string {
-	return s.ID
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *FlowDefinitionDetailResponse) GetProjectID() string {
-	return s.ProjectID
-}
-
-// GetFlowDefinition returns the value of FlowDefinition.
-func (s *FlowDefinitionDetailResponse) GetFlowDefinition() FlowDefinition {
-	return s.FlowDefinition
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *FlowDefinitionDetailResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *FlowDefinitionDetailResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *FlowDefinitionDetailResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *FlowDefinitionDetailResponse) SetProjectID(val string) {
-	s.ProjectID = val
-}
-
-// SetFlowDefinition sets the value of FlowDefinition.
-func (s *FlowDefinitionDetailResponse) SetFlowDefinition(val FlowDefinition) {
-	s.FlowDefinition = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *FlowDefinitionDetailResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *FlowDefinitionDetailResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*FlowDefinitionDetailResponse) createFlowDefinitionRes() {}
-func (*FlowDefinitionDetailResponse) getFlowDefinitionRes()    {}
-func (*FlowDefinitionDetailResponse) updateFlowDefinitionRes() {}
-
-// Ref: #
 type FlowDefinitionListResponse struct {
-	FlowDefinitions []FlowDefinitionDetailResponse `json:"flow_definitions"`
+	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
 	// The token to retrieve the next page of results. Absent if there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetFlowDefinitions returns the value of FlowDefinitions.
-func (s *FlowDefinitionListResponse) GetFlowDefinitions() []FlowDefinitionDetailResponse {
+func (s *FlowDefinitionListResponse) GetFlowDefinitions() []FlowDefinitionResponse {
 	return s.FlowDefinitions
 }
 
@@ -12401,7 +12336,7 @@ func (s *FlowDefinitionListResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetFlowDefinitions sets the value of FlowDefinitions.
-func (s *FlowDefinitionListResponse) SetFlowDefinitions(val []FlowDefinitionDetailResponse) {
+func (s *FlowDefinitionListResponse) SetFlowDefinitions(val []FlowDefinitionResponse) {
 	s.FlowDefinitions = val
 }
 
@@ -12426,6 +12361,71 @@ func (s *FlowDefinitionPurposes) init() FlowDefinitionPurposes {
 	}
 	return m
 }
+
+// Ref: #
+type FlowDefinitionResponse struct {
+	// Unique identifier for the flow definition.
+	ID string `json:"id"`
+	// Identifier of the project this flow definition belongs to.
+	ProjectID      string         `json:"project_id"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowDefinitionResponse) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *FlowDefinitionResponse) GetProjectID() string {
+	return s.ProjectID
+}
+
+// GetFlowDefinition returns the value of FlowDefinition.
+func (s *FlowDefinitionResponse) GetFlowDefinition() FlowDefinition {
+	return s.FlowDefinition
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FlowDefinitionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *FlowDefinitionResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *FlowDefinitionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowDefinitionResponse) SetProjectID(val string) {
+	s.ProjectID = val
+}
+
+// SetFlowDefinition sets the value of FlowDefinition.
+func (s *FlowDefinitionResponse) SetFlowDefinition(val FlowDefinition) {
+	s.FlowDefinition = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FlowDefinitionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*FlowDefinitionResponse) createFlowDefinitionRes() {}
+func (*FlowDefinitionResponse) getFlowDefinitionRes()    {}
+func (*FlowDefinitionResponse) updateFlowDefinitionRes() {}
 
 // The lifecycle state of this flow definition.
 // active: The flow definition is ready to be used. The flow engine can select it for new flows.

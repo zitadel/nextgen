@@ -2631,29 +2631,6 @@ func (s *FlowDefinition) Validate() error {
 	return nil
 }
 
-func (s *FlowDefinitionDetailResponse) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.FlowDefinition.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "flow_definition",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
 func (s *FlowDefinitionListResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -2697,6 +2674,29 @@ func (s *FlowDefinitionListResponse) Validate() error {
 func (s FlowDefinitionPurposes) Validate() error {
 	var failures []validate.FieldError
 
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowDefinitionResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.FlowDefinition.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "flow_definition",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
