@@ -420,6 +420,15 @@ type Handler interface {
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
+	// QueryUsers implements queryUsers operation.
+	//
+	// Returns the users of a project, paginated with a cursor.
+	// The project comes from the credential, not from a parameter: the operation
+	// is bound to the token's own project by construction. This is why it takes
+	// no `project_id`, unlike the other query endpoints.
+	//
+	// POST /users/query
+	QueryUsers(ctx context.Context, req *QueryUsersRequest) (QueryUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.

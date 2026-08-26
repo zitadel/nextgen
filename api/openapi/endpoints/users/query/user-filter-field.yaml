@@ -1,0 +1,20 @@
+type: string
+description: |
+  Field to filter users by:
+  - `created_at`: RFC3339 timestamp
+  - `id`: user id
+  - `schema`: the schema the user's attributes satisfy, matched against the
+    value the user carries as `schema`
+  - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
+  - `lifecycle_owner_team_id`: the team that owns the user's identity
+    lifecycle — who may deprovision them (ADR 024). This is not team
+    participation: a user's roster is a separate collection, read at
+    `GET /users/{user_id}/teams`. The column is nullable for self-owned users,
+    and a null filter value is rejected, so self-owned users cannot be selected
+    by this field.
+enum:
+  - created_at
+  - id
+  - schema
+  - status
+  - lifecycle_owner_team_id

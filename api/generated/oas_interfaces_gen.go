@@ -185,6 +185,10 @@ type QueryTeamsRes interface {
 	queryTeamsRes()
 }
 
+type QueryUsersRes interface {
+	queryUsersRes()
+}
+
 type RevokeMySessionRes interface {
 	revokeMySessionRes()
 }

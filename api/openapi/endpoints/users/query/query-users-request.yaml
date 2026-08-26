@@ -1,0 +1,41 @@
+type: object
+description: Request to query the users of a project.
+properties:
+  limit:
+    $ref: ../../../components/schemas/limit.yaml
+  page_token:
+    description: |
+      Token to retrieve the next page of results. Must be sent with the same
+      `sorting` as the request that issued the token. Omitting `sorting` reuses
+      the default sort and only succeeds when that default matches the token.
+    oneOf:
+      - $ref: ../../../components/schemas/page-token.yaml
+      - type: 'null'
+  sorting:
+    type: object
+    required:
+      - field
+      - direction
+    properties:
+      field:
+        $ref: user-sort-field.yaml
+        description: The field to sort by.
+      direction:
+        $ref: ../../../components/schemas/sort-direction.yaml
+        description: The direction to sort by.
+  filter:
+    type: array
+    description: Filter criteria for querying users. Criteria are combined with AND.
+    items:
+      type: object
+      required:
+        - field
+        - operation
+      properties:
+        field:
+          $ref: user-filter-field.yaml
+          description: The field to filter by.
+        value:
+          $ref: ../../../components/schemas/filter-value.yaml
+        operation:
+          $ref: ../../../components/schemas/filter-operation.yaml
