@@ -29,8 +29,17 @@ export const Route = createFileRoute("/_authed/schemas/")({
     // `kind` scopes the list to user schemas. The screen is titled `User
     // schemas` and only knows how to render one, so this is the contract the
     // rows already assume rather than a new restriction.
-    const entries = (await api.listSchemas({ project_id: projectId, kind: "user-schema" }))
-      .schemas;
+    //
+    // `revisions: latest` makes a row a schema rather than an edit: schemas are
+    // immutable and versioned by URL, so a project that has revised one four
+    // times has four rows for it in the full history.
+    const entries = (
+      await api.listSchemas({
+        project_id: projectId,
+        kind: "user-schema",
+        revisions: "latest",
+      })
+    ).schemas;
     // Mapped rather than spread so the wire's `created_at` stops at the loader
     // and the row keeps the console's camelCase.
     return entries.map((entry) => ({

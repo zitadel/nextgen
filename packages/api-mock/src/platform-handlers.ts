@@ -312,6 +312,48 @@ function schemaObjectType(body: GetSchemaById200Schema): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function schemaKind(body: GetSchemaById200Schema): string | undefined {
+  const value = (body as unknown as { kind?: unknown }).kind;
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * `created_at DESC, id DESC`, the order the server lists in. The comparator has
+ * to be a total order: `createdAt` is millisecond-resolution here, so two
+ * schemas can share one, and a tie that resolved arbitrarily would let
+ * `revisions=latest` pick a different revision from one call to the next.
+ */
+function compareSchemasNewestFirst(a: SchemaRecord, b: SchemaRecord): number {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt < b.createdAt ? 1 : -1;
+  }
+  if (a.id === b.id) {
+    return 0;
+  }
+  return a.id < b.id ? 1 : -1;
+}
+
+/**
+ * `revisions=latest` keeps the newest revision of each `objectType`. Takes the
+ * list already sorted newest-first, so the first record of an `objectType` is
+ * the one to keep. A record without an `objectType` is a revision of nothing
+ * and is kept rather than grouped — matching the server's anti-join, which
+ * cannot correlate a NULL either.
+ */
+function latestSchemaRevisions(newestFirst: SchemaRecord[]): SchemaRecord[] {
+  const seen = new Set<string>();
+  return newestFirst.filter((r) => {
+    if (r.objectType === undefined) {
+      return true;
+    }
+    if (seen.has(r.objectType)) {
+      return false;
+    }
+    seen.add(r.objectType);
+    return true;
+  });
+}
+
 function schemaID(id: string): string {
   try {
     return decodeURIComponent(id);
@@ -702,10 +744,21 @@ export function setupPlatformHandlers() {
         });
       }
       const objectTypeFilter = url.searchParams.get("object_type") ?? undefined;
-      const records = [...store.schemas.values()]
+      const kindFilter = url.searchParams.get("kind") ?? undefined;
+      const matching = [...store.schemas.values()]
         .filter((r) => r.projectId === projectId)
         .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+        .sort(compareSchemasNewestFirst);
+      // The server's anti-join repeats none of the caller's filters, and only
+      // object_type can correlate a suppressing row — so narrowing by
+      // object_type before selecting the latest is equivalent, while narrowing
+      // by kind is not: a newer revision of another kind still supersedes an
+      // older one, and the schema drops out of a kind-filtered result entirely.
+      const current =
+        url.searchParams.get("revisions") === "latest"
+          ? latestSchemaRevisions(matching)
+          : matching;
+      const records = current.filter((r) => !kindFilter || schemaKind(r.body) === kindFilter);
       const responseBody: ListSchemas200 = {
         schemas: records.map((r) => ({
           id: r.id,

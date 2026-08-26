@@ -68,6 +68,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
+		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
 		t.Run("encryption_keys", func(t *testing.T) { battleEncryptionKeys(t, d) })
 		t.Run("team_memberships", func(t *testing.T) { battleTeamMemberships(t, d) })
 		t.Run("user_teams", func(t *testing.T) { battleUserTeams(t, d) })
@@ -327,7 +328,7 @@ func battleJSONSchemas(t *testing.T, d dialect) {
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
 		return d.stmts.ListJSONSchemas(unfilteredListCtx(t), &database.ListOptions[domain.JSONSchemaField]{
 			Filter: filter, Pagination: page,
-		})
+		}, service.JSONSchemaQueryOptions{})
 	}, func(s *domain.JSONSchema) string { return s.URL }, 2)
 
 	// SchemaService.ListSchemas pages by (created_at, url); url breaks
@@ -356,9 +357,53 @@ func battleJSONSchemas(t *testing.T, d dialect) {
 		drainIncarnation(t, wantByCreated, orderCreatedAsc, func(page database.Page[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
 			return d.stmts.ListJSONSchemas(unfilteredListCtx(t), &database.ListOptions[domain.JSONSchemaField]{
 				Filter: filter, Pagination: page,
-			})
+			}, service.JSONSchemaQueryOptions{})
 		}, func(s *domain.JSONSchema) string { return s.URL }, 2)
 	})
+}
+
+// battleJSONSchemasLatest is the load-bearing case for #923: latest mode adds a
+// correlated anti-join to the same WHERE the keyset predicate lives in, so a
+// page boundary is where the two would fall out of step. Every object type here
+// has a superseded revision, so a drain that returns one of them — or drops a
+// current one — is a broken composition, not a slow test.
+func battleJSONSchemasLatest(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	suffix := uniqueSuffix(t)
+	want := make([]string, 0, 5)
+	for i := range 5 {
+		objectType := "battle-latest-" + suffix + "-" + string(rune('a'+i))
+		var latestURL string
+		for _, revision := range []string{"-v1", "-v2"} {
+			schema := &domain.JSONSchema{
+				ProjectID:  projectID,
+				URL:        "https://example.com/schemas/" + objectType + revision,
+				ObjectType: &objectType,
+				Schema:     []byte(`{"type":"object"}`),
+			}
+			require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), schema))
+			url := schema.URL
+			t.Cleanup(func() { _ = d.stmts.DeleteJSONSchemaByID(context.Background(), projectID, url) })
+			latestURL = url
+		}
+		want = append(want, latestURL)
+	}
+	filter := database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID)
+	orderAsc := database.OrderBy[domain.JSONSchemaField]{
+		Columns: []database.Column[domain.JSONSchemaField]{
+			database.Col(domain.JSONSchemaFieldCreatedAt),
+			database.Col(domain.JSONSchemaFieldURL),
+		},
+		Direction: database.OrderAsc,
+	}
+	// Seeded oldest first within an object type and object type by object type,
+	// so the surviving revisions are already in created_at order.
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+		return d.stmts.ListJSONSchemas(unfilteredListCtx(t), &database.ListOptions[domain.JSONSchemaField]{
+			Filter: filter, Pagination: page,
+		}, service.JSONSchemaQueryOptions{LatestRevisionPerObjectType: true})
+	}, func(s *domain.JSONSchema) string { return s.URL }, 2)
 }
 
 func battleEncryptionKeys(t *testing.T, d dialect) {

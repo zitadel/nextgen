@@ -46,6 +46,16 @@ CREATE TABLE json_schemas (
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- Revisions of one object type are ordered by created_at, so at most one may
+-- carry a given timestamp: a collision has no determinate winner and must fail
+-- loudly instead. The index is also the seek the latest-revision anti-join in
+-- ListJSONSchemas uses. NULLs are considered distinct, so rows with
+-- object_type=NULL do not conflict — they are not revisions of anything.
+CREATE UNIQUE INDEX idx_json_schemas_object_type_revision
+    ON json_schemas (project_id, object_type, created_at);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE TABLE users (
     project_id               TEXT    NOT NULL,
     id                       TEXT    NOT NULL,
@@ -662,6 +672,9 @@ DROP TABLE IF EXISTS user_attributes;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS users;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_json_schemas_object_type_revision;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS json_schemas;

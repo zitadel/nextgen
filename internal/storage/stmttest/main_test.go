@@ -17,12 +17,13 @@ import (
 )
 
 type dialectOpener struct {
-	name              string
-	open              func(ctx context.Context) (dbtest.Pool, func(), error)
-	seed              func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
-	hardDeleteTeam    func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error
-	schemaNullability []schematest.ColumnNullability
-	liveNullability   func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error)
+	name               string
+	open               func(ctx context.Context) (dbtest.Pool, func(), error)
+	seed               func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
+	hardDeleteTeam     func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error
+	insertJSONSchemaAt func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error
+	schemaNullability  []schematest.ColumnNullability
+	liveNullability    func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error)
 }
 
 // dialectOpeners is filled by build-tagged register files (postgres, spanner, and/or sqlite).
@@ -33,22 +34,28 @@ func registerDialect(
 	open func(ctx context.Context) (dbtest.Pool, func(), error),
 	seed func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error,
 	hardDeleteTeam func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error,
+	insertJSONSchemaAt func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error,
 	schemaNullability []schematest.ColumnNullability,
 	liveNullability func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error),
 ) {
 	dialectOpeners = append(dialectOpeners, dialectOpener{
 		name: name, open: open, seed: seed, hardDeleteTeam: hardDeleteTeam,
-		schemaNullability: schemaNullability, liveNullability: liveNullability,
+		insertJSONSchemaAt: insertJSONSchemaAt,
+		schemaNullability:  schemaNullability, liveNullability: liveNullability,
 	})
 }
 
 type dialect struct {
-	name              string
-	stmts             service.AllStatements
-	seedTiedProjects  func(ctx context.Context, ids []string, createdAt time.Time) error
-	hardDeleteTeam    func(ctx context.Context, projectID, teamID string) error
-	schemaNullability []schematest.ColumnNullability
-	liveNullability   func(ctx context.Context) (map[string]map[string]bool, error)
+	name             string
+	stmts            service.AllStatements
+	seedTiedProjects func(ctx context.Context, ids []string, createdAt time.Time) error
+	hardDeleteTeam   func(ctx context.Context, projectID, teamID string) error
+	// insertJSONSchemaAt writes a json_schemas row at an exact created_at, which
+	// CreateJSONSchema never accepts from a caller: Postgres and Spanner default
+	// the column in the database, SQLite stamps it in Go.
+	insertJSONSchemaAt func(ctx context.Context, projectID, url string, objectType *string, createdAt time.Time) error
+	schemaNullability  []schematest.ColumnNullability
+	liveNullability    func(ctx context.Context) (map[string]map[string]bool, error)
 }
 
 // dialects is populated by TestMain for every registered opener.
@@ -86,6 +93,7 @@ func run(m *testing.M) int {
 
 		seed := opener.seed
 		hardDeleteTeam := opener.hardDeleteTeam
+		insertJSONSchemaAt := opener.insertJSONSchemaAt
 		liveNullability := opener.liveNullability
 		dialects = append(dialects, dialect{
 			name:  opener.name,
@@ -95,6 +103,9 @@ func run(m *testing.M) int {
 			},
 			hardDeleteTeam: func(ctx context.Context, projectID, teamID string) error {
 				return hardDeleteTeam(ctx, pool, projectID, teamID)
+			},
+			insertJSONSchemaAt: func(ctx context.Context, projectID, url string, objectType *string, createdAt time.Time) error {
+				return insertJSONSchemaAt(ctx, pool, projectID, url, objectType, createdAt)
 			},
 			schemaNullability: opener.schemaNullability,
 			liveNullability: func(ctx context.Context) (map[string]map[string]bool, error) {
