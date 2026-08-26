@@ -12385,13 +12385,13 @@ func (*FlowDefinitionDetailResponse) updateFlowDefinitionRes() {}
 
 // Ref: #
 type FlowDefinitionListResponse struct {
-	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
+	FlowDefinitions []FlowDefinitionDetailResponse `json:"flow_definitions"`
 	// The token to retrieve the next page of results. Absent if there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetFlowDefinitions returns the value of FlowDefinitions.
-func (s *FlowDefinitionListResponse) GetFlowDefinitions() []FlowDefinitionResponse {
+func (s *FlowDefinitionListResponse) GetFlowDefinitions() []FlowDefinitionDetailResponse {
 	return s.FlowDefinitions
 }
 
@@ -12401,7 +12401,7 @@ func (s *FlowDefinitionListResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetFlowDefinitions sets the value of FlowDefinitions.
-func (s *FlowDefinitionListResponse) SetFlowDefinitions(val []FlowDefinitionResponse) {
+func (s *FlowDefinitionListResponse) SetFlowDefinitions(val []FlowDefinitionDetailResponse) {
 	s.FlowDefinitions = val
 }
 
@@ -12425,96 +12425,6 @@ func (s *FlowDefinitionPurposes) init() FlowDefinitionPurposes {
 		*s = m
 	}
 	return m
-}
-
-// Response object for a flow definition after creation.
-// Ref: #
-type FlowDefinitionResponse struct {
-	// Unique identifier for the created flow definition.
-	ID string `json:"id"`
-	// Stable identifier for this flow (echoed from the request).
-	Name string `json:"name"`
-	// Identifier of the project this flow definition belongs to.
-	ProjectID string `json:"project_id"`
-	// URI of the flow definition schema this definition was authored against.
-	// If the schema_uri was not provided in the request, the flow definition is validated against the
-	// latest version of the schema, and the response includes the schema_uri of the latest version.
-	SchemaURI OptURI               `json:"schema_uri"`
-	Status    FlowDefinitionStatus `json:"status"`
-	// Timestamp when the flow definition was created.
-	CreatedAt time.Time `json:"created_at"`
-	// Timestamp when the flow definition was last updated.
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// GetID returns the value of ID.
-func (s *FlowDefinitionResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *FlowDefinitionResponse) GetName() string {
-	return s.Name
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *FlowDefinitionResponse) GetProjectID() string {
-	return s.ProjectID
-}
-
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionResponse) GetSchemaURI() OptURI {
-	return s.SchemaURI
-}
-
-// GetStatus returns the value of Status.
-func (s *FlowDefinitionResponse) GetStatus() FlowDefinitionStatus {
-	return s.Status
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *FlowDefinitionResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *FlowDefinitionResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *FlowDefinitionResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *FlowDefinitionResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *FlowDefinitionResponse) SetProjectID(val string) {
-	s.ProjectID = val
-}
-
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionResponse) SetSchemaURI(val OptURI) {
-	s.SchemaURI = val
-}
-
-// SetStatus sets the value of Status.
-func (s *FlowDefinitionResponse) SetStatus(val FlowDefinitionStatus) {
-	s.Status = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *FlowDefinitionResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
 }
 
 // The lifecycle state of this flow definition.

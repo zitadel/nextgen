@@ -27,7 +27,7 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 		return nil, err
 	}
 
-	return flowDefinitionDetailResponse(flowDefinition), nil
+	return flowDefinitionResponse(flowDefinition), nil
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
@@ -39,7 +39,7 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 	if err != nil {
 		return nil, err
 	}
-	return flowDefinitionDetailResponse(definition), nil
+	return flowDefinitionResponse(definition), nil
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
@@ -53,9 +53,9 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	if err != nil {
 		return nil, err
 	}
-	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(listed.Items))
+	respDefinitions := make([]api.FlowDefinitionDetailResponse, 0, len(listed.Items))
 	for _, def := range listed.Items {
-		respDefinitions = append(respDefinitions, flowDefinitionResponse(def))
+		respDefinitions = append(respDefinitions, *flowDefinitionResponse(def))
 	}
 	resp := &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}
 	if listed.NextPageToken != "" {
@@ -79,7 +79,7 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 		return nil, err
 	}
 
-	resp := flowDefinitionDetailResponse(flowDefinition)
+	resp := flowDefinitionResponse(flowDefinition)
 	return resp, nil
 }
 
@@ -278,18 +278,7 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 
 /* domain to API response converters */
 
-func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) api.FlowDefinitionResponse {
-	return api.FlowDefinitionResponse{
-		ID:        flowDefinition.ID,
-		Name:      flowDefinition.Name,
-		ProjectID: flowDefinition.ProjectID,
-		CreatedAt: flowDefinition.CreatedAt,
-		UpdatedAt: flowDefinition.UpdatedAt,
-		Status:    api.FlowDefinitionStatus(flowDefinition.Status.String()),
-	}
-}
-
-func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionDetailResponse {
+func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionDetailResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{

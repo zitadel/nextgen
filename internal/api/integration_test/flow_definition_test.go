@@ -848,27 +848,13 @@ func TestListFlowDefinitions(t *testing.T) {
 				ProjectID: api.ProjectID(project1.ID),
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
+				FlowDefinitions: []api.FlowDefinitionDetailResponse{
 					{
-						Name:      "default-login",
-						ProjectID: project1.ID,
+						FlowDefinition: api.FlowDefinition{Name: "default-login"},
+						ProjectID:      project1.ID,
 					}, // for the default flow definition
-					{
-						ID:        flowDef1.ID,
-						Name:      flowDef1.FlowDefinition.GetName(),
-						Status:    flowDef1.FlowDefinition.GetStatus(),
-						ProjectID: flowDef1.ProjectID,
-						CreatedAt: flowDef1.CreatedAt,
-						UpdatedAt: flowDef1.UpdatedAt,
-					},
-					{
-						ID:        flowDef2.ID,
-						Name:      flowDef2.FlowDefinition.GetName(),
-						Status:    flowDef2.FlowDefinition.GetStatus(),
-						ProjectID: flowDef2.ProjectID,
-						CreatedAt: flowDef2.CreatedAt,
-						UpdatedAt: flowDef2.UpdatedAt,
-					},
+					*flowDef1,
+					*flowDef2,
 				},
 			},
 		},
@@ -879,19 +865,12 @@ func TestListFlowDefinitions(t *testing.T) {
 				ProjectID: api.ProjectID(project2.ID),
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
+				FlowDefinitions: []api.FlowDefinitionDetailResponse{
 					{
-						Name:      "default-login",
-						ProjectID: project2.ID,
+						FlowDefinition: api.FlowDefinition{Name: "default-login"},
+						ProjectID:      project2.ID,
 					}, // for the default flow definition
-					{
-						ID:        flowDef3.ID,
-						Name:      flowDef3.FlowDefinition.GetName(),
-						ProjectID: flowDef3.ProjectID,
-						Status:    flowDef3.FlowDefinition.GetStatus(),
-						CreatedAt: flowDef3.CreatedAt,
-						UpdatedAt: flowDef3.UpdatedAt,
-					},
+					*flowDef3,
 				},
 			},
 		},
@@ -906,15 +885,8 @@ func TestListFlowDefinitions(t *testing.T) {
 				},
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
-					{
-						ID:        flowDef2.ID,
-						Name:      flowDef2.FlowDefinition.GetName(),
-						ProjectID: flowDef2.ProjectID,
-						Status:    flowDef2.FlowDefinition.GetStatus(),
-						CreatedAt: flowDef2.CreatedAt,
-						UpdatedAt: flowDef2.UpdatedAt,
-					},
+				FlowDefinitions: []api.FlowDefinitionDetailResponse{
+					*flowDef2,
 				},
 			},
 		},
@@ -929,19 +901,12 @@ func TestListFlowDefinitions(t *testing.T) {
 				},
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
+				FlowDefinitions: []api.FlowDefinitionDetailResponse{
 					{
-						Name:      "default-login",
-						ProjectID: project1.ID,
+						FlowDefinition: api.FlowDefinition{Name: "default-login"},
+						ProjectID:      project1.ID,
 					}, // for the default flow definition
-					{
-						ID:        flowDef1.ID,
-						Name:      flowDef1.FlowDefinition.GetName(),
-						ProjectID: flowDef1.ProjectID,
-						Status:    flowDef1.FlowDefinition.GetStatus(),
-						CreatedAt: flowDef1.CreatedAt,
-						UpdatedAt: flowDef1.UpdatedAt,
-					},
+					*flowDef1,
 				},
 			},
 		},
@@ -952,10 +917,10 @@ func TestListFlowDefinitions(t *testing.T) {
 				ProjectID: api.ProjectID(project3.ID),
 			},
 			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
+				FlowDefinitions: []api.FlowDefinitionDetailResponse{
 					{
-						Name:      "default-login",
-						ProjectID: project3.ID,
+						FlowDefinition: api.FlowDefinition{Name: "default-login"},
+						ProjectID:      project3.ID,
 					}, // for the default flow definition
 				},
 			},
@@ -981,24 +946,32 @@ func TestListFlowDefinitions(t *testing.T) {
 			actual := resp.(*api.FlowDefinitionListResponse)
 
 			assert.Equal(t, len(expected.FlowDefinitions), len(actual.FlowDefinitions))
-			expectedFlowDefsMap := make(map[string]api.FlowDefinitionResponse, len(expected.FlowDefinitions))
-			for _, flowDef := range expected.FlowDefinitions {
-				expectedFlowDefsMap[flowDef.Name] = flowDef
-			}
-			actualFlowDefsMap := make(map[string]api.FlowDefinitionResponse, len(actual.FlowDefinitions))
+			actualFlowDefsMap := make(map[string]api.FlowDefinitionDetailResponse, len(actual.FlowDefinitions))
 			for _, flowDef := range actual.FlowDefinitions {
-				actualFlowDefsMap[flowDef.Name] = flowDef
+				actualFlowDefsMap[flowDef.FlowDefinition.Name] = flowDef
 			}
 
 			for _, flowDef := range expected.FlowDefinitions {
-				if flowDef.Name == "default-login" {
-					assert.Equal(t, flowDef.ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
+				name := flowDef.FlowDefinition.Name
+				// The default definition is server-seeded, so its id, document
+				// and timestamps are not knowable here.
+				if name == "default-login" {
+					assert.Equal(t, flowDef.ProjectID, actualFlowDefsMap[name].ProjectID)
 					continue
 				}
-				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].ID, actualFlowDefsMap[flowDef.Name].ID)
-				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Name, actualFlowDefsMap[flowDef.Name].Name)
-				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
-				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Status, actualFlowDefsMap[flowDef.Name].Status)
+				got := actualFlowDefsMap[name]
+				// A directory row renders last-changed, so the list's own
+				// timestamps have to be real.
+				assert.False(t, got.CreatedAt.IsZero())
+				assert.False(t, got.UpdatedAt.IsZero())
+				// The create response they are compared against carries zero
+				// timestamps: CreateFlowDefinition writes NOW() without reading
+				// it back, on every dialect. Everything else must match, because
+				// the list and the by-id read describe a flow definition the
+				// same way (#939) — document, purposes, audience and steps.
+				want := flowDef
+				want.CreatedAt, want.UpdatedAt = got.CreatedAt, got.UpdatedAt
+				assert.Equal(t, want, got)
 			}
 		})
 	}

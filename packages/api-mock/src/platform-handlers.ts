@@ -35,7 +35,6 @@ import type {
   InitClaim201,
   ListFlowDefinitions200,
   ListSchemas200,
-  ListFlowDefinitions200FlowDefinitionsItem,
   UpdateFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import {
@@ -249,6 +248,7 @@ function bearerToken(request: Request): string {
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * Every read serves this — list included, which is the point of #939.
  * The Go server unconditionally echoes an `audience` (empty `{}` when the
  * stored flow has none — `internal/api/flow_definition.go`); mirror that so
  * consumers exercise the same wire shape the live server produces.
@@ -257,27 +257,16 @@ function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
     id: r.id,
     project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status,
     flow_definition: {
       audience: {},
       ...(r.body as Record<string, unknown>),
+      // After the spread: an update that omits `status` keeps the stored one,
+      // which is what the endpoint documents.
+      status: r.status,
     } as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
-}
-
-function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200FlowDefinitionsItem {
-  return {
-    id: r.id,
-    name: r.name,
-    project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status as ListFlowDefinitions200FlowDefinitionsItem["status"],
-    created_at: r.createdAt,
-    updated_at: r.updatedAt,
-  };
 }
 
 function defaultHumanUserSchema(): GetSchemaById200Schema {
@@ -859,7 +848,7 @@ export function setupPlatformHandlers() {
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()]
           .filter((record) => record.projectId === query.data.project_id)
-          .map(flowListItemResponse),
+          .map(flowDetailResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
