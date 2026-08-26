@@ -227,6 +227,11 @@ type UserQueryOptions struct {
 	AttributeKeys []string
 	// Attributes, when non-empty, restricts to users matching all key/value pairs.
 	Attributes []domain.Attribute
+	// UniqueAttributesOnly restricts Attributes matching to values recorded
+	// in the unique-attributes registry. Identifier lookups set it so an
+	// equal value in a non-unique property of another user (for example a
+	// notification address) cannot make the lookup ambiguous.
+	UniqueAttributesOnly bool
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
 }

@@ -65,7 +65,8 @@ SELECT 1;
 
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM zitadel_nextgen.users`
 
-	userAttributesTable = "zitadel_nextgen.user_attributes"
+	userAttributesTable       = "zitadel_nextgen.user_attributes"
+	userUniqueAttributesTable = "zitadel_nextgen.user_unique_attributes"
 
 	userAttributesByIDsQuery = `
 SELECT user_id, key, value
@@ -211,11 +212,25 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		compileFilter(&compiler, readFilter, v2user.Schema)
 	}
 	for _, a := range opts.Attributes {
+		writeConjunct(&compiler, &hasWhere)
+		if opts.UniqueAttributesOnly {
+			hash, err := domain.UniqueValueHash(a.Value)
+			if err != nil {
+				return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+			}
+			compiler.WriteString("EXISTS (SELECT 1 FROM ")
+			compiler.WriteString(userUniqueAttributesTable)
+			compiler.WriteString(" ua WHERE ua.project_id = zitadel_nextgen.users.project_id AND ua.user_id = zitadel_nextgen.users.id AND ua.key = ")
+			compiler.WriteArg(a.Key)
+			compiler.WriteString(" AND ua.value_hash = ")
+			compiler.WriteArg(hash[:])
+			compiler.WriteString(")")
+			continue
+		}
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
-		writeConjunct(&compiler, &hasWhere)
 		compiler.WriteString("EXISTS (SELECT 1 FROM ")
 		compiler.WriteString(userAttributesTable)
 		compiler.WriteString(" a WHERE a.project_id = zitadel_nextgen.users.project_id AND a.user_id = zitadel_nextgen.users.id AND a.key = ")
