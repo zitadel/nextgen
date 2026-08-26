@@ -124,14 +124,37 @@ offers it in a step.
 | Listed and offered in a flow step | The button, on that page. | the cross-checks below |
 | Removed from `sso.providers`, or `sso.enabled: false` | This user type no longer uses the provider. Every flow that still offers it is an error until its step drops it. | Flow enables SSO, Provider ID validity, errors |
 
-A disabled slot is always written `{"enabled": false}` with no `providers`
-array.
-Disabling while keeping the list is rejected by the schema
-([below](#providers-and-enabled-must-agree)), so there is no state that reads as
-paused but behaves as removed.
-Whether `enabled: false` should instead mean paused, flows untouched and the
-button hidden at render, is a question about every authentication method, not
-only `sso`; it is recorded in the [README](README.md#product-decisions).
+A disabled authentication slot must be written exactly as `{"enabled": false}`
+and must drop its `providers` array.
+If a disabled slot attempts to retain its array, the schema will explicitly
+reject it ([below](#providers-and-enabled-must-agree)).
+
+**Preventing the "paused" illusion:**
+Retaining the array makes the configuration look like the providers are
+temporarily "paused."
+However, the validator processes `enabled: false` as a complete removal,
+throwing errors on any flow that still references those providers.
+Rejecting this shape prevents the configuration file from suggesting a state
+that doesn't actually exist.
+
+**Why a true "paused" state was rejected:**
+We evaluated treating `enabled: false` as a runtime pause (where flow validation
+passes, but the engine simply hides the SSO buttons at render time).
+This approach was rejected for two structural reasons:
+
+- **The empty step problem:** Treating `enabled: false` as a runtime "pause"
+  (simply hiding the buttons) would allow an SSO-only step to pass pre-apply
+  validation and reach the engine with zero user inputs, a state the engine
+  cannot currently handle.
+  True removal avoids this entirely by failing validation *before* the
+  configuration is applied, guaranteeing the engine never encounters an
+  unrenderable step.
+- **Semantic inconsistency:** Currently, `password.enabled: false` strictly
+  means *removed*.
+  A flow that requests a password field against a disabled password slot fails
+  validation.
+  Treating SSO as *paused* under the same boolean would either break this
+  symmetry or force the password validation rules to be dangerously loosened.
 
 Removing a provider is a two-file edit: the slug is removed from
 `sso.providers` in the user schema and from `sso_providers` in the flow
@@ -202,7 +225,7 @@ it (emitting an error like
 | **Full outcome routing** | **New:** A step with `sso_providers` must properly route `identity_unknown` and `user_already_exists`. The engine fires three possible outcomes, and routing only the callback dead-ends the other two. |
 | **Empty `claim_mapping` intersection** | **New (Warning):** If an offered provider's `claim_mapping` shares zero properties with the pinned schema, the collection fields are not prefilled, and every sign-up stops at the collection step for manual input. |
 | **Empty `verified_claims` intersection** | **New (Warning):** If a provider's `verified_claims` keys share no properties with the pinned schema, every property arrives unverified. Where a required property carries a non-empty `x-unique` scope, the auto-creation gate never passes and sign-up stops at the collection step. |
-| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs providers require (environments are design-only until [#534](https://github.com/zitadel/nextgen/issues/534)). Plan warns, never errors: a release is one artifact promoted through every environment, so a pattern environment must not block it. The engine leaves the provider buttons out at render ([area 3](3-social-login-flow.md#constraints--edge-cases)). |
+| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs providers require (environments are design-only until [#534](https://github.com/zitadel/nextgen/issues/534)). The validator returns a warning, never an error: a release is one artifact promoted through every environment, so a pattern environment must not block it. The engine leaves the provider buttons out at render ([area 3](3-social-login-flow.md#constraints--edge-cases)). |
 | **Dead capability** | **Warning:** A schema lists a provider that no flow offers. The Console shows it as a method of this user type, but no login page carries the button. |
 | **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
 
@@ -226,6 +249,8 @@ it (emitting an error like
   to re-publish or edit an affected schema body will trigger a validation error
   until a non-empty `providers` list is added or the `sso` block is removed.
   Schemas omitting the `sso` entry entirely remain unaffected.
+  Disabled slots are unaffected too: `providers` was never accepted under
+  `auth-method.json`, so no stored schema carries a disabled slot with a list.
 
 ## Dependencies
 
