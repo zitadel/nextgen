@@ -34,6 +34,18 @@ WHERE project_id = ? AND user_id IN (SELECT value FROM json_each(?))`
 	userAttributesByIDsAndKeysQuery = userAttributesByIDsQuery + `
 AND key IN (SELECT value FROM json_each(?))`
 
+	// userTeamsByIDsQuery hydrates the team memberships of one page of users
+	// (ADR 059), ordered so each user's rows arrive together and by team name.
+	// The cap is applied in Go — see the note on the postgres query for why a
+	// per-user window function is not used.
+	userTeamsByIDsQuery = `SELECT m.user_id, m.team_id, t.name, m.status, m.created_at, m.updated_at
+FROM team_memberships m
+JOIN teams t ON t.project_id = m.project_id AND t.id = m.team_id
+WHERE m.project_id = ?
+  AND m.user_id IN (SELECT value FROM json_each(?))
+  AND m.status IN (SELECT value FROM json_each(?))
+ORDER BY m.user_id, t.name, m.team_id`
+
 	deactivateUserStmt = `UPDATE users SET status = ?, updated_at = ?
 WHERE project_id = ? AND id = ?`
 
@@ -283,8 +295,62 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		if err := us.hydrateUserGroup(ctx, group, opts); err != nil {
 			return err
 		}
+		if opts.IncludeTeams {
+			if err := us.hydrateUserGroupTeams(ctx, group, opts); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// hydrateUserGroupTeams loads the team memberships of an already-read page of users
+// (ADR 059): one batched query keyed on the ids the page already returned.
+// Joining memberships into the user query instead would multiply rows — LIMIT
+// would count memberships rather than users, and the keyset cursor is
+// marshalled from the last row's sort values, so fan-out corrupts it.
+func (us userStatements) hydrateUserGroupTeams(ctx context.Context, group v2user.ProjectGroup, opts service.UserQueryOptions) error {
+	limit := opts.TeamsLimit
+	if limit <= 0 {
+		limit = service.DefaultUserTeamsLimit
+	}
+
+	idsJSON, err := json.Marshal(group.IDs)
+	if err != nil {
+		return err
+	}
+	statusesJSON, err := json.Marshal(v2user.MembershipStatusStrings())
+	if err != nil {
+		return err
+	}
+
+	collector := v2user.NewTeamCollector(group, limit)
+	rows, err := us.client.Query(ctx, userTeamsByIDsQuery, group.ProjectID, string(idsJSON), string(statusesJSON))
+	if err != nil {
+		return wrapError(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			userID               string
+			team                 domain.UserTeam
+			status               string
+			createdNano, updNano int64
+		)
+		// Timestamps come back as unix nanos here, the same way scanUserTeam
+		// reads them for the paginated membership list.
+		if err := rows.Scan(&userID, &team.TeamID, &team.TeamName, &status, &createdNano, &updNano); err != nil {
+			return err
+		}
+		team.ProjectID = group.ProjectID
+		team.UserID = userID
+		team.Status = domain.MembershipStatus(status)
+		team.CreatedAt = timeFromUnixNano(createdNano)
+		team.UpdatedAt = timeFromUnixNano(updNano)
+		collector.Add(userID, team)
+	}
+	return wrapError(rows.Err())
 }
 
 func (us userStatements) hydrateUserGroup(ctx context.Context, group v2user.ProjectGroup, opts service.UserQueryOptions) error {

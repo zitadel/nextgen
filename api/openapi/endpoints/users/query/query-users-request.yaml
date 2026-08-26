@@ -11,6 +11,14 @@ properties:
     oneOf:
       - $ref: ../../../components/schemas/page-token.yaml
       - type: 'null'
+  expand:
+    type: array
+    description: |
+      Related collections to embed on each user (ADR 059). Omit it and no
+      embedded collection is returned. An unrecognised value is rejected.
+    uniqueItems: true
+    items:
+      $ref: user-expand.yaml
   sorting:
     type: object
     required:

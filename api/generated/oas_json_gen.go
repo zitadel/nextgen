@@ -51214,6 +51214,16 @@ func (s *QueryUsersRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Expand != nil {
+			e.FieldStart("expand")
+			e.ArrStart()
+			for _, elem := range s.Expand {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
 		if s.Sorting.Set {
 			e.FieldStart("sorting")
 			s.Sorting.Encode(e)
@@ -51231,11 +51241,12 @@ func (s *QueryUsersRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfQueryUsersRequest = [4]string{
+var jsonFieldsNameOfQueryUsersRequest = [5]string{
 	0: "limit",
 	1: "page_token",
-	2: "sorting",
-	3: "filter",
+	2: "expand",
+	3: "sorting",
+	4: "filter",
 }
 
 // Decode decodes QueryUsersRequest from json.
@@ -51266,6 +51277,23 @@ func (s *QueryUsersRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"page_token\"")
+			}
+		case "expand":
+			if err := func() error {
+				s.Expand = make([]UserExpand, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem UserExpand
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Expand = append(s.Expand, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"expand\"")
 			}
 		case "sorting":
 			if err := func() error {
@@ -63039,13 +63067,31 @@ func (s *User) encodeFields(e *jx.Encoder) {
 		e.FieldStart("metadata")
 		s.Metadata.Encode(e)
 	}
+	{
+		if s.Teams != nil {
+			e.FieldStart("teams")
+			e.ArrStart()
+			for _, elem := range s.Teams {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
+		if s.TeamsTruncated.Set {
+			e.FieldStart("teams_truncated")
+			s.TeamsTruncated.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfUser = [4]string{
+var jsonFieldsNameOfUser = [6]string{
 	0: "id",
 	1: "schema",
 	2: "attributes",
 	3: "metadata",
+	4: "teams",
+	5: "teams_truncated",
 }
 
 // Decode decodes User from json.
@@ -63098,6 +63144,33 @@ func (s *User) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "teams":
+			if err := func() error {
+				s.Teams = make([]UserTeam, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem UserTeam
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Teams = append(s.Teams, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"teams\"")
+			}
+		case "teams_truncated":
+			if err := func() error {
+				s.TeamsTruncated.Reset()
+				if err := s.TeamsTruncated.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"teams_truncated\"")
 			}
 		default:
 			return d.Skip()
@@ -65383,6 +65456,44 @@ func (s UserDeletedEventDelegationType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserExpand as json.
+func (s UserExpand) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes UserExpand from json.
+func (s *UserExpand) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserExpand to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch UserExpand(v) {
+	case UserExpandTeams:
+		*s = UserExpandTeams
+	default:
+		*s = UserExpand(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserExpand) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserExpand) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
