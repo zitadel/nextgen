@@ -17,7 +17,7 @@ import { ComingSoon } from "../../components/coming-soon";
  * Home will be built on it once there is something true to put in it. What it
  * needs and does not have:
  *
- *   - the stat figures: no aggregate/count endpoint exists (`GET /users` and
+ *   - the stat figures: no aggregate/count endpoint exists (`POST /users/query` and
  *     `POST /projects/query` return pages, and the current query is
  *     scope-pinned until root ADR 053's authorized-project query lands)
  *   - "Total Projects" and its trend: no multi-project list, no time series

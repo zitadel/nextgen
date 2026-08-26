@@ -4052,46 +4052,6 @@ func (s *ListUserTeamsResponse) Validate() error {
 	return nil
 }
 
-func (s *ListUsersResponse) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if s.Users == nil {
-			return errors.New("nil is invalid value")
-		}
-		var failures []validate.FieldError
-		for i, elem := range s.Users {
-			if err := func() error {
-				if err := elem.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				failures = append(failures, validate.FieldError{
-					Name:  fmt.Sprintf("[%d]", i),
-					Error: err,
-				})
-			}
-		}
-		if len(failures) > 0 {
-			return &validate.Error{Fields: failures}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "users",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
 func (s *PasskeyChallengePayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

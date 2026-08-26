@@ -144,7 +144,7 @@ Vite, for pointing a separately-running console at a fresh instance. Overrides:
 `CONSOLE_DEV_EMAIL`, `CONSOLE_DEV_PASSWORD`, `CONSOLE_DEV_ZITADEL_PORT`,
 `CONSOLE_DEV_ORIGIN`. See [`scripts/dev-real.mts`](scripts/dev-real.mts).
 
-Note `listUsers` requires `user.read`, which only the **project secret** carries
+Note `queryUsers` requires `user.read`, which only the **project secret** carries
 — the browser-plane publishable key is deliberately refused
 (`internal/api/user.go`). So real list screens need the proxy's
 `CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.

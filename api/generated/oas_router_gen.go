@@ -105,7 +105,6 @@ var (
 		"PATCH":  "Authorization,Content-Type",
 	}
 	rn20AllowedHeaders = map[string]string{
-		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
 	}
 	rn55AllowedHeaders = map[string]string{
@@ -1262,13 +1261,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				if len(elem) == 0 {
 					switch r.Method {
-					case "GET":
-						s.handleListUsersRequest([0]string{}, elemIsEscaped, w, r)
 					case "POST":
 						s.handleCreateUserRequest([0]string{}, elemIsEscaped, w, r)
 					default:
 						s.notAllowed(w, r, notAllowedParams{
-							allowedMethods: "GET,POST",
+							allowedMethods: "POST",
 							allowedHeaders: rn20AllowedHeaders,
 							acceptPost:     "application/json",
 							acceptPatch:    "",
@@ -2757,15 +2754,6 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 				if len(elem) == 0 {
 					switch method {
-					case "GET":
-						r.name = ListUsersOperation
-						r.summary = "List users"
-						r.operationID = "listUsers"
-						r.operationGroup = ""
-						r.pathPattern = "/users"
-						r.args = args
-						r.count = 0
-						return r, true
 					case "POST":
 						r.name = CreateUserOperation
 						r.summary = "Create user"

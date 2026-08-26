@@ -165,10 +165,6 @@ type ListUserTeamsRes interface {
 	listUserTeamsRes()
 }
 
-type ListUsersRes interface {
-	listUsersRes()
-}
-
 type PatchProjectRes interface {
 	patchProjectRes()
 }

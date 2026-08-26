@@ -17,7 +17,7 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helper
 // The platform is unreachable unless a test says otherwise — a network error,
 // not an HTTP status — so the user-presence probe reads as "unknown" and
 // status keeps its lifecycle-only output.
-const server = setupServer(http.get("*/users", () => HttpResponse.error()));
+const server = setupServer(http.post("*/users/query", () => HttpResponse.error()));
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterAll(() => server.close());
@@ -251,7 +251,7 @@ describe("status command", () => {
 
   it("stages verify-login guidance while the project has no users", async () => {
     const cwd = await configuredProject();
-    server.use(http.get("*/users", () => HttpResponse.json({ users: [] })));
+    server.use(http.post("*/users/query", () => HttpResponse.json({ users: [] })));
 
     const res = await status(cwd);
 
@@ -271,7 +271,7 @@ describe("status command", () => {
 
   it("switches to customize/publish guidance once users exist", async () => {
     const cwd = await configuredProject();
-    server.use(http.get("*/users", () => HttpResponse.json({ users: [{ id: "usr_1" }] })));
+    server.use(http.post("*/users/query", () => HttpResponse.json({ users: [{ id: "usr_1" }] })));
 
     const res = await status(cwd);
 

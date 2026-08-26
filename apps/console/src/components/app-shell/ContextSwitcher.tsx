@@ -54,7 +54,7 @@ export function ContextSwitcher() {
 
             - **no current team.** Neither `GET /sessions/me` nor the runtime
               document carries one, so there is nothing to show as selected.
-            - **nothing is team-scoped.** `GET /users` takes no `team_id`, and the
+            - **nothing is team-scoped.** `POST /users/query` takes no `team_id`, and the
               users and schemas lists are scoped by project, so choosing a team
               would change nothing on screen. `team_id` exists only as an optional
               param on create and get-by-id calls.

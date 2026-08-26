@@ -83,36 +83,3 @@ post:
             $ref: ../../components/error-details.yaml
     default:
       $ref: createUser-error-response.yaml
-
-get:
-  operationId: listUsers
-  summary: List users
-  tags:
-    - Users
-  parameters:
-    - $ref: ../../components/parameters/limit.yaml
-    - $ref: ../../components/parameters/page-token.yaml
-  security:
-    - oauth2:
-        - user.read
-  responses:
-    '200':
-      description: A list of users was returned
-      content:
-        application/json:
-          schema:
-            $ref: list-users-response.yaml
-    '400':
-      description: The provided input was not valid
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-    '500':
-      description: Something went wrong on the server. This was not your fault.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-    default:
-      $ref: listUsers-error-response.yaml

@@ -90,16 +90,16 @@ Users live inside projects. A user in the platform project is a developer/admin;
 /me/memberships                 # every team_membership the caller holds
 ```
 
-Create/list with explicit scope:
+Create takes an explicit scope; the list derives it from the credential:
 
 ```http
 POST /users?project_id=…        # body: { schema, attributes: { email, ... } }
-GET  /users?limit=…&page_token=…   # cursor-paginated list
 POST /users/query               # structured filters + cursor pagination (ADR 031)
 ```
 
-`POST /users/query` takes no `project_id`, unlike the other query endpoints:
-the users list is bound to the token's own project by construction.
+There is no `GET /users`, matching projects and teams. `POST /users/query`
+takes no `project_id` either, unlike the other query endpoints: the users list
+is bound to the token's own project by construction.
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
 and credentials, and deactivates memberships. Teams and resources the user
