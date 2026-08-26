@@ -1,5 +1,5 @@
 {
-  "$schema": "../meta/idp-connection.json",
+  "$schema": "./idp-connection.json",
   "slug": "github",
   "protocol": "oauth2",
   "template": "github",
