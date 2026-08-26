@@ -8,7 +8,7 @@ Three capabilities, one naming cleanup:
 3. Gate the roster behind `team_membership.read`.
 4. Make all of it unambiguously *not* `lifecycle_owner_team_id`.
 
-Delivered as a stack of four PRs (§5).
+Delivered as a stack of five PRs (§6).
 
 ---
 
@@ -63,11 +63,40 @@ ADR 031 is explicit that `GET` carries no filter/sort and that structured
 querying lives at `POST /<resource>/query`. So the membership filter is a
 **filter field in the request body**, not a query parameter.
 
-`GET /users` stays exactly as it is — cursor list, no filters — and gains only
-`expand` (§2).
-
 Reference implementation is `POST /sessions/query` (ADR 027), with
 `POST /teams/query` as the second example.
+
+### `GET /users` is removed
+
+`POST /users/query` replaces it outright. Projects and teams have no `GET`
+collection at all — `system-permission-catalog.md:109` states it plainly for
+projects ("Listing is `POST /projects/query` — there is no `GET /projects`"),
+and `team.read` at line 155 lists only `POST /teams/query`, `GET /teams/{id}`.
+`GET /users` is the lone outlier. Keeping both would mean two list surfaces
+with different capabilities, and the filterable one immediately becomes the
+only one anybody uses.
+
+Remove the whole mechanism, not a deprecated shell: the path, the handler,
+`list-users-response.yaml`, `listUsers-error-response.yaml`, the generated
+`ListUsersParams`, and the mock's GET handler all go. Pre-production, so no
+deprecation window.
+
+Six consumers migrate to `queryUsers`:
+
+| Consumer | Call |
+|---|---|
+| `apps/cli/src/commands/status.ts:196` | `listUsers({ limit: 1 })` presence probe |
+| `apps/console/src/routes/_authed/users/index.tsx:44,168` | list route + `page_token` paging |
+| `packages/testing/tests/integration/kit.test.ts:31` | `zitadel.api.listUsers()` |
+| `packages/api-mock/src/platform-handlers.ts:690` | `http.get("*/users")` → `http.post("*/users/query")`, body-parsed instead of `ListUsersQueryParams` |
+| `apps/cli/tests/unit/commands/status.test.ts:20,254,274`, `tests/integration/contract.test.ts:15` | msw `http.get` handlers |
+| `internal/api/integration_test/user_list_test.go` | rewrite against `queryUsers` |
+
+The CLI presence probe becomes an uncacheable POST. ADR 031 already accepted
+that trade-off explicitly ("Where POST lacks, is in caching … it is a trade-off
+we are willing to take"), and a `limit: 1` probe is cheap either way.
+
+`GET /users/{user_id}` and `GET /users/{user_id}/teams` are untouched.
 
 ### Spec
 
@@ -99,11 +128,10 @@ The two team fields sit adjacent in the filter enum. Their descriptions carry
 the ADR 024 distinction — this is the highest-leverage place for it.
 
 **No `project_id` parameter.** `POST /teams/query` and `POST /projects/query`
-take one, but `GET /users` deliberately does not: it is bound to the token's
-project by construction (`internal/api/user.go:64-70`). `POST /users/query`
-follows the users surface, not the teams surface — project comes from
-`scopeCtx.ProjectID`. Worth a comment in the handler saying so, since it
-diverges from the other query endpoints on purpose.
+take one, but the users list deliberately does not: it is bound to the token's
+project by construction (`internal/api/user.go:60-70`). Carry that rationale —
+and its handler comment — across to `QueryUsers`, since it diverges from the
+other query endpoints on purpose.
 
 ### Handler
 
@@ -115,8 +143,8 @@ type parameter, so they work unchanged.
 ### Service
 
 `ListUsersInput` (`internal/service/user.go:44`) gains `Sorting *Sorting` and
-`Filters []Filter`. One `ListUsers` serves both `GET /users` (no filters) and
-`POST /users/query`.
+`Filters []Filter`. The service method keeps its name — `ListUsers` is the
+storage-layer verb too, and only the HTTP surface is changing.
 
 Mirror the team implementation (`internal/service/team.go:105-215`):
 
@@ -126,9 +154,9 @@ Mirror the team implementation (`internal/service/team.go:105-215`):
 - `userField(field string)` → `domain.UserField` for sorting, rejecting
   `member_of_team_id` explicitly with a message saying it is filter-only.
 - `listOrderBy(req.Sorting, domain.UserFieldCreatedAt, database.OrderDesc,
-  userField, domain.UserFieldID)`. Note **`OrderDesc`** — `GET /users` is
+  userField, domain.UserFieldID)`. Note **`OrderDesc`** — the users list is
   newest-first today (`internal/service/user.go:205`), unlike teams' ascending
-  default. Keep it, or `GET /users` silently changes order.
+  default. Carry it over, or the console's user list silently reverses.
 
 ### The membership filter does not fit `database.Filter`
 
@@ -182,15 +210,20 @@ Say so in the enum description — a pending invitee will not match. Adding a
 
 ## 2. Expansion: `expand=teams`
 
-Applies to both surfaces: an `expand` **query parameter** on `GET /users`, and
-an `expand` **body field** on `POST /users/query` (mixing a query param into a
-POST body request would be worse than the small asymmetry).
+With `GET /users` gone, `expand` is a **body field on `POST /users/query`
+only** — no query-parameter form is needed anywhere. The general pattern is
+recorded in ADR 056 (§8).
+
+`GET /users/{user_id}` is deliberately left without `expand`: a single user's
+roster already has a dedicated paginated endpoint at
+`GET /users/{user_id}/teams`, and expansion exists to kill the N+1 on a *list*.
+Adding it there later is cheap — the hydrate works for one user — but it is not
+in this plan.
 
 ### Contract
 
 - **Values** — closed enum, only `teams` today. Unknown value is
-  `400 req.invalid`, never a silent ignore. Query-param form uses
-  `style: form`, `explode: false`.
+  `400 req.invalid`, never a silent ignore.
 - **Response** — `user.yaml` gains an optional top-level `teams`, items `$ref`
   the existing `endpoints/users/by_id/teams/user-team.yaml` (`id`, `name`,
   `membership_status`, `created_at`, `updated_at`). Reusing that schema keeps
@@ -296,14 +329,14 @@ Return `403` rather than silently dropping the `teams` field — a caller that
 asked for expansion and got a user object without it cannot tell whether the
 user has no teams or whether they were not allowed to see them.
 
-Declare `team_membership.read` in the `security` block of `queryUsers`,
-`listUsers`, and `listUserTeams` so the spec states the target contract even
-while the handler runs the interim check.
+Declare `team_membership.read` in the `security` block of `queryUsers` and
+`listUserTeams` so the spec states the target contract even while the handler
+runs the interim check.
 
 ### Where the check goes
 
-- `GET /users` and `POST /users/query`: only when `expand` includes `teams`.
-  Unexpanded listing keeps requiring `user.read` alone.
+- `POST /users/query`: only when `expand` includes `teams`. Unexpanded
+  querying keeps requiring `user.read` alone.
 - `GET /users/{user_id}/teams`: always.
 - `member_of_team_id` **filtering** does not require it. Filtering by
   membership returns users, not roster rows — no membership data is disclosed
@@ -340,12 +373,15 @@ to readable teams.
 
 ## 5. Docs
 
-- `docs/design/api/resource-map.md:97` — add `POST /users/query` next to the
-  `GET /users` line.
-- `docs/design/api/system-permission-catalog.md:170` — `user.read` row: note
-  that roster expansion additionally requires `team_membership.read`, and
-  record the interim operator-secret behavior as drift with the other
-  ADR 036 rows.
+- **`docs/adrs/056-expanding-embedded-objects.md`** — new ADR recording the
+  `expand` pattern itself (§8). Add its row to `docs/adrs/README.md`.
+- `docs/design/api/resource-map.md:97` — replace the `GET /users` line with
+  `POST /users/query`.
+- `docs/design/api/system-permission-catalog.md:170` — `user.read` row becomes
+  `POST /users/query`, `GET /users/{id}`, matching the `team.read` row's shape
+  at line 155. Note that roster expansion additionally requires
+  `team_membership.read`, and record the interim operator-secret behavior as
+  drift with the other ADR 036 rows.
 - `docs/adrs/024-user-team-lifecycle-ownership.md` — append a dated Amendment
   recording that the API now spells the two concepts `member_of_team_id` and
   `lifecycle_owner_team_id`. Do not edit the original decision text.
@@ -360,18 +396,30 @@ Each branches off the previous, not off `main`.
 | # | Branch | Contents |
 |---|---|---|
 | 1 | `users-team-param-rename` | Split `team-id.yaml` into `member-of-team-id.yaml` + `lifecycle-owner-team-id.yaml`; update `POST /users` and `GET /users/{user_id}`; ADR 024 amendment. Mechanical, no behavior change. |
-| 2 | `users-query-endpoint` | `POST /users/query` with `created_at` / `id` / `schema` / `status` / `lifecycle_owner_team_id`. No membership filter yet. Spec, handler, service filter+sort mapping, tests, ADR 027 amendment. |
-| 3 | `users-query-membership-filter` | `member_of_team_id` filter field, `splitUserFilters`, service wiring. No storage work. |
-| 4 | `users-expand-teams` | `expand=teams` on both surfaces, three dialect hydrates, `stmttest` suite, `requireRosterRead` gate, tightening `GET /users/{user_id}/teams`, catalog doc update. |
+| 2 | `users-query-endpoint` | Add `POST /users/query` with `created_at` / `id` / `schema` / `status` / `lifecycle_owner_team_id`. No membership filter yet, `GET /users` still present. Spec, handler, service filter+sort mapping, tests, ADR 027 amendment. |
+| 3 | `users-drop-get-list` | Remove `GET /users` and migrate all six consumers (§1). Touches Go, console, CLI, `api-mock`, `packages/testing` — no new behavior, so it reviews as a migration. |
+| 4 | `users-query-membership-filter` | `member_of_team_id` filter field, `splitUserFilters`, service wiring. No storage work. |
+| 5 | `users-expand-teams` | `expand=teams`, three dialect hydrates, `stmttest` suite, `requireRosterRead` gate, tightening `GET /users/{user_id}/teams`, ADR 056, catalog doc update. |
 
-PR 1 is the smallest and unblocks the naming used by 2–4. PR 4 is the only one
-with storage work and should be reviewed on its own.
+PR 1 is the smallest and unblocks the naming used by 2–5. PRs 2 and 3 are split
+so the additive spec change is reviewable apart from the five-package
+migration; 3 must not land before 2, or there is no way to list users. PR 5 is
+the only one with storage work.
 
 ## 7. Decisions still open
 
-1. **Truncation cap of 10** — confirm or set a number.
-2. **Filter active-only vs expansion full-roster** — confirm the asymmetry is
+1. **Filter active-only vs expansion full-roster** — confirm the asymmetry is
    wanted rather than adding a `membership_status` filter field now.
-3. **Interim roster gate** — confirm that letting an operator project secret
+2. **Interim roster gate** — confirm that letting an operator project secret
    satisfy `team_membership.read` until #420 is acceptable, versus blocking
    expansion entirely until granular scopes ship.
+
+Settled: truncation cap is **10** (§2).
+
+## 8. ADR 056: expanding embedded objects
+
+Drafted at `docs/adrs/056-expanding-embedded-objects.md`. It records the
+pattern generally — opt-in `expand`, closed enum, absent-vs-empty, hard cap
+with a truncation flag, hydrate-never-join, and a paginated sub-resource as the
+escape hatch — so the next resource that wants an embedded child does not
+re-litigate it. Lands with PR 5.
