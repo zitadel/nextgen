@@ -107,6 +107,43 @@ func TestUserService_ListUsers_ValidationErrors(t *testing.T) {
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
+			name: "team_id cannot be sorted by",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "team_id", Direction: "asc"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			// The storage option holds one team and filters are ANDed, so a
+			// second value would silently win over the first.
+			name: "team_id given twice is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters: []service.Filter{
+					{Field: "team_id", Operation: "equals", Value: "team_1"},
+					{Field: "team_id", Operation: "equals", Value: "team_2"},
+				},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "contains on team_id is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "team_id", Operation: "contains", Value: "team_"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string team_id value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "team_id", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
 			name: "unparseable created_at value is invalid",
 			input: service.ListUsersInput{
 				ProjectID: "proj_1",
@@ -202,10 +239,57 @@ func TestUserService_ListUsers_TranslatesQuery(t *testing.T) {
 				{Field: "id", Operation: "equals", Value: "usr_1"},
 				{Field: "schema", Operation: "contains", Value: "sch_"},
 				{Field: "status", Operation: "equals", Value: "active"},
-				{Field: "lifecycle_owner_team_id", Operation: "equals", Value: "team_1"},
+				{Field: "team_id", Operation: "equals", Value: "team_1"},
+				{Field: "lifecycle_owner_team_id", Operation: "equals", Value: "team_2"},
 			},
 		})
 		require.NoError(t, err)
+	})
+
+	// Membership is not a column on the user, so it must not become a
+	// database.Filter — it reaches storage as the EXISTS option instead.
+	t.Run("team_id reaches storage as a query option, not a filter", func(t *testing.T) {
+		t.Parallel()
+
+		svc, stmts := newMockedUserService(t)
+		var gotOpts service.UserQueryOptions
+		var gotList *database.ListOptions[domain.UserField]
+		stmts.EXPECT().
+			ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], q service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				gotList = opts
+				gotOpts = q
+				return &database.ListResult[*domain.User]{}, nil
+			})
+
+		_, err := svc.ListUsers(t.Context(), service.ListUsersInput{
+			ProjectID: "proj_1",
+			Filters:   []service.Filter{{Field: "team_id", Operation: "equals", Value: "team_1"}},
+		})
+		require.NoError(t, err)
+
+		require.NotNil(t, gotOpts.MembershipTeamID)
+		assert.Equal(t, "team_1", *gotOpts.MembershipTeamID)
+		// Only the implicit project predicate is left on the row filter.
+		assert.NotNil(t, gotList.Filter)
+	})
+
+	t.Run("no membership filter leaves the query option unset", func(t *testing.T) {
+		t.Parallel()
+
+		svc, stmts := newMockedUserService(t)
+		var gotOpts service.UserQueryOptions
+		stmts.EXPECT().
+			ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ *database.ListOptions[domain.UserField], q service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				gotOpts = q
+				return &database.ListResult[*domain.User]{}, nil
+			})
+
+		_, err := svc.ListUsers(t.Context(), service.ListUsersInput{ProjectID: "proj_1"})
+		require.NoError(t, err)
+
+		assert.Nil(t, gotOpts.MembershipTeamID)
 	})
 }
 

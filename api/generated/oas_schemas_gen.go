@@ -41358,12 +41358,21 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 // - `schema`: the schema the user's attributes satisfy, matched against the
 // value the user carries as `schema`
 // - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
+// - `team_id`: restricts the result to users holding an **active** membership
+// in that team. A user who has been invited but has not accepted does not
+// match. `equals` is the only operation, and the field may be given once —
+// this names one team, not a set.
 // - `lifecycle_owner_team_id`: the team that owns the user's identity
-// lifecycle — who may deprovision them (ADR 024). This is not team
-// participation: a user's roster is a separate collection, read at
-// `GET /users/{user_id}/teams`. The column is nullable for self-owned users,
-// and a null filter value is rejected, so self-owned users cannot be selected
-// by this field.
+// lifecycle. The column is nullable for self-owned users, and a null filter
+// value is rejected, so self-owned users cannot be selected by this field.
+// **The two team fields answer different questions.** `team_id` is membership:
+// which team the user collaborates in, readable per user at
+// `GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which
+// team may deprovision the user. A user can belong to many teams while owning
+// their own lifecycle, so the two disagree often and neither implies the other
+// (ADR 024).
+// `team_id` is filterable but not sortable — it is not a column on the user, so
+// it is absent from the sort-field enum.
 // Ref: #
 type UserFilterField string
 
@@ -41372,6 +41381,7 @@ const (
 	UserFilterFieldID                   UserFilterField = "id"
 	UserFilterFieldSchema               UserFilterField = "schema"
 	UserFilterFieldStatus               UserFilterField = "status"
+	UserFilterFieldTeamID               UserFilterField = "team_id"
 	UserFilterFieldLifecycleOwnerTeamID UserFilterField = "lifecycle_owner_team_id"
 )
 
@@ -41382,6 +41392,7 @@ func (UserFilterField) AllValues() []UserFilterField {
 		UserFilterFieldID,
 		UserFilterFieldSchema,
 		UserFilterFieldStatus,
+		UserFilterFieldTeamID,
 		UserFilterFieldLifecycleOwnerTeamID,
 	}
 }
@@ -41396,6 +41407,8 @@ func (s UserFilterField) MarshalText() ([]byte, error) {
 	case UserFilterFieldSchema:
 		return []byte(s), nil
 	case UserFilterFieldStatus:
+		return []byte(s), nil
+	case UserFilterFieldTeamID:
 		return []byte(s), nil
 	case UserFilterFieldLifecycleOwnerTeamID:
 		return []byte(s), nil
@@ -41418,6 +41431,9 @@ func (s *UserFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case UserFilterFieldStatus:
 		*s = UserFilterFieldStatus
+		return nil
+	case UserFilterFieldTeamID:
+		*s = UserFilterFieldTeamID
 		return nil
 	case UserFilterFieldLifecycleOwnerTeamID:
 		*s = UserFilterFieldLifecycleOwnerTeamID

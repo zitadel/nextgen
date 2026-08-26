@@ -17,6 +17,7 @@ const (
 	userFieldID                   = "id"
 	userFieldSchema               = "schema"
 	userFieldStatus               = "status"
+	userFieldTeamID               = "team_id"
 	userFieldLifecycleOwnerTeamID = "lifecycle_owner_team_id"
 )
 
@@ -203,9 +204,14 @@ func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) err
 }
 
 func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
-	filters := make([]database.Filter[domain.UserField], 0, len(input.Filters)+1)
+	columnFilters, queryOpts, err := splitUserFilters(input.Filters)
+	if err != nil {
+		return nil, err
+	}
+
+	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
-	for _, f := range input.Filters {
+	for _, f := range columnFilters {
 		filter, err := userFilter(f)
 		if err != nil {
 			return nil, err
@@ -227,7 +233,7 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 			Cursor:  []byte(input.PageToken),
 			OrderBy: orderBy,
 		},
-	}, UserQueryOptions{})
+	}, queryOpts)
 	if err != nil {
 		return nil, mapListError(err, "failed to list users from database")
 	}
@@ -238,9 +244,44 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 	}, nil
 }
 
+// splitUserFilters separates the predicates that compile to a filter on the
+// users row from the one that does not. Team membership lives in another
+// table and reaches the query as [UserQueryOptions.MembershipTeamID], which
+// the dialects compile to an EXISTS clause — the same shape
+// [UserQueryOptions.Attributes] already uses for the EAV match.
+func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
+	var (
+		columns []Filter
+		opts    UserQueryOptions
+	)
+	for _, f := range filters {
+		if f.Field != userFieldTeamID {
+			columns = append(columns, f)
+			continue
+		}
+		// The storage option holds one team and ADR 031 ANDs filters, so a
+		// second value would silently win over the first. Refuse instead.
+		if opts.MembershipTeamID != nil {
+			return nil, UserQueryOptions{}, domain.ErrRequestInvalid().
+				WithDetails(fmt.Sprintf("%s may only be given once", userFieldTeamID))
+		}
+		if f.Operation != filterOpEquals {
+			return nil, UserQueryOptions{}, domain.ErrRequestInvalid().
+				WithDetails(fmt.Sprintf("operation %q is not valid for %s", f.Operation, userFieldTeamID))
+		}
+		teamID, err := stringFilterValue(f)
+		if err != nil {
+			return nil, UserQueryOptions{}, err
+		}
+		opts.MembershipTeamID = &teamID
+	}
+	return columns, opts, nil
+}
+
 // userFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
+// [splitUserFilters] has already taken team_id out.
 func userFilter(f Filter) (database.Filter[domain.UserField], error) {
 	switch f.Field {
 	case userFieldCreatedAt:
@@ -312,6 +353,11 @@ func userField(field string) (domain.UserField, error) {
 		return domain.UserFieldStatus, nil
 	case userFieldLifecycleOwnerTeamID:
 		return domain.UserFieldLifecycleOwnerTeamID, nil
+	case userFieldTeamID:
+		// Not a column on the user: the keyset cursor is built from the last
+		// row's sort values, and there is no membership value on that row.
+		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().
+			WithDetails(fmt.Sprintf("%s can be filtered but not sorted", userFieldTeamID))
 	default:
 		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}
