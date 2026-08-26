@@ -14,16 +14,23 @@ Delivered as a stack of five PRs (§6).
 
 ## 0. The naming problem (do this first)
 
-`team_id` is already a query parameter on two user endpoints, meaning two
-different things:
+`team_id` is a query parameter on two user endpoints, doing two different
+things — both of them membership, neither of them ownership:
 
 | Endpoint | Meaning | Code |
 |---|---|---|
-| `POST /users?team_id=` | Sets the **lifecycle owner** team | `internal/api/user.go:17` → `CreateUserParams.TeamID` → `domain.User.LifecycleOwnerTeamID` |
-| `GET /users/{user_id}?team_id=` | Requires an **active membership** | `internal/api/user.go:178` → `UserQueryOptions.MembershipTeamID` |
+| `POST /users?team_id=` | Puts the new user on that team's **roster**, and scopes team-unique attributes | `CreateUserParams.TeamID` → `CreateUser.InitialMembershipTeamID` → an active `team_memberships` row |
+| `GET /users/{user_id}?team_id=` | Requires an **active membership** | `UserQueryOptions.MembershipTeamID` |
 
 Both `$ref` the same `api/openapi/components/parameters/team-id.yaml`, described
 only as "The unique identifier of the team".
+
+**Lifecycle ownership is not settable through the API at all.**
+`domain.User.LifecycleOwnerTeamID` is written only by storage read-back and
+emitted by `domainUserToApiUser`; no handler sets it. So `team_id` is not
+ambiguous between ownership and membership on the wire — it is simply vague,
+and vague in a way that invites the reading "the team that owns this user",
+because the response next to it carries `metadata.lifecycle_owner_team_id`.
 
 This gets sharper with `POST /users/query`: `lifecycle_owner_team_id` is a real
 column (`domain.UserFieldLifecycleOwnerTeamID`, `internal/domain/user.go:249`),
@@ -35,15 +42,20 @@ ADR 024 already draws the line, and `user-metadata.yaml` states it well:
 lifecycle ownership decides *who may deprovision the user*; the roster decides
 *which teams the user collaborates in*.
 
-**Decision:** split the shared parameter into two named ones.
+**Decision:** split the shared parameter into two named ones. Different names
+rather than one, because the two do different things — create *writes* a
+membership, get *filters* by one.
 
+- `components/parameters/initial-membership-team-id.yaml` — name
+  `initial_membership_team_id`, used by `POST /users`. Mirrors the domain field
+  it already feeds.
 - `components/parameters/member-of-team-id.yaml` — name `member_of_team_id`,
-  used by `GET /users/{user_id}` (renamed from `team_id`).
-- `components/parameters/lifecycle-owner-team-id.yaml` — name
-  `lifecycle_owner_team_id`, used by `POST /users` (renamed from `team_id`).
+  used by `GET /users/{user_id}`, and later the filter-field enum in §1.
 
-Each description states what it is *and* what it is not, pointing at ADR 024.
-The same two names become the filter-field enum members in §1.
+Each description states what it is *and* what it is not, pointing at ADR 024,
+and says outright that lifecycle ownership cannot be set here.
+
+**Status: shipped in PR 1** — #980.
 
 The app is pre-production, so both renames are straight substitutions with no
 compatibility shim.
@@ -398,7 +410,7 @@ Each branches off the previous, not off `main`.
 
 | # | Branch | Contents |
 |---|---|---|
-| 1 | `users-team-param-rename` | Split `team-id.yaml` into `member-of-team-id.yaml` + `lifecycle-owner-team-id.yaml`; update `POST /users` and `GET /users/{user_id}`; ADR 024 amendment. Mechanical, no behavior change. |
+| 1 | `users-team-param-rename` — **open, #980** | Split `team-id.yaml` into `initial-membership-team-id.yaml` + `member-of-team-id.yaml`; update `POST /users` and `GET /users/{user_id}` and the matching service/domain fields; ADR 024 amendment. Rename only, no behavior change. |
 | 2 | `users-query-endpoint` | Add `POST /users/query` with `created_at` / `id` / `schema` / `status` / `lifecycle_owner_team_id`. No membership filter yet, `GET /users` still present. Spec, handler, service filter+sort mapping, tests, ADR 027 amendment. |
 | 3 | `users-drop-get-list` | Remove `GET /users` and migrate all six consumers (§1). Touches Go, console, CLI, `api-mock`, `packages/testing` — no new behavior, so it reviews as a migration. |
 | 4 | `users-query-membership-filter` | `member_of_team_id` filter field, `splitUserFilters`, service wiring. No storage work. |
