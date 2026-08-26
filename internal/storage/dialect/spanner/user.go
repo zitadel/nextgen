@@ -161,10 +161,6 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		compileFilter(&compiler, readFilter, v2user.Schema)
 	}
 	for _, a := range opts.Attributes {
-		raw, err := json.Marshal(a.Value)
-		if err != nil {
-			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-		}
 		writeConjunct(&compiler, &hasWhere)
 		if opts.UniqueAttributesOnly {
 			hash, err := domain.UniqueValueHash(a.Value)
@@ -177,6 +173,10 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 			compiler.WriteArg(hash[:])
 			compiler.WriteString(")")
 			continue
+		}
+		raw, err := json.Marshal(a.Value)
+		if err != nil {
+			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
 		compiler.WriteString("EXISTS (SELECT 1 FROM ")
 		compiler.WriteString(userAttributesTable)

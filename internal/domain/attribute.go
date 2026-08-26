@@ -107,9 +107,6 @@ type CreateAttribute struct {
 }
 
 func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness) (*CreateAttribute, error) {
-	if _, err := json.Marshal(value); err != nil {
-		return nil, fmt.Errorf("failed to marshal attribute value: %w", err)
-	}
 	attr := &CreateAttribute{
 		Key:         key,
 		Value:       value,
@@ -121,6 +118,10 @@ func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness)
 			return nil, err
 		}
 		attr.ValueHash = hash
+	} else if _, err := json.Marshal(value); err != nil {
+		// UniqueValueHash marshals on the unique path; keep the same
+		// marshalability guarantee for non-unique values.
+		return nil, fmt.Errorf("failed to marshal attribute value: %w", err)
 	}
 	return attr, nil
 }
