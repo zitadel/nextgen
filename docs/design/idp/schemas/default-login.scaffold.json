@@ -166,7 +166,7 @@
           "target": "done"
         },
         "user_already_exists": {
-          "target": "password"
+          "target": "sso-conflict"
         }
       }
     },

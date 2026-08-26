@@ -243,7 +243,7 @@ transitions route it:
 | Resolution State | Outcome Fired | Routing & Engine Behavior |
 | :--- | :--- | :--- |
 | **Known subject** | `callback` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
-| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, the outcome does not fire; the unknown subject fails as an error on the originating step ([Failures and Recovery](#failures-and-recovery)), because a step may offer providers with different `creation` values while `identity_unknown` has one authored target. |
+| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `identity_unknown` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
 | **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
@@ -271,8 +271,10 @@ the schema.
   * Without this gate an attacker's unverified claim to a victim's email
     creates the account first, and the victim meets the conflict step at their
     own sign-up.
-* **Disabled:** `creation: disabled` routes `identity_unknown` to an authored
-  error step instead, so the provider signs in existing users only.
+* **Disabled:** under `creation: disabled` an unknown subject is an error on
+  the step the user started from; `identity_unknown` is not raised
+  ([Failures and Recovery](#failures-and-recovery)).
+  The provider signs in existing users only.
   The deferred `auto_only` errors on incomplete claims rather than
   collecting ([area 1](1-resource-model.md#provisioning)).
 * **Static Warnings:** The plan phase warns when a pairing makes the gate

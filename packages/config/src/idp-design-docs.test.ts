@@ -304,7 +304,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
 
   it("both firing points reach sso-conflict, whose sign-in re-purposes to login's entry; no pivot anywhere", () => {
     const byName = new Map(flow.steps.map((s) => [s.name, s]));
-    for (const name of ["identifier", "register", "register-sso"]) {
+    for (const name of ["identifier", "register", "register-password", "register-sso"]) {
       expect(byName.get(name)!.transitions!["user_already_exists"]!.target).toBe("sso-conflict");
     }
     expect(byName.get("register-sso")!.on_success).toBe("create_user_with_sso");
@@ -345,7 +345,9 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
         delete byName.get(name)!.transitions![outcome];
       }
     }
-    byName.get("register")!.transitions!["user_already_exists"] = { target: "password" };
+    for (const name of ["register", "register-password"]) {
+      byName.get(name)!.transitions!["user_already_exists"] = { target: "password" };
+    }
     const shipped = JSON.parse(
       readFileSync(join(repoRoot, "packages/config/defaults/default-login.json"), "utf8"),
     ) as unknown;

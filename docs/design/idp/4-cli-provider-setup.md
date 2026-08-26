@@ -104,7 +104,7 @@ After claim, the same sub-journey runs behind the Sign-in methods journey.
   ([area 2](2-auth-method-selection.md#open-points)) owns specific regions of
   them. In the schema that is `x-auth-methods`; in the flow it is the scaffold
   delta (`sso_providers` arrays, the `register-sso` and `sso-conflict` steps,
-  the `user_already_exists` retarget, the conflict step's password field and
+  the `user_already_exists` retargets, the conflict step's password field and
   passkey action).
   The generator rewrites an owned region only while it still holds exactly what
   the scaffold produces.
@@ -395,9 +395,13 @@ The engine binds the attempt to the colliding account.
     ([area 3](3-social-login-flow.md#navigation-mechanics-switch-vs-pivot)).
 
 #### 5. Retargeting Registration Collisions
-The `register.user_already_exists` outcome is retargeted from the `password`
-step to the new `sso-conflict` step.
-A colliding account may be SSO-only, so `password` would dead-end it.
+`user_already_exists` is retargeted from the `password` step to the new
+`sso-conflict` step on both `register` and
+`register-password` steps.
+In case the colliding account is SSO-only, requiring a `password` to sign in would be a dead-end for the user.
+On `register-password` this collision is a race. It could happen when the same email
+is registered through a provider after the `register` step checked it and
+before the password is submitted.
 `sso-conflict` offers every method, so a password user still recovers in one
 step.
 

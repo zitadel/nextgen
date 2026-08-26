@@ -93,7 +93,7 @@
     "provisioning": {
       "type": "object",
       "additionalProperties": false,
-      "description": "How far this provider's data is trusted. `creation` names what happens to an unknown subject: `disabled` never creates a user, `auto` creates one without a collection step when the claims satisfy every required property and otherwise stops to collect what is missing. Verification gating joins that check when `x-verify` returns to the dialect. Deferred, all additive: the `auto_only` value (complete claims or fail closed), linking policy (`is_linking_allowed`, `auto_linking`) with the account-linking journey, and `is_auto_update` with per-property verification state.",
+      "description": "How far this provider's data is trusted. `creation` names what happens to a subject that has no account yet. With `disabled`, the provider never creates a user. With `auto`, the user is created without a collection step when the mapped claims fill every required property of the schema. A required property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a required property is missing or such a property is unverified, the collection step is shown instead, prefilled with the claims that did arrive. Gating on other properties will be added when `x-verify` returns to the dialect. The following are deferred and will be added as additive changes. The `auto_only` value, which creates the user from complete claims or fails without collecting. The linking policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey. `is_auto_update`, together with per-property verification state.",
       "properties": {
         "creation": {
           "type": "string",
