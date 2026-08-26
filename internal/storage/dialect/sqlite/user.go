@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -156,19 +155,22 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		compileFilter(&compiler, readFilter, v2user.Schema)
 	}
 	for _, a := range opts.Attributes {
-		raw, err := json.Marshal(a.Value)
-		if err != nil {
-			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-		}
 		writeConjunct(&compiler, &hasWhere)
 		if opts.UniqueAttributesOnly {
-			hash := sha256.Sum256(raw)
+			hash, err := domain.UniqueValueHash(a.Value)
+			if err != nil {
+				return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+			}
 			compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
 			compiler.WriteArg(string(a.Key))
 			compiler.WriteString(" AND ua.value_hash = ")
 			compiler.WriteArg(hash[:])
 			compiler.WriteString(")")
 			continue
+		}
+		raw, err := json.Marshal(a.Value)
+		if err != nil {
+			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
 		compiler.WriteString("EXISTS (SELECT 1 FROM user_attributes a WHERE a.project_id = users.project_id AND a.user_id = users.id AND a.key = ")
 		compiler.WriteArg(string(a.Key))
