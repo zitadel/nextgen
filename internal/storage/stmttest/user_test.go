@@ -367,3 +367,37 @@ func assertUserAttributes(t *testing.T, user *domain.User, want map[string]any) 
 	}
 	assert.Equal(t, want, got)
 }
+
+func TestUserStatements_GetUser_UniqueAttributesOnly(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		owner := newTestUser(t, projectID, schemaURL, "user_unique_owner", "shared@example.com", "Owner")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), owner))
+
+		// A second user carries the same value under the same key, but
+		// without a uniqueness scope (e.g. a notification address).
+		dupEmail, err := domain.NewCreateAttribute("email", "shared@example.com", domain.AttributeUniquenessUnspecified)
+		require.NoError(t, err)
+		dup := &domain.CreateUser{
+			ProjectID:  projectID,
+			SchemaURL:  schemaURL,
+			ID:         "user_unique_dup",
+			Attributes: []domain.CreateAttribute{*dupEmail},
+		}
+		require.NoError(t, d.stmts.CreateUser(t.Context(), dup))
+
+		attrs := []domain.Attribute{{Key: "email", Value: "shared@example.com"}}
+		projectFilter := database.Equal(database.Col(domain.UserFieldProjectID), projectID)
+
+		_, err = d.stmts.GetUser(t.Context(), projectFilter, service.UserQueryOptions{Attributes: attrs})
+		require.Error(t, err, "the plain attribute match sees both users")
+
+		got, err := d.stmts.GetUser(t.Context(), projectFilter, service.UserQueryOptions{
+			Attributes:           attrs,
+			UniqueAttributesOnly: true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, owner.ID, got.ID)
+	})
+}

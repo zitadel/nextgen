@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 
@@ -166,6 +167,15 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
 		writeConjunct(&compiler, &hasWhere)
+		if opts.UniqueAttributesOnly {
+			hash := sha256.Sum256(raw)
+			compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
+			compiler.WriteArg(a.Key)
+			compiler.WriteString(" AND ua.value_hash = ")
+			compiler.WriteArg(hash[:])
+			compiler.WriteString(")")
+			continue
+		}
 		compiler.WriteString("EXISTS (SELECT 1 FROM ")
 		compiler.WriteString(userAttributesTable)
 		compiler.WriteString(" a WHERE a.project_id = users.project_id AND a.user_id = users.id AND a.key = ")
