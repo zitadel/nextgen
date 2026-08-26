@@ -18,7 +18,7 @@
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "maxLength": 64,
-      "description": "Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps (sso_providers[].id). Unique within the Project.",
+      "description": "Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps (sso_providers). Unique within the Project.",
       "examples": [
         "google",
         "github",

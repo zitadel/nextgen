@@ -259,7 +259,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     fields?: string[];
     actions?: Array<{ kind: string }>;
     on_success?: string;
-    sso_providers?: Array<{ id: string }>;
+    sso_providers?: string[];
     transitions?: Record<string, { target: string; action?: string; purpose?: string }>;
   };
   const flow = loadJson("default-login.scaffold.json") as unknown as {
@@ -269,22 +269,32 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   const flowMeta = () =>
     JSON.parse(
       readFileSync(join(repoRoot, "packages/config/meta-schemas/flow-definition.json"), "utf8"),
-    ) as { $defs: { Step: { properties: { on_success: { enum: string[] } } } } };
+    ) as {
+      $defs: {
+        Step: {
+          properties: { on_success: { enum: string[] }; sso_providers: { items: object } };
+        };
+      };
+    };
 
-  it("fails against the shipped meta-schema only on the on_success enum", () => {
+  it("fails against the shipped meta-schema only on the two documented deltas", () => {
+    // The on_success enum gains create_user_with_sso, and sso_providers
+    // becomes a slug list (area 2, Rendering from the Connection).
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta(),
     );
     expect(validate(flow)).toBe(false);
     for (const err of validate.errors!) {
-      expect(err.keyword).toBe("enum");
-      expect(err.instancePath.endsWith("/on_success")).toBe(true);
+      const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
+      const slugList = err.keyword === "type" && err.instancePath.includes("/sso_providers/");
+      expect(onSuccess || slugList, `${err.instancePath} ${err.keyword}`).toBe(true);
     }
   });
 
-  it("validates once create_user_with_sso joins the enum (the single delta)", () => {
+  it("validates once both deltas land in the meta-schema", () => {
     const patched = flowMeta();
     patched.$defs.Step.properties.on_success.enum.push("create_user_with_sso");
+    patched.$defs.Step.properties.sso_providers.items = { type: "string", minLength: 1 };
     expect(ajv().compile(patched)(flow)).toBe(true);
   });
 
@@ -325,7 +335,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   });
 
   it("provider ids reference area 1's connection slug", () => {
-    const ids = flow.steps.flatMap((s) => (s.sso_providers ?? []).map((p) => p.id));
+    const ids = flow.steps.flatMap((s) => s.sso_providers ?? []);
     expect(ids).toEqual(["google", "google", "google"]);
     expect((googleExample as { slug: string }).slug).toBe("google");
   });

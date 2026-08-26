@@ -16,7 +16,7 @@ It requires three distinct artifacts to align perfectly:
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: [{id, name, template}]`, where `id` is the connection slug | Accepted by the meta-schema and validator; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
+| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema accepts `[{id, name, template}]` today and changes to slugs with the engine work; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
 
 Each authentication method surfaces differently within a flow, meaning there is
 no uniform rendering mechanism across the board:
@@ -26,6 +26,22 @@ password → a field:      fields: ["x-auth-methods#password"]      // "only pas
 passkey  → actions:      actions: ["passkey", "passkey_register"]
 sso      → its own slot: sso_providers: [...] + transitions.callback
 ```
+
+## Rendering from the Connection
+
+A step lists connection slugs. At render, the engine resolves each slug and
+emits `{id, name, template}` from the connection's `display_name` and
+`template`. The login UI payload (`GetFlowStep200StepSsoProvidersItem`) is
+unchanged.
+
+The connection is the only source for a provider's name and branding. The flow
+definition holds no copy that could go stale when the connection file is
+edited, and the validator only checks that the slug exists.
+
+The definition contract (`SSOProvider` in
+`api/openapi/endpoints/schemas/flow-definition.json` and the meta-schema)
+changes from `[{id, name, template}]` to a slug list with the engine work. No
+production flow carries the old shape.
 
 ## Principle: Capability vs. Usage
 
@@ -180,7 +196,7 @@ it (emitting an error like
 | Rule / Condition | Status & Impact |
 | :--- | :--- |
 | **Flow enables SSO** | **Mirrors existing logic:** If a step has `sso_providers`, the schema's `sso.enabled` must be `true`. |
-| **Provider ID validity** | **New:** Every `sso_providers[].id` must exist in the pinned schema's `sso.providers` list. |
+| **Provider ID validity** | **New:** Every `sso_providers[]` entry must exist in the pinned schema's `sso.providers` list. |
 | **Cross-resource resolution** | **New:** Every name in `sso.providers` must resolve to a valid connection file under `.zitadel/idps/`. |
 | **Callback transition** | **Already enforced:** A step utilizing `sso_providers` must define a `transitions.callback`. |
 | **Full outcome routing** | **New:** A step with `sso_providers` must properly route `identity_unknown` and `user_already_exists`. The engine fires three possible outcomes, and routing only the callback dead-ends the other two. |
@@ -191,15 +207,6 @@ it (emitting an error like
 | **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
 
 ---
-
-### Deliberate Exclusions from Validation
-
-The validator deliberately **does not** cross-check `sso_providers[].name` or
-`sso_providers[].template` against the connection file.
-
-`name` is display copy, often localized client-side, and `template` a rendering
-hint; a flow may override both.
-Only `id` (the slug) must resolve.
 
 ## Open Points
 
@@ -227,11 +234,11 @@ Only `id` (the slug) must resolve.
 | **Pair-level `claim_mapping` intersection:** warn when an offered provider's `claim_mapping` shares zero properties with the pinned schema (the [Validation Rules](#validation-rules) row). | `validate.ts` and the Go server mirror, at flow create and update |
 | **Pair-level `verified_claims` intersection:** warn when a provider's `verified_claims` keys share no properties with the pinned schema. | `validate.ts` and the Go server mirror, at flow create and update |
 | **Register-step topology:** whether registration shares the entry steps' `sso_providers` or carries its own step. Both shapes pass the validator and run, so the choice is scaffolding, not validation. | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: `sso_providers` on both shared entry steps and the conflict step) |
-| **Runtime example alignment:** `components/flows/sso-provider.yaml` shows an instance-suffixed `id: google-1`; `SSOProvider.id` is the connection slug, and the runtime example must say so before the engine reads it. | Flow API docs |
+| **Runtime example alignment:** `components/flows/sso-provider.yaml` shows an instance-suffixed `id: google-1`; the rendered `id` is the connection slug, and the runtime example must say so before the engine reads it. | Flow API docs |
 
 The two pairing rows live here because the flow definition is the only document
 that references both sides: its `user_schema` pins the schema revision and its
-`sso_providers[].id` names the connection.
+`sso_providers` entries name the connections.
 Connection-side checks flag a key unknown to *every* referencing schema; partial
 per-pair overlap is legitimate, since a connection may map a superset.
 Both rows are provisional pending schema-keyed validation

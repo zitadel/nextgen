@@ -34,11 +34,7 @@
         }
       ],
       "sso_providers": [
-        {
-          "id": "google",
-          "name": "Google",
-          "template": "google"
-        }
+        "google"
       ],
       "transitions": {
         "submit": {
@@ -119,11 +115,7 @@
         }
       ],
       "sso_providers": [
-        {
-          "id": "google",
-          "name": "Google",
-          "template": "google"
-        }
+        "google"
       ],
       "transitions": {
         "submit": {
@@ -219,11 +211,7 @@
         }
       ],
       "sso_providers": [
-        {
-          "id": "google",
-          "name": "Google",
-          "template": "google"
-        }
+        "google"
       ],
       "transitions": {
         "submit": {

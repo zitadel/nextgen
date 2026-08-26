@@ -147,6 +147,9 @@ How to read the schema:
   `template` names the catalog entry the file was scaffolded from and keys
   vendor knowledge only (glyphs and button branding, the setup scan/match, and
   catalog claim tables); it carries no protocol behavior.
+  The engine copies `display_name` and `template` onto the rendered step's
+  provider entry, so the flow definition lists only slugs
+  ([area 2](2-auth-method-selection.md#rendering-from-the-connection)).
 - **TLS Required:** Every endpoint URL (`issuer`, `jwks_uri`, and the endpoints
   in both blocks) carries a `pattern` requiring `https://`, with an exception
   for local development (`http://localhost` and `http://127.0.0.1`).
@@ -435,7 +438,7 @@ under an outer id).
 ## Referencing by Slug
 
 Upstream resources, such as schemas (`x-auth-methods.sso.providers`) and flow
-steps (`sso_providers[].id`), always reference connections by their `slug`
+steps (`sso_providers`), always reference connections by their `slug`
 (e.g., `google`), never by their revision ID.
 
 - **No cascade:** A new connection revision means a new revision id; references

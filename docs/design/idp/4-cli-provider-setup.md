@@ -181,7 +181,7 @@ discovery at runtime, and the server validates every deploy.
 | :--- | :--- |
 | **Protocol Block**<br>*(endpoints/issuer, `static_authorize_parameters`, `token_endpoint_auth_method`, scopes, `supplementary_fetch`, `verified_claims` defaults)* | Populates the connection file from Area 1's test-verified examples. The prompted `client_id` is filled in; `claim_mapping` is derived from the claim table (next row). |
 | **Claim Table**<br>*(schema property name → provider claim name)* | Authored per provider, like the rest of the catalog entry, not derived: each row pairs a schema property name with the provider's documented claim, cross-checked against zitadel/zitadel's provider packages. At scaffold the rows whose key the active schema defines become the connection's `claim_mapping`. |
-| **Display Name & `template`** | Populates `sso_providers` step entries and CLI console output. |
+| **Display Name & `template`** | Written to the connection file as `display_name` and `template`, shown in CLI console output. The engine copies them onto the rendered step ([area 2](2-auth-method-selection.md#rendering-from-the-connection)); the flow definition carries only the slug. |
 | **Console URL & Docs URL** | Surfaced during the announce step and within error envelopes. |
 | **Callback Guidance**<br>*(multi-URI client vs. app-per-environment)* | Surfaced during the announce step to guide developer app registration. |
 
