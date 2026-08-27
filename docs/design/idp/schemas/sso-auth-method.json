@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SSOAuthMethod",
+  "type": "object",
+  "required": [
+    "enabled"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether the authentication method is enabled or not"
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "maxLength": 64,
+        "examples": [
+          "google",
+          "github",
+          "corp_idp"
+        ]
+      },
+      "description": "Slugs of the Project-level identity provider connections available to users of this schema. Each entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does not by itself make it available here."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "providers"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "providers"
+          ]
+        }
+      }
+    }
+  ]
+}
