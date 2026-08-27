@@ -19,33 +19,33 @@ var ErrSchemaDesignationInvalid = errors.New("schema designation invalid")
 // user schema document. It runs after meta-schema validation, so shapes the
 // meta-schema already guarantees (keyword types) are not re-reported here.
 func validateUserSchemaDesignations(schema map[string]any) error {
-	identifier, hasIdentifier := schema["x-identifier"].(string)
+	identifier, hasIdentifier := schema[SchemaAnnotationIdentifier].(string)
 	hasIdentifier = hasIdentifier && identifier != ""
 
 	// Password verification is unreachable without a prior identifier (the
 	// flow state machine dispatches identifier before password), so enabling
 	// it without a designation is a schema error, not a runtime surprise.
-	if enabled, _ := maputil.GetNested[bool](schema, []string{"x-auth-methods", "password", "enabled"}); enabled && !hasIdentifier {
-		return fmt.Errorf(`%w: password authentication is enabled but the schema designates no "x-identifier"`, ErrSchemaDesignationInvalid)
+	if enabled, _ := maputil.GetNested[bool](schema, []string{SchemaAnnotationAuthMethods, "password", "enabled"}); enabled && !hasIdentifier {
+		return fmt.Errorf("%w: password authentication is enabled but the schema designates no %q", ErrSchemaDesignationInvalid, SchemaAnnotationIdentifier)
 	}
 
 	if hasIdentifier {
-		prop, err := designatedLeaf(schema, identifier, "x-identifier")
+		prop, err := designatedLeaf(schema, identifier, SchemaAnnotationIdentifier)
 		if err != nil {
 			return err
 		}
-		if scope, _ := prop["x-unique"].(string); scope != "project" {
-			return fmt.Errorf(`%w: "x-identifier" property %q must carry x-unique "project", has %q`, ErrSchemaDesignationInvalid, identifier, scope)
+		if scope, _ := prop[SchemaAnnotationUnique].(string); scope != SchemaUniqueScopeProject {
+			return fmt.Errorf("%w: %q property %q must carry %s %q, has %q", ErrSchemaDesignationInvalid, SchemaAnnotationIdentifier, identifier, SchemaAnnotationUnique, SchemaUniqueScopeProject, scope)
 		}
 	}
 
-	if display, ok := schema["x-display"].([]any); ok {
+	if display, ok := schema[SchemaAnnotationDisplay].([]any); ok {
 		for _, entry := range display {
 			path, ok := entry.(string)
 			if !ok || path == "" {
-				return fmt.Errorf(`%w: "x-display" entries must be non-empty property paths`, ErrSchemaDesignationInvalid)
+				return fmt.Errorf("%w: %q entries must be non-empty property paths", ErrSchemaDesignationInvalid, SchemaAnnotationDisplay)
 			}
-			if _, err := designatedLeaf(schema, path, "x-display"); err != nil {
+			if _, err := designatedLeaf(schema, path, SchemaAnnotationDisplay); err != nil {
 				return err
 			}
 		}
