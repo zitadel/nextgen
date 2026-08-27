@@ -146,12 +146,19 @@ tasks:
       runFromWorkspaceRoot: true
 
   test-postgres:
+    # Two independent caches can replay these lanes, and both have to be off.
+    #
     # -count=1 disables go's test-result cache. These suites talk to an external
     # database whose state is invisible to go's cache key, and CI restores
     # GOCACHE between runs (setup-go cache: true), so an unchanged source tree
     # yields "ok (cached)" without anything executing against the current
     # backend. Observed on run 32743380406, where this very lane reported
     # `ok … integration_test (cached)`.
+    #
+    # options.cache: false disables moon's. That one sits in front of go: on a
+    # repeat task hash moon reports the task cached and never starts the `go`
+    # process at all, so -count=1 never gets a turn. The external database is
+    # just as invisible to moon's hash as it is to go's.
     command: "go"
     args:
       - "test"
@@ -166,6 +173,9 @@ tasks:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
+      # See the -count=1 note above: moon's own cache would skip the process
+      # before go's cache mattered.
+      cache: false
       # Invoked explicitly by the CI "Run Go integration tests (postgres)" step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
@@ -209,6 +219,10 @@ tasks:
       - "$ZITADEL_TEST_SPANNER_INSTANCE"
     options:
       runFromWorkspaceRoot: true
+      # See the -count=1 note above: moon's own cache would skip the process
+      # before go's cache mattered. Observed on #934, where moon replayed the
+      # emulator task's result for a real-instance run.
+      cache: false
       # Invoked by the CI Spanner emulator step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
@@ -234,6 +248,9 @@ tasks:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
+      # See the -count=1 note above: moon's own cache would skip the process
+      # before go's cache mattered.
+      cache: false
       # Invoked explicitly by the CI "Run Go integration tests (sqlite)" step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
