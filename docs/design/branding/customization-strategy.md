@@ -74,12 +74,12 @@ widget in. It is not a second renderer and not a second branding model.
 flowchart LR
   subgraph embedded [Embedded — customer app]
     Page[Customer page / wrapper]
-    W1["#lt;zitadel-login#gt;"]
+    W1["＜zitadel-login＞"]
     Page --> W1
   end
   subgraph hosted [Hosted — Zitadel page]
     Shell[Platform page template]
-    W2["#lt;zitadel-login#gt;"]
+    W2["＜zitadel-login＞"]
     Shell --> W2
   end
   Branding[Project branding revision]
@@ -150,7 +150,7 @@ flowchart TB
   C4 --> Copy
   C5 --> Flow
 
-  BrandJSON --> Both1["#lt;zitadel-login#gt; — both deployments"]
+  BrandJSON --> Both1["＜zitadel-login＞ — both deployments"]
   WidTpl --> Both1
   Copy --> Both1
   Flow --> Both1
@@ -160,12 +160,12 @@ flowchart TB
 flowchart LR
   subgraph embed [Embedded]
     EW[App wrapper]
-    EL["#lt;zitadel-login#gt;"]
+    EL["＜zitadel-login＞"]
     EW --> EL
   end
   subgraph hosted [Hosted]
     PT["Page template — platform defined"]
-    HL["#lt;zitadel-login#gt;"]
+    HL["＜zitadel-login＞"]
     PT --> HL
   end
   subgraph api [Platform defined — API, both deployments]
@@ -397,7 +397,7 @@ flowchart TB
     EmbWrap[Customer wrapper code]
     HostWrap["Hosted page template (page.liquid)"]
   end
-  subgraph widget ["#lt;zitadel-login#gt; — same component both deployments"]
+  subgraph widget ["＜zitadel-login＞ — same component both deployments"]
     Props["Element props: variant, theme, lang, locales, purpose"]
     Tokens["--zl-* tokens"]
     Liquid[login.liquid]
