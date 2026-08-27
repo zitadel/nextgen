@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -106,24 +105,8 @@ func (a *recordAttemptFactorsAction) Apply(ctx context.Context, stmts AllStateme
 		return fmt.Errorf("record attempt factors: %w", err)
 	}
 	for _, factor := range a.factors {
-		checkID, err := stmts.SetAuthAttemptFactor(ctx, a.projectID, a.attemptID, factor)
-		if err != nil {
+		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, factor); err != nil {
 			return fmt.Errorf("record attempt factors: %w", err)
-		}
-		if err := audit.Emit(ctx, stmts, audit.EmitSpec{
-			Type:       domain.EventTypeAuthCheckSucceeded,
-			Category:   domain.EventCategoryAuth,
-			ProjectID:  a.projectID,
-			EntityType: "check",
-			EntityID:   checkID,
-			SessionID:  attempt.SessionID,
-			Payload: domain.AuthCheckPayload{
-				CheckID:       checkID,
-				CheckType:     factor.Type().String(),
-				AuthAttemptID: a.attemptID,
-			},
-		}); err != nil {
-			return err
 		}
 	}
 	return nil

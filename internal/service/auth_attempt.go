@@ -398,6 +398,31 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 	return attempt, nil
 }
 
+// recordDirectAuthFactor upserts a proof-equivalent factor on the attempt and
+// emits its auth.check.succeeded event, inside the caller's transaction. A
+// direct write is legitimate only when the fact was just established by other
+// verified means in the same transaction: a created user during sign-up, or a
+// user resolved cryptographically from a discoverable assertion.
+func recordDirectAuthFactor(ctx context.Context, stmts AllStatements, attempt *domain.AuthAttempt, factor domain.AuthFactor) (string, error) {
+	checkID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, factor)
+	if err != nil {
+		return "", err
+	}
+	return checkID, audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthCheckSucceeded,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  attempt.ProjectID,
+		EntityType: "check",
+		EntityID:   checkID,
+		SessionID:  attempt.SessionID,
+		Payload: domain.AuthCheckPayload{
+			CheckID:       checkID,
+			CheckType:     factor.Type().String(),
+			AuthAttemptID: attempt.ID,
+		},
+	})
+}
+
 func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, succeeded bool) error {
 	eventType := domain.EventTypeAuthCheckFailed
 	if succeeded {
@@ -485,26 +510,15 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 		if err != nil {
 			return nil, err
 		}
-		if provisional && userID != "" {
-			// No user factor is pinned but the caller supplied a handle: either
-			// an existing user (e.g. enrollment right after a discoverable
-			// passkey login, which pins no user check row) or a previously
-			// minted handle on a re-issued provisional challenge. The user row
-			// decides which.
-			_, err := s.stmts.Statements().GetUser(ctx, database.And(
-				database.Equal(database.Col(domain.UserFieldProjectID), attempt.ProjectID),
-				database.Equal(database.Col(domain.UserFieldID), userID),
-			), UserQueryOptions{})
-			if err == nil {
-				provisional = false
-			} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-				return nil, domain.ErrInternal(err).WithMessage("failed to resolve registration user")
-			} else if !attempt.HasProvisionalRegistrationHandle(userID) {
-				// A provisional handle becomes a user id at verification, so it
-				// must be server-minted: an unknown handle that is not the
-				// attempt's own in-flight ceremony is replaced by a fresh mint.
-				userID = ""
-			}
+		// A provisional handle becomes a user id at verification, so it must
+		// be server-minted: a caller-supplied handle is kept only when it
+		// matches the attempt's own in-flight provisional ceremony (a
+		// re-issued challenge); any other handle is replaced by a fresh mint.
+		// Enrollment for an existing user always rides a verified user factor
+		// on the attempt — every authenticated path persists one, including
+		// discoverable passkey login — so store-existence is never consulted.
+		if provisional && userID != "" && !attempt.HasProvisionalRegistrationHandle(userID) {
+			userID = ""
 		}
 		if userID == "" {
 			userID, err = s.stmts.Statements().NewManagedID(string(domain.PrefixUser))
@@ -603,15 +617,22 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return passkeyChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		// Discoverable login resolves the user cryptographically from the assertion; bind it onto
-		// the attempt so the subject is pinned and the session/handoff carries the user id. For an
-		// identified login the user factor is already present and unchanged.
+		// the attempt — including the persisted user check row, which downstream consumers
+		// (exchange user binding, password step-up, enrollment targeting) key on — so the
+		// subject is pinned and the session/handoff carries the user id. For an identified
+		// login the user factor is already present and unchanged.
+		var txExtra func(context.Context, AllStatements) error
 		if userFactor == nil && verification.UserID != "" {
-			attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+			resolvedUser := attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+			txExtra = func(ctx context.Context, stmts AllStatements) error {
+				_, err := recordDirectAuthFactor(ctx, stmts, attempt, resolvedUser)
+				return err
+			}
 		}
 		// Use the verified user as the source of truth: it is set for both identified and
 		// discoverable logins, whereas userFactor is nil in the discoverable case.
 		s.recordPasskeyUsage(ctx, attempt.ProjectID, verification)
-		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil, nil
+		return passkeyChallenge, attempt.SetPasskeyFactor(verification), txExtra, nil
 
 	case PasskeyRegistrationProof:
 		registrationChallenge, err := attempt.PreparePasskeyRegistrationVerification(challengeID)
@@ -658,23 +679,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			factor.PasskeyID = newPasskey.ID
 			factor.Name = newPasskey.Name
 			if !hadUserFactor {
-				userCheckID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, userFactor)
-				if err != nil {
-					return err
-				}
-				if err := audit.Emit(ctx, stmts, audit.EmitSpec{
-					Type:       domain.EventTypeAuthCheckSucceeded,
-					Category:   domain.EventCategoryAuth,
-					ProjectID:  attempt.ProjectID,
-					EntityType: "check",
-					EntityID:   userCheckID,
-					SessionID:  attempt.SessionID,
-					Payload: domain.AuthCheckPayload{
-						CheckID:       userCheckID,
-						CheckType:     userFactor.Type().String(),
-						AuthAttemptID: attempt.ID,
-					},
-				}); err != nil {
+				if _, err := recordDirectAuthFactor(ctx, stmts, attempt, userFactor); err != nil {
 					return err
 				}
 			}

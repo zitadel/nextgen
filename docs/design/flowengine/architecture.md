@@ -18,11 +18,9 @@ graph TD
     SM["internal/domain/flow_state_machine.go<br>FlowStateMachineRuntime"]
     FR["internal/domain/flow_field_resolver*<br>FlowFieldResolver"]
     OS["internal/domain/flow_on_success*<br>FlowOnSuccessHandler"]
-    AA["internal/domain/flow_auth_attempt.go<br>FlowAuthAttemptService"]
-    PR["internal/domain/flow_passkey_registration.go<br>FlowPasskeyRegistrationService"]
+    AA["internal/domain/flow_auth_attempt.go<br>FlowAuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
 
-    AAImpl["service: auth-attempt"]
-    PRImpl["service: PasskeyRegistrationService<br>(via FlowPasskeyRegistrationAdapter)"]
+    AAImpl["service: auth-attempt<br>(FlowAuthAttemptAdapter)"]
     Repo["repository: flow_definitions"]
     UserRepo["repository: users / passwords"]
     Schema["service: SchemaService"]
@@ -34,12 +32,10 @@ graph TD
     SM --> FR
     SM --> OS
     SM --> AA
-    SM --> PR
     Service --> Repo
     FR --> Schema
     OS --> UserRepo
     AA --> AAImpl
-    PR --> PRImpl
 ```
 
 ## Request path
@@ -120,13 +116,17 @@ Process(in):
   │     │   ├─ login: run dispatchChallenges first so SubmitIdentifier
   │     │   │   resolves the user and PreparePasskeyChallenge can
   │     │   │   populate allowCredentials
-  │     │   └─ register: GenerateUserID → store as provisional _user_id
-  │     │       (marked _passkey_provisional in CollectedData)
+  │     │   └─ register: the attempt service mints a provisional user
+  │     │       handle (stored as _user_id; the persisted challenge is
+  │     │       authoritative for provisional-or-not)
   │     └─ Phase 2 (challenge_response present):
   │         ├─ verify the assertion / attestation
-  │         ├─ if provisional: HandleProvisional creates the user inside
-  │         │   the credential-save transaction, then RegisterCreatedUser
-  │         │   marks the user verified on the auth attempt
+  │         ├─ registration verify is atomic in the attempt service:
+  │         │   create-user actions (provisional only), credential,
+  │         │   user factor, and check success in one transaction;
+  │         │   a lost uniqueness race routes user_already_exists after
+  │         │   pinning the conflicting owner; a stale ceremony clears
+  │         │   the pending challenge so a retry mints a fresh one
   │         └─ on success, fall through to terminal handoff
   ├── dispatchChallenges (identifier, then password) — skipped when the
   │     passkey ceremony handled the step
@@ -162,28 +162,25 @@ Interface (`Resolve` + `Validate`) plus a schema-backed implementation in `flow_
 
 Interface every `on_success` mutation satisfies. One implementation today:
 
-- `FlowCreateUserHandler` (`flow_on_success_create_user.go`) — reads the identifier and password fields from the collected data, hashes the password (argon2id) via `FlowPasswordHasher`, writes the user via the user repository, writes the credential via the password repository, then calls `auth-attempt.RegisterCreatedUser` so the new user is treated as verified by the terminal handoff.
-- `HandleProvisional` (same type) — used by the passkey-register verify leg: creates the user row inside the same DB transaction that persists the passkey credential, using the provisional `_user_id` minted at Phase 1.
+- `FlowCreateUserWithPasswordHandler` (`internal/service/flow_create_user_with_password_handler.go`) — reads the identifier and password fields from the collected data, hashes the password (argon2id), and applies user creation, password persistence, and the attempt's verified user + password factors (with their `auth.check.succeeded` events) in one transaction. A handler that returns a `UserID` must persist the user's factors itself; the state machine only records the id in flow state.
 
 ### `FlowAuthAttemptService` (`internal/domain/flow_auth_attempt.go`)
 
 A narrow interface over the auth-attempt service. The state machine sees
-`Start`, `SubmitIdentifier`, `SubmitPassword`, `RegisterCreatedUser`, and
-`Handoff`, and never sees challenge ids. Identifier no-match and password
-rejection both surface as `ErrAuthAttemptProofRejected`, which the state
-machine routes (`user_not_found`) or re-renders (step error) accordingly.
-`RegisterCreatedUser` is called after `create_user` (and after passkey-register
-verify) so the freshly-created user counts as a verified factor for the
-terminal handoff.
+`Start`, `SubmitIdentifier`, `SubmitPassword`, the two-phase passkey legs
+(`IssuePasskeyChallenge`/`SubmitPasskey`), the two-phase registration legs
+(`IssuePasskeyRegistrationChallenge`/`SubmitPasskeyRegistration`, ADR 056),
+and `Handoff`. Identifier no-match and password rejection both surface as
+`ErrAuthAttemptProofRejected`, which the state machine routes
+(`user_not_found`) or re-renders (step error) accordingly.
 
-### `FlowPasskeyRegistrationService` (`internal/domain/flow_passkey_registration.go`)
-
-A narrow interface for the passkey-register ceremony. The state machine sees
-`IssuePasskeyRegistrationChallenge` (Phase 1 — mints a WebAuthn registration
-challenge keyed to a provisional user id) and `SubmitPasskeyRegistration`
-(Phase 2 — verifies the attestation and persists the credential inside the
-caller's statements transaction, so it can share the transaction that
-`HandleProvisional` uses to materialize the user row).
+The registration verify leg is atomic in the attempt service: for a
+provisional ceremony it applies the create-user actions (built by a factory
+invoked with the challenge's authoritative user handle), persists the
+credential, records the user factor, and marks the check succeeded in one
+transaction. A lost uniqueness race surfaces as `ErrUserAlreadyExists`, which
+the state machine routes like the identifier-dispatch conflict after pinning
+the actually-conflicting owner via the collected identifier-class fields.
 
 ### Domain types worth knowing
 
@@ -191,8 +188,7 @@ caller's statements transaction, so it can share the transaction that
 - `FlowState` / `FlowProgress` — the cookie payload (`flow_state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
 - `FlowStep` — the capability payload returned to the client (`flow_state_machine.go`). `Challenge` carries the issue-leg payload of a two-phase ceremony.
 - `FlowStepChallenge` / `FlowChallengeResponse` / `FlowPendingChallenge` — the two-phase ceremony contract: a pending challenge the client signs, and the proof it submits back.
-- Reserved key `FlowCollectedUserIDKey` (`_user_id`) — set by the dispatch loop when the auth-attempt identifies the user; gates whether the terminal step mints a handoff.
-- Reserved key `_passkey_provisional` — flags that `_user_id` was minted by the passkey-register issue leg and still needs `HandleProvisional` + `RegisterCreatedUser` on verify.
+- Reserved key `FlowCollectedUserIDKey` (`_user_id`) — set by the dispatch loop when the auth-attempt identifies the user; gates whether the terminal step mints a handoff. For a provisional passkey registration it carries the server-minted user handle between the issue and verify legs (the persisted challenge, not the cookie, is authoritative for provisional-or-not).
 
 ## Upstream dependencies (what calls into the engine)
 
@@ -231,11 +227,14 @@ Source of truth for the wire format. The ogen-generated types under `api/generat
 
 ### auth-attempt service
 
-Wired in as `FlowAuthAttemptService`. The state machine calls `Start` at `FlowService.Start`, `SubmitIdentifier` and `SubmitPassword` from `dispatchChallenges`, and `Handoff` at the terminal step when a user has been resolved. Today the production implementation is the `AuthAttemptService` in `internal/service/auth_attempt.go`.
-
-### passkey-registration service
-
-Wired in as `FlowPasskeyRegistrationService` via `FlowPasskeyRegistrationAdapter` (`internal/service/flow_passkey_registration.go`), which wraps the broader `PasskeyRegistrationService`. The state machine calls `IssuePasskeyRegistrationChallenge` on Phase 1 of a `passkey_register` action and `SubmitPasskeyRegistration` on Phase 2. The adapter is the seam that lets the engine consume only the two methods it needs without depending on the full passkey-registration service surface.
+Wired in as `FlowAuthAttemptService` via `FlowAuthAttemptAdapter`
+(`internal/service/flow_auth_attempt.go`). The state machine calls `Start` at
+`FlowService.Start`, `SubmitIdentifier` and `SubmitPassword` from
+`dispatchChallenges`, the passkey and passkey-registration issue/submit legs
+from the two-phase ceremony handler, and `Handoff` at the terminal step when a
+user has been resolved. The production implementation is the
+`AuthAttemptService` in `internal/service/auth_attempt.go`; the registration
+ceremony rides the same attempt + checks machinery (ADR 056).
 
 ### `FlowDefinitionStatements`
 
@@ -247,10 +246,10 @@ Postgres, Spanner, and SQLite implementations live under
 
 ### User writers
 
-`FlowCreateUserHandler` depends on a narrow `flowUserWriter` (`Create`) and
-`flowUserPasswordWriter` (`Create`). Production wiring uses
-`UserStatements` / `UserPasswordStatements` (storage v2) through the user
-service — the handler itself stays storage-agnostic.
+`FlowCreateUserWithPasswordHandler` composes `UserService.ApplyActions` with a
+create-user action, a set-password action, and the attempt-factor recording
+action, so all writes share one transaction. The handler itself stays
+storage-agnostic.
 
 ### Password hasher
 
@@ -263,10 +262,10 @@ Backs the schema-driven `FlowFieldResolver` implementation. Reads the user schem
 ### ID generator
 
 Dialect-owned `NewManagedID` on the storage pool (ADR 047). `FlowService`
-mints `flow_*` / provisional `session_*` ids at `Start`; passkey registration
-mints provisional `user_*` ids in `PasskeyRegistrationService.Begin` when the
-caller has none; create inserts mint managed resource IDs in the dialect.
-Auth attempts use DB IDENTITY (ephemeral IDs).
+mints `flow_*` / provisional `session_*` ids at `Start`; the attempt service
+mints provisional `user_*` handles when a registration challenge is issued
+without a pinned user; create inserts mint managed resource IDs in the
+dialect. Auth attempts use DB IDENTITY (ephemeral IDs).
 
 ## Where to read next
 

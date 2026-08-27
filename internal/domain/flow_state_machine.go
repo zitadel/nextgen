@@ -753,6 +753,33 @@ func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *Flo
 	return false
 }
 
+// identifierFieldValues returns every identifier-class field with a collected
+// value, in field order and deduplicated by name across the given resolved
+// sets. Every x-unique property resolves as an identifier field, so this is
+// the candidate list for locating the owner of a conflicting unique value.
+func identifierFieldValues(values map[string]any, resolvedSets ...FlowResolvedFields) [][2]string {
+	var out [][2]string
+	seen := map[string]bool{}
+	for _, resolved := range resolvedSets {
+		for _, field := range resolved.Fields {
+			if field.Challenge != FlowFieldChallengeIdentifier || seen[field.Name] {
+				continue
+			}
+			raw, present := values[field.Name]
+			if !present {
+				continue
+			}
+			s, _ := raw.(string)
+			if s == "" {
+				continue
+			}
+			seen[field.Name] = true
+			out = append(out, [2]string{field.Name, s})
+		}
+	}
+	return out
+}
+
 func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, target FlowFieldChallenge) (name, value string, ok bool) {
 	for _, field := range resolved.Fields {
 		if field.Challenge != target {
@@ -845,37 +872,50 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
 			if errors.Is(err, ErrUserAlreadyExists()) {
-				// The provisional user's identifier is taken: route like the
-				// identifier dispatch does. That path pins the existing user
-				// on the attempt before routing — and the downstream password
-				// step requires a persisted user factor — so re-resolve the
-				// collected identifier here to land in the same state.
+				// A unique attribute of the provisional user is taken: route
+				// like the identifier dispatch does. That path pins the
+				// existing user on the attempt before routing — and the
+				// downstream password step requires a persisted user factor —
+				// so re-resolve the conflicting owner here to land in the
+				// same state. Every x-unique property resolves as an
+				// identifier-class field, so trying each collected one finds
+				// the owner even when the race was lost on a non-identifier
+				// unique attribute (e.g. a fresh email but a taken phone).
 				clearUserBoundState(state)
-				name, value, ok := fieldValueByChallenge(passkeyResolved, state.CollectedData.UserData, FlowFieldChallengeIdentifier)
-				if !ok {
-					if visited, verr := r.resolveVisitedFields(pc); verr == nil {
-						name, value, ok = fieldValueByChallenge(visited, state.CollectedData.UserData, FlowFieldChallengeIdentifier)
-					}
+				candidates := identifierFieldValues(state.CollectedData.UserData, passkeyResolved)
+				if visited, verr := r.resolveVisitedFields(pc); verr == nil {
+					candidates = identifierFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
 				}
-				if ok {
+				for _, candidate := range candidates {
 					userID, rerr := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 						ProjectID:     state.ProjectID,
 						AttemptID:     state.AuthAttemptID,
-						AttributeName: name,
-						Value:         value,
+						AttributeName: candidate[0],
+						Value:         candidate[1],
 					})
-					switch {
-					case rerr == nil:
+					if rerr == nil {
 						recordResolvedUser(state, userID)
-					case !errors.Is(rerr, ErrAuthAttemptProofRejected(nil)):
-						return passkeyPhaseResult{}, fmt.Errorf("flow state machine: resolve conflicting user: %w", rerr)
-					default:
-						// A rejected identifier means the conflicting user
-						// vanished again; route anyway and let the next step
-						// re-collect.
+						break
 					}
+					if !errors.Is(rerr, ErrAuthAttemptProofRejected(nil)) {
+						return passkeyPhaseResult{}, fmt.Errorf("flow state machine: resolve conflicting user: %w", rerr)
+					}
+					// Rejected means this field's value is not the taken one
+					// (or the owner vanished again); try the next candidate.
+					// All-rejected routes anyway and the next step re-collects.
 				}
 				return passkeyPhaseResult{handled: true, outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
+			}
+			if errors.Is(err, ErrAuthAttemptStaleChallenge()) {
+				// The ceremony window is tighter than the attempt TTL, and a
+				// deploy can strand an in-flight ceremony too. Clear the
+				// pending challenge so a retry mints a fresh one instead of
+				// re-emitting the stale ceremony until the attempt dies.
+				state.ClearPendingChallenge()
+				msg := FlowStepErrorPasskeyRegistrationInvalid
+				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
+				state.IssuedAt = r.now()
+				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
 			if err != nil {
 				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey registration: %w", err)
@@ -892,7 +932,10 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				ChallengeID: challengeID,
 				Assertion:   in.ChallengeResponse.Proof,
 			})
-			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) || errors.Is(err, ErrAuthAttemptStaleChallenge()) {
+				// Both a rejected assertion and a stale challenge (e.g. after
+				// a deploy) render on the step with the pending ceremony
+				// cleared, so a retry mints a fresh challenge.
 				state.ClearPendingChallenge()
 				msg := FlowStepErrorPasskeyInvalid
 				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
