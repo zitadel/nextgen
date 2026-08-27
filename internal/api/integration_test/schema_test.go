@@ -78,7 +78,7 @@ func TestCreateSchema(t *testing.T) {
 				"kind":       "does not exist",
 				"title":      "an invalid user schema",
 				"x-auth-methods": map[string]any{
-					"password": map[string]any{
+					"passkey": map[string]any{
 						"enabled": true,
 					},
 				},
@@ -114,7 +114,7 @@ func TestCreateSchema(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -238,7 +238,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -254,7 +254,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "firstName": { "type": "string" }
@@ -270,7 +270,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -358,7 +358,7 @@ func TestSchemaKindFilter(t *testing.T) {
           "kind": "user-schema",
           "type": "object",
           "x-auth-methods": {
-            "password": { "enabled": true }
+            "passkey": { "enabled": true }
           },
           "properties": {
             "givenName": { "type": "string" }
