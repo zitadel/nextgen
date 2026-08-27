@@ -11,5 +11,7 @@ description: |
 
     Membership is team participation, not lifecycle ownership — the
     owning team stays at `metadata.lifecycle_owner_team_id` (ADR 024).
+
+  Requires `team_membership.read` in addition to `user.read`.
 enum:
   - teams

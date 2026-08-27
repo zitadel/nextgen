@@ -190,7 +190,7 @@ their **own** password/factors is self-service (`/me`-gated), **not**
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team_membership.create` | `POST /teams/{id}/memberships`, `POST /team_memberships` | Prefer nested create; flat create with `team_id` in body is legacy. |
-| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}` | |
+| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}`, `GET /users/{id}/teams`, `POST /users/query` with `expand: ["teams"]` or a `team_id` filter | Required on top of `user.read` for the user-side membership reads: reading users is not reading memberships. The `team_id` filter is gated with the expansion — it answers "who is in this team" a page at a time, which is the same read. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet and memberships have no RSI kind, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. |
 | `team_membership.write` | `PATCH /team_memberships/{id}` | Role changes within a membership (replaces old `team.roles.assign`). |
 | `team_membership.delete` | `DELETE /team_memberships/{id}` | |
 
