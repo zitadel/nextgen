@@ -1,6 +1,6 @@
 # Templates
 
-**Status:** Draft. Storage, validation, and authoring workflow decided in [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md); grouping settled below. **Parent:** [`README.md`](README.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters); [`../glossary.md`](../glossary.md#6-config-terms) (branding / template / design / layout vocabulary).
+**Status:** Draft. Storage, validation, and authoring workflow decided in [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md); grouping settled below. **Parent:** [`README.md`](README.md). **Placement:** a Liquid template is *widget structure* — not page chrome and not radii. The category map is [`customization-strategy.md`](customization-strategy.md) / [ADR 056](../../adrs/056-login-customization-categories.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters); [`../glossary.md`](../glossary.md#6-config-terms) (branding / template / design / layout / page chrome vocabulary).
 
 A template is a Liquid string the component evaluates against the flow payload. It composes `<zl-*>` atoms in a chosen order and grouping, resolves labels through the i18n filter, and calls `{% mandatory_gates %}` as the safety net. Nothing more.
 

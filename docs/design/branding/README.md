@@ -2,6 +2,8 @@
 
 Notes for how the login UI is themed and laid out relative to the step payload.
 
+**Product strategy (where a customization lives):** [`customization-strategy.md`](customization-strategy.md) and [ADR 056](../../adrs/056-login-customization-categories.md). Read that first when the question is *page wrapper vs widget knob vs Liquid vs flow*.
+
 **Contract (source of truth):** [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md), the shipped Branding spec under [`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/), [`../flowengine/template-security.md`](../flowengine/template-security.md).
 
 **This folder:** optional extensions and working notes (extra branding fields, `--zl-*` tokens, Liquid layout checks). Details live in the files linked below.
@@ -40,7 +42,7 @@ Dark mode; i18n source; powered-by line. Settled elsewhere: template attachment 
 
 ## Files
 
-[`schema.md`](schema.md), [`tokens.md`](tokens.md), [`templates.md`](templates.md), [`component-capability-map.md`](component-capability-map.md), [`override-ladder.md`](override-ladder.md), [`validator.md`](validator.md), [`form-participation.md`](form-participation.md), [`branding.example.json`](branding.example.json)
+[`customization-strategy.md`](customization-strategy.md), [`schema.md`](schema.md), [`tokens.md`](tokens.md), [`templates.md`](templates.md), [`component-capability-map.md`](component-capability-map.md), [`override-ladder.md`](override-ladder.md), [`validator.md`](validator.md), [`form-participation.md`](form-participation.md), [`branding.example.json`](branding.example.json)
 
 ## Related
 
