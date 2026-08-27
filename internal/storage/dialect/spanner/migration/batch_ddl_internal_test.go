@@ -3,6 +3,7 @@
 package migration
 
 import (
+	"io/fs"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,10 +43,19 @@ func TestMigrateBatchesDDLPerFile(t *testing.T) {
 	assert.Greater(t, statements, batches,
 		"batching must group statements: got %d statements in %d batches", statements, batches)
 
-	// Boundaries follow goose's one-connection-per-file checkout, so batches
-	// should track the number of migration files, not the statement count.
-	assert.Less(t, batches, statements/2,
-		"expected file-sized batches, got %d batches for %d statements", batches, statements)
+	// Pin the file boundary, not just "fewer batches than statements". Batches
+	// are delimited by goose's per-file version write, so there is at least one
+	// per migration file carrying DDL. A ratio check alone would be satisfied by
+	// the whole pending set travelling as a single batch, which is materially
+	// worse to recover from (Spanner DDL batches are not atomic, so a failure
+	// would leave schema applied across many files with no version recorded).
+	files, err := fs.Glob(sqlFiles, "sql/*.sql")
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+	assert.GreaterOrEqual(t, int(batches), len(files),
+		"expected at least one batch per migration file: %d batches for %d files (%d statements). "+
+			"Far fewer means the per-file flush point was lost and the pending set is batching as one",
+		batches, len(files), statements)
 
-	t.Logf("migrated %d DDL statements in %d batches", statements, batches)
+	t.Logf("migrated %d DDL statements in %d batches across %d files", statements, batches, len(files))
 }

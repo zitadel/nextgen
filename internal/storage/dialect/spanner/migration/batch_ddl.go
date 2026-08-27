@@ -20,12 +20,12 @@ package migration
 // # Batching is opt-in, and must stay that way
 //
 // Buffering is per *connection*, so it is only safe where the caller holds one
-// connection for the whole sequence. goose does: it checks out a single
-// *sql.Conn, runs a file's statements on it, then records the version on that
-// same connection. Code that goes through the *sql.DB pool does not, and mixing
-// the two silently breaks: a CREATE TABLE buffered on one pooled connection is
-// invisible to a SELECT that the pool happens to serve from another, and the
-// buffered statements are then discarded when the first connection is reset.
+// connection for the whole sequence. goose does: Provider.initialize checks out
+// a single *sql.Conn and runMigrations reuses it for the entire Up run (goose
+// v3.27.1). Code that goes through the *sql.DB pool does not, and mixing the two
+// silently breaks: a CREATE TABLE buffered on one pooled connection is invisible
+// to a SELECT that the pool happens to serve from another, and the buffered
+// statements would then be stranded on the first connection.
 // [ensureLeaseRow] does exactly that, which is why batching is not automatic.
 //
 // So DDL is batched only when the context says so, via [WithDDLBatching], which
@@ -42,18 +42,24 @@ package migration
 //     at the flush, not at statement N, and goose reports it against whatever
 //     triggered the flush. The error text from Spanner still names the offending
 //     statement, so read the message rather than the position.
-//   - goose runs one migration file per connection checkout, so batches align
-//     with files. That is deliberate: Spanner DDL batches are not atomic (a
-//     failure leaves earlier statements applied), so keeping the boundary at the
-//     file preserves exactly the recovery behaviour goose already had. Do not
-//     widen it to the whole pending set without revisiting that.
-//   - A connection reset or closed with a batch still buffered *flushes* it,
-//     best effort, rather than discarding. That costs a late apply in the
-//     anomalous case, and buys the guarantee that DDL never disappears without
-//     an error: dropping it silently is how a misplaced [WithDDLBatching] would
-//     otherwise erase schema. It also bounds the blast radius of marking a
-//     pooled context by mistake, since the flush lands before the connection can
-//     serve anyone else.
+//   - Batches end at non-DDL statements, and that is the only thing bounding
+//     them. goose reuses one connection for the whole Up run, so the file
+//     boundary is not structural: it holds because goose writes the version row
+//     after each file, and that DML forces a flush. A file mixing DDL and DML
+//     therefore produces several batches, which is harmless. What would not be
+//     harmless is removing the per-file version write, since the whole pending
+//     set would then travel as one batch. Spanner DDL batches are not atomic (a
+//     failure leaves earlier statements applied), so that would widen the window
+//     in which a failure leaves schema applied with no version recorded, well
+//     past what goose already had. TestMigrateBatchesDDLPerFile pins the
+//     boundary count so that change cannot land silently.
+//   - A connection reset or closed with a batch still buffered *flushes* it
+//     rather than discarding, and reports a failed flush through the reset or
+//     close error. That costs a late apply in the anomalous case, and buys the
+//     guarantee that DDL never disappears without an error: dropping it silently
+//     is how a misplaced [WithDDLBatching] would otherwise erase schema. It also
+//     bounds the blast radius of marking a pooled context by mistake, since the
+//     flush lands before the connection can serve anyone else.
 //
 // The emulator applies DDL instantly, so none of this is observable locally;
 // only a real instance shows the difference.
@@ -62,6 +68,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -130,9 +137,13 @@ func (c batchConnector) Driver() driver.Driver { return c.base.Driver() }
 
 // batchConn buffers consecutive DDL and flushes it before anything else.
 //
-// It embeds driver.Conn so the many optional interfaces the driver implements
-// keep working, and overrides only the entry points that either start a batch
-// or must flush one first.
+// It embeds driver.Conn for the required methods and overrides the entry points
+// that either start a batch or must flush one first. Embedding does *not* carry
+// the optional interfaces across: Go promotes methods of the driver.Conn
+// interface, not of whatever concrete type is behind it, so anything the Spanner
+// connection implements beyond driver.Conn is invisible here unless forwarded
+// explicitly. CheckNamedValue and IsValid are forwarded below for that reason;
+// the assertions in the var block are what stop a future one being missed.
 type batchConn struct {
 	driver.Conn
 	spanner spannerdriver.SpannerConn
@@ -147,6 +158,8 @@ var (
 	_ driver.ConnBeginTx        = (*batchConn)(nil)
 	_ driver.SessionResetter    = (*batchConn)(nil)
 	_ driver.Pinger             = (*batchConn)(nil)
+	_ driver.NamedValueChecker  = (*batchConn)(nil)
+	_ driver.Validator          = (*batchConn)(nil)
 )
 
 // Counters exist so a test can prove batching actually engaged. Without them a
@@ -176,17 +189,21 @@ func (c *batchConn) flush(ctx context.Context) error {
 	return nil
 }
 
-// flushBestEffort sends a buffered batch where the caller cannot receive an
-// error: connection reset and close. Applying late beats discarding silently.
-// Dropping the batch here would make a CREATE TABLE vanish with no error
-// reported anywhere, which is the worst failure mode this type could have.
-func (c *batchConn) flushBestEffort() {
+// flushOnTeardown sends a buffered batch from reset or close. Applying late
+// beats discarding silently: dropping the batch here would make a CREATE TABLE
+// vanish with no error reported anywhere, which is the worst failure mode this
+// type could have. The error is returned so callers that have somewhere to put
+// it (Close) do not swallow a failed flush.
+func (c *batchConn) flushOnTeardown() error {
 	if !c.open {
-		return
+		return nil
 	}
 	c.open = false
 	ddlBatchesRun.Add(1)
-	_ = c.spanner.RunBatch(context.Background())
+	if err := c.spanner.RunBatch(context.Background()); err != nil {
+		return fmt.Errorf("run spanner ddl batch on teardown: %w", err)
+	}
+	return nil
 }
 
 func (c *batchConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -264,14 +281,36 @@ func (c *batchConn) Ping(ctx context.Context) error {
 // statements entirely, and flushing here still happens before the connection can
 // serve anyone else.
 func (c *batchConn) ResetSession(ctx context.Context) error {
-	c.flushBestEffort()
+	flushErr := c.flushOnTeardown()
 	if r, ok := c.Conn.(driver.SessionResetter); ok {
-		return r.ResetSession(ctx)
+		return errors.Join(flushErr, r.ResetSession(ctx))
 	}
-	return nil
+	return flushErr
 }
 
+// Close still closes the underlying connection when the flush fails, but
+// reports the failure rather than losing it: a connection closed with buffered
+// DDL that could not be applied must not look like a clean close.
 func (c *batchConn) Close() error {
-	c.flushBestEffort()
-	return c.Conn.Close()
+	flushErr := c.flushOnTeardown()
+	return errors.Join(flushErr, c.Conn.Close())
+}
+
+// CheckNamedValue and IsValid are forwarded explicitly. Embedding driver.Conn
+// only promotes methods of that *interface*, so any optional interface the
+// concrete Spanner connection satisfies is invisible through the wrapper.
+// Dropping CheckNamedValue would silently change parameter conversion, and
+// dropping IsValid would stop the pool from discarding dead connections.
+func (c *batchConn) CheckNamedValue(v *driver.NamedValue) error {
+	if checker, ok := c.Conn.(driver.NamedValueChecker); ok {
+		return checker.CheckNamedValue(v)
+	}
+	return driver.ErrSkip
+}
+
+func (c *batchConn) IsValid() bool {
+	if v, ok := c.Conn.(driver.Validator); ok {
+		return v.IsValid()
+	}
+	return true
 }

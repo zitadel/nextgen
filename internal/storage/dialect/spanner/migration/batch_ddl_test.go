@@ -52,6 +52,11 @@ func createTable(t *testing.T, ctx context.Context, e interface {
 // A batching context on a held connection defers the DDL until something else
 // forces a flush, and then applies all of it. This is the behaviour the whole
 // change exists for: goose's per-file statements become one UpdateDatabaseDdl.
+//
+// The absence check has to be made from a *different* connection. Querying the
+// held connection would itself flush the batch, so it could never observe the
+// buffered state, and the test would pass unchanged even if batching were
+// switched off entirely.
 func TestDDLBatchingBuffersUntilFlush(t *testing.T) {
 	ctx := migration.WithDDLBatching(t.Context())
 	db := openBatchTestDB(t)
@@ -63,9 +68,16 @@ func TestDDLBatchingBuffersUntilFlush(t *testing.T) {
 	createTable(t, ctx, conn, "batch_buffered_a")
 	createTable(t, ctx, conn, "batch_buffered_b")
 
-	// A query on the same connection flushes, so check the buffer state with
-	// the driver's own view: nothing is applied until that happens. The query
-	// below is itself the flush, so assert on what it returns afterwards.
+	// Pooled read, so it cannot be served by the connection holding the buffer.
+	// Deliberately an unmarked context: a batching one would be pointless here
+	// and this read must never buffer anything itself.
+	require.EqualValues(t, 0, tableCount(t, t.Context(), db, "batch_buffered_a"),
+		"DDL must still be buffered on the held connection, not applied")
+	require.EqualValues(t, 0, tableCount(t, t.Context(), db, "batch_buffered_b"),
+		"DDL must still be buffered on the held connection, not applied")
+
+	// A query on the held connection is a flush point, and must apply the whole
+	// batch rather than only the most recent statement.
 	require.EqualValues(t, 1, tableCount(t, ctx, conn, "batch_buffered_a"),
 		"the flushing query must see the batch it just flushed")
 	require.EqualValues(t, 1, tableCount(t, ctx, conn, "batch_buffered_b"),
