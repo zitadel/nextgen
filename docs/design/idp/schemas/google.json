@@ -1,0 +1,32 @@
+{
+  "$schema": "./idp-connection.json",
+  "slug": "google",
+  "protocol": "oidc",
+  "template": "google",
+  "display_name": "Google",
+  "subject_claim": "sub",
+  "claim_mapping": {
+    "email": "email",
+    "givenName": "given_name",
+    "familyName": "family_name"
+  },
+  "verified_claims": {
+    "email": "email_verified"
+  },
+  "provisioning": {
+    "creation": "auto"
+  },
+  "oidc": {
+    "issuer": "https://accounts.google.com",
+    "client_id": "1234-abc.apps.googleusercontent.com",
+    "client_secret_env": "GOOGLE_CLIENT_SECRET",
+    "scopes": [
+      "openid",
+      "profile",
+      "email"
+    ],
+    "static_authorize_parameters": {
+      "prompt": "select_account"
+    }
+  }
+}
