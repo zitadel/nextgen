@@ -211,11 +211,13 @@ tasks:
       - "./..."
     inputs:
       - "@group(serverInputs)"
-      # The target backend changes what actually runs (emulator container vs a
-      # real Cloud Spanner instance) but is invisible to moon's task hash, so
-      # without this input moon replays the emulator run's cached task result
-      # for a real-instance run, before go's own cache even gets a turn.
-      # Precedent: $ZITADEL_TELEMETRY_BUILD_CHANNEL in apps/cli/moon.yml.
+      # Belt-and-braces, not the thing protecting this lane: with cache: false
+      # below, the task hash is never consulted, so nothing can be replayed from
+      # it and this entry changes no outcome today. It is kept because the target
+      # backend (emulator container vs real Cloud Spanner instance) genuinely
+      # does change what runs, so the hash should reflect it if caching is ever
+      # switched back on. Same pairing as build-release in apps/cli/moon.yml,
+      # which also lists an env input alongside cache: false.
       - "$ZITADEL_TEST_SPANNER_INSTANCE"
     options:
       runFromWorkspaceRoot: true
