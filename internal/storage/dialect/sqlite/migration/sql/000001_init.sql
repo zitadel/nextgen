@@ -555,12 +555,6 @@ DROP INDEX IF EXISTS idx_claim_challenges_expires_at;
 DROP TABLE IF EXISTS claim_challenges;
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_passkey_registrations_expires_at;
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE IF EXISTS passkey_registrations;
--- +goose StatementEnd
--- +goose StatementBegin
 DROP INDEX IF EXISTS idx_branding_project_created_at;
 -- +goose StatementEnd
 -- +goose StatementBegin
