@@ -173,3 +173,53 @@ func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	assert.Contains(t, w.args, "proj_1")
 	assert.Contains(t, w.args, "user_a")
 }
+
+// TestListPredicateLiftsConstantArms pins the shape, because nothing else does.
+// The project-scoped and TTU arms cannot reference the correlated RSI row, so
+// inside the EXISTS they are a query-constant that Spanner's emulator
+// re-evaluates once per listed row: 18.6s of a 22.7s query over ten rows. If a
+// later refactor folds them back inside, every behavioural suite stays green and
+// only the timings move, which is exactly the regression that went unnoticed
+// from #811 until #972.
+func TestListPredicateLiftsConstantArms(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id",
+		domain.AuthzListObjectsParams{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID:     "cat_sys_1",
+				ProjectID:     "proj_1",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   "user_a",
+				ObjectType:    "project",
+				Relation:      "viewer",
+			},
+			ResourceKind: domain.ResourceKindTeam,
+		})
+	sql := w.b.String()
+
+	// The correlated subquery is the first mention of the RSI alias, so the
+	// lifted arms must appear before it.
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, firstRSI, "predicate must query resource_scope_index")
+
+	projectArm := strings.Index(sql, "a.scope_kind = 'project'")
+	require.NotEqual(t, -1, projectArm, "project-scoped arm must be emitted")
+	assert.Less(t, projectArm, firstRSI,
+		"project-scoped arm must be lifted out of the correlated EXISTS")
+
+	ttuArm := strings.Index(sql, "tuple_to_userset")
+	require.NotEqual(t, -1, ttuArm, "tuple-to-userset arm must be emitted")
+	assert.Less(t, ttuArm, firstRSI,
+		"tuple-to-userset arm must be lifted out of the correlated EXISTS")
+
+	// The lift is only sound because the constant arms are ANDed with an RSI
+	// existence check: an object with no RSI row must stay invisible even when
+	// they are true, so a bare `constant OR EXISTS(...)` would leak rows.
+	assert.Equal(t, 2, strings.Count(sql, "resource_scope_index r"),
+		"both halves of the lifted predicate must require an RSI row")
+
+	// The arms that genuinely depend on the row must stay inside, correlated.
+	assert.Contains(t, sql, "a.scope_team_id = r.team_id")
+	assert.Contains(t, sql, "a.scope_resource_id = r.resource_id")
+}

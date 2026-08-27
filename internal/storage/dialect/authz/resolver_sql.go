@@ -96,18 +96,78 @@ WHERE `)
 ORDER BY r.resource_id`)
 }
 
-// WriteListAuthzExistsPredicate emits EXISTS (SELECT 1 FROM RSI r WHERE
-// r.resource_id = <outer> AND …) using the same assignment/closure/TTU
-// branches as WriteListAuthzObjectIDs. outerResourceIDExpr is a raw SQL
-// column reference (e.g. "zitadel_nextgen.teams.id").
+// WriteListAuthzExistsPredicate emits the per-row visibility test for a
+// management list, using the same assignment/closure/TTU branches as
+// WriteListAuthzObjectIDs. outerResourceIDExpr is a raw SQL column reference
+// (e.g. "zitadel_nextgen.teams.id").
+//
+// The project-scoped and TTU arms cannot reference the RSI row r: they take no
+// raw-SQL scope expression (see writeScopedClosureExists' scopeIDExpr), so
+// everything they emit is a bind argument and their truth value is fixed once
+// the arguments are bound. Kept inside one correlated EXISTS, Spanner
+// re-evaluates them per outer row — 18.6s of a 22.7s query over ten rows (#972).
+// So they are lifted out, by the distributive law, for constant C:
+//
+//	EXISTS(base AND (C OR Q))  ==  (C AND EXISTS(base)) OR EXISTS(base AND Q)
+//
+// The `C AND EXISTS(base)` conjunct is load-bearing: an object with no RSI row
+// must stay invisible even when C is true, so C alone can never grant it.
 func WriteListAuthzExistsPredicate(w ArgWriter, env Env, outerResourceIDExpr string, params domain.AuthzListObjectsParams) {
+	w.WriteString(`((`)
+	writeProjectScopedClosureExists(w, env, params.AuthzCheckParams)
+	w.WriteString(`
+    OR `)
+	writeFullTTUExists(w, env, params.AuthzCheckParams)
+	w.WriteString(`)
+  AND `)
+	writeListAuthzRSIExists(w, env, params, outerResourceIDExpr, false)
+	w.WriteString(`
+  OR `)
+	writeListAuthzRSIExists(w, env, params, outerResourceIDExpr, true)
+	w.WriteString(`)`)
+}
+
+// writeListAuthzRSIExists emits EXISTS (SELECT 1 FROM RSI r WHERE …) for one
+// half of the lifted predicate. withScopedArms adds the two arms that do
+// correlate to r; both halves carry the constraint-team clause, which is also
+// correlated and so must not be distributed out of either.
+func writeListAuthzRSIExists(w ArgWriter, env Env, params domain.AuthzListObjectsParams, outerResourceIDExpr string, withScopedArms bool) {
 	w.WriteString(`EXISTS (
 SELECT 1
 FROM `)
 	writeTable(w, env, "resource_scope_index")
 	w.WriteString(` r
 WHERE `)
-	writeListAuthzRSIMatch(w, env, params, outerResourceIDExpr)
+	if outerResourceIDExpr != "" {
+		w.WriteString(`r.resource_id = `)
+		w.WriteString(outerResourceIDExpr)
+		w.WriteString(`
+  AND `)
+	}
+	w.WriteString(`r.project_id = `)
+	w.WriteArg(params.ProjectID)
+	w.WriteString(`
+  AND r.resource_kind = `)
+	w.WriteArg(params.ResourceKind.String())
+	if withScopedArms {
+		w.WriteString(`
+  AND (
+    (
+        r.team_id IS NOT NULL
+        AND `)
+		writeScopedClosureExists(w, env, params.AuthzCheckParams, "team", "r.team_id")
+		w.WriteString(`
+    )
+    OR `)
+		writeScopedClosureExists(w, env, params.AuthzCheckParams, "resource", "r.resource_id")
+		w.WriteString(`
+  )`)
+	}
+	if params.ConstraintTeamID != "" {
+		w.WriteString(`
+  AND `)
+		writeListedObjectInConstraintTeam(w, env, params)
+	}
 	w.WriteString(`
 )`)
 }
