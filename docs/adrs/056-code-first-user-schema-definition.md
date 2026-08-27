@@ -1,7 +1,7 @@
 # ADR 056: Code-First User Schema Definition
 
 > **Status:** Proposed
-> **Date:** 2026-08-26
+> **Date:** 2026-08-27
 > **Context:** User schema authoring, config push, developer and agent DX
 >
 > **Builds on** [ADR 008](008-users-eav-store.md), [ADR 009](009-user-json-schema-validation.md),
