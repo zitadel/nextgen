@@ -126,7 +126,7 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(schemaBs []byte) error {
 	// Designation rules cross-reference other parts of the document (property
 	// existence, uniqueness scope, enabled auth methods), which the meta
 	// JSON Schema cannot express — same pattern as flow-definition validation.
-	if kind, _ := schema["kind"].(string); kind == "user-schema" {
+	if kind, _ := schema["kind"].(string); kind == SchemaDocumentKindUser {
 		if err := validateUserSchemaDesignations(schema); err != nil {
 			return err
 		}
