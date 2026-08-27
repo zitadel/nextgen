@@ -203,21 +203,37 @@ func TestListPredicateLiftsConstantArms(t *testing.T) {
 	firstRSI := strings.Index(sql, "resource_scope_index r")
 	require.NotEqual(t, -1, firstRSI, "predicate must query resource_scope_index")
 
-	projectArm := strings.Index(sql, "a.scope_kind = 'project'")
-	require.NotEqual(t, -1, projectArm, "project-scoped arm must be emitted")
-	assert.Less(t, projectArm, firstRSI,
-		"project-scoped arm must be lifted out of the correlated EXISTS")
+	// Assert on the LAST occurrence, not the first. `a.scope_kind = 'project'`
+	// is emitted twice — once by the direct project-scoped arm and once inside
+	// writeFullTTUExists' own project-scope case — so checking the first match
+	// would still pass if the direct arm were folded back into the correlated
+	// subquery while the TTU arm stayed lifted. Requiring the last occurrence to
+	// precede the subquery pins every project-scope arm at once.
+	require.Contains(t, sql, "a.scope_kind = 'project'", "project-scoped arm must be emitted")
+	assert.Less(t, strings.LastIndex(sql, "a.scope_kind = 'project'"), firstRSI,
+		"every project-scoped arm must be lifted out of the correlated EXISTS")
 
-	ttuArm := strings.Index(sql, "tuple_to_userset")
-	require.NotEqual(t, -1, ttuArm, "tuple-to-userset arm must be emitted")
-	assert.Less(t, ttuArm, firstRSI,
+	require.Contains(t, sql, "tuple_to_userset", "tuple-to-userset arm must be emitted")
+	assert.Less(t, strings.LastIndex(sql, "tuple_to_userset"), firstRSI,
 		"tuple-to-userset arm must be lifted out of the correlated EXISTS")
 
 	// The lift is only sound because the constant arms are ANDed with an RSI
 	// existence check: an object with no RSI row must stay invisible even when
-	// they are true, so a bare `constant OR EXISTS(...)` would leak rows.
+	// they are true, so a bare `constant OR EXISTS(...)` would expose rows that
+	// were never registered.
 	assert.Equal(t, 2, strings.Count(sql, "resource_scope_index r"),
 		"both halves of the lifted predicate must require an RSI row")
+
+	// Counting the subqueries is not enough on its own: flipping that AND to an
+	// OR leaves the count and every other assertion above unchanged while
+	// reintroducing exactly that leak. So pin the connector that joins the
+	// constant group to the first RSI subquery.
+	head := sql[:firstRSI]
+	openingExists := strings.LastIndex(head, "EXISTS (")
+	require.NotEqual(t, -1, openingExists, "the first RSI subquery must be an EXISTS")
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(head[:openingExists]), "AND"),
+		"the constant arms must be ANDed with the RSI existence check, not ORed: "+
+			"an OR would make objects with no RSI row visible to any project-wide grant")
 
 	// The arms that genuinely depend on the row must stay inside, correlated.
 	assert.Contains(t, sql, "a.scope_team_id = r.team_id")
