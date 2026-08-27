@@ -63,7 +63,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true }
+					"passkey": { "enabled": true }
 				}
 			}`),
 		},
@@ -92,7 +92,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind":    "user-schema",
 				"title":   "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true }
+					"passkey": { "enabled": true }
 				},
 				"properties": {
 					"address": {
@@ -205,7 +205,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true }
+					"passkey": { "enabled": true }
 				},
 				"properties": {
 					"email": {
@@ -391,4 +391,109 @@ func TestSchemaValidator_LatestSchemaURI(t *testing.T) {
 		_, err := v.LatestSchemaURI("unknown-kind")
 		require.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
 	})
+}
+
+func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
+	v := newTestValidator(t)
+
+	doc := func(body string) []byte {
+		return []byte(`{
+			"metaSchema": "` + testBuiltinBase + `/user-schema.json",
+			"$id": "https://example.test/schemas/my-user.json",
+			"kind": "user-schema",
+			"title": "My User",
+			` + body + `}`)
+	}
+
+	tests := []struct {
+		name    string
+		input   []byte
+		wantErr error
+	}{
+		{
+			name: "identifier on a project-unique leaf",
+			input: doc(`"x-auth-methods": {"password": {"enabled": true}},
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+		},
+		{
+			name: "identifier on a nested leaf path",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account.handle",
+				"properties": {"account": {"type": "object", "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+		},
+		{
+			name: "password enabled without a designation",
+			input: doc(`"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name:  "passkey-only schema needs no designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}}`),
+		},
+		{
+			name: "identifier naming an unknown property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "username",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a non-unique property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a team-unique property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "username",
+				"properties": {"username": {"type": "string", "x-unique": "team"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an object is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account",
+				"properties": {"account": {"type": "object", "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "display on leaves without uniqueness",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["givenName", "name.family"],
+				"properties": {
+					"givenName": {"type": "string"},
+					"name": {"type": "object", "properties": {"family": {"type": "string"}}}}`),
+		},
+		{
+			name: "display naming an unknown property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["nickname"],
+				"properties": {"email": {"type": "string"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "display entry must be a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["name"],
+				"properties": {"name": {"type": "object", "properties": {"family": {"type": "string"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.ValidateAgainstMetaSchema(tt.input)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
 }

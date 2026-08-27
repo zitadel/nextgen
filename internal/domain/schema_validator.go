@@ -122,6 +122,15 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(schemaBs []byte) error {
 	if err := metaSchema.Validate(schema); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchemaValidationFailed, err)
 	}
+
+	// Designation rules cross-reference other parts of the document (property
+	// existence, uniqueness scope, enabled auth methods), which the meta
+	// JSON Schema cannot express — same pattern as flow-definition validation.
+	if kind, _ := schema["kind"].(string); kind == "user-schema" {
+		if err := validateUserSchemaDesignations(schema); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
