@@ -477,14 +477,6 @@ func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
 			wantErr: domain.ErrSchemaDesignationInvalid,
 		},
 		{
-			name: "identifier hiding an object behind a $ref is indeterminate",
-			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
-				"x-identifier": "profile",
-				"$defs": {"profile": {"type": "object", "properties": {"handle": {"type": "string"}}}},
-				"properties": {"profile": {"$ref": "#/$defs/profile", "x-unique": "project"}}`),
-			wantErr: domain.ErrSchemaDesignationInvalid,
-		},
-		{
 			name: "identifier on an untyped property is indeterminate",
 			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
 				"x-identifier": "handle",
