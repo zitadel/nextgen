@@ -74,32 +74,33 @@ func designatedLeaf(schema map[string]any, path, keyword string) (map[string]any
 			return nil, fmt.Errorf("%w: %q names unknown property %q", ErrSchemaDesignationInvalid, keyword, path)
 		}
 	}
-	if isCompositeProperty(current) {
-		return nil, fmt.Errorf("%w: %q property %q must be a leaf, not an object or array", ErrSchemaDesignationInvalid, keyword, path)
+	if !declaresScalarType(current) {
+		return nil, fmt.Errorf("%w: %q property %q must locally declare a scalar type", ErrSchemaDesignationInvalid, keyword, path)
 	}
 	return current, nil
 }
 
-// isCompositeProperty reports whether a property schema describes an object
-// or array rather than a scalar. A property carrying `properties` is an
-// object and one carrying `items` is an array even when it omits the `type`
-// keyword, and an array-form `type` union is composite as soon as any entry
-// is object or array — no unique row exists for such a value, so it can
-// never be resolved as a designation.
-func isCompositeProperty(prop map[string]any) bool {
-	if _, ok := prop["properties"]; ok {
-		return true
-	}
-	if _, ok := prop["items"]; ok {
-		return true
+// declaresScalarType reports whether a property schema locally proves its
+// values are scalars via the `type` keyword — a single scalar type name, or
+// a union of them (the nullable idiom included). JSON Schema keywords are
+// conjunctive, so a local scalar `type` cannot be widened by `$ref`,
+// `allOf`, or any other keyword the property carries. Without that local
+// proof the shape is indeterminate — an untyped property (or one hiding an
+// object behind `$ref`) accepts object values, which flatten into child
+// attribute rows with no unique row for the designated path.
+func declaresScalarType(prop map[string]any) bool {
+	isScalar := func(entry any) bool {
+		switch entry {
+		case "string", "number", "integer", "boolean", "null":
+			return true
+		}
+		return false
 	}
 	switch t := prop["type"].(type) {
 	case string:
-		return t == "object" || t == "array"
+		return isScalar(t)
 	case []any:
-		return slices.ContainsFunc(t, func(entry any) bool {
-			return entry == "object" || entry == "array"
-		})
+		return len(t) > 0 && !slices.ContainsFunc(t, func(entry any) bool { return !isScalar(entry) })
 	}
 	return false
 }
