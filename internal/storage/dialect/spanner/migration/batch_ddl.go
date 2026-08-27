@@ -31,6 +31,20 @@ package migration
 // So DDL is batched only when the context says so, via [WithDDLBatching], which
 // [Migrate] applies to the context it hands goose and to nothing else.
 //
+// # The alternative that was considered and rejected
+//
+// go-sql-spanner accepts START BATCH DDL and RUN BATCH as client-side statements
+// through the ordinary Exec path, and every migration file here already carries
+// `-- +goose NO TRANSACTION`, so goose execs each statement on the held
+// connection. Bracketing each file's statements with those two lines would
+// produce the same per-file batching in about 38 lines of SQL, with no driver
+// wrapper, no build-tagged stub and no dependency on the driver's parser.
+//
+// It was rejected for one reason: the batch boundary would become a convention
+// every future migration file has to remember twice, where here it cannot be
+// forgotten. That is the whole trade, and it is the only reason this file is
+// larger than the alternative.
+//
 // # The behaviour to know about when debugging a migration
 //
 //   - Under a batching context, a DDL Exec that appears to succeed has only
@@ -107,6 +121,14 @@ func OpenDB(dsn string) (*sql.DB, error) {
 	}
 	// Statement classification is the driver's own, not a prefix heuristic of
 	// ours: it already handles comments, hints and quoting correctly.
+	//
+	// Caveat for whoever bumps go-sql-spanner: NewStatementParser documents
+	// itself as "an internal function that can receive breaking changes without
+	// prior notice", so this is outside the module's compatibility promise. A
+	// signature change is loud, a change in how statements are classified is
+	// quiet and would silently stop batching or misapply it. TestMigrateBatches
+	// DDLPerFile is the tripwire for the quiet case: if DDL stopped being
+	// recognised, its statement counter would fall to zero and the test fails.
 	p, err := parser.NewStatementParser(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, 0)
 	if err != nil {
 		return nil, fmt.Errorf("create spanner statement parser: %w", err)
@@ -207,6 +229,7 @@ func (c *batchConn) flushOnTeardown() error {
 }
 
 func (c *batchConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	buffering := false
 	if ddlBatchingEnabled(ctx) && c.isDDL(query) {
 		if !c.open {
 			if err := c.spanner.StartBatchDDL(); err != nil {
@@ -214,7 +237,7 @@ func (c *batchConn) ExecContext(ctx context.Context, query string, args []driver
 			}
 			c.open = true
 		}
-		ddlStatementsBuffed.Add(1)
+		buffering = true
 	} else if err := c.flush(ctx); err != nil {
 		return nil, err
 	}
@@ -222,7 +245,14 @@ func (c *batchConn) ExecContext(ctx context.Context, query string, args []driver
 	if !ok {
 		return nil, driver.ErrSkip
 	}
-	return execer.ExecContext(ctx, query, args)
+	res, err := execer.ExecContext(ctx, query, args)
+	// Counted on the success path only, so the number the test reports is
+	// statements actually buffered. c.open deliberately stays set on failure:
+	// whatever was buffered before this statement still has to be flushed.
+	if buffering && err == nil {
+		ddlStatementsBuffed.Add(1)
+	}
+	return res, err
 }
 
 func (c *batchConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
