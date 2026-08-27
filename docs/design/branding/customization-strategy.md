@@ -97,19 +97,107 @@ editors.
 | --- | --- | --- | --- |
 | 1 | **Page chrome** | How the login sits on the *page*: split, centered, left-pane content | Embedder: app wrapper. Hosted: **page template** |
 | 2 | **Widget appearance** | Convenience look *inside* the widget: radii, colors, density, theme, logo | Tokens / branding knobs / element `appearance` |
-| 3 | **Widget structure** | What sits *between the atoms*: disclaimer, grouping | **Template** (`login.liquid`) — both deployments |
+| 3 | **Widget structure** | What sits *between the atoms*: disclaimer, grouping | **Widget template** (`login.liquid`) — both deployments |
 | 4 | **Voice** | Wording, locale overlays | Branding copy + `locales` / `lang` |
 | 5 | **Behavior** | Which steps, fields, factors exist | Flow definition — not an appearance surface |
 
-**Why two Liquid names.** A **template** is the widget-structure file. Its
-scope is strict (atoms, step payload, no page chrome) and it applies to
-**both** embeddings because the same widget runs in the app and on hosted
-login. A **page template** exists as a separate noun only because hosted
-login has no application to wrap: it is the document around
-`{% login_widget %}`, and it is **hosted-only**. Calling both "templates"
-would either loosen the shared file (page chrome leaking into every
-embed) or leave hosted login with nowhere to put a left pane. Embedder
-wrappers are application code, not page templates.
+**Why the paired names.** Call them **widget template** and **page
+template** — parallel nouns, different scope. The widget template is
+strict (atoms, step payload, no page chrome) and applies to **both**
+deployments because the same widget runs in the app and on hosted login.
+The page template exists only because hosted login has no application to
+wrap: it is the document around `{% login_widget %}`. One unqualified
+"template" would either loosen the shared file or leave hosted login
+with nowhere to put a left pane. Embedder wrappers are application code,
+not page templates.
+
+Page-local knobs (host CSS, `lang` / `locales`, the embedder wrapper) never
+enter the API. Everything else is **platform defined**: the same resources
+the Branding API, Flow API, and (later) hosted page-template API expose,
+whether the customer authors them as `.zitadel/` files, Console settings,
+or HTTP.
+
+```mermaid
+flowchart TB
+  subgraph cats [Five categories]
+    C1[1 Page chrome]
+    C2[2 Widget appearance]
+    C3[3 Widget structure]
+    C4[4 Voice]
+    C5[5 Behavior]
+  end
+
+  subgraph local [This page / embedder — not the API]
+    EmbWrap[App wrapper — embedder only]
+    HostCSS["Element appearance / host CSS"]
+    Locales["lang / locales"]
+  end
+
+  subgraph api [Platform defined — API]
+    PageTpl["page.liquid + {% login_widget %} — hosted only"]
+    BrandJSON[branding.json / Console]
+    WidTpl[Widget template login.liquid]
+    Copy[Branding copy overlay]
+    Flow[Flow definition]
+  end
+
+  C1 --> EmbWrap
+  C1 --> PageTpl
+  C2 --> HostCSS
+  C2 --> BrandJSON
+  C3 --> WidTpl
+  C4 --> Locales
+  C4 --> Copy
+  C5 --> Flow
+
+  BrandJSON --> Both1[Both deployments]
+  WidTpl --> Both1
+  Copy --> Both1
+  Flow --> Both1
+```
+
+```mermaid
+flowchart LR
+  subgraph embed [Embedded]
+    EW[App wrapper]
+    EL["<zitadel-login>"]
+    EW --> EL
+  end
+  subgraph hosted [Hosted]
+    PT["Page template — platform defined"]
+    HL["<zitadel-login>"]
+    PT --> HL
+  end
+  subgraph api [Platform defined — API, both deployments]
+    AP[Appearance knobs]
+    WT[Widget template]
+    VO[Voice overlay]
+    FL[Flow definition]
+  end
+  AP --> EL
+  AP --> HL
+  WT --> EL
+  WT --> HL
+  VO --> EL
+  VO --> HL
+  FL --> WT
+```
+
+## What would change
+
+Nothing in this table is implemented by this PR. It is the delta from
+**what ships today** to the destination above.
+
+| Surface | Today | Destination |
+| --- | --- | --- |
+| `zitadel setup --design split` | Writes `.zitadel/branding/login.liquid` (split chrome + copied form) and publishes branding revision 1. Generated auth page is still a bare `<zitadel-login>`. | Writes an **app wrapper** (grid + left pane + `variant="widget"`). Writes **no** Liquid, publishes **no** branding revision. |
+| `zitadel branding eject --design` | Catalog of five Liquid files that mix page chrome with the form card. | Ejects the **widget template** only — bundled default card. No split/hero in this catalog. |
+| One Liquid file | `login.liquid` is the only template noun; split/hero live inside it. | Two nouns: **widget template** (`login.liquid`, both deployments) and **page template** (`page.liquid` + `{% login_widget %}`, hosted-only). |
+| Widget look | Host CSS + proposed branding JSON; no first-class `appearance` object. | Same shape three ways: `el.appearance`, host CSS `--zl-*`, Console / `branding.json`. `chrome: card \| plain` replaces `minimal` as a design. |
+| Hosted `/ui/login/` | `variant="page"` shell; any split comes from a widget-internal design. | Hosted **page template**. Widget stays the default card (or an ejected widget template). |
+| Embedder who wants a left pane | Ejects Liquid and edits marketing copy inside the sanitiser. | Edits the scaffolded wrapper as app code. |
+| Shared widget structure (disclaimer) | Same eject path, but the starting files are page layouts. | Same eject path, starting from the default card. Applies to **both** deployments. |
+| Already-ejected split/hero revisions | Render today. | Keep rendering. Legacy path, not the setup path. |
 
 ### 1. Page chrome
 
@@ -248,7 +336,7 @@ Everything that lives **between the atoms** and is still *inside* the
 widget: field order and grouping, a disclaimer under the password field, a
 "or continue with" divider, footer legal links, a compact header.
 
-That is the **template** — `branding.liquid_template`, authored as
+That is the **widget template** — `branding.liquid_template`, authored as
 `.zitadel/branding/login.liquid`. Scope is stricter than a page template
 and **the same on both deployments**: compose `<zl-*>` against the step
 payload; do not set colors; do not wrap the page
@@ -299,7 +387,7 @@ The same change, two deployments.
 | --- | --- | --- | --- |
 | **Page chrome** | App wrapper (CLI scaffold). Not a page template. | **Page template** (`page.liquid` + `{% login_widget %}`). Hosted-only. | *None shared.* Different documents. |
 | **Widget appearance** | `appearance` / host CSS / `theme`. Optional `branding.json` via `apply`. | Same object in Console / `branding.json`. | Branding revision when the look must follow the project. |
-| **Widget structure** | Opt-in **template** (`login.liquid`) from the bundled default. | Same `login.liquid` / later block editor. | `branding.liquid_template` — both deployments, strict scope. |
+| **Widget structure** | Opt-in **widget template** (`login.liquid`) from the bundled default. | Same `login.liquid` / later block editor. | `branding.liquid_template` — both deployments, strict scope. |
 | **Voice** | `lang` / `locales` on the element; branding copy overlays via CLI. | Console copy editor. | Branding copy overlay; element `locales` remains the embedder override. |
 | **Behavior** | `.zitadel/flows/*.json` via plan/apply. | Console flow editor. | Flow definition (release-pinned per [ADR 035](../../adrs/035-configuration-environments.md)). |
 
@@ -407,9 +495,9 @@ whether the failure is chrome or the flow.
    Do not eject the widget template for this.
 2. **Appearance** — host tokens for "match my app"; branding knobs for
    "match my brand everywhere."
-3. **Structure** — eject the template when something must sit *between*
-   atoms or the shipped grouping is wrong.
-4. **Voice** — overlay copy; keep `text_key` in the template.
+3. **Structure** — eject the widget template when something must sit
+   *between* atoms or the shipped grouping is wrong.
+4. **Voice** — overlay copy; keep `text_key` in the widget template.
 5. **Behavior** — edit the flow definition when the *step* is wrong.
 
 ### 4. Publish
@@ -488,9 +576,9 @@ runtime break.
 
 ### Hosted page templates are hosted-only
 
-The name exists to keep the shared **template** strict. A page template
-is Liquid around `{% login_widget %}`. A template is Liquid inside the
-widget. Only hosted login needs the former.
+The paired names keep the **widget template** strict. A page template is
+Liquid around `{% login_widget %}`. A widget template is Liquid inside
+the widget. Only hosted login needs the former.
 
 | Who | How they get a split / hero / centered page |
 | --- | --- |
@@ -505,8 +593,8 @@ Neither is `login.liquid`.
 
 | Term | Meaning |
 | --- | --- |
-| **Template** | Widget structure (`login.liquid`). Strict scope: `<zl-*>` + step payload. **Both deployments.** |
-| **Page template** | Hosted-only document Liquid (`page.liquid`) with `{% login_widget %}`. The distinct name is the point: it does not apply to embeds. |
+| **Widget template** | Widget structure (`login.liquid`). Strict scope: `<zl-*>` + step payload. **Both deployments.** |
+| **Page template** | Hosted-only document Liquid (`page.liquid`) with `{% login_widget %}`. Parallel name, different scope: it does not apply to embeds. |
 | **Wrapper** | Embedder application code around the widget. Not a page template. |
 | **Design** | Retired as the setup noun. Historical Liquid starting points; no longer the path to a look. |
 | **Layout** | Wire degrade enum `centered \| split` for an invalid/missing *template*. Not how you get a split page. |

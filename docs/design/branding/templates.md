@@ -114,9 +114,9 @@ Two built-in `layout` values ship with the component package (the bundled `defau
 | `centered` (default) | Card centred on page. Fields stacked, primary action full-width, SSO below a divider.                               |
 | `split`              | Brand panel on the left (logo, `hero_url` background), form on the right. Maps to the legacy `side-by-side` layout. |
 
-The `layout` enum stays this small on purpose. This file is the **template**
-(widget structure, both deployments). Hosted **page templates**
-(`page.liquid` + `{% login_widget %}`) are a different artifact — see
+The `layout` enum stays this small on purpose. This file is the **widget
+template** (structure inside the widget, both deployments). Hosted **page
+templates** (`page.liquid` + `{% login_widget %}`) are a different artifact — see
 [`customization-strategy.md`](customization-strategy.md#what-the-shipped-designs-really-are)
 and [ADR 056](../../adrs/056-login-customization-categories.md). The five
 named files below are what `zitadel branding eject --design` / `setup --design`

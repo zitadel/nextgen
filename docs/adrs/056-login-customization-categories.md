@@ -39,7 +39,7 @@ Zitadel owns the page.
 | --- | --- |
 | **Page chrome** | Embedder: app wrapper. Hosted: **page template** (`page.liquid`) |
 | **Widget appearance** | `--zl-*` / structured branding / element `appearance` |
-| **Widget structure** | The **template** (`login.liquid`) — both deployments, strict scope |
+| **Widget structure** | The **widget template** (`login.liquid`) — both deployments, strict scope |
 | **Voice** | Branding copy overlays; element `lang` / `locales` as the page override |
 | **Behavior** | The flow definition — never an appearance editor |
 
@@ -60,17 +60,17 @@ branding revision.
 
 ### 3. "Page template" is hosted-only; "template" is shared and strict
 
-The distinct name is the point. A **template** (`login.liquid`) is widget
-structure: `<zl-*>` against the step payload, no page chrome. Because the
-same widget runs in the customer app and on hosted login, that file must
-stay strict and apply to **both** deployments.
+The paired names are the point. A **widget template** (`login.liquid`) is
+widget structure: `<zl-*>` against the step payload, no page chrome.
+Because the same widget runs in the customer app and on hosted login,
+that file must stay strict and apply to **both** deployments.
 
 A **page template** (`page.liquid`) exists only because hosted login has
 no application to wrap. It is a Liquid document with a required
 `{% login_widget %}` hole; the rest is the customer's page (split, left
 pane, nav) under the same sanitiser family. `{% login_widget %}` is
-opaque — page templates do not emit atoms; templates do not emit a
-marketing column.
+opaque — page templates do not emit atoms; widget templates do not emit
+a marketing column.
 
 **Embedded.** Page chrome is application code wrapping
 `<zitadel-login variant="widget">` (ADR 042). The CLI may scaffold a
