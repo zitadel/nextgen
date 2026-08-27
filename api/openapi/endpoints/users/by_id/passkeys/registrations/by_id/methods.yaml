@@ -3,7 +3,7 @@ post:
   summary: Finish passkey registration
   description: |
     Verifies the attestation against the ceremony started by
-    `POST /users/{user_id}/passkeys` and persists the new credential. A
+    `POST /users/{user_id}/passkeys/registrations` and persists the new credential. A
     rejected attestation counts against the ceremony's failure budget and the
     ceremony stays open for a retry. An expired ceremony surfaces as
     `att.stale_challenge`; an unknown or already-consumed registration id
@@ -15,7 +15,7 @@ post:
       in: path
       required: true
       schema:
-        $ref: ../../../../../components/schemas/user-id.yaml
+        $ref: ../../../../../../components/schemas/user-id.yaml
     - name: registration_id
       in: path
       required: true
@@ -43,30 +43,30 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/error-details.yaml
+            $ref: ../../../../../../components/error-details.yaml
     '401':
       description: Client was not authorized or the session is anonymous.
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/error-details.yaml
+            $ref: ../../../../../../components/error-details.yaml
     '403':
       description: Client does not have the permissions to perform this action.
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/error-details.yaml
+            $ref: ../../../../../../components/error-details.yaml
     '404':
       description: No user was found for the provided user ID
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/error-details.yaml
+            $ref: ../../../../../../components/error-details.yaml
     '500':
       description: Something went wrong on the server. This was not your fault.
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/error-details.yaml
+            $ref: ../../../../../../components/error-details.yaml
     default:
       $ref: finishUserPasskeyRegistration-error-response.yaml

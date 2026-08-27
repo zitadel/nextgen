@@ -32,6 +32,11 @@ func (h Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptPa
 	if err != nil {
 		return nil, err
 	}
+	if attempt.Internal {
+		// A server-orchestrated ceremony's attempt is a state carrier, not an
+		// attempt-surface resource: it stays invisible here.
+		return nil, domain.ErrAuthAttemptNotFound()
+	}
 	return authAttemptToAPI(attempt), nil
 }
 

@@ -37,18 +37,18 @@ func (c *codeRecorder) Unwrap() http.ResponseWriter {
 //
 // Starts a WebAuthn registration ceremony for the user and returns the
 // creation options for `navigator.credentials.create()`. Complete the
-// ceremony with `POST /users/{user_id}/passkeys/{registration_id}` within
+// ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
 // five minutes. Credentials already registered for the user are excluded
 // automatically.
 //
-// POST /users/{user_id}/passkeys
+// POST /users/{user_id}/passkeys/registrations
 func (s *Server) handleBeginUserPasskeyRegistrationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("beginUserPasskeyRegistration"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys"),
+		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys/registrations"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -3142,20 +3142,20 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 // handleFinishUserPasskeyRegistrationRequest handles finishUserPasskeyRegistration operation.
 //
 // Verifies the attestation against the ceremony started by
-// `POST /users/{user_id}/passkeys` and persists the new credential. A
+// `POST /users/{user_id}/passkeys/registrations` and persists the new credential. A
 // rejected attestation counts against the ceremony's failure budget and the
 // ceremony stays open for a retry. An expired ceremony surfaces as
 // `att.stale_challenge`; an unknown or already-consumed registration id
 // surfaces as `att.not_found`.
 //
-// POST /users/{user_id}/passkeys/{registration_id}
+// POST /users/{user_id}/passkeys/registrations/{registration_id}
 func (s *Server) handleFinishUserPasskeyRegistrationRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("finishUserPasskeyRegistration"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys/{registration_id}"),
+		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys/registrations/{registration_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)

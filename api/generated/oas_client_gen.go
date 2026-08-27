@@ -32,11 +32,11 @@ type Invoker interface {
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
 	// creation options for `navigator.credentials.create()`. Complete the
-	// ceremony with `POST /users/{user_id}/passkeys/{registration_id}` within
+	// ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
 	// five minutes. Credentials already registered for the user are excluded
 	// automatically.
 	//
-	// POST /users/{user_id}/passkeys
+	// POST /users/{user_id}/passkeys/registrations
 	BeginUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error)
 	// CompleteClaim invokes completeClaim operation.
 	//
@@ -208,13 +208,13 @@ type Invoker interface {
 	// FinishUserPasskeyRegistration invokes finishUserPasskeyRegistration operation.
 	//
 	// Verifies the attestation against the ceremony started by
-	// `POST /users/{user_id}/passkeys` and persists the new credential. A
+	// `POST /users/{user_id}/passkeys/registrations` and persists the new credential. A
 	// rejected attestation counts against the ceremony's failure budget and the
 	// ceremony stays open for a retry. An expired ceremony surfaces as
 	// `att.stale_challenge`; an unknown or already-consumed registration id
 	// surfaces as `att.not_found`.
 	//
-	// POST /users/{user_id}/passkeys/{registration_id}
+	// POST /users/{user_id}/passkeys/registrations/{registration_id}
 	FinishUserPasskeyRegistration(ctx context.Context, request *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (FinishUserPasskeyRegistrationRes, error)
 	// GetAuthAttempt invokes getAuthAttempt operation.
 	//
@@ -565,11 +565,11 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 //
 // Starts a WebAuthn registration ceremony for the user and returns the
 // creation options for `navigator.credentials.create()`. Complete the
-// ceremony with `POST /users/{user_id}/passkeys/{registration_id}` within
+// ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
 // five minutes. Credentials already registered for the user are excluded
 // automatically.
 //
-// POST /users/{user_id}/passkeys
+// POST /users/{user_id}/passkeys/registrations
 func (c *Client) BeginUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error) {
 	res, err := c.sendBeginUserPasskeyRegistration(ctx, request, params)
 	return res, err
@@ -588,7 +588,7 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("beginUserPasskeyRegistration"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/users/{user_id}/passkeys"),
+		semconv.URLTemplateKey.String("/users/{user_id}/passkeys/registrations"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -644,7 +644,7 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 		}
 		pathParts[1] = encoded
 	}
-	pathParts[2] = "/passkeys"
+	pathParts[2] = "/passkeys/registrations"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
@@ -2722,13 +2722,13 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 // FinishUserPasskeyRegistration invokes finishUserPasskeyRegistration operation.
 //
 // Verifies the attestation against the ceremony started by
-// `POST /users/{user_id}/passkeys` and persists the new credential. A
+// `POST /users/{user_id}/passkeys/registrations` and persists the new credential. A
 // rejected attestation counts against the ceremony's failure budget and the
 // ceremony stays open for a retry. An expired ceremony surfaces as
 // `att.stale_challenge`; an unknown or already-consumed registration id
 // surfaces as `att.not_found`.
 //
-// POST /users/{user_id}/passkeys/{registration_id}
+// POST /users/{user_id}/passkeys/registrations/{registration_id}
 func (c *Client) FinishUserPasskeyRegistration(ctx context.Context, request *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (FinishUserPasskeyRegistrationRes, error) {
 	res, err := c.sendFinishUserPasskeyRegistration(ctx, request, params)
 	return res, err
@@ -2738,7 +2738,7 @@ func (c *Client) sendFinishUserPasskeyRegistration(ctx context.Context, request 
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("finishUserPasskeyRegistration"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/users/{user_id}/passkeys/{registration_id}"),
+		semconv.URLTemplateKey.String("/users/{user_id}/passkeys/registrations/{registration_id}"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -2794,7 +2794,7 @@ func (c *Client) sendFinishUserPasskeyRegistration(ctx context.Context, request 
 		}
 		pathParts[1] = encoded
 	}
-	pathParts[2] = "/passkeys/"
+	pathParts[2] = "/passkeys/registrations/"
 	{
 		// Encode "registration_id" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{

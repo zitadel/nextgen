@@ -148,6 +148,9 @@ CREATE TABLE auth_attempts (
     required_checks TEXT,
     created_at      INTEGER NOT NULL,
     time_to_live    INTEGER,
+    -- internal marks server-orchestrated ceremonies (e.g. management passkey
+    -- enrollment) that must never be handed off or read as attempts (ADR 056).
+    internal        INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_auth_attempts_id CHECK (id <> ''),
     CONSTRAINT fk_auth_attempts_project

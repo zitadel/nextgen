@@ -16,13 +16,13 @@ import (
 
 const (
 	authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-		` aa.required_checks, aa.created_at, c.type, aa.time_to_live,` +
+		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal,` +
 		` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
-	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at)
-VALUES (?, ?, ?, ?, ?, ?)`
+	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal)
+VALUES (?, ?, ?, ?, ?, ?, ?)`
 
 	createAuthCheckStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
@@ -93,7 +93,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 	return withTransaction(ctx, as.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, createAuthAttemptStmt,
-			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(),
+			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(), attempt.Internal,
 		); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", wrapError(err))
 		}
@@ -198,10 +198,11 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			challengePayload   sql.NullString
 			factorPayload      sql.NullString
 			createdNano        int64
+			internalInt        int64
 		)
 		if err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAtNano, &sessionIDVal,
-			&requiredChecksJSON, &createdNano, &checkType, &timeToLiveNano,
+			&requiredChecksJSON, &createdNano, &checkType, &timeToLiveNano, &internalInt,
 			&checkID, &lastChallengedNano, &verifiedAtNano, &lastFailedAtNano, &failureCount,
 			&challengePayload, &factorPayload,
 		); err != nil {
@@ -209,6 +210,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		}
 		attempt.ID = attemptID
 		attempt.CreatedAt = timeFromUnixNano(createdNano)
+		attempt.Internal = internalInt != 0
 
 		if attempt.RequiredChecks == nil && requiredChecksJSON.Valid {
 			var reqInts []int64

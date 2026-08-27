@@ -86,6 +86,11 @@ type AuthAttempt struct {
 	// TTL describes how long an auth attempt is valid, it should be set to a reasonable value (e.g. 5 minutes) to prevent abuse and to ensure that old auth attempts are cleaned up.
 	// An auth attempt gets garbage collected after CreatedAt + TimeToLive, so it is important to set it to a reasonable value to prevent abuse and to ensure that old auth attempts are cleaned up.
 	TimeToLive *time.Duration
+
+	// Internal marks a server-orchestrated ceremony (e.g. management-plane
+	// passkey enrollment, ADR 056) whose attempt row is only a state carrier:
+	// it must never be handed off, exchanged, or read through the attempt API.
+	Internal bool
 }
 
 const AuthAttemptTTL = 15 * time.Minute
@@ -501,6 +506,11 @@ func (a *AuthAttempt) SetPasskeyFactor(passkeyVerification *PasskeyVerification)
 // And will generate and store the handoff token.
 // Note: The HandoffToken is generated using a crypto/rand token and stored in a hashed way for security reasons.
 func (a *AuthAttempt) PrepareHandoff() error {
+	if a.Internal {
+		// An internal ceremony's attempt never becomes a session: reporting
+		// not-found keeps it invisible on the attempt surface.
+		return ErrAuthAttemptNotFound()
+	}
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}

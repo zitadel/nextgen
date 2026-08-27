@@ -155,6 +155,25 @@ func TestSessionExchange_PasskeyClassPruning(t *testing.T) {
 	})
 }
 
+// TestAuthAttemptStatements_InternalFlagRoundTrip pins the internal marker
+// that gates handoff/read for server-orchestrated ceremonies (ADR 056).
+func TestAuthAttemptStatements_InternalFlagRoundTrip(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+
+		internal := &domain.AuthAttempt{ProjectID: projectID, Internal: true}
+		require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), internal))
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, internal.ID)
+		require.NoError(t, err)
+		assert.True(t, got.Internal)
+
+		regular := createBareAttempt(t, d.stmts, projectID)
+		got, err = d.stmts.GetAuthAttemptByID(t.Context(), projectID, regular.ID)
+		require.NoError(t, err)
+		assert.False(t, got.Internal)
+	})
+}
+
 func TestAuthAttemptStatements_SetAuthAttemptFactor(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("inserts_a_fresh_verified_factor", func(t *testing.T) {

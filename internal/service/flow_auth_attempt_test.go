@@ -56,6 +56,14 @@ func (f *fakeAuthAttempts) Handoff(_ context.Context, in service.HandoffInput) (
 	return f.handoffAttempt, f.handoffErr
 }
 
+func (f *fakeAuthAttempts) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {
+	return nil, errors.New("not used by the flow adapter")
+}
+
+func (f *fakeAuthAttempts) FinishPasskeyEnrollment(context.Context, service.FinishPasskeyEnrollmentInput) (*service.FinishPasskeyEnrollmentOutput, error) {
+	return nil, errors.New("not used by the flow adapter")
+}
+
 func attemptWithUserChallenge(id string) *domain.AuthAttempt {
 	att := &domain.AuthAttempt{}
 	ch := att.SetUserChallenge()

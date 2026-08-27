@@ -8,7 +8,7 @@ properties:
     type: string
     description: |
       Identifier of this ceremony. Pass it back on
-      `POST /users/{user_id}/passkeys/{registration_id}` together with the
+      `POST /users/{user_id}/passkeys/registrations/{registration_id}` together with the
       attestation.
   options:
     type: object

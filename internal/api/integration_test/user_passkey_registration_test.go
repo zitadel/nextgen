@@ -197,6 +197,28 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 		assert.Contains(t, helpers.MustMarshal(t, resp), "att.invalid_request", helpers.MustMarshal(t, resp))
 	})
 
+	t.Run("registration_id_is_invisible_on_the_attempt_surface", func(t *testing.T) {
+		t.Parallel()
+		_, userID, client := seedMgmtPasskeyUser(t)
+		begun := beginMgmtRegistration(t, client, userID)
+
+		// The internal ceremony attempt can neither be read as an attempt...
+		got, err := client.GetAuthAttempt(t.Context(), api.GetAuthAttemptParams{
+			AttemptID: api.AttemptID(begun.RegistrationID),
+		})
+		require.NoError(t, err)
+		assert.Contains(t, helpers.MustMarshal(t, got), "att.not_found",
+			"an internal ceremony attempt must read as not found")
+
+		// ...nor be handed off toward a session.
+		handedOff, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{
+			AttemptID: api.AttemptID(begun.RegistrationID),
+		})
+		require.NoError(t, err)
+		assert.Contains(t, helpers.MustMarshal(t, handedOff), "att.not_found",
+			"an internal ceremony attempt must never hand off")
+	})
+
 	t.Run("consumed_ceremony_cannot_be_finished_again", func(t *testing.T) {
 		t.Parallel()
 		_, userID, client := seedMgmtPasskeyUser(t)

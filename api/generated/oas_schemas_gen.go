@@ -5564,7 +5564,7 @@ func (s *BeginUserPasskeyRegistrationRequest) SetDisplayName(val OptString) {
 // Ref: #
 type BeginUserPasskeyRegistrationResponse struct {
 	// Identifier of this ceremony. Pass it back on
-	// `POST /users/{user_id}/passkeys/{registration_id}` together with the
+	// `POST /users/{user_id}/passkeys/registrations/{registration_id}` together with the
 	// attestation.
 	RegistrationID string `json:"registration_id"`
 	// The `PublicKeyCredentialCreationOptions` object, passed directly to the
@@ -12518,7 +12518,6 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	EvtInvalid           EvtInvalid
 	Internal             Internal
 	ReqInvalid           ReqInvalid
-	UserAlreadyExists    UserAlreadyExists
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
@@ -12540,7 +12539,6 @@ const (
 	EvtInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
 	InternalFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "internal"
 	ReqInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
-	UserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.already_exists"
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
 	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
@@ -12599,11 +12597,6 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is ReqInvalid.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidFinishUserPasskeyRegistrationErrorResponse
-}
-
-// IsUserAlreadyExists reports whether FinishUserPasskeyRegistrationErrorResponse is UserAlreadyExists.
-func (s FinishUserPasskeyRegistrationErrorResponse) IsUserAlreadyExists() bool {
-	return s.Type == UserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is UserInvalid.
@@ -12849,27 +12842,6 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetReqInvalid() (v ReqInvali
 func NewReqInvalidFinishUserPasskeyRegistrationErrorResponse(v ReqInvalid) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetUserAlreadyExists sets FinishUserPasskeyRegistrationErrorResponse to UserAlreadyExists.
-func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
-	s.Type = UserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse
-	s.UserAlreadyExists = v
-}
-
-// GetUserAlreadyExists returns UserAlreadyExists and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserAlreadyExists.
-func (s FinishUserPasskeyRegistrationErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
-	if !s.IsUserAlreadyExists() {
-		return v, false
-	}
-	return s.UserAlreadyExists, true
-}
-
-// NewUserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserAlreadyExists.
-func NewUserAlreadyExistsFinishUserPasskeyRegistrationErrorResponse(v UserAlreadyExists) FinishUserPasskeyRegistrationErrorResponse {
-	var s FinishUserPasskeyRegistrationErrorResponse
-	s.SetUserAlreadyExists(v)
 	return s
 }
 
