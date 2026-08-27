@@ -25,6 +25,11 @@ func validateUserSchemaDesignations(schema map[string]any) error {
 	// Password verification is unreachable without a prior identifier (the
 	// flow state machine dispatches identifier before password), so enabling
 	// it without a designation is a schema error, not a runtime surprise.
+	// Passkey is deliberately NOT in this trigger: discoverable credentials
+	// identify the user through the assertion itself, so passkey-only (and
+	// API-managed) schemas legitimately designate nothing. A flow that picks
+	// the identifier-first passkey pattern instead is checked at the flow
+	// level, where the on_success manifest requires the identifier upstream.
 	if enabled, _ := maputil.GetNested[bool](schema, []string{SchemaAnnotationAuthMethods, "password", "enabled"}); enabled && !hasIdentifier {
 		return fmt.Errorf("%w: password authentication is enabled but the schema designates no %q", ErrSchemaDesignationInvalid, SchemaAnnotationIdentifier)
 	}
