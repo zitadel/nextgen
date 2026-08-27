@@ -24,6 +24,7 @@ var exampleUserSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/schemas/flow-engine-examples-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": true },

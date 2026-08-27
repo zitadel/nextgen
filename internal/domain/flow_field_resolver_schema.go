@@ -28,8 +28,10 @@ type SchemaResolver interface {
 //   - `required` membership at every level of the field's path →
 //     [FlowField.Required]
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
-//   - `x-unique` (non-empty) → [FlowFieldChallengeIdentifier] +
-//     [FlowImplicitOutcomeUserNotFound] + [FlowField.Unique]
+//   - `x-unique` (non-empty) → [FlowField.Unique]
+//   - the schema-root `x-identifier` designation → the designated field
+//     carries [FlowFieldChallengeIdentifier] +
+//     [FlowImplicitOutcomeUserNotFound]
 //   - `x-auth-methods#<method>` field name → credential challenge for
 //     that method (e.g. `x-auth-methods#password` → password)
 type SchemaFieldResolver struct{}
@@ -47,6 +49,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow field resolver: read x-auth-methods: %w", err)
 	}
+	identifier := root.String(SchemaAnnotationIdentifier)
 
 	fields := make([]FlowField, 0, len(fieldNames))
 	implicit := make(map[string][]string)
@@ -60,7 +63,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 		case field.IsAuthMethod():
 			ff, err = resolveAuthMethodField(authMethods, field, stepName)
 		default:
-			ff, err = resolveUserPropertyField(root, field, stepName)
+			ff, err = resolveUserPropertyField(root, field, stepName, identifier)
 		}
 		if err != nil {
 			return FlowResolvedFields{}, err
@@ -83,7 +86,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 // [ErrFlowFieldNotScalar] when it lands on an object or array, and
 // [ErrFlowFieldUnsupportedType] when the JSON `type` keyword is an
 // ambiguous union.
-func resolveUserPropertyField(root schemaReader, field Field, stepName string) (FlowField, error) {
+func resolveUserPropertyField(root schemaReader, field Field, stepName, identifier string) (FlowField, error) {
 	prop, required, err := walkUserProperty(root, field)
 	if err != nil {
 		return FlowField{}, err
@@ -100,7 +103,7 @@ func resolveUserPropertyField(root schemaReader, field Field, stepName string) (
 		Name:      field.String(),
 		TextKey:   stepName + ".field." + field.String(),
 		Type:      fieldType,
-		Challenge: deriveIdentifierChallenge(unique),
+		Challenge: deriveIdentifierChallenge(field, identifier),
 		Unique:    unique,
 		Required:  required,
 	}
@@ -207,10 +210,13 @@ func deriveAuthMethodType(field Field) (FlowFieldType, error) {
 }
 
 // deriveIdentifierChallenge surfaces [FlowFieldChallengeIdentifier]
-// when the property has any non-empty `x-unique` scope. Any uniquely-
-// keyed property can identify a user.
-func deriveIdentifierChallenge(unique AttributeUniqueness) FlowFieldChallenge {
-	if unique != AttributeUniquenessUnspecified {
+// when the field names the schema's designated identifier (the
+// schema-root `x-identifier` path). Any other property — unique or not —
+// carries no identifier challenge: uniqueness is data integrity,
+// identification is a designation (ADR 058 §5, retiring the "any
+// `x-unique` property can identify" rule).
+func deriveIdentifierChallenge(field Field, identifier string) FlowFieldChallenge {
+	if identifier != "" && field.String() == identifier {
 		return FlowFieldChallengeIdentifier
 	}
 	return FlowFieldChallengeNone
