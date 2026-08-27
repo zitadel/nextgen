@@ -699,6 +699,15 @@ func TestGetFlowDefinition(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
 	flowDef := createResp.(*api.FlowDefinitionResponse)
 
+	emptyCollections := newFlowDefinitionFixture("empty-collections", userSchemaURI)
+	emptyCollections.Audience.Value.AppIds = []string{}
+	emptyCollections.Steps[1].Actions = []api.StepAction{}
+	emptyCollections.Steps[1].Fields = []string{}
+	createResp, err = client.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(api.ProjectID(project.ID), emptyCollections))
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	emptyCollectionsDef := createResp.(*api.FlowDefinitionResponse)
+
 	tests := []struct {
 		name     string
 		req      api.GetFlowDefinitionParams
@@ -710,6 +719,13 @@ func TestGetFlowDefinition(t *testing.T) {
 				ID: flowDef.ID,
 			},
 			wantResp: flowDef,
+		},
+		{
+			name: "create response matches get for empty collections",
+			req: api.GetFlowDefinitionParams{
+				ID: emptyCollectionsDef.ID,
+			},
+			wantResp: emptyCollectionsDef,
 		},
 		{
 			name: "non-existing flow definition",
@@ -838,10 +854,13 @@ func TestListFlowDefinitions(t *testing.T) {
 	flowDef3 := resp3.(*api.FlowDefinitionResponse)
 
 	tests := []struct {
-		name     string
-		project  *domain.Project
-		req      api.ListFlowDefinitionsParams
-		wantResp api.ListFlowDefinitionsRes
+		name    string
+		project *domain.Project
+		req     api.ListFlowDefinitionsParams
+		// The server seeds default-login into every project; its id,
+		// document and timestamps are not knowable here.
+		wantDefault bool
+		want        []api.FlowDefinitionResponse
 	}{
 		{
 			name:    "list all flow definitions in a project",
@@ -849,15 +868,10 @@ func TestListFlowDefinitions(t *testing.T) {
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 			},
-			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
-					{
-						FlowDefinition: api.FlowDefinition{Name: "default-login"},
-						ProjectID:      project1.ID,
-					}, // for the default flow definition
-					*flowDef1,
-					*flowDef2,
-				},
+			wantDefault: true,
+			want: []api.FlowDefinitionResponse{
+				*flowDef1,
+				*flowDef2,
 			},
 		},
 		{
@@ -866,14 +880,9 @@ func TestListFlowDefinitions(t *testing.T) {
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project2.ID),
 			},
-			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
-					{
-						FlowDefinition: api.FlowDefinition{Name: "default-login"},
-						ProjectID:      project2.ID,
-					}, // for the default flow definition
-					*flowDef3,
-				},
+			wantDefault: true,
+			want: []api.FlowDefinitionResponse{
+				*flowDef3,
 			},
 		},
 		{
@@ -886,10 +895,9 @@ func TestListFlowDefinitions(t *testing.T) {
 					Set:   true,
 				},
 			},
-			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
-					*flowDef2,
-				},
+			wantDefault: false,
+			want: []api.FlowDefinitionResponse{
+				*flowDef2,
 			},
 		},
 		{
@@ -902,14 +910,9 @@ func TestListFlowDefinitions(t *testing.T) {
 					Set:   true,
 				},
 			},
-			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
-					{
-						FlowDefinition: api.FlowDefinition{Name: "default-login"},
-						ProjectID:      project1.ID,
-					}, // for the default flow definition
-					*flowDef1,
-				},
+			wantDefault: true,
+			want: []api.FlowDefinitionResponse{
+				*flowDef1,
 			},
 		},
 		{
@@ -918,14 +921,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project3.ID),
 			},
-			wantResp: &api.FlowDefinitionListResponse{
-				FlowDefinitions: []api.FlowDefinitionResponse{
-					{
-						FlowDefinition: api.FlowDefinition{Name: "default-login"},
-						ProjectID:      project3.ID,
-					}, // for the default flow definition
-				},
-			},
+			wantDefault: true,
 		},
 	}
 	for _, tt := range tests {
@@ -941,31 +937,24 @@ func TestListFlowDefinitions(t *testing.T) {
 			resp, err := client.ListFlowDefinitions(t.Context(), tt.req)
 			assert.NoError(t, err)
 
-			require.IsType(t, &api.FlowDefinitionListResponse{}, tt.wantResp, helpers.MustMarshal(t, tt.wantResp))
-			expected := tt.wantResp.(*api.FlowDefinitionListResponse)
-
 			require.IsType(t, &api.FlowDefinitionListResponse{}, resp, helpers.MustMarshal(t, resp))
 			actual := resp.(*api.FlowDefinitionListResponse)
 
-			assert.Equal(t, len(expected.FlowDefinitions), len(actual.FlowDefinitions))
-			actualFlowDefsMap := make(map[string]api.FlowDefinitionResponse, len(actual.FlowDefinitions))
+			var others []api.FlowDefinitionResponse
+			gotDefault := false
 			for _, flowDef := range actual.FlowDefinitions {
-				actualFlowDefsMap[flowDef.FlowDefinition.Name] = flowDef
-			}
-
-			for _, flowDef := range expected.FlowDefinitions {
-				name := flowDef.FlowDefinition.Name
-				// The default definition is server-seeded, so its id, document
-				// and timestamps are not knowable here.
-				if name == "default-login" {
-					assert.Equal(t, flowDef.ProjectID, actualFlowDefsMap[name].ProjectID)
+				if flowDef.FlowDefinition.Name == "default-login" {
+					gotDefault = true
+					assert.Equal(t, tt.project.ID, flowDef.ProjectID)
 					continue
 				}
-				// The list and the by-id read describe a flow definition the
-				// same way (#939): document, purposes, audience, steps and
-				// timestamps all match the create response.
-				assert.Equal(t, flowDef, actualFlowDefsMap[name])
+				others = append(others, flowDef)
 			}
+			assert.Equal(t, tt.wantDefault, gotDefault)
+			// The list and the by-id read describe a flow definition the
+			// same way (#939): document, purposes, audience, steps and
+			// timestamps all match the create response.
+			assert.ElementsMatch(t, tt.want, others)
 		})
 	}
 }
@@ -1023,8 +1012,6 @@ func TestDeleteFlowDefinition(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	assert.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
-
 	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
 	flowDef := createResp.(*api.FlowDefinitionResponse)
 

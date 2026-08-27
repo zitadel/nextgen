@@ -63,7 +63,6 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
-  DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
 } from "@zitadel/config/defaults";
@@ -173,9 +172,7 @@ type ProjectRecord = {
  */
 type FlowDefinitionRecord = {
   id: string;
-  name: string;
   projectId: string;
-  schemaUri: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -286,9 +283,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   const id = `flow_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
-    name: "default-login",
     projectId: projectID,
-    schemaUri: DEFAULT_FLOW_SCHEMA_URI,
     status: "active",
     createdAt,
     updatedAt: createdAt,
@@ -819,12 +814,9 @@ export function setupPlatformHandlers() {
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
-      const flowDef = body.data.flow_definition as Record<string, unknown>;
       const record: FlowDefinitionRecord = {
         id,
-        name: flowDef.name as string,
         projectId: body.data.project_id,
-        schemaUri: body.data.schema_uri ?? DEFAULT_FLOW_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,
@@ -905,8 +897,6 @@ export function setupPlatformHandlers() {
 
       const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
       record.body = flowDefinition;
-      record.name = typeof flowDefinition.name === "string" ? flowDefinition.name : record.name;
-      record.schemaUri = body.data.schema_uri ?? record.schemaUri;
       record.status =
         typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
       record.updatedAt = nowIso();

@@ -151,25 +151,21 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 			Name:   step.GetName(),
 			Fields: domain.FieldsFromStrings(step.GetFields()),
 		}
-		// actions — preserve the nil-vs-empty distinction so an explicit `[]`
-		// (deliberately no actions, e.g. terminal-step shape) survives the
-		// round-trip distinct from an omitted field (engine-default behavior).
-		if apiActions := step.GetActions(); apiActions != nil {
-			actions := make([]domain.FlowStepAction, 0, len(apiActions))
-			for _, apiAction := range apiActions {
-				kind, err := domain.FlowActionKindString(string(apiAction.GetKind()))
-				if err != nil {
-					return svcReq, fmt.Errorf("step %q: action %q has invalid kind %q: %w", step.GetName(), apiAction.GetName(), apiAction.GetKind(), err)
-				}
-				actions = append(actions, domain.FlowStepAction{
-					Name:    apiAction.GetName(),
-					Kind:    kind,
-					Primary: apiAction.GetPrimary().Value,
-					TextKey: apiAction.GetTextKey().Value,
-				})
+		// actions
+		actions := make([]domain.FlowStepAction, 0, len(step.GetActions()))
+		for _, apiAction := range step.GetActions() {
+			kind, err := domain.FlowActionKindString(string(apiAction.GetKind()))
+			if err != nil {
+				return svcReq, fmt.Errorf("step %q: action %q has invalid kind %q: %w", step.GetName(), apiAction.GetName(), apiAction.GetKind(), err)
 			}
-			s.Actions = actions
+			actions = append(actions, domain.FlowStepAction{
+				Name:    apiAction.GetName(),
+				Kind:    kind,
+				Primary: apiAction.GetPrimary().Value,
+				TextKey: apiAction.GetTextKey().Value,
+			})
 		}
+		s.Actions = actions
 
 		// gates
 		if step.GetGates().IsSet() {
@@ -282,8 +278,8 @@ func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefi
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{
-			TeamIds: flowDefinition.Audience.TeamIDs,
-			AppIds:  flowDefinition.Audience.AppIDs,
+			TeamIds: nilIfEmpty(flowDefinition.Audience.TeamIDs),
+			AppIds:  nilIfEmpty(flowDefinition.Audience.AppIDs),
 		},
 		Set: true,
 	}
@@ -331,7 +327,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		}
 		apiStep := api.FlowDefinitionStep{
 			Name:    step.Name,
-			Fields:  domain.FieldsToStrings(step.Fields),
+			Fields:  nilIfEmpty(domain.FieldsToStrings(step.Fields)),
 			Actions: actions,
 			Gates: api.OptFlowDefinitionStepGates{
 				Value: gates,
@@ -356,11 +352,21 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 	return steps
 }
 
+// Storage drops empty collections on write, so responses built from the
+// request entity must drop them too or create/update would answer a
+// different document than get/list.
+func nilIfEmpty[T any](s []T) []T {
+	if len(s) == 0 {
+		return nil
+	}
+	return s
+}
+
 // mapActionsToAPI preserves the nil-vs-empty distinction so a stored flow
 // definition's explicit `[]` round-trips back to the client as `[]` (not
 // omitted), keeping sync/diff tooling honest.
 func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
-	if domainActions == nil {
+	if len(domainActions) == 0 {
 		return nil
 	}
 	actions := make([]api.StepAction, 0, len(domainActions))

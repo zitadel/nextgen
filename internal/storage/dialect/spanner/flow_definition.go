@@ -68,7 +68,7 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			definition,
 		).statement()
 		if err := tx.Write(ctx, stmt, scanFlowDefinitionTimestamps(entity)); err != nil {
-			return wrapError(err)
+			return err
 		}
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
@@ -102,7 +102,7 @@ func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, enti
 		entity.ProjectID,
 		entity.ID,
 	).statement()
-	return wrapError(f.db.Write(ctx, stmt, scanFlowDefinitionTimestamps(entity)))
+	return f.db.Write(ctx, stmt, scanFlowDefinitionTimestamps(entity))
 }
 
 func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition) func(*spanner.RowIterator) error {
