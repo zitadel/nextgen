@@ -198,9 +198,23 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		passwordHasher,
 	)
 
+	// The platform project's registration side effect (#527): every flow-created
+	// user on the platform project gets their personal team — the team
+	// claim/complete attaches projects to — ensured idempotently. Gated on the
+	// explicit bootstrap opt-in, never the standalone pin: a pinned deployment's
+	// end-user registrations must not silently mint teams (#605, #736). Note the
+	// deliberate asymmetry with claimService above, which resolves the pin —
+	// a pinned deployment can attempt claims but is never auto-provisioned.
+	personalTeams := service.NewPersonalTeamService(
+		serviceDBPool,
+		userIdentity,
+		cfg.Platform.ProvisioningProjectID(),
+	)
+
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
-	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc).
+		WithPersonalTeamEnsurer(personalTeams)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		passwordHasher,
 		userService,
@@ -280,7 +294,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		),
+		).WithPersonalTeamEnsurer(personalTeams),
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),

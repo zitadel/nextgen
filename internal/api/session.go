@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -47,6 +48,20 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
+	}
+
+	// Platform personal-team self-heal (#527): every sign-in converges the
+	// account toward having its personal team — covering a missed
+	// registration-time ensure and every user provisioned before the effect
+	// existed (the backfill). Best-effort: a failure must not cost the login;
+	// claim/complete's 403 remains the honest floor until the next attempt.
+	if h.personalTeams != nil && session.UserID != nil {
+		if err := h.personalTeams.EnsurePersonalTeam(ctx, session.ProjectID, *session.UserID); err != nil {
+			slog.WarnContext(ctx, "personal team ensure failed on session exchange",
+				slog.String("project_id", session.ProjectID),
+				slog.String("user_id", *session.UserID),
+				slog.Any("error", err))
+		}
 	}
 
 	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, string(params.ProjectID), domain.EncryptionKeyPurposeToken)
