@@ -6,7 +6,8 @@
 > applied across embedded login (customer application) and hosted login
 > (Zitadel-served page for SSO).
 > **Long form:** [`../design/branding/customization-strategy.md`](../design/branding/customization-strategy.md)
-> **Relates to:** [ADR 040](040-tenant-login-templates-editable-config.md),
+> **Relates to:** [ADR 040](040-tenant-login-templates-editable-config.md)
+> (amends §5: page-layout catalog leaves Liquid),
 > [ADR 044](044-scaffold-embedding-posture-defaults.md),
 > [ADR 045](045-copy-overlays-as-branding-revisions.md),
 > [ADR 018](018-widget-owned-locale-resolution.md),
@@ -86,17 +87,28 @@ Do not add a second appearance vocabulary on the element that duplicates
 `branding.json`. New typed element sugar must map onto `--zl-*` / the
 branding shape.
 
-### 5. Shipped widget designs stay; they are not page templates
+### 5. Page-layout "designs" leave Liquid; setup writes a wrapper
 
-`centered`, `split`, `split-right`, `hero`, and `minimal` remain **widget
-designs** (Liquid starting points with a `centered | split` degrade
-`layout`). They are the right tool for brand furniture inside the widget
-and for getting a split before a wrapper or hosted page-template settings
-exist. They are the wrong tool for arbitrary product UI beside the login.
+An audit of the five shipped files
+(`packages/config/defaults/branding/*/login.liquid`) is in the
+[strategy doc](../design/branding/customization-strategy.md#what-the-shipped-designs-really-are):
+`centered` is the bundled default; `split` / `split-right` / `hero` are
+page chrome around a copy-pasted card; `minimal` is card-less widget
+chrome. They are not five widget structures.
 
-A **page template** is a new catalog noun: a wrapper in the app, or a
-hosted shell layout. The CLI may later ask for both a page template and a
-widget design. `--design` stays on the widget.
+**Embedders.** The CLI keeps a setup look-picker. That picker scaffolds
+application files (a wrapper around `<zitadel-login variant="widget">`).
+It does not write `login.liquid` and does not publish a branding revision.
+`branding eject` remains the opt-in for *structure* and starts from the
+bundled default card, not from a catalog of page layouts.
+
+**Hosted login.** Page templates exist **only** here: Console settings the
+hosted shell reads. Same catalog *names* as the CLI wrappers are fine;
+the artifact is hosted-shell config, never Liquid. Embedders do not get
+this panel.
+
+Already-ejected split/hero revisions keep rendering. This decision
+retires them as the setup path, not as a runtime.
 
 ### 6. Hosted login does not get a second renderer or branding model
 
@@ -115,11 +127,12 @@ atoms remain embedded-only: there is no customer repo on the hosted path.
 - Hosted login work is scoped: ship page-template settings and Console
   knobs that write the existing branding resource; do not fork the widget.
 - Setup guidance should point at the generated auth file for page chrome
-  and at `.zitadel/branding/` for appearance and structure — already the
-  shape of the setup summary, now with a named reason.
-- Follow-ups (page-template scaffolds, `--page-template`, hosted slots,
-  GitOps for those slots) land as implementation, not as a new ownership
-  model.
+  and at `.zitadel/` for schema, flow, and appearance knobs. Structure
+  (`login.liquid`) appears only after an opt-in eject.
+- Follow-ups land as implementation: page-template scaffolds instead of
+  `--design` Liquid, move `.zl-split` / `.zl-hero` CSS out of the
+  orchestrator, hosted-only page-template settings, optional `minimal`
+  chrome knob. Already-ejected revisions stay valid.
 
 ## Rejected alternatives
 
@@ -133,6 +146,12 @@ atoms remain embedded-only: there is no customer repo on the hosted path.
   and forces restyling when a customer turns on SSO.
 - **Require `apply` for every appearance tweak.** Embedders matching a
   host design system would take a config release to change a radius.
+- **Keep split/hero as Liquid so embedders can skip a wrapper.** Those
+  files are wrappers. The CLI already writes the auth page; writing a
+  real one is cheaper than a five-way template fork and a sanitiser
+  around marketing copy (`hero` already invites that).
+- **Offer hosted page-template settings to embedders.** They have an
+  application. That setting exists only because hosted login does not.
 
 ## See also
 

@@ -129,19 +129,24 @@ ordinary framework files the customer then edits. Those files are
 presentation-owned ([ADR 042](../../adrs/042-scaffolded-file-ownership-and-drift-detection.md)):
 once edited, they stay the customer's.
 
-**Hosted.** There is no application file to edit. The platform offers the
-same page-template catalog as **settings**: pick `split`, put markdown/HTML
-(or an image URL) in the left slot, set the split ratio. The hosted shell
-renders that wrapper and drops `<zitadel-login variant="widget">` into the
-form pane. Until that catalog ships, `/ui/login/` is a `variant="page"`
-shell and any split comes from a widget-internal design (see
-[Coexistence with shipped designs](#coexistence-with-shipped-designs)).
+**Hosted.** There is no application file to edit, so this is the **only**
+place a platform page-template setting exists: pick `split`, put
+markdown/HTML (or an image URL) in the left slot, set the split ratio. The
+hosted shell — a Zitadel-owned wrapper, not Liquid — renders that layout
+and drops `<zitadel-login variant="widget">` into the form pane. Embedders
+never see this panel; they already have the app. Offering the same setting
+to embedders would recreate today's mistake (page chrome stored on a
+project resource that then fights the host page).
 
-Page chrome is the only category that is **not** stored on the branding
-revision for embedders. Promoting a wrapper into branding would either
-sandbox customer HTML (too weak) or execute it on every hosted request (too
-dangerous). Hosted page templates are a *constrained* equivalent of the
-wrapper, not a dump of the customer's React tree.
+Until that catalog ships, `/ui/login/` is a `variant="page"` shell. Do not
+grow new widget-internal splits as a substitute; the next split for hosted
+login is a shell layout, not another `login.liquid`.
+
+Page chrome is **not** stored on the branding revision. Promoting a wrapper
+into branding would either sandbox customer HTML (too weak) or execute it
+on every hosted request (too dangerous). Hosted page templates are a
+*constrained* equivalent of the wrapper, authored only where Zitadel owns
+the document.
 
 ### 2. Widget appearance
 
@@ -188,13 +193,18 @@ A disclaimer belongs here because it is step-aware (show it on `password`,
 not on `mfa_totp`), must survive hosted login, and is not host-page
 content. A marketing essay on the left of a split does **not** belong here.
 
-**Embedded.** `zitadel branding eject --design <name>` (or `setup --design`)
-writes the files; the customer edits Liquid; `zitadel plan` / `zitadel apply`
-publishes an immutable revision ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)).
+**Embedded.** Opt-in. `zitadel branding eject` (no design catalog of page
+layouts) copies the bundled default card into `.zitadel/branding/login.liquid`
+so the customer can insert a disclaimer or reorder atoms; `zitadel plan` /
+`zitadel apply` publishes an immutable revision
+([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)).
+Setup does **not** write this file just because the customer picked a
+split page — that pick is a wrapper, not a template.
 
-**Hosted.** The same revision. Console grows a design picker and, later, a
-block editor that emits Liquid through the same validator. There is no
-second template dialect for hosted login.
+**Hosted.** The same revision, when someone has actually customized
+structure. Console later grows a block editor that emits Liquid through
+the same validator. There is no second template dialect, and there is no
+hosted "design picker" that reintroduces split/hero as Liquid.
 
 ### 4. Voice
 
@@ -228,7 +238,7 @@ The same change, two deployments.
 | --- | --- | --- | --- |
 | **Page chrome** | Wrapper / route in the app. CLI scaffolds a page template; the customer edits it as code. | Page-template setting + content slots (split pane, hero image, markdown). Rendered by the hosted shell. | *None for embedders.* Hosted settings are the hosted shell's config, not branding. |
 | **Widget appearance** | (a) Host CSS / `theme` / `variant` on the element. (b) `.zitadel/branding/branding.json` published with `apply`. | Console branding settings (radius, palette, logo, density, theme). | Branding revision — used whenever the look must follow the project. |
-| **Widget structure** | `.zitadel/branding/login.liquid` via eject → edit → apply. | Console design picker / later block editor. | `branding.liquid_template` on the same revision. |
+| **Widget structure** | Opt-in `login.liquid` via eject from the bundled default → apply. | Later: Console block editor, same validator. Not a page-layout picker. | `branding.liquid_template` on the same revision, when present. |
 | **Voice** | `lang` / `locales` on the element; branding copy overlays via CLI. | Console copy editor. | Branding copy overlay; element `locales` remains the embedder override. |
 | **Behavior** | `.zitadel/flows/*.json` via plan/apply. | Console flow editor. | Flow definition (release-pinned per [ADR 035](../../adrs/035-configuration-environments.md)). |
 
@@ -313,18 +323,20 @@ flowchart TD
 `zitadel setup` detects the framework, creates the project, installs the
 SDK, and embeds `<zitadel-login>`.
 
-- Fresh app → `variant="page"` (the generated route *is* the login page).
+- Fresh app → `variant="page"` unless the customer picked a split-family
+  **page** template, in which case the generated route is a wrapper around
+  `variant="widget"`.
 - Existing app, route-based frameworks → `variant="widget"` in a
-  layout-neutral wrapper ([ADR 044](../../adrs/044-scaffold-embedding-posture-defaults.md)).
-- Optional `--design` / wizard pick ejects a **widget** design into
-  `.zitadel/branding/` and publishes revision 1. That pick is category 3
-  (and the shipped convenience chrome in
-  [Coexistence with shipped designs](#coexistence-with-shipped-designs)),
-  not a substitute for editing the wrapper.
+  layout-neutral wrapper
+  ([ADR 044](../../adrs/044-scaffold-embedding-posture-defaults.md)).
+- Optional look pick (`--page-template` / wizard) writes **application
+  files** (the wrapper). It does **not** write `.zitadel/branding/login.liquid`
+  or publish a branding revision. Today's `--design` that ejects Liquid is
+  the behavior this strategy retires; see
+  [What the shipped designs really are](#what-the-shipped-designs-really-are).
 
-The setup summary already points at the `.zitadel/` entry points (schema,
-flow, branding). Page chrome is pointed at by the generated auth file
-itself — that is the file to wrap.
+The setup summary points at the generated auth file for page chrome and at
+`.zitadel/` for schema, flow, and (only after a later eject) structure.
 
 ### 2. Verify
 
@@ -379,40 +391,71 @@ Hosted login does not offer eject: there is no customer repo to land
 source in. Customers who need that level move the SSO-facing login back
 to an embedded page or wait for a richer template/part.
 
-## Coexistence with shipped designs
+## What the shipped designs really are
 
-Today `centered`, `split`, `split-right`, `hero`, and `minimal` are
-**widget designs**: full Liquid files whose `layout` degrade target is
-`centered | split` ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md),
-[`templates.md`](templates.md)). `hero`'s left pane is token-styled
-template chrome, not a customer React tree.
+ADR 040 shipped five named Liquid files under
+`packages/config/defaults/branding/*/login.liquid`. `setup --design` and
+`branding eject --design` copy one of them into `.zitadel/branding/` and
+publish it as branding revision 1. The generated auth page is still just
+`<zitadel-login>` — the "design" never becomes a wrapper. An audit of
+those files:
 
-That catalog stays. It is the right answer when:
+| Design | What differs from the bundled `default.liquid` | Category it actually is |
+| --- | --- | --- |
+| `centered` | Nothing. Drift-tested copy of the bundled default. | The widget itself. Ejecting it only materializes a file the customer did not need yet. |
+| `minimal` | Same field/action/passkey/gates loop; drops `<zl-card>` and the logo slot; wraps in `.zl-minimal`. | A thin widget-chrome variant (card off). Could be a host class or a future `chrome` knob; it is not a page layout. |
+| `split` | Same card, wrapped in `.zl-split` with a brand `<aside>` (`logo_url` / `hero_url` / gradient placeholder), a compact mark for narrow containers, and an attribution anchor. | **Page chrome.** A 1:1 split whose left pane is an asset, not product UI. |
+| `split-right` | `split` plus `zl-split--right`. | The same page chrome, mirrored. |
+| `hero` | Same card, plus a landing-page left pane (nav, headline, bullets, footnote) whose own comment says "YOUR LANDING CONTENT — everything inside this aside is yours." | **Page chrome**, and the loudest proof: the template invites you to edit marketing copy inside a sandboxed Liquid string. |
 
-- the customer wants a split *without* writing a wrapper (fresh
-  `variant="page"` scaffold, hosted login before page-template settings
-  exist);
-- the left pane is brand furniture (logo, `hero_url`, short headline), not
-  application content.
+The form wiring (~160 lines) is copy-pasted five times. The only real
+payload of `split` / `split-right` / `hero` is a grid and a left pane.
+The CSS that paints that grid (`layout-chrome.css`: `.zl-split*`,
+`.zl-hero*`) lives in the orchestrator shadow root *because* the chrome
+was stuffed into Liquid.
 
-It is the **wrong** answer when the left pane is arbitrary product UI.
-Those customers use page chrome (category 1) and a compact widget design
-(`centered` / `minimal`) on the right.
+**They are not worth keeping as widget templates for embedders.** An
+embedder who wants a split already has a better tool — their application.
+Saving the split as `login.liquid` costs them a branding revision, a
+sanitiser, a five-way template fork, and a left pane they cannot fill
+with real React/Vue. The CLI should still *offer* the look at setup; it
+should write a wrapper file and leave the widget on the bundled default.
 
-Vocabulary, aligned with [`../glossary.md`](../glossary.md) § 6:
+`minimal` is the one catalog entry that is not page chrome. Keep the
+idea (card-less widget) as a future appearance/chrome knob or as the
+starting point of an opt-in eject. Do not keep it as a reason to ship
+four page layouts as Liquid.
 
-| Term | Meaning after this strategy |
+Already-ejected revisions keep rendering. This is direction, not a
+runtime break.
+
+### Hosted page templates are hosted-only
+
+Yes: offer the page-template catalog **only** on hosted login.
+
+| Who | How they get a split / hero / centered page |
 | --- | --- |
-| **Page template** | Catalog starting point for *page chrome* — a wrapper in the app, or a hosted shell layout. |
-| **Design** | Catalog starting point that produces a *widget* Liquid template. Unchanged. |
-| **Layout** | Wire degrade enum `centered \| split` for invalid/missing templates. Unchanged. |
-| **Template** | The Liquid artifact inside the widget. Unchanged. |
-| **Branding** | The project resource that carries appearance, template, assets, and copy. Unchanged. |
+| Embedder (customer app) | CLI scaffolds a wrapper (or they write one). Widget stays the default card. |
+| Hosted login (Zitadel page) | Console page-template setting + slots. Hosted shell is the wrapper. Widget stays the default card. |
 
-The CLI may later ask two questions at setup — page template and widget
-design — instead of one. Until then, `--design split` remains a
-widget-internal split, which is still the fastest way to get that look on
-a `variant="page"` route.
+The catalog can share *names and sketches* (`centered`, `split`,
+`split-right`, `hero`) so a customer who later turns on SSO recognizes
+the same looks. The *artifact* is different: app source vs hosted-shell
+config. It is never `login.liquid`.
+
+Do not expose hosted page-template settings to embedders. There is
+nothing for those settings to wrap, and writing them would fight the
+app the CLI just generated.
+
+### Vocabulary after this shift
+
+| Term | Meaning |
+| --- | --- |
+| **Page template** | Catalog starting point for *page chrome*. Embedded: a scaffolded wrapper in the app. Hosted: a shell layout + slots. The only catalog setup should apply by default. |
+| **Design** | Retired as a customer-facing noun for "pick a look." Historically a Liquid starting point; that catalog stops being the setup path. |
+| **Layout** | Wire degrade enum `centered \| split` for an invalid/missing template. Hosted shell may keep using it internally; embedders should not set it to get a split. |
+| **Template** | The Liquid artifact inside the widget. Opt-in, starts from the bundled default card, used for inter-atom structure. |
+| **Branding** | Project resource for appearance, optional structure, assets, and copy. Not page chrome. |
 
 ## What we will not do
 
@@ -431,15 +474,20 @@ a `variant="page"` route.
   widget, different page owner.
 - **Requiring `apply` to restyle one embedded page.** Host CSS and element
   properties exist so embedders can match an app without a config release.
+- **Keep shipping split/hero as Liquid so embedders can skip writing a
+  wrapper.** The audit above is that those files *are* wrappers, poorly
+  placed. The CLI already writes the auth page; it can write a better one.
+- **A hosted page-template setting for embedders.** They have an app.
+  That setting exists only because hosted login does not.
 
 ## Rollout
 
 | Stage | What customers can do | Notes |
 | --- | --- | --- |
-| **Now** | Embed via CLI; host CSS / element props; branding eject for designs and Liquid; `variant` postures; `/ui/login/` as a `page`-variant shell | Categories 2–5 have a path. Category 1 is "edit the generated page." |
-| **Next** | Document and scaffold explicit *page templates* as wrapper files (split-left, split-right, centered, modal) distinct from `--design` | Unblocks the "content on the left" story without overloading Liquid. |
-| **Hosted login** | Page-template settings + content slots on the hosted shell; Console knobs for appearance, design picker, copy | Categories 2–5 already apply. Category 1 gets a platform home. |
-| **Later** | Block editor that emits Liquid (same validator); structured branding knobs in Console; GitOps for hosted page-template settings if wanted | Editor stages in [`templates.md`](templates.md). |
+| **Now (shipped)** | `setup --design` still ejects Liquid; `/ui/login/` is a `page`-variant shell | Documented here as the behavior to retire, not the destination. |
+| **Next** | Setup asks for a **page template** and scaffolds a wrapper; does not write `login.liquid`. `branding eject` copies the bundled default only. Split/hero Liquid files stop being the catalog. | Move `.zl-split` / `.zl-hero` CSS out of the orchestrator into the scaffold (and later the hosted shell). |
+| **Hosted login** | Page-template settings + slots **on the hosted shell only**. Console knobs for appearance and copy. | Same widget card. No Liquid design picker. |
+| **Later** | Block editor that emits Liquid for *structure* (disclaimer, grouping); structured branding knobs; optional GitOps for hosted page-template settings | Editor stages in [`templates.md`](templates.md). |
 
 ## Open questions
 
@@ -450,13 +498,16 @@ a `variant="page"` route.
 2. **How much HTML a hosted left pane accepts.** Markdown + image URL is
    the safe default. A small allowlisted HTML subset is the next step.
    Arbitrary scripts are out.
-3. **Whether `--design split` eventually scaffolds a page wrapper** instead
-   of (or as well as) a widget-internal split, once page templates exist.
-   Recommendation: keep `--design` on the widget; add `--page-template`
-   (or a second wizard question) for the wrapper.
+3. **`minimal` as a knob vs an eject starting point.** Card-less chrome is
+   the one shipped design that is not a page layout. Appearance knob
+   (`chrome: card \| plain`) is simpler for embedders; eject still covers
+   anyone who wants to delete more than the card.
 4. **Attribution / powered-by** — still open in [`README.md`](README.md).
    Treat it as widget chrome (category 3 or a policy flag), not page
    chrome.
+5. **Migration of already-ejected split/hero revisions.** They keep
+   working. Do we later offer a one-shot "move this left pane into your
+   app wrapper" helper, or leave them as a supported legacy render path?
 
 ## See also
 

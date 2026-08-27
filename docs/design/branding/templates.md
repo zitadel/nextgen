@@ -114,7 +114,14 @@ Two built-in `layout` values ship with the component package (the bundled `defau
 | `centered` (default) | Card centred on page. Fields stacked, primary action full-width, SSO below a divider.                               |
 | `split`              | Brand panel on the left (logo, `hero_url` background), form on the right. Maps to the legacy `side-by-side` layout. |
 
-The `layout` enum stays this small on purpose. Richer starting points ship as **designs** — full template files in `@zitadel/config` that `zitadel branding eject --design <name>` (or `zitadel setup --design <name>`) scaffolds into `.zitadel/branding/`:
+The `layout` enum stays this small on purpose. Richer *page* starting points
+are **page templates** (app wrappers for embedders; hosted-shell layouts for
+hosted login) — not extra Liquid files. See
+[`customization-strategy.md`](customization-strategy.md#what-the-shipped-designs-really-are)
+and [ADR 056](../../adrs/056-login-customization-categories.md). The five
+named files below are what `zitadel branding eject --design` / `setup --design`
+still write today; that catalog is the setup path to retire, not the
+destination:
 
 | Design        | Descriptor `layout` | Sketch                                                                  |
 | ------------- | ------------------- | ----------------------------------------------------------------------- |
@@ -124,7 +131,10 @@ The `layout` enum stays this small on purpose. Richer starting points ship as **
 | `hero`        | `split`             | Landing-style brand pane left (nav, headline, feature bullets — editable copy on token-styled `zl-hero__*` classes), form right. |
 | `minimal`     | `centered`          | Chrome stripped to heading, fields, and actions.                        |
 
-A design is delivered *as a template* (the escape hatch this doc always reserved for ADR-033's `muted`/`minimal`), with the descriptor's `layout` set to the nearest built-in so an invalid template degrades to sane chrome. Every shipped design passes the authoring validator and a component-level render test.
+Those five files still pass the authoring validator and a component-level
+render test. They remain a supported *render* path for already-ejected
+revisions. They are not the setup destination: page looks move to app
+wrappers (embedders) and hosted-shell layouts (hosted login).
 
 ### Split chrome: mobile fallback and knobs
 
