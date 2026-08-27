@@ -239,3 +239,57 @@ func TestListPredicateLiftsConstantArms(t *testing.T) {
 	assert.Contains(t, sql, "a.scope_team_id = r.team_id")
 	assert.Contains(t, sql, "a.scope_resource_id = r.resource_id")
 }
+
+// TestListPredicateConstraintTeamInBothHalves covers the sk_team clause on the
+// EXISTS path, which no test reached before: TestWriteCheckAuthzConstraintTeam
+// sets ConstraintTeamID but drives WriteCheckAuthz and WriteListAuthzObjectIDs,
+// never this predicate.
+//
+// The clause is correlated to r, so the lift has to carry it into *both* halves:
+// (C AND EXISTS(base AND CT)) OR EXISTS(base AND CT AND Q). Emit it only in the
+// correlated half and the first half becomes `C AND EXISTS(base)`, which makes
+// an object outside the token's team visible to anyone holding a project-wide
+// grant. Same class of leak as an AND flipped to OR, reached by a different
+// route, and nothing would have failed.
+func TestListPredicateConstraintTeamInBothHalves(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id",
+		domain.AuthzListObjectsParams{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID:        "cat_sys_1",
+				ProjectID:        "proj_1",
+				PrincipalType:    domain.AuthzPrincipalTypeSKTeam,
+				PrincipalID:      "sk_team_1",
+				ObjectType:       "project",
+				Relation:         "viewer",
+				ConstraintTeamID: "team_1",
+			},
+			ResourceKind: domain.ResourceKindTeam,
+		})
+	sql := w.b.String()
+
+	// Split on the top-level OR joining the two halves: it is the OR that
+	// immediately precedes the second RSI subquery.
+	secondRSI := strings.LastIndex(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, secondRSI)
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, firstRSI, secondRSI, "the lift must emit two RSI subqueries")
+
+	// Marker must be unique to writeListedObjectInConstraintTeam. Deliberately
+	// not "authz_membership_edges": that is also emitted by the TTU arm and by
+	// every principal match, so it appears in the lifted section regardless and
+	// would make this test pass with the clause missing entirely. This string is
+	// written once per constraint-team clause and nowhere else.
+	const ctClause = `) OR (r.resource_kind <> `
+	assert.Equal(t, 2, strings.Count(sql, ctClause),
+		"the constraint-team clause must be emitted once per half of the lift")
+	assert.Less(t, strings.Index(sql, ctClause), secondRSI,
+		"the constraint-team clause must be inside the constant half's RSI subquery; "+
+			"without it a project-wide grant sees objects outside the token's team")
+	assert.Greater(t, strings.LastIndex(sql, ctClause), secondRSI,
+		"the constraint-team clause must be inside the correlated half's RSI subquery")
+
+	// And it must be bound to the token's team, not merely present.
+	assert.Contains(t, w.args, "team_1")
+}

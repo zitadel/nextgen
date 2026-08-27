@@ -91,7 +91,7 @@ FROM `)
 	writeTable(w, env, "resource_scope_index")
 	w.WriteString(` r
 WHERE `)
-	writeListAuthzRSIMatch(w, env, params, "")
+	writeListAuthzRSIMatch(w, env, params, "", listArmsAll)
 	w.WriteString(`
 ORDER BY r.resource_id`)
 }
@@ -120,24 +120,59 @@ func WriteListAuthzExistsPredicate(w ArgWriter, env Env, outerResourceIDExpr str
 	writeFullTTUExists(w, env, params.AuthzCheckParams)
 	w.WriteString(`)
   AND `)
-	writeListAuthzRSIExists(w, env, params, outerResourceIDExpr, false)
+	writeListAuthzRSIExists(w, env, params, outerResourceIDExpr, listArmsNone)
 	w.WriteString(`
   OR `)
-	writeListAuthzRSIExists(w, env, params, outerResourceIDExpr, true)
+	writeListAuthzRSIExists(w, env, params, outerResourceIDExpr, listArmsCorrelated)
 	w.WriteString(`)`)
 }
 
-// writeListAuthzRSIExists emits EXISTS (SELECT 1 FROM RSI r WHERE …) for one
-// half of the lifted predicate. withScopedArms adds the two arms that do
-// correlate to r; both halves carry the constraint-team clause, which is also
-// correlated and so must not be distributed out of either.
-func writeListAuthzRSIExists(w ArgWriter, env Env, params domain.AuthzListObjectsParams, outerResourceIDExpr string, withScopedArms bool) {
+// writeListAuthzRSIExists wraps one half of the lifted predicate in
+// EXISTS (SELECT 1 FROM RSI r WHERE …). The body, including the base filter and
+// the constraint-team clause, comes from writeListAuthzRSIMatch so that both
+// this path and WriteListAuthzObjectIDs share one definition of it.
+//
+// outerResourceIDExpr is always non-empty here: every caller reaches this
+// through WriteListAuthzExistsPredicate, whose three dialect entry points build
+// it as `<table>.<column>`. An empty value would drop the correlation and both
+// halves would collapse to "does any RSI row exist for this project and kind",
+// admitting every row; the uncorrelated shape is only meaningful for the
+// materialising query, which calls writeListAuthzRSIMatch directly.
+func writeListAuthzRSIExists(w ArgWriter, env Env, params domain.AuthzListObjectsParams, outerResourceIDExpr string, arms listArmSet) {
 	w.WriteString(`EXISTS (
 SELECT 1
 FROM `)
 	writeTable(w, env, "resource_scope_index")
 	w.WriteString(` r
 WHERE `)
+	writeListAuthzRSIMatch(w, env, params, outerResourceIDExpr, arms)
+	w.WriteString(`
+)`)
+}
+
+// listArmSet selects which arms of the visibility disjunction accompany the RSI
+// base filter. The base filter itself, and the constraint-team clause, are the
+// same for every caller and must stay that way: they decide who can see what on
+// both the materialising and the EXISTS-injection paths, and two copies would be
+// free to drift apart with every test still green.
+type listArmSet int
+
+const (
+	// listArmsAll is the full disjunction, for the uncorrelated materialising
+	// query.
+	listArmsAll listArmSet = iota
+	// listArmsNone is the base filter alone: the RSI existence half of the
+	// lifted predicate, which the constant arms are ANDed with.
+	listArmsNone
+	// listArmsCorrelated is the two arms that reference r, the other half of
+	// the lift.
+	listArmsCorrelated
+)
+
+// writeListAuthzRSIMatch writes the RSI WHERE body shared by list materialization
+// and EXISTS injection. When outerResourceIDExpr is non-empty, correlates
+// r.resource_id to that outer column.
+func writeListAuthzRSIMatch(w ArgWriter, env Env, params domain.AuthzListObjectsParams, outerResourceIDExpr string, arms listArmSet) {
 	if outerResourceIDExpr != "" {
 		w.WriteString(`r.resource_id = `)
 		w.WriteString(outerResourceIDExpr)
@@ -149,7 +184,27 @@ WHERE `)
 	w.WriteString(`
   AND r.resource_kind = `)
 	w.WriteArg(params.ResourceKind.String())
-	if withScopedArms {
+	switch arms {
+	case listArmsAll:
+		w.WriteString(`
+  AND (
+    `)
+		writeProjectScopedClosureExists(w, env, params.AuthzCheckParams)
+		w.WriteString(`
+    OR `)
+		writeFullTTUExists(w, env, params.AuthzCheckParams)
+		w.WriteString(`
+    OR (
+        r.team_id IS NOT NULL
+        AND `)
+		writeScopedClosureExists(w, env, params.AuthzCheckParams, "team", "r.team_id")
+		w.WriteString(`
+    )
+    OR `)
+		writeScopedClosureExists(w, env, params.AuthzCheckParams, "resource", "r.resource_id")
+		w.WriteString(`
+  )`)
+	case listArmsCorrelated:
 		w.WriteString(`
   AND (
     (
@@ -162,49 +217,10 @@ WHERE `)
 		writeScopedClosureExists(w, env, params.AuthzCheckParams, "resource", "r.resource_id")
 		w.WriteString(`
   )`)
+	case listArmsNone:
 	}
-	if params.ConstraintTeamID != "" {
-		w.WriteString(`
-  AND `)
-		writeListedObjectInConstraintTeam(w, env, params)
-	}
-	w.WriteString(`
-)`)
-}
-
-// writeListAuthzRSIMatch writes the RSI WHERE body shared by list materialization
-// and EXISTS injection. When outerResourceIDExpr is non-empty, correlates
-// r.resource_id to that outer column.
-func writeListAuthzRSIMatch(w ArgWriter, env Env, params domain.AuthzListObjectsParams, outerResourceIDExpr string) {
-	if outerResourceIDExpr != "" {
-		w.WriteString(`r.resource_id = `)
-		w.WriteString(outerResourceIDExpr)
-		w.WriteString(`
-  AND `)
-	}
-	w.WriteString(`r.project_id = `)
-	w.WriteArg(params.ProjectID)
-	w.WriteString(`
-  AND r.resource_kind = `)
-	w.WriteArg(params.ResourceKind.String())
-	w.WriteString(`
-  AND (
-    `)
-	writeProjectScopedClosureExists(w, env, params.AuthzCheckParams)
-	w.WriteString(`
-    OR `)
-	writeFullTTUExists(w, env, params.AuthzCheckParams)
-	w.WriteString(`
-    OR (
-        r.team_id IS NOT NULL
-        AND `)
-	writeScopedClosureExists(w, env, params.AuthzCheckParams, "team", "r.team_id")
-	w.WriteString(`
-    )
-    OR `)
-	writeScopedClosureExists(w, env, params.AuthzCheckParams, "resource", "r.resource_id")
-	w.WriteString(`
-  )`)
+	// Correlated to r, so it belongs to whichever RSI subquery is being written
+	// and cannot be distributed out of either half of the lift.
 	if params.ConstraintTeamID != "" {
 		w.WriteString(`
   AND `)
