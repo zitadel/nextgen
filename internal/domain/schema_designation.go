@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/maputil"
@@ -73,8 +74,32 @@ func designatedLeaf(schema map[string]any, path, keyword string) (map[string]any
 			return nil, fmt.Errorf("%w: %q names unknown property %q", ErrSchemaDesignationInvalid, keyword, path)
 		}
 	}
-	if kind, _ := current["type"].(string); kind == "object" || kind == "array" {
-		return nil, fmt.Errorf("%w: %q property %q must be a leaf, is %s", ErrSchemaDesignationInvalid, keyword, path, kind)
+	if isCompositeProperty(current) {
+		return nil, fmt.Errorf("%w: %q property %q must be a leaf, not an object or array", ErrSchemaDesignationInvalid, keyword, path)
 	}
 	return current, nil
+}
+
+// isCompositeProperty reports whether a property schema describes an object
+// or array rather than a scalar. A property carrying `properties` is an
+// object and one carrying `items` is an array even when it omits the `type`
+// keyword, and an array-form `type` union is composite as soon as any entry
+// is object or array — no unique row exists for such a value, so it can
+// never be resolved as a designation.
+func isCompositeProperty(prop map[string]any) bool {
+	if _, ok := prop["properties"]; ok {
+		return true
+	}
+	if _, ok := prop["items"]; ok {
+		return true
+	}
+	switch t := prop["type"].(type) {
+	case string:
+		return t == "object" || t == "array"
+	case []any:
+		return slices.ContainsFunc(t, func(entry any) bool {
+			return entry == "object" || entry == "array"
+		})
+	}
+	return false
 }
