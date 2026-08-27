@@ -182,7 +182,7 @@ type FlowDefinitionAudience struct {
 // authMethodPrefix marks a step.fields entry as referring to an entry
 // under the user schema's `x-auth-methods` keyword (e.g.
 // "x-auth-methods#password") rather than to a user property.
-const authMethodPrefix = "x-auth-methods#"
+const authMethodPrefix = SchemaAnnotationAuthMethods + "#"
 
 // Field carries the raw field name from a flow-definition step.
 type Field string

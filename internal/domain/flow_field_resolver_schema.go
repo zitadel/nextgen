@@ -224,10 +224,10 @@ func deriveIdentifierChallenge(field Field, identifier string) FlowFieldChalleng
 }
 
 func deriveUnique(prop schemaReader) AttributeUniqueness {
-	switch prop.String("x-unique") {
-	case "project":
+	switch prop.String(SchemaAnnotationUnique) {
+	case SchemaUniqueScopeProject:
 		return AttributeUniquenessProject
-	case "team":
+	case SchemaUniqueScopeTeam:
 		return AttributeUniquenessTeam
 	}
 	return AttributeUniquenessUnspecified
@@ -506,7 +506,7 @@ func (r schemaReader) collectRequiredPaths(prefix AttributeKey, materialized, ou
 // absent. An error is returned only when the keyword is present but
 // shaped differently than expected.
 func (r schemaReader) AuthMethods() (xAuthMethodsReader, error) {
-	v, ok := r.s.LookupKeyword("x-auth-methods")
+	v, ok := r.s.LookupKeyword(SchemaAnnotationAuthMethods)
 	if !ok {
 		return xAuthMethodsReader{}, nil
 	}
