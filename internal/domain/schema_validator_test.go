@@ -455,6 +455,28 @@ func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
 			wantErr: domain.ErrSchemaDesignationInvalid,
 		},
 		{
+			name: "identifier on an implicit object (properties without type)",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account",
+				"properties": {"account": {"properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an array is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "emails",
+				"properties": {"emails": {"items": {"type": "string"}, "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a nullable-object type union is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "profile",
+				"properties": {"profile": {"type": ["null", "object"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
 			name: "identifier on an object is not a leaf",
 			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
 				"x-identifier": "account",

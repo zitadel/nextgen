@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -8,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // TestShippedUserSchemasPassServerValidation feeds every user schema shipped
@@ -28,7 +31,12 @@ func TestShippedUserSchemasPassServerValidation(t *testing.T) {
 		}
 		raw, err := os.ReadFile(path)
 		require.NoError(t, err)
-		if !strings.Contains(string(raw), `"kind": "user-schema"`) {
+		// The ${...} placeholders live inside JSON strings, so the templates
+		// parse as-is; select user schemas by their decoded kind, not by a
+		// formatting-sensitive substring.
+		var parsed map[string]any
+		require.NoError(t, json.Unmarshal(raw, &parsed), path)
+		if kind, _ := parsed["kind"].(string); kind != domain.SchemaDocumentKindUser {
 			return nil
 		}
 		rel, err := filepath.Rel(root, path)
