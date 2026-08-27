@@ -228,8 +228,9 @@ authoritative validator and a component-level render test.
 ## Amendment (2026-08-27)
 
 [ADR 056](056-login-customization-categories.md) keeps this ADR's storage,
-validation, and eject→apply path for **widget structure**. It amends §5's
-catalog: `split` / `split-right` / `hero` are page chrome, not Liquid
-starting points. Setup should scaffold an application wrapper and not
-publish those files as branding revision 1. Hosted login gets the same
-looks as hosted-shell page templates, not as `liquid_template`.
+validation, and eject→apply path for the **template** (widget structure,
+both deployments, strict scope). It amends §5's catalog: `split` /
+`split-right` / `hero` are page chrome. Setup scaffolds an application
+wrapper and does not publish those files as `login.liquid`. Hosted login
+gets the same looks as a **page template** (`page.liquid` +
+`{% login_widget %}`), not as `branding.liquid_template`.

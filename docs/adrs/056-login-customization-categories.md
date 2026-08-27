@@ -7,7 +7,7 @@
 > (Zitadel-served page for SSO).
 > **Long form:** [`../design/branding/customization-strategy.md`](../design/branding/customization-strategy.md)
 > **Relates to:** [ADR 040](040-tenant-login-templates-editable-config.md)
-> (amends §5: page-layout catalog leaves Liquid),
+> (amends §5: page-layout catalog is not a widget-template catalog),
 > [ADR 044](044-scaffold-embedding-posture-defaults.md),
 > [ADR 045](045-copy-overlays-as-branding-revisions.md),
 > [ADR 018](018-widget-owned-locale-resolution.md),
@@ -37,9 +37,9 @@ Zitadel owns the page.
 
 | Category | Home |
 | --- | --- |
-| **Page chrome** | The document around `<zitadel-login>` |
-| **Widget appearance** | `--zl-*` tokens / structured branding knobs / page-local element props |
-| **Widget structure** | The Liquid template (`login.liquid`) |
+| **Page chrome** | Embedder: app wrapper. Hosted: **page template** (`page.liquid`) |
+| **Widget appearance** | `--zl-*` / structured branding / element `appearance` |
+| **Widget structure** | The **template** (`login.liquid`) — both deployments, strict scope |
 | **Voice** | Branding copy overlays; element `lang` / `locales` as the page override |
 | **Behavior** | The flow definition — never an appearance editor |
 
@@ -58,21 +58,26 @@ knob between categories.
 Both placements render the same `<zitadel-login>` against the same project
 branding revision.
 
-### 3. Page chrome is not a branding field
+### 3. "Page template" is hosted-only; "template" is shared and strict
+
+The distinct name is the point. A **template** (`login.liquid`) is widget
+structure: `<zl-*>` against the step payload, no page chrome. Because the
+same widget runs in the customer app and on hosted login, that file must
+stay strict and apply to **both** deployments.
+
+A **page template** (`page.liquid`) exists only because hosted login has
+no application to wrap. It is a Liquid document with a required
+`{% login_widget %}` hole; the rest is the customer's page (split, left
+pane, nav) under the same sanitiser family. `{% login_widget %}` is
+opaque — page templates do not emit atoms; templates do not emit a
+marketing column.
 
 **Embedded.** Page chrome is application code wrapping
-`<zitadel-login variant="widget">`. The CLI may scaffold page templates as
-ordinary framework files; they are presentation-owned (ADR 042).
+`<zitadel-login variant="widget">` (ADR 042). The CLI may scaffold a
+wrapper. That file is not a page template.
 
-**Hosted.** Page chrome is a platform page-template setting plus constrained
-content slots (markdown, image URL, later allowlisted HTML). The hosted
-shell renders the wrapper; the widget stays `variant="widget"` inside the
-form pane.
-
-Page chrome is not stored on the branding revision for embedders. Promoting
-arbitrary host HTML into branding is either too weak (sandboxed) or too
-dangerous (executed on hosted requests). Hosted slots are a constrained
-equivalent of the wrapper, not a serialization of the customer's app.
+**Hosted.** The shell renders `page.liquid` and injects the widget at
+`{% login_widget %}`. Embedders never author this file.
 
 ### 4. Project look travels on the branding revision; page-local look stays on the element
 
@@ -102,10 +107,9 @@ It does not write `login.liquid` and does not publish a branding revision.
 `branding eject` remains the opt-in for *structure* and starts from the
 bundled default card, not from a catalog of page layouts.
 
-**Hosted login.** Page templates exist **only** here: Console settings the
-hosted shell reads. Same catalog *names* as the CLI wrappers are fine;
-the artifact is hosted-shell config, never Liquid. Embedders do not get
-this panel.
+**Hosted login.** Page templates exist **only** here: `page.liquid` with
+`{% login_widget %}`. Same catalog *names* as the CLI wrappers are fine;
+the artifact is not `login.liquid`. Embedders do not get this editor.
 
 Already-ejected split/hero revisions keep rendering. This decision
 retires them as the setup path, not as a runtime.
@@ -120,8 +124,9 @@ atoms remain embedded-only: there is no customer repo on the hosted path.
 
 - Product and Console can place a control by asking "which category?"
   rather than inventing a new store.
-- The "content on the left" story is unblocked without weakening the
-  Liquid sandbox: it is a wrapper (now) or a hosted slot (later).
+- The "content on the left" story is unblocked without loosening the
+  shared template: embedders wrap in the app; hosted login uses a page
+  template. The widget template stays strict for both.
 - Embedders keep a no-publish path (host CSS / element props) so matching
   an app design system stays a local edit.
 - Hosted login work is scoped: ship page-template settings and Console
@@ -129,17 +134,18 @@ atoms remain embedded-only: there is no customer repo on the hosted path.
 - Setup guidance should point at the generated auth file for page chrome
   and at `.zitadel/` for schema, flow, and appearance knobs. Structure
   (`login.liquid`) appears only after an opt-in eject.
-- Follow-ups land as implementation: page-template scaffolds instead of
-  `--design` Liquid, move `.zl-split` / `.zl-hero` CSS out of the
-  orchestrator, hosted-only page-template settings, optional `minimal`
-  chrome knob. Already-ejected revisions stay valid.
+- Follow-ups land as implementation: setup scaffolds app wrappers instead
+  of `--design` Liquid; hosted `page.liquid` + `{% login_widget %}`;
+  element `appearance`; move `.zl-split` / `.zl-hero` CSS out of the
+  orchestrator; `chrome: card | plain`. Already-ejected revisions stay
+  valid.
 
 ## Rejected alternatives
 
-- **Put the split-with-content-left story in Liquid.** Arbitrary customer
-  HTML inside the template either bypasses the sanitiser or cannot express
-  a real application pane. Page chrome is the document; the template is
-  the atoms.
+- **Put the split-with-content-left story in the (widget) template.**
+  That file is shared. Page chrome in `login.liquid` would land on every
+  embed. Hosted page chrome is a *page* template; embedder page chrome
+  is the app.
 - **One settings blob for every visual change.** Page chrome, tokens, and
   atom order have different authors, publish paths, and trust boundaries.
 - **Hosted login as a separately themed app.** Doubles the branding model
@@ -150,8 +156,8 @@ atoms remain embedded-only: there is no customer repo on the hosted path.
   files are wrappers. The CLI already writes the auth page; writing a
   real one is cheaper than a five-way template fork and a sanitiser
   around marketing copy (`hero` already invites that).
-- **Offer hosted page-template settings to embedders.** They have an
-  application. That setting exists only because hosted login does not.
+- **Offer page templates to embedders.** They have an application. The
+  name exists because hosted login does not.
 
 ## See also
 
