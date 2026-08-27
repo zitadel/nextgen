@@ -153,14 +153,14 @@ func TestEnsurePersonalTeam_LostRaceConvergesOnTheWinner(t *testing.T) {
 	// The winner committed team AND membership together, so the re-check
 	// confirms convergence instead of assuming it.
 	f := newEnsureFixture(t, emailIdentity("maya@acme.com"))
-	first := f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
-		Return(nil, database.NewNoRowFoundError(nil))
-	f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
-		Return(&domain.Team{ProjectID: ensureTestPlatform, ID: "team_winner"}, nil).
-		After(first)
-
-	f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).
-		Return(database.NewUniqueError("teams", "uq_teams_project_name", nil))
+	gomock.InOrder(
+		f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
+			Return(nil, database.NewNoRowFoundError(nil)),
+		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).
+			Return(database.NewUniqueError("teams", "uq_teams_project_name", nil)),
+		f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
+			Return(&domain.Team{ProjectID: ensureTestPlatform, ID: "team_winner"}, nil),
+	)
 	expectEnsureTx(f)
 
 	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
