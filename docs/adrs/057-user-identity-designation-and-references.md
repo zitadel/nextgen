@@ -70,7 +70,14 @@ Validation (at schema create/update):
   must designate an identifier. Password verification is unreachable without
   a prior identifier (the state machine dispatches identifier before
   password), so the absence is a schema error, not a runtime surprise.
-  Passkey-only and API-managed schemas may designate none.
+  Passkey-only and API-managed schemas may designate none: discoverable
+  credentials identify the user through the assertion itself, so no typed
+  identifier exists in a usernameless flow, and a universal requirement
+  would outlaw that design. A flow that picks the identifier-first passkey
+  pattern instead is enforced at the flow level, where the on_success
+  manifest requires the identifier to be collected upstream — the schema
+  rule covers only methods that can never work identifier-free (magic link
+  and OTP join password there when they arrive).
 
 ### 2. `x-display` — the display designation
 
