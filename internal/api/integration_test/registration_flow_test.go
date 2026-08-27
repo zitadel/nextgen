@@ -131,7 +131,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
 
 	// --- Start flow ---
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{

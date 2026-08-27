@@ -24,7 +24,7 @@
  * `id`, or out-of-spec routes):
  *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
- *   - POST /flow_definitions            → flow detail envelope
+ *   - POST /flow_definitions            → flow-definition-response envelope
  *
  * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
  * the user POSTed verbatim, so the response shape depends on the request
@@ -334,7 +334,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    // POST 201 and GET 200 share the `flow-definition-detail-response`
+    // POST 201 and GET 200 share the `flow-definition-response`
     // envelope per the spec, so the GET response zod schema validates both.
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
@@ -358,7 +358,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
-    await fetch(`${BASE}/flow_definitions`, {
+    const create = await fetch(`${BASE}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -366,11 +366,20 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
         flow_definition: validFlowDefinitionBody(),
       }),
     });
+    const { id } = (await create.json()) as { id: string };
     // Spec: `ListFlowDefinitionsQueryParams` requires `project_id`.
     const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_list`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ListFlowDefinitionsResponse.parse(body)).not.toThrow();
+
+    // Both read endpoints describe a flow definition the same way (#939), so
+    // the row and the by-id document must be the same object.
+    const row = (body as { flow_definitions: { id: string }[] }).flow_definitions.find(
+      (entry) => entry.id === id,
+    );
+    const detail = await (await fetch(`${BASE}/flow_definitions/${id}`)).json();
+    expect(row).toEqual(detail);
   });
 
   test("GET /flow_definitions/:id matches GetFlowDefinitionResponse", async () => {

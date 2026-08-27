@@ -35,7 +35,6 @@ import type {
   InitClaim201,
   ListFlowDefinitions200,
   ListSchemas200,
-  ListFlowDefinitions200FlowDefinitionsItem,
   UpdateFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import {
@@ -64,7 +63,6 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
-  DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
 } from "@zitadel/config/defaults";
@@ -170,13 +168,11 @@ type ProjectRecord = {
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
- * `flow-definition-detail-response` per the OpenAPI contract.
+ * `flow-definition-response` per the OpenAPI contract.
  */
 type FlowDefinitionRecord = {
   id: string;
-  name: string;
   projectId: string;
-  schemaUri: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -247,37 +243,27 @@ function bearerToken(request: Request): string {
 }
 
 /**
- * Build a `flow-definition-detail-response` envelope around a stored body, as
- * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * Build a `flow-definition-response` envelope around a stored body, as
+ * specified by `api/openapi/components/flows/flow-definition-response.yaml`.
+ * Every read serves this — list included, which is the point of #939.
  * The Go server unconditionally echoes an `audience` (empty `{}` when the
  * stored flow has none — `internal/api/flow_definition.go`); mirror that so
  * consumers exercise the same wire shape the live server produces.
  */
-function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
+function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
     id: r.id,
     project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status,
     flow_definition: {
       audience: {},
       ...(r.body as Record<string, unknown>),
+      // After the spread: an update that omits `status` keeps the stored one,
+      // which is what the endpoint documents.
+      status: r.status,
     } as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
-}
-
-function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200FlowDefinitionsItem {
-  return {
-    id: r.id,
-    name: r.name,
-    project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status as ListFlowDefinitions200FlowDefinitionsItem["status"],
-    created_at: r.createdAt,
-    updated_at: r.updatedAt,
-  };
 }
 
 function defaultHumanUserSchema(): GetSchemaById200Schema {
@@ -297,9 +283,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   const id = `flow_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
-    name: "default-login",
     projectId: projectID,
-    schemaUri: DEFAULT_FLOW_SCHEMA_URI,
     status: "active",
     createdAt,
     updatedAt: createdAt,
@@ -830,19 +814,16 @@ export function setupPlatformHandlers() {
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
-      const flowDef = body.data.flow_definition as Record<string, unknown>;
       const record: FlowDefinitionRecord = {
         id,
-        name: flowDef.name as string,
         projectId: body.data.project_id,
-        schemaUri: body.data.schema_uri ?? DEFAULT_FLOW_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,
         body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
-      const responseBody: CreateFlowDefinition201 = flowDetailResponse(record);
+      const responseBody: CreateFlowDefinition201 = flowResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
@@ -859,7 +840,7 @@ export function setupPlatformHandlers() {
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()]
           .filter((record) => record.projectId === query.data.project_id)
-          .map(flowListItemResponse),
+          .map(flowResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
@@ -881,7 +862,7 @@ export function setupPlatformHandlers() {
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
+      const responseBody: GetFlowDefinition200 = flowResponse(record);
       const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
@@ -916,12 +897,10 @@ export function setupPlatformHandlers() {
 
       const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
       record.body = flowDefinition;
-      record.name = typeof flowDefinition.name === "string" ? flowDefinition.name : record.name;
-      record.schemaUri = body.data.schema_uri ?? record.schemaUri;
       record.status =
         typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
       record.updatedAt = nowIso();
-      const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
+      const responseBody: UpdateFlowDefinition200 = flowResponse(record);
       const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
