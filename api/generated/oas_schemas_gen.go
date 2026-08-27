@@ -41425,7 +41425,11 @@ type UserSchema struct {
 	// Path of the leaf property whose value identifies a user (nested leaves
 	// are addressed by their dot-joined attribute path). The property must
 	// carry `x-unique` "project". Required when an auth method needing
-	// identifier-first dispatch (password) is enabled.
+	// identifier-first dispatch (password) is enabled. Passkey is exempt:
+	// discoverable credentials identify the user through the assertion
+	// itself, so passkey-only and API-managed schemas may designate nothing;
+	// flows using identifier-first passkey are validated at the flow level
+	// instead.
 	XMinusIdentifier OptString `json:"x-identifier"`
 	// Ordered leaf property paths whose values, joined with a space, render
 	// the user's display name.
