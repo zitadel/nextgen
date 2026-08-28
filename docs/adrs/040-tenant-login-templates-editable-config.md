@@ -1,6 +1,6 @@
 # ADR 040: Tenant Login Templates as Editable Config
 
-> **Status:** Proposed (amended 2026-08-27 by [ADR 056](056-login-customization-categories.md))
+> **Status:** Proposed (amended 2026-08-27 by [ADR 057](057-login-customization-categories.md))
 > **Date:** 2026-07-20
 > **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
 
@@ -227,7 +227,7 @@ authoritative validator and a component-level render test.
 
 ## Amendment (2026-08-27)
 
-[ADR 056](056-login-customization-categories.md) keeps this ADR's storage,
+[ADR 057](057-login-customization-categories.md) keeps this ADR's storage,
 validation, and eject→apply path for the **widget template** (advanced
 structure inside the widget, shared by embedded and Zitadel-served login,
 strict scope, later). It amends §5's catalog: `split` / `split-right` /

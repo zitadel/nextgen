@@ -2,7 +2,7 @@
 
 Notes for how the login UI is themed and laid out relative to the step payload.
 
-**Product strategy (where a customization lives):** [`customization-strategy.md`](customization-strategy.md) and [ADR 056](../../adrs/056-login-customization-categories.md). Read that first when the question is *page wrapper vs widget knob vs Liquid vs flow*.
+**Product strategy (where a customization lives):** [`customization-strategy.md`](customization-strategy.md) and [ADR 057](../../adrs/057-login-customization-categories.md). Read that first when the question is *page wrapper vs widget knob vs Liquid vs flow*.
 
 **Contract (source of truth):** [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md), the shipped Branding spec under [`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/), [`../flowengine/template-security.md`](../flowengine/template-security.md).
 

@@ -82,8 +82,12 @@ func (stubAuthAttempt) Handoff(context.Context, service.HandoffInput) (*domain.A
 	return nil, errors.New("stub auth attempt")
 }
 
-func (stubAuthAttempt) RegisterCreatedUser(context.Context, string, string, string) error {
-	return errors.New("stub auth attempt")
+func (stubAuthAttempt) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {
+	return nil, errors.New("stub auth attempt")
+}
+
+func (stubAuthAttempt) FinishPasskeyEnrollment(context.Context, service.FinishPasskeyEnrollmentInput) (*service.FinishPasskeyEnrollmentOutput, error) {
+	return nil, errors.New("stub auth attempt")
 }
 
 var _ service.AuthAttemptService = stubAuthAttempt{}

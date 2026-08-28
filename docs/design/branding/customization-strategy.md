@@ -8,7 +8,7 @@
 > (vision), [#936](https://github.com/zitadel/nextgen/issues/936) (first
 > iteration), vision doc landing in
 > [#1034](https://github.com/zitadel/nextgen/pull/1034)
-> **Decisions:** [ADR 056](../../adrs/056-login-customization-categories.md)
+> **Decisions:** [ADR 057](../../adrs/057-login-customization-categories.md)
 > **Implements:** [`templates.md`](templates.md), [`schema.md`](schema.md),
 > [`tokens.md`](tokens.md), [`override-ladder.md`](override-ladder.md),
 > [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md),
@@ -667,7 +667,7 @@ Matches #678's delivery direction, with #936 as the first visual ticket.
   first iteration
 - [#1034 vision doc](https://github.com/zitadel/nextgen/pull/1034) —
   landing `authentication-experience-vision.md`
-- [ADR 056](../../adrs/056-login-customization-categories.md) — the
+- [ADR 057](../../adrs/057-login-customization-categories.md) — the
   decision record for these categories
 - [`templates.md`](templates.md) — Liquid scope, shipped designs, eject
   workflow

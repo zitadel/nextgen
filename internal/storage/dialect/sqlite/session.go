@@ -271,11 +271,16 @@ func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessio
 		}
 	}
 	for _, c := range last {
-		if _, err := ss.client.Exec(ctx,
-			`DELETE FROM checks WHERE project_id = ? AND session_id = ? AND type = ? AND id != ?`,
-			projectID, sessionID, int64(c.Type), c.ID,
-		); err != nil {
-			return wrapError(err)
+		// Prune every losing row in the winner's class, not just its exact
+		// type: an enrollment row and a login row compete for the same
+		// passkey slot on the session.
+		for _, typ := range v2session.ClassMembers(c.Type) {
+			if _, err := ss.client.Exec(ctx,
+				`DELETE FROM checks WHERE project_id = ? AND session_id = ? AND type = ? AND id != ?`,
+				projectID, sessionID, int64(typ), c.ID,
+			); err != nil {
+				return wrapError(err)
+			}
 		}
 	}
 	return nil

@@ -1,4 +1,4 @@
-# ADR 056: Login Customization Categories and Ownership
+# ADR 057: Login Customization Categories and Ownership
 
 > **Status:** Proposed
 > **Date:** 2026-08-28
