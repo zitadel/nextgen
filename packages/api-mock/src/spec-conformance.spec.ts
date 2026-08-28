@@ -312,6 +312,70 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(typeof row?.metadata.created_at).toBe("string");
   });
 
+  test("GET /schemas pages with limit and next_page_token", async () => {
+    // The consumer suites replace this handler with local MSW handlers, so
+    // the mock's own slicing, token emission and continuation are only
+    // proven here.
+    for (let i = 0; i < 5; i += 1) {
+      const create = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "user-schema",
+          metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+          objectType: `paging-${i}`,
+          "x-auth-methods": { password: { enabled: true } },
+        }),
+      });
+      expect(create.status).toBe(201);
+    }
+
+    // The whole set fits in the default limit of 20: no token.
+    const full = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`);
+    expect(full.status).toBe(200);
+    const fullBody = (await full.json()) as {
+      schemas: Array<{ id: string }>;
+      next_page_token?: string | null;
+    };
+    expect(fullBody.schemas).toHaveLength(5);
+    expect(fullBody.next_page_token ?? undefined).toBeUndefined();
+    const wantIds = fullBody.schemas.map((row) => row.id);
+
+    // A limit-2 walk covers the same rows in the same order, exactly once;
+    // every page before the end carries a token, the last does not.
+    const gotIds: string[] = [];
+    let token: string | undefined;
+    for (const wantSize of [2, 2, 1]) {
+      const url = new URL(`${BASE}/schemas`);
+      url.searchParams.set("project_id", "proj_schema_paging");
+      url.searchParams.set("limit", "2");
+      if (token !== undefined) url.searchParams.set("page_token", token);
+      const page = await fetch(url);
+      expect(page.status).toBe(200);
+      const body = (await page.json()) as {
+        schemas: Array<{ id: string }>;
+        next_page_token?: string | null;
+      };
+      expect(body.schemas).toHaveLength(wantSize);
+      gotIds.push(...body.schemas.map((row) => row.id));
+      token = body.next_page_token ?? undefined;
+    }
+    expect(token).toBeUndefined();
+    expect(gotIds).toEqual(wantIds);
+
+    // A token the mock never minted is rejected, like the real server.
+    const bad = await fetch(
+      `${BASE}/schemas?project_id=proj_schema_paging&page_token=not-a-cursor`,
+    );
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
+
+    // An out-of-range limit is rejected by the generated query schema, not
+    // silently clamped.
+    const oversized = await fetch(`${BASE}/schemas?project_id=proj_schema_paging&limit=101`);
+    expect(oversized.status).toBe(400);
+  });
+
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
     const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
       method: "POST",
