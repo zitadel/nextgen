@@ -784,7 +784,7 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	for i := range 3 {
+	for i := range 25 {
 		resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 			ProjectID: api.ProjectID(project.ID),
 			FlowDefinition: api.FlowDefinition{
