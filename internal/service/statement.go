@@ -124,6 +124,7 @@ type TeamStatements interface {
 	Statements
 	CreateTeam(ctx context.Context, entity *domain.Team) error
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error)
 	UpdateTeam(ctx context.Context, entity *domain.Team) error
 	ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle

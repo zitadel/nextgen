@@ -174,9 +174,10 @@ func (s *GrantService) resolvePrincipalHome(ctx context.Context, stmts AllStatem
 func (s *GrantService) loadPrincipal(ctx context.Context, stmts AllStatements, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) error {
 	switch principalType {
 	case domain.AuthzPrincipalTypeUser:
-		user, err := stmts.GetUser(ctx, database.And(
+		_, err := stmts.GetUser(ctx, database.And(
 			database.Equal(database.Col(domain.UserFieldProjectID), homeProjectID),
 			database.Equal(database.Col(domain.UserFieldID), principalID),
+			database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
 		), UserQueryOptions{})
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -184,22 +185,18 @@ func (s *GrantService) loadPrincipal(ctx context.Context, stmts AllStatements, h
 			}
 			return err
 		}
-		switch user.Metadata.Status {
-		case domain.UserStatusDeactivated, domain.UserStatusSuspended, domain.UserStatusPendingPurge:
-			return domain.ErrGrantPrincipalNotFound()
-		}
 		return nil
 	case domain.AuthzPrincipalTypeTeam:
-		team, err := stmts.GetTeamByID(ctx, homeProjectID, principalID)
+		_, err := stmts.GetTeam(ctx, database.And(
+			database.Equal(database.Col(domain.TeamFieldProjectID), homeProjectID),
+			database.Equal(database.Col(domain.TeamFieldID), principalID),
+			database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusActive.String()),
+		))
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrGrantPrincipalNotFound()
 			}
 			return err
-		}
-		switch team.Status {
-		case domain.TeamStatusDeactivated, domain.TeamStatusPendingPurge:
-			return domain.ErrGrantPrincipalNotFound()
 		}
 		return nil
 	default:

@@ -135,11 +135,8 @@ func TestGrantService_Create(t *testing.T) {
 					ResourceKind: domain.ResourceKindUser,
 					ProjectID:    grantPlatformProjID,
 				}, nil)
-				s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
-					ProjectID: grantPlatformProjID,
-					ID:        userID,
-					Metadata:  domain.UserMetadata{Status: domain.UserStatusDeactivated},
-				}, nil)
+				s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrGrantPrincipalNotFound(),
 		},
@@ -295,7 +292,7 @@ func expectActiveTeamPrincipal(s *servicemocks.MockAllStatements, teamID string)
 		ResourceKind: domain.ResourceKindTeam,
 		ProjectID:    grantPlatformProjID,
 	}, nil)
-	s.EXPECT().GetTeamByID(gomock.Any(), grantPlatformProjID, teamID).Return(&domain.Team{
+	s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).Return(&domain.Team{
 		ProjectID: grantPlatformProjID,
 		ID:        teamID,
 		Status:    domain.TeamStatusActive,

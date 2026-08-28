@@ -101,7 +101,7 @@ func TestTeamService_Get(t *testing.T) {
 			name:   "ok",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
 					Return(&domain.Team{
 						ProjectID: "proj_1",
 						ID:        "team_1",
@@ -121,7 +121,7 @@ func TestTeamService_Get(t *testing.T) {
 			name:   "not found",
 			teamID: "missing",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "missing").
+				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
 					Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrTeamNotFound(),
@@ -130,13 +130,8 @@ func TestTeamService_Get(t *testing.T) {
 			name:   "pending_purge team reads as not found",
 			teamID: "team_purge",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_purge").
-					Return(&domain.Team{
-						ProjectID: "proj_1",
-						ID:        "team_purge",
-						Name:      "doomed",
-						Status:    domain.TeamStatusPendingPurge,
-					}, nil)
+				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
+					Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrTeamNotFound(),
 		},
