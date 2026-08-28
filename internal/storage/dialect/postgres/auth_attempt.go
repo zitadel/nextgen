@@ -16,14 +16,14 @@ import (
 )
 
 const authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-	` aa.required_checks, aa.created_at, c.type, aa.time_to_live,` +
+	` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal,` +
 	` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
 	` LEFT JOIN zitadel_nextgen.checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
 const createAuthAttemptStmt = `WITH inserted_attempt AS (` +
-	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live, session_id)` +
-	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL, $5)` +
+	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live, session_id, internal)` +
+	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL, $5, $6)` +
 	` RETURNING project_id, id, created_at` +
 	`), inserted_checks AS (` +
 	` INSERT INTO zitadel_nextgen.checks (project_id, auth_attempt_id, id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
@@ -31,7 +31,7 @@ const createAuthAttemptStmt = `WITH inserted_attempt AS (` +
 	` CASE WHEN checks.is_challenge THEN NOW() ELSE NULL END,` +
 	` CASE WHEN checks.is_factor AND NOT checks.is_challenge THEN NOW() ELSE NULL END` +
 	` FROM inserted_attempt ia` +
-	` JOIN LATERAL jsonb_to_recordset(COALESCE($6::JSONB, '[]'::JSONB)) AS checks(id TEXT, type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenge BOOLEAN, is_factor BOOLEAN) ON TRUE` +
+	` JOIN LATERAL jsonb_to_recordset(COALESCE($7::JSONB, '[]'::JSONB)) AS checks(id TEXT, type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenge BOOLEAN, is_factor BOOLEAN) ON TRUE` +
 	` RETURNING id, type, last_challenged_at, last_verified_at` +
 	`) SELECT ia.id, ia.created_at, ic.id, ic.type, ic.last_challenged_at, ic.last_verified_at` +
 	` FROM inserted_attempt ia` +
@@ -100,7 +100,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 
 	rows, err := as.client.Query(ctx, createAuthAttemptStmt,
 		authAttempt.ProjectID, authAttempt.ID, requiredChecks, authAttempt.TimeToLive,
-		authattempt.SessionIDArg(authAttempt.SessionID), checkRowsJSON)
+		authattempt.SessionIDArg(authAttempt.SessionID), authAttempt.Internal, checkRowsJSON)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -220,7 +220,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 		)
 		err := rows.Scan(
 			&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID,
-			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLive,
+			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLive, &attempt.Internal,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return wrapError(err)

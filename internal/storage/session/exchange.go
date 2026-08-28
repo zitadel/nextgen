@@ -38,6 +38,11 @@ func ExchangeTTL(ttl time.Duration) time.Duration {
 
 // ValidateHandoffAttempt rejects missing, expired, or incomplete handoff state.
 func ValidateHandoffAttempt(attempt *domain.AuthAttempt) error {
+	if attempt.Internal {
+		// Belt to PrepareHandoff's guard: an internal ceremony's attempt
+		// must never exchange into a session.
+		return domain.ErrSessionInvalidHandoffToken()
+	}
 	if attempt.HandoffToken == nil || attempt.HandedOffAt == nil || attempt.HandedOffAt.IsZero() {
 		return domain.ErrSessionInvalidHandoffToken()
 	}

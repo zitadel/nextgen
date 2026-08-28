@@ -80,6 +80,14 @@ func (s *stubAuthAttemptService) RegisterCreatedUser(ctx context.Context, projec
 	return nil
 }
 
+func (s *stubAuthAttemptService) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {
+	return nil, nil
+}
+
+func (s *stubAuthAttemptService) FinishPasskeyEnrollment(context.Context, service.FinishPasskeyEnrollmentInput) (*service.FinishPasskeyEnrollmentOutput, error) {
+	return nil, nil
+}
+
 var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {
