@@ -85,20 +85,17 @@ func Migrate(ctx context.Context, db *sql.DB) (err error) {
 	if err != nil {
 		return err
 	}
+	// batchDDLFS brackets each run of consecutive DDL with START BATCH DDL /
+	// RUN BATCH, so those statements reach Spanner as one UpdateDatabaseDdl
+	// instead of one per statement (#973). goose just executes what it reads.
+	// See ddl_batch.go.
+	//
 	// WithIsolateDDL runs DDL statements outside transactions, which Spanner requires.
-	p, err := goose.NewProvider(goose.DialectSpanner, db, sqlFS, goose.WithIsolateDDL(true))
+	p, err := goose.NewProvider(goose.DialectSpanner, db, batchDDLFS{inner: sqlFS}, goose.WithIsolateDDL(true))
 	if err != nil {
 		return err
 	}
-	// WithDDLBatching is what makes each migration file's statements travel as
-	// one UpdateDatabaseDdl call instead of one per statement (#973). It is
-	// applied here and nowhere else, because goose holds a single connection for
-	// the whole Up run and buffering is only safe on a held connection; the
-	// pooled callers above (acquireLease, ensureLeaseRow) must not be marked.
-	//
-	// The per-file batch boundary depends on goose writing the version row after
-	// each file: that DML is what flushes the batch. See batch_ddl.go.
-	_, upErr := p.Up(WithDDLBatching(fenced))
+	_, upErr := p.Up(fenced)
 	if cause := context.Cause(fenced); cause != nil && !errors.Is(cause, context.Canceled) {
 		return errors.Join(upErr, fmt.Errorf("migration fenced off: %w", cause))
 	}

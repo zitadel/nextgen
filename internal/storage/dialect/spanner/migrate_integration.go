@@ -4,6 +4,7 @@ package spanner
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/zitadel/nextgen/internal/storage/dialect/spanner/migration"
 )
@@ -14,13 +15,8 @@ func (c *Client) Migrate(ctx context.Context) error {
 		return nil
 	}
 
-	// Not sql.Open("spanner", …): migration.OpenDB returns a *sql.DB whose
-	// connections group consecutive DDL into one UpdateDatabaseDdl call, which
-	// is what keeps a real-instance boot from spending ~43 minutes in Migrate
-	// (#973). goose is unaware of it. The buffering that implies, and how it
-	// changes where a bad statement reports its error, is documented on
-	// migration.OpenDB.
-	db, err := migration.OpenDB(c.dsn)
+	// goose uses database/sql via go-sql-spanner (registered by the migration package).
+	db, err := sql.Open("spanner", c.dsn)
 	if err != nil {
 		return wrapError(err)
 	}
