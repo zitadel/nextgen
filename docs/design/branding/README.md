@@ -2,6 +2,8 @@
 
 Notes for how the login UI is themed and laid out relative to the step payload.
 
+**Product vision:** [`authentication-experience-vision.md`](authentication-experience-vision.md) defines the presentation models, ownership boundaries, customer journeys, and delivery direction. Use it as product context before changing the login experience.
+
 **Contract (source of truth):** [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md), the shipped Branding spec under [`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/), [`../flowengine/template-security.md`](../flowengine/template-security.md).
 
 **This folder:** optional extensions and working notes (extra branding fields, `--zl-*` tokens, Liquid layout checks). Details live in the files linked below.

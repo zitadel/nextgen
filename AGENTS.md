@@ -280,6 +280,8 @@ building any UI under `apps/console/**` or
    recipe ([`apps/storybook/AGENTS.md`](apps/storybook/AGENTS.md)) and iterate
    there behind the a11y gate, not on a console mock.
 
+Before changing the login presentation, component customisation, onboarding layout, or served-login experience, review the [authentication experience product vision](docs/design/branding/authentication-experience-vision.md) for the intended presentation models and ownership boundaries.
+
 Both surfaces are theme-portable: tokens are authored as `{ dark, light }` pairs
 and flip via `[data-theme="light"]` (amended ADR 014 §5). When adding atom CSS,
 never reach for the raw `--zl-color-gray-*` ramp — it is mode-independent by
