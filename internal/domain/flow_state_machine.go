@@ -1201,15 +1201,26 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 // step the user has passed through (history plus current). on_success
 // handlers read this to find attributes by challenge across the full
 // progress, not just the current step.
+//
+// The union keeps definition order — steps in the order they were
+// visited, fields in the order the step declares them. Callers that walk
+// the result positionally depend on it: [identifierFieldValues] returns
+// its candidates in field order, so a set-ordered union would make the
+// owner pinned on a multi-unique conflict depend on map iteration.
 func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowResolvedFields, error) {
 	ctx, def, state, current := pc.ctx, pc.def, pc.state, pc.currentStep
+	var names []Field
 	seen := map[Field]struct{}{}
 	collect := func(s *FlowDefinitionStep) {
 		if s == nil {
 			return
 		}
 		for _, f := range s.Fields {
+			if _, dup := seen[f]; dup {
+				continue
+			}
 			seen[f] = struct{}{}
+			names = append(names, f)
 		}
 	}
 	for _, name := range state.History {
@@ -1218,12 +1229,8 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 		}
 	}
 	collect(current)
-	if len(seen) == 0 {
+	if len(names) == 0 {
 		return FlowResolvedFields{}, nil
-	}
-	names := make([]Field, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
 	}
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {

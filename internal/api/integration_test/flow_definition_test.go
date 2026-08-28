@@ -773,6 +773,17 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 	}, getResp)
 }
 
+const (
+	// createdFlowDefinitions overruns the default page on purpose: a fixture
+	// that fits in one page cannot tell a bounded list from an unbounded one.
+	createdFlowDefinitions = 25
+	// Creating a project seeds it with a default flow definition, so the
+	// project holds one row more than the fixture loop creates.
+	totalFlowDefinitions = createdFlowDefinitions + 1
+	// Mirrors service.defaultListLimit, which is unexported.
+	defaultFlowDefinitionPageSize = 20
+)
+
 func TestListFlowDefinitionsPagination(t *testing.T) {
 	t.Parallel()
 
@@ -784,7 +795,7 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	for i := range 25 {
+	for i := range createdFlowDefinitions {
 		resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 			ProjectID: api.ProjectID(project.ID),
 			FlowDefinition: api.FlowDefinition{
@@ -809,18 +820,30 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 			return res.(*api.FlowDefinitionListResponse)
 		}
 
-		full := listFlowDefinitions(t, api.ListFlowDefinitionsParams{})
-		require.Len(t, full.FlowDefinitions, 4)
-		assert.False(t, full.NextPageToken.IsSet(), "the whole result fits in one page")
+		// A request that omits limit must bound its page at the server default
+		// instead of returning every flow definition in the project.
+		first := listFlowDefinitions(t, api.ListFlowDefinitionsParams{})
+		require.Len(t, first.FlowDefinitions, defaultFlowDefinitionPageSize)
+		firstToken, ok := first.NextPageToken.Get()
+		require.True(t, ok, "a full page carries a cursor")
 
-		wantIDs := make([]string, 0, len(full.FlowDefinitions))
-		for _, item := range full.FlowDefinitions {
-			wantIDs = append(wantIDs, item.ID)
+		// The remainder is shorter than a page, so it closes the walk.
+		rest := listFlowDefinitions(t, api.ListFlowDefinitionsParams{
+			PageToken: api.NewOptPageToken(firstToken),
+		})
+		require.Len(t, rest.FlowDefinitions, totalFlowDefinitions-defaultFlowDefinitionPageSize)
+		assert.False(t, rest.NextPageToken.IsSet(), "a partial page ends the walk")
+
+		wantIDs := make([]string, 0, totalFlowDefinitions)
+		for _, page := range [][]api.FlowDefinitionResponse{first.FlowDefinitions, rest.FlowDefinitions} {
+			for _, item := range page {
+				wantIDs = append(wantIDs, item.ID)
+			}
 		}
 
 		var gotIDs []string
 		var pageToken api.OptPageToken
-		for range len(wantIDs) {
+		for range totalFlowDefinitions {
 			// iterate over all pages (with size one)
 			page := listFlowDefinitions(t, api.ListFlowDefinitionsParams{
 				Limit:     api.NewOptLimit(1),
