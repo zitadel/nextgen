@@ -115,8 +115,9 @@ Two built-in `layout` values ship with the component package (the bundled `defau
 | `split`              | Brand panel on the left (logo, `hero_url` background), form on the right. Maps to the legacy `side-by-side` layout. |
 
 The `layout` enum stays this small on purpose. This file is the **widget
-template** (structure inside the widget, both deployments). Hosted **page
-templates** (`page.liquid` + `{% login_widget %}`) are a different artifact — see
+template** (advanced structure inside the widget, shared later by embedded
+and Zitadel-served login). Zitadel-served **page chrome** is unset;
+`page.liquid` is only a later proposal — see
 [`customization-strategy.md`](customization-strategy.md#what-the-shipped-designs-really-are)
 and [ADR 056](../../adrs/056-login-customization-categories.md). The five
 named files below are what `zitadel branding eject --design` / `setup --design`
@@ -133,8 +134,8 @@ destination:
 
 Those five files still pass the authoring validator and a component-level
 render test. They remain a supported *render* path for already-ejected
-revisions. They are not the setup destination: page looks move to app
-wrappers (embedders) and hosted-shell layouts (hosted login).
+revisions. They are not the setup destination: embedder page looks live
+in the application; Zitadel-served page chrome is unset.
 
 ### Split chrome: mobile fallback and knobs
 

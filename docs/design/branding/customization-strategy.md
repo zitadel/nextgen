@@ -1,9 +1,13 @@
 # Login Customization Strategy
 
 > **Status:** Proposed
-> **Date:** 2026-08-27
+> **Date:** 2026-08-28
 > **Audience:** Product, design, and engineering deciding *where* a login
 > customization lives — not the token catalogue or Liquid grammar.
+> **Product context:** [#678](https://github.com/zitadel/nextgen/issues/678)
+> (vision), [#936](https://github.com/zitadel/nextgen/issues/936) (first
+> iteration), vision doc landing in
+> [#1034](https://github.com/zitadel/nextgen/pull/1034)
 > **Decisions:** [ADR 056](../../adrs/056-login-customization-categories.md)
 > **Implements:** [`templates.md`](templates.md), [`schema.md`](schema.md),
 > [`tokens.md`](tokens.md), [`override-ladder.md`](override-ladder.md),
@@ -11,12 +15,17 @@
 > [ADR 044](../../adrs/044-scaffold-embedding-posture-defaults.md),
 > [ADR 045](../../adrs/045-copy-overlays-as-branding-revisions.md)
 
-Nextgen ships one login surface — `<zitadel-login>` plus the `<zl-*>` atoms —
-and two ways to put it in front of a user. The product goal is **total
-customizability** without dumping every kind of change into one editor, one
-JSON blob, or one Liquid file. This document names the customization
-categories, the surface each one is authored on, and the journey a customer
-takes from first embed to hosted SSO.
+This is the engineering **placement map** under the product vision in #678.
+It does not define a required journey from embedded login to Zitadel-served
+login. Customers pick a presentation model; they can change it later; they
+do not have to.
+
+Nextgen ships one login component — `<zitadel-login>` plus the `<zl-*>`
+atoms — and three ways to put authentication in front of a user. The
+product goal is **total customizability** without dumping every kind of
+change into one editor, one JSON blob, or one Liquid file. This document
+names the customization categories, the surface each one is authored on,
+what the first iteration ships, and what stays later or unset.
 
 ## Thesis
 
@@ -30,92 +39,109 @@ disclaimer between the password field and the submit button is editing the
 are different products: different authors, different publish paths, different
 failure modes.
 
-The strategy is: **give every change exactly one home, then make the two
-deployments (embedded and hosted) read the same project-scoped home whenever
-the look must travel with the project.**
+The strategy is: **give every change exactly one home.** Where a look must
+travel with the project, embedded and Zitadel-served login read the same
+project-scoped resource (branding, copy, flows, and later widget structure).
+That reuse is optional sharing, not a ladder one model must climb to reach
+the next.
 
-## Two orthogonal deployments
+## Three presentation models
 
-"Self-hosted" is overloaded in this repo. Keep these axes separate.
+From [#678](https://github.com/zitadel/nextgen/issues/678). These are
+**choices**, not stages.
+
+| Model | Zitadel provides | Customer controls |
+| --- | --- | --- |
+| **Customer-embedded login** | `<zitadel-login>`, journeys, security controls | The application around the component, and supported component customisation |
+| **Zitadel-served login** | A complete standalone login (today `/ui/login/`) | Supported branding, content, and authentication configuration. Page-level customisation is **not defined yet** |
+| **Fully custom frontend** | Authentication APIs, policies, backend enforcement | The complete frontend |
+
+"Self-hosted" is overloaded. Keep this axis separate from the models:
 
 | Axis | Values | What it decides |
 | --- | --- | --- |
-| **Login placement** | **Embedded** in the customer application · **Hosted** by Zitadel | Who owns the HTML page around `<zitadel-login>` |
+| **Presentation model** | Embedded · Zitadel-served · Fully custom | Who presents the login UI |
 | **Zitadel runtime** | Cloud · customer-operated server | Where the API and (optionally) `/ui/login/` run |
 
-This document is about **login placement**. A customer-operated Zitadel
-server can still embed the widget in the app, and a cloud project can still
-use hosted login later. The runtime axis does not move a knob from one
-category to another.
-
-### Embedded login (ships now)
-
-The customer application renders `<zitadel-login>` on a route, in a modal, or
-in a card. The CLI (`zitadel setup`) bootstraps the app, installs the SDK,
-and drops the widget onto a generated auth page. The customer owns the
-document, the layout around the widget, and the deploy of that page.
-
-This is the default path and the only path that can offer *absolute*
-page-level freedom: arbitrary React/Vue/HTML around the widget, the host
-design system, and framework routing.
-
-### Hosted login (later, SSO)
-
-Zitadel serves the login page — today the bootstrap shell at `/ui/login/`,
-later a first-class hosted login on a customer-chosen domain for OIDC/SAML
-SSO. The same `<zitadel-login>` runs inside a **Zitadel-owned page**. There
-is no customer application to wrap, so page chrome that embedders write in
-code must be expressible as **platform settings**.
-
-Hosted login is how a customer offers SSO to apps they do not embed the
-widget in. It is not a second renderer and not a second branding model.
+A customer-operated Zitadel server can still embed the widget. A cloud
+project can still use Zitadel-served login. The runtime axis does not move
+a knob from one category to another. “Zitadel-served” means who presents
+the page, not who operates the server.
 
 ```mermaid
 flowchart LR
-  subgraph embedded [Embedded — customer app]
-    Page[Customer page / wrapper]
-    W1[zitadel-login]
-    Page --> W1
+  subgraph embed [Customer-embedded]
+    EW[App around the component]
+    EL[zitadel-login]
+    EW --> EL
   end
-  subgraph hosted [Hosted — Zitadel page]
-    Shell[Platform page template]
-    W2[zitadel-login]
-    Shell --> W2
+  subgraph served [Zitadel-served]
+    SP[Zitadel-owned page]
+    SL[zitadel-login]
+    SP --> SL
   end
-  Branding[Project branding revision]
-  Branding --> W1
-  Branding --> W2
+  subgraph custom [Fully custom frontend]
+    API[Auth APIs]
+  end
+  Branding[Shared branding / copy / flows — where applicable]
+  Branding --> EL
+  Branding --> SL
 ```
 
+Fully custom does not render `<zitadel-login>`. Shared branding does not
+apply there.
+
+### First iteration vs later
+
+[#936](https://github.com/zitadel/nextgen/issues/936) is the first visual
+milestone. It is **not** this whole map.
+
+| Area | First iteration (#936) | Later / unset |
+| --- | --- | --- |
+| **Appearance** | Supported brand assets, colours, typography inside the embedded components | More knobs; typed `appearance` sugar |
+| **Voice** | Supported headings, labels, guidance inside the embedded components | Full localisation management |
+| **Surrounding application** | Customer-owned. Not customised in #936 | CLI may stop applying a template at setup (follow-up) |
+| **Structure** (`login.liquid`) | Out of scope | Advanced, opt-in, shared with Zitadel-served |
+| **Behaviour** | Login flows; not edited in the visual UI | Unchanged ownership |
+| **Zitadel-served login** | Separate milestone | First served ship is a polished default + reused branding/content. Advanced page chrome unset |
+| **Fully custom frontend** | Not included | Supported APIs and responsibility split |
+| **Visual customisation door** | Console preview / publish (#936) | Code-based branding remains valid; CLI-to-Console handoff is out of #936 |
+
+Do not lock the visual experience to a CLI `setup → apply → hosted` path.
+Setup gets authentication working. #936 is where a customer opens visual
+customisation for **already working** embedded components.
+
+## Categories
 ## Categories
 
 Five categories. The first three are the ones a screenshot usually
 conflates. The last two are adjacent and must stay out of the appearance
 editors.
 
-| # | Category | What the customer is changing | One-line home |
-| --- | --- | --- | --- |
-| 1 | **Page chrome** | How the login sits on the *page*: split, centered, left-pane content | Embedder: app wrapper. Hosted: **page template** |
-| 2 | **Widget appearance** | Convenience look *inside* the widget: radii, colors, density, theme, logo | Tokens / branding knobs / element `appearance` |
-| 3 | **Widget structure** | What sits *between the atoms*: disclaimer, grouping | **Widget template** (`login.liquid`) — both deployments |
-| 4 | **Voice** | Wording, locale overlays | Branding copy + `locales` / `lang` |
-| 5 | **Behavior** | Which steps, fields, factors exist | Flow definition — not an appearance surface |
+| # | Category | What the customer is changing | One-line home | Horizon |
+| --- | --- | --- | --- | --- |
+| 1 | **Page chrome** | How the login sits on the *page*: split, centered, left-pane content | Embedder: app wrapper. Zitadel-served: **unset** (a `page.liquid` + `login_widget` hole is one proposed later direction) | Embedder: now (their app). Served page chrome: later |
+| 2 | **Widget appearance** | Convenience look *inside* the widget: radii, colors, density, theme, logo | Tokens / branding knobs / element `appearance` | **First iteration (#936)** |
+| 3 | **Widget structure** | What sits *between the atoms*: disclaimer, grouping | **Widget template** (`login.liquid`) — embedded and Zitadel-served | **Later** |
+| 4 | **Voice** | Wording, locale overlays | Branding copy + `locales` / `lang` | **First iteration (#936)** |
+| 5 | **Behavior** | Which steps, fields, factors exist | Flow definition — not an appearance surface | Already owned by flows |
 
-**Why the paired names.** Call them **widget template** and **page
-template** — parallel nouns, different scope. The widget template is
-strict (atoms, step payload, no page chrome) and applies to **both**
-deployments because the same widget runs in the app and on hosted login.
-The page template exists only because hosted login has no application to
-wrap: it is the document around `{% login_widget %}`. One unqualified
-"template" would either loosen the shared file or leave hosted login
-with nowhere to put a left pane. Embedder wrappers are application code,
-not page templates.
+**Why "widget template" at all.** The Liquid file inside the widget is
+**advanced structure**: `<zl-*>` against the step payload, no page chrome.
+It is shared by embedded and Zitadel-served login because they render the
+same component. It is not a setup default and not part of #936.
+
+**"Page template" is not a decision.** Zitadel-served page chrome has no
+chosen artifact yet. `page.liquid` with a `login_widget` hole is a
+*proposal* for a later milestone, after the first Zitadel-served login
+ships as a polished standalone page. Embedder wrappers are application
+code, never that file.
 
 Page-local knobs (host CSS, `lang` / `locales`, the embedder wrapper) never
-enter the API. Everything else is **platform defined**: the same resources
-the Branding API, Flow API, and (later) hosted page-template API expose,
-whether the customer authors them as `.zitadel/` files, Console settings,
-or HTTP.
+enter the API. Project appearance, voice, flows, and later widget structure
+are **platform defined**: the same resources the Branding API and Flow API
+expose, whether the customer authors them as `.zitadel/` files, Console
+settings, or HTTP.
 
 ```mermaid
 flowchart TB
@@ -134,15 +160,13 @@ flowchart TB
   end
 
   subgraph api [Platform defined — API]
-    PageTpl["page.liquid + login_widget — hosted only"]
     BrandJSON["branding.json / Console"]
-    WidTpl[Widget template login.liquid]
+    WidTpl[Widget template login.liquid — later]
     Copy[Branding copy overlay]
     Flow[Flow definition]
   end
 
   C1 --> EmbWrap
-  C1 --> PageTpl
   C2 --> HostCSS
   C2 --> BrandJSON
   C3 --> WidTpl
@@ -150,54 +174,74 @@ flowchart TB
   C4 --> Copy
   C5 --> Flow
 
-  BrandJSON --> Both1[zitadel-login — both deployments]
-  WidTpl --> Both1
-  Copy --> Both1
-  Flow --> Both1
+  BrandJSON --> Shared[zitadel-login — embedded and Zitadel-served]
+  WidTpl --> Shared
+  Copy --> Shared
+  Flow --> Shared
 ```
 
 ```mermaid
 flowchart LR
-  subgraph embed [Embedded]
+  subgraph embed [Customer-embedded]
     EW[App wrapper]
     EL[zitadel-login]
     EW --> EL
   end
-  subgraph hosted [Hosted]
-    PT[Page template — platform defined]
-    HL[zitadel-login]
-    PT --> HL
+  subgraph served [Zitadel-served]
+    SP[Zitadel-owned page — chrome unset]
+    SL[zitadel-login]
+    SP --> SL
   end
-  subgraph api [Platform defined — API, both deployments]
+  subgraph api [Platform defined — API]
     AP[Appearance knobs]
-    WT[Widget template]
     VO[Voice overlay]
     FL[Flow definition]
+    WT[Widget template — later]
   end
   AP --> EL
-  AP --> HL
-  WT --> EL
-  WT --> HL
+  AP --> SL
   VO --> EL
-  VO --> HL
+  VO --> SL
   FL --> WT
+  WT --> EL
+  WT --> SL
 ```
 
 ## What would change
 
-Nothing in this table is implemented by this PR. It is the delta from
-**what ships today** to the destination above.
+Nothing in these tables is implemented by this PR. Follow-up issues will
+own the CLI and structure work; #936 owns the first visual loop.
 
-| Surface | Today | Destination |
+### First iteration — #936
+
+| Surface | Today | First iteration |
 | --- | --- | --- |
-| `zitadel setup --design split` | Writes `.zitadel/branding/login.liquid` (split chrome + copied form) and publishes branding revision 1. Generated auth page is still a bare `<zitadel-login>`. | Writes an **app wrapper** (grid + left pane + `variant="widget"`). Writes **no** Liquid, publishes **no** branding revision. |
-| `zitadel branding eject --design` | Catalog of five Liquid files that mix page chrome with the form card. | Ejects the **widget template** only — bundled default card. No split/hero in this catalog. |
-| One Liquid file | `login.liquid` is the only template noun; split/hero live inside it. | Two nouns: **widget template** (`login.liquid`, both deployments) and **page template** (`page.liquid` + `{% login_widget %}`, hosted-only). |
-| Widget look | Host CSS + proposed branding JSON; no first-class `appearance` object. | Same shape three ways: `el.appearance`, host CSS `--zl-*`, Console / `branding.json`. `chrome: card \| plain` replaces `minimal` as a design. |
-| Hosted `/ui/login/` | `variant="page"` shell; any split comes from a widget-internal design. | Hosted **page template**. Widget stays the default card (or an ejected widget template). |
-| Embedder who wants a left pane | Ejects Liquid and edits marketing copy inside the sanitiser. | Edits the scaffolded wrapper as app code. |
-| Shared widget structure (disclaimer) | Same eject path, but the starting files are page layouts. | Same eject path, starting from the default card. Applies to **both** deployments. |
-| Already-ejected split/hero revisions | Render today. | Keep rendering. Legacy path, not the setup path. |
+| Visual customisation | Host CSS + proposed branding JSON; no Console preview/publish loop | Console: appearance + voice on working embedded components. Preview, validate, publish, restore |
+| Project look | Optional `branding.json` via CLI | Same branding resource. One customisation applies project-wide across the journeys #936 lists |
+| Surrounding application | Customer-owned | Still customer-owned. Not edited here |
+
+### Follow-up — stop setup from applying a template
+
+File separately under #678. Not part of #936 (onboarding is out of scope there).
+
+| Surface | Today | Follow-up |
+| --- | --- | --- |
+| `zitadel setup --design` / wizard | Writes `.zitadel/branding/login.liquid` and publishes branding revision 1. Generated auth page is still a bare `<zitadel-login>` | Setup embeds the maintained component only. Writes **no** Liquid, publishes **no** branding revision. Optional look pick, if kept, writes **app files** only |
+| Embedder who wants a left pane | Ejects Liquid and edits marketing copy inside the sanitiser | Edits their application |
+
+### Later — widget structure
+
+| Surface | Today | Later |
+| --- | --- | --- |
+| `zitadel branding eject --design` | Catalog of five Liquid files that mix page chrome with the form card | Ejects the **widget template** only — bundled default card. No split/hero in this catalog |
+| Shared widget structure (disclaimer) | Same eject path, starting files are page layouts | Opt-in `login.liquid` from the default card. Embedded **and** Zitadel-served |
+
+### Proposed / unset — Zitadel-served page chrome
+
+| Surface | Today | Status |
+| --- | --- | --- |
+| `/ui/login/` | `variant="page"` shell; any split comes from a widget-internal design | First Zitadel-served ship: polished default + reused appearance/voice. Advanced page chrome **unset**. `page.liquid` + `login_widget` is a proposal, not a requirement |
+| Already-ejected split/hero revisions | Render today | Keep rendering. Legacy path |
 
 ### 1. Page chrome
 
@@ -221,20 +265,24 @@ content-sized and does not paint page chrome of its own
 `variant="page"` is the other posture — a dedicated login route that *is*
 the page, used by fresh scaffolds and by today's hosted shell.
 
-**Embedded.** Authored in the customer's application. The CLI may scaffold a
-*wrapper* (centered full page, split-left, split-right, modal host) as
-ordinary framework files the customer then edits. Those files are
-presentation-owned ([ADR 042](../../adrs/042-scaffolded-file-ownership-and-drift-detection.md)).
-They are not page templates.
+**Embedded.** Authored in the customer's application. New-app setup may
+leave a starting page the customer then edits; existing apps place the
+component in their layout
+([ADR 042](../../adrs/042-scaffolded-file-ownership-and-drift-detection.md)).
+Those files are not Zitadel templates.
 
-**Hosted.** There is no application file, so this is the only place a
-**page template** exists: a Liquid document with a required
-`{% login_widget %}` hole. The rest of the file is the customer's page —
-split grid, left-pane copy, nav — under the same sanitiser family as
-widget Liquid (no `<script>`, no `on*`). The hosted shell renders that
-file and injects `<zitadel-login variant="widget">` at the tag. Catalog
-starting points (`centered`, `split`, `split-right`, `hero`) are page
-templates, not `login.liquid`.
+**Zitadel-served.** There is no customer application file. The first
+Zitadel-served milestone is a polished standalone page plus reused
+branding and content — not advanced page-level customisation
+([#678](https://github.com/zitadel/nextgen/issues/678)). How customers
+later customise that page is **unset**.
+
+One later proposal (not a requirement): a Liquid document with a
+`login_widget` hole, so the rest of the file can be the customer's page
+under the same sanitiser family as widget Liquid. If that lands, catalog
+*names* (`centered`, `split`, `hero`) could match embedder wrappers; the
+artifact would still not be `login.liquid`. Embedders would never author
+it.
 
 ```liquid
 <main class="page">
@@ -248,13 +296,8 @@ templates, not `login.liquid`.
 </main>
 ```
 
-`{% login_widget %}` is opaque. A page template must not emit `<zl-field>`;
-a (widget) template must not emit a marketing column.
-
-Embedders never author `page.liquid`. Offering it to them would fight the
-app the CLI just generated. Until hosted login ships, `/ui/login/` stays a
-`variant="page"` shell — do not grow new widget-internal splits as a
-stand-in.
+Until that is decided, `/ui/login/` stays a `variant="page"` shell. Do
+not grow new widget-internal splits as a stand-in.
 
 ### 2. Widget appearance
 
@@ -271,14 +314,14 @@ Two authoring surfaces, same tokens:
 | Author | Surface | When to use it |
 | --- | --- | --- |
 | Embedder, this page only | JS/CSS on `<zitadel-login>` — `theme`, `variant`, host CSS `--zl-radius-md`, `::part()` | Match the host app *right now*, no publish |
-| Project (every surface) | Branding revision — `.zitadel/branding/branding.json` via CLI, or Console settings | Hosted login, a second app, or a designer who should not touch the repo |
+| Project (every surface) | Branding revision — `.zitadel/branding/branding.json` via CLI, or Console settings | Zitadel-served login, a second app, or a designer who should not touch the repo |
 
 Host-page tokens beat server-side branding
 ([`override-ladder.md`](override-ladder.md)). That is intentional: an
 embedded login should be able to inherit the app's design system without a
 round-trip. Leave the host tokens unset and the project branding applies
-unchanged — which is what hosted login does, because the hosted shell is
-not a design system of its own.
+unchanged — which is what Zitadel-served login does, because that page is
+not a customer design system of its own.
 
 The same object, three doors — all compile to `--zl-*`:
 
@@ -337,23 +380,23 @@ widget: field order and grouping, a disclaimer under the password field, a
 "or continue with" divider, footer legal links, a compact header.
 
 That is the **widget template** — `branding.liquid_template`, authored as
-`.zitadel/branding/login.liquid`. Scope is stricter than a page template
-and **the same on both deployments**: compose `<zl-*>` against the step
-payload; do not set colors; do not wrap the page
-([`templates.md`](templates.md)). Because the widget is shared, loosening
-this file for a hosted left pane would also loosen every embed.
+`.zitadel/branding/login.liquid`. Scope is **structure only**: compose
+`<zl-*>` against the step payload; do not set colors; do not wrap the
+page ([`templates.md`](templates.md)). Because the same widget runs in
+the customer app and on Zitadel-served login, this file is shared — and
+must stay strict. Loosening it for a served left pane would also loosen
+every embed.
 
 A disclaimer belongs here because it is step-aware (show it on `password`,
-not on `mfa_totp`), must survive hosted login, and is not host-page
-content. A marketing essay on the left of a split does **not**.
+not on `mfa_totp`), should survive Zitadel-served login, and is not
+host-page content. A marketing essay on the left of a split does **not**.
 
-**Both deployments.** Opt-in. `zitadel branding eject` copies the bundled
-default card into `login.liquid`; `plan` / `apply` publishes a revision
+**Later, not setup, not #936.** Opt-in when it ships. `zitadel branding
+eject` copies the bundled default card into `login.liquid`; `plan` /
+`apply` publishes a revision
 ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)).
-Setup does not write this file because the customer picked a split.
-Hosted Console later grows a block editor that emits the same validator.
-There is no hosted picker that reintroduces split/hero as a (widget)
-template.
+Setup must not write this file. Console may later grow a block editor
+that emits the same validator. Split/hero must not re-enter this catalog.
 
 ### 4. Voice
 
@@ -381,26 +424,27 @@ the payload.
 
 ## Where each category lives
 
-The same change, two deployments.
+Same component, two presentation models that render it. Fully custom is
+out of this table.
 
-| Category | Embedded (customer application) | Hosted login (platform) | Shared source of truth |
+| Category | Customer-embedded | Zitadel-served | Shared source of truth |
 | --- | --- | --- | --- |
-| **Page chrome** | App wrapper (CLI scaffold). Not a page template. | **Page template** (`page.liquid` + `{% login_widget %}`). Hosted-only. | *None shared.* Different documents. |
-| **Widget appearance** | `appearance` / host CSS / `theme`. Optional `branding.json` via `apply`. | Same object in Console / `branding.json`. | Branding revision when the look must follow the project. |
-| **Widget structure** | Opt-in **widget template** (`login.liquid`) from the bundled default. | Same `login.liquid` / later block editor. | `branding.liquid_template` — both deployments, strict scope. |
-| **Voice** | `lang` / `locales` on the element; branding copy overlays via CLI. | Console copy editor. | Branding copy overlay; element `locales` remains the embedder override. |
+| **Page chrome** | App around the component. Not a Zitadel template. | Unset. First served ship is a polished default. `page.liquid` is a later proposal only. | *None shared.* Different documents. |
+| **Widget appearance** | `appearance` / host CSS / `theme`. Optional `branding.json`. Console in #936. | Same object when that milestone reuses branding. | Branding revision when the look must follow the project. |
+| **Widget structure** | Later: opt-in **widget template** from the bundled default. | Same file / later block editor. | `branding.liquid_template` — both models, strict scope, **later**. |
+| **Voice** | `lang` / `locales` on the element; branding copy. Console in #936. | Console copy when served customisation ships. | Branding copy overlay; element `locales` remains the embedder override. |
 | **Behavior** | `.zitadel/flows/*.json` via plan/apply. | Console flow editor. | Flow definition (release-pinned per [ADR 035](../../adrs/035-configuration-environments.md)). |
 
 ```mermaid
 flowchart TB
   subgraph page [Page — who owns the document]
-    EmbWrap[Customer wrapper code]
-    HostWrap["Hosted page template (page.liquid)"]
+    EmbWrap[Customer application]
+    HostWrap[Zitadel-served page — chrome unset]
   end
-  subgraph widget [zitadel-login — same component both deployments]
-    Props[Element props: variant, theme, lang, locales, purpose]
+  subgraph widget [zitadel-login — same component]
+    Props["Element props: variant, theme, lang, locales, purpose"]
     Tokens[zl design tokens]
-    Liquid[login.liquid]
+    Liquid[login.liquid — later]
     Flow[Flow step JSON]
   end
   EmbWrap --> Props
@@ -424,117 +468,60 @@ host stylesheet, not a second configuration file format:
   this page.
 - **`::part()`** — surgical restyle of an atom interior
   ([`override-ladder.md`](override-ladder.md) tier 2).
-- **Project branding** — still the path that hosted login and other apps
-  will see. Embedders who only set host CSS have customized *this page*;
-  they have not customized the project.
+-   **Project branding** — still the path that Zitadel-served login and
+  other apps will see. Embedders who only set host CSS have customized
+  *this page*; they have not customized the project.
 
-### Operators of hosted login, in practice
+### Operators of Zitadel-served login, in practice
 
 "Settings within the platform" means Console (and the Branding API) for
-every category that is project-scoped, plus a **page template** editor
-that only the hosted shell reads (`page.liquid`). Embedders never see
-that editor. Hosted operators never eject a Next.js file to get a split.
+project-scoped appearance, voice, and flows. The first served milestone
+does not add a page-chrome editor. If a later page-chrome artifact exists,
+embedders never see it — they have an application.
 
-## The journey
+## How customers customise (not a ladder)
 
-One golden path. Appearance and structure fork only when the customer needs
-them; page chrome forks immediately because the two deployments own
-different documents.
+Three doors. A customer picks one model and can change later. None of
+these paths is a prerequisite for the others.
 
-```mermaid
-flowchart TD
-  A[zitadel setup] --> B[Working login in the app]
-  B --> C{Need a different page shape?}
-  C -->|yes, embedded| D[Edit the scaffolded wrapper]
-  C -->|yes, hosted later| E[Pick a hosted page template]
-  C -->|no| F[Leave posture as scaffolded]
-  D --> G{Need different radii / colors / logo?}
-  E --> G
-  F --> G
-  G -->|this page only| H[Set tokens / theme on the element]
-  G -->|every surface| I[Edit branding.json or Console knobs]
-  H --> J{Need a disclaimer or reorder atoms?}
-  I --> J
-  J -->|yes| K[Eject or edit login.liquid / Console template]
-  J -->|no| L[Done]
-  K --> L
-  L --> M[zitadel plan && zitadel apply]
-  M --> N[Optional: turn on hosted login]
-  N --> E
-```
+### Customer-embedded
 
-### 1. Bootstrap
+1. Get authentication working — new app starting page, or drop the
+   component into an existing layout
+   ([ADR 044](../../adrs/044-scaffold-embedding-posture-defaults.md)).
+2. **First iteration (#936):** open visual customisation for those working
+   components. Appearance and voice, preview, publish, restore.
+3. Page chrome stays in the application. Host CSS / element props remain
+   the no-publish path for "match this page."
+4. **Later:** opt-in widget structure (`login.liquid`) if something must
+   sit between atoms.
+5. Behaviour stays on the flow definition.
 
-`zitadel setup` detects the framework, creates the project, installs the
-SDK, and embeds `<zitadel-login>`.
+Setup is only step 1. Today's `setup --design` that ejects Liquid and
+publishes branding revision 1 is the behavior a **follow-up issue**
+retires; see
+[What the shipped designs really are](#what-the-shipped-designs-really-are).
 
-- Fresh app → `variant="page"` unless the customer picked a split-family
-  **page** template, in which case the generated route is a wrapper around
-  `variant="widget"`.
-- Existing app, route-based frameworks → `variant="widget"` in a
-  layout-neutral wrapper
-  ([ADR 044](../../adrs/044-scaffold-embedding-posture-defaults.md)).
-- Optional look pick (wizard) writes **application wrapper files**. It
-  does **not** write `login.liquid`, `page.liquid`, or a branding
-  revision. Today's `--design` that ejects widget Liquid is the behavior
-  this strategy retires; see
-  [What the shipped designs really are](#what-the-shipped-designs-really-are).
+### Zitadel-served
 
-The setup summary points at the generated auth file for page chrome and at
-`.zitadel/` for schema, flow, and (only after a later eject) structure.
+A separate choice: SSO, third-party or legacy apps, or a centrally
+operated login. First ship: polished standalone page, configure journeys,
+apply supported branding and content, reuse compatible embedded
+configuration where applicable. Advanced page customisation is a later
+capability and is not required for that ship.
 
-### 2. Verify
+### Fully custom frontend
 
-Sign in once. `zitadel status` withholds customize/publish guidance until
-login works. Customizing a template you have never seen succeed hides
-whether the failure is chrome or the flow.
+APIs, policies, backend enforcement. The customer owns the UI. This is a
+presentation model, not an eject footnote at the end of the embed path.
 
-### 3. Customize, cheapest first
-
-1. **Page** — edit the app wrapper, or (hosted only) the page template.
-   Do not eject the widget template for this.
-2. **Appearance** — host tokens for "match my app"; branding knobs for
-   "match my brand everywhere."
-3. **Structure** — eject the widget template when something must sit
-   *between* atoms or the shipped grouping is wrong.
-4. **Voice** — overlay copy; keep `text_key` in the widget template.
-5. **Behavior** — edit the flow definition when the *step* is wrong.
-
-### 4. Publish
-
-`zitadel plan` then `zitadel apply` uploads the project-scoped artifacts
-(branding revision, flow, schema). The embedder wrapper is an app deploy,
-not an `apply`. A hosted page template is a platform write (`page.liquid`)
-until a GitOps home is added (open question below).
+When knobs, parts, and (later) Liquid are not enough *inside* an embed,
+customers can still compose `<zl-*>` by hand or eject an atom
+([`override-ladder.md`](override-ladder.md) tier 4). That is embedded
+escape, not the fully custom model.
 
 Under [ADR 035](../../adrs/035-configuration-environments.md), branding and
-flows become release-pinned. The inner loop stays ceremony-free on
-dev-class environments (local preview of Liquid; release-per-save). This
-strategy does not change that boundary.
-
-### 5. Grow into hosted login
-
-Turning on hosted login for SSO must **not** ask the customer to restyle
-the widget. Categories 2–5 already live on project resources. The only
-new choice is category 1: pick or edit a hosted page template (or accept
-centered chrome). Appearance, template, copy, and flow already apply.
-
-Embedders who already built a rich wrapper keep it for the in-app login.
-Hosted SSO gets the constrained page template. Both render the same
-widget against the same branding revision.
-
-### 6. Escape hatches (embedded only)
-
-When knobs, parts, and Liquid are not enough:
-
-- Compose `<zl-*>` atoms by hand (lose the orchestrator, keep the design
-  system).
-- Eject an atom (`npx zitadel add zl-field`) and own the source
-  ([`override-ladder.md`](override-ladder.md) tier 4).
-
-Hosted login does not offer eject: there is no customer repo to land
-source in. Customers who need that level move the SSO-facing login back
-to an embedded page or wait for a richer template/part.
+flows become release-pinned. This strategy does not change that boundary.
 
 ## What the shipped designs really are
 
@@ -563,8 +550,9 @@ was stuffed into Liquid.
 embedder who wants a split already has a better tool — their application.
 Saving the split as `login.liquid` costs them a branding revision, a
 sanitiser, a five-way template fork, and a left pane they cannot fill
-with real React/Vue. The CLI should still *offer* the look at setup; it
-should write a wrapper file and leave the widget on the bundled default.
+with real React/Vue. Setup should leave the widget on the bundled default
+and must not publish those files. A follow-up may still offer a look pick
+that writes **application** files only.
 
 `minimal` is the one catalog entry that is not page chrome. Keep the
 idea (card-less widget) as a future appearance/chrome knob or as the
@@ -574,31 +562,29 @@ four page layouts as Liquid.
 Already-ejected revisions keep rendering. This is direction, not a
 runtime break.
 
-### Hosted page templates are hosted-only
+### Zitadel-served page chrome is unset
 
-The paired names keep the **widget template** strict. A page template is
-Liquid around `{% login_widget %}`. A widget template is Liquid inside
-the widget. Only hosted login needs the former.
+The widget template stays strict so it can be shared later. Page chrome
+for Zitadel-served login is a **separate, later** question. A Liquid page
+around a `login_widget` hole is one proposal; it is not the first served
+milestone and not a product requirement yet.
 
 | Who | How they get a split / hero / centered page |
 | --- | --- |
-| Embedder | CLI scaffolds an app wrapper. Widget stays the default card. No `page.liquid`. |
-| Hosted login | Page template (`page.liquid` + `{% login_widget %}`). Widget stays the default card unless a (widget) template was ejected. |
-
-Catalog *names* (`centered`, `split`, `split-right`, `hero`) can match so
-SSO looks familiar. The artifacts do not: app source vs `page.liquid`.
-Neither is `login.liquid`.
+| Embedder | Their application. Widget stays the default card. |
+| Zitadel-served | First ship: polished default. Advanced page chrome TBD. |
 
 ### Vocabulary after this shift
 
 | Term | Meaning |
 | --- | --- |
-| **Widget template** | Widget structure (`login.liquid`). Strict scope: `<zl-*>` + step payload. **Both deployments.** |
-| **Page template** | Hosted-only document Liquid (`page.liquid`) with `{% login_widget %}`. Parallel name, different scope: it does not apply to embeds. |
-| **Wrapper** | Embedder application code around the widget. Not a page template. |
+| **Widget template** | Advanced widget structure (`login.liquid`). Strict scope: `<zl-*>` + step payload. Shared by embedded and Zitadel-served. **Later**, not setup, not #936. |
+| **Page template** | Proposed later Liquid document (`page.liquid`) with a `login_widget` hole for Zitadel-served page chrome. **Unset.** Not a requirement. |
+| **Wrapper** | Embedder application code around the widget. Not a Zitadel template. |
 | **Design** | Retired as the setup noun. Historical Liquid starting points; no longer the path to a look. |
 | **Layout** | Wire degrade enum `centered \| split` for an invalid/missing *template*. Not how you get a split page. |
-| **Branding** | Project resource for appearance, optional (widget) template, assets, and copy. Not page chrome. |
+| **Branding** | Project resource for appearance, optional (later) widget template, assets, and copy. Not page chrome. |
+| **Zitadel-served login** | Zitadel presents the page (`/ui/login/` today). Alias: hosted login. Independent of Cloud vs customer-operated server. |
 
 ## What we will not do
 
@@ -607,40 +593,48 @@ Neither is `login.liquid`.
   differ.
 - **`advanced.custom_css` as the customization surface.** Rejected in
   [`schema.md`](schema.md); the override ladder covers CSS.
-- **Page chrome inside the (widget) template.** Templates stay strict so
-  they apply to both deployments. Hosted page chrome lives in
-  `page.liquid`; embedder page chrome lives in the app.
+- **Treat the three models as a ladder.** Embedded, Zitadel-served, and
+  fully custom are choices. There is no required "grow into hosted" path.
+- **Lock visual customisation to a CLI-led journey.** #936 is Console
+  preview/publish for working embedded components. Setup only gets login
+  working.
+- **Page chrome inside the widget template.** That file is shared later
+  and must stay structure-only. Embedder page chrome lives in the app.
+  Zitadel-served page chrome is unset.
 - **Appearance switches that change the flow** ("add phone", "hide SSO").
   Those are flow-definition edits.
-- **A second branding model for hosted login.** Same revision, same
-  widget, different page owner.
+- **A second branding model for Zitadel-served login.** Same revision,
+  same widget, where reuse applies. Different page owner.
 - **Requiring `apply` to restyle one embedded page.** Host CSS and element
   properties exist so embedders can match an app without a config release.
 - **Keep shipping split/hero as Liquid so embedders can skip writing a
-  wrapper.** The audit above is that those files *are* wrappers, poorly
-  placed. The CLI already writes the auth page; it can write a better one.
-- **A hosted page-template setting for embedders.** They have an app.
-  That setting exists only because hosted login does not.
+  wrapper.** Those files *are* wrappers, poorly placed.
+- **Decide `page.liquid` in this PR.** First Zitadel-served login does not
+  need advanced page customisation. That artifact stays a proposal.
+- **Put structure or setup-template work in #936.** Onboarding and
+  CLI-to-Console handoff are out of scope there.
 
 ## Rollout
 
-| Stage | What customers can do | Notes |
+Matches #678's delivery direction, with #936 as the first visual ticket.
+
+| Stage | What customers can do | Ticket |
 | --- | --- | --- |
-| **Now (shipped)** | `setup --design` still ejects widget Liquid; `/ui/login/` is a `page`-variant shell | Documented here as the behavior to retire, not the destination. |
-| **Next** | Setup scaffolds an app **wrapper**; does not write `login.liquid`. `branding eject` copies the bundled default only. | Move `.zl-split` / `.zl-hero` CSS out of the orchestrator into the scaffold (and later page templates). |
-| **Hosted login** | **Page templates** (`page.liquid` + `{% login_widget %}`) on the hosted shell only. Console appearance knobs. | Same widget card / same (widget) template. |
-| **Later** | Block editor that emits *widget* Liquid; structured branding knobs; optional GitOps for `page.liquid` | Editor stages in [`templates.md`](templates.md). |
+| **Now (shipped)** | `setup --design` still ejects widget Liquid; `/ui/login/` is a `page`-variant shell | Behavior to retire from setup, not the destination |
+| **First iteration** | Console appearance + voice on working embedded components; preview / publish / restore | [#936](https://github.com/zitadel/nextgen/issues/936) |
+| **Follow-up** | Setup embeds the maintained component only. No Liquid, no branding revision 1. `branding eject` stays opt-in for later structure | New issue under #678 (not filed in this PR) |
+| **Later** | Widget structure (`login.liquid`) from the default card; shared with Zitadel-served | New issue under #678 |
+| **Zitadel-served login** | Polished standalone page; branding/content reuse; no advanced page chrome required | #678 follow-up |
+| **Zitadel-served customisation** | Define and deliver served-page customisation | #678 follow-up; `page.liquid` only if that work chooses it |
 
 ## Open questions
 
-1. **GitOps for hosted page templates.** Embedder wrappers live in the app
-   repo. `page.liquid` is hosted-shell config. Should it grow a
-   `.zitadel/` dialect so `plan`/`apply` can pin it in a release, or is
-   Console-only enough?
-2. **Page-template sanitiser vs widget-template sanitiser.** Same family
-   (no script, no handlers). Page templates additionally allow a document
-   shell and a scoped `<style>`; they forbid `<zl-*>`. Widget templates
-   the inverse. Exact allowlists TBD.
+1. **Zitadel-served page chrome artifact.** Unset. If a later milestone
+   wants Liquid around the widget, does `page.liquid` grow a `.zitadel/`
+   dialect so `plan`/`apply` can pin it, or is Console-only enough?
+2. **Page-chrome sanitiser vs widget-template sanitiser** — only if a
+   page-chrome artifact is chosen. Same family (no script, no handlers)
+   is the starting assumption; allowlists TBD.
 3. **`minimal` as a knob vs an eject starting point.** Card-less chrome is
    the one shipped design that is not a page layout. Appearance knob
    (`chrome: card \| plain`) is simpler for embedders; eject still covers
@@ -654,6 +648,12 @@ Neither is `login.liquid`.
 
 ## See also
 
+- [#678 Customise the authentication experience](https://github.com/zitadel/nextgen/issues/678) —
+  product vision and presentation models
+- [#936 Visually customise and preview the embedded login components](https://github.com/zitadel/nextgen/issues/936) —
+  first iteration
+- [#1034 vision doc](https://github.com/zitadel/nextgen/pull/1034) —
+  landing `authentication-experience-vision.md`
 - [ADR 056](../../adrs/056-login-customization-categories.md) — the
   decision record for these categories
 - [`templates.md`](templates.md) — Liquid scope, shipped designs, eject
@@ -666,6 +666,5 @@ Neither is `login.liquid`.
 - [ADR 044](../../adrs/044-scaffold-embedding-posture-defaults.md) —
   `page` vs `widget` posture
 - [`../platform/README.md`](../platform/README.md) — integration levels
-  (embedded MVP, hosted login deferred)
 - [`../../quick-start/login-ui.md`](../../quick-start/login-ui.md) —
-  today's hosted shell
+  today's `/ui/login/` shell

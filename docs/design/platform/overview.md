@@ -170,7 +170,7 @@ For customers who specifically *want* a redirect-to-Zitadel auth pattern — eit
 
 Pro-gated because DNS validation, cert rotation, and abuse takedown response all have ongoing operational cost. This is the only level where Zitadel hosts UI under a branded domain on the customer's behalf.
 
-Customization ownership — the shared **widget template** versus the hosted-only **page template** — is in [`../branding/customization-strategy.md`](../branding/customization-strategy.md) ([ADR 056](../../adrs/056-login-customization-categories.md)). The widget and the project branding do not fork at this level; only the document around the widget does.
+Customization ownership — categories, first-iteration vs later, and the three presentation models — is in [`../branding/customization-strategy.md`](../branding/customization-strategy.md) ([ADR 056](../../adrs/056-login-customization-categories.md)). Embedded and Zitadel-served share the widget and project branding where applicable; they are choices, not a ladder.
 
 ### Level 4 — White-label multi-tenant mapping  *(deferred)*
 
