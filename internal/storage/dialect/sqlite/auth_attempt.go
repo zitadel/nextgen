@@ -36,6 +36,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` DO UPDATE SET id = excluded.id, last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
 		` RETURNING id`
 
+	setAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_verified_at, factor_payload, failure_count)` +
+		` VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT (project_id, auth_attempt_id, type)` +
+		` DO UPDATE SET last_verified_at = EXCLUDED.last_verified_at, factor_payload = EXCLUDED.factor_payload,` +
+		` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+		` RETURNING id`
+
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
 
@@ -325,6 +331,31 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	challenge.SetFailureCount(0)
 	challenge.SetLastFailedAt(time.Time{})
 	return nil
+}
+
+// SetAuthAttemptFactor implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
+	}
+	checkID := ""
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return "", err
+	}
+	var payloadArg any
+	if payloadStr != nil {
+		payloadArg = *payloadStr
+	}
+	var returnedID string
+	if err := as.client.QueryRow(ctx, setAuthAttemptFactorStmt,
+		projectID, authAttemptID, checkID, int64(factor.Type()), now.UnixNano(), payloadArg,
+	).Scan(&returnedID); err != nil {
+		return "", fmt.Errorf("failed to set factor: %w", wrapError(err))
+	}
+	factor.SetLastVerifiedAt(now)
+	return returnedID, nil
 }
 
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].

@@ -40776,6 +40776,8 @@ type VerifyChallengeProofErrorResponse struct {
 	EvtInvalid          EvtInvalid
 	Internal            Internal
 	ReqInvalid          ReqInvalid
+	UserAlreadyExists   UserAlreadyExists
+	UserInvalid         UserInvalid
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -40794,6 +40796,8 @@ const (
 	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
 	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
 	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
+	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
+	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -40849,6 +40853,16 @@ func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether VerifyChallengeProofErrorResponse is ReqInvalid.
 func (s VerifyChallengeProofErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidVerifyChallengeProofErrorResponse
+}
+
+// IsUserAlreadyExists reports whether VerifyChallengeProofErrorResponse is UserAlreadyExists.
+func (s VerifyChallengeProofErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsVerifyChallengeProofErrorResponse
+}
+
+// IsUserInvalid reports whether VerifyChallengeProofErrorResponse is UserInvalid.
+func (s VerifyChallengeProofErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidVerifyChallengeProofErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets VerifyChallengeProofErrorResponse to AttAlreadyHandedOff.
@@ -41079,6 +41093,48 @@ func (s VerifyChallengeProofErrorResponse) GetReqInvalid() (v ReqInvalid, ok boo
 func NewReqInvalidVerifyChallengeProofErrorResponse(v ReqInvalid) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserAlreadyExists sets VerifyChallengeProofErrorResponse to UserAlreadyExists.
+func (s *VerifyChallengeProofErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsVerifyChallengeProofErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if VerifyChallengeProofErrorResponse is UserAlreadyExists.
+func (s VerifyChallengeProofErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsVerifyChallengeProofErrorResponse(v UserAlreadyExists) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserInvalid sets VerifyChallengeProofErrorResponse to UserInvalid.
+func (s *VerifyChallengeProofErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidVerifyChallengeProofErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if VerifyChallengeProofErrorResponse is UserInvalid.
+func (s VerifyChallengeProofErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserInvalid.
+func NewUserInvalidVerifyChallengeProofErrorResponse(v UserInvalid) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserInvalid(v)
 	return s
 }
 

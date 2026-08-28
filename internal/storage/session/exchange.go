@@ -50,20 +50,52 @@ func ValidateHandoffAttempt(attempt *domain.AuthAttempt) error {
 	return nil
 }
 
+// ClassMembers lists the check types competing in t's class (see
+// [domain.AuthCheckType.Class]), for loser cleanup after a promotion.
+func ClassMembers(t domain.AuthCheckType) []domain.AuthCheckType {
+	members := make([]domain.AuthCheckType, 0, 2)
+	for _, v := range domain.AuthCheckTypeValues() {
+		if v.Class() == t.Class() {
+			members = append(members, v)
+		}
+	}
+	return members
+}
+
 // PickLastVerifiedByType merges attempt and session verified checks, keeping the
-// newest LastVerifiedAt per AuthCheckType (attempt wins ties that are strictly after).
+// newest LastVerifiedAt per factor class (attempt wins ties that are strictly after).
 func PickLastVerifiedByType(attemptChecks, sessionChecks []StoredCheck) map[domain.AuthCheckType]StoredCheck {
 	out := map[domain.AuthCheckType]StoredCheck{}
 	for _, c := range sessionChecks {
-		out[c.Type] = c
+		out[c.Type.Class()] = c
 	}
 	for _, c := range attemptChecks {
-		existing, ok := out[c.Type]
+		existing, ok := out[c.Type.Class()]
 		if !ok || c.LastVerifiedAt.After(existing.LastVerifiedAt) {
-			out[c.Type] = c
+			out[c.Type.Class()] = c
 		}
 	}
 	return out
+}
+
+// NormalizeSessionFactor maps a promoted enrollment factor to the passkey
+// class. Sessions record HOW the user authenticated; the ceremony-level
+// distinction between registering and asserting a credential stays on the
+// attempt.
+func NormalizeSessionFactor(check domain.AuthCheck) domain.AuthCheck {
+	registration, ok := check.(*domain.AuthFactorPasskeyRegistration)
+	if !ok {
+		return check
+	}
+	passkey := &domain.AuthFactorPasskey{
+		UserVerified:   registration.UserVerified,
+		UserID:         registration.UserID,
+		CredentialID:   domain.DecodePasskeyCredentialID(registration.CredentialID),
+		BackupEligible: registration.BackupEligible,
+		BackupState:    registration.BackupState,
+	}
+	passkey.SetLastVerifiedAt(registration.GetLastVerifiedAt())
+	return passkey
 }
 
 // UserAgentFromStoredInfo reconstructs a UserAgent from the user_agents.info map.
@@ -78,15 +110,22 @@ func UserAgentFromStoredInfo(info map[string]any) *domain.UserAgent {
 	return ua
 }
 
-// AppendFactor replaces an existing factor of the same type or appends a new one.
+// AppendFactor replaces an existing factor of the same class or appends a new
+// one. Factors are normalized on the way in ([NormalizeSessionFactor]), so a
+// promoted enrollment lands as a passkey factor and never coexists with a
+// login factor for the same class.
 func AppendFactor(sess *domain.Session, factor domain.AuthFactor) {
+	normalized, ok := NormalizeSessionFactor(factor).(domain.AuthFactor)
+	if !ok {
+		return
+	}
 	for i, f := range sess.Factors {
-		if f.Type() == factor.Type() {
-			sess.Factors[i] = factor
+		if f.Type().Class() == normalized.Type().Class() {
+			sess.Factors[i] = normalized
 			return
 		}
 	}
-	sess.Factors = append(sess.Factors, factor)
+	sess.Factors = append(sess.Factors, normalized)
 }
 
 // DecodeAuthChecks builds domain auth checks from a stored checks row.
@@ -137,6 +176,25 @@ func DecodeAuthChecks(
 				}
 			}
 			checks = append(checks, passkeyCheck)
+		}
+	case domain.AuthCheckTypePasskeyRegistration:
+		if !verifiedAt.IsZero() {
+			registrationFactor := domain.SetAuthFactorPasskeyRegistration(verifiedAt)
+			if len(factor) > 0 {
+				if err := json.Unmarshal(factor, registrationFactor); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal passkey registration auth check factor payload: %w", err)
+				}
+			}
+			checks = append(checks, registrationFactor)
+		}
+		if !lastChallengedAt.IsZero() {
+			registrationCheck := domain.SetAuthChallengePasskeyRegistration(id, lastChallengedAt, lastFailedAt, failureCount)
+			if len(challenge) > 0 {
+				if err := json.Unmarshal(challenge, registrationCheck); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal passkey registration auth check challenge payload: %w", err)
+				}
+			}
+			checks = append(checks, registrationCheck)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported auth check type %v", checkType)

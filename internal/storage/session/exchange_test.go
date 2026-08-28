@@ -73,6 +73,30 @@ func TestPickLastVerifiedByType(t *testing.T) {
 	assert.Equal(t, "a-pk", got[domain.AuthCheckTypePasskey].ID)
 }
 
+func TestPickLastVerifiedByType_PasskeyClass(t *testing.T) {
+	t.Parallel()
+	earlier := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	later := earlier.Add(time.Hour)
+
+	t.Run("newer enrollment beats an older login factor", func(t *testing.T) {
+		got := session.PickLastVerifiedByType(
+			[]session.StoredCheck{{ID: "a-reg", Type: domain.AuthCheckTypePasskeyRegistration, LastVerifiedAt: later, OnAttempt: true}},
+			[]session.StoredCheck{{ID: "s-pk", Type: domain.AuthCheckTypePasskey, LastVerifiedAt: earlier}},
+		)
+		require.Len(t, got, 1)
+		assert.Equal(t, "a-reg", got[domain.AuthCheckTypePasskey].ID)
+	})
+
+	t.Run("newer login factor beats an older enrollment", func(t *testing.T) {
+		got := session.PickLastVerifiedByType(
+			[]session.StoredCheck{{ID: "a-pk", Type: domain.AuthCheckTypePasskey, LastVerifiedAt: later, OnAttempt: true}},
+			[]session.StoredCheck{{ID: "s-reg", Type: domain.AuthCheckTypePasskeyRegistration, LastVerifiedAt: earlier}},
+		)
+		require.Len(t, got, 1)
+		assert.Equal(t, "a-pk", got[domain.AuthCheckTypePasskey].ID)
+	})
+}
+
 func TestUserAgentFromStoredInfo(t *testing.T) {
 	t.Parallel()
 	ua := session.UserAgentFromStoredInfo(map[string]any{
@@ -101,6 +125,32 @@ func TestAppendFactor(t *testing.T) {
 	user := domain.SetAuthFactorUser(time.Now())
 	session.AppendFactor(sess, user)
 	require.Len(t, sess.Factors, 2)
+}
+
+func TestAppendFactor_NormalizesEnrollmentToPasskey(t *testing.T) {
+	t.Parallel()
+	sess := &domain.Session{}
+	verifiedAt := time.Date(2024, 2, 3, 4, 5, 6, 0, time.UTC)
+
+	registration := domain.SetAuthFactorPasskeyRegistration(verifiedAt)
+	registration.UserID = "user-1"
+	registration.UserVerified = true
+	registration.CredentialID = domain.EncodePasskeyCredentialID([]byte("cred-1"))
+	session.AppendFactor(sess, registration)
+
+	require.Len(t, sess.Factors, 1)
+	passkey, ok := sess.Factors[0].(*domain.AuthFactorPasskey)
+	require.True(t, ok, "an enrollment factor must land on the session as a passkey factor")
+	assert.Equal(t, "user-1", passkey.UserID)
+	assert.True(t, passkey.UserVerified)
+	assert.Equal(t, []byte("cred-1"), passkey.CredentialID)
+	assert.Equal(t, verifiedAt, passkey.GetLastVerifiedAt())
+
+	// A later login factor replaces the enrollment in the same class slot.
+	login := domain.SetAuthFactorPasskey(verifiedAt.Add(time.Hour))
+	session.AppendFactor(sess, login)
+	require.Len(t, sess.Factors, 1)
+	assert.Same(t, login, sess.Factors[0])
 }
 
 func TestDecodeAuthChecks(t *testing.T) {
