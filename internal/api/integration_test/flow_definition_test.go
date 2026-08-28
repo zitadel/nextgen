@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -769,6 +771,94 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 			Message: "The request lacks valid authentication credentials.",
 		},
 	}, getResp)
+}
+
+func TestListFlowDefinitionsPagination(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	for i := range 3 {
+		resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+			ProjectID: api.ProjectID(project.ID),
+			FlowDefinition: api.FlowDefinition{
+				Name:       fmt.Sprintf("paged-flow-%d", i),
+				Status:     "active",
+				UserSchema: userSchemaURI,
+				Purposes:   map[string]string{"login": "step_1"},
+				Steps:      validSteps(),
+			},
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionResponse{}, resp, helpers.MustMarshal(t, resp))
+	}
+
+	t.Run("happy", func(t *testing.T) {
+		listFlowDefinitions := func(t *testing.T, params api.ListFlowDefinitionsParams) *api.FlowDefinitionListResponse {
+			t.Helper()
+			params.ProjectID = api.ProjectID(project.ID)
+			res, err := client.ListFlowDefinitions(t.Context(), params)
+			require.NoError(t, err)
+			require.IsType(t, &api.FlowDefinitionListResponse{}, res, helpers.MustMarshal(t, res))
+			return res.(*api.FlowDefinitionListResponse)
+		}
+
+		full := listFlowDefinitions(t, api.ListFlowDefinitionsParams{})
+		require.Len(t, full.FlowDefinitions, 4)
+		assert.False(t, full.NextPageToken.IsSet(), "the whole result fits in one page")
+
+		wantIDs := make([]string, 0, len(full.FlowDefinitions))
+		for _, item := range full.FlowDefinitions {
+			wantIDs = append(wantIDs, item.ID)
+		}
+
+		var gotIDs []string
+		var pageToken api.OptPageToken
+		for range len(wantIDs) {
+			// iterate over all pages (with size one)
+			page := listFlowDefinitions(t, api.ListFlowDefinitionsParams{
+				Limit:     api.NewOptLimit(1),
+				PageToken: pageToken,
+			})
+			require.Len(t, page.FlowDefinitions, 1)
+
+			gotIDs = append(gotIDs, page.FlowDefinitions[0].ID)
+			token, ok := page.NextPageToken.Get()
+			require.True(t, ok, "a full page carries a cursor")
+			pageToken = api.NewOptPageToken(token)
+		}
+		assert.Equal(t, wantIDs, gotIDs, "paging must cover the list in order, each row exactly once")
+
+		// fetch the last page (with no next token)
+		past := listFlowDefinitions(t, api.ListFlowDefinitionsParams{
+			Limit:     api.NewOptLimit(1),
+			PageToken: pageToken,
+		})
+		assert.Empty(t, past.FlowDefinitions)
+		assert.False(t, past.NextPageToken.IsSet())
+	})
+
+	t.Run("malformed page token", func(t *testing.T) {
+		res, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			PageToken: api.NewOptPageToken("not-a-cursor"),
+		})
+		require.NoError(t, err)
+		invalid := domain.ErrRequestInvalid()
+		assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
+			StatusCode: http.StatusBadRequest,
+			Response: api.ErrorDetails{
+				Code:    api.ErrorCode(invalid.Code),
+				Message: invalid.Message,
+			},
+		}, res)
+	})
 }
 
 func TestListFlowDefinitions(t *testing.T) {
