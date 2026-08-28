@@ -1375,6 +1375,39 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 			}},
 			wantErr: assert.AnError,
 		},
+		{
+			name: "row deleted between get and update",
+			fields: fields{
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
+					stmts := servicemocks.NewMockAllStatements(ctrl)
+					stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.FlowDefinition, error) {
+						return &domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1"}, nil
+					}).Times(1)
+					stmts.EXPECT().UpdateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.FlowDefinition) error {
+						return &database.NoRowFoundError{}
+					}).Times(1)
+					return stmts
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login",
+				Status:           "active",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes:         map[string]string{"login": "step_1"},
+				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: domain.ErrFlowDefinitionNotFound(),
+		},
 	}
 
 	for _, tt := range tests {

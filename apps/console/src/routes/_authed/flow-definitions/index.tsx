@@ -14,7 +14,9 @@ export const Route = createFileRoute("/_authed/flow-definitions/")({
 
 function FlowDefinitionsList() {
   const { flow_definitions: definitions } = Route.useLoaderData();
-  const active = definitions.filter((definition) => definition.status === "active").length;
+  const active = definitions.filter(
+    (definition) => definition.flow_definition.status === "active",
+  ).length;
 
   return (
     <Page>
@@ -41,13 +43,13 @@ function FlowDefinitionsList() {
             header: "Name",
             cell: (definition) => (
               <TableLink to="/flow-definitions/$definitionId" params={{ definitionId: definition.id }}>
-                {definition.name}
+                {definition.flow_definition.name}
               </TableLink>
             ),
           },
           {
             header: "Status",
-            cell: (definition) => <StatusBadge status={definition.status} />,
+            cell: (definition) => <StatusBadge status={definition.flow_definition.status} />,
           },
           { header: "Created", cell: (definition) => definition.created_at },
         ]}

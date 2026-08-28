@@ -1,4 +1,4 @@
-# ADR 056: Code-First User Schema Definition
+# ADR 058: Code-First User Schema Definition
 
 > **Status:** Proposed
 > **Date:** 2026-08-27

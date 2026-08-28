@@ -18,14 +18,6 @@ func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserW
 	)
 }
 
-func (h *Harness) EnsureFlowCreateUserForPasskeyHandler(t *testing.T) *service.FlowCreateUserForPasskeyHandler {
-	t.Helper()
-	return service.NewFlowCreateUserForPasskeyHandler(
-		h.EnsureUserService(t),
-		h.EnsureSchemaStore(t),
-	)
-}
-
 func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	t.Helper()
 	h.flowService.mutex.Lock()
@@ -47,19 +39,13 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
-		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
-		passkeyRegSvc := service.NewPasskeyRegistrationService(
-			h.EnsureServiceDB(t),
-		)
-		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
+		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t))
 		h.flowStateMachine.value = domain.NewFlowStateMachine(
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaStore(t),
 			fields,
 			h.EnsureCreateUserHandler(t),
-			h.EnsureFlowCreateUserForPasskeyHandler(t),
 			authAdapter,
-			passkeyRegAdapter,
 			time.Now,
 		)
 	}

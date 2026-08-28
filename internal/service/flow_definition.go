@@ -170,6 +170,9 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	}
 	err = fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().UpdateFlowDefinition(ctx, flowDefinition); err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return domain.ErrFlowDefinitionNotFound()
+			}
 			return err
 		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{

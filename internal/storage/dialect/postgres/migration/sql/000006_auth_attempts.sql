@@ -8,6 +8,9 @@ CREATE TABLE zitadel_nextgen.auth_attempts (
     , required_checks SMALLINT[]
     , created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , time_to_live  INTERVAL
+    -- internal marks server-orchestrated ceremonies (e.g. management passkey
+    -- enrollment) that must never be handed off or read as attempts (ADR 056).
+    , internal      BOOLEAN NOT NULL DEFAULT false
 
     , PRIMARY KEY (project_id, id)
     , UNIQUE (project_id, handoff_token)

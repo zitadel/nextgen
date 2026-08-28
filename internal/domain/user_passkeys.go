@@ -33,6 +33,7 @@ type CreateUserPasskey struct {
 	AttestationType *string
 	Transports      []string
 	SignCount       int64
+	UserVerified    bool
 	BackupEligible  bool
 	BackupState     bool
 	Name            string
