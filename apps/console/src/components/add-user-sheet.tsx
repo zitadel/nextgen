@@ -137,7 +137,7 @@ function AddUserForm({
             kind: "user-schema",
             revisions: "latest",
             limit: 100,
-            ...(pageToken === undefined ? {} : { page_token: pageToken }),
+            page_token: pageToken,
           });
           listed.push(...page.schemas);
           pageToken = page.next_page_token ?? undefined;

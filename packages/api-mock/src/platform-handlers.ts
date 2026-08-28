@@ -759,7 +759,7 @@ export function setupPlatformHandlers() {
           schema: r.body,
           metadata: { created_at: r.createdAt },
         })),
-        ...(next === undefined ? {} : { next_page_token: next }),
+        next_page_token: next,
       };
       return HttpResponse.json(responseBody);
     }),

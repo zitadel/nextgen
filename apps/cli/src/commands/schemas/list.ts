@@ -59,7 +59,7 @@ export default class SchemasList extends BaseCommand {
         project_id: secret.project_id,
         object_type: objectType,
         limit: 100,
-        ...(pageToken === undefined ? {} : { page_token: pageToken }),
+        page_token: pageToken,
       });
       revisions.push(...page.schemas);
       pageToken = page.next_page_token ?? undefined;
