@@ -243,7 +243,7 @@ func emitSchemaCreated(ctx context.Context, stmts EventStatements, schema *domai
 		ProjectID:  schema.ProjectID,
 		EntityType: "json_schema",
 		EntityID:   schema.URL,
-		Payload:    struct{}{},
+		Payload:    domain.SchemaCreatedPayloadSnapshot(schema),
 	})
 }
 

@@ -305,7 +305,9 @@ type Invoker interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetSchemaById invokes getSchemaById operation.
 	//
-	// Get a schema by its ID. This will return the default revision of the schema.
+	// Get a schema by its ID. A schema ID identifies one immutable revision, so
+	// this returns exactly that revision. To find the current revision of an
+	// object type, list with `revisions=latest`.
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
@@ -4237,7 +4239,9 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 // GetSchemaById invokes getSchemaById operation.
 //
-// Get a schema by its ID. This will return the default revision of the schema.
+// Get a schema by its ID. A schema ID identifies one immutable revision, so
+// this returns exactly that revision. To find the current revision of an
+// object type, list with `revisions=latest`.
 //
 // GET /schemas/{id}
 func (c *Client) GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error) {
@@ -5896,16 +5900,19 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		}
 	}
 	{
-		// Encode "offset" parameter.
+		// Encode "limit" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "offset",
+			Name:    "limit",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Offset.Get(); ok {
-				return e.EncodeValue(conv.IntToString(val))
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -5943,6 +5950,40 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.ObjectType.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "revisions" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "revisions",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Revisions.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "kind" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "kind",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Kind.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {

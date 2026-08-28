@@ -11,12 +11,33 @@ import (
 )
 
 const (
-	createJSONSchemaStmt = `INSERT INTO json_schemas (project_id, url, object_type, payload, created_at)
-VALUES (?, ?, ?, ?, ?) RETURNING project_id, url, object_type, created_at, payload`
+	createJSONSchemaStmt = `INSERT INTO json_schemas (project_id, url, object_type, kind, payload, created_at)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING project_id, url, object_type, kind, created_at, payload`
 
 	deleteByIDJSONSchemaStmt = `DELETE FROM json_schemas WHERE project_id = ? AND url = ?`
 
-	jsonSchemaQuery = `SELECT project_id, url, object_type, created_at, payload FROM json_schemas`
+	jsonSchemaQuery = `SELECT project_id, url, object_type, kind, created_at, payload FROM json_schemas`
+
+	// latestRevisionPerObjectType keeps only the newest revision of each
+	// object_type. It is an anti-join rather than `created_at = (SELECT MAX(…))`
+	// because the correlation on a NULL object_type is NULL either way: MAX then
+	// yields NULL and the row is filtered out, while NOT EXISTS passes it
+	// through, which is what a row that is a revision of nothing deserves.
+	//
+	// The uniqueness of (project_id, object_type, created_at) makes created_at a
+	// total order within an object_type, so no tiebreak belongs in here.
+	//
+	// The sub-query deliberately carries no authz predicate, so "newest" is the
+	// newest revision that exists rather than the newest the caller may read: a
+	// caller granted only a superseded revision sees it under revisions=all and
+	// sees nothing for that object type under revisions=latest. Which revision
+	// is current is a property of the object type, not of the reader, and
+	// returning a replaced revision as the current one would have callers write
+	// against a schema their peers have already moved off.
+	latestRevisionPerObjectType = `NOT EXISTS (SELECT 1 FROM json_schemas AS newer` +
+		` WHERE newer.project_id = json_schemas.project_id` +
+		` AND newer.object_type = json_schemas.object_type` +
+		` AND newer.created_at > json_schemas.created_at)`
 )
 
 type jsonSchemaStatements struct{ statement }
@@ -37,7 +58,7 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 	}
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
 		row := tx.QueryRow(ctx, createJSONSchemaStmt,
-			schema.ProjectID, schema.URL, schema.ObjectType, payload, now,
+			schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind.String(), payload, now,
 		)
 		scanned, err := scanJSONSchemaRow(row)
 		if err != nil {
@@ -88,9 +109,14 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 }
 
 // ListJSONSchemas implements [service.JSONSchemaStatements].
-func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+	var conjuncts []string
+	if opts.LatestRevisionPerObjectType {
+		conjuncts = append(conjuncts, latestRevisionPerObjectType)
+	}
+
 	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url"); err != nil {
+	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url", conjuncts...); err != nil {
 		return nil, err
 	}
 	rows, err := js.client.Query(ctx, compiler.String(), compiler.args...)
@@ -115,12 +141,18 @@ func scanJSONSchemaRow(row *sql.Row) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
 	var (
 		objectType  sql.NullString
+		kind        string
 		createdNano int64
 		payloadStr  sql.NullString
 	)
-	if err := row.Scan(&schema.ProjectID, &schema.URL, &objectType, &createdNano, &payloadStr); err != nil {
+	if err := row.Scan(&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr); err != nil {
 		return nil, err
 	}
+	parsedKind, err := domain.JSONSchemaKindString(kind)
+	if err != nil {
+		return nil, err
+	}
+	schema.Kind = parsedKind
 	schema.CreatedAt = timeFromUnixNano(createdNano)
 	if objectType.Valid {
 		v := objectType.String
@@ -134,12 +166,18 @@ func scanJSONSchema(rows *sql.Rows) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
 	var (
 		objectType  sql.NullString
+		kind        string
 		createdNano int64
 		payloadStr  sql.NullString
 	)
-	if err := rows.Scan(&schema.ProjectID, &schema.URL, &objectType, &createdNano, &payloadStr); err != nil {
+	if err := rows.Scan(&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr); err != nil {
 		return nil, err
 	}
+	parsedKind, err := domain.JSONSchemaKindString(kind)
+	if err != nil {
+		return nil, err
+	}
+	schema.Kind = parsedKind
 	schema.CreatedAt = timeFromUnixNano(createdNano)
 	if objectType.Valid {
 		v := objectType.String
@@ -172,5 +210,10 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 		SQLName:  "created_at",
 		Accessor: func(s *domain.JSONSchema) any { return s.CreatedAt },
 		Coerce:   database.CoerceTime,
+	},
+	domain.JSONSchemaFieldKind: {
+		SQLName:  "kind",
+		Accessor: func(s *domain.JSONSchema) any { return s.Kind.String() },
+		Coerce:   database.CoerceString,
 	},
 })

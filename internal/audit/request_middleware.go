@@ -2,11 +2,19 @@ package audit
 
 import (
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/events"
+)
+
+// Untrusted header persist caps (Go's default header limit is ~1 MiB).
+const (
+	maxEventUserAgentBytes = 1024
+	maxEventOriginBytes    = 512
 )
 
 type statusCapturingWriter struct {
@@ -81,6 +89,34 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ev := FromContext(WithActorContext(r.Context(), *ac), domain.EventTypeRequestAPI, domain.EventCategoryRequest)
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
+		if c := clientFromRequest(r); c != nil {
+			if meta, err := events.MarshalPayload(domain.EventMetadata{Client: c}); err == nil {
+				ev.Metadata = meta
+			}
+		}
 		buf.EnqueueSince(ev, start)
 	})
+}
+
+func clientFromRequest(r *http.Request) *domain.EventClientMetadata {
+	var c domain.EventClientMetadata
+	if ua, ok := middleware.UserAgentFromContext(r.Context()); ok {
+		c.IP = ua.IP
+	}
+	c.UserAgent = boundHeader(r.UserAgent(), maxEventUserAgentBytes)
+	c.Origin = boundHeader(r.Header.Get("Origin"), maxEventOriginBytes)
+	if c == (domain.EventClientMetadata{}) {
+		return nil
+	}
+	return &c
+}
+
+func boundHeader(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	for max > 0 && !utf8.RuneStart(s[max]) {
+		max--
+	}
+	return strings.Clone(s[:max])
 }

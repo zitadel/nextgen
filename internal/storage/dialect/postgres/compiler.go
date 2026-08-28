@@ -31,7 +31,13 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 // (e.g. "zitadel_nextgen.teams", "id"); empty skips authz (compileRead).
 // A non-empty table+column pair is the management-list path and requires
 // AuthzListFilterFromContext (#838).
-func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T], tableName, resourceIDCol string) error {
+//
+// conjuncts are predicates a caller cannot express as a [database.Filter] —
+// correlated sub-queries over the same table. Each writes one self-contained
+// term and is ANDed into the same WHERE, which keeps the statement a plain
+// single-table SELECT the cursor, authz predicate, ORDER BY and LIMIT all
+// still apply to.
+func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T], tableName, resourceIDCol string, conjuncts ...string) error {
 	c.WriteString(stmt)
 
 	filter := opt.Filter
@@ -56,9 +62,12 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 	}
 	hasWhere := false
 	if filter != nil {
-		c.WriteString(" WHERE ")
+		writeConjunct(c, &hasWhere)
 		compileFilter(c, filter, schema)
-		hasWhere = true
+	}
+	for _, conjunct := range conjuncts {
+		writeConjunct(c, &hasWhere)
+		c.WriteString(conjunct)
 	}
 	if tableName != "" && resourceIDCol != "" {
 		if err := authz.RequireManagementListFilter(ctx); err != nil {

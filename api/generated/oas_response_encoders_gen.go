@@ -174,6 +174,19 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 
 		return nil
 
+	case *ClaimNoPersonalTeam:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(403)
+		span.SetStatus(codes.Error, http.StatusText(403))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
 	case *CompleteClaimNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
@@ -471,7 +484,7 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 
 func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *FlowDefinitionDetailResponse:
+	case *FlowDefinitionResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -1804,7 +1817,7 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 
 func encodeGetFlowDefinitionResponse(response GetFlowDefinitionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *FlowDefinitionDetailResponse:
+	case *FlowDefinitionResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -4159,7 +4172,7 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 
 func encodeUpdateFlowDefinitionResponse(response UpdateFlowDefinitionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *FlowDefinitionDetailResponse:
+	case *FlowDefinitionResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

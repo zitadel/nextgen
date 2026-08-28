@@ -85,7 +85,7 @@ get:
     - Schemas
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/offset.yaml
+    - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
     - name: object_type
       in: query
@@ -93,6 +93,43 @@ get:
       schema:
         type: string
         maxLength: 256
+    - name: revisions
+      in: query
+      description: |
+        Which revisions to return. Schemas are immutable and versioned by URL,
+        so editing one mints a new row sharing its `objectType`.
+
+        `all` (the default) returns every revision — the full history an
+        export, an audit or a GitOps diff needs. `latest` returns the newest
+        revision of each `objectType`, which is one row per schema.
+
+        A schema stored without an `objectType` is a revision of nothing, and
+        is returned by both.
+
+        A `page_token` is bound to the mode it was issued in and is rejected by
+        the other.
+      schema:
+        type: string
+        default: all
+        enum:
+          - all
+          - latest
+    - name: kind
+      in: query
+      description: |
+        The kind of schema to filter by, read from the stored document's
+        `kind` property.
+
+        `schema-url` is not a kind: it discriminates the create request body,
+        not a stored schema. A schema registered by URL is stored as whatever
+        document the URL served, and declares its own kind.
+
+        A schema stored without its document being parsed has no kind that
+        could be read, and is excluded from every filtered result.
+      schema:
+        type: string
+        enum:
+          - user-schema
   security:
     - oauth2:
         - schema.read

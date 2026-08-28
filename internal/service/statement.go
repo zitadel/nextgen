@@ -97,11 +97,20 @@ type CryptoKeyStatements interface {
 // 	Transactioner[JSONSchemaStatements]
 // }
 
+// JSONSchemaQueryOptions carries query modes for ListJSONSchemas that are not
+// column predicates. Column predicates stay in Filter / ListOptions.
+type JSONSchemaQueryOptions struct {
+	// LatestRevisionPerObjectType keeps only the newest revision of each
+	// object_type. Rows without an object_type are revisions of nothing and
+	// pass through untouched.
+	LatestRevisionPerObjectType bool
+}
+
 type JSONSchemaStatements interface {
 	Statements
 	CreateJSONSchema(ctx context.Context, entity *domain.JSONSchema) error
 	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
-	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error)
+	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
 	DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error
 }
 
@@ -210,6 +219,11 @@ type UserQueryOptions struct {
 	AttributeKeys []string
 	// Attributes, when non-empty, restricts to users matching all key/value pairs.
 	Attributes []domain.Attribute
+	// UniqueAttributesOnly restricts Attributes matching to values recorded
+	// in the unique-attributes registry. Identifier lookups set it so an
+	// equal value in a non-unique property of another user (for example a
+	// notification address) cannot make the lookup ambiguous.
+	UniqueAttributesOnly bool
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
 }

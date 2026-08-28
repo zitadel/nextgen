@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"net"
 	"net/http"
 	"net/url"
@@ -42,7 +40,6 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	secretSum := sha256.Sum256([]byte(t.Token))
 	scope := ScopeContext{
 		ProjectID:     payload.ProjectID,
 		Scope:         payload.Scope,
@@ -50,7 +47,9 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		// Project secrets are JWEs without a stable key id; the project id is
 		// the durable principal for sk_proj grants (survives rotate/claim).
 		PrincipalID: payload.ProjectID,
-		SecretHash:  hex.EncodeToString(secretSum[:]),
+	}
+	if secretHashOperations[operationName] {
+		scope.SecretHash = domain.HashSecret(t.Token)
 	}
 
 	ctx = WithScopeContext(ctx, scope)
@@ -92,6 +91,15 @@ var sessionCookieOperations = map[api.OperationName]bool{
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
 // cookie-secured operations in api/openapi.
 const sessionUnauthorizedMessage = "Missing or invalid session token."
+
+// secretHashOperations lists the operations whose handlers read
+// ScopeContext.SecretHash: claim init stores it, claim status compares it
+// (ADR 046 §3). An operation missing here gets an empty hash and the claim
+// service answers 403, so a new claim leg must be added to this map.
+var secretHashOperations = map[api.OperationName]bool{
+	api.InitClaimOperation:      true,
+	api.GetClaimStatusOperation: true,
+}
 
 type sessionTokenKey struct{}
 
@@ -193,9 +201,10 @@ type ScopeContext struct {
 	PrincipalID   string
 	// TeamID is the token team for sk_team_ principals (resolver ConstraintTeamID).
 	TeamID string
-	// SecretHash is the hex SHA-256 of the presented bearer string: the
+	// SecretHash is domain.HashSecret of the presented bearer string: the
 	// proof-of-possession seam for the claim flow (ADR 046 §3). The claim
-	// service stores it on init and compares it on status.
+	// service stores it on init and compares it on status; it is set only on
+	// those two operations.
 	SecretHash string
 }
 

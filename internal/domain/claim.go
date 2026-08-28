@@ -38,6 +38,14 @@ func NewClaimChallengeToken() (plain, id string, err error) {
 // plaintext token. The claim_challenges.id column is TEXT, so unlike the
 // handoff token's raw []byte hash this one is hex-encoded.
 func HashClaimChallengeToken(plain string) string {
+	return HashSecret(plain)
+}
+
+// HashSecret is the proof-of-possession hash of a presented bearer string
+// (ADR 029): hex-encoded SHA-256. HandleOAuth2 stores it on claim init and the
+// claim service compares it on claim/status with a constant-time compare, so
+// the handler, domain, and tests must all derive it from this one definition.
+func HashSecret(plain string) string {
 	sum := sha256.Sum256([]byte(plain))
 	return hex.EncodeToString(sum[:])
 }
