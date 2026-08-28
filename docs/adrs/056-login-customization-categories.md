@@ -24,9 +24,10 @@ are alternatives, not a required progression from embed to hosted SSO.
 Without an ownership map, three different changes — a 1:1 split page with
 marketing on the left, rounder buttons, a disclaimer between atoms —
 collapse into one "template" or one settings screen. The first visual
-iteration (#936) is appearance + voice on embedded components only.
-Structure, setup-template apply, and Zitadel-served page chrome must not
-be smuggled into that ticket.
+iteration (#936) is **branding settings** (appearance) on embedded
+components only. Voice is a different setting. Structure,
+setup-template apply, and Zitadel-served page chrome must not be
+smuggled into that ticket.
 
 Existing decisions already cover pieces: branding revisions and the design
 catalog (ADR 040), `page` vs `widget` posture (ADR 044), copy overlays
@@ -42,9 +43,9 @@ first.
 | Category | Home | Horizon |
 | --- | --- | --- |
 | **Page chrome** | Embedder: application around the component. Zitadel-served: **unset** | Embedder now; served page chrome later |
-| **Widget appearance** | `--zl-*` / structured branding / element `appearance` | **First iteration (#936)** |
+| **Widget appearance** | **Branding settings** — `--zl-*` / structured branding / element `appearance` | **First iteration (#936)** |
 | **Widget structure** | The **widget template** (`login.liquid`) — embedded and Zitadel-served, strict scope | **Later** |
-| **Voice** | Branding copy overlays; element `lang` / `locales` as the page override | **First iteration (#936)** |
+| **Voice** | **Voice setting** — copy overlays; element `lang` / `locales` as the page override | Separate setting, not #936 |
 | **Behavior** | The flow definition — never an appearance editor | Already owned by flows |
 
 A split layout whose left pane is *customer content* is page chrome. A
@@ -98,8 +99,9 @@ Do not add a second appearance vocabulary on the element that duplicates
 `branding.json`. New typed element sugar must map onto `--zl-*` / the
 branding shape.
 
-Visual customisation for the first iteration is the Console loop in #936.
-CLI-to-Console handoff is out of that ticket.
+The first iteration is Console **branding settings** in #936.
+Voice is a different setting (copy overlays). CLI-to-Console handoff is
+out of #936.
 
 ### 5. Setup must not apply a widget template
 
@@ -135,7 +137,8 @@ escape hatch at the end of the embed path.
 
 - Product and Console can place a control by asking "which category?" and
   "which horizon?" rather than inventing a new store.
-- #936 stays appearance + voice on embedded components.
+- #936 stays branding settings (appearance) on embedded components.
+  Voice is a different setting.
 - The widget template stays strict so it can be shared later.
 - Embedders keep a no-publish path (host CSS / element props).
 - Setup-template apply and widget structure get their own issues.
