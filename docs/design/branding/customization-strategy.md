@@ -6,7 +6,9 @@
 > customization lives — not the token catalogue or Liquid grammar.
 > **Product context:** [#678](https://github.com/zitadel/nextgen/issues/678)
 > (vision), [#936](https://github.com/zitadel/nextgen/issues/936) (first
-> iteration), vision doc landing in
+> iteration — branding), [#1038](https://github.com/zitadel/nextgen/issues/1038)
+> (translations), [#1039](https://github.com/zitadel/nextgen/issues/1039)
+> (setup template), vision doc landing in
 > [#1034](https://github.com/zitadel/nextgen/pull/1034)
 > **Decisions:** [ADR 057](../../adrs/057-login-customization-categories.md)
 > **Implements:** [`templates.md`](templates.md), [`schema.md`](schema.md),
@@ -95,21 +97,21 @@ apply there.
 
 [#936](https://github.com/zitadel/nextgen/issues/936) is the first
 **branding** milestone: project appearance settings for working embedded
-components. It is **not** this whole map, and it is **not** the voice
-setting.
+components. It is **not** this whole map, and it is **not** the
+translations setting.
 
-Voice is a different setting (copy overlays, [ADR 045](../../adrs/045-copy-overlays-as-branding-revisions.md)).
-It must not live in the appearance editor. #936's write-up currently lists
-"authentication content" in the same ticket; this strategy treats that as
-a separate setting and a separate follow-up under #678.
+Translations is a different setting (locale × key copy overlays,
+[ADR 045](../../adrs/045-copy-overlays-as-branding-revisions.md)).
+It must not live in the appearance editor.
+[#1038](https://github.com/zitadel/nextgen/issues/1038) owns that setting.
 
 | Area | First iteration | Later / unset |
 | --- | --- | --- |
-| **Appearance (branding settings)** | Supported brand assets, colours, typography inside the embedded components. Console in #936 | More knobs; typed `appearance` sugar |
-| **Voice** | Out of this iteration. Different setting | Copy overlays for supported keys; then full localisation |
-| **Surrounding application** | Customer-owned. Not customised in #936 | CLI may stop applying a template at setup (follow-up) |
+| **Appearance (branding settings)** | Supported brand assets, colors, typography inside the embedded components. Console in #936 | More knobs; typed `appearance` sugar |
+| **Translations** | Out of this iteration. Different setting ([#1038](https://github.com/zitadel/nextgen/issues/1038)) | Locale × key overlays for supported keys; then more locales |
+| **Surrounding application** | Customer-owned. Not customized in #936 | CLI must stop applying a template at setup ([#1039](https://github.com/zitadel/nextgen/issues/1039)) |
 | **Structure** (`login.liquid`) | Out of scope | Advanced, opt-in, shared with Zitadel-served |
-| **Behaviour** | Login flows; not edited in branding settings | Unchanged ownership |
+| **Behavior** | Login flows; not edited in branding settings | Unchanged ownership |
 | **Zitadel-served login** | Separate milestone | First served ship is a polished default + reused branding. Advanced page chrome unset |
 | **Fully custom frontend** | Not included | Supported APIs and responsibility split |
 | **Branding door** | Console appearance settings (#936). Host CSS remains the page-local path | Code-based `branding.json` remains valid; CLI-to-Console handoff is out of #936 |
@@ -121,7 +123,7 @@ settings** for already working embedded components.
 ## Categories
 
 Five categories. The first three are the ones a screenshot usually
-conflates. Voice and behaviour must stay out of the appearance
+conflates. Translations and behavior must stay out of the appearance
 (branding) settings.
 
 | # | Category | What the customer is changing | One-line home | Horizon |
@@ -129,7 +131,7 @@ conflates. Voice and behaviour must stay out of the appearance
 | 1 | **Page chrome** | How the login sits on the *page*: split, centered, left-pane content | Embedder: app wrapper. Zitadel-served: **unset** (a `page.liquid` + `login_widget` hole is one proposed later direction) | Embedder: now (their app). Served page chrome: later |
 | 2 | **Widget appearance** | Convenience look *inside* the widget: radii, colors, density, theme, logo | **Branding settings** — tokens / `branding.json` / element `appearance` | **First iteration (#936)** |
 | 3 | **Widget structure** | What sits *between the atoms*: disclaimer, grouping | **Widget template** (`login.liquid`) — embedded and Zitadel-served | **Later** |
-| 4 | **Voice** | Wording, locale overlays | **Voice setting** — copy overlays; element `locales` / `lang` | **Separate setting**, not #936 |
+| 4 | **Translations** | Wording per locale and key | **Translations setting** — locale × key overlays; element `locales` / `lang` | **Separate setting** ([#1038](https://github.com/zitadel/nextgen/issues/1038)), not #936 |
 | 5 | **Behavior** | Which steps, fields, factors exist | Flow definition — not an appearance surface | Already owned by flows |
 
 **Why "widget template" at all.** The Liquid file inside the widget is
@@ -144,7 +146,7 @@ ships as a polished standalone page. Embedder wrappers are application
 code, never that file.
 
 Page-local knobs (host CSS, `lang` / `locales`, the embedder wrapper) never
-enter the API. Project appearance, voice, flows, and later widget structure
+enter the API. Project appearance, translations, flows, and later widget structure
 are **platform defined**: the same resources the Branding API and Flow API
 expose, whether the customer authors them as `.zitadel/` files, Console
 settings, or HTTP.
@@ -155,7 +157,7 @@ flowchart TB
     C1[1 Page chrome]
     C2[2 Widget appearance]
     C3[3 Widget structure]
-    C4[4 Voice]
+    C4[4 Translations]
     C5[5 Behavior]
   end
 
@@ -200,14 +202,14 @@ flowchart LR
   end
   subgraph api [Platform defined — API]
     AP[Appearance knobs]
-    VO[Voice overlay]
+    TR[Translations overlay]
     FL[Flow definition]
     WT[Widget template — later]
   end
   AP --> EL
   AP --> SL
-  VO --> EL
-  VO --> SL
+  TR --> EL
+  TR --> SL
   FL --> WT
   WT --> EL
   WT --> SL
@@ -222,14 +224,14 @@ own the CLI and structure work; #936 owns the first visual loop.
 
 | Surface | Today | First iteration |
 | --- | --- | --- |
-| Branding settings | Host CSS + proposed branding JSON; no Console appearance loop | Console: logo, colours, typography, theme on working embedded components. Preview, validate, publish, restore |
-| Project look | Optional `branding.json` via CLI | Same branding resource. One appearance customisation applies project-wide across the journeys #936 lists |
+| Branding settings | Host CSS + proposed branding JSON; no Console appearance loop | Console: logo, colors, typography, theme on working embedded components. Preview, validate, publish, restore |
+| Project look | Optional `branding.json` via CLI | Same branding resource. One appearance customization applies project-wide across the journeys #936 lists |
 | Surrounding application | Customer-owned | Still customer-owned. Not edited here |
-| Voice | Built-in dictionaries; optional element `locales` | **Different setting.** Not this iteration |
+| Translations | Built-in dictionaries; optional element `locales` | **Different setting** ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Not this iteration |
 
 ### Follow-up — stop setup from applying a template
 
-File separately under #678. Not part of #936 (onboarding is out of scope there).
+[#1039](https://github.com/zitadel/nextgen/issues/1039) under #678. Not part of #936 (onboarding is out of scope there).
 
 | Surface | Today | Follow-up |
 | --- | --- | --- |
@@ -247,7 +249,7 @@ File separately under #678. Not part of #936 (onboarding is out of scope there).
 
 | Surface | Today | Status |
 | --- | --- | --- |
-| `/ui/login/` | `variant="page"` shell; any split comes from a widget-internal design | First Zitadel-served ship: polished default + reused appearance/voice. Advanced page chrome **unset**. `page.liquid` + `login_widget` is a proposal, not a requirement |
+| `/ui/login/` | `variant="page"` shell; any split comes from a widget-internal design | First Zitadel-served ship: polished default + reused appearance/translations. Advanced page chrome **unset**. `page.liquid` + `login_widget` is a proposal, not a requirement |
 | Already-ejected split/hero revisions | Render today | Keep rendering. Legacy path |
 
 ### 1. Page chrome
@@ -405,15 +407,17 @@ eject` copies the bundled default card into `login.liquid`; `plan` /
 Setup must not write this file. Console may later grow a block editor
 that emits the same validator. Split/hero must not re-enter this catalog.
 
-### 4. Voice
+### 4. Translations
 
-User-facing strings. A **different setting** from branding appearance —
-not fields on the #936 branding screen, even if copy later travels on the
-same branding revision for publish
+User-facing strings, keyed by locale and message key. A **different
+setting** from branding appearance — not fields on the #936 branding
+screen, even if copy later travels on the same branding revision for
+publish
 ([ADR 045](../../adrs/045-copy-overlays-as-branding-revisions.md)).
+[#1038](https://github.com/zitadel/nextgen/issues/1038) owns this setting.
 
-- **Project voice** — copy overlays. CLI and Console write this setting;
-  the flow response delivers the effective overlay.
+- **Project translations** — locale × key copy overlays. CLI and Console
+  write this setting; the flow response delivers the effective overlay.
 - **This page only** — `lang` and `locales` on `<zitadel-login>`
   ([ADR 018](../../adrs/018-widget-owned-locale-resolution.md)). Highest
   precedence; for embedders who need a one-off override.
@@ -440,7 +444,7 @@ out of this table.
 | **Page chrome** | App around the component. Not a Zitadel template. | Unset. First served ship is a polished default. `page.liquid` is a later proposal only. | *None shared.* Different documents. |
 | **Widget appearance** | Branding settings: `appearance` / host CSS / `theme`. Optional `branding.json`. Console in #936. | Same object when that milestone reuses branding. | Branding revision when the look must follow the project. |
 | **Widget structure** | Later: opt-in **widget template** from the bundled default. | Same file / later block editor. | `branding.liquid_template` — both models, strict scope, **later**. |
-| **Voice** | `lang` / `locales` on the element. Copy overlays later (ADR 045). | Same voice setting when it ships. | Copy overlay resource; element `locales` remains the embedder override. Not the branding-settings screen. |
+| **Translations** | `lang` / `locales` on the element. Copy overlays later (ADR 045). | Same translations setting when it ships. | Locale × key overlay resource; element `locales` remains the embedder override. Not the branding-settings screen. |
 | **Behavior** | `.zitadel/flows/*.json` via plan/apply. | Console flow editor. | Flow definition (release-pinned per [ADR 035](../../adrs/035-configuration-environments.md)). |
 
 ```mermaid
@@ -483,7 +487,7 @@ host stylesheet, not a second configuration file format:
 ### Operators of Zitadel-served login, in practice
 
 "Settings within the platform" means Console (and the Branding API) for
-project-scoped appearance, voice, and flows. The first served milestone
+project-scoped appearance, translations, and flows. The first served milestone
 does not add a page-chrome editor. If a later page-chrome artifact exists,
 embedders never see it — they have an application.
 
@@ -499,7 +503,8 @@ these paths is a prerequisite for the others.
    ([ADR 044](../../adrs/044-scaffold-embedding-posture-defaults.md)).
 2. **First iteration (#936):** open **branding settings** for those
    working components. Appearance only — preview, publish, restore.
-   Voice is a different setting.
+   Translations is a different setting
+   ([#1038](https://github.com/zitadel/nextgen/issues/1038)).
 3. Page chrome stays in the application. Host CSS / element props remain
    the no-publish path for "match this page."
 4. **Later:** opt-in widget structure (`login.liquid`) if something must
@@ -607,9 +612,8 @@ milestone and not a product requirement yet.
 - **Lock branding settings to a CLI-led journey.** #936 is Console
   appearance settings for working embedded components. Setup only gets
   login working.
-- **Put voice in the branding-settings editor.** Copy is a different
-  setting. #936 lists "authentication content" today; do not take that as
-  one combined first-iteration screen.
+- **Put translations in the branding-settings editor.** Copy is a
+  different setting ([#1038](https://github.com/zitadel/nextgen/issues/1038)).
 - **Page chrome inside the widget template.** That file is shared later
   and must stay structure-only. Embedder page chrome lives in the app.
   Zitadel-served page chrome is unset.
@@ -634,8 +638,8 @@ Matches #678's delivery direction, with #936 as the first visual ticket.
 | --- | --- | --- |
 | **Now (shipped)** | `setup --design` still ejects widget Liquid; `/ui/login/` is a `page`-variant shell | Behavior to retire from setup, not the destination |
 | **First iteration** | Console **branding settings** (appearance) on working embedded components; preview / publish / restore | [#936](https://github.com/zitadel/nextgen/issues/936) |
-| **Voice setting** | Copy overlays for supported keys. Different Console setting from branding | Follow-up under #678. #936 currently lists content in the same ticket; this map splits it |
-| **Follow-up** | Setup embeds the maintained component only. No Liquid, no branding revision 1. `branding eject` stays opt-in for later structure | New issue under #678 (not filed in this PR) |
+| **Translations setting** | Locale × key copy overlays. Different Console setting from branding | [#1038](https://github.com/zitadel/nextgen/issues/1038) |
+| **Follow-up** | Setup embeds the maintained component only. No Liquid, no branding revision 1. `branding eject` stays opt-in for later structure | [#1039](https://github.com/zitadel/nextgen/issues/1039) |
 | **Later** | Widget structure (`login.liquid`) from the default card; shared with Zitadel-served | New issue under #678 |
 | **Zitadel-served login** | Polished standalone page; branding/content reuse; no advanced page chrome required | #678 follow-up |
 | **Zitadel-served customisation** | Define and deliver served-page customisation | #678 follow-up; `page.liquid` only if that work chooses it |
@@ -663,8 +667,12 @@ Matches #678's delivery direction, with #936 as the first visual ticket.
 
 - [#678 Customise the authentication experience](https://github.com/zitadel/nextgen/issues/678) —
   product vision and presentation models
-- [#936 Visually customise and preview the embedded login components](https://github.com/zitadel/nextgen/issues/936) —
-  first iteration
+- [#936 Visually customize and preview the embedded login components](https://github.com/zitadel/nextgen/issues/936) —
+  first iteration (branding)
+- [#1038 Customize login translations](https://github.com/zitadel/nextgen/issues/1038) —
+  locale × key overlays; different setting from branding
+- [#1039 Stop zitadel setup from applying a login template](https://github.com/zitadel/nextgen/issues/1039) —
+  setup embeds the maintained component only
 - [#1034 vision doc](https://github.com/zitadel/nextgen/pull/1034) —
   landing `authentication-experience-vision.md`
 - [ADR 057](../../adrs/057-login-customization-categories.md) — the

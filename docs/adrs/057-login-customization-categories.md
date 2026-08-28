@@ -25,9 +25,10 @@ Without an ownership map, three different changes — a 1:1 split page with
 marketing on the left, rounder buttons, a disclaimer between atoms —
 collapse into one "template" or one settings screen. The first visual
 iteration (#936) is **branding settings** (appearance) on embedded
-components only. Voice is a different setting. Structure,
-setup-template apply, and Zitadel-served page chrome must not be
-smuggled into that ticket.
+components only. Translations is a different setting
+([#1038](https://github.com/zitadel/nextgen/issues/1038)). Structure,
+setup-template apply ([#1039](https://github.com/zitadel/nextgen/issues/1039)),
+and Zitadel-served page chrome must not be smuggled into that ticket.
 
 Existing decisions already cover pieces: branding revisions and the design
 catalog (ADR 040), `page` vs `widget` posture (ADR 044), copy overlays
@@ -45,7 +46,7 @@ first.
 | **Page chrome** | Embedder: application around the component. Zitadel-served: **unset** | Embedder now; served page chrome later |
 | **Widget appearance** | **Branding settings** — `--zl-*` / structured branding / element `appearance` | **First iteration (#936)** |
 | **Widget structure** | The **widget template** (`login.liquid`) — embedded and Zitadel-served, strict scope | **Later** |
-| **Voice** | **Voice setting** — copy overlays; element `lang` / `locales` as the page override | Separate setting, not #936 |
+| **Translations** | **Translations setting** — locale × key copy overlays; element `lang` / `locales` as the page override | Separate setting ([#1038](https://github.com/zitadel/nextgen/issues/1038)), not #936 |
 | **Behavior** | The flow definition — never an appearance editor | Already owned by flows |
 
 A split layout whose left pane is *customer content* is page chrome. A
@@ -87,7 +88,7 @@ template.
 
 ### 4. Project look travels on the branding revision; page-local look stays on the element
 
-Widget appearance, later widget structure, and project voice are
+Widget appearance, later widget structure, and project translations are
 project-scoped and live on the branding revision (ADR 040 / 045).
 Embedders *may* also set host CSS and element properties (`theme`,
 `variant`, `lang`, `locales`) for the current page; those win over server
@@ -100,8 +101,8 @@ Do not add a second appearance vocabulary on the element that duplicates
 branding shape.
 
 The first iteration is Console **branding settings** in #936.
-Voice is a different setting (copy overlays). CLI-to-Console handoff is
-out of #936.
+Translations is a different setting (locale × key copy overlays, #1038).
+CLI-to-Console handoff is out of #936.
 
 ### 5. Setup must not apply a widget template
 
@@ -115,8 +116,9 @@ chrome. They are not five widget structures.
 **Setup.** `zitadel setup --design` / the wizard must stop writing
 `login.liquid` and must stop publishing branding revision 1. Setup embeds
 the maintained component (new app: starting page; existing app: drop-in).
-That correction is a follow-up issue under #678, not #936. If a look
-picker remains, it writes **application** files only.
+That correction is [#1039](https://github.com/zitadel/nextgen/issues/1039)
+under #678, not #936. If a look picker remains, it writes **application**
+files only.
 
 **Later structure.** `branding eject` remains the opt-in for *structure*
 and starts from the bundled default card, not from a catalog of page
@@ -127,7 +129,7 @@ retires them as the setup path, not as a runtime.
 
 ### 6. Zitadel-served login does not get a second renderer or branding model
 
-Choosing Zitadel-served reuses appearance, voice, flows, and later widget
+Choosing Zitadel-served reuses appearance, translations, flows, and later widget
 structure where applicable. It does **not** require a page-chrome editor
 on the first served ship. Atom eject and hand-composed atoms remain
 embedded-only. Fully custom frontend is a third model (APIs), not an
@@ -138,7 +140,7 @@ escape hatch at the end of the embed path.
 - Product and Console can place a control by asking "which category?" and
   "which horizon?" rather than inventing a new store.
 - #936 stays branding settings (appearance) on embedded components.
-  Voice is a different setting.
+  Translations is a different setting (#1038).
 - The widget template stays strict so it can be shared later.
 - Embedders keep a no-publish path (host CSS / element props).
 - Setup-template apply and widget structure get their own issues.
@@ -171,6 +173,8 @@ escape hatch at the end of the embed path.
 
 - [#678](https://github.com/zitadel/nextgen/issues/678)
 - [#936](https://github.com/zitadel/nextgen/issues/936)
+- [#1038](https://github.com/zitadel/nextgen/issues/1038)
+- [#1039](https://github.com/zitadel/nextgen/issues/1039)
 - [`../design/branding/customization-strategy.md`](../design/branding/customization-strategy.md)
 - [`../design/branding/templates.md`](../design/branding/templates.md)
 - [`../design/branding/override-ladder.md`](../design/branding/override-ladder.md)
