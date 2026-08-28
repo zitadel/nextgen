@@ -1,0 +1,21 @@
+type: object
+description: |
+  Emit-time metadata, already redacted at write. Path A request.api may
+  set client (ip, user_agent, origin) for SIEM join on request_id. Not a
+  live risk-evaluator input.
+additionalProperties: true
+properties:
+  client:
+    description: Observed HTTP requestor context on Path A request.api only.
+    type: object
+    additionalProperties: false
+    properties:
+      ip:
+        type: string
+        description: Client IP from the first X-Forwarded-For hop or RemoteAddr.
+      user_agent:
+        type: string
+        description: Observed User-Agent header.
+      origin:
+        type: string
+        description: Origin header when present.

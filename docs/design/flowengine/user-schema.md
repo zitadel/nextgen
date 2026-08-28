@@ -14,7 +14,7 @@ What matters here is the contract: which schema annotations exist, how the flow 
 | `writeOnly: true` | Field | Read API | Reserved for a value that may be written but is never returned. Nothing enforces it yet — responses currently include write-only properties |
 | `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
 | `x-unique: "<scope>"` | Field | Flow Engine | Server validates uniqueness on form submit at the given scope (`project` or `team`); a non-empty scope also marks the field as an identifier used for user resolution |
-| `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
+| `x-claim: "claims.email"` | Field | Flow Engine | Outbound only: the claim Zitadel emits for this property. Earlier drafts read it as inbound auto-population; that job belongs to IdP connections' `claim_mapping` ([`1-resource-model.md`](../idp/1-resource-model.md#claim-mapping)) |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
 
 `writeOnly` is native JSON Schema, so the dialect does not declare it; the `x-*`

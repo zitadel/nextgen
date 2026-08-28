@@ -14,13 +14,13 @@ import (
 const (
 	createFlowDefinitionStmt = `INSERT INTO flow_definitions
 (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = ? AND id = ?`
 
 	updateFlowDefinitionStmt = `UPDATE flow_definitions SET
 name = ?, schema_version = ?, status = ?, purposes = ?, definition = ?, updated_at = ?
-WHERE project_id = ? AND id = ?`
+WHERE project_id = ? AND id = ? RETURNING created_at, updated_at`
 
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at
 FROM flow_definitions`
@@ -51,11 +51,11 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 	}
 	now := nowUnixNano()
 	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
-		if _, err := tx.Exec(ctx, createFlowDefinitionStmt,
+		if err := scanFlowDefinitionTimestamps(entity, tx.QueryRow(ctx, createFlowDefinitionStmt,
 			entity.ProjectID, entity.ID, entity.Name, entity.SchemaVersion,
 			entity.Status.String(), purposes, defStr, now, now,
-		); err != nil {
-			return wrapError(err)
+		)); err != nil {
+			return err
 		}
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
@@ -100,11 +100,20 @@ func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, enti
 		return wrapError(err)
 	}
 	now := nowUnixNano()
-	_, err = f.client.Exec(ctx, updateFlowDefinitionStmt,
+	return scanFlowDefinitionTimestamps(entity, f.client.QueryRow(ctx, updateFlowDefinitionStmt,
 		entity.Name, entity.SchemaVersion, entity.Status.String(), purposes, defStr, now,
 		entity.ProjectID, entity.ID,
-	)
-	return wrapError(err)
+	))
+}
+
+func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition, row *sql.Row) error {
+	var createdNano, updatedNano int64
+	if err := row.Scan(&createdNano, &updatedNano); err != nil {
+		return wrapError(err)
+	}
+	entity.CreatedAt = timeFromUnixNano(createdNano)
+	entity.UpdatedAt = timeFromUnixNano(updatedNano)
+	return nil
 }
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].

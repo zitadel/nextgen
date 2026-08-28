@@ -4943,7 +4943,9 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 
 // handleGetSchemaByIdRequest handles getSchemaById operation.
 //
-// Get a schema by its ID. This will return the default revision of the schema.
+// Get a schema by its ID. A schema ID identifies one immutable revision, so
+// this returns exactly that revision. To find the current revision of an
+// object type, list with `revisions=latest`.
 //
 // GET /schemas/{id}
 func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -6897,9 +6899,9 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "offset",
+					Name: "limit",
 					In:   "query",
-				}: params.Offset,
+				}: params.Limit,
 				{
 					Name: "page_token",
 					In:   "query",
@@ -6908,6 +6910,14 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 					Name: "object_type",
 					In:   "query",
 				}: params.ObjectType,
+				{
+					Name: "revisions",
+					In:   "query",
+				}: params.Revisions,
+				{
+					Name: "kind",
+					In:   "query",
+				}: params.Kind,
 			},
 			Raw: r,
 		}

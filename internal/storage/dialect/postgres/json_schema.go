@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
-const createJSONSchemaStmt = `INSERT INTO zitadel_nextgen.json_schemas (project_id, url, object_type, payload) VALUES ($1, $2, $3, $4) RETURNING project_id, url, object_type, created_at, payload`
+const createJSONSchemaStmt = `INSERT INTO zitadel_nextgen.json_schemas (project_id, url, object_type, kind, payload) VALUES ($1, $2, $3, $4, $5) RETURNING project_id, url, object_type, kind, created_at, payload`
 
 type jsonSchemaStatements struct{ statement }
 
@@ -29,10 +29,16 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		return err
 	}
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
-		if err := tx.QueryRow(ctx, createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Schema).
-			Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.CreatedAt, &schema.Schema); err != nil {
+		var kind string
+		if err := tx.QueryRow(ctx, createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind.String(), schema.Schema).
+			Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema); err != nil {
 			return wrapError(err)
 		}
+		parsedKind, err := domain.JSONSchemaKindString(kind)
+		if err != nil {
+			return wrapError(err)
+		}
+		schema.Kind = parsedKind
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
 	})
@@ -55,7 +61,28 @@ func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, project
 	})
 }
 
-const jsonSchemaQuery = "SELECT project_id, url, object_type, created_at, payload FROM zitadel_nextgen.json_schemas"
+const jsonSchemaQuery = "SELECT project_id, url, object_type, kind, created_at, payload FROM zitadel_nextgen.json_schemas"
+
+// latestRevisionPerObjectType keeps only the newest revision of each
+// object_type. It is an anti-join rather than `created_at = (SELECT MAX(…))`
+// because the correlation on a NULL object_type is NULL either way: MAX then
+// yields NULL and the row is filtered out, while NOT EXISTS passes it through,
+// which is what a row that is a revision of nothing deserves.
+//
+// The uniqueness of (project_id, object_type, created_at) makes created_at a
+// total order within an object_type, so no tiebreak belongs in here.
+//
+// The sub-query deliberately carries no authz predicate, so "newest" is the
+// newest revision that exists rather than the newest the caller may read: a
+// caller granted only a superseded revision sees it under revisions=all and
+// sees nothing for that object type under revisions=latest. Which revision is
+// current is a property of the object type, not of the reader, and returning a
+// replaced revision as the current one would have callers write against a
+// schema their peers have already moved off.
+const latestRevisionPerObjectType = `NOT EXISTS (SELECT 1 FROM zitadel_nextgen.json_schemas newer` +
+	` WHERE newer.project_id = zitadel_nextgen.json_schemas.project_id` +
+	` AND newer.object_type = zitadel_nextgen.json_schemas.object_type` +
+	` AND newer.created_at > zitadel_nextgen.json_schemas.created_at)`
 
 // GetJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
@@ -81,9 +108,14 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 }
 
 // ListJSONSchemas implements [service.JSONSchemaStatements].
-func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+	var conjuncts []string
+	if opts.LatestRevisionPerObjectType {
+		conjuncts = append(conjuncts, latestRevisionPerObjectType)
+	}
+
 	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "zitadel_nextgen.json_schemas", "url"); err != nil {
+	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "zitadel_nextgen.json_schemas", "url", conjuncts...); err != nil {
 		return nil, err
 	}
 
@@ -112,9 +144,15 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 
 func (js jsonSchemaStatements) scanJSONSchema(row pgx.CollectableRow) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
-	if err := row.Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.CreatedAt, &schema.Schema); err != nil {
+	var kind string
+	if err := row.Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema); err != nil {
 		return nil, err
 	}
+	parsedKind, err := domain.JSONSchemaKindString(kind)
+	if err != nil {
+		return nil, err
+	}
+	schema.Kind = parsedKind
 	return schema, nil
 }
 
@@ -141,5 +179,10 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 		SQLName:  "created_at",
 		Accessor: func(s *domain.JSONSchema) any { return s.CreatedAt },
 		Coerce:   database.CoerceTime,
+	},
+	domain.JSONSchemaFieldKind: {
+		SQLName:  "kind",
+		Accessor: func(s *domain.JSONSchema) any { return s.Kind.String() },
+		Coerce:   database.CoerceString,
 	},
 })

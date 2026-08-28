@@ -18,13 +18,13 @@ const (
 
 	createFlowDefinitionStmt = `INSERT INTO flow_definitions ` +
 		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
-		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`
+		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = @p1 AND id = @p2`
 
 	updateFlowDefinitionStmt = `UPDATE flow_definitions SET ` +
 		`name = @p1, schema_version = @p2, status = @p3, purposes = @p4, ` +
-		`definition = @p5, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p6 AND id = @p7`
+		`definition = @p5, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p6 AND id = @p7 THEN RETURN created_at, updated_at`
 
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
 		`FROM flow_definitions`
@@ -67,8 +67,8 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			purposes,
 			definition,
 		).statement()
-		if _, err := tx.Update(ctx, stmt); err != nil {
-			return wrapError(err)
+		if err := tx.Write(ctx, stmt, scanFlowDefinitionTimestamps(entity)); err != nil {
+			return err
 		}
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
@@ -102,8 +102,16 @@ func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, enti
 		entity.ProjectID,
 		entity.ID,
 	).statement()
-	_, err = f.db.Update(ctx, stmt)
-	return wrapError(err)
+	return f.db.Write(ctx, stmt, scanFlowDefinitionTimestamps(entity))
+}
+
+func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition) func(*spanner.RowIterator) error {
+	return func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&entity.CreatedAt, &entity.UpdatedAt)
+		})
+		return err
+	}
 }
 
 func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {

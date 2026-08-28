@@ -2631,29 +2631,6 @@ func (s *FlowDefinition) Validate() error {
 	return nil
 }
 
-func (s *FlowDefinitionDetailResponse) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.FlowDefinition.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "flow_definition",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
 func (s *FlowDefinitionListResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -2710,36 +2687,13 @@ func (s *FlowDefinitionResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
-			MaxLength:     0,
-			MaxLengthSet:  false,
-			Email:         false,
-			Hostname:      false,
-			Regex:         regexMap["^[a-z][a-z0-9-]*$"],
-			MinNumeric:    0,
-			MinNumericSet: false,
-			MaxNumeric:    0,
-			MaxNumericSet: false,
-		}).Validate(string(s.Name)); err != nil {
-			return errors.Wrap(err, "string")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "name",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.Status.Validate(); err != nil {
+		if err := s.FlowDefinition.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "status",
+			Name:  "flow_definition",
 			Error: err,
 		})
 	}
@@ -3921,6 +3875,15 @@ func (s ListFlowDefinitionsPurpose) Validate() error {
 	}
 }
 
+func (s ListSchemasKind) Validate() error {
+	switch s {
+	case "user-schema":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *ListSchemasResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -3959,6 +3922,17 @@ func (s *ListSchemasResponse) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s ListSchemasRevisions) Validate() error {
+	switch s {
+	case "all":
+		return nil
+	case "latest":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *ListUserPasskeysResponse) Validate() error {

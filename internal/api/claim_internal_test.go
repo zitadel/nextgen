@@ -218,7 +218,7 @@ func TestClaimErrorResponse(t *testing.T) {
 	}{
 		{"challenge_not_found", domain.ErrClaimChallengeNotFound(), http.StatusNotFound},
 		{"challenge_invalid", domain.ErrClaimChallengeInvalid(), http.StatusBadRequest},
-		{"no_personal_team", domain.ErrClaimNoPersonalTeam(), http.StatusInternalServerError},
+		{"no_personal_team", domain.ErrClaimNoPersonalTeam(), http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

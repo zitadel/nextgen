@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"strings"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -22,6 +23,25 @@ type CreateSchemaByURLInput struct {
 	ProjectID string
 	TeamID    string
 	URL       url.URL
+}
+
+type ListSchemasInput struct {
+	ProjectID  string
+	ObjectType string
+	// Kind is nil when the caller did not filter by one. It is a pointer rather
+	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
+	// it cannot double as "no filter".
+	Kind *domain.JSONSchemaKind
+	// LatestRevisionPerObjectType asks for the newest revision of each object
+	// type instead of the full revision history.
+	LatestRevisionPerObjectType bool
+	PageToken                   string
+	Limit                       int
+}
+
+type ListSchemasOutput struct {
+	Items         []*domain.JSONSchema
+	NextPageToken string
 }
 
 // ---- Secondary ports -------------------------------------------------------------
@@ -59,7 +79,9 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		stmts := tx.Statements()
 		if err := stmts.CreateJSONSchema(ctx, model); err != nil {
 			if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
-				return domain.ErrJSONSchemaAlreadyExists().WithParent(err)
+				// Which of the two unique constraints fired is settled after the
+				// transaction ends, by classifyCreateConflict.
+				return err
 			}
 			return domain.ErrInternal(err).WithMessage("failed to create schema in database")
 		}
@@ -77,7 +99,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 			ProjectID:  model.ProjectID,
 			EntityType: "json_schema",
 			EntityID:   model.URL,
-			Payload:    struct{}{},
+			Payload:    domain.SchemaCreatedPayloadSnapshot(model),
 		})
 	})
 	if err != nil {
@@ -85,12 +107,25 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 			return nil, de
 		}
 		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
-			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
+			return nil, s.classifyCreateConflict(ctx, input.ProjectID, model.URL, err)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
 	return model, nil
+}
+
+// classifyCreateConflict tells the two unique constraints on json_schemas apart.
+// Only Postgres reports which one a violation came from, so the URL is read back
+// instead: a row under it means the `$id` was taken, and its absence means the
+// insert lost the (object_type, created_at) race. An inconclusive read keeps the
+// broader of the two answers.
+func (s *SchemaService) classifyCreateConflict(ctx context.Context, projectID, schemaURL string, cause error) error {
+	_, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaURL)
+	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
+		return domain.ErrJSONSchemaRevisionConflict().WithParent(cause)
+	}
+	return domain.ErrJSONSchemaAlreadyExists().WithParent(cause)
 }
 
 func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
@@ -123,30 +158,90 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]*domain.JSONSchema, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
-		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
 	}
-	if objectType != "" {
+	if input.ObjectType != "" {
 		filters = append(filters,
-			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), input.ObjectType),
+		)
+	}
+	// Schemas persisted without their document being parsed — ingested by URL,
+	// or a $ref target pulled in during resolution (#812) — are stored as
+	// domain.JSONSchemaKindUnknown, which no filterable kind matches.
+	if input.Kind != nil {
+		filters = append(filters,
+			database.Equal(database.Col(domain.JSONSchemaFieldKind), input.Kind.String()),
 		)
 	}
 
-	// TODO: implement pagination
+	cursor, err := revisionsCursor(input.PageToken, input.LatestRevisionPerObjectType)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.And(filters...),
 		Pagination: database.Page[domain.JSONSchemaField]{
+			Limit:  uint32(normalizeLimit(input.Limit)),
+			Cursor: cursor,
 			OrderBy: database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
+				// url is the resource id and, with project_id fixed by the
+				// filter, makes the order total so page boundaries cannot
+				// skip or repeat rows sharing a created_at.
+				Columns: []database.Column[domain.JSONSchemaField]{
+					database.Col(domain.JSONSchemaFieldCreatedAt),
+					database.Col(domain.JSONSchemaFieldURL),
+				},
 				Direction: database.OrderDesc,
 			},
 		},
-	})
+	}, JSONSchemaQueryOptions{LatestRevisionPerObjectType: input.LatestRevisionPerObjectType})
 	if err != nil {
 		return nil, mapListError(err, "failed to list schemas")
 	}
 
-	return result.Items, nil
+	return &ListSchemasOutput{
+		Items:         result.Items,
+		NextPageToken: stampRevisionsMode(result.NextCursor, input.LatestRevisionPerObjectType),
+	}, nil
+}
+
+// Both revision modes sort by the same columns in the same direction — they
+// have to, or a keyset boundary would tie-break differently on either side of
+// it — so the cursor's own MatchesOrderBy cannot tell a token minted in one
+// from a token minted in the other. The mode is stamped onto the token instead.
+const (
+	revisionsModeAll       = "all"
+	revisionsModeLatest    = "latest"
+	revisionsModeSeparator = "."
+)
+
+func revisionsMode(latest bool) string {
+	if latest {
+		return revisionsModeLatest
+	}
+	return revisionsModeAll
+}
+
+func stampRevisionsMode(cursor []byte, latest bool) string {
+	if len(cursor) == 0 {
+		return ""
+	}
+	return revisionsMode(latest) + revisionsModeSeparator + string(cursor)
+}
+
+// revisionsCursor strips the mode a page token was minted in, rejecting one
+// that names the other mode: the keyset predicate would resume happily against
+// a different row set and silently skip everything between the two.
+func revisionsCursor(pageToken string, latest bool) ([]byte, error) {
+	if pageToken == "" {
+		return nil, nil
+	}
+	mode, cursor, ok := strings.Cut(pageToken, revisionsModeSeparator)
+	if !ok || mode != revisionsMode(latest) {
+		return nil, domain.ErrRequestInvalid().WithDetails("page token was issued for a different revisions mode")
+	}
+	return []byte(cursor), nil
 }

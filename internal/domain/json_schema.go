@@ -26,6 +26,22 @@ const (
 	PrefixJSONSchema ResourcePrefix = "sch"
 )
 
+// JSONSchemaKind is the `kind` a stored schema document declares. It is the
+// discriminator the meta-schemas are keyed on, not the `kind` of a create
+// request — `schema-url` describes how a schema was supplied, and the document
+// fetched from that URL declares its own kind like any other.
+//
+//go:generate go tool enumer -type JSONSchemaKind -trimprefix JSONSchemaKind -linecomment -sql
+type JSONSchemaKind uint8
+
+const (
+	// JSONSchemaKindUnknown is recorded when a schema is persisted without its
+	// document being parsed, so no declared kind was ever read. Filtering by
+	// kind never matches it.
+	JSONSchemaKindUnknown    JSONSchemaKind = iota // unknown
+	JSONSchemaKindUserSchema                       // user-schema
+)
+
 func ErrJSONSchemaNotFound() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("not_found"), "schema not found", nil, nil)
 }
@@ -38,6 +54,14 @@ func ErrJSONSchemaAlreadyExists() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
 }
 
+// ErrJSONSchemaRevisionConflict reports that another revision of the same
+// object type already holds this creation timestamp. Which of the two is the
+// latest would be undecidable, so the loser is rejected and the caller can
+// simply retry.
+func ErrJSONSchemaRevisionConflict() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("revision_conflict"), "another revision of the same object type was created at the same instant", nil, nil)
+}
+
 func ErrJSONSchemaPermissionDenied() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("permission_denied"), "the schema management API requires the project secret", nil, nil)
 }
@@ -48,6 +72,7 @@ type JSONSchema struct {
 	ProjectID  string
 	URL        string
 	ObjectType *string
+	Kind       JSONSchemaKind
 	CreatedAt  time.Time
 	Schema     []byte
 }
@@ -62,6 +87,7 @@ const (
 	JSONSchemaFieldURL
 	JSONSchemaFieldObjectType
 	JSONSchemaFieldCreatedAt
+	JSONSchemaFieldKind
 )
 
 func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error) {
@@ -86,10 +112,21 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		objectType = &ot
 	}
 
+	// A document declaring no kind, or one this server does not know, is
+	// rejected by the meta-schema moments later — but NewJSONSchema runs first,
+	// so an unrecognised value maps to unknown rather than failing here.
+	kind := JSONSchemaKindUnknown
+	if k, ok := maputil.Get[string](schema, "kind"); ok {
+		if parsed, err := JSONSchemaKindString(k); err == nil {
+			kind = parsed
+		}
+	}
+
 	return &JSONSchema{
 		ProjectID:  projectID,
 		URL:        schemaID,
 		ObjectType: objectType,
+		Kind:       kind,
 		CreatedAt:  time.Now().UTC(),
 		Schema:     schemabs,
 	}, nil
@@ -378,9 +415,14 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 	if err != nil {
 		return nil, err
 	}
+	// TODO(#812): a fetched document is persisted without being parsed or
+	// validated, so its declared kind is never read and ObjectType/CreatedAt go
+	// unset too. #812 routes this path through NewJSONSchema and settles how a
+	// $ref fragment differs from a root schema; until then the kind is unknown.
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
+		Kind:      JSONSchemaKindUnknown,
 		Schema:    data,
 	}
 	if err := store.CreateJSONSchema(ctx, dbSchema); err != nil {
