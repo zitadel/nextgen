@@ -124,14 +124,18 @@ function AddUserForm({
     void (async () => {
       try {
         const projectId = getConsoleProjectId();
-        // The picker needs every user schema, so it drains the
-        // cursor-paginated list rather than showing whatever fits in one page.
+        // One option per schema, not per edit: a superseded revision is not
+        // something a new user should be created against, and offering the
+        // same schema once per revision reads as duplicates. The picker needs
+        // every one of them, so it drains the cursor-paginated list rather
+        // than showing whatever fits in one page.
         const listed: Awaited<ReturnType<typeof api.listSchemas>>["schemas"] = [];
         let pageToken: string | undefined;
         do {
           const page = await api.listSchemas({
             project_id: projectId,
             kind: "user-schema",
+            revisions: "latest",
             limit: 100,
             ...(pageToken === undefined ? {} : { page_token: pageToken }),
           });

@@ -54,7 +54,6 @@ the dialect generator is the only mint path, not that create always overwrites.
 | JSON schema (when server-assigned) | `sch` |
 | encryption key | `enc_key` |
 | signing key | `sig_key` |
-| passkey registration | `pkreg` |
 | session | `sess` |
 | auth attempt | `att` |
 | check / challenge | `ch` |
@@ -107,9 +106,11 @@ the forbid; handlers enforce it where ogen cannot (e.g. create-user).
 
 ### 6. Pre-persist ceremony IDs
 
-When an ID is needed before insert (provisional `user_*`, `pkreg_*`, in-memory
+When an ID is needed before insert (provisional `user_*`, in-memory
 `flow_*` / `sess_*` handles), mint via dialect `NewManagedID` — same generator
 as insert-time `Ensure`. Keep-any on create then preserves that value.
+(The `pkreg` prefix once listed here was removed with the standalone passkey
+registration store — ADR 056 folds the ceremony into auth-attempt checks.)
 
 ## Consequences
 

@@ -113,6 +113,18 @@ type Event struct {
 	OccurredAtWait time.Duration
 }
 
+// EventClientMetadata is Path A requestor context on events.metadata.client.
+type EventClientMetadata struct {
+	IP        string `json:"ip,omitempty"`
+	UserAgent string `json:"user_agent,omitempty"`
+	Origin    string `json:"origin,omitempty"`
+}
+
+// EventMetadata is the events.metadata JSON object.
+type EventMetadata struct {
+	Client *EventClientMetadata `json:"client,omitempty"`
+}
+
 // EventField enumerates filterable/sortable Event columns.
 type EventField uint8
 

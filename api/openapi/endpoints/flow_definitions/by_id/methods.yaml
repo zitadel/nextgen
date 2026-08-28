@@ -15,7 +15,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../components/flows/flow-definition-detail-response.yaml
+            $ref: ../../../components/flows/flow-definition-response.yaml
     default:
       $ref: getFlowDefinition-error-response.yaml
 
@@ -44,7 +44,7 @@ put:
       content:
         application/json:
           schema:
-            $ref: ../../../components/flows/flow-definition-detail-response.yaml
+            $ref: ../../../components/flows/flow-definition-response.yaml
     '400':
       description: Invalid request body.
       content:

@@ -1,6 +1,6 @@
 # Templates
 
-**Status:** Draft. Storage, validation, and authoring workflow decided in [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md); grouping settled below. **Parent:** [`README.md`](README.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters); [`../glossary.md`](../glossary.md#6-config-terms) (branding / template / design / layout vocabulary).
+**Status:** Draft. Storage, validation, and authoring workflow decided in [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md); grouping settled below. **Parent:** [`README.md`](README.md). **Placement:** a Liquid template is *widget structure* — not page chrome and not radii. The category map is [`customization-strategy.md`](customization-strategy.md) / [ADR 057](../../adrs/057-login-customization-categories.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters); [`../glossary.md`](../glossary.md#6-config-terms) (branding / template / design / layout / page chrome vocabulary).
 
 A template is a Liquid string the component evaluates against the flow payload. It composes `<zl-*>` atoms in a chosen order and grouping, resolves labels through the i18n filter, and calls `{% mandatory_gates %}` as the safety net. Nothing more.
 
@@ -114,7 +114,15 @@ Two built-in `layout` values ship with the component package (the bundled `defau
 | `centered` (default) | Card centred on page. Fields stacked, primary action full-width, SSO below a divider.                               |
 | `split`              | Brand panel on the left (logo, `hero_url` background), form on the right. Maps to the legacy `side-by-side` layout. |
 
-The `layout` enum stays this small on purpose. Richer starting points ship as **designs** — full template files in `@zitadel/config` that `zitadel branding eject --design <name>` (or `zitadel setup --design <name>`) scaffolds into `.zitadel/branding/`:
+The `layout` enum stays this small on purpose. This file is the **widget
+template** (advanced structure inside the widget, shared later by embedded
+and Zitadel-served login). Zitadel-served **page chrome** is unset;
+`page.liquid` is only a later proposal — see
+[`customization-strategy.md`](customization-strategy.md#what-the-shipped-designs-really-are)
+and [ADR 057](../../adrs/057-login-customization-categories.md). The five
+named files below are what `zitadel branding eject --design` / `setup --design`
+still write today; that catalog is the setup path to retire, not the
+destination:
 
 | Design        | Descriptor `layout` | Sketch                                                                  |
 | ------------- | ------------------- | ----------------------------------------------------------------------- |
@@ -124,7 +132,10 @@ The `layout` enum stays this small on purpose. Richer starting points ship as **
 | `hero`        | `split`             | Landing-style brand pane left (nav, headline, feature bullets — editable copy on token-styled `zl-hero__*` classes), form right. |
 | `minimal`     | `centered`          | Chrome stripped to heading, fields, and actions.                        |
 
-A design is delivered *as a template* (the escape hatch this doc always reserved for ADR-033's `muted`/`minimal`), with the descriptor's `layout` set to the nearest built-in so an invalid template degrades to sane chrome. Every shipped design passes the authoring validator and a component-level render test.
+Those five files still pass the authoring validator and a component-level
+render test. They remain a supported *render* path for already-ejected
+revisions. They are not the setup destination: embedder page looks live
+in the application; Zitadel-served page chrome is unset.
 
 ### Split chrome: mobile fallback and knobs
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -43,4 +44,20 @@ func HardDeleteTeam(ctx context.Context, pool database.Pool, projectID, teamID s
 		projectID, teamID,
 	).statement())
 	return err
+}
+
+// InsertJSONSchemaAt inserts a json_schemas row at an exact created_at.
+// CreateJSONSchema never accepts a caller-supplied created_at, so a test that
+// needs two revisions to collide has to write the row itself.
+func InsertJSONSchemaAt(ctx context.Context, pool database.Pool, projectID, url string, objectType *string, createdAt time.Time) error {
+	c, ok := pool.(*Client)
+	if !ok {
+		return fmt.Errorf("spanner.InsertJSONSchemaAt: expected *Client, got %T", pool)
+	}
+	db := newClientDB(c.client)
+	_, err := db.Update(ctx, buildStatement(
+		`INSERT INTO json_schemas (project_id, url, object_type, kind, created_at, payload) VALUES (@p1, @p2, @p3, @p4, @p5, JSON '{}')`,
+		projectID, url, objectType, domain.JSONSchemaKindUnknown.String(), createdAt,
+	).statement())
+	return wrapError(err)
 }

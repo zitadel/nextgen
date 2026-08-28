@@ -221,7 +221,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   /**
-   * `GET /flow_definitions/:id` returns a detail envelope with metadata
+   * `GET /flow_definitions/:id` returns a response envelope with metadata
    * (`id`, `project_id`, `created_at`, `updated_at`) plus `flow_definition`.
    * Return only `flow_definition` so diffs compare with the on-disk bare body.
    * Flat-by-id: no `project_id` query — authz resolves the project from RSI.

@@ -11,6 +11,7 @@ content:
         - $ref: '../../components/schemas/errors/sch-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/sch-not_found.yaml'
         - $ref: '../../components/schemas/errors/sch-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/sch-revision_conflict.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
@@ -22,6 +23,7 @@ content:
           sch.invalid_request: '../../components/schemas/errors/sch-invalid_request.yaml'
           sch.not_found: '../../components/schemas/errors/sch-not_found.yaml'
           sch.permission_denied: '../../components/schemas/errors/sch-permission_denied.yaml'
+          sch.revision_conflict: '../../components/schemas/errors/sch-revision_conflict.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -59,6 +61,11 @@ content:
         value:
           code: sch.permission_denied
           message: 'the schema management API requires the project secret'
+      sch.revision_conflict:
+        summary: sch.revision_conflict
+        value:
+          code: sch.revision_conflict
+          message: 'another revision of the same object type was created at the same instant'
       req.invalid:
         summary: req.invalid
         value:

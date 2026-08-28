@@ -31,9 +31,14 @@ export const Route = createFileRoute("/_authed/schemas/")({
     // `kind` scopes the list to user schemas. The screen is titled `User
     // schemas` and only knows how to render one, so this is the contract the
     // rows already assume rather than a new restriction.
+    //
+    // `revisions: latest` makes a row a schema rather than an edit: schemas are
+    // immutable and versioned by URL, so a project that has revised one four
+    // times has four rows for it in the full history.
     const page = await api.listSchemas({
       project_id: projectId,
       kind: "user-schema",
+      revisions: "latest",
       limit: PAGE_SIZE,
     });
     return {
@@ -95,11 +100,13 @@ function SchemasScreen() {
     setLoadingMore(true);
     setLoadError(undefined);
     try {
-      // Same `kind` as the loader: the cursor only pins the ordering, so a
-      // filter drift between pages would silently page over a different set.
+      // Same `kind` and `revisions` as the loader: the cursor only pins the
+      // ordering and mode, so a filter drift between pages would silently
+      // page over a different set.
       const page = await api.listSchemas({
         project_id: getConsoleProjectId(),
         kind: "user-schema",
+        revisions: "latest",
         limit: PAGE_SIZE,
         page_token: nextPageToken,
       });

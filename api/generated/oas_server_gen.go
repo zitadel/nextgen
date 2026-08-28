@@ -8,6 +8,16 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
+	//
+	// Starts a WebAuthn registration ceremony for the user and returns the
+	// creation options for `navigator.credentials.create()`. Complete the
+	// ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
+	// five minutes. Credentials already registered for the user are excluded
+	// automatically.
+	//
+	// POST /users/{user_id}/passkeys/registrations
+	BeginUserPasskeyRegistration(ctx context.Context, req *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error)
 	// CompleteClaim implements completeClaim operation.
 	//
 	// Called by the browser after the developer authenticates on the claim page.
@@ -175,6 +185,17 @@ type Handler interface {
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
+	// FinishUserPasskeyRegistration implements finishUserPasskeyRegistration operation.
+	//
+	// Verifies the attestation against the ceremony started by
+	// `POST /users/{user_id}/passkeys/registrations` and persists the new credential. A
+	// rejected attestation counts against the ceremony's failure budget and the
+	// ceremony stays open for a retry. An expired ceremony surfaces as
+	// `att.stale_challenge`; an unknown or already-consumed registration id
+	// surfaces as `att.not_found`.
+	//
+	// POST /users/{user_id}/passkeys/registrations/{registration_id}
+	FinishUserPasskeyRegistration(ctx context.Context, req *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (FinishUserPasskeyRegistrationRes, error)
 	// GetAuthAttempt implements getAuthAttempt operation.
 	//
 	// Polls the current state of an authentication attempt.
@@ -264,7 +285,9 @@ type Handler interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetSchemaById implements getSchemaById operation.
 	//
-	// Get a schema by its ID. This will return the default revision of the schema.
+	// Get a schema by its ID. A schema ID identifies one immutable revision, so
+	// this returns exactly that revision. To find the current revision of an
+	// object type, list with `revisions=latest`.
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)

@@ -452,8 +452,8 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 		resp, err := client.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(
 			api.ProjectID(project.ID), def))
 		require.NoError(t, err)
-		require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp, helpers.MustMarshal(t, resp))
-		return resp.(*api.FlowDefinitionDetailResponse).ID
+		require.IsType(t, &api.FlowDefinitionResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.FlowDefinitionResponse).ID
 	}
 	flowIn := createFlow(t, "authz-list-in-"+helpers.RandString(6), "login")
 	flowOut := createFlow(t, "authz-list-out-"+helpers.RandString(6), "profiling")

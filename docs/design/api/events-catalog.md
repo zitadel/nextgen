@@ -65,6 +65,12 @@ renamed. If origins become patchable later, the update delta includes the
 Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
 `client_id`, `token_id`, `actor_id`, `entity_id`.
 
+Path A `request.api` may also carry observed requestor context on metadata
+(`ip`, `user_agent`, `origin` under `client`). Join Path B mutations to that
+snapshot via `request_id`. Exported events enable offline SIEM rules; they
+are not inputs to the live risk evaluator
+([bot-detection.md](../flowengine/bot-detection.md)).
+
 - Auth attempt `entity_id` ↔ check payload `auth_attempt_id`.
 - Session after handoff: `session_id` **column** (set via `EmitSpec.SessionID`;
   not duplicated in attempt payloads).
@@ -113,6 +119,7 @@ tracked below.
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
 | Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
+| Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
 | Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | delta of allowlisted fields that changed |
 | Flow definition delete | `flowdef.deleted` | `admin` | `flow_definition` | _(empty)_ |
