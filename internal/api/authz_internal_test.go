@@ -228,6 +228,11 @@ func TestRequireProjectAccess(t *testing.T) {
 			readMiss: domain.ErrEventNotFound().Code, writeMiss: domain.ErrEventNotFound().Code,
 			denied: domain.ErrEventPermissionDenied().Code,
 		},
+		{
+			name: "grants", res: grantAccess,
+			readMiss: domain.ErrGrantNotFound().Code, writeMiss: domain.ErrGrantNotFound().Code,
+			denied: domain.ErrGrantPermissionDenied().Code,
+		},
 	}
 
 	for _, res := range resources {

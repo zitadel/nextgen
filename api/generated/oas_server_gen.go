@@ -64,6 +64,15 @@ type Handler interface {
 	//
 	// POST /flow_definitions
 	CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
+	// CreateGrant implements createGrant operation.
+	//
+	// Bind a user or team to `project.viewer`, `project.editor`, or
+	// `project.admin` on the project identified by the `project-id` header.
+	// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
+	// created here — claim owns that path.
+	//
+	// POST /grants
+	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -139,6 +148,13 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteGrant implements deleteGrant operation.
+	//
+	// Soft-revokes the grant and emits `authz.revoked`. Already-revoked or
+	// missing grants return 404. The row is not un-revoked.
+	//
+	// DELETE /grants/{id}
+	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
 	// DeleteTeam implements deleteTeam operation.
 	//
 	// Deactivates the team.
@@ -222,6 +238,15 @@ type Handler interface {
 	//
 	// GET /flow/{id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
+	// GetGrant implements getGrant operation.
+	//
+	// Loads a single active grant by `(project_id, id)`. Grants are not
+	// registered in `resource_scope_index`; project scope is required on the
+	// query (same as events). Misses, revoked rows, and cross-project ids
+	// return 404.
+	//
+	// GET /grants/{id}
+	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
 	// GetHealth implements getHealth operation.
 	//
 	// Check whether the server is healthy.

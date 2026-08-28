@@ -84,6 +84,18 @@ func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *Creat
 	return r, ht.ErrNotImplemented
 }
 
+// CreateGrant implements createGrant operation.
+//
+// Bind a user or team to `project.viewer`, `project.editor`, or
+// `project.admin` on the project identified by the `project-id` header.
+// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
+// created here — claim owns that path.
+//
+// POST /grants
+func (UnimplementedHandler) CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (r CreateGrantRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateHandoff implements createHandoff operation.
 //
 // Completes the authentication attempt and mints a `handoff_token`.
@@ -177,6 +189,16 @@ func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserReque
 //
 // DELETE /flow_definitions/{id}
 func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteGrant implements deleteGrant operation.
+//
+// Soft-revokes the grant and emits `authz.revoked`. Already-revoked or
+// missing grants return 404. The row is not un-revoked.
+//
+// DELETE /grants/{id}
+func (UnimplementedHandler) DeleteGrant(ctx context.Context, params DeleteGrantParams) (r DeleteGrantRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -287,6 +309,18 @@ func (UnimplementedHandler) GetFlowDefinition(ctx context.Context, params GetFlo
 //
 // GET /flow/{id}
 func (UnimplementedHandler) GetFlowStep(ctx context.Context, params GetFlowStepParams) (r GetFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetGrant implements getGrant operation.
+//
+// Loads a single active grant by `(project_id, id)`. Grants are not
+// registered in `resource_scope_index`; project scope is required on the
+// query (same as events). Misses, revoked rows, and cross-project ids
+// return 404.
+//
+// GET /grants/{id}
+func (UnimplementedHandler) GetGrant(ctx context.Context, params GetGrantParams) (r GetGrantRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

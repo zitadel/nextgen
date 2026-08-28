@@ -1,0 +1,91 @@
+get:
+  operationId: getGrant
+  summary: Get grant
+  description: |
+    Loads a single active grant by `(project_id, id)`. Grants are not
+    registered in `resource_scope_index`; project scope is required on the
+    query (same as events). Misses, revoked rows, and cross-project ids
+    return 404.
+  tags:
+    - Grants
+  security:
+    - oauth2:
+        - project.read
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: The grant.
+      content:
+        application/json:
+          schema:
+            $ref: ../grant.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No active grant was found for the given project and id.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getGrant-error-response.yaml
+
+delete:
+  operationId: deleteGrant
+  summary: Revoke grant
+  description: |
+    Soft-revokes the grant and emits `authz.revoked`. Already-revoked or
+    missing grants return 404. The row is not un-revoked.
+  tags:
+    - Grants
+  security:
+    - oauth2:
+        - project.write
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '204':
+      description: The grant was revoked.
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No active grant was found for the given project and id.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: deleteGrant-error-response.yaml

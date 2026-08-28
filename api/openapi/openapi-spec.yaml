@@ -39,6 +39,11 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Grants
+    description: |
+      Collaboration grants that bind a user or team to project.viewer,
+      project.editor, or project.admin. Create, get, and revoke; listing and
+      role-change PATCH are follow-ups.
   - name: Events
     description: |
       Project-scoped audit event list and get (ADR 049). Unified surface for
@@ -121,6 +126,10 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /grants:
+    $ref: endpoints/grants/methods.yaml
+  /grants/{id}:
+    $ref: endpoints/grants/by_id/methods.yaml
   /events:
     $ref: endpoints/events/methods.yaml
   /events/{id}:

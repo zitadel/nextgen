@@ -125,6 +125,14 @@ var eventsAccess = resourceAccess{
 	denied:    domain.ErrEventPermissionDenied,
 }
 
+// grantAccess gates create/get/revoke. Grants are not in resource_scope_index;
+// every op takes project_id from the header (same as events).
+var grantAccess = resourceAccess{
+	readMiss:  domain.ErrGrantNotFound,
+	writeMiss: domain.ErrGrantNotFound,
+	denied:    domain.ErrGrantPermissionDenied,
+}
+
 var projectAccess = resourceAccess{
 	kind:      domain.ResourceKindProject,
 	readMiss:  domain.ErrProjectNotFound,

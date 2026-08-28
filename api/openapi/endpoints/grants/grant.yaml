@@ -1,0 +1,48 @@
+type: object
+description: A collaboration grant binding a principal to a project relation.
+required:
+  - id
+  - project_id
+  - principal_type
+  - principal_id
+  - object_type
+  - relation
+  - created_at
+properties:
+  id:
+    type: string
+    description: Managed assignment id (`asgn_<opaque>`).
+  project_id:
+    type: string
+    description: Project this grant is scoped to.
+  principal_type:
+    type: string
+    enum:
+      - user
+      - team
+    description: Kind of principal bound by this grant.
+  principal_id:
+    type: string
+    description: Principal id (`user_<opaque>` or `team_<opaque>`).
+  object_type:
+    type: string
+    enum:
+      - project
+    description: Catalog object type. Always `project` for this API.
+  relation:
+    type: string
+    enum:
+      - viewer
+      - editor
+      - admin
+    description: Catalog relation on the project.
+  created_at:
+    type: string
+    format: date-time
+    description: When the grant was created.
+  expires_at:
+    description: When the grant expires. Null when it does not expire.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
