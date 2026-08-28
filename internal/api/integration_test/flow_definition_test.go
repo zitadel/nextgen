@@ -850,14 +850,13 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 			PageToken: api.NewOptPageToken("not-a-cursor"),
 		})
 		require.NoError(t, err)
+		// The operation declares its own 400, so the client hands back a bare
+		// ErrorDetails: the decoded variant is what carries the status here.
+		require.IsType(t, &api.ErrorDetails{}, res, helpers.MustMarshal(t, res))
+		errRes := res.(*api.ErrorDetails)
 		invalid := domain.ErrRequestInvalid()
-		assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
-			StatusCode: http.StatusBadRequest,
-			Response: api.ErrorDetails{
-				Code:    api.ErrorCode(invalid.Code),
-				Message: invalid.Message,
-			},
-		}, res)
+		assert.Equal(t, api.ErrorCode(invalid.Code), errRes.Code)
+		assert.Equal(t, invalid.Message, errRes.Message)
 	})
 }
 
