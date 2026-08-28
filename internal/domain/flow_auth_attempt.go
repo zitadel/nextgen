@@ -30,19 +30,21 @@ type FlowAuthAttemptService interface {
 	// the already-pinned user. Rejection surfaces as
 	// [ErrAuthAttemptProofRejected].
 	SubmitPasskey(ctx context.Context, in FlowSubmitPasskeyInput) (userID string, err error)
+	// IssuePasskeyRegistrationChallenge mints a WebAuthn registration
+	// challenge on the attempt and returns its id plus the
+	// PublicKeyCredentialCreationOptions the browser passes to
+	// navigator.credentials.create(). Enrollment rides the same two-phase
+	// ceremony shape as [IssuePasskeyChallenge]/[SubmitPasskey].
+	IssuePasskeyRegistrationChallenge(ctx context.Context, in FlowIssuePasskeyRegistrationChallengeInput) (FlowPasskeyRegistrationChallengeOutput, error)
+	// SubmitPasskeyRegistration verifies the attestation against the issued
+	// challenge and persists the new credential; for a provisional ceremony
+	// the user row is created in the same transaction. Rejection surfaces as
+	// [ErrAuthAttemptProofRejected]; a conflicting user as
+	// [ErrUserAlreadyExists].
+	SubmitPasskeyRegistration(ctx context.Context, in FlowSubmitPasskeyRegistrationInput) error
 	// Handoff mints the single-use token the client exchanges for a
 	// session. Called by the state machine on the terminal step.
 	Handoff(ctx context.Context, in FlowHandoffInput) (FlowHandoffOutput, error)
-	// RegisterCreatedUser registers a newly-created user's ID as a verified
-	// user factor on the auth attempt. Called after on_success: create_user
-	// and passkey registration so that the session gets user_id after exchange.
-	RegisterCreatedUser(ctx context.Context, in FlowRegisterCreatedUserInput) error
-}
-
-type FlowRegisterCreatedUserInput struct {
-	ProjectID string
-	AttemptID string
-	UserID    string
 }
 
 // FlowCreateAttemptInput is the bootstrap input to
@@ -98,6 +100,44 @@ type FlowSubmitPasskeyInput struct {
 	AttemptID   string
 	ChallengeID string
 	Assertion   []byte
+}
+
+// FlowIssuePasskeyRegistrationChallengeInput carries the relying-party
+// parameters and the user context needed to begin a registration ceremony.
+// UserID is the stable WebAuthn user handle (empty on a fresh sign-up: the
+// attempt service mints a provisional one); Username and DisplayName are
+// browser-visible labels when the flow has a collected identifier.
+type FlowIssuePasskeyRegistrationChallengeInput struct {
+	ProjectID   string
+	AttemptID   string
+	UserID      string
+	Username    string
+	DisplayName string
+	RPID        string
+	RPOrigins   []string
+}
+
+// FlowPasskeyRegistrationChallengeOutput is the issued challenge.
+// UserID is the WebAuthn user handle (minted by the attempt service when
+// the issue input had none).
+type FlowPasskeyRegistrationChallengeOutput struct {
+	ChallengeID string
+	UserID      string
+	Options     []byte
+}
+
+// FlowSubmitPasskeyRegistrationInput carries the attestation plus the
+// ChallengeID returned by IssuePasskeyRegistrationChallenge. UserSchemaURL
+// and UserAttributes feed the user creation that runs inside the verify
+// transaction when the ceremony is provisional.
+type FlowSubmitPasskeyRegistrationInput struct {
+	ProjectID      string
+	AttemptID      string
+	UserID         string
+	ChallengeID    string
+	Attestation    []byte
+	UserSchemaURL  string
+	UserAttributes map[string]any
 }
 
 type FlowHandoffInput struct {

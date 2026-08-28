@@ -1,0 +1,16 @@
+type: object
+description: Request to complete a WebAuthn registration ceremony.
+required:
+  - attestation
+additionalProperties: false
+properties:
+  attestation:
+    type: object
+    description: The WebAuthn AttestationResponse object from `navigator.credentials.create()`.
+    additionalProperties: true
+  name:
+    type: string
+    description: |
+      Label for the credential in passkey management surfaces. Optional: when
+      omitted, a name is derived from the credential itself.
+    example: Work laptop

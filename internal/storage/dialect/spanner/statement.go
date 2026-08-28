@@ -12,7 +12,6 @@ type statements struct {
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
-	passkeyRegistrationStatements
 	sessionStatements
 	authAttemptStatements
 	userStatements
@@ -46,7 +45,6 @@ func newStatements(db queryExecutor) statements {
 		teamStatements:                newTeamStatements(db),
 		teamMembershipStatements:      newTeamMembershipStatements(db),
 		tokenStatements:               newTokenStatements(db),
-		passkeyRegistrationStatements: newPasskeyRegistrationStatements(db),
 		sessionStatements:             newSessionStatements(db),
 		authAttemptStatements:         newAuthAttemptStatements(db),
 		userStatements:                newUserStatements(db),
