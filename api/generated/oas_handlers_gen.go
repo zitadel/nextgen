@@ -7332,6 +7332,10 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 					In:   "query",
 				}: params.Revisions,
 				{
+					Name: "id",
+					In:   "query",
+				}: params.ID,
+				{
 					Name: "kind",
 					In:   "query",
 				}: params.Kind,

@@ -3889,6 +3889,15 @@ type ListSchemasParams struct {
 	// A `page_token` is bound to the mode it was issued in and is rejected by
 	// the other.
 	Revisions OptListSchemasRevisions `json:",omitempty,omitzero"`
+	// Exact-match filter on schema ids. Repeatable (OR within the parameter)
+	// and ANDed with the other filters, so a schema is returned when it
+	// matches one of the ids *and* everything else asked for.
+	// Ids are revision-specific — editing a schema mints a new one — so this
+	// resolves the exact revisions a caller holds ids for, whether or not
+	// they are current. An id that matches nothing is absent from the result
+	// rather than an error, which includes ids from another project.
+	// At most 100 ids per request.
+	ID []string `json:",omitempty"`
 	// The kind of schema to filter by, read from the stored document's
 	// `kind` property.
 	// `schema-url` is not a kind: it discriminates the create request body,
@@ -3941,6 +3950,15 @@ func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasPa
 		}
 		if v, ok := packed[key]; ok {
 			params.Revisions = v.(OptListSchemasRevisions)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ID = v.([]string)
 		}
 	}
 	{
@@ -4249,6 +4267,65 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "revisions",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				return d.DecodeArray(func(d uri.Decoder) error {
+					var paramsDotIDVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotIDVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					params.ID = append(params.ID, paramsDotIDVal)
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if params.ID == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    100,
+					MaxLengthSet: true,
+				}).ValidateLength(len(params.ID)); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "id",
 			In:   "query",
 			Err:  err,
 		}

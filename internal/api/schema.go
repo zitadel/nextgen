@@ -83,6 +83,7 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 
 	schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
 		ProjectID:                   string(params.ProjectID),
+		IDs:                         params.ID,
 		ObjectType:                  params.ObjectType.Value,
 		Kind:                        kind,
 		LatestRevisionPerObjectType: params.Revisions.Value == api.ListSchemasRevisionsLatest,

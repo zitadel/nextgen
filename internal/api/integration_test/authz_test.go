@@ -515,6 +515,16 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.IsType(t, &api.ListSchemasResponse{}, listResp, helpers.MustMarshal(t, listResp))
 	require.Empty(t, listResp.(*api.ListSchemasResponse).Schemas)
 
+	// The id filter (#940) narrows inside the row predicate rather than around
+	// it: naming a schema this principal cannot see does not surface it.
+	byID, err := client.ListSchemas(t.Context(), api.ListSchemasParams{
+		ProjectID: api.ProjectID(project.ID),
+		ID:        []string{schemaURI},
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListSchemasResponse{}, byID, helpers.MustMarshal(t, byID))
+	require.Empty(t, byID.(*api.ListSchemasResponse).Schemas)
+
 	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.QueryTeamsResponse{}, teamsResp, helpers.MustMarshal(t, teamsResp))

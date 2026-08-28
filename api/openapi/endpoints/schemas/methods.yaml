@@ -114,6 +114,26 @@ get:
         enum:
           - all
           - latest
+    - name: id
+      in: query
+      description: |
+        Exact-match filter on schema ids. Repeatable (OR within the parameter)
+        and ANDed with the other filters, so a schema is returned when it
+        matches one of the ids *and* everything else asked for.
+
+        Ids are revision-specific — editing a schema mints a new one — so this
+        resolves the exact revisions a caller holds ids for, whether or not
+        they are current. An id that matches nothing is absent from the result
+        rather than an error, which includes ids from another project.
+
+        At most 100 ids per request.
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
     - name: kind
       in: query
       description: |

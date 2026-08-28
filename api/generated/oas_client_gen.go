@@ -5974,6 +5974,32 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		}
 	}
 	{
+		// Encode "id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.ID != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.ID {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(item))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
 		// Encode "kind" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "kind",
