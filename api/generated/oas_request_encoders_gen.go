@@ -10,6 +10,20 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
+func encodeBeginUserPasskeyRegistrationRequest(
+	req *BeginUserPasskeyRegistrationRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCompleteClaimRequest(
 	req *CompleteClaimRequest,
 	r *http.Request,
@@ -166,6 +180,20 @@ func encodeCreateUserRequest(
 
 func encodeExchangeHandoffRequest(
 	req *ExchangeRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeFinishUserPasskeyRegistrationRequest(
+	req *FinishUserPasskeyRegistrationRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

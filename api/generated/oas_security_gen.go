@@ -68,6 +68,9 @@ func GetRolesForNextgenSession(operation string) []string {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	BeginUserPasskeyRegistrationOperation: []string{
+		"user.write",
+	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
 	},
@@ -109,6 +112,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ExchangeHandoffOperation: []string{
 		"session.write",
+	},
+	FinishUserPasskeyRegistrationOperation: []string{
+		"user.write",
 	},
 	GetAuthAttemptOperation: []string{
 		"auth_attempt.read",

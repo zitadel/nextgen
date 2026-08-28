@@ -32,7 +32,6 @@ type AllStatements interface {
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
-	PasskeyRegistrationStatements
 	SessionStatements
 	AuthAttemptStatements
 	UserStatements
@@ -169,19 +168,6 @@ type TokenStatements interface {
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
-// type PasskeyRegistrationPool interface {
-// 	Statementer[PasskeyRegistrationStatements]
-// 	Transactioner[PasskeyRegistrationStatements]
-// }
-
-type PasskeyRegistrationStatements interface {
-	Statements
-	CreatePasskeyRegistration(ctx context.Context, entity *domain.CreatePasskeyRegistration) error
-	GetPasskeyRegistration(ctx context.Context, projectID, id string) (*domain.PasskeyRegistration, error)
-	DeletePasskeyRegistration(ctx context.Context, projectID, id string) error
-}
-
-// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type SessionPool interface {
 // 	Statementer[SessionStatements]
 // 	Transactioner[SessionStatements]
@@ -216,6 +202,12 @@ type AuthAttemptStatements interface {
 	DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error
 	HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error
 	SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
+	// SetAuthAttemptFactor upserts a verified factor directly, without a
+	// challenge/proof cycle: the caller has already established the fact by
+	// other means (e.g. the user row was just created in the same transaction).
+	// An existing check row of the same type is overwritten and its challenge
+	// state cleared. Returns the check row's id for audit emits.
+	SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 }

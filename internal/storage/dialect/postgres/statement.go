@@ -22,7 +22,6 @@ type statements struct {
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
-	passkeyRegistrationStatements
 	sessionStatements
 	authAttemptStatements
 	userStatements
@@ -56,7 +55,6 @@ func newStatements(client queryExecutor) statements {
 		teamStatements:                newTeamStatements(client),
 		teamMembershipStatements:      newTeamMembershipStatements(client),
 		tokenStatements:               newTokenStatements(client),
-		passkeyRegistrationStatements: newPasskeyRegistrationStatements(client),
 		sessionStatements:             newSessionStatements(client),
 		authAttemptStatements:         newAuthAttemptStatements(client),
 		userStatements:                newUserStatements(client),

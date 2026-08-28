@@ -201,24 +201,19 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
-	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		passwordHasher,
 		userService,
 		schemaStore,
 		serviceDBPool,
 	)
-	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool)
-	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
 		schemaStore,
 		fields,
 		createUserHandler,
-		createUserForPasskeyHandler,
 		flowAuth,
-		passkeyRegAdapter,
 		time.Now,
 	)
 

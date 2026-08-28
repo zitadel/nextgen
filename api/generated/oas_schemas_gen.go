@@ -5468,6 +5468,477 @@ func (s *AuthzRevokedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
+type BeginUserPasskeyRegistrationBadRequest ErrorDetails
+
+func (*BeginUserPasskeyRegistrationBadRequest) beginUserPasskeyRegistrationRes() {}
+
+// BeginUserPasskeyRegistrationErrorResponse represents sum type.
+type BeginUserPasskeyRegistrationErrorResponse struct {
+	Type                 BeginUserPasskeyRegistrationErrorResponseType // switch on this field
+	AttAlreadyHandedOff  AttAlreadyHandedOff
+	AttInvalidRequest    AttInvalidRequest
+	AttInvalidState      AttInvalidState
+	AttNotFound          AttNotFound
+	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserInvalid          UserInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// BeginUserPasskeyRegistrationErrorResponseType is oneOf type of BeginUserPasskeyRegistrationErrorResponse.
+type BeginUserPasskeyRegistrationErrorResponseType string
+
+// Possible values for BeginUserPasskeyRegistrationErrorResponseType.
+const (
+	AttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse  BeginUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestBeginUserPasskeyRegistrationErrorResponse    BeginUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
+	AttInvalidStateBeginUserPasskeyRegistrationErrorResponse      BeginUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
+	AttNotFoundBeginUserPasskeyRegistrationErrorResponse          BeginUserPasskeyRegistrationErrorResponseType = "att.not_found"
+	AuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse     BeginUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
+	EvtInvalidBeginUserPasskeyRegistrationErrorResponse           BeginUserPasskeyRegistrationErrorResponseType = "evt.invalid"
+	InternalBeginUserPasskeyRegistrationErrorResponse             BeginUserPasskeyRegistrationErrorResponseType = "internal"
+	ReqInvalidBeginUserPasskeyRegistrationErrorResponse           BeginUserPasskeyRegistrationErrorResponseType = "req.invalid"
+	UserInvalidBeginUserPasskeyRegistrationErrorResponse          BeginUserPasskeyRegistrationErrorResponseType = "user.invalid"
+	UserNotFoundBeginUserPasskeyRegistrationErrorResponse         BeginUserPasskeyRegistrationErrorResponseType = "user.not_found"
+	UserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse BeginUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
+)
+
+// IsAttAlreadyHandedOff reports whether BeginUserPasskeyRegistrationErrorResponse is AttAlreadyHandedOff.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttInvalidRequest reports whether BeginUserPasskeyRegistrationErrorResponse is AttInvalidRequest.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttInvalidState reports whether BeginUserPasskeyRegistrationErrorResponse is AttInvalidState.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttNotFound reports whether BeginUserPasskeyRegistrationErrorResponse is AttNotFound.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether BeginUserPasskeyRegistrationErrorResponse is AuthUnauthorized.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsEvtInvalid reports whether BeginUserPasskeyRegistrationErrorResponse is EvtInvalid.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsInternal reports whether BeginUserPasskeyRegistrationErrorResponse is Internal.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsInternal() bool {
+	return s.Type == InternalBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsReqInvalid reports whether BeginUserPasskeyRegistrationErrorResponse is ReqInvalid.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserInvalid reports whether BeginUserPasskeyRegistrationErrorResponse is UserInvalid.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserNotFound reports whether BeginUserPasskeyRegistrationErrorResponse is UserNotFound.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPermissionDenied reports whether BeginUserPasskeyRegistrationErrorResponse is UserPermissionDenied.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse
+}
+
+// SetAttAlreadyHandedOff sets BeginUserPasskeyRegistrationErrorResponse to AttAlreadyHandedOff.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse
+	s.AttAlreadyHandedOff = v
+}
+
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if BeginUserPasskeyRegistrationErrorResponse is AttAlreadyHandedOff.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
+		return v, false
+	}
+	return s.AttAlreadyHandedOff, true
+}
+
+// NewAttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse(v AttAlreadyHandedOff) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetAttAlreadyHandedOff(v)
+	return s
+}
+
+// SetAttInvalidRequest sets BeginUserPasskeyRegistrationErrorResponse to AttInvalidRequest.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestBeginUserPasskeyRegistrationErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if BeginUserPasskeyRegistrationErrorResponse is AttInvalidRequest.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestBeginUserPasskeyRegistrationErrorResponse(v AttInvalidRequest) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetAttInvalidState sets BeginUserPasskeyRegistrationErrorResponse to AttInvalidState.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateBeginUserPasskeyRegistrationErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if BeginUserPasskeyRegistrationErrorResponse is AttInvalidState.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from AttInvalidState.
+func NewAttInvalidStateBeginUserPasskeyRegistrationErrorResponse(v AttInvalidState) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttNotFound sets BeginUserPasskeyRegistrationErrorResponse to AttNotFound.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundBeginUserPasskeyRegistrationErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if BeginUserPasskeyRegistrationErrorResponse is AttNotFound.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from AttNotFound.
+func NewAttNotFoundBeginUserPasskeyRegistrationErrorResponse(v AttNotFound) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAuthUnauthorized sets BeginUserPasskeyRegistrationErrorResponse to AuthUnauthorized.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if BeginUserPasskeyRegistrationErrorResponse is AuthUnauthorized.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse(v AuthUnauthorized) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets BeginUserPasskeyRegistrationErrorResponse to EvtInvalid.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidBeginUserPasskeyRegistrationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if BeginUserPasskeyRegistrationErrorResponse is EvtInvalid.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from EvtInvalid.
+func NewEvtInvalidBeginUserPasskeyRegistrationErrorResponse(v EvtInvalid) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets BeginUserPasskeyRegistrationErrorResponse to Internal.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalBeginUserPasskeyRegistrationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if BeginUserPasskeyRegistrationErrorResponse is Internal.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from Internal.
+func NewInternalBeginUserPasskeyRegistrationErrorResponse(v Internal) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets BeginUserPasskeyRegistrationErrorResponse to ReqInvalid.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidBeginUserPasskeyRegistrationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if BeginUserPasskeyRegistrationErrorResponse is ReqInvalid.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from ReqInvalid.
+func NewReqInvalidBeginUserPasskeyRegistrationErrorResponse(v ReqInvalid) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserInvalid sets BeginUserPasskeyRegistrationErrorResponse to UserInvalid.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidBeginUserPasskeyRegistrationErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if BeginUserPasskeyRegistrationErrorResponse is UserInvalid.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from UserInvalid.
+func NewUserInvalidBeginUserPasskeyRegistrationErrorResponse(v UserInvalid) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets BeginUserPasskeyRegistrationErrorResponse to UserNotFound.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundBeginUserPasskeyRegistrationErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if BeginUserPasskeyRegistrationErrorResponse is UserNotFound.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from UserNotFound.
+func NewUserNotFoundBeginUserPasskeyRegistrationErrorResponse(v UserNotFound) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets BeginUserPasskeyRegistrationErrorResponse to UserPermissionDenied.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if BeginUserPasskeyRegistrationErrorResponse is UserPermissionDenied.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse(v UserPermissionDenied) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// BeginUserPasskeyRegistrationErrorResponseStatusCode wraps BeginUserPasskeyRegistrationErrorResponse with StatusCode.
+type BeginUserPasskeyRegistrationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   BeginUserPasskeyRegistrationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *BeginUserPasskeyRegistrationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *BeginUserPasskeyRegistrationErrorResponseStatusCode) GetResponse() BeginUserPasskeyRegistrationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *BeginUserPasskeyRegistrationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *BeginUserPasskeyRegistrationErrorResponseStatusCode) SetResponse(val BeginUserPasskeyRegistrationErrorResponse) {
+	s.Response = val
+}
+
+func (*BeginUserPasskeyRegistrationErrorResponseStatusCode) beginUserPasskeyRegistrationRes() {}
+
+type BeginUserPasskeyRegistrationForbidden ErrorDetails
+
+func (*BeginUserPasskeyRegistrationForbidden) beginUserPasskeyRegistrationRes() {}
+
+type BeginUserPasskeyRegistrationInternalServerError ErrorDetails
+
+func (*BeginUserPasskeyRegistrationInternalServerError) beginUserPasskeyRegistrationRes() {}
+
+type BeginUserPasskeyRegistrationNotFound ErrorDetails
+
+func (*BeginUserPasskeyRegistrationNotFound) beginUserPasskeyRegistrationRes() {}
+
+// Request to begin a WebAuthn registration ceremony for the user.
+// Management callers are not browsers, so the relying-party parameters cannot
+// be derived from an Origin header and must be supplied explicitly.
+// Ref: #
+type BeginUserPasskeyRegistrationRequest struct {
+	// Relying Party ID the credential is scoped to.
+	RpID string `json:"rp_id"`
+	// Allowed origins for this ceremony's attestation.
+	RpOrigins []url.URL `json:"rp_origins"`
+	// Browser-visible account label for the credential picker. Optional: when
+	// omitted, a neutral default is used.
+	Username OptString `json:"username"`
+	// Browser-visible display name. Optional; defaults to the username.
+	DisplayName OptString `json:"display_name"`
+}
+
+// GetRpID returns the value of RpID.
+func (s *BeginUserPasskeyRegistrationRequest) GetRpID() string {
+	return s.RpID
+}
+
+// GetRpOrigins returns the value of RpOrigins.
+func (s *BeginUserPasskeyRegistrationRequest) GetRpOrigins() []url.URL {
+	return s.RpOrigins
+}
+
+// GetUsername returns the value of Username.
+func (s *BeginUserPasskeyRegistrationRequest) GetUsername() OptString {
+	return s.Username
+}
+
+// GetDisplayName returns the value of DisplayName.
+func (s *BeginUserPasskeyRegistrationRequest) GetDisplayName() OptString {
+	return s.DisplayName
+}
+
+// SetRpID sets the value of RpID.
+func (s *BeginUserPasskeyRegistrationRequest) SetRpID(val string) {
+	s.RpID = val
+}
+
+// SetRpOrigins sets the value of RpOrigins.
+func (s *BeginUserPasskeyRegistrationRequest) SetRpOrigins(val []url.URL) {
+	s.RpOrigins = val
+}
+
+// SetUsername sets the value of Username.
+func (s *BeginUserPasskeyRegistrationRequest) SetUsername(val OptString) {
+	s.Username = val
+}
+
+// SetDisplayName sets the value of DisplayName.
+func (s *BeginUserPasskeyRegistrationRequest) SetDisplayName(val OptString) {
+	s.DisplayName = val
+}
+
+// The started registration ceremony.
+// Ref: #
+type BeginUserPasskeyRegistrationResponse struct {
+	// Identifier of this ceremony. Pass it back on
+	// `POST /users/{user_id}/passkeys/registrations/{registration_id}` together with the
+	// attestation.
+	RegistrationID string `json:"registration_id"`
+	// The `PublicKeyCredentialCreationOptions` object, passed directly to the
+	// browser's `navigator.credentials.create()`.
+	Options BeginUserPasskeyRegistrationResponseOptions `json:"options"`
+}
+
+// GetRegistrationID returns the value of RegistrationID.
+func (s *BeginUserPasskeyRegistrationResponse) GetRegistrationID() string {
+	return s.RegistrationID
+}
+
+// GetOptions returns the value of Options.
+func (s *BeginUserPasskeyRegistrationResponse) GetOptions() BeginUserPasskeyRegistrationResponseOptions {
+	return s.Options
+}
+
+// SetRegistrationID sets the value of RegistrationID.
+func (s *BeginUserPasskeyRegistrationResponse) SetRegistrationID(val string) {
+	s.RegistrationID = val
+}
+
+// SetOptions sets the value of Options.
+func (s *BeginUserPasskeyRegistrationResponse) SetOptions(val BeginUserPasskeyRegistrationResponseOptions) {
+	s.Options = val
+}
+
+func (*BeginUserPasskeyRegistrationResponse) beginUserPasskeyRegistrationRes() {}
+
+// The `PublicKeyCredentialCreationOptions` object, passed directly to the
+// browser's `navigator.credentials.create()`.
+type BeginUserPasskeyRegistrationResponseOptions map[string]jx.Raw
+
+func (s *BeginUserPasskeyRegistrationResponseOptions) init() BeginUserPasskeyRegistrationResponseOptions {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type BeginUserPasskeyRegistrationUnauthorized ErrorDetails
+
+func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes() {}
+
 // Branding configuration. Appears in two places with one shape:
 // - On flow responses as a read-only projection: the server resolves the
 // latest branding revision for the project per step response (falling
@@ -13190,6 +13661,543 @@ func NewNullFilterValue(v struct{}) FilterValue {
 	s.SetNull(v)
 	return s
 }
+
+type FinishUserPasskeyRegistrationBadRequest ErrorDetails
+
+func (*FinishUserPasskeyRegistrationBadRequest) finishUserPasskeyRegistrationRes() {}
+
+// FinishUserPasskeyRegistrationErrorResponse represents sum type.
+type FinishUserPasskeyRegistrationErrorResponse struct {
+	Type                 FinishUserPasskeyRegistrationErrorResponseType // switch on this field
+	AttAlreadyHandedOff  AttAlreadyHandedOff
+	AttInvalidProof      AttInvalidProof
+	AttInvalidRequest    AttInvalidRequest
+	AttInvalidState      AttInvalidState
+	AttNotFound          AttNotFound
+	AttProofRejected     AttProofRejected
+	AttStaleChallenge    AttStaleChallenge
+	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserInvalid          UserInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// FinishUserPasskeyRegistrationErrorResponseType is oneOf type of FinishUserPasskeyRegistrationErrorResponse.
+type FinishUserPasskeyRegistrationErrorResponseType string
+
+// Possible values for FinishUserPasskeyRegistrationErrorResponseType.
+const (
+	AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
+	AttInvalidProofFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
+	AttInvalidStateFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
+	AttNotFoundFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "att.not_found"
+	AttProofRejectedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
+	EvtInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
+	InternalFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "internal"
+	ReqInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
+	UserInvalidFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
+	UserNotFoundFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
+	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
+)
+
+// IsAttAlreadyHandedOff reports whether FinishUserPasskeyRegistrationErrorResponse is AttAlreadyHandedOff.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttInvalidProof reports whether FinishUserPasskeyRegistrationErrorResponse is AttInvalidProof.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAttInvalidProof() bool {
+	return s.Type == AttInvalidProofFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttInvalidRequest reports whether FinishUserPasskeyRegistrationErrorResponse is AttInvalidRequest.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttInvalidState reports whether FinishUserPasskeyRegistrationErrorResponse is AttInvalidState.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttNotFound reports whether FinishUserPasskeyRegistrationErrorResponse is AttNotFound.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttProofRejected reports whether FinishUserPasskeyRegistrationErrorResponse is AttProofRejected.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAttProofRejected() bool {
+	return s.Type == AttProofRejectedFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsAttStaleChallenge reports whether FinishUserPasskeyRegistrationErrorResponse is AttStaleChallenge.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAttStaleChallenge() bool {
+	return s.Type == AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether FinishUserPasskeyRegistrationErrorResponse is AuthUnauthorized.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsEvtInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is EvtInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsInternal reports whether FinishUserPasskeyRegistrationErrorResponse is Internal.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsInternal() bool {
+	return s.Type == InternalFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsReqInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is ReqInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is UserInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserNotFound reports whether FinishUserPasskeyRegistrationErrorResponse is UserNotFound.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPermissionDenied reports whether FinishUserPasskeyRegistrationErrorResponse is UserPermissionDenied.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse
+}
+
+// SetAttAlreadyHandedOff sets FinishUserPasskeyRegistrationErrorResponse to AttAlreadyHandedOff.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse
+	s.AttAlreadyHandedOff = v
+}
+
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if FinishUserPasskeyRegistrationErrorResponse is AttAlreadyHandedOff.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
+		return v, false
+	}
+	return s.AttAlreadyHandedOff, true
+}
+
+// NewAttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse(v AttAlreadyHandedOff) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAttAlreadyHandedOff(v)
+	return s
+}
+
+// SetAttInvalidProof sets FinishUserPasskeyRegistrationErrorResponse to AttInvalidProof.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAttInvalidProof(v AttInvalidProof) {
+	s.Type = AttInvalidProofFinishUserPasskeyRegistrationErrorResponse
+	s.AttInvalidProof = v
+}
+
+// GetAttInvalidProof returns AttInvalidProof and true boolean if FinishUserPasskeyRegistrationErrorResponse is AttInvalidProof.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAttInvalidProof() (v AttInvalidProof, ok bool) {
+	if !s.IsAttInvalidProof() {
+		return v, false
+	}
+	return s.AttInvalidProof, true
+}
+
+// NewAttInvalidProofFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AttInvalidProof.
+func NewAttInvalidProofFinishUserPasskeyRegistrationErrorResponse(v AttInvalidProof) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAttInvalidProof(v)
+	return s
+}
+
+// SetAttInvalidRequest sets FinishUserPasskeyRegistrationErrorResponse to AttInvalidRequest.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if FinishUserPasskeyRegistrationErrorResponse is AttInvalidRequest.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestFinishUserPasskeyRegistrationErrorResponse(v AttInvalidRequest) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetAttInvalidState sets FinishUserPasskeyRegistrationErrorResponse to AttInvalidState.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateFinishUserPasskeyRegistrationErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if FinishUserPasskeyRegistrationErrorResponse is AttInvalidState.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AttInvalidState.
+func NewAttInvalidStateFinishUserPasskeyRegistrationErrorResponse(v AttInvalidState) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttNotFound sets FinishUserPasskeyRegistrationErrorResponse to AttNotFound.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundFinishUserPasskeyRegistrationErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if FinishUserPasskeyRegistrationErrorResponse is AttNotFound.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AttNotFound.
+func NewAttNotFoundFinishUserPasskeyRegistrationErrorResponse(v AttNotFound) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAttProofRejected sets FinishUserPasskeyRegistrationErrorResponse to AttProofRejected.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAttProofRejected(v AttProofRejected) {
+	s.Type = AttProofRejectedFinishUserPasskeyRegistrationErrorResponse
+	s.AttProofRejected = v
+}
+
+// GetAttProofRejected returns AttProofRejected and true boolean if FinishUserPasskeyRegistrationErrorResponse is AttProofRejected.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAttProofRejected() (v AttProofRejected, ok bool) {
+	if !s.IsAttProofRejected() {
+		return v, false
+	}
+	return s.AttProofRejected, true
+}
+
+// NewAttProofRejectedFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AttProofRejected.
+func NewAttProofRejectedFinishUserPasskeyRegistrationErrorResponse(v AttProofRejected) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAttProofRejected(v)
+	return s
+}
+
+// SetAttStaleChallenge sets FinishUserPasskeyRegistrationErrorResponse to AttStaleChallenge.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAttStaleChallenge(v AttStaleChallenge) {
+	s.Type = AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse
+	s.AttStaleChallenge = v
+}
+
+// GetAttStaleChallenge returns AttStaleChallenge and true boolean if FinishUserPasskeyRegistrationErrorResponse is AttStaleChallenge.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAttStaleChallenge() (v AttStaleChallenge, ok bool) {
+	if !s.IsAttStaleChallenge() {
+		return v, false
+	}
+	return s.AttStaleChallenge, true
+}
+
+// NewAttStaleChallengeFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AttStaleChallenge.
+func NewAttStaleChallengeFinishUserPasskeyRegistrationErrorResponse(v AttStaleChallenge) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAttStaleChallenge(v)
+	return s
+}
+
+// SetAuthUnauthorized sets FinishUserPasskeyRegistrationErrorResponse to AuthUnauthorized.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if FinishUserPasskeyRegistrationErrorResponse is AuthUnauthorized.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse(v AuthUnauthorized) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets FinishUserPasskeyRegistrationErrorResponse to EvtInvalid.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidFinishUserPasskeyRegistrationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if FinishUserPasskeyRegistrationErrorResponse is EvtInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from EvtInvalid.
+func NewEvtInvalidFinishUserPasskeyRegistrationErrorResponse(v EvtInvalid) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets FinishUserPasskeyRegistrationErrorResponse to Internal.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalFinishUserPasskeyRegistrationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if FinishUserPasskeyRegistrationErrorResponse is Internal.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from Internal.
+func NewInternalFinishUserPasskeyRegistrationErrorResponse(v Internal) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets FinishUserPasskeyRegistrationErrorResponse to ReqInvalid.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidFinishUserPasskeyRegistrationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if FinishUserPasskeyRegistrationErrorResponse is ReqInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from ReqInvalid.
+func NewReqInvalidFinishUserPasskeyRegistrationErrorResponse(v ReqInvalid) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserInvalid sets FinishUserPasskeyRegistrationErrorResponse to UserInvalid.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidFinishUserPasskeyRegistrationErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserInvalid.
+func NewUserInvalidFinishUserPasskeyRegistrationErrorResponse(v UserInvalid) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets FinishUserPasskeyRegistrationErrorResponse to UserNotFound.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundFinishUserPasskeyRegistrationErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserNotFound.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserNotFound.
+func NewUserNotFoundFinishUserPasskeyRegistrationErrorResponse(v UserNotFound) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets FinishUserPasskeyRegistrationErrorResponse to UserPermissionDenied.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPermissionDenied.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse(v UserPermissionDenied) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// FinishUserPasskeyRegistrationErrorResponseStatusCode wraps FinishUserPasskeyRegistrationErrorResponse with StatusCode.
+type FinishUserPasskeyRegistrationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   FinishUserPasskeyRegistrationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *FinishUserPasskeyRegistrationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *FinishUserPasskeyRegistrationErrorResponseStatusCode) GetResponse() FinishUserPasskeyRegistrationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *FinishUserPasskeyRegistrationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *FinishUserPasskeyRegistrationErrorResponseStatusCode) SetResponse(val FinishUserPasskeyRegistrationErrorResponse) {
+	s.Response = val
+}
+
+func (*FinishUserPasskeyRegistrationErrorResponseStatusCode) finishUserPasskeyRegistrationRes() {}
+
+type FinishUserPasskeyRegistrationForbidden ErrorDetails
+
+func (*FinishUserPasskeyRegistrationForbidden) finishUserPasskeyRegistrationRes() {}
+
+type FinishUserPasskeyRegistrationInternalServerError ErrorDetails
+
+func (*FinishUserPasskeyRegistrationInternalServerError) finishUserPasskeyRegistrationRes() {}
+
+type FinishUserPasskeyRegistrationNotFound ErrorDetails
+
+func (*FinishUserPasskeyRegistrationNotFound) finishUserPasskeyRegistrationRes() {}
+
+// Request to complete a WebAuthn registration ceremony.
+// Ref: #
+type FinishUserPasskeyRegistrationRequest struct {
+	// The WebAuthn AttestationResponse object from `navigator.credentials.create()`.
+	Attestation FinishUserPasskeyRegistrationRequestAttestation `json:"attestation"`
+	// Label for the credential in passkey management surfaces. Optional: when
+	// omitted, a name is derived from the credential itself.
+	Name OptString `json:"name"`
+}
+
+// GetAttestation returns the value of Attestation.
+func (s *FinishUserPasskeyRegistrationRequest) GetAttestation() FinishUserPasskeyRegistrationRequestAttestation {
+	return s.Attestation
+}
+
+// GetName returns the value of Name.
+func (s *FinishUserPasskeyRegistrationRequest) GetName() OptString {
+	return s.Name
+}
+
+// SetAttestation sets the value of Attestation.
+func (s *FinishUserPasskeyRegistrationRequest) SetAttestation(val FinishUserPasskeyRegistrationRequestAttestation) {
+	s.Attestation = val
+}
+
+// SetName sets the value of Name.
+func (s *FinishUserPasskeyRegistrationRequest) SetName(val OptString) {
+	s.Name = val
+}
+
+// The WebAuthn AttestationResponse object from `navigator.credentials.create()`.
+type FinishUserPasskeyRegistrationRequestAttestation map[string]jx.Raw
+
+func (s *FinishUserPasskeyRegistrationRequestAttestation) init() FinishUserPasskeyRegistrationRequestAttestation {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// The registered passkey.
+// Ref: #
+type FinishUserPasskeyRegistrationResponse struct {
+	// The unique identifier of the passkey.
+	ID string `json:"id"`
+	// The name of the passkey.
+	Name string `json:"name"`
+	// The timestamp when the passkey was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *FinishUserPasskeyRegistrationResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *FinishUserPasskeyRegistrationResponse) GetName() string {
+	return s.Name
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FinishUserPasskeyRegistrationResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *FinishUserPasskeyRegistrationResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *FinishUserPasskeyRegistrationResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FinishUserPasskeyRegistrationResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*FinishUserPasskeyRegistrationResponse) finishUserPasskeyRegistrationRes() {}
+
+type FinishUserPasskeyRegistrationUnauthorized ErrorDetails
+
+func (*FinishUserPasskeyRegistrationUnauthorized) finishUserPasskeyRegistrationRes() {}
 
 // Scopes which teams or apps this flow definition applies to. Empty or
 // omitted fields mean "no restriction"; when both are empty the definition
@@ -28205,52 +29213,6 @@ func (o OptPasskeyFactorPayloadAuthenticatorAttachment) Or(d PasskeyFactorPayloa
 	return d
 }
 
-// NewOptPkregNotFoundDetails returns new OptPkregNotFoundDetails with value set to v.
-func NewOptPkregNotFoundDetails(v PkregNotFoundDetails) OptPkregNotFoundDetails {
-	return OptPkregNotFoundDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptPkregNotFoundDetails is optional PkregNotFoundDetails.
-type OptPkregNotFoundDetails struct {
-	Value PkregNotFoundDetails
-	Set   bool
-}
-
-// IsSet returns true if OptPkregNotFoundDetails was set.
-func (o OptPkregNotFoundDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptPkregNotFoundDetails) Reset() {
-	var v PkregNotFoundDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptPkregNotFoundDetails) SetTo(v PkregNotFoundDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptPkregNotFoundDetails) Get() (v PkregNotFoundDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptPkregNotFoundDetails) Or(d PkregNotFoundDetails) PkregNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -31017,59 +31979,6 @@ func (s *PatchProjectRequest) SetName(val OptNilString) {
 type PatchProjectUnauthorized ErrorDetails
 
 func (*PatchProjectUnauthorized) patchProjectRes() {}
-
-// Merged schema.
-// Ref: #
-type PkregNotFound struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptPkregNotFoundDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *PkregNotFound) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *PkregNotFound) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *PkregNotFound) GetDetails() OptPkregNotFoundDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *PkregNotFound) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *PkregNotFound) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *PkregNotFound) SetDetails(val OptPkregNotFoundDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type PkregNotFoundDetails map[string]jx.Raw
-
-func (s *PkregNotFoundDetails) init() PkregNotFoundDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 // Merged schema.
 // Ref: #
@@ -37878,7 +38787,6 @@ type SubmitFlowStepErrorResponse struct {
 	Internal            Internal
 	TknInvalid          TknInvalid
 	NotImplemented      NotImplemented
-	PkregNotFound       PkregNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
 	Unavailable         Unavailable
@@ -37912,7 +38820,6 @@ const (
 	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
-	PkregNotFoundSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "pkreg.not_found"
 	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
@@ -38019,11 +38926,6 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
-}
-
-// IsPkregNotFound reports whether SubmitFlowStepErrorResponse is PkregNotFound.
-func (s SubmitFlowStepErrorResponse) IsPkregNotFound() bool {
-	return s.Type == PkregNotFoundSubmitFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether SubmitFlowStepErrorResponse is ReqInvalid.
@@ -38473,27 +39375,6 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
-	return s
-}
-
-// SetPkregNotFound sets SubmitFlowStepErrorResponse to PkregNotFound.
-func (s *SubmitFlowStepErrorResponse) SetPkregNotFound(v PkregNotFound) {
-	s.Type = PkregNotFoundSubmitFlowStepErrorResponse
-	s.PkregNotFound = v
-}
-
-// GetPkregNotFound returns PkregNotFound and true boolean if SubmitFlowStepErrorResponse is PkregNotFound.
-func (s SubmitFlowStepErrorResponse) GetPkregNotFound() (v PkregNotFound, ok bool) {
-	if !s.IsPkregNotFound() {
-		return v, false
-	}
-	return s.PkregNotFound, true
-}
-
-// NewPkregNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from PkregNotFound.
-func NewPkregNotFoundSubmitFlowStepErrorResponse(v PkregNotFound) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetPkregNotFound(v)
 	return s
 }
 
@@ -42954,6 +43835,8 @@ type VerifyChallengeProofErrorResponse struct {
 	EvtInvalid          EvtInvalid
 	Internal            Internal
 	ReqInvalid          ReqInvalid
+	UserAlreadyExists   UserAlreadyExists
+	UserInvalid         UserInvalid
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -42972,6 +43855,8 @@ const (
 	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
 	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
 	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
+	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
+	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -43027,6 +43912,16 @@ func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether VerifyChallengeProofErrorResponse is ReqInvalid.
 func (s VerifyChallengeProofErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidVerifyChallengeProofErrorResponse
+}
+
+// IsUserAlreadyExists reports whether VerifyChallengeProofErrorResponse is UserAlreadyExists.
+func (s VerifyChallengeProofErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsVerifyChallengeProofErrorResponse
+}
+
+// IsUserInvalid reports whether VerifyChallengeProofErrorResponse is UserInvalid.
+func (s VerifyChallengeProofErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidVerifyChallengeProofErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets VerifyChallengeProofErrorResponse to AttAlreadyHandedOff.
@@ -43257,6 +44152,48 @@ func (s VerifyChallengeProofErrorResponse) GetReqInvalid() (v ReqInvalid, ok boo
 func NewReqInvalidVerifyChallengeProofErrorResponse(v ReqInvalid) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserAlreadyExists sets VerifyChallengeProofErrorResponse to UserAlreadyExists.
+func (s *VerifyChallengeProofErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsVerifyChallengeProofErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if VerifyChallengeProofErrorResponse is UserAlreadyExists.
+func (s VerifyChallengeProofErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsVerifyChallengeProofErrorResponse(v UserAlreadyExists) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserInvalid sets VerifyChallengeProofErrorResponse to UserInvalid.
+func (s *VerifyChallengeProofErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidVerifyChallengeProofErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if VerifyChallengeProofErrorResponse is UserInvalid.
+func (s VerifyChallengeProofErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserInvalid.
+func NewUserInvalidVerifyChallengeProofErrorResponse(v UserInvalid) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserInvalid(v)
 	return s
 }
 
