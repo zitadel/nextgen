@@ -224,6 +224,108 @@ func TestAuthAttemptService_IssueChallenge_PasskeyRegistration(t *testing.T) {
 	})
 }
 
+// TestAuthAttemptService_IssueChallenge_PasskeyRegistration_CreationOptions
+// pins the browser-facing ceremony options: a passkey must be created as a
+// discoverable credential (residentKey required — without it usernameless
+// login breaks silently), and a ceremony without a collected identifier gets
+// the neutral account label rather than an empty one.
+func TestAuthAttemptService_IssueChallenge_PasskeyRegistration_CreationOptions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").
+		Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+	stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_minted01", nil)
+	stmts.EXPECT().SetAuthAttemptChallenge(gomock.Any(), "proj", "att-1", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _, _ string, ch domain.AuthChallenge) error {
+			ch.SetID("ch-reg-1")
+			ch.SetLastChallengedAt(time.Now())
+			return nil
+		})
+
+	svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
+	attempt, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+		ProjectID: "proj",
+		AttemptID: "att-1",
+		Challenge: service.PasskeyRegistrationChallenge{
+			RPID:      passkeyRPID,
+			RPOrigins: passkeyTestOrigins(t),
+		},
+	})
+	require.NoError(t, err)
+
+	check, ok := attempt.ChallengeByType(domain.AuthCheckTypePasskeyRegistration)
+	require.True(t, ok)
+	options, err := domain.BuildPasskeyCreationOptions(check.(*domain.AuthChallengePasskeyRegistration))
+	require.NoError(t, err)
+
+	var optMap map[string]any
+	require.NoError(t, json.Unmarshal(options, &optMap))
+	selection, ok := optMap["authenticatorSelection"].(map[string]any)
+	require.True(t, ok, "creation options must include authenticatorSelection")
+	assert.Equal(t, "required", selection["residentKey"])
+	assert.Equal(t, "preferred", selection["userVerification"])
+	user, ok := optMap["user"].(map[string]any)
+	require.True(t, ok, "creation options must include a user object")
+	assert.Equal(t, "Passkey account", user["name"],
+		"a ceremony without a collected identifier gets the neutral label")
+	assert.Empty(t, user["displayName"])
+}
+
+// TestAuthAttemptService_VerifyProof_DiscoverableLoginPersistsUserFactor pins
+// that a usernameless assertion writes the resolved user as a real check row:
+// exchange user binding, password step-up, and enrollment targeting all key
+// on the persisted user factor.
+func TestAuthAttemptService_VerifyProof_DiscoverableLoginPersistsUserFactor(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAllStatements(ctrl)
+	f := newPasskeyFixture(t)
+
+	challenge, err := domain.CreatePasskeyChallenge("", nil, "preferred", passkeyRPID, f.origins)
+	require.NoError(t, err)
+	check := domain.SetAuthChallengePasskey("ch-pk-1", time.Now(), time.Time{}, 0)
+	check.PasskeyChallenge = challenge
+	attempt := &domain.AuthAttempt{
+		ProjectID: "proj",
+		ID:        "att-1",
+		Checks:    []domain.AuthCheck{check},
+	}
+	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(attempt, nil)
+	// The assertion's user handle resolves the user; their credentials load
+	// for verification.
+	expectListUserPasskeys(stmts, []*domain.UserPasskey{f.passkey})
+	stmts.EXPECT().UpdateUserPasskey(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+	var pinnedUser domain.AuthFactor
+	stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), "proj", "att-1", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor) (string, error) {
+			pinnedUser = factor
+			return "ch-user-1", nil
+		})
+	stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), "proj", "att-1", gomock.Any(), "ch-pk-1").Return(nil)
+
+	rawChallenge, err := base64.RawURLEncoding.DecodeString(challenge.Challenge)
+	require.NoError(t, err)
+	assertion := virtualwebauthn.CreateAssertionResponse(f.rp, f.auth, f.cred, virtualwebauthn.AssertionOptions{
+		Challenge:      rawChallenge,
+		RelyingPartyID: challenge.RPID,
+	})
+
+	svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
+	got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+		ProjectID:   "proj",
+		AttemptID:   "att-1",
+		ChallengeID: "ch-pk-1",
+		Proof:       service.PasskeyProof{AssertionResponse: []byte(assertion)},
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, pinnedUser, "the discoverable login must persist the resolved user factor")
+	assert.Equal(t, passkeyUserID, pinnedUser.(*domain.AuthFactorUser).UserID)
+	gotUser, ok := got.FactorByType(domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, passkeyUserID, gotUser.(*domain.AuthFactorUser).UserID)
+}
+
 func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 	t.Run("provisional creates user, credential, and factors in one transaction", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

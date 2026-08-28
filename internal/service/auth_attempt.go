@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -64,12 +65,6 @@ type AuthAttemptService interface {
 	//
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error)
-
-	// RegisterCreatedUser registers a newly-created user's ID as a verified user
-	// factor directly on the auth attempt, bypassing the challenge/proof cycle.
-	// Used after on_success: create_user and passkey registration so the session
-	// receives user_id after exchange.
-	RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error
 }
 
 // ---- Input types -------------------------------------------------------------
@@ -403,25 +398,28 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 	return attempt, nil
 }
 
-// RegisterCreatedUser registers a newly-created user's ID as a verified user
-// factor on the auth attempt without a challenge/proof cycle. It issues a
-// synthetic user challenge and immediately marks it succeeded so the exchange
-// can promote the user_id to the session.
-func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
+// recordDirectAuthFactor upserts a proof-equivalent factor on the attempt and
+// emits its auth.check.succeeded event, inside the caller's transaction. A
+// direct write is legitimate only when the fact was just established by other
+// verified means in the same transaction: a created user during sign-up, or a
+// user resolved cryptographically from a discoverable assertion.
+func recordDirectAuthFactor(ctx context.Context, stmts AllStatements, attempt *domain.AuthAttempt, factor domain.AuthFactor) (string, error) {
+	checkID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, factor)
 	if err != nil {
-		return err
+		return "", err
 	}
-	challenge := &domain.AuthChallengeUser{}
-	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
-			return err
-		}
-		factor := &domain.AuthFactorUser{UserID: userID}
-		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID()); err != nil {
-			return err
-		}
-		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
+	return checkID, audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthCheckSucceeded,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  attempt.ProjectID,
+		EntityType: "check",
+		EntityID:   checkID,
+		SessionID:  attempt.SessionID,
+		Payload: domain.AuthCheckPayload{
+			CheckID:       checkID,
+			CheckType:     factor.Type().String(),
+			AuthAttemptID: attempt.ID,
+		},
 	})
 }
 
@@ -443,6 +441,35 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.A
 			AuthAttemptID: attempt.ID,
 		},
 	})
+}
+
+const passkeyRegistrationDefaultUsername = "Passkey account"
+
+// passkeyRegistrationLabels normalizes the browser-visible labels for a
+// registration ceremony: a neutral default when no identifier was collected,
+// and the username doubling as display name when only it is known.
+func passkeyRegistrationLabels(username, displayName string) (string, string) {
+	username = strings.TrimSpace(username)
+	displayName = strings.TrimSpace(displayName)
+	if username == "" {
+		return passkeyRegistrationDefaultUsername, ""
+	}
+	if displayName == "" {
+		displayName = username
+	}
+	return username, displayName
+}
+
+func parseOrigins(raw []string) ([]url.URL, error) {
+	origins := make([]url.URL, 0, len(raw))
+	for _, o := range raw {
+		u, err := url.Parse(o)
+		if err != nil {
+			return nil, fmt.Errorf("parse origin %q: %w", o, err)
+		}
+		origins = append(origins, *u)
+	}
+	return origins, nil
 }
 
 // buildChallenge constructs the challenge for the given check type.
@@ -484,9 +511,12 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 			return nil, err
 		}
 		// A provisional handle becomes a user id at verification, so it must
-		// be server-minted: keep a caller-supplied handle only when it matches
-		// the attempt's own in-flight provisional ceremony (a re-issued
-		// challenge); any other handle is replaced by a fresh mint.
+		// be server-minted: a caller-supplied handle is kept only when it
+		// matches the attempt's own in-flight provisional ceremony (a
+		// re-issued challenge); any other handle is replaced by a fresh mint.
+		// Enrollment for an existing user always rides a verified user factor
+		// on the attempt — every authenticated path persists one, including
+		// discoverable passkey login — so store-existence is never consulted.
 		if provisional && userID != "" && !attempt.HasProvisionalRegistrationHandle(userID) {
 			userID = ""
 		}
@@ -587,15 +617,22 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return passkeyChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		// Discoverable login resolves the user cryptographically from the assertion; bind it onto
-		// the attempt so the subject is pinned and the session/handoff carries the user id. For an
-		// identified login the user factor is already present and unchanged.
+		// the attempt — including the persisted user check row, which downstream consumers
+		// (exchange user binding, password step-up, enrollment targeting) key on — so the
+		// subject is pinned and the session/handoff carries the user id. For an identified
+		// login the user factor is already present and unchanged.
+		var txExtra func(context.Context, AllStatements) error
 		if userFactor == nil && verification.UserID != "" {
-			attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+			resolvedUser := attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+			txExtra = func(ctx context.Context, stmts AllStatements) error {
+				_, err := recordDirectAuthFactor(ctx, stmts, attempt, resolvedUser)
+				return err
+			}
 		}
 		// Use the verified user as the source of truth: it is set for both identified and
 		// discoverable logins, whereas userFactor is nil in the discoverable case.
 		s.recordPasskeyUsage(ctx, attempt.ProjectID, verification)
-		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil, nil
+		return passkeyChallenge, attempt.SetPasskeyFactor(verification), txExtra, nil
 
 	case PasskeyRegistrationProof:
 		registrationChallenge, err := attempt.PreparePasskeyRegistrationVerification(challengeID)
@@ -642,23 +679,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			factor.PasskeyID = newPasskey.ID
 			factor.Name = newPasskey.Name
 			if !hadUserFactor {
-				userCheckID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, userFactor)
-				if err != nil {
-					return err
-				}
-				if err := audit.Emit(ctx, stmts, audit.EmitSpec{
-					Type:       domain.EventTypeAuthCheckSucceeded,
-					Category:   domain.EventCategoryAuth,
-					ProjectID:  attempt.ProjectID,
-					EntityType: "check",
-					EntityID:   userCheckID,
-					SessionID:  attempt.SessionID,
-					Payload: domain.AuthCheckPayload{
-						CheckID:       userCheckID,
-						CheckType:     userFactor.Type().String(),
-						AuthAttemptID: attempt.ID,
-					},
-				}); err != nil {
+				if _, err := recordDirectAuthFactor(ctx, stmts, attempt, userFactor); err != nil {
 					return err
 				}
 			}

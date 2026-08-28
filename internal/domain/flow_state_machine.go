@@ -204,14 +204,12 @@ type FlowAuthRequestRef struct {
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas               SchemaResolver
-	schemaStore           JSONSchemaStore
-	fields                FlowFieldResolver
-	userCreater           FlowOnSuccessHandler
-	userForPasskeyCreater FlowPasskeyUserCreater
-	authAttempts          FlowAuthAttemptService
-	passkeyRegistration   FlowPasskeyRegistrationService
-	now                   func() time.Time
+	schemas      SchemaResolver
+	schemaStore  JSONSchemaStore
+	fields       FlowFieldResolver
+	userCreater  FlowOnSuccessHandler
+	authAttempts FlowAuthAttemptService
+	now          func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -221,23 +219,19 @@ func NewFlowStateMachine(
 	schemaStore JSONSchemaStore,
 	fields FlowFieldResolver,
 	createUser FlowOnSuccessHandler,
-	userForPasskeyCreater FlowPasskeyUserCreater,
 	authAttempts FlowAuthAttemptService,
-	passkeyRegistration FlowPasskeyRegistrationService,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
 	return &FlowStateMachineRuntime{
-		schemas:               schemas,
-		schemaStore:           schemaStore,
-		fields:                fields,
-		userCreater:           createUser,
-		userForPasskeyCreater: userForPasskeyCreater,
-		authAttempts:          authAttempts,
-		passkeyRegistration:   passkeyRegistration,
-		now:                   now,
+		schemas:      schemas,
+		schemaStore:  schemaStore,
+		fields:       fields,
+		userCreater:  createUser,
+		authAttempts: authAttempts,
+		now:          now,
 	}
 }
 
@@ -578,14 +572,9 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		return r.renderStepError(pc, resolved, result.StepError), nil
 	}
 	if result.UserID != "" {
+		// The handler already recorded the user's factors on the attempt
+		// inside its own transaction; only the flow state needs the id.
 		recordResolvedUser(pc.state, result.UserID)
-		if err := r.authAttempts.RegisterCreatedUser(pc.ctx, FlowRegisterCreatedUserInput{
-			ProjectID: pc.state.ProjectID,
-			AttemptID: pc.state.AuthAttemptID,
-			UserID:    result.UserID,
-		}); err != nil {
-			return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
-		}
 	}
 	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
 }
@@ -622,6 +611,9 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved F
 		// the user still gets a response.
 		return r.processSubmit(pc, resolved)
 	}
+	if pk.outcome != "" {
+		return r.routeOutcome(pc, resolved, pk.outcome, false)
+	}
 
 	return r.routeOutcome(pc, resolved, pc.in.Action, pk.irreversible)
 }
@@ -652,6 +644,9 @@ func (r *FlowStateMachineRuntime) processPasskeyRegister(pc *processCtx, resolve
 		// submitted action): treat the submit as a plain kind=submit so
 		// the user still gets a response.
 		return r.processSubmit(pc, resolved)
+	}
+	if pk.outcome != "" {
+		return r.routeOutcome(pc, resolved, pk.outcome, false)
 	}
 
 	return r.routeOutcome(pc, resolved, pc.in.Action, pk.irreversible)
@@ -758,6 +753,33 @@ func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *Flo
 	return false
 }
 
+// identifierFieldValues returns every identifier-class field with a collected
+// value, in field order and deduplicated by name across the given resolved
+// sets. Every x-unique property resolves as an identifier field, so this is
+// the candidate list for locating the owner of a conflicting unique value.
+func identifierFieldValues(values map[string]any, resolvedSets ...FlowResolvedFields) [][2]string {
+	var out [][2]string
+	seen := map[string]bool{}
+	for _, resolved := range resolvedSets {
+		for _, field := range resolved.Fields {
+			if field.Challenge != FlowFieldChallengeIdentifier || seen[field.Name] {
+				continue
+			}
+			raw, present := values[field.Name]
+			if !present {
+				continue
+			}
+			s, _ := raw.(string)
+			if s == "" {
+				continue
+			}
+			seen[field.Name] = true
+			out = append(out, [2]string{field.Name, s})
+		}
+	}
+	return out
+}
+
 func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, target FlowFieldChallenge) (name, value string, ok bool) {
 	for _, field := range resolved.Fields {
 		if field.Challenge != target {
@@ -777,10 +799,12 @@ func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, t
 // with a submission. handled is true when a passkey leg ran (so the
 // field-shaped dispatch must be skipped); halt, when non-nil, is the result
 // to return immediately (challenge issued and awaiting proof, or a
-// verification error rendered on the step).
+// verification error rendered on the step); outcome, when set, diverts
+// routing (e.g. user_already_exists from a provisional registration).
 type passkeyPhaseResult struct {
 	handled      bool
 	irreversible bool
+	outcome      string
 	halt         *FlowStepResult
 }
 
@@ -827,23 +851,66 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 
 		switch method {
 		case FlowChallengeMethodPasskeyRegister:
-			userID := state.CollectedData.UserID
-			// Only create the user provisionally when this passkey flow generated
-			// the ID (no prior on_success handler already created the user row).
-			provisional := state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey
-			if provisional {
-				state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
-				if err := r.userForPasskeyCreater.CreateProvisionalUser(ctx, userID, state); err != nil {
-					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
-				}
-			}
-			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
-				ProjectID:   state.ProjectID,
-				UserID:      userID,
-				ChallengeID: challengeID,
-				Attestation: in.ChallengeResponse.Proof,
+			// The verify transaction persists the credential, the user row
+			// (when the ceremony is provisional), and the attempt factors
+			// atomically — the attempt service decides provisional-or-not
+			// from the stored challenge.
+			err := r.authAttempts.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
+				ProjectID:      state.ProjectID,
+				AttemptID:      state.AuthAttemptID,
+				UserID:         state.CollectedData.UserID,
+				ChallengeID:    challengeID,
+				Attestation:    in.ChallengeResponse.Proof,
+				UserSchemaURL:  state.UserSchemaURL,
+				UserAttributes: state.CollectedData.UserData,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+				state.ClearPendingChallenge()
+				msg := FlowStepErrorPasskeyRegistrationInvalid
+				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
+				state.IssuedAt = r.now()
+				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+			}
+			if errors.Is(err, ErrUserAlreadyExists()) {
+				// A unique attribute of the provisional user is taken: route
+				// like the identifier dispatch does. That path pins the
+				// existing user on the attempt before routing — and the
+				// downstream password step requires a persisted user factor —
+				// so re-resolve the conflicting owner here to land in the
+				// same state. Every x-unique property resolves as an
+				// identifier-class field, so trying each collected one finds
+				// the owner even when the race was lost on a non-identifier
+				// unique attribute (e.g. a fresh email but a taken phone).
+				clearUserBoundState(state)
+				candidates := identifierFieldValues(state.CollectedData.UserData, passkeyResolved)
+				if visited, verr := r.resolveVisitedFields(pc); verr == nil {
+					candidates = identifierFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
+				}
+				for _, candidate := range candidates {
+					userID, rerr := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
+						ProjectID:     state.ProjectID,
+						AttemptID:     state.AuthAttemptID,
+						AttributeName: candidate[0],
+						Value:         candidate[1],
+					})
+					if rerr == nil {
+						recordResolvedUser(state, userID)
+						break
+					}
+					if !errors.Is(rerr, ErrAuthAttemptProofRejected(nil)) {
+						return passkeyPhaseResult{}, fmt.Errorf("flow state machine: resolve conflicting user: %w", rerr)
+					}
+					// Rejected means this field's value is not the taken one
+					// (or the owner vanished again); try the next candidate.
+					// All-rejected routes anyway and the next step re-collects.
+				}
+				return passkeyPhaseResult{handled: true, outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
+			}
+			if errors.Is(err, ErrAuthAttemptStaleChallenge()) {
+				// The ceremony window is tighter than the attempt TTL, and a
+				// deploy can strand an in-flight ceremony too. Clear the
+				// pending challenge so a retry mints a fresh one instead of
+				// re-emitting the stale ceremony until the attempt dies.
 				state.ClearPendingChallenge()
 				msg := FlowStepErrorPasskeyRegistrationInvalid
 				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
@@ -853,18 +920,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			if err != nil {
 				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey registration: %w", err)
 			}
-			// Only register the created user on the attempt when the passkey
-			// flow itself created the user. If an on_success handler already
-			// created and registered the user, don't call it again.
-			if provisional {
-				if err := r.authAttempts.RegisterCreatedUser(ctx, FlowRegisterCreatedUserInput{
-					ProjectID: state.ProjectID,
-					AttemptID: state.AuthAttemptID,
-					UserID:    userID,
-				}); err != nil {
-					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: register passkey user on attempt: %w", err)
-				}
-			}
+			recordResolvedUser(state, state.CollectedData.UserID)
 			state.ClearPendingChallenge()
 			// Registration wrote a credential — the user cannot back out.
 			return passkeyPhaseResult{handled: true, irreversible: true}, nil
@@ -876,7 +932,10 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				ChallengeID: challengeID,
 				Assertion:   in.ChallengeResponse.Proof,
 			})
-			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) || errors.Is(err, ErrAuthAttemptStaleChallenge()) {
+				// Both a rejected assertion and a stale challenge (e.g. after
+				// a deploy) render on the step with the pending ceremony
+				// cleared, so a retry mints a fresh challenge.
 				state.ClearPendingChallenge()
 				msg := FlowStepErrorPasskeyInvalid
 				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
@@ -926,15 +985,11 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 		if in.PasskeyRP == nil {
 			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrFlowIntegrity())
 		}
-		if r.passkeyRegistration == nil {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrFlowIntegrity())
-		}
-		userID := state.CollectedData.UserID
-		provisional := userID == ""
 		username, displayName := passkeyRegistrationDisplay(passkeyResolved, state.CollectedData.UserData)
-		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
+		out, err := r.authAttempts.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
 			ProjectID:   state.ProjectID,
-			UserID:      userID,
+			AttemptID:   state.AuthAttemptID,
+			UserID:      state.CollectedData.UserID,
 			Username:    username,
 			DisplayName: displayName,
 			RPID:        in.PasskeyRP.RPID,
@@ -943,10 +998,9 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)
 		}
+		// Keep the (possibly minted) user handle so a re-issued challenge
+		// stays stable and the verify leg knows which user it targets.
 		state.CollectedData.UserID = out.UserID
-		if provisional {
-			state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = true
-		}
 		state.PendingChallenge = &FlowPendingChallenge{
 			ID:       out.ChallengeID,
 			Method:   FlowChallengeMethodPasskeyRegister,
@@ -1278,12 +1332,11 @@ func recordResolvedUser(state *FlowState, userID string) {
 	state.CollectedData.UserID = userID
 }
 
-// clearUserBoundState drops the resolved user id, any in-flight
-// ceremony, and the passkey provisional marker.
+// clearUserBoundState drops the resolved user id and any in-flight
+// ceremony.
 func clearUserBoundState(state *FlowState) {
 	state.ClearPendingChallenge()
 	state.CollectedData.UserID = ""
-	state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
 }
 
 // prefillFromCollected sets FlowField.Value from collectedData for any field

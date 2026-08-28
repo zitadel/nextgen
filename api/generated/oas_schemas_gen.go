@@ -26027,52 +26027,6 @@ func (o OptPasskeyFactorPayloadAuthenticatorAttachment) Or(d PasskeyFactorPayloa
 	return d
 }
 
-// NewOptPkregNotFoundDetails returns new OptPkregNotFoundDetails with value set to v.
-func NewOptPkregNotFoundDetails(v PkregNotFoundDetails) OptPkregNotFoundDetails {
-	return OptPkregNotFoundDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptPkregNotFoundDetails is optional PkregNotFoundDetails.
-type OptPkregNotFoundDetails struct {
-	Value PkregNotFoundDetails
-	Set   bool
-}
-
-// IsSet returns true if OptPkregNotFoundDetails was set.
-func (o OptPkregNotFoundDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptPkregNotFoundDetails) Reset() {
-	var v PkregNotFoundDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptPkregNotFoundDetails) SetTo(v PkregNotFoundDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptPkregNotFoundDetails) Get() (v PkregNotFoundDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptPkregNotFoundDetails) Or(d PkregNotFoundDetails) PkregNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -28839,59 +28793,6 @@ func (s *PatchProjectRequest) SetName(val OptNilString) {
 type PatchProjectUnauthorized ErrorDetails
 
 func (*PatchProjectUnauthorized) patchProjectRes() {}
-
-// Merged schema.
-// Ref: #
-type PkregNotFound struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptPkregNotFoundDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *PkregNotFound) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *PkregNotFound) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *PkregNotFound) GetDetails() OptPkregNotFoundDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *PkregNotFound) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *PkregNotFound) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *PkregNotFound) SetDetails(val OptPkregNotFoundDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type PkregNotFoundDetails map[string]jx.Raw
-
-func (s *PkregNotFoundDetails) init() PkregNotFoundDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 // Merged schema.
 // Ref: #
@@ -35700,7 +35601,6 @@ type SubmitFlowStepErrorResponse struct {
 	Internal            Internal
 	TknInvalid          TknInvalid
 	NotImplemented      NotImplemented
-	PkregNotFound       PkregNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
 	Unavailable         Unavailable
@@ -35734,7 +35634,6 @@ const (
 	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
-	PkregNotFoundSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "pkreg.not_found"
 	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
@@ -35841,11 +35740,6 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
-}
-
-// IsPkregNotFound reports whether SubmitFlowStepErrorResponse is PkregNotFound.
-func (s SubmitFlowStepErrorResponse) IsPkregNotFound() bool {
-	return s.Type == PkregNotFoundSubmitFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether SubmitFlowStepErrorResponse is ReqInvalid.
@@ -36295,27 +36189,6 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
-	return s
-}
-
-// SetPkregNotFound sets SubmitFlowStepErrorResponse to PkregNotFound.
-func (s *SubmitFlowStepErrorResponse) SetPkregNotFound(v PkregNotFound) {
-	s.Type = PkregNotFoundSubmitFlowStepErrorResponse
-	s.PkregNotFound = v
-}
-
-// GetPkregNotFound returns PkregNotFound and true boolean if SubmitFlowStepErrorResponse is PkregNotFound.
-func (s SubmitFlowStepErrorResponse) GetPkregNotFound() (v PkregNotFound, ok bool) {
-	if !s.IsPkregNotFound() {
-		return v, false
-	}
-	return s.PkregNotFound, true
-}
-
-// NewPkregNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from PkregNotFound.
-func NewPkregNotFoundSubmitFlowStepErrorResponse(v PkregNotFound) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetPkregNotFound(v)
 	return s
 }
 

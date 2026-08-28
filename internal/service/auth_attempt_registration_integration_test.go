@@ -8,7 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
+	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -174,6 +176,110 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 		ch, ok := attempt.ChallengeByType(domain.AuthCheckTypePasskeyRegistration)
 		require.True(t, ok)
 		assert.Zero(t, ch.GetFailureCount())
+	})
+
+	t.Run("passkey_signup_session_carries_user_and_passkey_factors", func(t *testing.T) {
+		projectID := "p-reg-exchange-" + uniqueIntegrationSuffix(t)
+		ensureProject(t, projectID)
+		ensureUserSchema(t, projectID)
+		sessions, _ := newSessionServiceForIntegration(t)
+
+		attemptID, registration, options := issueRegistrationChallenge(t, svc, projectID)
+		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID:   projectID,
+			AttemptID:   attemptID,
+			ChallengeID: registration.GetID(),
+			Proof: service.PasskeyRegistrationProof{
+				AttestationResponse: attestRegistration(t, options),
+				CreateUser: func(userID string) []service.UserAction {
+					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "signup@example.com")}
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		handedOff, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: projectID, AttemptID: attemptID})
+		require.NoError(t, err)
+		exchanged, err := sessions.Exchange(t.Context(), service.ExchangeInput{
+			ProjectID:    projectID,
+			HandoffToken: handedOff.HandoffToken.Plain(),
+		})
+		require.NoError(t, err)
+
+		stored, err := sessions.Get(t.Context(), service.GetSessionInput{
+			ProjectID: projectID,
+			SessionID: exchanged.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, stored.UserID, "the sign-up session must be bound to the created user")
+		assert.Equal(t, registration.UserID, *stored.UserID)
+		factors := sessionFactorsByType(stored)
+		require.Contains(t, factors, domain.AuthCheckTypeUser)
+		require.Contains(t, factors, domain.AuthCheckTypePasskey,
+			"a completed enrollment must merge into the session as a passkey factor")
+		passkeyFactor, ok := factors[domain.AuthCheckTypePasskey].(*domain.AuthFactorPasskey)
+		require.True(t, ok)
+		assert.Equal(t, registration.UserID, passkeyFactor.UserID)
+		assert.NotEmpty(t, passkeyFactor.CredentialID)
+		assert.False(t, passkeyFactor.GetLastVerifiedAt().IsZero())
+	})
+
+	t.Run("password_signup_session_carries_user_and_password_factors", func(t *testing.T) {
+		projectID := "p-reg-pw-exchange-" + uniqueIntegrationSuffix(t)
+		ensureProject(t, projectID)
+		ensureUserSchema(t, projectID)
+		pool := integrationPoolOrFail(t)
+		sessions, _ := newSessionServiceForIntegration(t)
+
+		ctrl := gomock.NewController(t)
+		hasher := cryptomock.NewMockHasher(ctrl)
+		hasher.EXPECT().Hash(gomock.Any()).Return("hashed:pw", nil)
+		handler := service.NewFlowCreateUserHandler(
+			hasher,
+			service.NewUserService(pool, pool.Statements(), hasher),
+			pool.Statements(),
+			pool,
+		)
+
+		attempt, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{ProjectID: projectID})
+		require.NoError(t, err)
+
+		out, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+			ProjectID:     projectID,
+			UserSchemaURL: registrationTestSchemaURL,
+			State: &domain.FlowState{
+				ProjectID:     projectID,
+				AuthAttemptID: attempt.ID,
+				FlowProgress: domain.FlowProgress{
+					CollectedData: domain.CollectedFlowData{
+						UserData:    map[string]any{"email": "pw-signup@example.com"},
+						AuthMethods: domain.CollectedAuthMethodData{Password: "s3cret"},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, out.UserID)
+
+		handedOff, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: projectID, AttemptID: attempt.ID})
+		require.NoError(t, err)
+		exchanged, err := sessions.Exchange(t.Context(), service.ExchangeInput{
+			ProjectID:    projectID,
+			HandoffToken: handedOff.HandoffToken.Plain(),
+		})
+		require.NoError(t, err)
+
+		stored, err := sessions.Get(t.Context(), service.GetSessionInput{
+			ProjectID: projectID,
+			SessionID: exchanged.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, stored.UserID)
+		assert.Equal(t, out.UserID, *stored.UserID)
+		factors := sessionFactorsByType(stored)
+		require.Contains(t, factors, domain.AuthCheckTypeUser)
+		require.Contains(t, factors, domain.AuthCheckTypePassword,
+			"a password sign-up must record a real password factor on the session")
 	})
 
 	t.Run("bad_attestation_bumps_failure_count_then_retry_succeeds", func(t *testing.T) {
