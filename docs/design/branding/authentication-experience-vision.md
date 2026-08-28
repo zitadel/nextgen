@@ -98,7 +98,7 @@ The customer controls the application around the components separately, includin
 
 Customers should be able to manage supported component customisation through the available visual or code-based experience without creating incompatible versions of the authentication experience.
 
-The exact options included in the first visual customisation milestone are defined in #936.
+The exact options included in the first visual customisation milestone are defined in [#936](https://github.com/zitadel/nextgen/issues/936).
 
 ## Embedded customer journey
 
