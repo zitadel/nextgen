@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -134,4 +135,27 @@ func forEachDialect(t *testing.T, fn func(t *testing.T, d dialect)) {
 			fn(t, d)
 		})
 	}
+}
+
+// adapterCacheEnv is read inside a Test (not TestMain/init) so `go test` keys
+// this package's result cache on the adapter. getenv during package init or
+// TestMain is invisible to the cache (golang/go#44625, #59849). Each
+// server:test-{postgres,spanner,sqlite} task sets the variable to that
+// adapter so a postgres run cannot cache-hit a sqlite (or spanner) result.
+const adapterCacheEnv = "ZITADEL_STMTTEST_ADAPTER"
+
+func TestAdapterCacheKey(t *testing.T) {
+	names := make([]string, 0, len(dialects))
+	for _, d := range dialects {
+		names = append(names, d.name)
+	}
+	require.NotEmpty(t, names)
+
+	adapter := os.Getenv(adapterCacheEnv)
+	if adapter == "" {
+		t.Logf("%s unset; cache key is the compiled adapter set %v", adapterCacheEnv, names)
+		return
+	}
+	require.Truef(t, slices.Contains(names, adapter),
+		"%s=%q is not among registered adapters %v", adapterCacheEnv, adapter, names)
 }
