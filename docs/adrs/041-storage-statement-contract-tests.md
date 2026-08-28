@@ -31,12 +31,6 @@ boundary without pulling in unrelated orchestration.
 - **CI:** still one tag per job (`server:test-postgres` /
   `server:test-spanner` / `server:test-sqlite`). Locally, multiple tags may be
   set in one process.
-- **Test cache:** `go test` caches successful package results. Build tags
-  change the test binary via each adapter's `open_*.go`, and
-  `TestAdapterCacheKey` reads `ZITADEL_STMTTEST_ADAPTER` inside a Test so each
-  adapter is a separate cache slot. A Getenv in TestMain or `init` does not
-  count ([golang/go#44625](https://github.com/golang/go/issues/44625)). Moon
-  sets the variable on the three `server:test-*` tasks.
 - **Assertions:** domain fields, list/filter/cursor behavior, and typed
   integrity errors (`database.ForeignKeyError`, etc.). No live cross-dialect
   `cmp` of rows and no SQL string equality.

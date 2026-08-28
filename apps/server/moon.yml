@@ -155,11 +155,6 @@ tasks:
       - "-timeout"
       - "10m"
       - "./..."
-    env:
-      # Read by stmttest.TestAdapterCacheKey so `go test` caches that package
-      # per adapter. Moon also hashes task env, so postgres/spanner/sqlite
-      # cannot restore each other's cached results.
-      ZITADEL_STMTTEST_ADAPTER: "postgres"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -190,9 +185,6 @@ tasks:
       - "-p"
       - "1"
       - "./..."
-    env:
-      # See test-postgres: per-adapter `go test` and Moon cache key.
-      ZITADEL_STMTTEST_ADAPTER: "spanner"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -213,9 +205,6 @@ tasks:
       - "-timeout"
       - "5m"
       - "./..."
-    env:
-      # See test-postgres: per-adapter `go test` and Moon cache key.
-      ZITADEL_STMTTEST_ADAPTER: "sqlite"
     inputs:
       - "@group(serverInputs)"
     options:
