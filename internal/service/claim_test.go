@@ -337,11 +337,54 @@ func TestClaimService_Complete(t *testing.T) {
 			wantConflict: "team_1",
 		},
 		{
+			// No membership at all: the user is provisioned a team on the next
+			// sign-in (#527), so the refusal clears itself.
 			name: "no personal team",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
 				unclaimedProjectStmts(s)
 				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(nil, database.NewNoRowFoundError(nil))
+				s.EXPECT().GetEarliestTeamMembership(gomock.Any(), claimPlatformProjID, "usr_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrClaimNoPersonalTeam(),
+		},
+		{
+			// Same not-found from the resolver, different cause: the team is
+			// there but deactivated, so no sign-in will fix it and the client
+			// must be told something else.
+			name: "personal team exists but is not active",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				unclaimedProjectStmts(s)
+				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(nil, database.NewNoRowFoundError(nil))
+				s.EXPECT().GetEarliestTeamMembership(gomock.Any(), claimPlatformProjID, "usr_1").
+					Return(&domain.TeamMembership{
+						ProjectID: claimPlatformProjID,
+						TeamID:    "team_gone",
+						UserID:    "usr_1",
+						Status:    domain.MembershipStatusRemoved,
+					}, nil)
+			},
+			wantErr: domain.ErrPersonalTeamNotActive(string(domain.MembershipStatusRemoved)),
+		},
+		{
+			// The two reads take separate snapshots under read-committed, so a
+			// provisioning commit in between can show an active membership after
+			// the resolver has already refused. Reporting "not active: active"
+			// would be self-contradictory; the original verdict is the honest
+			// one and the next attempt succeeds.
+			name: "membership turned active between the two reads",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				unclaimedProjectStmts(s)
+				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(nil, database.NewNoRowFoundError(nil))
+				s.EXPECT().GetEarliestTeamMembership(gomock.Any(), claimPlatformProjID, "usr_1").
+					Return(&domain.TeamMembership{
+						ProjectID: claimPlatformProjID,
+						TeamID:    "team_fresh",
+						UserID:    "usr_1",
+						Status:    domain.MembershipStatusActive,
+					}, nil)
 			},
 			wantErr: domain.ErrClaimNoPersonalTeam(),
 		},
