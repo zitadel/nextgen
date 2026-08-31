@@ -63,16 +63,22 @@ func validateUserSchemaDesignations(schema map[string]any) error {
 }
 
 // designatedLeaf resolves a dot-separated attribute path (the same path shape
-// flattened attribute rows are keyed by) to its property schema. Every
-// intermediate segment must be object-shaped — JSON Schema ignores a
+// flattened attribute rows are keyed by) to its property schema. The root
+// and every intermediate segment must be object-shaped — JSON Schema ignores a
 // `properties` map on a scalar-typed parent, so a path through one could
 // never exist on any valid user document — and the final segment must
 // locally declare a scalar type.
 func designatedLeaf(schema map[string]any, path, keyword string) (map[string]any, error) {
 	unknown := fmt.Errorf("%w: %q names unknown property %q", ErrSchemaDesignationInvalid, keyword, path)
 	current := schema
-	segments := strings.Split(path, ".")
-	for i, segment := range segments {
+	parent := "the schema root"
+	for _, segment := range strings.Split(path, ".") {
+		// The node being descended into must be able to hold object values —
+		// this covers the schema root too, whose type the meta-schema does
+		// not constrain.
+		if !isObjectShaped(current) {
+			return nil, fmt.Errorf("%w: %q path %q: %s is not an object", ErrSchemaDesignationInvalid, keyword, path, parent)
+		}
 		properties, ok := current["properties"].(map[string]any)
 		if !ok {
 			return nil, unknown
@@ -81,9 +87,7 @@ func designatedLeaf(schema map[string]any, path, keyword string) (map[string]any
 		if !ok {
 			return nil, unknown
 		}
-		if i < len(segments)-1 && !isObjectShaped(current) {
-			return nil, fmt.Errorf("%w: %q path %q: intermediate segment %q must be an object property", ErrSchemaDesignationInvalid, keyword, path, segment)
-		}
+		parent = fmt.Sprintf("segment %q", segment)
 	}
 	if !declaresScalarType(current) {
 		return nil, fmt.Errorf("%w: %q property %q must locally declare exactly one scalar type", ErrSchemaDesignationInvalid, keyword, path)
