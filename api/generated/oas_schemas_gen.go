@@ -41589,6 +41589,18 @@ type UserSchema struct {
 	// The user Schema version used for this schema.
 	MetaSchema             url.URL     `json:"metaSchema"`
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
+	// Path of the leaf property whose value identifies a user (nested leaves
+	// are addressed by their dot-joined attribute path). The property must
+	// carry `x-unique` "project". Required when an auth method needing
+	// identifier-first dispatch (password) is enabled. Passkey is exempt:
+	// discoverable credentials identify the user through the assertion
+	// itself, so passkey-only and API-managed schemas may designate nothing;
+	// flows using identifier-first passkey are validated at the flow level
+	// instead.
+	XMinusIdentifier OptString `json:"x-identifier"`
+	// Ordered leaf property paths whose values, joined with a space, render
+	// the user's display name.
+	XMinusDisplay []string `json:"x-display"`
 	// A map of additional properties for the user definition, where the
 	// key is the property name and the value is the property schema.
 	Properties      OptUserSchemaProperties `json:"properties"`
@@ -41618,6 +41630,16 @@ func (s *UserSchema) GetMetaSchema() url.URL {
 // GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
 func (s *UserSchema) GetXMinusAuthMinusMethods() AuthMethods {
 	return s.XMinusAuthMinusMethods
+}
+
+// GetXMinusIdentifier returns the value of XMinusIdentifier.
+func (s *UserSchema) GetXMinusIdentifier() OptString {
+	return s.XMinusIdentifier
+}
+
+// GetXMinusDisplay returns the value of XMinusDisplay.
+func (s *UserSchema) GetXMinusDisplay() []string {
+	return s.XMinusDisplay
 }
 
 // GetProperties returns the value of Properties.
@@ -41653,6 +41675,16 @@ func (s *UserSchema) SetMetaSchema(val url.URL) {
 // SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.
 func (s *UserSchema) SetXMinusAuthMinusMethods(val AuthMethods) {
 	s.XMinusAuthMinusMethods = val
+}
+
+// SetXMinusIdentifier sets the value of XMinusIdentifier.
+func (s *UserSchema) SetXMinusIdentifier(val OptString) {
+	s.XMinusIdentifier = val
+}
+
+// SetXMinusDisplay sets the value of XMinusDisplay.
+func (s *UserSchema) SetXMinusDisplay(val []string) {
+	s.XMinusDisplay = val
 }
 
 // SetProperties sets the value of Properties.
