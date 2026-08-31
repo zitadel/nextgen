@@ -18,9 +18,11 @@ CREATE TABLE zitadel_nextgen.environments (
 CREATE UNIQUE INDEX uq_environments_project_name
     ON zitadel_nextgen.environments (project_id, name);
 
--- Serves the pipeline-ordered list (created_at ASC, id ASC).
+-- Serves the creation-ordered list (created_at ASC, name ASC). name is the
+-- tiebreak, not id: seeded rows share a created_at and id orders differently
+-- per dialect (ADR 047).
 CREATE INDEX idx_environments_project_created_at
-    ON zitadel_nextgen.environments (project_id, created_at, id);
+    ON zitadel_nextgen.environments (project_id, created_at, name);
 
 -- +goose Down
 DROP INDEX IF EXISTS zitadel_nextgen.idx_environments_project_created_at;

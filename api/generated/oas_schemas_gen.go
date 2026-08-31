@@ -10493,8 +10493,6 @@ func (s *EnvNotFound) SetDetails(val OptEnvNotFoundDetails) {
 	s.Details = val
 }
 
-func (*EnvNotFound) getEnvironmentByNameRes() {}
-
 // Additional error-specific context.
 type EnvNotFoundDetails map[string]jx.Raw
 

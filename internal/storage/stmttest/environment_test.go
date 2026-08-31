@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -100,16 +101,20 @@ func TestEnvironmentStatements_NameReusableAcrossProjects(t *testing.T) {
 	})
 }
 
-func TestEnvironmentStatements_ListIsProjectScopedInPipelineOrder(t *testing.T) {
+func TestEnvironmentStatements_ListIsProjectScopedInCreationOrder(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureEnvironmentProject(t, d.stmts)
 		otherProject := ensureEnvironmentProject(t, d.stmts)
 
-		want := make([]string, 0, len(domain.DefaultEnvironmentNames))
+		// Seeded in pipeline order, inside one transaction — so every row
+		// shares a created_at and the name tiebreak decides the result. That
+		// is the point of ordering by name rather than id: id is a monotonic
+		// ULID here but a random UUID on spanner, so an id tiebreak would
+		// answer differently per dialect (ADR 047).
 		for _, name := range domain.DefaultEnvironmentNames {
 			createEnvironment(t, d.stmts, projectID, name)
-			want = append(want, name)
 		}
+		want := slices.Sorted(slices.Values(domain.DefaultEnvironmentNames))
 		createEnvironment(t, d.stmts, otherProject, "prod")
 
 		result, err := d.stmts.ListEnvironments(
@@ -123,7 +128,6 @@ func TestEnvironmentStatements_ListIsProjectScopedInPipelineOrder(t *testing.T) 
 			assert.Equal(t, projectID, item.ProjectID)
 			got = append(got, item.Name)
 		}
-		// Oldest first: the seed order is the pipeline order.
 		assert.Equal(t, want, got)
 	})
 }

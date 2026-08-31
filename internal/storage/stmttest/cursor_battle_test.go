@@ -273,20 +273,24 @@ func battleBrandings(t *testing.T, d dialect) {
 func battleEnvironments(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureEnvironmentProject(t, d.stmts)
-	names := []string{"dev", "staging", "prod", "preview", "sandbox"}
+	// Five names, not the three seeded ones: drainIncarnation needs more rows
+	// than the emission limit so the last page is short. They are created in
+	// name order because the seed shares one created_at, so name decides the
+	// order the drain must see.
+	names := []string{"dev", "preview", "prod", "sandbox", "staging"}
 	want := make([]string, 0, len(names))
 	for _, name := range names {
 		want = append(want, createEnvironment(t, d.stmts, projectID, name).ID)
 	}
 	filter := database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID)
-	orderAsc := environment.PipelineOrder()
+	orderAsc := environment.CreationOrder()
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error) {
 		return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
 			Filter: filter, Pagination: page,
 		})
 	}, func(e *domain.Environment) string { return e.ID }, 2)
 
-	t.Run("pipeline_order_helper", func(t *testing.T) {
+	t.Run("creation_order_helper", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Environment], error) {
 			return d.stmts.ListEnvironments(unfilteredListCtx(t), environment.ListOptions(projectID, 2, cursor))
 		}, func(e *domain.Environment) string { return e.ID })

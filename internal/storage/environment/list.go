@@ -5,32 +5,43 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// PipelineOrder is created_at ASC, id ASC.
+// CreationOrder is created_at ASC, name ASC.
 //
-// Oldest first, unlike the revisioned resources: environments are a small
-// stable set seeded in promotion order (dev, staging, prod), and reading them
-// back in that order is what a deploy target prompt wants. id (a ULID under
-// postgres/sqlite, a UUID under spanner) breaks created_at ties so the order
-// is total and keyset pages cannot skip or repeat a row.
-func PipelineOrder() database.OrderBy[domain.EnvironmentField] {
+// name is the tiebreak rather than id, because id cannot order these rows
+// portably: a project's environments are seeded inside the project-creation
+// transaction, where postgres `now()` is the transaction timestamp and spanner
+// evaluates one `CURRENT_TIMESTAMP()`, so every seeded row shares a created_at
+// and the tiebreak decides the whole result. id is a monotonic ULID under
+// postgres and sqlite but a random UUID under spanner (ADR 047), so ordering
+// by it returns a different order per dialect.
+//
+// name is NOT NULL and unique per project, so with project_id fixed by the
+// filter this is a total order on every dialect — which keyset pagination
+// needs, or a page boundary could skip or repeat a row.
+//
+// It is not a promotion order: seeded environments come back alphabetically,
+// not dev → staging → prod. Ordering environments by their role in a pipeline
+// needs a position the rows do not carry, and defining one belongs to the
+// environment lifecycle (#528) rather than here.
+func CreationOrder() database.OrderBy[domain.EnvironmentField] {
 	return database.OrderBy[domain.EnvironmentField]{
 		Columns: []database.Column[domain.EnvironmentField]{
 			database.Col(domain.EnvironmentFieldCreatedAt),
-			database.Col(domain.EnvironmentFieldID),
+			database.Col(domain.EnvironmentFieldName),
 		},
 		Direction: database.OrderAsc,
 	}
 }
 
 // ListOptions returns options for listing a project's environments in
-// pipeline order, capped at limit and resumed from cursor.
+// creation order, capped at limit and resumed from cursor.
 func ListOptions(projectID string, limit uint32, cursor []byte) *database.ListOptions[domain.EnvironmentField] {
 	return &database.ListOptions[domain.EnvironmentField]{
 		Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
 		Pagination: database.Page[domain.EnvironmentField]{
 			Limit:   limit,
 			Cursor:  cursor,
-			OrderBy: PipelineOrder(),
+			OrderBy: CreationOrder(),
 		},
 	}
 }
