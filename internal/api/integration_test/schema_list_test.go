@@ -37,7 +37,7 @@ func TestListSchemasPagination(t *testing.T) {
 			"kind": "user-schema",
 			"type": "object",
 			"x-auth-methods": {
-				"password": { "enabled": true }
+				"passkey": { "enabled": true }
 			},
 			"properties": {
 				"prop%d": { "type": "string" }
@@ -135,7 +135,7 @@ func TestListSchemasRevisions(t *testing.T) {
 			"kind": "user-schema",
 			"type": "object",
 			"x-auth-methods": {
-				"password": { "enabled": true }
+				"passkey": { "enabled": true }
 			},
 			"properties": {
 				"givenName": { "type": "string" }
