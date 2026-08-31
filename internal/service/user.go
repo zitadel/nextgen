@@ -526,6 +526,22 @@ func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID str
 	)
 }
 
+// GetByIdentifier resolves a designated-identifier value with the full ADR
+// 058 §5 scoping: only users of the designating schemas (schemaURLs) and only
+// uniquely registered values of the designated property. Without the schema
+// scope, an equal value in another schema's unique-but-undesignated property
+// would collide with a legitimate identifier and break its login.
+func (l UserStatementsLookup) GetByIdentifier(ctx context.Context, projectID string, schemaURLs []string, attr domain.Attribute) (*domain.User, error) {
+	schemaFilters := make([]database.Filter[domain.UserField], 0, len(schemaURLs))
+	for _, schemaURL := range schemaURLs {
+		schemaFilters = append(schemaFilters, database.Equal(database.Col(domain.UserFieldSchemaURL), schemaURL))
+	}
+	return l.Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Or(schemaFilters...),
+	), UserQueryOptions{Attributes: []domain.Attribute{attr}, UniqueAttributesOnly: true})
+}
+
 // UserStatementsIdentityReader adapts [UserStatements] to [UserIdentityReader].
 type UserStatementsIdentityReader struct {
 	Pool StatementPool

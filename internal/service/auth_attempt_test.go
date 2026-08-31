@@ -520,6 +520,145 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 	})
 }
 
+func TestAuthAttemptService_VerifyProof_CrossSchemaIdentifier(t *testing.T) {
+	newUserChallengeAttempt := func() *domain.AuthAttempt {
+		challenge := domain.SetAuthChallengeUser("ch-1", time.Now(), time.Time{}, 0)
+		return &domain.AuthAttempt{
+			ProjectID: "proj",
+			ID:        "att-1",
+			Checks:    []domain.AuthCheck{challenge},
+		}
+	}
+
+	// The direct API leaves AttributeName empty: the bare value resolves
+	// against every schema's designated identifier (ADR 058 §5).
+	bareProof := service.UserProof{LoginName: "u@example.com"}
+
+	userSchema := func(schemaURL, document string) *domain.JSONSchema {
+		return &domain.JSONSchema{
+			ProjectID: "proj",
+			URL:       schemaURL,
+			Kind:      domain.JSONSchemaKindUserSchema,
+			Schema:    []byte(document),
+		}
+	}
+
+	expectSchemas := func(stmts *mocks.MockAllStatements, schemas ...*domain.JSONSchema) {
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: schemas}, nil)
+	}
+
+	expectAttempt := func(stmts *mocks.MockAllStatements) {
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+	}
+
+	verify := func(t *testing.T, stmts *mocks.MockAllStatements, users service.UserLookup) (*domain.AuthAttempt, error) {
+		t.Helper()
+		svc := newAuthAttemptSvc(gomock.NewController(t), stmts, nil, users)
+		return svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: bareProof,
+		})
+	}
+
+	noRow := database.NewNoRowFoundError(errors.New("no rows"))
+	attr := domain.Attribute{Key: "email", Value: "u@example.com"}
+
+	t.Run("resolves against the single designating schema", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+		expectAttempt(stmts)
+		expectSchemas(stmts, userSchema("https://s/human", `{"x-identifier":"email"}`))
+		users.EXPECT().GetByIdentifier(gomock.Any(), "proj", []string{"https://s/human"}, attr).
+			Return(&domain.User{ID: "user-1"}, nil)
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		got, err := verify(t, stmts, users)
+
+		require.NoError(t, err)
+		factor, ok := domain.CheckAs[*domain.AuthFactorUser](got, domain.AuthCheckTypeUser)
+		require.True(t, ok)
+		assert.Equal(t, "user-1", factor.UserID)
+	})
+
+	t.Run("groups revisions sharing a designation into one scoped lookup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+		expectAttempt(stmts)
+		expectSchemas(stmts,
+			userSchema("https://s/human/v1", `{"x-identifier":"email"}`),
+			userSchema("https://s/human/v2", `{"x-identifier":"email"}`),
+			userSchema("https://s/admin", `{"x-identifier":"username"}`),
+		)
+		users.EXPECT().GetByIdentifier(gomock.Any(), "proj", []string{"https://s/human/v1", "https://s/human/v2"}, attr).
+			Return(nil, noRow)
+		users.EXPECT().GetByIdentifier(gomock.Any(), "proj", []string{"https://s/admin"}, domain.Attribute{Key: "username", Value: "u@example.com"}).
+			Return(&domain.User{ID: "admin-1"}, nil)
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		got, err := verify(t, stmts, users)
+
+		require.NoError(t, err)
+		factor, ok := domain.CheckAs[*domain.AuthFactorUser](got, domain.AuthCheckTypeUser)
+		require.True(t, ok)
+		assert.Equal(t, "admin-1", factor.UserID)
+	})
+
+	t.Run("rejects a value matching several designated properties", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+		expectAttempt(stmts)
+		expectSchemas(stmts,
+			userSchema("https://s/human", `{"x-identifier":"email"}`),
+			userSchema("https://s/admin", `{"x-identifier":"username"}`),
+		)
+		users.EXPECT().GetByIdentifier(gomock.Any(), "proj", gomock.Any(), gomock.Any()).
+			Return(&domain.User{ID: "user-1"}, nil)
+		users.EXPECT().GetByIdentifier(gomock.Any(), "proj", gomock.Any(), gomock.Any()).
+			Return(&domain.User{ID: "admin-1"}, nil)
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		got, err := verify(t, stmts, users)
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+	})
+
+	t.Run("rejects when no designated identifier matches", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+		expectAttempt(stmts)
+		expectSchemas(stmts, userSchema("https://s/human", `{"x-identifier":"email"}`))
+		users.EXPECT().GetByIdentifier(gomock.Any(), "proj", gomock.Any(), gomock.Any()).
+			Return(nil, noRow)
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		got, err := verify(t, stmts, users)
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+	})
+
+	t.Run("rejects without lookups when no schema designates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+		expectAttempt(stmts)
+		expectSchemas(stmts, userSchema("https://s/passkey-only", `{"type":"object"}`))
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		got, err := verify(t, stmts, users)
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+	})
+}
+
 func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 	lookupErr := errors.New("password missing")
 
