@@ -93,12 +93,18 @@ func confirmSeeded(ctx context.Context, pool service.StatementPool) error {
 	// The remedy deliberately does not mention deleting the project. Its
 	// children cascade — users, teams, schemas, sessions, branding, grants — and
 	// this check exists to greet *existing* deployments, which are the ones with
-	// data to lose. Turning the flag back off restores the pre-upgrade behaviour
-	// without touching a row.
+	// data to lose.
+	//
+	// It also names the pin, not just the flag. Clearing the flag alone leaves
+	// ResolvedProjectID empty, and DefaultProject then answers with the
+	// earliest-created project, which is only this one if the bootstrap ran
+	// before any other project existed. Pinning platform.project_id keeps the
+	// console and claim routing on the same project the deployment used before.
 	return fmt.Errorf(
 		"platform project %q exists but has no active token encryption key, so it was created by a bootstrap that predates seeding "+
 			"and cannot serve a registration. Seeding an existing project in place is not implemented yet (#527); "+
-			"until it is, unset platform.bootstrap_project to start with the pre-upgrade behaviour. "+
+			"until it is, unset platform.bootstrap_project and set platform.project_id to %[1]q, "+
+			"which starts with the pre-upgrade behaviour and keeps the same default project. "+
 			"Do not delete the project to force a reseed: that cascades to its users, teams, schemas and sessions",
 		domain.PlatformProjectID)
 }
