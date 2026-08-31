@@ -9,8 +9,10 @@
 > (which supersedes the Withdrawn ADR 003). In the MVP, claim is
 > **association-only**: it writes a project→team **grant** in the permission
 > engine, authenticated on completion by the platform **session cookie**, and
-> attaches the project to the claiming user's **pre-existing "Personal Team"**
-> (created at platform registration, not here). Identity is **email
+> attaches the project to the claiming user's **pre-existing personal team**
+> (created at platform registration, not here; its name is derived per user
+> rather than a shared "Personal Team" literal, because team names are unique
+> per project — ADR 046 §4). Identity is **email
 > registration and login only** (no SSO/OAuth). Accordingly, the sections below
 > on **what authenticates the claim (the GitHub/Google OAuth authenticators)**,
 > **secret rotation at claim**, **domain-based team matching / team
