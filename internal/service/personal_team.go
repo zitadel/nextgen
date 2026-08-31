@@ -20,10 +20,10 @@ import (
 // (`personalTeamForUserStmt`, shared with the claim service) — so a user who
 // already holds any membership is already provisioned and the call is a no-op.
 //
-// An idempotent *ensure* rather than a create: it runs from more than one call
-// site (after flow registration, and as a self-heal on session exchange), both
-// best-effort, and users created before the effect existed converge on their
-// next sign-in.
+// An idempotent *ensure* rather than a create: it runs on session exchange —
+// the one credential-agnostic point every registration and every sign-in
+// passes through before any authenticated call — best-effort, so users created
+// before the effect existed converge on their next sign-in too.
 type PersonalTeamEnsurer interface {
 	// EnsurePersonalTeam is a no-op outside the platform project and for users
 	// that already hold an active membership. Otherwise it creates the team

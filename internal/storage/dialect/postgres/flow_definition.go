@@ -19,13 +19,13 @@ const (
 
 	createFlowDefinitionStmt = `INSERT INTO zitadel_nextgen.flow_definitions ` +
 		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
-		`VALUES ($1, $2, $3, $4, $5` + statusCast + `, $6` + purposeArrCast + `, $7, NOW(), NOW())`
+		`VALUES ($1, $2, $3, $4, $5` + statusCast + `, $6` + purposeArrCast + `, $7, NOW(), NOW()) RETURNING created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM zitadel_nextgen.flow_definitions WHERE project_id = $1 AND id = $2`
 
 	updateFlowDefinitionStmt = `UPDATE zitadel_nextgen.flow_definitions SET ` +
 		`name = $1, schema_version = $2, status = $3` + statusCast + `, purposes = $4` + purposeArrCast + `, ` +
-		`definition = $5, updated_at = NOW() WHERE project_id = $6 AND id = $7`
+		`definition = $5, updated_at = NOW() WHERE project_id = $6 AND id = $7 RETURNING created_at, updated_at`
 
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
 		`FROM zitadel_nextgen.flow_definitions`
@@ -52,7 +52,7 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 	}
 	purposes := flowdefinition.PurposeStrings(entity)
 	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
-		if _, err := tx.Exec(ctx, createFlowDefinitionStmt,
+		if err := tx.QueryRow(ctx, createFlowDefinitionStmt,
 			entity.ProjectID,
 			entity.ID,
 			entity.Name,
@@ -60,9 +60,10 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			entity.Status.String(),
 			purposes,
 			content,
-		); err != nil {
+		).Scan(&entity.CreatedAt, &entity.UpdatedAt); err != nil {
 			return wrapError(err)
 		}
+		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
 	})
@@ -98,7 +99,7 @@ func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, enti
 		return err
 	}
 	purposes := flowdefinition.PurposeStrings(entity)
-	_, err = f.client.Exec(ctx, updateFlowDefinitionStmt,
+	if err := f.client.QueryRow(ctx, updateFlowDefinitionStmt,
 		entity.Name,
 		entity.SchemaVersion,
 		entity.Status.String(),
@@ -106,8 +107,12 @@ func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, enti
 		content,
 		entity.ProjectID,
 		entity.ID,
-	)
-	return wrapError(err)
+	).Scan(&entity.CreatedAt, &entity.UpdatedAt); err != nil {
+		return wrapError(err)
+	}
+	// pgx scans timestamptz in Local; reads go through ToDomain, which is UTC.
+	entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
+	return nil
 }
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].

@@ -166,7 +166,7 @@ func TestBranding(t *testing.T) {
 			FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
+		require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 		flowResp := createBrandingTestFlow(t, client, project.ID)
 		require.Equal(t, api.BrandingLayoutSplit, flowResp.Branding.Value.Layout.Value)
@@ -214,7 +214,7 @@ func TestBranding(t *testing.T) {
 			FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
+		require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 		flowResp := createBrandingTestFlow(t, bareClient, bare.ID)
 		assert.Equal(t, api.BrandingLayoutCentered, flowResp.Branding.Value.Layout.Value)

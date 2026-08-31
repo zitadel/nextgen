@@ -50,10 +50,12 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 		return nil, err
 	}
 
-	// Platform personal-team self-heal (#527): every sign-in converges the
-	// account toward having its personal team — covering a missed
-	// registration-time ensure and every user provisioned before the effect
-	// existed (the backfill). Best-effort: a failure must not cost the login;
+	// Platform personal-team ensure (#527). The exchange is the one
+	// credential-agnostic point every account passes through before any
+	// authenticated call: a fresh registration exchanges its handoff token
+	// immediately, so the team exists before the first claim, and users
+	// provisioned before this effect existed converge on their next sign-in
+	// (the backfill). Best-effort: a failure must not cost the login;
 	// claim/complete's 403 remains the honest floor until the next attempt.
 	if h.personalTeams != nil && session.UserID != nil {
 		if err := h.personalTeams.EnsurePersonalTeam(ctx, session.ProjectID, *session.UserID); err != nil {
