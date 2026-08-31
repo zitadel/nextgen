@@ -22,6 +22,16 @@
 > a non-simple header. SameSite becomes defense in depth rather than the only
 > check. This is a wire-contract change to an already-implemented flow; do not
 > implement §2's CSRF posture from this ADR alone.
+>
+> **Amendment (2026-08-31):** [§4](#4-the-personal-team-is-created-at-registration-not-at-claim)
+> stated that team names are not unique. That was never true of the schema: the
+> teams table has carried a unique index on `(project_id, name_lower)` since it
+> was introduced, so team names are unique per project. §4 is corrected below,
+> and the correction is load-bearing rather than editorial. The personal team's
+> name is derived per user, and that uniqueness is what limits a user to one
+> team: two ensures racing compute the same name, so the index rejects the
+> second insert instead of minting a second team (#527, #979).
+>
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
 > Withdrawn [ADR 003](003-create-first-claim-later.md), which removed the
@@ -161,13 +171,19 @@ hashed at rest) and `complete` must be rate-limited.
 
 ### 4. The personal team is created at registration, not at claim
 
-The user, their **"Personal Team"**, and their membership in it all exist before
+The user, their **personal team**, and their membership in it all exist before
 claim: they are created when the user registers on the platform project. The
 claim transaction only writes the project-to-team grant; it never creates a team
 or a membership.
 
-- The team is named "Personal Team" and is user-renamable later; team names are
-  not unique.
+- Team names are unique per project, enforced by a unique index on
+  `(project_id, name_lower)`. The personal team's name is therefore derived per
+  user rather than shared: a single literal "Personal Team" would collide on the
+  second registration. The name is a renamable placeholder, not an identifier.
+- That per-user determinism is the one-team-per-user constraint. Because the
+  name is a pure function of the user id, a second concurrent creation for the
+  same user collides on the index and converges on the winner instead of
+  creating a second team.
 - Automatic team creation is restricted to platform-project registrations;
   customer projects must not auto-create teams.
 - A returning claimer reuses their one existing personal team (per ADR 024);

@@ -2123,6 +2123,45 @@ func (c *MockAllStatementsGetChallengeByIDCall) DoAndReturn(f func(context.Conte
 	return c
 }
 
+// GetEarliestTeamMembership mocks base method.
+func (m *MockAllStatements) GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEarliestTeamMembership", ctx, projectID, userID)
+	ret0, _ := ret[0].(*domain.TeamMembership)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEarliestTeamMembership indicates an expected call of GetEarliestTeamMembership.
+func (mr *MockAllStatementsMockRecorder) GetEarliestTeamMembership(ctx, projectID, userID any) *MockAllStatementsGetEarliestTeamMembershipCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEarliestTeamMembership", reflect.TypeOf((*MockAllStatements)(nil).GetEarliestTeamMembership), ctx, projectID, userID)
+	return &MockAllStatementsGetEarliestTeamMembershipCall{Call: call}
+}
+
+// MockAllStatementsGetEarliestTeamMembershipCall wrap *gomock.Call
+type MockAllStatementsGetEarliestTeamMembershipCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetEarliestTeamMembershipCall) Return(arg0 *domain.TeamMembership, arg1 error) *MockAllStatementsGetEarliestTeamMembershipCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetEarliestTeamMembershipCall) Do(f func(context.Context, string, string) (*domain.TeamMembership, error)) *MockAllStatementsGetEarliestTeamMembershipCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetEarliestTeamMembershipCall) DoAndReturn(f func(context.Context, string, string) (*domain.TeamMembership, error)) *MockAllStatementsGetEarliestTeamMembershipCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetEncryptionKey mocks base method.
 func (m *MockAllStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
 	m.ctrl.T.Helper()
@@ -8713,6 +8752,45 @@ func (c *MockClaimStatementsGetChallengeByIDCall) Do(f func(context.Context, str
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockClaimStatementsGetChallengeByIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.ClaimChallenge, error)) *MockClaimStatementsGetChallengeByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetEarliestTeamMembership mocks base method.
+func (m *MockClaimStatements) GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEarliestTeamMembership", ctx, projectID, userID)
+	ret0, _ := ret[0].(*domain.TeamMembership)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEarliestTeamMembership indicates an expected call of GetEarliestTeamMembership.
+func (mr *MockClaimStatementsMockRecorder) GetEarliestTeamMembership(ctx, projectID, userID any) *MockClaimStatementsGetEarliestTeamMembershipCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEarliestTeamMembership", reflect.TypeOf((*MockClaimStatements)(nil).GetEarliestTeamMembership), ctx, projectID, userID)
+	return &MockClaimStatementsGetEarliestTeamMembershipCall{Call: call}
+}
+
+// MockClaimStatementsGetEarliestTeamMembershipCall wrap *gomock.Call
+type MockClaimStatementsGetEarliestTeamMembershipCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockClaimStatementsGetEarliestTeamMembershipCall) Return(arg0 *domain.TeamMembership, arg1 error) *MockClaimStatementsGetEarliestTeamMembershipCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockClaimStatementsGetEarliestTeamMembershipCall) Do(f func(context.Context, string, string) (*domain.TeamMembership, error)) *MockClaimStatementsGetEarliestTeamMembershipCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockClaimStatementsGetEarliestTeamMembershipCall) DoAndReturn(f func(context.Context, string, string) (*domain.TeamMembership, error)) *MockClaimStatementsGetEarliestTeamMembershipCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -61,37 +61,52 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 		return nil
 	}
 
-	// Idempotency: any earliest active membership is the team this would
-	// create, by the same resolution the claim service uses.
-	if _, err := s.v2Pool.Statements().GetPersonalTeamForUser(ctx, projectID, userID); err == nil {
+	// The earliest membership decides, and its mere existence is the answer:
+	// this user's personal team is already settled. Active means provisioned.
+	// Deactivated means an administrator took the team away, and the ensure
+	// must leave that alone — minting a second team would not help, because
+	// claim resolves the earliest membership and would keep seeing the
+	// deactivated one. Asking for the membership rather than the resolved team
+	// is what tells those two states apart from "holds nothing at all".
+	if _, err := s.v2Pool.Statements().GetEarliestTeamMembership(ctx, projectID, userID); err == nil {
 		return nil
 	} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-		return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed fetching personal team for user %s", userID))
-	}
-
-	team, err := domain.NewTeam(projectID, personalTeamName(userID))
-	if err != nil {
-		return err
+		return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed fetching earliest team membership for user %s", userID))
 	}
 
 	actorHuman := domain.EventActorTypeHuman
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		// CreateTeam mints the team id; CreateTeamMembership maintains the
-		// authz membership edge itself, so the pair is complete provisioning.
-		if err := tx.Statements().CreateTeam(ctx, team); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// The team may already exist without this membership: the user was
+		// removed from their own team, or a previous provisioning attempt
+		// committed the team and lost the membership. Reuse it rather than
+		// colliding with it forever — the requirement is that the user ends up
+		// in a team, not that this call is the one that created it.
+		team, err := s.existingTeam(ctx, tx.Statements(), projectID, userID)
+		if err != nil {
 			return err
 		}
-		if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeTeamCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  team.ProjectID,
-			EntityType: "team",
-			EntityID:   team.ID,
-			ActorID:    &userID,
-			ActorType:  &actorHuman,
-			Payload:    domain.TeamPayload{Name: team.Name},
-		}); err != nil {
-			return err
+		if team == nil {
+			team, err = domain.NewTeam(projectID, personalTeamName(userID))
+			if err != nil {
+				return err
+			}
+			// CreateTeam mints the team id; CreateTeamMembership maintains the
+			// authz membership edge itself, so the pair is complete provisioning.
+			if err := tx.Statements().CreateTeam(ctx, team); err != nil {
+				return err
+			}
+			if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+				Type:       domain.EventTypeTeamCreated,
+				Category:   domain.EventCategoryAdmin,
+				ProjectID:  team.ProjectID,
+				EntityType: "team",
+				EntityID:   team.ID,
+				ActorID:    &userID,
+				ActorType:  &actorHuman,
+				Payload:    domain.TeamPayload{Name: team.Name},
+			}); err != nil {
+				return err
+			}
 		}
 		return tx.Statements().CreateTeamMembership(ctx, &domain.TeamMembership{
 			ProjectID: projectID,
@@ -102,25 +117,43 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 	})
 
 	if err != nil {
-		// The name is deterministic per user, so a unique-name violation means
-		// a concurrent ensure for THIS user already took the name — registration
-		// racing the first sign-in. If that winner has committed, it committed
-		// team AND membership together and we are already provisioned: converge.
-		// Confirm rather than assume.
+		// The name is deterministic per user, so a unique-name violation means a
+		// concurrent ensure for THIS user won the insert between our membership
+		// check and our create. If it has committed, it committed team AND
+		// membership together and we are already provisioned: converge.
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			if _, rerr := s.v2Pool.Statements().GetPersonalTeamForUser(ctx, projectID, userID); rerr == nil {
+			if _, rerr := s.v2Pool.Statements().GetEarliestTeamMembership(ctx, projectID, userID); rerr == nil {
 				return nil
 			}
 		}
-		// Either the winner had not committed yet, or the name is held by an
-		// unrelated team. Both call sites are best-effort and only log, so this
-		// reports rather than retries: retrying under a different name is what
-		// would produce the second team. The next sign-in ensures again, and by
-		// then the winner has committed.
+		// The winner had not committed yet. Report rather than retry under
+		// another name: retrying is what would produce the second team. Both
+		// call sites are best-effort and only log, and the next sign-in ensures
+		// again, by which point the winner has committed.
 		return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed creating team for user %s", userID))
 	}
 
 	return nil
+}
+
+// existingTeam finds this user's team by its deterministic name, or nil when
+// there is none. Reusing the existing statement rather than adding a by-name
+// read: the name is unique per project, so at most one team can come back.
+func (s *personalTeamService) existingTeam(ctx context.Context, stmts AllStatements, projectID, userID string) (*domain.Team, error) {
+	result, err := stmts.ListTeams(ctx, &database.ListOptions[domain.TeamField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TeamFieldName), personalTeamName(userID)),
+		),
+		Pagination: database.Page[domain.TeamField]{Limit: 1},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
 }
 
 // personalTeamName derives the team's name from the user id alone. This is what
