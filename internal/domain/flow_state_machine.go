@@ -1204,12 +1204,17 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowResolvedFields, error) {
 	ctx, def, state, current := pc.ctx, pc.def, pc.state, pc.currentStep
 	seen := map[Field]struct{}{}
+	var names []Field
 	collect := func(s *FlowDefinitionStep) {
 		if s == nil {
 			return
 		}
 		for _, f := range s.Fields {
+			if _, dup := seen[f]; dup {
+				continue
+			}
 			seen[f] = struct{}{}
+			names = append(names, f)
 		}
 	}
 	for _, name := range state.History {
@@ -1218,12 +1223,8 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 		}
 	}
 	collect(current)
-	if len(seen) == 0 {
+	if len(names) == 0 {
 		return FlowResolvedFields{}, nil
-	}
-	names := make([]Field, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
 	}
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
