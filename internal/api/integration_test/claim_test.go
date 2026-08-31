@@ -353,6 +353,70 @@ func TestCompleteClaimNoPersonalTeam(t *testing.T) {
 	assert.Equal(t, "claim.no_personal_team", body.GetCode())
 }
 
+// TestCompleteClaimPersonalTeamNotActive: the session user's only team was
+// deactivated, which cascades their membership to removed. The resolver refuses
+// the claim exactly as it does for a user with no team at all, but the code
+// must differ: no sign-in will provision around this one, so the client has to
+// be told an administrator is needed. Proves the second 403 variant survives
+// the error mapping and the generated sum-type decode, including the nested
+// producer details.
+func TestCompleteClaimPersonalTeamNotActive(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+	initOK := mustInitClaim(t, client, project.ID)
+
+	platformID := harness.EnsurePlatformProject(t).ID
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: platformID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+
+	userID := "user_" + helpers.RandString(8)
+	emailAttr, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+		ProjectID:               platformID,
+		SchemaURL:               apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL),
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              domain.CreateAttributes{*emailAttr},
+	}))
+
+	// Deactivating the team cascades every membership it owns to removed, which
+	// is how this state arises in practice.
+	require.NoError(t, harness.EnsureTeamService(t).Delete(t.Context(), platformID, team.ID))
+
+	client.SetSessionToken(platformSessionCookie(t, userID).Value)
+	resp, err := client.CompleteClaim(t.Context(),
+		&api.CompleteClaimRequest{ChallengeID: initOK.ChallengeID},
+		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+
+	forbidden, ok := resp.(*api.CompleteClaimForbidden)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	body, ok := forbidden.GetClaimPersonalTeamNotActive()
+	require.True(t, ok, "expected the not-active variant, got %q", forbidden.Type)
+	assert.Equal(t, "claim.personal_team_not_active", body.GetCode())
+
+	// Producer payloads nest under details.details, so this is the path a client
+	// actually reads to tell a removed team from a pending invitation. Read the
+	// raw member rather than the marshalled envelope: Details is a
+	// map[string]jx.Raw, so a string match on the whole body would depend on how
+	// encoding/json happens to treat the raw bytes.
+	details, ok := body.GetDetails().Get()
+	require.True(t, ok, "the not-active variant must carry details")
+	producer, ok := details["details"]
+	require.True(t, ok, "producer payload nests under details.details: %v", details)
+	assert.JSONEq(t, `{"membership_status":"removed"}`, string(producer))
+}
+
 // TestClaimStatusBearerMismatch: a valid project.write bearer for the same
 // project that is not the initiating one passes the authz gate but fails the
 // constant-time secret-hash compare → 403, before expiry is even evaluated.

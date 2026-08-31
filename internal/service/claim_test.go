@@ -368,6 +368,27 @@ func TestClaimService_Complete(t *testing.T) {
 			wantErr: domain.ErrPersonalTeamNotActive(string(domain.MembershipStatusRemoved)),
 		},
 		{
+			// The two reads take separate snapshots under read-committed, so a
+			// provisioning commit in between can show an active membership after
+			// the resolver has already refused. Reporting "not active: active"
+			// would be self-contradictory; the original verdict is the honest
+			// one and the next attempt succeeds.
+			name: "membership turned active between the two reads",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				unclaimedProjectStmts(s)
+				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(nil, database.NewNoRowFoundError(nil))
+				s.EXPECT().GetEarliestTeamMembership(gomock.Any(), claimPlatformProjID, "usr_1").
+					Return(&domain.TeamMembership{
+						ProjectID: claimPlatformProjID,
+						TeamID:    "team_fresh",
+						UserID:    "usr_1",
+						Status:    domain.MembershipStatusActive,
+					}, nil)
+			},
+			wantErr: domain.ErrClaimNoPersonalTeam(),
+		},
+		{
 			name: "lost the same-challenge race",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)

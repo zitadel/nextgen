@@ -96,10 +96,16 @@ type claimStatements interface {
 // undo, and no amount of retrying will clear it.
 //
 // The membership status rides along on the second so a client can distinguish a
-// removed team from a pending invitation. An *active* status there would mean
-// the team itself is deactivated rather than the membership; DeactivateTeam
-// cascades removed to every membership it owns, so that combination should not
-// occur, and the error code is the right answer for it regardless.
+// removed team from a pending invitation.
+//
+// This refines a verdict already reached; it does not revisit it. The two reads
+// take separate snapshots under read-committed, so provisioning or a
+// reactivation committing in between can show an *active* membership here even
+// though the resolver just refused the claim. Reporting "not active: active"
+// would be self-contradictory, so an active membership falls back to the
+// original verdict: the refusal is then transient and the next attempt sees the
+// team. (The same fallback covers an active membership on a deactivated team,
+// which DeactivateTeam's cascade to removed should already prevent.)
 func (s *claimService) noPersonalTeamErr(ctx context.Context, stmts claimStatements, userID string) error {
 	membership, err := stmts.GetEarliestTeamMembership(ctx, s.platformProjectID, userID)
 	if err != nil {
@@ -107,6 +113,9 @@ func (s *claimService) noPersonalTeamErr(ctx context.Context, stmts claimStateme
 			return domain.ErrClaimNoPersonalTeam()
 		}
 		return err
+	}
+	if membership.Status == domain.MembershipStatusActive {
+		return domain.ErrClaimNoPersonalTeam()
 	}
 	return domain.ErrPersonalTeamNotActive(membership.Status.String())
 }
