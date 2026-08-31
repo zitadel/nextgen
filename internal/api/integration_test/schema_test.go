@@ -35,6 +35,24 @@ func TestCreateSchema(t *testing.T) {
 				name:   "user-schema in body",
 				schema: harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema,
 			},
+			{
+				name: "password schema with a designated identifier",
+				schema: fmt.Sprintf(`{
+                  "title": "password with identifier",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/schemas/pw-with-identifier.json",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-identifier": "email",
+                  "x-auth-methods": {
+                    "password": { "enabled": true }
+                  },
+                  "properties": {
+                    "email": { "type": "string", "format": "email", "x-unique": "project" }
+                  }
+                }`, helpers.BuiltinSchemaBaseURL),
+			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
 			//	name: "user-schema by url",
@@ -147,6 +165,39 @@ func TestCreateSchema(t *testing.T) {
 
 			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
 		})
+
+		t.Run("password without a designated identifier is rejected with the rule named", func(t *testing.T) {
+			t.Parallel()
+
+			schema := fmt.Sprintf(`{
+                  "title": "password without identifier",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/schemas/pw-no-identifier.json",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-auth-methods": {
+                    "password": { "enabled": true }
+                  },
+                  "properties": {
+                    "email": { "type": "string", "x-unique": "project" }
+                  }
+                }`, helpers.BuiltinSchemaBaseURL)
+
+			apiSchema := api.UserSchema{}
+			require.NoError(t, apiSchema.UnmarshalJSON([]byte(schema)))
+
+			resp, err := client.CreateSchema(t.Context(), api.CreateSchemaReq{
+				Type:       api.UserSchemaCreateSchemaReq,
+				UserSchema: apiSchema,
+			}, api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)})
+			assert.NoError(t, err)
+			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			// The rule text must reach the client, not vanish into an
+			// unserialized Parent.
+			assert.Contains(t, helpers.MustMarshal(t, resp), "x-identifier")
+		})
+
 	})
 }
 
