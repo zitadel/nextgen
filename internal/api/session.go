@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -47,6 +48,32 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
+	}
+
+	// Platform personal-team ensure (#527). The exchange is the one
+	// credential-agnostic point every account passes through before any
+	// authenticated call: a fresh registration exchanges its handoff token
+	// immediately, so the team is normally in place before the first claim, and
+	// users provisioned before this effect existed converge on their next
+	// sign-in (the backfill).
+	//
+	// Best-effort, and that is a trade rather than an oversight. A failure here
+	// must not cost the login, because a provisioning hiccup taking down
+	// sign-in is far worse than the alternative it buys: the handoff is already
+	// spent, so the caller keeps a valid session that briefly has no team, and
+	// an immediate claim/complete answers claim.no_personal_team until the next
+	// exchange retries. That 403 is the honest floor, and it clears itself.
+	// Making the team a transactional postcondition of exchange would close the
+	// window but couple the auth path to a provisioning write; provisioning at
+	// claim instead is ruled out by ADR 046 §1, which says the claim
+	// transaction only writes the grant and never creates a team or membership.
+	if h.personalTeams != nil && session.UserID != nil {
+		if err := h.personalTeams.EnsurePersonalTeam(ctx, session.ProjectID, *session.UserID); err != nil {
+			slog.WarnContext(ctx, "personal team ensure failed on session exchange",
+				slog.String("project_id", session.ProjectID),
+				slog.String("user_id", *session.UserID),
+				slog.Any("error", err))
+		}
 	}
 
 	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, string(params.ProjectID), domain.EncryptionKeyPurposeToken)

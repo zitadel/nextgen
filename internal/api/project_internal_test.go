@@ -25,6 +25,9 @@ type stubProjectService struct {
 func (s stubProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
 	return s.created, nil
 }
+func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+	return s.created, nil
+}
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }

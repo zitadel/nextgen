@@ -27,6 +27,12 @@ type ProjectService interface {
 	// Returns the stored project including timestamps.
 	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
+	// CreateWithID is Create under a caller-supplied id, for the one project
+	// whose id the server owns rather than mints: the platform project
+	// (domain.PlatformProjectID). Reports the same already-exists error as
+	// Create when the id is taken.
+	CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
@@ -80,12 +86,29 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
+func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
 	project, err := domain.NewProject(name, previewOrigins)
 	if err != nil {
 		return nil, err
 	}
+	return s.create(ctx, project, seedDefaults)
+}
 
+// CreateWithID creates a project under a caller-supplied id rather than a
+// minted one, seeding exactly what Create seeds. Only the platform project
+// needs this: its id is well-known (domain.PlatformProjectID) so that every
+// deployment can address the same project, which is the whole point of a
+// bootstrap. Everything else must keep taking a minted id.
+func (s *projectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, previewOrigins)
+	if err != nil {
+		return nil, err
+	}
+	project.ID = id
+	return s.create(ctx, project, seedDefaults)
+}
+
+func (s *projectService) create(ctx context.Context, project *domain.Project, seedDefaults bool) (_ *domain.Project, err error) {
 	masterKey, err := s.keyService.GetMasterKeyCrypter(ctx)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get master key")

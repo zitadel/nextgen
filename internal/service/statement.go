@@ -345,6 +345,14 @@ type ClaimStatements interface {
 	// is not active. It never falls back to a later membership: a deactivated
 	// personal team is not silently replaced by another team the user belongs to.
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
+	// GetEarliestTeamMembership returns the same earliest membership
+	// GetPersonalTeamForUser resolves from, but regardless of its status and
+	// without joining the team. It exists to tell apart the two states
+	// GetPersonalTeamForUser deliberately collapses into NoRowFoundError:
+	// a user who holds no membership at all (NoRowFoundError here too) from one
+	// whose personal team is deactivated (a row with a non-active status).
+	// Provisioning must create a team for the first and leave the second alone.
+	GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error)
 }
 
 // ResourceScopeStatements persists resource_scope_index rows (path.id → project/team).
