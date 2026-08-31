@@ -31,7 +31,8 @@ type SchemaResolver interface {
 //   - `x-unique` (non-empty) → [FlowField.Unique]
 //   - the schema-root `x-identifier` designation → the designated field
 //     carries [FlowFieldChallengeIdentifier] +
-//     [FlowImplicitOutcomeUserNotFound]
+//     [FlowImplicitOutcomeUserNotFound] +
+//     [FlowImplicitOutcomeUserAlreadyExists]
 //   - `x-auth-methods#<method>` field name → credential challenge for
 //     that method (e.g. `x-auth-methods#password` → password)
 type SchemaFieldResolver struct{}
