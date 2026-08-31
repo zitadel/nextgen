@@ -16,6 +16,20 @@ var allowedGrantRelations = map[string]struct{}{
 	"admin":  {},
 }
 
+// isManagedGrant is the class this HTTP API may Get or Revoke. Create already
+// allowlists the same principal types and relations. Other authz_assignments
+// rows (project-secret setup, owning-team / claim) live in the same table and
+// must 404 here so a project secret cannot self-lockout or transfer ownership.
+func isManagedGrant(a *domain.AuthzAssignment) bool {
+	switch a.PrincipalType {
+	case domain.AuthzPrincipalTypeUser, domain.AuthzPrincipalTypeTeam:
+		_, ok := allowedGrantRelations[a.Relation]
+		return ok
+	default:
+		return false
+	}
+}
+
 type GrantService struct {
 	v2Pool            *DB
 	platformProjectID string
@@ -93,7 +107,7 @@ func (s *GrantService) Get(ctx context.Context, projectID, id string) (*domain.A
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get grant")
 	}
-	if asgn.RevokedAt != nil {
+	if asgn.RevokedAt != nil || !isManagedGrant(asgn) {
 		return nil, domain.ErrGrantNotFound()
 	}
 	return asgn, nil
@@ -108,7 +122,7 @@ func (s *GrantService) Revoke(ctx context.Context, projectID, id string) error {
 			}
 			return err
 		}
-		if asgn.RevokedAt != nil {
+		if asgn.RevokedAt != nil || !isManagedGrant(asgn) {
 			return domain.ErrGrantNotFound()
 		}
 		if err := tx.Statements().RevokeAuthzAssignment(ctx, projectID, id); err != nil {
@@ -165,6 +179,9 @@ func (s *GrantService) resolvePrincipalHome(ctx context.Context, stmts AllStatem
 	if scope.ResourceKind != wantKind {
 		return "", domain.ErrGrantPrincipalNotFound()
 	}
+	// When no platform project is pinned (bootstrap / single-project), any
+	// homed principal may be bound; this matches claim. When pinned, home
+	// must be that project.
 	if s.platformProjectID != "" && scope.ProjectID != s.platformProjectID {
 		return "", domain.ErrGrantPrincipalNotFound()
 	}

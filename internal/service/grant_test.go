@@ -232,6 +232,49 @@ func TestGrantService_Get(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
+
+	t.Run("sk_proj setup is not found", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_setup").Return(
+				domain.NewSKProjProjectSetupAssignment("proj_customer"), nil)
+		})
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_setup")
+		require.ErrorIs(t, err, domain.ErrGrantNotFound())
+		assert.Nil(t, got)
+	})
+
+	t.Run("owning-team grant is not found", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_own").Return(
+				domain.NewClaimTeamAssignment("proj_customer", "team_owner"), nil)
+		})
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_own")
+		require.ErrorIs(t, err, domain.ErrGrantNotFound())
+		assert.Nil(t, got)
+	})
+
+	t.Run("expired managed grant is still returned", func(t *testing.T) {
+		t.Parallel()
+		expired := time.Now().Add(-time.Hour)
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_exp").Return(&domain.AuthzAssignment{
+				ID:            "asgn_exp",
+				ProjectID:     "proj_customer",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   "user_grant01",
+				ObjectType:    "project",
+				Relation:      "viewer",
+				ExpiresAt:     &expired,
+			}, nil)
+		})
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_exp")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "asgn_exp", got.ID)
+		require.NotNil(t, got.ExpiresAt)
+	})
 }
 
 func TestGrantService_Revoke(t *testing.T) {
@@ -270,6 +313,24 @@ func TestGrantService_Revoke(t *testing.T) {
 			}, nil)
 		})
 		require.ErrorIs(t, svc.Revoke(t.Context(), "proj_customer", "asgn_1"), domain.ErrGrantNotFound())
+	})
+
+	t.Run("sk_proj setup is not found", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_setup").Return(
+				domain.NewSKProjProjectSetupAssignment("proj_customer"), nil)
+		})
+		require.ErrorIs(t, svc.Revoke(t.Context(), "proj_customer", "asgn_setup"), domain.ErrGrantNotFound())
+	})
+
+	t.Run("owning-team grant is not found", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_own").Return(
+				domain.NewClaimTeamAssignment("proj_customer", "team_owner"), nil)
+		})
+		require.ErrorIs(t, svc.Revoke(t.Context(), "proj_customer", "asgn_own"), domain.ErrGrantNotFound())
 	})
 }
 

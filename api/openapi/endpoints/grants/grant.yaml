@@ -41,7 +41,9 @@ properties:
     format: date-time
     description: When the grant was created.
   expires_at:
-    description: When the grant expires. Null when it does not expire.
+    description: |
+      When the grant expires. Null when it does not expire. GET still
+      returns expired unrevoked grants; authorization ignores them.
     oneOf:
       - type: string
         format: date-time

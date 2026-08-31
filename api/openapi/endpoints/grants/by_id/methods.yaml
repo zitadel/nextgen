@@ -2,10 +2,14 @@ get:
   operationId: getGrant
   summary: Get grant
   description: |
-    Loads a single active grant by `(project_id, id)`. Grants are not
-    registered in `resource_scope_index`; project scope is required on the
-    query (same as events). Misses, revoked rows, and cross-project ids
-    return 404.
+    Loads a grant by `(project_id, id)` that this API manages (user or team
+    bound to viewer, editor, or admin) and that has not been revoked.
+    "Active" here means not revoked: expired grants stay visible so the
+    client can DELETE before re-granting the same binding. Authorization
+    still ignores expired grants. Grants are not registered in
+    `resource_scope_index`; project scope is required on the query (same as
+    events). Misses, revoked rows, project-secret setup (`sk_proj`),
+    owning-team (`relation=team`) rows, and cross-project ids return 404.
   tags:
     - Grants
   security:
@@ -39,7 +43,9 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
-      description: No active grant was found for the given project and id.
+      description: |
+        No unrevoked collaboration grant was found for the given project and
+        id (including setup and owning-team rows this API does not manage).
       content:
         application/json:
           schema:
@@ -51,8 +57,10 @@ delete:
   operationId: deleteGrant
   summary: Revoke grant
   description: |
-    Soft-revokes the grant and emits `authz.revoked`. Already-revoked or
-    missing grants return 404. The row is not un-revoked.
+    Soft-revokes a grant this API manages and emits `authz.revoked`.
+    Already-revoked, missing, project-secret setup, and owning-team grants
+    return 404. The row is not un-revoked. Expired grants can still be
+    revoked so the unique binding can be reused.
   tags:
     - Grants
   security:
@@ -82,7 +90,9 @@ delete:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
-      description: No active grant was found for the given project and id.
+      description: |
+        No unrevoked collaboration grant was found for the given project and
+        id (including setup and owning-team rows this API does not manage).
       content:
         application/json:
           schema:

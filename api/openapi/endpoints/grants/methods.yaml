@@ -5,7 +5,9 @@ post:
     Bind a user or team to `project.viewer`, `project.editor`, or
     `project.admin` on the project identified by the `project-id` header.
     IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-    created here — claim owns that path.
+    created here — claim owns that path. An unrevoked grant with the same
+    principal and relation occupies the unique key even after `expires_at`;
+    DELETE it before re-creating.
   tags:
     - Grants
   security:
@@ -51,7 +53,7 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     '409':
-      description: An active grant with this principal and relation already exists on the project.
+      description: An unrevoked grant with this principal and relation already exists on the project.
       content:
         application/json:
           schema:

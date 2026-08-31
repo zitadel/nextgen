@@ -40,7 +40,7 @@ content:
         summary: grant.already_exists
         value:
           code: grant.already_exists
-          message: 'an active grant with this principal and relation already exists on the project'
+          message: 'an unrevoked grant with this principal and relation already exists on the project'
       grant.invalid:
         summary: grant.invalid
         value:
@@ -60,7 +60,7 @@ content:
         summary: grant.principal_not_found
         value:
           code: grant.principal_not_found
-          message: 'grant not found'
+          message: 'the principal could not be resolved'
       internal:
         summary: internal
         value:

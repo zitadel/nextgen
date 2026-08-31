@@ -1191,7 +1191,9 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 // Bind a user or team to `project.viewer`, `project.editor`, or
 // `project.admin` on the project identified by the `project-id` header.
 // IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-// created here — claim owns that path.
+// created here — claim owns that path. An unrevoked grant with the same
+// principal and relation occupies the unique key even after `expires_at`;
+// DELETE it before re-creating.
 //
 // POST /grants
 func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2748,8 +2750,10 @@ func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped b
 
 // handleDeleteGrantRequest handles deleteGrant operation.
 //
-// Soft-revokes the grant and emits `authz.revoked`. Already-revoked or
-// missing grants return 404. The row is not un-revoked.
+// Soft-revokes a grant this API manages and emits `authz.revoked`.
+// Already-revoked, missing, project-secret setup, and owning-team grants
+// return 404. The row is not un-revoked. Expired grants can still be
+// revoked so the unique binding can be reused.
 //
 // DELETE /grants/{id}
 func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4850,10 +4854,14 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 
 // handleGetGrantRequest handles getGrant operation.
 //
-// Loads a single active grant by `(project_id, id)`. Grants are not
-// registered in `resource_scope_index`; project scope is required on the
-// query (same as events). Misses, revoked rows, and cross-project ids
-// return 404.
+// Loads a grant by `(project_id, id)` that this API manages (user or team
+// bound to viewer, editor, or admin) and that has not been revoked.
+// "Active" here means not revoked: expired grants stay visible so the
+// client can DELETE before re-granting the same binding. Authorization
+// still ignores expired grants. Grants are not registered in
+// `resource_scope_index`; project scope is required on the query (same as
+// events). Misses, revoked rows, project-secret setup (`sk_proj`),
+// owning-team (`relation=team`) rows, and cross-project ids return 404.
 //
 // GET /grants/{id}
 func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

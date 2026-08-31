@@ -13,11 +13,11 @@ func ErrGrantNotFound() Error {
 }
 
 func ErrGrantAlreadyExists() Error {
-	return newError(PrefixGrant.ErrorCodePrefix("already_exists"), "an active grant with this principal and relation already exists on the project", nil, nil)
+	return newError(PrefixGrant.ErrorCodePrefix("already_exists"), "an unrevoked grant with this principal and relation already exists on the project", nil, nil)
 }
 
 func ErrGrantPrincipalNotFound() Error {
-	return newError(PrefixGrant.ErrorCodePrefix("principal_not_found"), "grant not found", nil, nil)
+	return newError(PrefixGrant.ErrorCodePrefix("principal_not_found"), "the principal could not be resolved", nil, nil)
 }
 
 func ErrGrantPermissionDenied() Error {

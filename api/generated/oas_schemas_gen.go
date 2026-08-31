@@ -8864,7 +8864,9 @@ type CreateGrantRequest struct {
 	PrincipalID string `json:"principal_id"`
 	// Catalog relation on `object_type` `project`. `team` (owning-team) is not allowed.
 	Relation CreateGrantRequestRelation `json:"relation"`
-	// Optional expiry. Must be in the future when set.
+	// Optional expiry. Must be in the future when set. Expiry stops
+	// authorization but does not free the unique binding; DELETE the grant
+	// before posting the same principal and relation again.
 	ExpiresAt OptDateTime `json:"expires_at"`
 }
 
@@ -19992,7 +19994,8 @@ type Grant struct {
 	Relation GrantRelation `json:"relation"`
 	// When the grant was created.
 	CreatedAt time.Time `json:"created_at"`
-	// When the grant expires. Null when it does not expire.
+	// When the grant expires. Null when it does not expire. GET still
+	// returns expired unrevoked grants; authorization ignores them.
 	ExpiresAt OptNilDateTime `json:"expires_at"`
 }
 

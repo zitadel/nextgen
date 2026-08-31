@@ -26,4 +26,7 @@ properties:
   expires_at:
     type: string
     format: date-time
-    description: Optional expiry. Must be in the future when set.
+    description: |
+      Optional expiry. Must be in the future when set. Expiry stops
+      authorization but does not free the unique binding; DELETE the grant
+      before posting the same principal and relation again.

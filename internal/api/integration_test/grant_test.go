@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -134,6 +135,97 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		}, params())
 		require.NoError(t, err)
 		assertGrantNotFound(t, resp)
+	})
+
+	t.Run("revoke then re-create same binding", func(t *testing.T) {
+		t.Parallel()
+
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		req := &api.CreateGrantRequest{
+			PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
+			PrincipalID:   userID,
+			Relation:      api.CreateGrantRequestRelationViewer,
+		}
+		first, err := client.CreateGrant(t.Context(), req, params())
+		require.NoError(t, err)
+		created, ok := first.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, first))
+
+		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
+			ID:        created.ID,
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
+
+		second, err := client.CreateGrant(t.Context(), req, params())
+		require.NoError(t, err)
+		recreated, ok := second.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, second))
+		assert.NotEqual(t, created.ID, recreated.ID)
+	})
+
+	t.Run("setup assignment get and delete are not found", func(t *testing.T) {
+		t.Parallel()
+
+		stmts := harness.EnsureServiceDB(t).Statements()
+		asgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
+		require.NoError(t, err)
+		require.NotEmpty(t, asgns, "CreateProject seeds sk_proj setup assignment")
+		setupID := asgns[0].ID
+
+		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+			ID:        setupID,
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		assertGrantNotFound(t, getResp)
+
+		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
+			ID:        setupID,
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		assertGrantNotFound(t, delResp)
+
+		still, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
+		require.NoError(t, err)
+		require.NotEmpty(t, still)
+		assert.Nil(t, still[0].RevokedAt)
+	})
+
+	t.Run("owning-team assignment get and delete are not found", func(t *testing.T) {
+		t.Parallel()
+
+		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+			ProjectID: platform.ID,
+			Name:      helpers.TeamName(),
+		})
+		require.NoError(t, err)
+
+		stmts := harness.EnsureServiceDB(t).Statements()
+		asgn := domain.NewClaimTeamAssignment(project.ID, team.ID)
+		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), asgn))
+		require.NotEmpty(t, asgn.ID)
+
+		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+			ID:        asgn.ID,
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		assertGrantNotFound(t, getResp)
+
+		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
+			ID:        asgn.ID,
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		assertGrantNotFound(t, delResp)
+
+		owning, err := stmts.GetActiveOwningTeamGrant(t.Context(), project.ID)
+		require.NoError(t, err)
+		assert.Equal(t, asgn.ID, owning.ID)
+		assert.Nil(t, owning.RevokedAt)
 	})
 }
 
