@@ -68,11 +68,15 @@ func ErrClaimNoPersonalTeam() Error {
 // but is not active: the membership was flipped, or the team was deactivated
 // and cascaded the membership to removed.
 //
-// Deliberately distinct from ErrClaimNoPersonalTeam. "You never had a team" is
-// provisioned automatically on the next sign-in, while "your team is not
-// active" is an administrative state that only an administrator can undo, so a
-// UI has to say different things about them. Details carries the membership
-// status so a client can tell a removed team from a pending invitation.
+// Deliberately distinct from ErrClaimNoPersonalTeam. "You hold no membership"
+// is provisioned automatically on the next sign-in, while a membership that is
+// not active will not be provisioned around, so a UI has to say different
+// things about them.
+//
+// What clears it depends on the status, which is why Details carries it rather
+// than the message summarising one cause: `removed` follows a team or user
+// deactivation and needs an administrator, while `pending` is an invitation
+// the user can still accept.
 func ErrPersonalTeamNotActive(status string) Error {
 	return newError(
 		PrefixClaim.ErrorCodePrefix("personal_team_not_active"),
