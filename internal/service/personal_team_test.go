@@ -43,13 +43,6 @@ func expectEnsureTx(f *ensureFixture) {
 		})
 }
 
-// expectNoExistingTeam is the provisioning path's by-name probe coming back
-// empty, i.e. this user has no team to reuse.
-func expectNoExistingTeam(f *ensureFixture) {
-	f.stmts.EXPECT().ListTeams(gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.Team]{}, nil)
-}
-
 func membership(status domain.MembershipStatus) *domain.TeamMembership {
 	return &domain.TeamMembership{
 		ProjectID: ensureTestPlatform,
@@ -89,11 +82,13 @@ func TestEnsurePersonalTeam_NoOpWhenMembershipExists(t *testing.T) {
 	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
 }
 
-func TestEnsurePersonalTeam_NoOpWhenTheEarliestMembershipIsDeactivated(t *testing.T) {
-	// An administrator took this user's team away. Claim resolves the earliest
-	// membership and would keep seeing the deactivated one, so minting a second
-	// team would not restore the claim and would leave a stray team behind.
-	// The ensure must leave the administrative state alone: no transaction.
+func TestEnsurePersonalTeam_ReportsAnInactiveEarliestMembership(t *testing.T) {
+	// An administrator took this user's team away, or their invitation is still
+	// pending. Claim resolves the earliest membership and would keep seeing this
+	// one, so minting a second team would not restore the claim and would leave
+	// a stray team behind: the ensure must not provision. It reports the state
+	// rather than succeeding silently, so a caller can say something more useful
+	// than "you have no team". No transaction is opened.
 	for _, status := range []domain.MembershipStatus{
 		domain.MembershipStatusRemoved,
 		domain.MembershipStatusInactive,
@@ -104,43 +99,22 @@ func TestEnsurePersonalTeam_NoOpWhenTheEarliestMembershipIsDeactivated(t *testin
 			f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, "user_1").
 				Return(membership(status), nil)
 
-			require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
+			err := f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1")
+			require.ErrorIs(t, err, domain.ErrPersonalTeamNotActive(""),
+				"must be distinguishable from having no team at all")
+			// The status rides along so a UI can tell a removed team from a
+			// pending invitation.
+			var de domain.Error
+			require.ErrorAs(t, err, &de)
+			assert.Equal(t, domain.PersonalTeamNotActiveDetails{MembershipStatus: string(status)}, de.Details)
 		})
 	}
-}
-
-func TestEnsurePersonalTeam_ReusesAnExistingTeamWhenOnlyTheMembershipIsMissing(t *testing.T) {
-	// The user was removed from their own team, membership row and all. The
-	// deterministic name would collide with the surviving team on every later
-	// sign-in, so the ensure adopts that team instead of creating a second one.
-	f := newEnsureFixture(t)
-	f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, "user_1").
-		Return(nil, database.NewNoRowFoundError(nil))
-	f.stmts.EXPECT().ListTeams(gomock.Any(), gomock.Any()).Return(
-		&database.ListResult[*domain.Team]{Items: []*domain.Team{
-			{ProjectID: ensureTestPlatform, ID: "team_survivor", Name: "Personal user_1"},
-		}}, nil)
-
-	// No CreateTeam and no team.created event: gomock fails on an unexpected call.
-	var joined *domain.TeamMembership
-	f.stmts.EXPECT().CreateTeamMembership(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, m *domain.TeamMembership) error {
-			joined = m
-			return nil
-		})
-	expectEnsureTx(f)
-
-	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
-	require.NotNil(t, joined)
-	assert.Equal(t, "team_survivor", joined.TeamID, "must adopt the surviving team, not mint a new one")
-	assert.Equal(t, domain.MembershipStatusActive, joined.Status)
 }
 
 func TestEnsurePersonalTeam_ProvisionsTeamAndMembershipTogether(t *testing.T) {
 	f := newEnsureFixture(t)
 	f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, "user_1").
 		Return(nil, database.NewNoRowFoundError(nil))
-	expectNoExistingTeam(f)
 
 	var team *domain.Team
 	var membership *domain.TeamMembership
@@ -181,7 +155,6 @@ func TestEnsurePersonalTeam_TheNameIsAPureFunctionOfTheUserID(t *testing.T) {
 		f := newEnsureFixture(t)
 		f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, userID).
 			Return(nil, database.NewNoRowFoundError(nil))
-		expectNoExistingTeam(f)
 		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, tm *domain.Team) error {
 				if prev, seen := names[userID]; seen {
@@ -208,8 +181,6 @@ func TestEnsurePersonalTeam_LostRaceConvergesOnTheWinner(t *testing.T) {
 	gomock.InOrder(
 		f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, "user_1").
 			Return(nil, database.NewNoRowFoundError(nil)),
-		f.stmts.EXPECT().ListTeams(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Team]{}, nil),
 		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).
 			Return(database.NewUniqueError("teams", "uq_teams_project_name", nil)),
 		f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, "user_1").
@@ -230,8 +201,6 @@ func TestEnsurePersonalTeam_LostRaceBeforeTheWinnerCommitsReportsRatherThanRetry
 	gomock.InOrder(
 		f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, "user_1").
 			Return(nil, database.NewNoRowFoundError(nil)),
-		f.stmts.EXPECT().ListTeams(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Team]{}, nil),
 		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).
 			Return(database.NewUniqueError("teams", "uq_teams_project_name", nil)),
 		f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, "user_1").

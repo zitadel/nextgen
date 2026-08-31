@@ -61,52 +61,53 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 		return nil
 	}
 
-	// The earliest membership decides, and its mere existence is the answer:
-	// this user's personal team is already settled. Active means provisioned.
-	// Deactivated means an administrator took the team away, and the ensure
-	// must leave that alone — minting a second team would not help, because
-	// claim resolves the earliest membership and would keep seeing the
-	// deactivated one. Asking for the membership rather than the resolved team
-	// is what tells those two states apart from "holds nothing at all".
-	if _, err := s.v2Pool.Statements().GetEarliestTeamMembership(ctx, projectID, userID); err == nil {
-		return nil
-	} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+	// The earliest membership decides. Asking for the membership rather than the
+	// resolved team is what tells "holds nothing at all" apart from "holds a
+	// team that is not active", which GetPersonalTeamForUser collapses.
+	membership, err := s.v2Pool.Statements().GetEarliestTeamMembership(ctx, projectID, userID)
+	switch {
+	case err == nil:
+		if membership.Status == domain.MembershipStatusActive {
+			return nil
+		}
+		// Not active, so the ensure must not provision: claim resolves the
+		// earliest membership and would keep seeing this one, so a second team
+		// would not restore the claim and would leave a stray team behind.
+		// Report the state instead of succeeding silently, so a caller can say
+		// something more useful than "you have no team".
+		//
+		// A deactivated team reaches us as a removed membership: DeactivateTeam
+		// cascades the status to every membership it owns.
+		return domain.ErrPersonalTeamNotActive(membership.Status.String())
+	case isNoRowFound(err):
+		// The only provisionable state: this user holds no membership at all.
+	default:
 		return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed fetching earliest team membership for user %s", userID))
 	}
 
+	team, err := domain.NewTeam(projectID, personalTeamName(userID))
+	if err != nil {
+		return err
+	}
+
 	actorHuman := domain.EventActorTypeHuman
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		// The team may already exist without this membership: the user was
-		// removed from their own team, or a previous provisioning attempt
-		// committed the team and lost the membership. Reuse it rather than
-		// colliding with it forever — the requirement is that the user ends up
-		// in a team, not that this call is the one that created it.
-		team, err := s.existingTeam(ctx, tx.Statements(), projectID, userID)
-		if err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// CreateTeam mints the team id; CreateTeamMembership maintains the
+		// authz membership edge itself, so the pair is complete provisioning.
+		if err := tx.Statements().CreateTeam(ctx, team); err != nil {
 			return err
 		}
-		if team == nil {
-			team, err = domain.NewTeam(projectID, personalTeamName(userID))
-			if err != nil {
-				return err
-			}
-			// CreateTeam mints the team id; CreateTeamMembership maintains the
-			// authz membership edge itself, so the pair is complete provisioning.
-			if err := tx.Statements().CreateTeam(ctx, team); err != nil {
-				return err
-			}
-			if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-				Type:       domain.EventTypeTeamCreated,
-				Category:   domain.EventCategoryAdmin,
-				ProjectID:  team.ProjectID,
-				EntityType: "team",
-				EntityID:   team.ID,
-				ActorID:    &userID,
-				ActorType:  &actorHuman,
-				Payload:    domain.TeamPayload{Name: team.Name},
-			}); err != nil {
-				return err
-			}
+		if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  team.ProjectID,
+			EntityType: "team",
+			EntityID:   team.ID,
+			ActorID:    &userID,
+			ActorType:  &actorHuman,
+			Payload:    domain.TeamPayload{Name: team.Name},
+		}); err != nil {
+			return err
 		}
 		return tx.Statements().CreateTeamMembership(ctx, &domain.TeamMembership{
 			ProjectID: projectID,
@@ -122,7 +123,10 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 		// check and our create. If it has committed, it committed team AND
 		// membership together and we are already provisioned: converge.
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			if _, rerr := s.v2Pool.Statements().GetEarliestTeamMembership(ctx, projectID, userID); rerr == nil {
+			if m, rerr := s.v2Pool.Statements().GetEarliestTeamMembership(ctx, projectID, userID); rerr == nil {
+				if m.Status != domain.MembershipStatusActive {
+					return domain.ErrPersonalTeamNotActive(m.Status.String())
+				}
 				return nil
 			}
 		}
@@ -136,29 +140,9 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 	return nil
 }
 
-// existingTeam finds this user's team by its deterministic name, or nil when
-// there is none. Reusing the existing statement rather than adding a by-name
-// read: the name is unique per project, so at most one team can come back.
-func (s *personalTeamService) existingTeam(ctx context.Context, stmts AllStatements, projectID, userID string) (*domain.Team, error) {
-	// A nested, non-HTTP uniqueness read, like the create-uniqueness lookups
-	// WithAuthzListUnrestricted exists for (#838). Without the marker this trips
-	// the missing-list-filter guard, because the session exchange that drives
-	// the ensure carries no management list filter.
-	ctx = WithAuthzListUnrestricted(ctx)
-	result, err := stmts.ListTeams(ctx, &database.ListOptions[domain.TeamField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
-			database.Equal(database.Col(domain.TeamFieldName), personalTeamName(userID)),
-		),
-		Pagination: database.Page[domain.TeamField]{Limit: 1},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(result.Items) == 0 {
-		return nil, nil
-	}
-	return result.Items[0], nil
+func isNoRowFound(err error) bool {
+	_, ok := errors.AsType[*database.NoRowFoundError](err)
+	return ok
 }
 
 // personalTeamName derives the team's name from the user id alone. This is what
