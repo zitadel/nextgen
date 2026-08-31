@@ -7127,6 +7127,10 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 					Name: "purpose",
 					In:   "query",
 				}: params.Purpose,
+				{
+					Name: "expand",
+					In:   "query",
+				}: params.Expand,
 			},
 			Raw: r,
 		}

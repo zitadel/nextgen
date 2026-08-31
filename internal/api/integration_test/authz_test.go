@@ -537,6 +537,21 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.Len(t, flows, 1)
 	assert.Equal(t, flowIn, flows[0].ID)
 
+	// Expanding the user schema must not widen schema access (ADR 059 rule 8):
+	// ListSchemas answers this caller an empty list above, so the embed
+	// resolves to null rather than leaking the document it points at.
+	flowExpandResp, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+		ProjectID: api.ProjectID(project.ID),
+		Expand:    []api.FlowDefinitionExpand{api.FlowDefinitionExpandUserSchema},
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, flowExpandResp, helpers.MustMarshal(t, flowExpandResp))
+	expandedFlows := flowExpandResp.(*api.FlowDefinitionListResponse).FlowDefinitions
+	require.Len(t, expandedFlows, 1)
+	assert.Equal(t, flowIn, expandedFlows[0].ID)
+	require.True(t, expandedFlows[0].UserSchema.Set, "expand was requested, so the property must be present")
+	assert.True(t, expandedFlows[0].UserSchema.Null, "the caller cannot read the schema, so it embeds as null")
+
 	usersResp, err := client.ListUsers(t.Context(), api.ListUsersParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListUsersResponse{}, usersResp, helpers.MustMarshal(t, usersResp))

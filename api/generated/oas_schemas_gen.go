@@ -13447,6 +13447,48 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
+// A related entity to embed on each returned flow definition (ADR 059).
+// - `user_schema`: the user schema the flow operates on, embedded as
+// `user_schema` on each entry: the same object `GET /schemas/{id}` returns.
+// The property is omitted entirely when not requested and `null` when the
+// referenced schema no longer resolves (for example, the pinned revision
+// was deleted), so "did not ask" stays distinguishable from "cannot
+// resolve". Requesting it requires read access to schemas.
+// Ref: #
+type FlowDefinitionExpand string
+
+const (
+	FlowDefinitionExpandUserSchema FlowDefinitionExpand = "user_schema"
+)
+
+// AllValues returns all FlowDefinitionExpand values.
+func (FlowDefinitionExpand) AllValues() []FlowDefinitionExpand {
+	return []FlowDefinitionExpand{
+		FlowDefinitionExpandUserSchema,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionExpandUserSchema:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionExpand) UnmarshalText(data []byte) error {
+	switch FlowDefinitionExpand(data) {
+	case FlowDefinitionExpandUserSchema:
+		*s = FlowDefinitionExpandUserSchema
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Ref: #
 type FlowDefinitionListResponse struct {
 	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
@@ -13498,8 +13540,13 @@ type FlowDefinitionResponse struct {
 	// Identifier of the project this flow definition belongs to.
 	ProjectID      string         `json:"project_id"`
 	FlowDefinition FlowDefinition `json:"flow_definition"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	// The user schema this flow operates on: the same object
+	// `GET /schemas/{id}` returns. Present only when the request asked for it
+	// with `expand=user_schema` (ADR 059); `null` when it was requested but
+	// the referenced schema no longer resolves.
+	UserSchema OptNilSchema `json:"user_schema"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -13515,6 +13562,11 @@ func (s *FlowDefinitionResponse) GetProjectID() string {
 // GetFlowDefinition returns the value of FlowDefinition.
 func (s *FlowDefinitionResponse) GetFlowDefinition() FlowDefinition {
 	return s.FlowDefinition
+}
+
+// GetUserSchema returns the value of UserSchema.
+func (s *FlowDefinitionResponse) GetUserSchema() OptNilSchema {
+	return s.UserSchema
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -13540,6 +13592,11 @@ func (s *FlowDefinitionResponse) SetProjectID(val string) {
 // SetFlowDefinition sets the value of FlowDefinition.
 func (s *FlowDefinitionResponse) SetFlowDefinition(val FlowDefinition) {
 	s.FlowDefinition = val
+}
+
+// SetUserSchema sets the value of UserSchema.
+func (s *FlowDefinitionResponse) SetUserSchema(val OptNilSchema) {
+	s.UserSchema = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -19478,6 +19535,8 @@ type ListFlowDefinitionsErrorResponse struct {
 	FlowdefNotFound         FlowdefNotFound
 	FlowdefPermissionDenied FlowdefPermissionDenied
 	Internal                Internal
+	SchNotFound             SchNotFound
+	SchPermissionDenied     SchPermissionDenied
 	FlowdefMissingProjectID FlowdefMissingProjectID
 	ReqInvalid              ReqInvalid
 }
@@ -19492,6 +19551,8 @@ const (
 	FlowdefNotFoundListFlowDefinitionsErrorResponse         ListFlowDefinitionsErrorResponseType = "flowdef.not_found"
 	FlowdefPermissionDeniedListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.permission_denied"
 	InternalListFlowDefinitionsErrorResponse                ListFlowDefinitionsErrorResponseType = "internal"
+	SchNotFoundListFlowDefinitionsErrorResponse             ListFlowDefinitionsErrorResponseType = "sch.not_found"
+	SchPermissionDeniedListFlowDefinitionsErrorResponse     ListFlowDefinitionsErrorResponseType = "sch.permission_denied"
 	FlowdefMissingProjectIDListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.missing_project_id"
 	ReqInvalidListFlowDefinitionsErrorResponse              ListFlowDefinitionsErrorResponseType = "req.invalid"
 )
@@ -19519,6 +19580,16 @@ func (s ListFlowDefinitionsErrorResponse) IsFlowdefPermissionDenied() bool {
 // IsInternal reports whether ListFlowDefinitionsErrorResponse is Internal.
 func (s ListFlowDefinitionsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListFlowDefinitionsErrorResponse
+}
+
+// IsSchNotFound reports whether ListFlowDefinitionsErrorResponse is SchNotFound.
+func (s ListFlowDefinitionsErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundListFlowDefinitionsErrorResponse
+}
+
+// IsSchPermissionDenied reports whether ListFlowDefinitionsErrorResponse is SchPermissionDenied.
+func (s ListFlowDefinitionsErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedListFlowDefinitionsErrorResponse
 }
 
 // IsFlowdefMissingProjectID reports whether ListFlowDefinitionsErrorResponse is FlowdefMissingProjectID.
@@ -19633,6 +19704,48 @@ func (s ListFlowDefinitionsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListFlowDefinitionsErrorResponse(v Internal) ListFlowDefinitionsErrorResponse {
 	var s ListFlowDefinitionsErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets ListFlowDefinitionsErrorResponse to SchNotFound.
+func (s *ListFlowDefinitionsErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundListFlowDefinitionsErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if ListFlowDefinitionsErrorResponse is SchNotFound.
+func (s ListFlowDefinitionsErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from SchNotFound.
+func NewSchNotFoundListFlowDefinitionsErrorResponse(v SchNotFound) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets ListFlowDefinitionsErrorResponse to SchPermissionDenied.
+func (s *ListFlowDefinitionsErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedListFlowDefinitionsErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if ListFlowDefinitionsErrorResponse is SchPermissionDenied.
+func (s ListFlowDefinitionsErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedListFlowDefinitionsErrorResponse(v SchPermissionDenied) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetSchPermissionDenied(v)
 	return s
 }
 
@@ -26073,6 +26186,69 @@ func (o OptNilRequestAPIEventActorType) Or(d RequestAPIEventActorType) RequestAP
 	return d
 }
 
+// NewOptNilSchema returns new OptNilSchema with value set to v.
+func NewOptNilSchema(v Schema) OptNilSchema {
+	return OptNilSchema{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilSchema is optional nullable Schema.
+type OptNilSchema struct {
+	Value Schema
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilSchema was set.
+func (o OptNilSchema) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilSchema) Reset() {
+	var v Schema
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilSchema) SetTo(v Schema) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilSchema) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilSchema) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v Schema
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilSchema) Get() (v Schema, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilSchema) Or(d Schema) Schema {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilSchemaCreatedEventActorType returns new OptNilSchemaCreatedEventActorType with value set to v.
 func NewOptNilSchemaCreatedEventActorType(v SchemaCreatedEventActorType) OptNilSchemaCreatedEventActorType {
 	return OptNilSchemaCreatedEventActorType{
@@ -27886,6 +28062,52 @@ func (o OptSchNotFoundDetails) Get() (v SchNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSchNotFoundDetails) Or(d SchNotFoundDetails) SchNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchPermissionDeniedDetails returns new OptSchPermissionDeniedDetails with value set to v.
+func NewOptSchPermissionDeniedDetails(v SchPermissionDeniedDetails) OptSchPermissionDeniedDetails {
+	return OptSchPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchPermissionDeniedDetails is optional SchPermissionDeniedDetails.
+type OptSchPermissionDeniedDetails struct {
+	Value SchPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchPermissionDeniedDetails was set.
+func (o OptSchPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchPermissionDeniedDetails) Reset() {
+	var v SchPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchPermissionDeniedDetails) SetTo(v SchPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchPermissionDeniedDetails) Get() (v SchPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchPermissionDeniedDetails) Or(d SchPermissionDeniedDetails) SchPermissionDeniedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -33831,6 +34053,59 @@ func (s *SchNotFound) SetDetails(val OptSchNotFoundDetails) {
 type SchNotFoundDetails map[string]jx.Raw
 
 func (s *SchNotFoundDetails) init() SchNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchPermissionDenied) GetDetails() OptSchPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchPermissionDenied) SetDetails(val OptSchPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchPermissionDeniedDetails map[string]jx.Raw
+
+func (s *SchPermissionDeniedDetails) init() SchPermissionDeniedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

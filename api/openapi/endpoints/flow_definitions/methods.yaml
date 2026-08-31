@@ -89,6 +89,14 @@ get:
       schema:
         type: string
         enum: [ login, register, recovery, profiling, reauth, link_account ]
+    - name: expand
+      in: query
+      required: false
+      description: Related entities to embed on each returned flow definition (ADR 059).
+      schema:
+        type: array
+        items:
+          $ref: flow-definition-expand.yaml
   responses:
     '200':
       description: A list of flow definitions.

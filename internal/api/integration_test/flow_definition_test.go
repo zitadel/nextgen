@@ -959,6 +959,107 @@ func TestListFlowDefinitions(t *testing.T) {
 	}
 }
 
+// TestListFlowDefinitionsExpandUserSchema covers `expand=user_schema`
+// (ADR 059 applied to a one-to-one relation): opt-in embedding of the flow's
+// user schema as the same object GET /schemas/{id} returns, off the wire
+// entirely when not requested, and orthogonal to pagination.
+func TestListFlowDefinitionsExpandUserSchema(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	schemaURI := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	created, err := client.CreateFlowDefinition(t.Context(),
+		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("expand-flow", schemaURI)))
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, created, helpers.MustMarshal(t, created))
+	flowID := created.(*api.FlowDefinitionResponse).ID
+
+	schemaRes, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: schemaURI})
+	require.NoError(t, err)
+	require.IsType(t, &api.Schema{}, schemaRes, helpers.MustMarshal(t, schemaRes))
+	wantSchema := *schemaRes.(*api.Schema)
+
+	listFlows := func(t *testing.T, params api.ListFlowDefinitionsParams) *api.FlowDefinitionListResponse {
+		t.Helper()
+		res, err := client.ListFlowDefinitions(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionListResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.FlowDefinitionListResponse)
+	}
+
+	t.Run("expand embeds the sub-resource item", func(t *testing.T) {
+		t.Parallel()
+		list := listFlows(t, api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			Expand:    []api.FlowDefinitionExpand{api.FlowDefinitionExpandUserSchema},
+		})
+		require.NotEmpty(t, list.FlowDefinitions)
+		var found bool
+		for _, def := range list.FlowDefinitions {
+			// Every row was asked for the expansion, and both the fixture's
+			// schema and the seeded default-login's resolve.
+			require.True(t, def.UserSchema.Set, helpers.MustMarshal(t, &def))
+			require.False(t, def.UserSchema.Null, helpers.MustMarshal(t, &def))
+			if def.ID == flowID {
+				found = true
+				assert.Equal(t, wantSchema, def.UserSchema.Value)
+			}
+		}
+		require.True(t, found)
+	})
+
+	t.Run("no expand keeps the property off the wire", func(t *testing.T) {
+		t.Parallel()
+		list := listFlows(t, api.ListFlowDefinitionsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NotEmpty(t, list.FlowDefinitions)
+		for _, def := range list.FlowDefinitions {
+			assert.False(t, def.UserSchema.Set, helpers.MustMarshal(t, &def))
+		}
+	})
+
+	t.Run("unknown expand value is rejected", func(t *testing.T) {
+		t.Parallel()
+		res, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			Expand:    []api.FlowDefinitionExpand{"teams"},
+		})
+		require.NoError(t, err)
+		// The endpoint's 400 response is the bare error details; the matched
+		// status branch implies the code path, so there is no wrapper to read
+		// a StatusCode from.
+		require.IsType(t, &api.ErrorDetails{}, res, helpers.MustMarshal(t, res))
+		errRes := res.(*api.ErrorDetails)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), errRes.Code)
+	})
+
+	t.Run("page token means the same with and without expand", func(t *testing.T) {
+		t.Parallel()
+		first := listFlows(t, api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			Limit:     api.NewOptLimit(1),
+		})
+		require.Len(t, first.FlowDefinitions, 1)
+		token, ok := first.NextPageToken.Get()
+		require.True(t, ok)
+
+		second := listFlows(t, api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			Limit:     api.NewOptLimit(1),
+			PageToken: api.NewOptPageToken(token),
+			Expand:    []api.FlowDefinitionExpand{api.FlowDefinitionExpandUserSchema},
+		})
+		require.Len(t, second.FlowDefinitions, 1)
+		assert.NotEqual(t, first.FlowDefinitions[0].ID, second.FlowDefinitions[0].ID)
+		require.True(t, second.FlowDefinitions[0].UserSchema.Set, helpers.MustMarshal(t, second))
+	})
+}
+
 func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 	t.Parallel()
 	server := harness.EnsureTestServer(t)

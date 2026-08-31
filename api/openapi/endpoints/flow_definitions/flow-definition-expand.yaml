@@ -1,0 +1,12 @@
+type: string
+description: |
+  A related entity to embed on each returned flow definition (ADR 059).
+
+  - `user_schema`: the user schema the flow operates on, embedded as
+    `user_schema` on each entry: the same object `GET /schemas/{id}` returns.
+    The property is omitted entirely when not requested and `null` when the
+    referenced schema no longer resolves (for example, the pinned revision
+    was deleted), so "did not ask" stays distinguishable from "cannot
+    resolve". Requesting it requires read access to schemas.
+enum:
+  - user_schema
