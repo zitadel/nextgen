@@ -1208,13 +1208,22 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 // progress, not just the current step.
 func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowResolvedFields, error) {
 	ctx, def, state, current := pc.ctx, pc.def, pc.state, pc.currentStep
+	// First-encounter order, not map order: consumers walk these fields
+	// positionally (uniqueFieldValues promises field order), so the union
+	// must be deterministic — visited steps in history order, fields in
+	// their step order.
 	seen := map[Field]struct{}{}
+	names := make([]Field, 0, 8)
 	collect := func(s *FlowDefinitionStep) {
 		if s == nil {
 			return
 		}
 		for _, f := range s.Fields {
+			if _, ok := seen[f]; ok {
+				continue
+			}
 			seen[f] = struct{}{}
+			names = append(names, f)
 		}
 	}
 	for _, name := range state.History {
@@ -1223,12 +1232,8 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 		}
 	}
 	collect(current)
-	if len(seen) == 0 {
+	if len(names) == 0 {
 		return FlowResolvedFields{}, nil
-	}
-	names := make([]Field, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
 	}
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
