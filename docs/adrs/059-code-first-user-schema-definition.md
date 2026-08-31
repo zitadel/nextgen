@@ -1,4 +1,4 @@
-# ADR 058: Code-First User Schema Definition
+# ADR 059: Code-First User Schema Definition
 
 > **Status:** Proposed
 > **Date:** 2026-08-27
@@ -6,7 +6,8 @@
 >
 > **Builds on** [ADR 008](008-users-eav-store.md), [ADR 009](009-user-json-schema-validation.md),
 > [ADR 020](020-credentials-out-of-user-schema.md), [ADR 035](035-configuration-environments.md),
-> [ADR 036](036-api-credential-planes.md), [ADR 052](052-user-envelope-and-attributes.md).
+> [ADR 036](036-api-credential-planes.md), [ADR 052](052-user-envelope-and-attributes.md),
+> [ADR 058](058-user-identity-designation-and-references.md).
 > Keeps [ADR 007](007-gitops-configuration-surface.md)'s premise — the repo
 > declares configuration — while changing the authoring format. Resolves
 > ADR 035's open inner-loop question as Vercel-shaped for the development
@@ -31,8 +32,9 @@ repository**. JSON Schema becomes its compile target, not its editing surface.
 
 1. **One definition, in code.** `defineUser({ … })` is a runtime-introspectable
    definition (builder / Standard Schema object — not a bare TS type, not an
-   example object) declaring properties, required, uniqueness scope, and auth
-   methods. It compiles deterministically to today's user-schema dialect. The
+   example object) declaring properties, required, uniqueness scope, auth
+   methods, and identity designation (`x-identifier` / `x-display`, ADR 058).
+   It compiles deterministically to today's user-schema dialect. The
    server model is unchanged: immutable revisions keyed by `objectType`, EAV
    validation, releases per ADR 035.
 2. **Both sides generate from it.** The register step's `fields[]` and the
