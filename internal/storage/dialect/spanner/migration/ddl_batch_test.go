@@ -101,6 +101,21 @@ func TestBatchDDLFSOverRealMigrations(t *testing.T) {
 		closes := strings.Count(text, "RUN BATCH")
 		assert.Equal(t, opens, closes, "%s: every batch must be closed", name)
 		totalBatches += opens
+
+		// Walk the rewritten Up section and check each statement's placement,
+		// rather than trusting the counts above. Counting alone would pass a
+		// file whose new CREATE sits outside every batch.
+		for _, s := range upStatements(text) {
+			if isDDLStatement(s.block) {
+				assert.True(t, s.batched,
+					"%s: DDL statement is outside a batch, so it costs its own UpdateDatabaseDdl:\n%s",
+					name, strings.Join(s.block, "\n"))
+				continue
+			}
+			assert.False(t, s.batched,
+				"%s: non-DDL statement is inside a DDL batch, which Spanner rejects:\n%s",
+				name, strings.Join(s.block, "\n"))
+		}
 	}
 	assert.Positive(t, totalBatches, "the migrations must produce at least one batch")
 
@@ -112,4 +127,54 @@ func TestBatchDDLFSOverRealMigrations(t *testing.T) {
 
 func stmt(sql string) string {
 	return stmtBegin + "\n" + sql + "\n" + stmtEnd
+}
+
+// upStatement is one goose statement block from a rewritten Up section, with
+// whether it fell inside an open DDL batch.
+type upStatement struct {
+	block   []string
+	batched bool
+}
+
+// upStatements walks a rewritten migration's Up section and reports each
+// statement block in order, tracking batch state as START/RUN are encountered.
+// The injected START/RUN blocks are not themselves reported.
+func upStatements(text string) []upStatement {
+	var out []upStatement
+	var block []string
+	inUp, inBatch, inStatement := false, false, false
+
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case trimmed == gooseUp:
+			inUp = true
+			continue
+		case trimmed == gooseDown:
+			inUp = false
+			continue
+		}
+		if !inUp {
+			continue
+		}
+
+		switch {
+		case trimmed == stmtBegin:
+			inStatement = true
+			block = nil
+		case trimmed == stmtEnd:
+			inStatement = false
+			switch strings.TrimSpace(strings.Join(block, "\n")) {
+			case "START BATCH DDL":
+				inBatch = true
+			case "RUN BATCH":
+				inBatch = false
+			default:
+				out = append(out, upStatement{block: append([]string(nil), block...), batched: inBatch})
+			}
+		case inStatement:
+			block = append(block, line)
+		}
+	}
+	return out
 }

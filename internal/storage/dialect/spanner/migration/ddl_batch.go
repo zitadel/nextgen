@@ -3,9 +3,8 @@ package migration
 // DDL batching for Spanner migrations.
 //
 // On a real Cloud Spanner instance every DDL statement goose executes becomes
-// its own UpdateDatabaseDdl long-running operation, costing tens of seconds.
-// Measured on run 33069782911: ~43 minutes of schema setup for ~1 minute of
-// tests, 97-98% of the lane, and paid again per package (#973).
+// its own UpdateDatabaseDdl long-running operation, costing tens of seconds
+// (#973).
 //
 // go-sql-spanner accepts START BATCH DDL and RUN BATCH as client-side
 // statements on an ordinary Exec, and sends everything buffered between them as
