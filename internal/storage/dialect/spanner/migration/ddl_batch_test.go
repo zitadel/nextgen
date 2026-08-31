@@ -2,6 +2,7 @@ package migration
 
 import (
 	"io/fs"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -105,7 +106,16 @@ func TestBatchDDLFSOverRealMigrations(t *testing.T) {
 		// Walk the rewritten Up section and check each statement's placement,
 		// rather than trusting the counts above. Counting alone would pass a
 		// file whose new CREATE sits outside every batch.
+		//
+		// looksLikeDDL is deliberately a second, cruder implementation rather
+		// than isDDLStatement: sharing the classifier makes it its own oracle,
+		// which is how `CREATE` alone on a line went unbatched in five blocks of
+		// 000012 with this test green.
 		for _, s := range upStatements(text) {
+			assert.Equal(t, looksLikeDDL(s.block), isDDLStatement(s.block),
+				"%s: classifier disagrees with an independent read of:\n%s",
+				name, strings.Join(s.block, "\n"))
+
 			if isDDLStatement(s.block) {
 				assert.True(t, s.batched,
 					"%s: DDL statement is outside a batch, so it costs its own UpdateDatabaseDdl:\n%s",
@@ -177,4 +187,57 @@ func upStatements(text string) []upStatement {
 		}
 	}
 	return out
+}
+
+// looksLikeDDL is an independent oracle for isDDLStatement, written as a regexp
+// on the first non-comment line so it cannot share the production classifier's
+// blind spots. Kept crude on purpose.
+var ddlFirstToken = regexp.MustCompile(`(?i)^\s*(CREATE|ALTER|DROP|RENAME|GRANT|REVOKE|ANALYZE)\b`)
+
+func looksLikeDDL(block []string) bool {
+	for _, line := range block {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+		return ddlFirstToken.MatchString(trimmed)
+	}
+	return false
+}
+
+// The verb can sit alone on its own line, as it does five times in
+// 000012_crypto_keys.sql. A prefix test for "CREATE " with a trailing space
+// misses those and leaves real indexes unbatched.
+func TestIsDDLStatementAcceptsVerbAloneOnItsLine(t *testing.T) {
+	t.Parallel()
+	assert.True(t, isDDLStatement([]string{
+		stmtBegin,
+		"CREATE",
+		"UNIQUE",
+		"NULL_FILTERED INDEX idx_x",
+		"    ON encryption_keys (project_id)",
+		stmtEnd,
+	}), "multi-line CREATE with the verb alone must classify as DDL")
+
+	assert.False(t, isDDLStatement([]string{
+		stmtBegin, "UPDATE users SET x = 1", stmtEnd,
+	}), "DML must not be classified as DDL")
+}
+
+// Unwrapped SQL is legal in goose, and must not be swept into an open batch.
+func TestBatchUpDDLClosesRunBeforeUnwrappedSQL(t *testing.T) {
+	t.Parallel()
+	src := strings.Join([]string{
+		"-- +goose Up",
+		stmt("CREATE TABLE a (id STRING(MAX)) PRIMARY KEY (id)"),
+		"UPDATE a SET id = '1';",
+		stmt("CREATE TABLE b (id STRING(MAX)) PRIMARY KEY (id)"),
+	}, "\n")
+
+	got := batchUpDDL(src)
+	upTo := got[:strings.Index(got, "UPDATE a SET")]
+	assert.Equal(t, 1, strings.Count(upTo, "RUN BATCH"),
+		"the batch must close before unwrapped DML, which Spanner would reject inside it:\n%s", got)
+	assert.Equal(t, 2, strings.Count(got, "START BATCH DDL"),
+		"the statement after it opens a new run")
 }

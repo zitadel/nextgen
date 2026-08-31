@@ -133,6 +133,15 @@ func batchUpDDL(src string) string {
 		case inStatement:
 			statement = append(statement, line)
 		default:
+			// StatementBegin/End is optional in goose: a plain
+			// semicolon-terminated statement is legal. We cannot classify one
+			// reliably here, so close any open batch rather than let unwrapped
+			// SQL land inside it, which Spanner would reject. Blank lines,
+			// comments and goose annotations are not statements and must not
+			// close a run.
+			if isSubstantiveSQL(trimmed) {
+				closeBatch()
+			}
 			out = append(out, line)
 		}
 	}
@@ -142,22 +151,31 @@ func batchUpDDL(src string) string {
 	return strings.Join(out, "\n")
 }
 
-// isDDLStatement reports whether a goose statement block is DDL, judged by the
-// first keyword that is not a comment. Spanner's DDL verbs are a closed set
-// here: these are our own migrations, not arbitrary user SQL.
+// ddlVerbs is the closed set of leading keywords that make a statement DDL for
+// Spanner. These are our own migrations, not arbitrary user SQL.
+var ddlVerbs = map[string]bool{
+	"CREATE": true, "ALTER": true, "DROP": true,
+	"RENAME": true, "GRANT": true, "REVOKE": true, "ANALYZE": true,
+}
+
+// isDDLStatement reports whether a goose statement block is DDL, judged by its
+// first token that is not a comment.
+//
+// Token, not prefix: 000012_crypto_keys.sql writes `CREATE` on a line of its
+// own, above `UNIQUE` and `NULL_FILTERED INDEX …`, so a prefix test for
+// "CREATE " with a trailing space silently classifies five real indexes as
+// non-DDL and leaves them unbatched.
 func isDDLStatement(block []string) bool {
 	for _, line := range block {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
 			continue
 		}
-		upper := strings.ToUpper(trimmed)
-		for _, verb := range []string{"CREATE ", "ALTER ", "DROP ", "RENAME ", "GRANT ", "REVOKE ", "ANALYZE"} {
-			if strings.HasPrefix(upper, verb) {
-				return true
-			}
+		fields := strings.Fields(strings.ToUpper(trimmed))
+		if len(fields) == 0 {
+			continue
 		}
-		return false
+		return ddlVerbs[fields[0]]
 	}
 	return false
 }
@@ -182,3 +200,11 @@ type rewrittenInfo struct {
 
 func (i rewrittenInfo) Size() int64        { return i.size }
 func (i rewrittenInfo) ModTime() time.Time { return i.FileInfo.ModTime() }
+
+// isSubstantiveSQL reports whether a line outside a StatementBegin/End block is
+// SQL rather than a blank line, a comment or a goose annotation.
+func isSubstantiveSQL(trimmed string) bool {
+	return trimmed != "" &&
+		!strings.HasPrefix(trimmed, "--") &&
+		!strings.HasPrefix(trimmed, "/*")
+}
