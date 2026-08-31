@@ -95,7 +95,7 @@ func TestEnsure(t *testing.T) {
 				expectCreate(projects).Return(nil, database.NewUniqueError("projects", "projects_pkey", nil))
 			},
 			probe:      unseeded,
-			wantErrMsg: "exists but was never seeded",
+			wantErrMsg: "has no active token encryption key",
 		},
 		{
 			name:    "a failing seeded check is propagated, not read as unseeded",

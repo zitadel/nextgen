@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -152,14 +154,22 @@ func isNoRowFound(err error) bool {
 // racing therefore compute the same name and one loses the insert, instead of
 // both succeeding under different names and minting two teams.
 //
-// Deriving it from the user id rather than a human attribute is what keeps it
-// safe to fail closed on: it is bounded well under TeamNameMaxLength and
-// unguessable, so unlike an email-derived name it cannot be made invalid by a
-// long address or squatted by an unrelated team.
+// It hashes the id rather than embedding it, because the raw id is not safe to
+// build a team name out of. User ids are caller-supplied for bootstrap imports
+// and carry no length limit and a case-sensitive collation, while team names
+// are capped at TeamNameMaxLength and unique case-insensitively. Embedding the
+// id therefore
+// breaks in two ways that never recover, since the same name is recomputed on
+// every later attempt: a long id yields a name NewTeam rejects outright, and
+// two ids differing only in case collide, permanently blocking whichever user
+// arrives second. The digest is fixed-length and single-case, so neither
+// applies, and it stays deterministic, distinct per user, and unguessable —
+// the three properties ADR 046 §4 asks of it.
 //
 // The name is a placeholder, not an identifier. It is renameable via
 // PATCH /teams/{id}, and renaming is safe because later ensures short-circuit
 // on the membership and never recompute it.
 func personalTeamName(userID string) string {
-	return "Personal " + userID
+	sum := sha256.Sum256([]byte(userID))
+	return "Personal " + hex.EncodeToString(sum[:])
 }

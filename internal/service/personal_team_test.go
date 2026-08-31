@@ -2,7 +2,9 @@ package service_test
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -136,10 +138,13 @@ func TestEnsurePersonalTeam_ProvisionsTeamAndMembershipTogether(t *testing.T) {
 	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
 
 	require.NotNil(t, team)
-	// A pure function of the user id. This exact string is the one-team-per-user
+	// A pure function of the user id, and that is the one-team-per-user
 	// constraint: it is what makes a second concurrent ensure collide on the
-	// unique index instead of minting a second team.
-	assert.Equal(t, "Personal user_1", team.Name)
+	// unique index instead of minting a second team. The id is hashed rather
+	// than embedded, so a name can never carry it verbatim.
+	assert.NotEmpty(t, team.Name)
+	assert.NotContains(t, team.Name, "user_1", "the raw id must not reach the name")
+	assert.Less(t, utf8.RuneCountInString(team.Name), domain.TeamNameMaxLength)
 	require.NotNil(t, membership)
 	assert.Equal(t, "team_minted", membership.TeamID, "membership must join the team minted in the same transaction")
 	assert.Equal(t, "user_1", membership.UserID)
@@ -150,8 +155,15 @@ func TestEnsurePersonalTeam_TheNameIsAPureFunctionOfTheUserID(t *testing.T) {
 	// The property the one-team-per-user guarantee rests on: same user, same
 	// name, every time — so the unique index can reject the second insert.
 	// Different users never collide with each other.
+	// The ids cover what a caller-supplied id can look like: user ids carry no
+	// length limit and a case-sensitive collation, so a very long one and a
+	// pair differing only in case are both legal and both used to break this.
+	// The long id would have produced a name over TeamNameMaxLength, and the
+	// case pair would have collided in the case-insensitive name index,
+	// permanently blocking whichever user arrived second.
+	longID := "user_" + strings.Repeat("x", 300)
 	names := map[string]string{}
-	for _, userID := range []string{"user_1", "user_1", "user_2"} {
+	for _, userID := range []string{"user_1", "user_1", "user_2", "USER_2", longID} {
 		f := newEnsureFixture(t)
 		f.stmts.EXPECT().GetEarliestTeamMembership(gomock.Any(), ensureTestPlatform, userID).
 			Return(nil, database.NewNoRowFoundError(nil))
@@ -170,6 +182,12 @@ func TestEnsurePersonalTeam_TheNameIsAPureFunctionOfTheUserID(t *testing.T) {
 		require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, userID))
 	}
 	assert.NotEqual(t, names["user_1"], names["user_2"], "different users must not collide")
+	assert.NotEqual(t, strings.ToLower(names["user_2"]), strings.ToLower(names["USER_2"]),
+		"ids differing only in case must not collide in the case-insensitive name index")
+	for id, name := range names {
+		assert.Less(t, utf8.RuneCountInString(name), domain.TeamNameMaxLength,
+			"the name for %q must stay under the team-name cap", id[:min(len(id), 20)])
+	}
 }
 
 func TestEnsurePersonalTeam_LostRaceConvergesOnTheWinner(t *testing.T) {
