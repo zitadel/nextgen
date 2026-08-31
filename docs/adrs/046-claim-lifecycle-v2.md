@@ -29,11 +29,12 @@
 > the project, since it was introduced, so team names are unique per project.
 > §4 is corrected below, and the correction is load-bearing rather than
 > editorial: it is what makes automatic personal-team provisioning converge.
-> Because the name is derived deterministically from the user, two provisioning
-> attempts racing for the same user compute the same name, so the index rejects
-> the loser instead of minting a second team (#527, #979). This bounds
-> *automatic provisioning* to one team per user; it does not change §Context's
-> rule that a user may belong to many teams.
+> Because the name is derived per user — deterministically for one user and
+> distinctly between users — two provisioning attempts racing for the same user
+> compute the same name, so the index rejects the loser instead of minting a
+> second team, while different users never block each other (#527, #979). This
+> bounds *automatic provisioning* to one team per user; it does not change
+> §Context's rule that a user may belong to many teams.
 >
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
@@ -185,13 +186,22 @@ or a membership.
   personal team's name is therefore derived per user rather than shared: a
   single literal "Personal Team" would collide on the second registration. The
   name is a renamable placeholder, not an identifier.
-- Determinism, not the particular derivation, is what the contract requires:
-  the same user must always yield the same name. That turns the unique index
-  into the concurrency guard for provisioning, so a second concurrent attempt
-  for the same user collides and converges on the winner instead of creating a
-  second team. It bounds automatic provisioning to one team per user, which is
-  narrower than a limit on how many teams a user may belong to; per §Context a
-  user may still belong to many.
+- The contract constrains the name's *properties*, not the derivation. It must
+  be **deterministic** for a given user, **distinct** between users, and
+  **unlikely to be chosen by a human** naming an ordinary team. Determinism
+  alone is not enough: a shared literal "Personal Team" is deterministic too,
+  and it would make the first registration's name block every later one.
+  - Determinism is what makes the unique index the concurrency guard: a second
+    concurrent attempt for the same user computes the same name, collides, and
+    converges on the winner instead of creating a second team.
+  - Distinctness and unguessability are what keep one user's provisioning from
+    being blocked by another user's team, or by a pre-existing team that
+    happens to hold the name. A name that can be squatted turns a recoverable
+    race into a permanent failure, because the same name is recomputed on every
+    later attempt.
+- This bounds *automatic provisioning* to one team per user. It is narrower
+  than a limit on how many teams a user may belong to; per §Context a user may
+  still belong to many.
 - Automatic team creation is restricted to platform-project registrations;
   customer projects must not auto-create teams.
 - A returning claimer reuses their one existing personal team (per ADR 024);
