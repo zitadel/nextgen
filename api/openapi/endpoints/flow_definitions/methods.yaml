@@ -46,7 +46,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../components/flows/flow-definition-detail-response.yaml
+            $ref: ../../components/flows/flow-definition-response.yaml
     '400':
       description: Invalid request (e.g., missing required fields, invalid step configuration).
       content:

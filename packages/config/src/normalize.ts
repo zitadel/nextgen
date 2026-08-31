@@ -27,11 +27,11 @@ export const USER_PROPERTY_DEFAULTS: Readonly<Record<string, boolean>> = {
 };
 
 /**
- * Keys of the flow-definition detail envelope. `fetch` in the flow syncer
+ * Keys of the flow-definition response envelope. `fetch` in the flow syncer
  * already unwraps the envelope; stripping them here as well makes the
  * normalizer safe on raw detail responses.
  */
-const FLOW_ENVELOPE_KEYS = ["id", "project_id", "schema_uri", "created_at", "updated_at"];
+const FLOW_ENVELOPE_KEYS = ["id", "project_id", "created_at", "updated_at"];
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

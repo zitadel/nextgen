@@ -128,6 +128,64 @@ describe("schemas list", () => {
     ]);
   });
 
+  it("drains every page of a cursor-paginated revision list", async () => {
+    // `GET /schemas` pages by cursor (#924); the command walks
+    // `next_page_token` so the revision history stays complete.
+    const cwd = await makeProject();
+    const askedTokens: Array<string | null> = [];
+    server.use(
+      http.get("*/schemas", ({ request }) => {
+        const url = new URL(request.url);
+        const token = url.searchParams.get("page_token");
+        askedTokens.push(token);
+        expect(url.searchParams.get("limit")).toBe("100");
+        return token
+          ? HttpResponse.json({
+              schemas: [
+                {
+                  id: "sch_01",
+                  schema: { kind: "user-schema" },
+                  metadata: { created_at: "2026-06-01T00:00:00Z" },
+                },
+              ],
+            })
+          : HttpResponse.json({
+              schemas: [
+                {
+                  id: "sch_02",
+                  schema: { kind: "user-schema" },
+                  metadata: { created_at: "2026-07-02T00:00:00Z" },
+                },
+              ],
+              next_page_token: "tok_2",
+            });
+      }),
+    );
+
+    const res = await runCliForTest([
+      "schemas",
+      "list",
+      "--cwd",
+      cwd,
+      "--object-type",
+      "human-user",
+      "--json",
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { revisions: Array<{ id: string; created_at: string }>; count: number };
+    };
+    expect(askedTokens).toEqual([null, "tok_2"]);
+    expect(json.data.count).toBe(2);
+    expect(json.data.revisions).toEqual([
+      { id: "sch_02", created_at: "2026-07-02T00:00:00Z" },
+      { id: "sch_01", created_at: "2026-06-01T00:00:00Z" },
+    ]);
+  });
+
   it("URL-encodes URL-shaped schema ids when fetching a revision", async () => {
     // Server-seeded default schemas carry a URL `$id`; unencoded it would
     // shear the `/schemas/:id` path apart at every slash.
