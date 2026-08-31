@@ -140,6 +140,11 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 // there is none. Reusing the existing statement rather than adding a by-name
 // read: the name is unique per project, so at most one team can come back.
 func (s *personalTeamService) existingTeam(ctx context.Context, stmts AllStatements, projectID, userID string) (*domain.Team, error) {
+	// A nested, non-HTTP uniqueness read, like the create-uniqueness lookups
+	// WithAuthzListUnrestricted exists for (#838). Without the marker this trips
+	// the missing-list-filter guard, because the session exchange that drives
+	// the ensure carries no management list filter.
+	ctx = WithAuthzListUnrestricted(ctx)
 	result, err := stmts.ListTeams(ctx, &database.ListOptions[domain.TeamField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),

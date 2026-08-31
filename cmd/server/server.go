@@ -123,14 +123,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
-	if err := platform.Ensure(ctx, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
-		return fmt.Errorf("failed to bootstrap platform project: %w", err)
-	}
-
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
 	if err != nil {
@@ -175,6 +167,21 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		schemaValidator,
 		keyService,
 	)
+
+	// Bootstrap runs here rather than straight after the migrations because it
+	// now seeds a usable project (keys, user schema, login flows) and so needs
+	// the project service, which needs the key service. It must still precede
+	// the user import: that import creates a bare, unseeded project row for any
+	// project id a bootstrap user names, and a project row that already exists
+	// would make this a no-op and leave the platform project unseeded.
+	if err := platform.Ensure(ctx, projectService, cfg.Platform.BootstrapProject); err != nil {
+		return fmt.Errorf("failed to bootstrap platform project: %w", err)
+	}
+
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
+
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
