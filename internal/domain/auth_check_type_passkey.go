@@ -54,6 +54,10 @@ func (a *AuthFactorPasskey) Payload() any {
 
 type AuthChallengePasskeyRegistration struct {
 	*PasskeyRegistrationChallenge
+	// Provisional is true when the challenge minted the user handle itself:
+	// the user row does not exist yet and is created when the attestation is
+	// verified.
+	Provisional bool
 	authChallenge
 }
 
@@ -77,8 +81,44 @@ func SetAuthChallengePasskeyRegistration(id string, lastChallengedAt, lastFailed
 	}
 }
 
+// AuthFactorPasskeyRegistration records a completed passkey enrollment on the
+// attempt. It merges into the session as a passkey-class factor: creating the
+// credential with user verification proves possession and presence just like
+// an assertion does for that credential.
+type AuthFactorPasskeyRegistration struct {
+	UserVerified bool
+	UserID       string
+	// CredentialID is base64url-encoded ([EncodePasskeyCredentialID]).
+	CredentialID   string
+	BackupEligible bool
+	BackupState    bool
+	// PasskeyID and Name identify the persisted credential row, so callers of
+	// the verify transaction can answer with the created passkey without a
+	// read-back that could fail after the ceremony is already consumed.
+	PasskeyID string
+	Name      string
+	authFactor
+}
+
+func SetAuthFactorPasskeyRegistration(lastVerifiedAt time.Time) *AuthFactorPasskeyRegistration {
+	return &AuthFactorPasskeyRegistration{
+		authFactor: authFactor{
+			LastVerifiedAt: lastVerifiedAt,
+		},
+	}
+}
+
+func (a *AuthFactorPasskeyRegistration) Type() AuthCheckType {
+	return AuthCheckTypePasskeyRegistration
+}
+
+func (a *AuthFactorPasskeyRegistration) Payload() any {
+	return a
+}
+
 var (
 	_ AuthChallenge = (*AuthChallengePasskey)(nil)
 	_ AuthFactor    = (*AuthFactorPasskey)(nil)
 	_ AuthChallenge = (*AuthChallengePasskeyRegistration)(nil)
+	_ AuthFactor    = (*AuthFactorPasskeyRegistration)(nil)
 )

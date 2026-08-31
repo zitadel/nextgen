@@ -295,3 +295,37 @@ func mustNewCreateAttribute(t *testing.T, key AttributeKey, value any, unique At
 	require.NoError(t, err)
 	return *a
 }
+
+func TestUniqueValueHash(t *testing.T) {
+	upper, err := UniqueValueHash("Alice@Example.COM")
+	require.NoError(t, err)
+	lower, err := UniqueValueHash("alice@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, upper, lower, "casings of one string are one unique value")
+
+	eszett, err := UniqueValueHash("straße")
+	require.NoError(t, err)
+	folded, err := UniqueValueHash("STRASSE")
+	require.NoError(t, err)
+	assert.Equal(t, eszett, folded, "case folding is Unicode, not ASCII")
+
+	other, err := UniqueValueHash("bob@example.com")
+	require.NoError(t, err)
+	assert.NotEqual(t, lower, other)
+
+	num, err := UniqueValueHash(42)
+	require.NoError(t, err)
+	str, err := UniqueValueHash("42")
+	require.NoError(t, err)
+	assert.NotEqual(t, num, str, "non-strings hash as encoded, distinct from strings")
+}
+
+func TestNewCreateAttribute_UniqueHashIsNormalized(t *testing.T) {
+	a, err := NewCreateAttribute("email", "Alice@Example.com", AttributeUniquenessProject)
+	require.NoError(t, err)
+	b, err := NewCreateAttribute("email", "alice@example.com", AttributeUniquenessProject)
+	require.NoError(t, err)
+
+	assert.Equal(t, a.ValueHash, b.ValueHash, "the registry sees one value")
+	assert.Equal(t, "Alice@Example.com", a.Value, "the stored value keeps its casing")
+}

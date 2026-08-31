@@ -86,9 +86,19 @@ type AuthAttempt struct {
 	// TTL describes how long an auth attempt is valid, it should be set to a reasonable value (e.g. 5 minutes) to prevent abuse and to ensure that old auth attempts are cleaned up.
 	// An auth attempt gets garbage collected after CreatedAt + TimeToLive, so it is important to set it to a reasonable value to prevent abuse and to ensure that old auth attempts are cleaned up.
 	TimeToLive *time.Duration
+
+	// Internal marks a server-orchestrated ceremony (e.g. management-plane
+	// passkey enrollment, ADR 056) whose attempt row is only a state carrier:
+	// it must never be handed off, exchanged, or read through the attempt API.
+	Internal bool
 }
 
 const AuthAttemptTTL = 15 * time.Minute
+
+// PasskeyRegistrationChallengeTTL bounds the registration ceremony: the
+// attestation must come back within this window even though the attempt
+// itself lives longer.
+const PasskeyRegistrationChallengeTTL = 5 * time.Minute
 
 type AuthAttemptOption func(*AuthAttempt)
 
@@ -146,9 +156,11 @@ func (a *AuthAttempt) ExpiresAt() time.Time {
 }
 
 // IsCompleted returns true if all required checks are verified successfully.
+// Matching is by factor class, so a completed passkey enrollment satisfies a
+// required passkey check.
 func (a *AuthAttempt) IsCompleted() bool {
 	for _, requiredCheck := range a.RequiredChecks {
-		_, ok := a.FactorByType(requiredCheck)
+		_, ok := a.FactorByClass(requiredCheck)
 		if !ok {
 			return false
 		}
@@ -159,6 +171,18 @@ func (a *AuthAttempt) IsCompleted() bool {
 // IsHandedOff returns true if a handoff token has been generated.
 func (a *AuthAttempt) IsHandedOff() bool {
 	return a.HandoffToken != nil
+}
+
+// FactorByClass returns a verified factor whose type competes in typ's class
+// (see [AuthCheckType.Class]), if one exists on the attempt.
+func (a *AuthAttempt) FactorByClass(typ AuthCheckType) (AuthFactor, bool) {
+	for _, check := range a.Checks {
+		factor, ok := check.(AuthFactor)
+		if ok && factor.Type().Class() == typ.Class() {
+			return factor, true
+		}
+	}
+	return nil, false
 }
 
 // FactorByType returns the verified factor of the given type, if it exists on the attempt.
@@ -259,6 +283,48 @@ func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 	return userCheck.UserID, nil
 }
 
+// PreparePasskeyRegistrationChallenge validates that a passkey registration
+// challenge can be issued and resolves the user handle for the ceremony.
+// Unlike password, no prior user factor is required: registration is how a
+// user comes to exist in the first place.
+//
+// With a pinned user factor the enrollment targets that user (requestedUserID
+// must match when set) and the ceremony is not provisional. Without one the
+// ceremony is provisional: every authenticated path persists a user factor —
+// including discoverable passkey login — so an unpinned attempt has no user.
+// A non-empty requestedUserID is kept by the caller only when
+// [AuthAttempt.HasProvisionalRegistrationHandle] confirms it is the handle of
+// the attempt's own in-flight ceremony (a re-issued challenge); any other
+// handle must be replaced by a fresh mint, so a caller-chosen id never
+// becomes a user id. An empty handle signals the caller to mint a fresh one.
+func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string) (userID string, provisional bool, err error) {
+	if err := a.PrepareChallenge(AuthCheckTypePasskeyRegistration); err != nil {
+		return "", false, err
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if ok {
+		if requestedUserID != "" && requestedUserID != userCheck.UserID {
+			return "", false, ErrAuthAttemptInvalidRequest().WithMessage("The registration user must match the authenticated user.")
+		}
+		return userCheck.UserID, false, nil
+	}
+	return requestedUserID, true, nil
+}
+
+// HasProvisionalRegistrationHandle reports whether the attempt's current
+// registration challenge is provisional and carries the given user handle.
+// This is the only situation in which a caller-supplied handle is known to be
+// server-minted, so a re-issued challenge may keep it; any other unknown
+// handle must be replaced by a fresh mint, never adopted.
+func (a *AuthAttempt) HasProvisionalRegistrationHandle(userID string) bool {
+	challenge, ok := a.ChallengeByType(AuthCheckTypePasskeyRegistration)
+	if !ok {
+		return false
+	}
+	registration, ok := challenge.(*AuthChallengePasskeyRegistration)
+	return ok && registration.Provisional && registration.UserID == userID
+}
+
 // SetUserChallenge registers a new user challenge on the attempt, replacing any existing challenge of the same type.
 func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
 	challenge := &AuthChallengeUser{}
@@ -276,6 +342,16 @@ func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
 func (a *AuthAttempt) SetPasskeyChallenge(passkeyChallenge *PasskeyChallenge) *AuthChallengePasskey {
 	challenge := &AuthChallengePasskey{
 		PasskeyChallenge: passkeyChallenge,
+	}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+// SetPasskeyRegistrationChallenge registers a new passkey registration challenge on the attempt, replacing any existing challenge of the same type.
+func (a *AuthAttempt) SetPasskeyRegistrationChallenge(registrationChallenge *PasskeyRegistrationChallenge, provisional bool) *AuthChallengePasskeyRegistration {
+	challenge := &AuthChallengePasskeyRegistration{
+		PasskeyRegistrationChallenge: registrationChallenge,
+		Provisional:                  provisional,
 	}
 	a.SetCheck(challenge)
 	return challenge
@@ -353,6 +429,37 @@ func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChalle
 	return challenge, userCheck, nil
 }
 
+// PreparePasskeyRegistrationVerification validates that a registration proof
+// can be submitted. Beyond the generic checks it enforces the ceremony's own
+// window ([PasskeyRegistrationChallengeTTL]), which is tighter than the
+// attempt TTL, and that the attempt's user state still matches what the
+// challenge was issued for: an authentication that happened after the issue
+// supersedes the ceremony. Without this, a provisional attestation could
+// create a second user on an attempt that meanwhile authenticated user A —
+// overwriting the user check A→H while A's other factors survive, so the
+// handoff would mint a session for H carrying factors verified against A.
+func (a *AuthAttempt) PreparePasskeyRegistrationVerification(challengeID string) (*AuthChallengePasskeyRegistration, error) {
+	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePasskeyRegistration)
+	if err != nil {
+		return nil, err
+	}
+	registrationChallenge, ok := challenge.(*AuthChallengePasskeyRegistration)
+	if !ok {
+		return nil, ErrAuthAttemptInvalidRequest()
+	}
+	if time.Since(registrationChallenge.GetLastChallengedAt()) > PasskeyRegistrationChallengeTTL {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	userCheck, hasUserFactor := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if registrationChallenge.Provisional && hasUserFactor {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	if !registrationChallenge.Provisional && hasUserFactor && userCheck.UserID != registrationChallenge.UserID {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	return registrationChallenge, nil
+}
+
 // SetUserFactor registers a verified user factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 	factor := &AuthFactorUser{
@@ -365,6 +472,20 @@ func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 // SetPasswordFactor registers a verified password factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
 	factor := &AuthFactorPassword{}
+	a.SetCheck(factor)
+	return factor
+}
+
+// SetPasskeyRegistrationFactor records a completed passkey enrollment as a
+// verified factor on the attempt, replacing the registration challenge.
+func (a *AuthAttempt) SetPasskeyRegistrationFactor(passkey *CreateUserPasskey) *AuthFactorPasskeyRegistration {
+	factor := &AuthFactorPasskeyRegistration{
+		UserVerified:   passkey.UserVerified,
+		UserID:         passkey.UserID,
+		CredentialID:   passkey.CredentialID,
+		BackupEligible: passkey.BackupEligible,
+		BackupState:    passkey.BackupState,
+	}
 	a.SetCheck(factor)
 	return factor
 }
@@ -385,6 +506,11 @@ func (a *AuthAttempt) SetPasskeyFactor(passkeyVerification *PasskeyVerification)
 // And will generate and store the handoff token.
 // Note: The HandoffToken is generated using a crypto/rand token and stored in a hashed way for security reasons.
 func (a *AuthAttempt) PrepareHandoff() error {
+	if a.Internal {
+		// An internal ceremony's attempt never becomes a session: reporting
+		// not-found keeps it invisible on the attempt surface.
+		return ErrAuthAttemptNotFound()
+	}
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}

@@ -35,7 +35,6 @@ import type {
   InitClaim201,
   ListFlowDefinitions200,
   ListSchemas200,
-  ListFlowDefinitions200FlowDefinitionsItem,
   UpdateFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import {
@@ -57,6 +56,7 @@ import {
   InitClaimParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListSchemasQueryParams,
   ListUsersQueryParams,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
@@ -64,7 +64,6 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
-  DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
 } from "@zitadel/config/defaults";
@@ -170,13 +169,11 @@ type ProjectRecord = {
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
- * `flow-definition-detail-response` per the OpenAPI contract.
+ * `flow-definition-response` per the OpenAPI contract.
  */
 type FlowDefinitionRecord = {
   id: string;
-  name: string;
   projectId: string;
-  schemaUri: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -247,37 +244,27 @@ function bearerToken(request: Request): string {
 }
 
 /**
- * Build a `flow-definition-detail-response` envelope around a stored body, as
- * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * Build a `flow-definition-response` envelope around a stored body, as
+ * specified by `api/openapi/components/flows/flow-definition-response.yaml`.
+ * Every read serves this — list included, which is the point of #939.
  * The Go server unconditionally echoes an `audience` (empty `{}` when the
  * stored flow has none — `internal/api/flow_definition.go`); mirror that so
  * consumers exercise the same wire shape the live server produces.
  */
-function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
+function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
     id: r.id,
     project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status,
     flow_definition: {
       audience: {},
       ...(r.body as Record<string, unknown>),
+      // After the spread: an update that omits `status` keeps the stored one,
+      // which is what the endpoint documents.
+      status: r.status,
     } as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
-}
-
-function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200FlowDefinitionsItem {
-  return {
-    id: r.id,
-    name: r.name,
-    project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status as ListFlowDefinitions200FlowDefinitionsItem["status"],
-    created_at: r.createdAt,
-    updated_at: r.updatedAt,
-  };
 }
 
 function defaultHumanUserSchema(): GetSchemaById200Schema {
@@ -297,9 +284,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   const id = `flow_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
-    name: "default-login",
     projectId: projectID,
-    schemaUri: DEFAULT_FLOW_SCHEMA_URI,
     status: "active",
     createdAt,
     updatedAt: createdAt,
@@ -310,6 +295,48 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
 function schemaObjectType(body: GetSchemaById200Schema): string | undefined {
   const value = (body as unknown as { objectType?: unknown }).objectType;
   return typeof value === "string" ? value : undefined;
+}
+
+function schemaKind(body: GetSchemaById200Schema): string | undefined {
+  const value = (body as unknown as { kind?: unknown }).kind;
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * `created_at DESC, id DESC`, the order the server lists in. The comparator has
+ * to be a total order: `createdAt` is millisecond-resolution here, so two
+ * schemas can share one, and a tie that resolved arbitrarily would let
+ * `revisions=latest` pick a different revision from one call to the next.
+ */
+function compareSchemasNewestFirst(a: SchemaRecord, b: SchemaRecord): number {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt < b.createdAt ? 1 : -1;
+  }
+  if (a.id === b.id) {
+    return 0;
+  }
+  return a.id < b.id ? 1 : -1;
+}
+
+/**
+ * `revisions=latest` keeps the newest revision of each `objectType`. Takes the
+ * list already sorted newest-first, so the first record of an `objectType` is
+ * the one to keep. A record without an `objectType` is a revision of nothing
+ * and is kept rather than grouped — matching the server's anti-join, which
+ * cannot correlate a NULL either.
+ */
+function latestSchemaRevisions(newestFirst: SchemaRecord[]): SchemaRecord[] {
+  const seen = new Set<string>();
+  return newestFirst.filter((r) => {
+    if (r.objectType === undefined) {
+      return true;
+    }
+    if (seen.has(r.objectType)) {
+      return false;
+    }
+    seen.add(r.objectType);
+    return true;
+  });
 }
 
 function schemaID(id: string): string {
@@ -694,24 +721,45 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      const url = new URL(request.url);
-      const projectId = url.searchParams.get("project_id");
-      if (!projectId) {
-        return HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
-          status: 400,
-        });
+      // Same `limit` coercion caveat as `GET /users` above: URLs carry strings
+      // and the generated zod does not coerce, so out-of-range limits are
+      // rejected by the schema (1-100) rather than silently normalised.
+      const { limit, ...rest } = queryRecord(request);
+      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
+      if (!query.ok) {
+        return query.response;
       }
-      const objectTypeFilter = url.searchParams.get("object_type") ?? undefined;
-      const records = [...store.schemas.values()]
-        .filter((r) => r.projectId === projectId)
-        .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      const matching = [...store.schemas.values()]
+        .filter((r) => r.projectId === query.data.project_id)
+        .filter((r) => !query.data.object_type || r.objectType === query.data.object_type)
+        .sort(compareSchemasNewestFirst);
+      // The server's anti-join repeats none of the caller's filters, and only
+      // object_type can correlate a suppressing row — so narrowing by
+      // object_type before selecting the latest is equivalent, while narrowing
+      // by kind is not: a newer revision of another kind still supersedes an
+      // older one, and the schema drops out of a kind-filtered result entirely.
+      const current =
+        query.data.revisions === "latest" ? latestSchemaRevisions(matching) : matching;
+      const records = current.filter(
+        (r) => !query.data.kind || schemaKind(r.body) === query.data.kind,
+      );
+      // The real cursor is opaque; the mock's is the next start index. A token
+      // it never minted is rejected with req.invalid, like the real server.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const page = records.slice(start, start + query.data.limit);
+      const next =
+        start + query.data.limit < records.length ? String(start + query.data.limit) : undefined;
       const responseBody: ListSchemas200 = {
-        schemas: records.map((r) => ({
+        schemas: page.map((r) => ({
           id: r.id,
           schema: r.body,
           metadata: { created_at: r.createdAt },
         })),
+        next_page_token: next,
       };
       return HttpResponse.json(responseBody);
     }),
@@ -777,19 +825,16 @@ export function setupPlatformHandlers() {
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
-      const flowDef = body.data.flow_definition as Record<string, unknown>;
       const record: FlowDefinitionRecord = {
         id,
-        name: flowDef.name as string,
         projectId: body.data.project_id,
-        schemaUri: body.data.schema_uri ?? DEFAULT_FLOW_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,
         body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
-      const responseBody: CreateFlowDefinition201 = flowDetailResponse(record);
+      const responseBody: CreateFlowDefinition201 = flowResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
@@ -806,7 +851,7 @@ export function setupPlatformHandlers() {
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()]
           .filter((record) => record.projectId === query.data.project_id)
-          .map(flowListItemResponse),
+          .map(flowResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
@@ -828,7 +873,7 @@ export function setupPlatformHandlers() {
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
+      const responseBody: GetFlowDefinition200 = flowResponse(record);
       const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
@@ -863,12 +908,10 @@ export function setupPlatformHandlers() {
 
       const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
       record.body = flowDefinition;
-      record.name = typeof flowDefinition.name === "string" ? flowDefinition.name : record.name;
-      record.schemaUri = body.data.schema_uri ?? record.schemaUri;
       record.status =
         typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
       record.updatedAt = nowIso();
-      const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
+      const responseBody: UpdateFlowDefinition200 = flowResponse(record);
       const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;

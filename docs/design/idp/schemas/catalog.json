@@ -1,0 +1,48 @@
+{
+  "google": {
+    "display_name": "Google",
+    "template": "google",
+    "console_url": "https://console.cloud.google.com/apis/credentials",
+    "docs_url": "https://developers.google.com/identity/openid-connect/openid-connect",
+    "callback_guidance": "multi_uri_client",
+    "protocol_block": {
+      "protocol": "oidc",
+      "subject_claim": "sub",
+      "verified_claims": { "email": "email_verified" },
+      "oidc": {
+        "issuer": "https://accounts.google.com",
+        "scopes": ["openid", "profile", "email"],
+        "static_authorize_parameters": { "prompt": "select_account" }
+      }
+    },
+    "claim_table": {
+      "email": "email",
+      "givenName": "given_name",
+      "familyName": "family_name"
+    }
+  },
+  "github": {
+    "display_name": "GitHub",
+    "template": "github",
+    "console_url": "https://github.com/settings/developers",
+    "docs_url": "https://docs.github.com/en/apps/oauth-apps",
+    "callback_guidance": "app_per_environment",
+    "protocol_block": {
+      "protocol": "oauth2",
+      "subject_claim": "id",
+      "verified_claims": { "email": "$supplementary_fetch" },
+      "oauth2": {
+        "authorization_endpoint": "https://github.com/login/oauth/authorize",
+        "token_endpoint": "https://github.com/login/oauth/access_token",
+        "userinfo_endpoint": "https://api.github.com/user",
+        "token_endpoint_auth_method": "client_secret_post",
+        "scopes": ["read:user", "user:email"],
+        "supplementary_fetch": "github_primary_email"
+      }
+    },
+    "claim_table": {
+      "email": "email",
+      "givenName": "name"
+    }
+  }
+}

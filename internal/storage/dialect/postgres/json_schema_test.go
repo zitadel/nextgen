@@ -62,7 +62,7 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 				Direction: v2database.OrderDesc,
 			},
 		},
-	})
+	}, service.JSONSchemaQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, schemaURL, listed.Items[0].URL)

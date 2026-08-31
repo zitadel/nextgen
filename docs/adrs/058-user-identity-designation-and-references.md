@@ -1,4 +1,4 @@
-# ADR 057: User Identity Designation and References
+# ADR 058: User Identity Designation and References
 
 > **Status:** Proposed
 > **Date:** 2026-08-24

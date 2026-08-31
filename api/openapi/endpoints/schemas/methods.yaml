@@ -93,6 +93,27 @@ get:
       schema:
         type: string
         maxLength: 256
+    - name: revisions
+      in: query
+      description: |
+        Which revisions to return. Schemas are immutable and versioned by URL,
+        so editing one mints a new row sharing its `objectType`.
+
+        `all` (the default) returns every revision — the full history an
+        export, an audit or a GitOps diff needs. `latest` returns the newest
+        revision of each `objectType`, which is one row per schema.
+
+        A schema stored without an `objectType` is a revision of nothing, and
+        is returned by both.
+
+        A `page_token` is bound to the mode it was issued in and is rejected by
+        the other.
+      schema:
+        type: string
+        default: all
+        enum:
+          - all
+          - latest
     - name: kind
       in: query
       description: |
