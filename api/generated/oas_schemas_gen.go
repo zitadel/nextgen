@@ -6445,12 +6445,63 @@ func (s *ClaimNoPersonalTeam) SetDetails(val OptClaimNoPersonalTeamDetails) {
 	s.Details = val
 }
 
-func (*ClaimNoPersonalTeam) completeClaimRes() {}
-
 // Additional error-specific context.
 type ClaimNoPersonalTeamDetails map[string]jx.Raw
 
 func (s *ClaimNoPersonalTeamDetails) init() ClaimNoPersonalTeamDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ClaimPersonalTeamNotActive struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimPersonalTeamNotActiveDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimPersonalTeamNotActive) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimPersonalTeamNotActive) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimPersonalTeamNotActive) GetDetails() OptClaimPersonalTeamNotActiveDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimPersonalTeamNotActive) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimPersonalTeamNotActive) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimPersonalTeamNotActive) SetDetails(val OptClaimPersonalTeamNotActiveDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ClaimPersonalTeamNotActiveDetails map[string]jx.Raw
+
+func (s *ClaimPersonalTeamNotActiveDetails) init() ClaimPersonalTeamNotActiveDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -6679,6 +6730,76 @@ func (*ClaimStatusResponse) getClaimStatusRes() {}
 type CompleteClaimBadRequest ErrorDetails
 
 func (*CompleteClaimBadRequest) completeClaimRes() {}
+
+// CompleteClaimForbidden represents sum type.
+type CompleteClaimForbidden struct {
+	Type                       CompleteClaimForbiddenType // switch on this field
+	ClaimNoPersonalTeam        ClaimNoPersonalTeam
+	ClaimPersonalTeamNotActive ClaimPersonalTeamNotActive
+}
+
+// CompleteClaimForbiddenType is oneOf type of CompleteClaimForbidden.
+type CompleteClaimForbiddenType string
+
+// Possible values for CompleteClaimForbiddenType.
+const (
+	ClaimNoPersonalTeamCompleteClaimForbidden        CompleteClaimForbiddenType = "claim.no_personal_team"
+	ClaimPersonalTeamNotActiveCompleteClaimForbidden CompleteClaimForbiddenType = "claim.personal_team_not_active"
+)
+
+// IsClaimNoPersonalTeam reports whether CompleteClaimForbidden is ClaimNoPersonalTeam.
+func (s CompleteClaimForbidden) IsClaimNoPersonalTeam() bool {
+	return s.Type == ClaimNoPersonalTeamCompleteClaimForbidden
+}
+
+// IsClaimPersonalTeamNotActive reports whether CompleteClaimForbidden is ClaimPersonalTeamNotActive.
+func (s CompleteClaimForbidden) IsClaimPersonalTeamNotActive() bool {
+	return s.Type == ClaimPersonalTeamNotActiveCompleteClaimForbidden
+}
+
+// SetClaimNoPersonalTeam sets CompleteClaimForbidden to ClaimNoPersonalTeam.
+func (s *CompleteClaimForbidden) SetClaimNoPersonalTeam(v ClaimNoPersonalTeam) {
+	s.Type = ClaimNoPersonalTeamCompleteClaimForbidden
+	s.ClaimNoPersonalTeam = v
+}
+
+// GetClaimNoPersonalTeam returns ClaimNoPersonalTeam and true boolean if CompleteClaimForbidden is ClaimNoPersonalTeam.
+func (s CompleteClaimForbidden) GetClaimNoPersonalTeam() (v ClaimNoPersonalTeam, ok bool) {
+	if !s.IsClaimNoPersonalTeam() {
+		return v, false
+	}
+	return s.ClaimNoPersonalTeam, true
+}
+
+// NewClaimNoPersonalTeamCompleteClaimForbidden returns new CompleteClaimForbidden from ClaimNoPersonalTeam.
+func NewClaimNoPersonalTeamCompleteClaimForbidden(v ClaimNoPersonalTeam) CompleteClaimForbidden {
+	var s CompleteClaimForbidden
+	s.SetClaimNoPersonalTeam(v)
+	return s
+}
+
+// SetClaimPersonalTeamNotActive sets CompleteClaimForbidden to ClaimPersonalTeamNotActive.
+func (s *CompleteClaimForbidden) SetClaimPersonalTeamNotActive(v ClaimPersonalTeamNotActive) {
+	s.Type = ClaimPersonalTeamNotActiveCompleteClaimForbidden
+	s.ClaimPersonalTeamNotActive = v
+}
+
+// GetClaimPersonalTeamNotActive returns ClaimPersonalTeamNotActive and true boolean if CompleteClaimForbidden is ClaimPersonalTeamNotActive.
+func (s CompleteClaimForbidden) GetClaimPersonalTeamNotActive() (v ClaimPersonalTeamNotActive, ok bool) {
+	if !s.IsClaimPersonalTeamNotActive() {
+		return v, false
+	}
+	return s.ClaimPersonalTeamNotActive, true
+}
+
+// NewClaimPersonalTeamNotActiveCompleteClaimForbidden returns new CompleteClaimForbidden from ClaimPersonalTeamNotActive.
+func NewClaimPersonalTeamNotActiveCompleteClaimForbidden(v ClaimPersonalTeamNotActive) CompleteClaimForbidden {
+	var s CompleteClaimForbidden
+	s.SetClaimPersonalTeamNotActive(v)
+	return s
+}
+
+func (*CompleteClaimForbidden) completeClaimRes() {}
 
 type CompleteClaimNotFound ErrorDetails
 
@@ -21771,6 +21892,52 @@ func (o OptClaimNoPersonalTeamDetails) Get() (v ClaimNoPersonalTeamDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptClaimNoPersonalTeamDetails) Or(d ClaimNoPersonalTeamDetails) ClaimNoPersonalTeamDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimPersonalTeamNotActiveDetails returns new OptClaimPersonalTeamNotActiveDetails with value set to v.
+func NewOptClaimPersonalTeamNotActiveDetails(v ClaimPersonalTeamNotActiveDetails) OptClaimPersonalTeamNotActiveDetails {
+	return OptClaimPersonalTeamNotActiveDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimPersonalTeamNotActiveDetails is optional ClaimPersonalTeamNotActiveDetails.
+type OptClaimPersonalTeamNotActiveDetails struct {
+	Value ClaimPersonalTeamNotActiveDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimPersonalTeamNotActiveDetails was set.
+func (o OptClaimPersonalTeamNotActiveDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimPersonalTeamNotActiveDetails) Reset() {
+	var v ClaimPersonalTeamNotActiveDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimPersonalTeamNotActiveDetails) SetTo(v ClaimPersonalTeamNotActiveDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimPersonalTeamNotActiveDetails) Get() (v ClaimPersonalTeamNotActiveDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimPersonalTeamNotActiveDetails) Or(d ClaimPersonalTeamNotActiveDetails) ClaimPersonalTeamNotActiveDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

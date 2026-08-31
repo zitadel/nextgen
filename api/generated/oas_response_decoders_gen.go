@@ -404,7 +404,7 @@ func decodeCompleteClaimResponse(resp *http.Response) (res CompleteClaimRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ClaimNoPersonalTeam
+			var response CompleteClaimForbidden
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

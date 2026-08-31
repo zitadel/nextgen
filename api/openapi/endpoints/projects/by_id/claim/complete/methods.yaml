@@ -49,14 +49,21 @@ post:
         because the next sign-in provisions a team, while
         `claim.personal_team_not_active` means the team exists but was
         deactivated and only an administrator can restore it, so retrying will
-        not help. The schema below names the first; both are listed in the
-        default error response, because a `oneOf` of two codes that differ only
-        by a `const` gives ogen no discriminator to infer and makes it skip the
-        whole operation.
+        not help.
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
+            # The explicit discriminator is required, not decorative: the two
+            # schemas differ only by a `const` code, so without it ogen cannot
+            # infer one and silently skips the whole operation.
+            oneOf:
+              - $ref: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
+              - $ref: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
+            discriminator:
+              propertyName: code
+              mapping:
+                claim.no_personal_team: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
+                claim.personal_team_not_active: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
     '404':
       description: Challenge not found.
       content:

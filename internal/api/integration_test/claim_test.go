@@ -343,8 +343,14 @@ func TestCompleteClaimNoPersonalTeam(t *testing.T) {
 		&api.CompleteClaimRequest{ChallengeID: initOK.ChallengeID},
 		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	require.IsType(t, &api.ClaimNoPersonalTeam{}, resp, helpers.MustMarshal(t, resp))
-	assert.Equal(t, "claim.no_personal_team", resp.(*api.ClaimNoPersonalTeam).GetCode())
+	// The 403 is a sum type over the two codes that carry it, so a client can
+	// tell "no team yet" (this case, cleared by the next sign-in) from
+	// "team deactivated", which needs an administrator.
+	forbidden, ok := resp.(*api.CompleteClaimForbidden)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	body, ok := forbidden.GetClaimNoPersonalTeam()
+	require.True(t, ok, "expected the no-team variant, got %q", forbidden.Type)
+	assert.Equal(t, "claim.no_personal_team", body.GetCode())
 }
 
 // TestClaimStatusBearerMismatch: a valid project.write bearer for the same
