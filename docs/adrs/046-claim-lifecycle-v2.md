@@ -25,12 +25,15 @@
 >
 > **Amendment (2026-08-31):** [§4](#4-the-personal-team-is-created-at-registration-not-at-claim)
 > stated that team names are not unique. That was never true of the schema: the
-> teams table has carried a unique index on `(project_id, name_lower)` since it
-> was introduced, so team names are unique per project. §4 is corrected below,
-> and the correction is load-bearing rather than editorial. The personal team's
-> name is derived per user, and that uniqueness is what limits a user to one
-> team: two ensures racing compute the same name, so the index rejects the
-> second insert instead of minting a second team (#527, #979).
+> teams table has carried a case-insensitive unique index on the name, scoped to
+> the project, since it was introduced, so team names are unique per project.
+> §4 is corrected below, and the correction is load-bearing rather than
+> editorial: it is what makes automatic personal-team provisioning converge.
+> Because the name is derived deterministically from the user, two provisioning
+> attempts racing for the same user compute the same name, so the index rejects
+> the loser instead of minting a second team (#527, #979). This bounds
+> *automatic provisioning* to one team per user; it does not change §Context's
+> rule that a user may belong to many teams.
 >
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
@@ -176,14 +179,19 @@ claim: they are created when the user registers on the platform project. The
 claim transaction only writes the project-to-team grant; it never creates a team
 or a membership.
 
-- Team names are unique per project, enforced by a unique index on
-  `(project_id, name_lower)`. The personal team's name is therefore derived per
-  user rather than shared: a single literal "Personal Team" would collide on the
-  second registration. The name is a renamable placeholder, not an identifier.
-- That per-user determinism is the one-team-per-user constraint. Because the
-  name is a pure function of the user id, a second concurrent creation for the
-  same user collides on the index and converges on the winner instead of
-  creating a second team.
+- Team names are unique per project, case-insensitively. (Postgres indexes
+  `lower(name)`; SQLite and Spanner materialise a `name_lower` column because
+  neither can index an expression. The invariant is the same on all three.) The
+  personal team's name is therefore derived per user rather than shared: a
+  single literal "Personal Team" would collide on the second registration. The
+  name is a renamable placeholder, not an identifier.
+- Determinism, not the particular derivation, is what the contract requires:
+  the same user must always yield the same name. That turns the unique index
+  into the concurrency guard for provisioning, so a second concurrent attempt
+  for the same user collides and converges on the winner instead of creating a
+  second team. It bounds automatic provisioning to one team per user, which is
+  narrower than a limit on how many teams a user may belong to; per §Context a
+  user may still belong to many.
 - Automatic team creation is restricted to platform-project registrations;
   customer projects must not auto-create teams.
 - A returning claimer reuses their one existing personal team (per ADR 024);
