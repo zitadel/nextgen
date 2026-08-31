@@ -83,8 +83,32 @@ type claimStatements interface {
 	GetChallengeByID(ctx context.Context, projectID, id string) (*domain.ClaimChallenge, error)
 	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
+	GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error)
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	InsertEvent(ctx context.Context, event *domain.Event) error
+}
+
+// noPersonalTeamErr splits the resolver's single not-found into the two states
+// behind it. GetPersonalTeamForUser collapses them because the claim is refused
+// either way, but a caller has to tell them apart: "you have no team yet"
+// resolves itself, since the next sign-in provisions one (#527), while "your
+// team is not active" is an administrative state only an administrator can
+// undo, and no amount of retrying will clear it.
+//
+// The membership status rides along on the second so a client can distinguish a
+// removed team from a pending invitation. An *active* status there would mean
+// the team itself is deactivated rather than the membership; DeactivateTeam
+// cascades removed to every membership it owns, so that combination should not
+// occur, and the error code is the right answer for it regardless.
+func (s *claimService) noPersonalTeamErr(ctx context.Context, stmts claimStatements, userID string) error {
+	membership, err := stmts.GetEarliestTeamMembership(ctx, s.platformProjectID, userID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrClaimNoPersonalTeam()
+		}
+		return err
+	}
+	return domain.ErrPersonalTeamNotActive(membership.Status.String())
 }
 
 // NewClaimService builds the claim service. platformProjectID is the project
@@ -203,7 +227,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		team, err := stmts.GetPersonalTeamForUser(ctx, s.platformProjectID, userID)
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return domain.ErrClaimNoPersonalTeam()
+				return s.noPersonalTeamErr(ctx, stmts, userID)
 			}
 			return err
 		}

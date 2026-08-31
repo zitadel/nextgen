@@ -44,7 +44,15 @@ post:
     '403':
       description: |
         The session user has no active personal team in the platform project,
-        so there is no team to attach the claimed project to.
+        so there is no team to attach the claimed project to. Two codes carry
+        this, and the remedies differ: `claim.no_personal_team` clears itself,
+        because the next sign-in provisions a team, while
+        `claim.personal_team_not_active` means the team exists but was
+        deactivated and only an administrator can restore it, so retrying will
+        not help. The schema below names the first; both are listed in the
+        default error response, because a `oneOf` of two codes that differ only
+        by a `const` gives ogen no discriminator to infer and makes it skip the
+        whole operation.
       content:
         application/json:
           schema:

@@ -183,6 +183,12 @@ func claimErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		// the project: no active personal team to attach it to. Reachable until
 		// #527 auto-creates the personal team at registration.
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrPersonalTeamNotActive("").Code:
+		// Same refusal, different cause: the team exists but is not active, so
+		// #527's auto-creation will not clear it and only an administrator can.
+		// A distinct code so the console can say so instead of implying the user
+		// simply needs to wait.
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		// The claim.session_* sentinels only ever leave verifyClaimSession
 		// wrapped in auth.unauthorized. Anything landing here unwrapped is an
