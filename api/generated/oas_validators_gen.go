@@ -7189,6 +7189,8 @@ func (s UserExpand) Validate() error {
 	switch s {
 	case "teams":
 		return nil
+	case "lifecycle_owner_team":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
@@ -7247,6 +7249,24 @@ func (s *UserMetadata) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "status",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.LifecycleOwnerTeam.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "lifecycle_owner_team",
 			Error: err,
 		})
 	}

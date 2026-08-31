@@ -69,6 +69,16 @@ type User struct {
 	// TeamsTruncated reports that the user is on more teams than the read's
 	// cap carries. The whole list is served by ListUserTeams.
 	TeamsTruncated bool
+
+	// LifecycleOwnerTeam is the team named by LifecycleOwnerTeamID, populated
+	// only when the read asked for it. Nil alone is ambiguous — a self-owned
+	// user has no owner to load — so LifecycleOwnerTeamLoaded is what says the
+	// read looked.
+	LifecycleOwnerTeam *Team
+	// LifecycleOwnerTeamLoaded reports that the read resolved the owner team.
+	// It is the to-one counterpart of Teams being non-nil: it separates "not
+	// asked for" from "asked for, and the user is self-owned".
+	LifecycleOwnerTeamLoaded bool
 }
 
 type UserMetadata struct {

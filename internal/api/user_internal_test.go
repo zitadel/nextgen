@@ -37,3 +37,30 @@ func TestFiltersOnTeamID(t *testing.T) {
 		})
 	}
 }
+
+// Each expand value drives its own gate and its own storage option, so the two
+// must not bleed into each other.
+func TestMapQueryUsersToService_Expand(t *testing.T) {
+	tests := []struct {
+		name          string
+		expand        []api.UserExpand
+		wantTeams     bool
+		wantOwnerTeam bool
+	}{
+		{"none", nil, false, false},
+		{"teams", []api.UserExpand{api.UserExpandTeams}, true, false},
+		{"owner team", []api.UserExpand{api.UserExpandLifecycleOwnerTeam}, false, true},
+		{"both", []api.UserExpand{api.UserExpandTeams, api.UserExpandLifecycleOwnerTeam}, true, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := mapQueryUsersToService("proj_a", &api.QueryUsersRequest{Expand: tt.expand})
+			if input.IncludeTeams != tt.wantTeams {
+				t.Fatalf("IncludeTeams = %v, want %v", input.IncludeTeams, tt.wantTeams)
+			}
+			if input.IncludeLifecycleOwnerTeam != tt.wantOwnerTeam {
+				t.Fatalf("IncludeLifecycleOwnerTeam = %v, want %v", input.IncludeLifecycleOwnerTeam, tt.wantOwnerTeam)
+			}
+		})
+	}
+}

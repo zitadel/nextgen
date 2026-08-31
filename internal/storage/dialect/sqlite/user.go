@@ -46,6 +46,12 @@ WHERE m.project_id = ?
   AND m.status IN (SELECT value FROM json_each(?))
 ORDER BY m.user_id, t.name, m.team_id`
 
+	// ownerTeamsByIDsQuery hydrates the lifecycle owner teams of one page of
+	// users (ADR 059), keyed on the distinct owner ids the page returned.
+	ownerTeamsByIDsQuery = `SELECT id, name, status, created_at, updated_at
+FROM teams
+WHERE project_id = ? AND id IN (SELECT value FROM json_each(?))`
+
 	deactivateUserStmt = `UPDATE users SET status = ?, updated_at = ?
 WHERE project_id = ? AND id = ?`
 
@@ -300,6 +306,11 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 				return err
 			}
 		}
+		if opts.IncludeLifecycleOwnerTeam {
+			if err := us.hydrateUserGroupOwnerTeams(ctx, group); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -349,6 +360,46 @@ func (us userStatements) hydrateUserGroupTeams(ctx context.Context, group v2user
 		team.CreatedAt = timeFromUnixNano(createdNano)
 		team.UpdatedAt = timeFromUnixNano(updNano)
 		collector.Add(userID, team)
+	}
+	return wrapError(rows.Err())
+}
+
+// hydrateUserGroupOwnerTeams loads the lifecycle owner teams of an already-read
+// page of users (ADR 059), keyed on the distinct owner ids the page returned.
+// A page of self-owned users runs no query at all.
+func (us userStatements) hydrateUserGroupOwnerTeams(ctx context.Context, group v2user.ProjectGroup) error {
+	collector := v2user.NewOwnerTeamCollector(group)
+	teamIDs := collector.TeamIDs()
+	if len(teamIDs) == 0 {
+		return nil
+	}
+
+	idsJSON, err := json.Marshal(teamIDs)
+	if err != nil {
+		return err
+	}
+
+	rows, err := us.client.Query(ctx, ownerTeamsByIDsQuery, group.ProjectID, string(idsJSON))
+	if err != nil {
+		return wrapError(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			team                 domain.Team
+			status               string
+			createdNano, updNano int64
+		)
+		// Unix nanos here, the same way the membership hydrate reads them.
+		if err := rows.Scan(&team.ID, &team.Name, &status, &createdNano, &updNano); err != nil {
+			return err
+		}
+		team.ProjectID = group.ProjectID
+		team.Status = domain.TeamStatus(status)
+		team.CreatedAt = timeFromUnixNano(createdNano)
+		team.UpdatedAt = timeFromUnixNano(updNano)
+		collector.Add(team)
 	}
 	return wrapError(rows.Err())
 }

@@ -333,6 +333,22 @@ func requireMembershipRead(ctx context.Context) error {
 		WithMessage("reading a user's team memberships requires team_membership.read")
 }
 
+// requireTeamRead gates `expand: ["lifecycle_owner_team"]` on the users query.
+// The id is already on every user; resolving it to the team's name and status
+// reads the team resource, which user.read does not cover
+// (system-permission-catalog.md).
+//
+// Same interim fallback as requireMembershipRead, for the same reason: team.read
+// is not minted yet (ADR 036). TODO(#420): drop it once granular scopes are.
+func requireTeamRead(ctx context.Context) error {
+	scope, ok := GetScopeContext(ctx)
+	if ok && (slices.Contains(scope.Scope, "team.read") || hasOperatorProjectWrite(scope.Scope)) {
+		return nil
+	}
+	return domain.ErrUserPermissionDenied().
+		WithMessage("expanding a user's lifecycle owner team requires team.read")
+}
+
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {
 	switch dec {
 	case resolver.DecisionAllow:

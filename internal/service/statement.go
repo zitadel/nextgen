@@ -234,6 +234,11 @@ type UserQueryOptions struct {
 	// TeamsLimit caps how many membership entries each user carries when
 	// IncludeTeams is set. Zero means [DefaultUserTeamsLimit].
 	TeamsLimit int
+	// IncludeLifecycleOwnerTeam hydrates the team that owns each user's
+	// lifecycle (ADR 059). Like IncludeTeams it is a batched second query,
+	// keyed on the distinct owner ids the page returned; self-owned users
+	// contribute no id and stay nil.
+	IncludeLifecycleOwnerTeam bool
 }
 
 // DefaultUserTeamsLimit caps an embedded membership list. Embedded collections are not
