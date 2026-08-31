@@ -3,7 +3,6 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/maputil"
@@ -20,8 +19,8 @@ var ErrSchemaDesignationInvalid = errors.New("schema designation invalid")
 // user schema document. It runs after meta-schema validation, so shapes the
 // meta-schema already guarantees (keyword types) are not re-reported here.
 func validateUserSchemaDesignations(schema map[string]any) error {
-	identifier, hasIdentifier := schema[SchemaAnnotationIdentifier].(string)
-	hasIdentifier = hasIdentifier && identifier != ""
+	identifier, _ := schema[SchemaAnnotationIdentifier].(string)
+	hasIdentifier := identifier != ""
 
 	// Password verification is unreachable without a prior identifier (the
 	// flow state machine dispatches identifier before password), so enabling
@@ -31,6 +30,10 @@ func validateUserSchemaDesignations(schema map[string]any) error {
 	// API-managed) schemas legitimately designate nothing. A flow that picks
 	// the identifier-first passkey pattern instead is checked at the flow
 	// level, where the on_success manifest requires the identifier upstream.
+	// magic_link, otp and sso are enable-able in the meta-schema but not in
+	// this trigger yet: they are not wired in the flow engine, and ADR 058
+	// defers them ("magic link and OTP join password there when they
+	// arrive") — extend the trigger when those methods land.
 	if enabled, _ := maputil.GetNested[bool](schema, []string{SchemaAnnotationAuthMethods, "password", "enabled"}); enabled && !hasIdentifier {
 		return fmt.Errorf("%w: password authentication is enabled but the schema designates no %q", ErrSchemaDesignationInvalid, SchemaAnnotationIdentifier)
 	}
@@ -60,47 +63,93 @@ func validateUserSchemaDesignations(schema map[string]any) error {
 }
 
 // designatedLeaf resolves a dot-separated attribute path (the same path shape
-// flattened attribute rows are keyed by) to its property schema and requires
-// it to be a leaf: a scalar value, not an object or array.
+// flattened attribute rows are keyed by) to its property schema. Every
+// intermediate segment must be object-shaped — JSON Schema ignores a
+// `properties` map on a scalar-typed parent, so a path through one could
+// never exist on any valid user document — and the final segment must
+// locally declare a scalar type.
 func designatedLeaf(schema map[string]any, path, keyword string) (map[string]any, error) {
+	unknown := fmt.Errorf("%w: %q names unknown property %q", ErrSchemaDesignationInvalid, keyword, path)
 	current := schema
-	for _, segment := range strings.Split(path, ".") {
+	segments := strings.Split(path, ".")
+	for i, segment := range segments {
 		properties, ok := current["properties"].(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("%w: %q names unknown property %q", ErrSchemaDesignationInvalid, keyword, path)
+			return nil, unknown
 		}
 		current, ok = properties[segment].(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("%w: %q names unknown property %q", ErrSchemaDesignationInvalid, keyword, path)
+			return nil, unknown
+		}
+		if i < len(segments)-1 && !isObjectShaped(current) {
+			return nil, fmt.Errorf("%w: %q path %q: intermediate segment %q must be an object property", ErrSchemaDesignationInvalid, keyword, path, segment)
 		}
 	}
 	if !declaresScalarType(current) {
-		return nil, fmt.Errorf("%w: %q property %q must locally declare a scalar type", ErrSchemaDesignationInvalid, keyword, path)
+		return nil, fmt.Errorf("%w: %q property %q must locally declare exactly one scalar type", ErrSchemaDesignationInvalid, keyword, path)
 	}
 	return current, nil
 }
 
+// isObjectShaped reports whether a property schema can hold object values:
+// no `type` declared (its `properties` map carries the intent), the type
+// "object", or a union whose only non-null entry is "object".
+func isObjectShaped(prop map[string]any) bool {
+	switch t := prop["type"].(type) {
+	case nil:
+		return true
+	case string:
+		return t == "object"
+	case []any:
+		object := false
+		for _, entry := range t {
+			switch entry {
+			case "object":
+				object = true
+			case "null":
+			default:
+				return false
+			}
+		}
+		return object
+	}
+	return false
+}
+
 // declaresScalarType reports whether a property schema locally proves its
-// values are scalars via the `type` keyword — a single scalar type name, or
-// a union of them (the nullable idiom included). JSON Schema keywords are
-// conjunctive, so a local scalar `type` cannot be widened by `$ref`,
-// `allOf`, or any other keyword the property carries. Without that local
-// proof the shape is indeterminate — an untyped property (or one hiding an
-// object behind `$ref`) accepts object values, which flatten into child
-// attribute rows with no unique row for the designated path.
+// values are non-null scalars via the `type` keyword: one scalar type name,
+// optionally in a union with "null" (the nullable idiom). Exactly one
+// non-null type is required, matching the flow resolver's reduction —
+// schemaReader.JSONType rejects multi-type unions, so accepting one here
+// would designate an identifier no flow could ever render as a field. JSON
+// Schema keywords are conjunctive, so a local scalar type cannot be widened
+// by `$ref`, `allOf`, or any other keyword the property carries; without
+// the local proof the shape is indeterminate — an untyped property (or one
+// hiding an object behind `$ref`) accepts object values, which flatten into
+// child attribute rows with no unique row for the designated path.
 func declaresScalarType(prop map[string]any) bool {
-	isScalar := func(entry any) bool {
+	scalar := func(entry any) bool {
 		switch entry {
-		case "string", "number", "integer", "boolean", "null":
+		case "string", "number", "integer", "boolean":
 			return true
 		}
 		return false
 	}
 	switch t := prop["type"].(type) {
 	case string:
-		return isScalar(t)
+		return scalar(t)
 	case []any:
-		return len(t) > 0 && !slices.ContainsFunc(t, func(entry any) bool { return !isScalar(entry) })
+		nonNull := 0
+		for _, entry := range t {
+			if entry == "null" {
+				continue
+			}
+			if !scalar(entry) {
+				return false
+			}
+			nonNull++
+		}
+		return nonNull == 1
 	}
 	return false
 }

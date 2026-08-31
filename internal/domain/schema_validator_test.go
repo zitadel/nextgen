@@ -502,6 +502,42 @@ func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
 				"properties": {"handle": {"type": ["null", "string"], "x-unique": "project"}}`),
 		},
 		{
+			name: "an all-scalar type union is rejected like the flow resolver rejects it",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["string", "integer"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a null-only type cannot identify anyone",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": "null", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a null-only union cannot identify anyone",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["null"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "an intermediate segment on a scalar-typed parent is unreachable",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "a.b",
+				"properties": {"a": {"type": "string", "properties": {
+					"b": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a nullable-object intermediate segment is reachable",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account.handle",
+				"properties": {"account": {"type": ["null", "object"], "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+		},
+		{
 			name: "identifier on an implicit object (properties without type)",
 			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
 				"x-identifier": "account",
