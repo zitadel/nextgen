@@ -83,8 +83,43 @@ type claimStatements interface {
 	GetChallengeByID(ctx context.Context, projectID, id string) (*domain.ClaimChallenge, error)
 	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
+	GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error)
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	InsertEvent(ctx context.Context, event *domain.Event) error
+}
+
+// noPersonalTeamErr splits the resolver's single not-found into the two states
+// behind it. GetPersonalTeamForUser collapses them because the claim is refused
+// either way, but a caller has to tell them apart: "you hold no membership at
+// all" resolves itself, since the next sign-in provisions one (#527), while a
+// membership that exists but is not active will not be provisioned around.
+//
+// What clears the second depends on the status, which is why it travels with
+// the error rather than being summarised in it: `removed` follows a team or
+// user deactivation and needs someone to restore the user's access (a user
+// deactivation cascades without touching their teams, so the team itself may
+// still be active), while `pending` is an invitation the user can still accept.
+//
+// This refines a verdict already reached; it does not revisit it. The two reads
+// take separate snapshots under read-committed, so provisioning or a
+// reactivation committing in between can show an *active* membership here even
+// though the resolver just refused the claim. Reporting "not active: active"
+// would be self-contradictory, so an active membership falls back to the
+// original verdict: the refusal is then transient and the next attempt sees the
+// team. (The same fallback covers an active membership on a deactivated team,
+// which DeactivateTeam's cascade to removed should already prevent.)
+func (s *claimService) noPersonalTeamErr(ctx context.Context, stmts claimStatements, userID string) error {
+	membership, err := stmts.GetEarliestTeamMembership(ctx, s.platformProjectID, userID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrClaimNoPersonalTeam()
+		}
+		return err
+	}
+	if membership.Status == domain.MembershipStatusActive {
+		return domain.ErrClaimNoPersonalTeam()
+	}
+	return domain.ErrPersonalTeamNotActive(membership.Status.String())
 }
 
 // NewClaimService builds the claim service. platformProjectID is the project
@@ -203,7 +238,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		team, err := stmts.GetPersonalTeamForUser(ctx, s.platformProjectID, userID)
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return domain.ErrClaimNoPersonalTeam()
+				return s.noPersonalTeamErr(ctx, stmts, userID)
 			}
 			return err
 		}
