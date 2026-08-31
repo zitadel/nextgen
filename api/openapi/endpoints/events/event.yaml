@@ -13,6 +13,7 @@ oneOf:
   - $ref: types/auth-token-revoked-event.yaml
   - $ref: types/authz-granted-event.yaml
   - $ref: types/branding-created-event.yaml
+  - $ref: types/environment-created-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
   - $ref: types/flowdef-updated-event.yaml
@@ -42,6 +43,7 @@ discriminator:
     auth.token.revoked: types/auth-token-revoked-event.yaml
     authz.granted: types/authz-granted-event.yaml
     branding.created: types/branding-created-event.yaml
+    environment.created: types/environment-created-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml
     flowdef.updated: types/flowdef-updated-event.yaml

@@ -29,6 +29,7 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
+	EnvironmentStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -112,6 +113,19 @@ type JSONSchemaStatements interface {
 	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
 	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
 	DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type EnvironmentPool interface {
+// 	Statementer[EnvironmentStatements]
+// 	Transactioner[EnvironmentStatements]
+// }
+
+type EnvironmentStatements interface {
+	Statements
+	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
+	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
+	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

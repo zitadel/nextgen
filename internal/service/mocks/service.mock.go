@@ -552,6 +552,44 @@ func (c *MockAllStatementsCreateEncryptionKeyCall) DoAndReturn(f func(context.Co
 	return c
 }
 
+// CreateEnvironment mocks base method.
+func (m *MockAllStatements) CreateEnvironment(ctx context.Context, entity *domain.Environment) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateEnvironment", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateEnvironment indicates an expected call of CreateEnvironment.
+func (mr *MockAllStatementsMockRecorder) CreateEnvironment(ctx, entity any) *MockAllStatementsCreateEnvironmentCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEnvironment", reflect.TypeOf((*MockAllStatements)(nil).CreateEnvironment), ctx, entity)
+	return &MockAllStatementsCreateEnvironmentCall{Call: call}
+}
+
+// MockAllStatementsCreateEnvironmentCall wrap *gomock.Call
+type MockAllStatementsCreateEnvironmentCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCreateEnvironmentCall) Return(arg0 error) *MockAllStatementsCreateEnvironmentCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCreateEnvironmentCall) Do(f func(context.Context, *domain.Environment) error) *MockAllStatementsCreateEnvironmentCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCreateEnvironmentCall) DoAndReturn(f func(context.Context, *domain.Environment) error) *MockAllStatementsCreateEnvironmentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateFlowDefinition mocks base method.
 func (m *MockAllStatements) CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
 	m.ctrl.T.Helper()
@@ -2162,6 +2200,45 @@ func (c *MockAllStatementsGetEncryptionKeyCall) DoAndReturn(f func(context.Conte
 	return c
 }
 
+// GetEnvironmentByName mocks base method.
+func (m *MockAllStatements) GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEnvironmentByName", ctx, projectID, name)
+	ret0, _ := ret[0].(*domain.Environment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEnvironmentByName indicates an expected call of GetEnvironmentByName.
+func (mr *MockAllStatementsMockRecorder) GetEnvironmentByName(ctx, projectID, name any) *MockAllStatementsGetEnvironmentByNameCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironmentByName", reflect.TypeOf((*MockAllStatements)(nil).GetEnvironmentByName), ctx, projectID, name)
+	return &MockAllStatementsGetEnvironmentByNameCall{Call: call}
+}
+
+// MockAllStatementsGetEnvironmentByNameCall wrap *gomock.Call
+type MockAllStatementsGetEnvironmentByNameCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetEnvironmentByNameCall) Return(arg0 *domain.Environment, arg1 error) *MockAllStatementsGetEnvironmentByNameCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetEnvironmentByNameCall) Do(f func(context.Context, string, string) (*domain.Environment, error)) *MockAllStatementsGetEnvironmentByNameCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetEnvironmentByNameCall) DoAndReturn(f func(context.Context, string, string) (*domain.Environment, error)) *MockAllStatementsGetEnvironmentByNameCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetEventByID mocks base method.
 func (m *MockAllStatements) GetEventByID(ctx context.Context, projectID, id string) (*domain.Event, error) {
 	m.ctrl.T.Helper()
@@ -3284,6 +3361,45 @@ func (c *MockAllStatementsListEncryptionKeysCall) Do(f func(context.Context, *da
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsListEncryptionKeysCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)) *MockAllStatementsListEncryptionKeysCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListEnvironments mocks base method.
+func (m *MockAllStatements) ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnvironments", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Environment])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnvironments indicates an expected call of ListEnvironments.
+func (mr *MockAllStatementsMockRecorder) ListEnvironments(ctx, filter any) *MockAllStatementsListEnvironmentsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnvironments", reflect.TypeOf((*MockAllStatements)(nil).ListEnvironments), ctx, filter)
+	return &MockAllStatementsListEnvironmentsCall{Call: call}
+}
+
+// MockAllStatementsListEnvironmentsCall wrap *gomock.Call
+type MockAllStatementsListEnvironmentsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListEnvironmentsCall) Return(arg0 *database.ListResult[*domain.Environment], arg1 error) *MockAllStatementsListEnvironmentsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListEnvironmentsCall) Do(f func(context.Context, *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)) *MockAllStatementsListEnvironmentsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListEnvironmentsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)) *MockAllStatementsListEnvironmentsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

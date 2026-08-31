@@ -227,6 +227,12 @@ type BrandingPayload struct {
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
 
+type EnvironmentPayload struct {
+	Name string `json:"name,omitempty"`
+}
+
+type EnvironmentCreatedPayload = EnvironmentPayload
+
 type AuthzGrantedPayload struct {
 	PrincipalType string `json:"principal_type,omitempty"`
 	PrincipalID   string `json:"principal_id,omitempty"`

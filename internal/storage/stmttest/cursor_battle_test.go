@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/environment"
 )
 
 func sampleFlowDefinition(projectID, id, name string) *domain.FlowDefinition {
@@ -66,6 +67,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
+		t.Run("environments", func(t *testing.T) { battleEnvironments(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -264,6 +266,30 @@ func battleBrandings(t *testing.T, d dialect) {
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListBrandings(unfilteredListCtx(t), opts)
 		}, func(b *domain.Branding) string { return b.ID })
+		assertDrainMatch(t, want, got)
+	})
+}
+
+func battleEnvironments(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureEnvironmentProject(t, d.stmts)
+	names := []string{"dev", "staging", "prod", "preview", "sandbox"}
+	want := make([]string, 0, len(names))
+	for _, name := range names {
+		want = append(want, createEnvironment(t, d.stmts, projectID, name).ID)
+	}
+	filter := database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID)
+	orderAsc := environment.PipelineOrder()
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error) {
+		return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(e *domain.Environment) string { return e.ID }, 2)
+
+	t.Run("pipeline_order_helper", func(t *testing.T) {
+		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Environment], error) {
+			return d.stmts.ListEnvironments(unfilteredListCtx(t), environment.ListOptions(projectID, 2, cursor))
+		}, func(e *domain.Environment) string { return e.ID })
 		assertDrainMatch(t, want, got)
 	})
 }

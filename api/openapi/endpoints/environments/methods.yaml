@@ -1,0 +1,24 @@
+get:
+  operationId: listEnvironments
+  summary: List environments
+  description: |
+    Lists the project's environments in pipeline order, which is the order 
+    they were created in (`dev`, `staging`, `prod`).
+  tags:
+    - Environments
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - environment.read
+  responses:
+    '200':
+      description: The environments were retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-environments-response.yaml
+    default:
+      $ref: listEnvironments-error-response.yaml

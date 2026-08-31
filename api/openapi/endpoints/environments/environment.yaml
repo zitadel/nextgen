@@ -1,0 +1,34 @@
+title: Environment
+description: |
+  A runtime slot on a project (ADR 035).
+
+  This is identity only. The release an environment currently runs, and its
+  deployment history, arrive with the deployments endpoints; environment
+  lifecycle (create, rename, retire) arrives with its own ADR. Until then
+  every project is seeded with a fixed set of environments at creation and
+  the set cannot be changed.
+type: object
+required:
+  - id
+  - project_id
+  - name
+  - created_at
+properties:
+  id:
+    readOnly: true
+    type: string
+    description: The opaque, immutable resource id.
+    example: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+  project_id:
+    readOnly: true
+    description: The project this environment is a runtime slot of.
+    $ref: ../../components/schemas/project-id.yaml
+  name:
+    readOnly: true
+    $ref: ../../components/schemas/environment-name.yaml
+  created_at:
+    readOnly: true
+    type: string
+    format: date-time
+    description: When the environment was created.
+    example: '2026-07-01T00:00:00Z'

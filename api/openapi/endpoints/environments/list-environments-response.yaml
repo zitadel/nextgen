@@ -1,0 +1,16 @@
+type: object
+description: The project's environments, in pipeline order (oldest first).
+required:
+  - environments
+properties:
+  environments:
+    type: array
+    items:
+      $ref: environment.yaml
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following page.
+      Absent when there are no more results.
+    oneOf:
+      - $ref: ../../components/schemas/page-token.yaml
+      - type: 'null'
