@@ -1038,6 +1038,21 @@ func TestListFlowDefinitionsExpandUserSchema(t *testing.T) {
 		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), errRes.Code)
 	})
 
+	// The single hydrate query in expandUserSchemas is complete only while a
+	// flow page cannot reference more distinct schemas than one schema query
+	// returns; this pins the flow page cap that guarantees it.
+	t.Run("a flow page cannot outgrow one hydrate query", func(t *testing.T) {
+		t.Parallel()
+		res, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			Limit:     api.NewOptLimit(101),
+			Expand:    []api.FlowDefinitionExpand{api.FlowDefinitionExpandUserSchema},
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ErrorDetails{}, res, helpers.MustMarshal(t, res))
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), res.(*api.ErrorDetails).Code)
+	})
+
 	t.Run("page token means the same with and without expand", func(t *testing.T) {
 		t.Parallel()
 		first := listFlows(t, api.ListFlowDefinitionsParams{

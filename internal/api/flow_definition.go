@@ -132,10 +132,11 @@ func (h Handler) expandUserSchemas(ctx context.Context, projectID string, defini
 
 	byID := make(map[string]*api.Schema, len(ids))
 	if len(ids) > 0 {
-		// The schema service caps its page at the list maximum, while
-		// listFlowDefinitions applies no default limit yet (#942), so an
-		// unbounded flow page can reference more schemas than one hydrate
-		// query returns; the overflow embeds as null.
+		// One batched query suffices: the generated validation caps the flow
+		// page at the shared list maximum (limit defaults to 20, tops out at
+		// 100), so a page can never reference more distinct schemas than one
+		// schema query of the same maximum returns. If either cap ever moves
+		// independently, chunk this loop instead.
 		schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
 			ProjectID: projectID,
 			IDs:       ids,
