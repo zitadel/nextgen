@@ -128,7 +128,7 @@ func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness)
 
 // UniqueValueHash is the one comparison function behind attribute uniqueness:
 // the unique-attributes registry stores it and identifier resolution looks it
-// up, so both always agree on what counts as the same value (ADR 057 §4a).
+// up, so both always agree on what counts as the same value (ADR 058 §4a).
 // String values are Unicode case-folded before hashing — Alice@Example.com
 // and alice@example.com are one unique value — while the attribute itself
 // keeps its original casing. Non-string values hash as encoded.

@@ -4,10 +4,10 @@ package domain
 // each — a mistyped annotation does not fail loudly, it reads as absent.
 const (
 	// SchemaAnnotationIdentifier designates the leaf property whose value
-	// identifies a user (ADR 057 §1). Schema-root, dot-joined path.
+	// identifies a user (ADR 058 §1). Schema-root, dot-joined path.
 	SchemaAnnotationIdentifier = "x-identifier"
 	// SchemaAnnotationDisplay lists the leaf property paths rendering the
-	// user's display name (ADR 057 §2). Schema-root.
+	// user's display name (ADR 058 §2). Schema-root.
 	SchemaAnnotationDisplay = "x-display"
 	// SchemaAnnotationUnique carries a property's uniqueness scope.
 	SchemaAnnotationUnique = "x-unique"

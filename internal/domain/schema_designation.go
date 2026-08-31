@@ -10,7 +10,7 @@ import (
 )
 
 // ErrSchemaDesignationInvalid reports an x-identifier / x-display designation
-// the user meta-schema cannot check itself (ADR 057 §1–§2): the named
+// the user meta-schema cannot check itself (ADR 058 §1–§2): the named
 // property must exist, be a leaf, and — for x-identifier — carry
 // project-scoped uniqueness; a schema that enables an auth method needing
 // identifier-first dispatch must designate an identifier.
