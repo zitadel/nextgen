@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Ellipsis, Lock } from "lucide-react";
+import { Ellipsis, Loader2, Lock } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
+import { describeError } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
 import {
   type UserSchema,
@@ -33,26 +35,95 @@ export const Route = createFileRoute("/_authed/schemas/")({
     // `revisions: latest` makes a row a schema rather than an edit: schemas are
     // immutable and versioned by URL, so a project that has revised one four
     // times has four rows for it in the full history.
-    const entries = (
-      await api.listSchemas({
-        project_id: projectId,
-        kind: "user-schema",
-        revisions: "latest",
-      })
-    ).schemas;
-    // Mapped rather than spread so the wire's `created_at` stops at the loader
-    // and the row keeps the console's camelCase.
-    return entries.map((entry) => ({
-      id: entry.id,
-      createdAt: entry.metadata.created_at,
-      schema: entry.schema as UserSchema,
-    }));
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      revisions: "latest",
+      limit: PAGE_SIZE,
+    });
+    return {
+      schemas: page.schemas.map(toSchemaRow),
+      nextPageToken: page.next_page_token ?? undefined,
+    };
   },
   component: SchemasScreen,
 });
 
+/**
+ * One page of schemas. `GET /schemas` is cursor-paginated, so the size is a
+ * page size rather than a cap on what the operator can reach — `Load more`
+ * walks the rest (same D5 reading as the users screen: a button, not
+ * pagination controls).
+ */
+const PAGE_SIZE = 25;
+
+// Mapped rather than spread so the wire's `created_at` stops at the loader
+// and the row keeps the console's camelCase.
+function toSchemaRow(entry: { id: string; metadata: { created_at: string }; schema: unknown }) {
+  return {
+    id: entry.id,
+    createdAt: entry.metadata.created_at,
+    schema: entry.schema as UserSchema,
+  };
+}
+
 function SchemasScreen() {
-  const schemas = Route.useLoaderData();
+  const loaded = Route.useLoaderData();
+
+  // Pages fetched after the first live here rather than in the loader: `Load
+  // more` appends without re-running it, and a route invalidation resets to
+  // the first page — the honest thing to show once the set has changed.
+  const [extra, setExtra] = useState<ReturnType<typeof toSchemaRow>[]>([]);
+  const [nextPageToken, setNextPageToken] = useState(loaded.nextPageToken);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    setExtra([]);
+    setNextPageToken(loaded.nextPageToken);
+    setLoadError(undefined);
+  }, [loaded]);
+
+  // The loader hands back a new object on every invalidation, so its identity
+  // is the generation of the list on screen; `loadMore` reads it after
+  // awaiting to tell whether the page it fetched still belongs to that set.
+  const loadedRef = useRef(loaded);
+  useEffect(() => {
+    loadedRef.current = loaded;
+  }, [loaded]);
+
+  const schemas = [...loaded.schemas, ...extra];
+
+  async function loadMore() {
+    if (!nextPageToken || loadingMore) return;
+    const generation = loaded;
+    setLoadingMore(true);
+    setLoadError(undefined);
+    try {
+      // Same `kind` and `revisions` as the loader: the cursor only pins the
+      // ordering and mode, so a filter drift between pages would silently
+      // page over a different set.
+      const page = await api.listSchemas({
+        project_id: getConsoleProjectId(),
+        kind: "user-schema",
+        revisions: "latest",
+        limit: PAGE_SIZE,
+        page_token: nextPageToken,
+      });
+      if (loadedRef.current !== generation) return;
+      setExtra((current) => [...current, ...page.schemas.map(toSchemaRow)]);
+      setNextPageToken(page.next_page_token ?? undefined);
+    } catch (cause) {
+      // The caller fires-and-forgets, and a route error boundary cannot catch
+      // an event handler's rejection — surface it here. The page token is
+      // untouched, so the button stays and retries the same page.
+      if (loadedRef.current === generation) {
+        setLoadError(describeError(cause, "Could not load more schemas."));
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
@@ -75,6 +146,24 @@ function SchemasScreen() {
           schemas.map((entry) => <SchemaRow key={entry.id} {...entry} />)
         )}
       </Card>
+      {loadError && (
+        <p role="alert" className="text-destructive mt-3 text-sm">
+          {loadError}
+        </p>
+      )}
+      {/* D5: `Load more` rather than pagination controls — its presence means
+          there is more, its absence means the directory is complete. */}
+      {nextPageToken && (
+        <Button
+          variant="secondary"
+          className="mt-6 h-9 w-full gap-1.5 px-2.5"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+        >
+          {loadingMore && <Loader2 className="size-3 animate-spin" aria-hidden />}
+          Load more
+        </Button>
+      )}
     </div>
   );
 }

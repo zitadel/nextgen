@@ -174,7 +174,7 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 
 		return nil
 
-	case *ClaimNoPersonalTeam:
+	case *CompleteClaimForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 		span.SetStatus(codes.Error, http.StatusText(403))
