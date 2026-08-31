@@ -120,6 +120,9 @@ fields:
 - `display` is the `x-display` rendering. Absent under the same conditions.
   No source attribution — it is a rendering of several properties and purely
   presentational.
+- `display` and `identifier` are resolved independently of each other: a
+  passkey-only user with no designated identifier still carries `display`
+  when the schema designates display properties, and vice versa.
 - Clients render `display` → `identifier` → `user_id`, uniformly everywhere.
 
 The fields are role-named, not property-named, on purpose: a list can mix
