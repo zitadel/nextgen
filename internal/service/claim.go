@@ -96,11 +96,9 @@ type claimStatements interface {
 //
 // What clears the second depends on the status, which is why it travels with
 // the error rather than being summarised in it: `removed` follows a team or
-// user deactivation and needs an administrator, while `pending` is an
-// invitation the user can still accept.
-//
-// The membership status rides along on the second so a client can distinguish a
-// removed team from a pending invitation.
+// user deactivation and needs someone to restore the user's access (a user
+// deactivation cascades without touching their teams, so the team itself may
+// still be active), while `pending` is an invitation the user can still accept.
 //
 // This refines a verdict already reached; it does not revisit it. The two reads
 // take separate snapshots under read-committed, so provisioning or a

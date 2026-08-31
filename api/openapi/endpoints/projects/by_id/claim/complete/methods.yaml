@@ -48,9 +48,17 @@ post:
         this. `claim.no_personal_team` means no membership at all, and clears
         itself because the next sign-in provisions a team.
         `claim.personal_team_not_active` means the membership exists but is not
-        active, so provisioning will not clear it; what will depends on the
-        `membership_status` in the details (`removed` needs an administrator to
-        restore the team, `pending` is an invitation still to be accepted).
+        active, so provisioning will not clear it. What will depends on
+        `membership_status` in the details. The details object is otherwise
+        untyped, so the values to expect are enumerated here:
+
+          * `removed` — the membership was withdrawn, by deactivating either the
+            team or the user. A user deactivation cascades to that user's
+            memberships without touching their teams, so the team may well still
+            be active: what unblocks the claim is restoring the user's access,
+            not necessarily the team.
+          * `inactive` — the membership is suspended.
+          * `pending` — an invitation the user has not accepted yet.
       content:
         application/json:
           schema:
