@@ -33,7 +33,6 @@ type PersonalTeamEnsurer interface {
 
 type personalTeamService struct {
 	v2Pool StatementPool
-	users  UserIdentityReader
 	// platformProjectID is PlatformConfig.ProvisioningProjectID: the built-in
 	// platform id when the deployment opted in via platform.bootstrap_project,
 	// empty otherwise. Empty makes every call a no-op — a standalone
@@ -42,16 +41,13 @@ type personalTeamService struct {
 	platformProjectID string
 }
 
-// NewPersonalTeamService wires the ensurer. `users` resolves the user's email
-// for the team's display name.
+// NewPersonalTeamService wires the ensurer.
 func NewPersonalTeamService(
 	v2Pool StatementPool,
-	users UserIdentityReader,
 	platformProjectID string,
 ) PersonalTeamEnsurer {
 	return &personalTeamService{
 		v2Pool:            v2Pool,
-		users:             users,
 		platformProjectID: platformProjectID,
 	}
 }
@@ -70,56 +66,16 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 	if _, err := s.v2Pool.Statements().GetPersonalTeamForUser(ctx, projectID, userID); err == nil {
 		return nil
 	} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-		return fmt.Errorf("ensure personal team: resolve membership for %s: %w", userID, err)
+		return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed fetching personal team for user %s", userID))
 	}
 
-	unique := uniqueTeamName(userID)
-	name := s.preferredTeamName(ctx, projectID, userID)
-	if name == "" {
-		name = unique
-	}
-
-	err := s.provision(ctx, projectID, userID, name)
-	if err == nil {
-		return nil
-	}
-	if _, ok := errors.AsType[*database.UniqueError](err); !ok {
-		return fmt.Errorf("ensure personal team: provision for %s: %w", userID, err)
-	}
-
-	// A unique violation is one of two different situations, and they are told
-	// apart by whether this user ended up with a membership.
-	//
-	// (a) A concurrent ensure for THIS user won — registration racing the first
-	//     sign-in. Both computed the same name, the winner committed team and
-	//     membership together, so we are already provisioned: converge.
-	if _, rerr := s.v2Pool.Statements().GetPersonalTeamForUser(ctx, projectID, userID); rerr == nil {
-		return nil
-	}
-	// (b) The display name is simply taken by ANOTHER team in this project —
-	//     team names are unique per project, and the email that seeds the
-	//     friendly name is only unique by schema convention. The friendly name
-	//     is a convenience, never the requirement: retry once with the id-based
-	//     name, which cannot collide.
-	if name == unique {
-		return fmt.Errorf("ensure personal team: provision for %s: %w", userID, err)
-	}
-	if err := s.provision(ctx, projectID, userID, unique); err != nil {
-		return fmt.Errorf("ensure personal team: provision for %s under a unique name: %w", userID, err)
-	}
-	return nil
-}
-
-// provision creates the team and the user's membership in one transaction, so
-// a registered user never ends up with a team they are not a member of.
-func (s *personalTeamService) provision(ctx context.Context, projectID, userID, name string) error {
-	team, err := domain.NewTeam(projectID, name)
+	team, err := domain.NewTeam(projectID, personalTeamName(userID))
 	if err != nil {
 		return err
 	}
 
 	actorHuman := domain.EventActorTypeHuman
-	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		// CreateTeam mints the team id; CreateTeamMembership maintains the
 		// authz membership edge itself, so the pair is complete provisioning.
 		if err := tx.Statements().CreateTeam(ctx, team); err != nil {
@@ -144,38 +100,44 @@ func (s *personalTeamService) provision(ctx context.Context, projectID, userID, 
 			Status:    domain.MembershipStatusActive,
 		})
 	})
-}
 
-// preferredTeamName is the friendly default: "max@example.com personal team",
-// from the user's email. The shipped platform schema marks email
-// `x-unique: "project"`, so this is collision-free in practice — but that is a
-// *schema* property, not a guarantee of the teams table, which is why the
-// caller keeps an id-based fallback for a schema that drops the marker or
-// scopes it to a team.
-//
-// The name is a convenience only. It is not an identifier, it does not bind
-// the team to its first member, and anyone can change it later via
-// PATCH /teams/{id}; a team whose original member leaves keeps working under a
-// name that no longer fits, which is a rename, not a defect.
-func (s *personalTeamService) preferredTeamName(ctx context.Context, projectID, userID string) string {
-	user, err := s.users.GetIdentity(ctx, projectID, userID, "email")
-	if err != nil || user == nil {
-		return ""
-	}
-	email := user.Email()
-	if email == "" {
-		return ""
-	}
-	name, err := domain.ValidateTeamName(email + " personal team")
 	if err != nil {
-		return ""
+		// The name is deterministic per user, so a unique-name violation means
+		// a concurrent ensure for THIS user already took the name — registration
+		// racing the first sign-in. If that winner has committed, it committed
+		// team AND membership together and we are already provisioned: converge.
+		// Confirm rather than assume.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			if _, rerr := s.v2Pool.Statements().GetPersonalTeamForUser(ctx, projectID, userID); rerr == nil {
+				return nil
+			}
+		}
+		// Either the winner had not committed yet, or the name is held by an
+		// unrelated team. Both call sites are best-effort and only log, so this
+		// reports rather than retries: retrying under a different name is what
+		// would produce the second team. The next sign-in ensures again, and by
+		// then the winner has committed.
+		return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed creating team for user %s", userID))
 	}
-	return name
+
+	return nil
 }
 
-// uniqueTeamName is the collision-free default. It is derived from the user id
-// rather than any human attribute, so it is unique per project by construction
-// and stays stable no matter who ends up in the team.
-func uniqueTeamName(userID string) string {
+// personalTeamName derives the team's name from the user id alone. This is what
+// limits a user to one team: team names are unique per project, so a name that
+// is a pure function of the user id is the closest thing the schema has to a
+// one-team-per-user constraint, and the database enforces it. Two ensures
+// racing therefore compute the same name and one loses the insert, instead of
+// both succeeding under different names and minting two teams.
+//
+// Deriving it from the user id rather than a human attribute is what keeps it
+// safe to fail closed on: it is bounded well under TeamNameMaxLength and
+// unguessable, so unlike an email-derived name it cannot be made invalid by a
+// long address or squatted by an unrelated team.
+//
+// The name is a placeholder, not an identifier. It is renameable via
+// PATCH /teams/{id}, and renaming is safe because later ensures short-circuit
+// on the membership and never recompute it.
+func personalTeamName(userID string) string {
 	return "Personal " + userID
 }

@@ -2,7 +2,6 @@ package service_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,24 +16,13 @@ import (
 
 const ensureTestPlatform = "proj_platform"
 
-// stubIdentity satisfies [service.UserIdentityReader] without mockgen — the
-// interface is one method, and the ensure only reads the user's email from it.
-type stubIdentity struct {
-	user *domain.User
-	err  error
-}
-
-func (s stubIdentity) GetIdentity(_ context.Context, _, _ string, _ ...string) (*domain.User, error) {
-	return s.user, s.err
-}
-
 type ensureFixture struct {
 	ensurer service.PersonalTeamEnsurer
 	v2Pool  *servicemocks.MockPool
 	stmts   *servicemocks.MockAllStatements
 }
 
-func newEnsureFixture(t *testing.T, users service.UserIdentityReader) *ensureFixture {
+func newEnsureFixture(t *testing.T) *ensureFixture {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	v2Pool := servicemocks.NewMockPool(ctrl)
@@ -42,16 +30,10 @@ func newEnsureFixture(t *testing.T, users service.UserIdentityReader) *ensureFix
 	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
 
 	return &ensureFixture{
-		ensurer: service.NewPersonalTeamService(service.NewPool(v2Pool), users, ensureTestPlatform),
+		ensurer: service.NewPersonalTeamService(service.NewPool(v2Pool), ensureTestPlatform),
 		v2Pool:  v2Pool,
 		stmts:   stmts,
 	}
-}
-
-func emailIdentity(email string) stubIdentity {
-	return stubIdentity{user: &domain.User{
-		Attributes: domain.AttributesFromMap(map[string]any{"email": email}),
-	}}
 }
 
 func expectEnsureTx(f *ensureFixture) {
@@ -64,7 +46,7 @@ func expectEnsureTx(f *ensureFixture) {
 func TestEnsurePersonalTeam_NoOpOutsidePlatformProject(t *testing.T) {
 	// Every registration in every customer project passes through the same
 	// funnel; none of those may mint teams — and none may even be read.
-	f := newEnsureFixture(t, stubIdentity{})
+	f := newEnsureFixture(t)
 
 	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), "proj_customer", "user_1"))
 }
@@ -75,7 +57,7 @@ func TestEnsurePersonalTeam_NoOpWhenUnconfigured(t *testing.T) {
 	// no-op, even for a project that happens to match "".
 	ctrl := gomock.NewController(t)
 	v2Pool := servicemocks.NewMockPool(ctrl)
-	ensurer := service.NewPersonalTeamService(service.NewPool(v2Pool), stubIdentity{}, "")
+	ensurer := service.NewPersonalTeamService(service.NewPool(v2Pool), "")
 
 	require.NoError(t, ensurer.EnsurePersonalTeam(t.Context(), "proj_anything", "user_1"))
 	require.NoError(t, ensurer.EnsurePersonalTeam(t.Context(), "", "user_1"))
@@ -84,7 +66,7 @@ func TestEnsurePersonalTeam_NoOpWhenUnconfigured(t *testing.T) {
 func TestEnsurePersonalTeam_NoOpWhenMembershipExists(t *testing.T) {
 	// Idempotency: any earliest active membership IS the personal team —
 	// seeded, migrated, or a previous ensure. No transaction is opened.
-	f := newEnsureFixture(t, stubIdentity{})
+	f := newEnsureFixture(t)
 	f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
 		Return(&domain.Team{ProjectID: ensureTestPlatform, ID: "team_existing"}, nil)
 
@@ -92,7 +74,7 @@ func TestEnsurePersonalTeam_NoOpWhenMembershipExists(t *testing.T) {
 }
 
 func TestEnsurePersonalTeam_ProvisionsTeamAndMembershipTogether(t *testing.T) {
-	f := newEnsureFixture(t, emailIdentity("maya@acme.com"))
+	f := newEnsureFixture(t)
 	f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
 		Return(nil, database.NewNoRowFoundError(nil))
 
@@ -116,43 +98,48 @@ func TestEnsurePersonalTeam_ProvisionsTeamAndMembershipTogether(t *testing.T) {
 	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
 
 	require.NotNil(t, team)
-	// The friendly default, from the user's email. It is a convenience, not an
-	// identifier: renameable, and it does not bind the team to Maya.
-	assert.Equal(t, "maya@acme.com personal team", team.Name)
+	// A pure function of the user id. This exact string is the one-team-per-user
+	// constraint: it is what makes a second concurrent ensure collide on the
+	// unique index instead of minting a second team.
+	assert.Equal(t, "Personal user_1", team.Name)
 	require.NotNil(t, membership)
 	assert.Equal(t, "team_minted", membership.TeamID, "membership must join the team minted in the same transaction")
 	assert.Equal(t, "user_1", membership.UserID)
 	assert.Equal(t, domain.MembershipStatusActive, membership.Status)
 }
 
-func TestEnsurePersonalTeam_FallsBackToTheIDNameWhenTheUserHasNoEmail(t *testing.T) {
-	// A schema that carries no email attribute still gets a team: the id-based
-	// name is collision-free by construction.
-	f := newEnsureFixture(t, stubIdentity{err: errors.New("identity unavailable")})
-	f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
-		Return(nil, database.NewNoRowFoundError(nil))
+func TestEnsurePersonalTeam_TheNameIsAPureFunctionOfTheUserID(t *testing.T) {
+	// The property the one-team-per-user guarantee rests on: same user, same
+	// name, every time — so the unique index can reject the second insert.
+	// Different users never collide with each other.
+	names := map[string]string{}
+	for _, userID := range []string{"user_1", "user_1", "user_2"} {
+		f := newEnsureFixture(t)
+		f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, userID).
+			Return(nil, database.NewNoRowFoundError(nil))
+		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, tm *domain.Team) error {
+				if prev, seen := names[userID]; seen {
+					assert.Equal(t, prev, tm.Name, "same user must always yield the same name")
+				}
+				names[userID] = tm.Name
+				return nil
+			})
+		f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		f.stmts.EXPECT().CreateTeamMembership(gomock.Any(), gomock.Any()).Return(nil)
+		expectEnsureTx(f)
 
-	var team *domain.Team
-	f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, tm *domain.Team) error {
-			team = tm
-			return nil
-		})
-	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	f.stmts.EXPECT().CreateTeamMembership(gomock.Any(), gomock.Any()).Return(nil)
-	expectEnsureTx(f)
-
-	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
-	require.NotNil(t, team)
-	assert.Equal(t, "Personal user_1", team.Name)
+		require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, userID))
+	}
+	assert.NotEqual(t, names["user_1"], names["user_2"], "different users must not collide")
 }
 
 func TestEnsurePersonalTeam_LostRaceConvergesOnTheWinner(t *testing.T) {
 	// Registration racing the first sign-in for the SAME user: both compute the
 	// same name, so the loser's CreateTeam hits the unique index. The winner
 	// committed team AND membership together, so the re-check confirms
-	// convergence rather than retrying under another name.
-	f := newEnsureFixture(t, emailIdentity("maya@acme.com"))
+	// convergence — one team, not two.
+	f := newEnsureFixture(t)
 	gomock.InOrder(
 		f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
 			Return(nil, database.NewNoRowFoundError(nil)),
@@ -166,39 +153,23 @@ func TestEnsurePersonalTeam_LostRaceConvergesOnTheWinner(t *testing.T) {
 	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
 }
 
-func TestEnsurePersonalTeam_FallsBackWhenTheFriendlyNameIsTakenByAnotherUser(t *testing.T) {
-	// The friendly name is already taken by another team in this project. Email
-	// is unique per project only by schema convention (`x-unique`), so this is
-	// reachable — and the requirement is that the user gets a team at all, so
-	// the ensure retries under the id-based name rather than leaving them
-	// without one, which would surface much later as claim/complete's 403.
-	f := newEnsureFixture(t, emailIdentity("maya@acme.com"))
-
-	var attempted []string
+func TestEnsurePersonalTeam_LostRaceBeforeTheWinnerCommitsReportsRatherThanRetrying(t *testing.T) {
+	// Same collision, but the winner has not committed yet, so the re-check
+	// still finds no membership. The ensure must report and let the next
+	// sign-in heal: retrying under a different name here is exactly what would
+	// produce a second team. This is also the shape of an unrelated team
+	// holding the name.
+	f := newEnsureFixture(t)
 	gomock.InOrder(
 		f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
 			Return(nil, database.NewNoRowFoundError(nil)),
-		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(_ context.Context, tm *domain.Team) error {
-				attempted = append(attempted, tm.Name)
-				return database.NewUniqueError("teams", "idx_teams_project_name", nil)
-			}),
-		// Still no membership for this user — so the collision was another
-		// user's team, not a concurrent ensure for this one.
+		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).
+			Return(database.NewUniqueError("teams", "uq_teams_project_name", nil)),
 		f.stmts.EXPECT().GetPersonalTeamForUser(gomock.Any(), ensureTestPlatform, "user_1").
 			Return(nil, database.NewNoRowFoundError(nil)),
-		f.stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(_ context.Context, tm *domain.Team) error {
-				attempted = append(attempted, tm.Name)
-				tm.ID = "team_minted"
-				return nil
-			}),
 	)
-	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	f.stmts.EXPECT().CreateTeamMembership(gomock.Any(), gomock.Any()).Return(nil)
-	expectEnsureTx(f)
 	expectEnsureTx(f)
 
-	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
-	assert.Equal(t, []string{"maya@acme.com personal team", "Personal user_1"}, attempted)
+	// No second CreateTeam is expected: gomock fails the test if one happens.
+	require.Error(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
 }

@@ -207,7 +207,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	// a pinned deployment can attempt claims but is never auto-provisioned.
 	personalTeams := service.NewPersonalTeamService(
 		serviceDBPool,
-		userIdentity,
 		cfg.Platform.ProvisioningProjectID(),
 	)
 
