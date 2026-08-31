@@ -11651,6 +11651,45 @@ func (c *MockUserLookupGetByAttributesCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
+// GetByIdentifier mocks base method.
+func (m *MockUserLookup) GetByIdentifier(ctx context.Context, projectID string, schemaURLs []string, attr domain.Attribute) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByIdentifier", ctx, projectID, schemaURLs, attr)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByIdentifier indicates an expected call of GetByIdentifier.
+func (mr *MockUserLookupMockRecorder) GetByIdentifier(ctx, projectID, schemaURLs, attr any) *MockUserLookupGetByIdentifierCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIdentifier", reflect.TypeOf((*MockUserLookup)(nil).GetByIdentifier), ctx, projectID, schemaURLs, attr)
+	return &MockUserLookupGetByIdentifierCall{Call: call}
+}
+
+// MockUserLookupGetByIdentifierCall wrap *gomock.Call
+type MockUserLookupGetByIdentifierCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserLookupGetByIdentifierCall) Return(arg0 *domain.User, arg1 error) *MockUserLookupGetByIdentifierCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserLookupGetByIdentifierCall) Do(f func(context.Context, string, []string, domain.Attribute) (*domain.User, error)) *MockUserLookupGetByIdentifierCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserLookupGetByIdentifierCall) DoAndReturn(f func(context.Context, string, []string, domain.Attribute) (*domain.User, error)) *MockUserLookupGetByIdentifierCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockUserAction is a mock of UserAction interface.
 type MockUserAction struct {
 	ctrl     *gomock.Controller

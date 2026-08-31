@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -209,6 +211,10 @@ type Proof interface {
 }
 
 // UserProof identifies the user by login name (email, username, phone).
+// The flow path sets AttributeName — its step is bound to a schema whose
+// designated identifier the field resolver already derived. The direct API
+// leaves AttributeName empty and the bare LoginName resolves against the
+// designated identifier of every user schema in the project (ADR 058 §5).
 type UserProof struct {
 	AttributeName string
 	LoginName     string
@@ -258,6 +264,10 @@ type SessionResolver interface {
 
 type UserLookup interface {
 	GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error)
+	// GetByIdentifier is the scoped identifier lookup of ADR 058 §5: it
+	// matches attr only on users of the given schema URLs and only against
+	// uniquely registered values.
+	GetByIdentifier(ctx context.Context, projectID string, schemaURLs []string, attr domain.Attribute) (*domain.User, error)
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -605,10 +615,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
-			Key:   domain.AttributeKey(p.AttributeName),
-			Value: p.LoginName,
-		}})
+		user, err := s.resolveUserProof(ctx, attempt.ProjectID, p)
 		if err != nil {
 			return userChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
@@ -747,6 +754,114 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 	default:
 		return nil, nil, nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("unsupported proof type")
 	}
+}
+
+// resolveUserProof resolves the submitted identifier to a user. The flow
+// path names the attribute to match; the direct API submits a bare login
+// name that resolves cross-schema.
+func (s *authAttemptService) resolveUserProof(ctx context.Context, projectID string, p UserProof) (*domain.User, error) {
+	if p.AttributeName != "" {
+		return s.users.GetByAttributes(ctx, projectID, []domain.Attribute{{
+			Key:   domain.AttributeKey(p.AttributeName),
+			Value: p.LoginName,
+		}})
+	}
+	return s.resolveIdentifierCrossSchema(ctx, projectID, p.LoginName)
+}
+
+// resolveIdentifierCrossSchema resolves a bare login name against the
+// designated identifier of every user schema in the project (ADR 058 §5).
+// Each lookup is scoped to the designating schemas' users, the value must
+// match exactly one user across the derived set, and zero or several matches
+// reject the proof — never property or schema precedence, which is how
+// classic Zitadel let one user's username shadow another user's email
+// (zitadel/zitadel#10782). With a single designating schema this degenerates
+// to the same single-attribute lookup as the flow path.
+func (s *authAttemptService) resolveIdentifierCrossSchema(ctx context.Context, projectID, loginName string) (*domain.User, error) {
+	byProperty, err := s.designatedIdentifiers(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	var matches []*domain.User
+	for _, property := range slices.Sorted(maps.Keys(byProperty)) {
+		user, err := s.users.GetByIdentifier(ctx, projectID, byProperty[property], domain.Attribute{
+			Key:   domain.AttributeKey(property),
+			Value: loginName,
+		})
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				continue
+			}
+			if _, ok := errors.AsType[*database.MultipleRowsFoundError](err); ok {
+				// The unique registry allows one row per project and key, so
+				// several users here mean a corrupted registry: surface it as
+				// ambiguity, never pick one.
+				return nil, fmt.Errorf("identifier resolution: property %q matches multiple users", property)
+			}
+			return nil, err
+		}
+		// A schema URL designates exactly one property and a user carries
+		// exactly one schema URL, so matches from different property groups
+		// are distinct users.
+		matches = append(matches, user)
+	}
+	switch len(matches) {
+	case 0:
+		return nil, errors.New("identifier resolution: no user matches the submitted identifier")
+	case 1:
+		return matches[0], nil
+	default:
+		return nil, fmt.Errorf("identifier resolution: value matches %d designated identifier properties", len(matches))
+	}
+}
+
+// identifierSchemaPageSize pages the user-schema listing during identifier
+// resolution. Projects hold few schemas; paging is correctness, not tuning.
+const identifierSchemaPageSize = 100
+
+// designatedIdentifiers groups the project's user-schema URLs by their
+// designated identifier property. Every stored revision contributes its own
+// designation: users pin the schema URL they were created under, so an older
+// revision's users stay resolvable under that revision's designation even
+// after a newer revision designates differently. Schemas that designate
+// nothing (passkey-only, API-managed) drop out of resolution entirely.
+func (s *authAttemptService) designatedIdentifiers(ctx context.Context, projectID string) (map[string][]string, error) {
+	stmts := s.stmts.Statements()
+	list := func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
+		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
+			),
+			Pagination: database.Page[domain.JSONSchemaField]{
+				Limit:  identifierSchemaPageSize,
+				Cursor: cursor,
+				OrderBy: database.OrderBy[domain.JSONSchemaField]{
+					// url is the resource id and, with project_id fixed by
+					// the filter, makes the order total so page boundaries
+					// cannot skip or repeat rows.
+					Columns: []database.Column[domain.JSONSchemaField]{
+						database.Col(domain.JSONSchemaFieldURL),
+					},
+					Direction: database.OrderAsc,
+				},
+			},
+		}, JSONSchemaQueryOptions{})
+	}
+	first, err := list(nil)
+	if err != nil {
+		return nil, err
+	}
+	byProperty := make(map[string][]string)
+	for schema, err := range first.Iterate(list) {
+		if err != nil {
+			return nil, err
+		}
+		if property := domain.DesignatedIdentifier(schema.Schema); property != "" {
+			byProperty[property] = append(byProperty[property], schema.URL)
+		}
+	}
+	return byProperty, nil
 }
 
 // recordProofFailure records a failed proof for rate limiting — best effort,
