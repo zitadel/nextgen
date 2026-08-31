@@ -178,11 +178,15 @@ func claimErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrClaimChallengeInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrClaimNoPersonalTeam().Code:
+		// The session is authenticated but the user is not eligible to receive
+		// the project: no active personal team to attach it to. Reachable until
+		// #527 auto-creates the personal team at registration.
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
-		// claim.no_personal_team is impossible once #527 auto-creates the
-		// personal team, and the claim.session_* sentinels only ever leave
-		// verifyClaimSession wrapped in auth.unauthorized. Anything landing
-		// here unwrapped is an internal invariant break.
+		// The claim.session_* sentinels only ever leave verifyClaimSession
+		// wrapped in auth.unauthorized. Anything landing here unwrapped is an
+		// internal invariant break.
 		return internalErrorResponse(err)
 	}
 }

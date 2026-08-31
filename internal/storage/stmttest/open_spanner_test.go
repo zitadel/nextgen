@@ -20,6 +20,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error {
 			return spanner.HardDeleteTeam(ctx, pool, projectID, teamID)
 		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error {
+			return spanner.InsertJSONSchemaAt(ctx, pool, projectID, url, objectType, createdAt)
+		},
 		spanner.SchemaColumnNullability(),
 		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
 			return spanner.LiveColumnNullability(ctx, pool)

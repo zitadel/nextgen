@@ -2,6 +2,7 @@ package audit_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -74,4 +75,5 @@ func TestEmit_CopiesRequestIDFromMiddleware(t *testing.T) {
 	require.Equal(t, 1, cap.called)
 	require.NotNil(t, cap.last.RequestID)
 	require.Equal(t, "req_api", *cap.last.RequestID)
+	require.Equal(t, json.RawMessage("{}"), cap.last.Metadata)
 }

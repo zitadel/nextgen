@@ -47,7 +47,19 @@ describe("login flows list states", () => {
       http.get(FLOWS_URL, () =>
         HttpResponse.json({
           flow_definitions: [
-            { id: "flow_1", name: "Login", status: "active", created_at: "2026-01-01" },
+            {
+              id: "flow_1",
+              project_id: "proj_1",
+              flow_definition: {
+                name: "Login",
+                status: "active",
+                user_schema: "sch_1",
+                purposes: { login: "identifier" },
+                steps: [{ name: "identifier" }],
+              },
+              created_at: "2026-01-01",
+              updated_at: "2026-01-02",
+            },
           ],
         }),
       ),

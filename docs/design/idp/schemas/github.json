@@ -1,0 +1,31 @@
+{
+  "$schema": "./idp-connection.json",
+  "slug": "github",
+  "protocol": "oauth2",
+  "template": "github",
+  "display_name": "GitHub",
+  "subject_claim": "id",
+  "claim_mapping": {
+    "email": "email",
+    "givenName": "name"
+  },
+  "verified_claims": {
+    "email": "$supplementary_fetch"
+  },
+  "provisioning": {
+    "creation": "auto"
+  },
+  "oauth2": {
+    "authorization_endpoint": "https://github.com/login/oauth/authorize",
+    "token_endpoint": "https://github.com/login/oauth/access_token",
+    "userinfo_endpoint": "https://api.github.com/user",
+    "client_id": "Iv1.abc123",
+    "client_secret_env": "GITHUB_CLIENT_SECRET",
+    "token_endpoint_auth_method": "client_secret_post",
+    "scopes": [
+      "read:user",
+      "user:email"
+    ],
+    "supplementary_fetch": "github_primary_email"
+  }
+}

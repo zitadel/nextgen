@@ -220,6 +220,11 @@ CREATE TABLE authz_assignments (
         (delegation_id IS NULL AND grantor_id IS NULL)
         OR (delegation_id IS NOT NULL AND grantor_id IS NOT NULL)
     ),
+    -- ADR 054 §2: ownership never lapses — an owning-team grant carries no
+    -- expiry; it ends only by explicit transfer or revocation.
+    CONSTRAINT chk_authz_assignments_owning_team_no_expiry CHECK (
+        NOT (object_type = 'project' AND relation = 'team' AND expires_at IS NOT NULL)
+    ),
     CONSTRAINT fk_authz_assignments_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_authz_assignments_catalog

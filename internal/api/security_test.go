@@ -1,8 +1,6 @@
 package api
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"testing"
 
@@ -48,7 +46,7 @@ func TestHandleOAuth2(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(tc.token, nil)
 
 			handler := NewSecurityHandler(tokenService)
-			ctx, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+			ctx, err := handler.HandleOAuth2(t.Context(), api.InitClaimOperation, api.OAuth2{Token: "raw-bearer"})
 			require.NoError(t, err)
 
 			got, ok := GetScopeContext(ctx)
@@ -57,10 +55,31 @@ func TestHandleOAuth2(t *testing.T) {
 			require.Equal(t, domain.AuthzPrincipalTypeSKProj, got.PrincipalType)
 			require.Equal(t, tc.token.ProjectID, got.PrincipalID)
 			require.Equal(t, tc.token.Scope, got.Scope)
-			sum := sha256.Sum256([]byte("raw-bearer"))
-			require.Equal(t, hex.EncodeToString(sum[:]), got.SecretHash)
+			require.Equal(t, domain.HashSecret("raw-bearer"), got.SecretHash)
 		})
 	}
+
+	t.Run("secret hash is only computed for the claim operations", func(t *testing.T) {
+		t.Parallel()
+
+		token := &domain.Token{
+			ProjectID: "project-1",
+			TokenID:   "token-1",
+			Type:      domain.TokenTypeProjectToken,
+			Scope:     []string{"project.write", "project.read"},
+		}
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(token, nil)
+
+		handler := NewSecurityHandler(tokenService)
+		ctx, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+		require.NoError(t, err)
+
+		got, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Empty(t, got.SecretHash)
+	})
 
 	t.Run("empty token is an unsatisfied requirement", func(t *testing.T) {
 		t.Parallel()

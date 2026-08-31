@@ -81,24 +81,28 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 		kind = &parsed
 	}
 
-	schemas, err := h.schemaService.ListSchemas(ctx,
-		string(params.ProjectID),
-		params.ObjectType.Value,
-		kind,
-		params.Offset.Value,
-		string(params.PageToken.Value),
-	)
+	schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+		ProjectID:                   string(params.ProjectID),
+		ObjectType:                  params.ObjectType.Value,
+		Kind:                        kind,
+		LatestRevisionPerObjectType: params.Revisions.Value == api.ListSchemasRevisionsLatest,
+		PageToken:                   string(params.PageToken.Value),
+		Limit:                       int(params.Limit.Value),
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	resp := api.ListSchemasResponse{Schemas: make([]api.Schema, len(schemas))}
-	for i, schema := range schemas {
+	resp := api.ListSchemasResponse{Schemas: make([]api.Schema, len(schemas.Items))}
+	for i, schema := range schemas.Items {
 		apiSchema, err := domainSchemaToApiSchema(schema)
 		if err != nil {
 			return nil, err
 		}
 		resp.Schemas[i] = *apiSchema
+	}
+	if schemas.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(schemas.NextPageToken))
 	}
 
 	return &resp, nil
@@ -125,7 +129,8 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrJSONSchemaNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrJSONSchemaAlreadyExists().Code:
+	case domain.ErrJSONSchemaAlreadyExists().Code,
+		domain.ErrJSONSchemaRevisionConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrJSONSchemaInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
