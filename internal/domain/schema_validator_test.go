@@ -523,6 +523,14 @@ func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
 			wantErr: domain.ErrSchemaDesignationInvalid,
 		},
 		{
+			name: "a scalar-typed schema root cannot carry a designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"type": "string",
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
 			name: "an intermediate segment on a scalar-typed parent is unreachable",
 			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
 				"x-identifier": "a.b",
