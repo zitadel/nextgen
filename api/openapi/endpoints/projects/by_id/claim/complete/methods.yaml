@@ -45,11 +45,12 @@ post:
       description: |
         The session user has no active personal team in the platform project,
         so there is no team to attach the claimed project to. Two codes carry
-        this, and the remedies differ: `claim.no_personal_team` clears itself,
-        because the next sign-in provisions a team, while
-        `claim.personal_team_not_active` means the team exists but was
-        deactivated and only an administrator can restore it, so retrying will
-        not help.
+        this. `claim.no_personal_team` means no membership at all, and clears
+        itself because the next sign-in provisions a team.
+        `claim.personal_team_not_active` means the membership exists but is not
+        active, so provisioning will not clear it; what will depends on the
+        `membership_status` in the details (`removed` needs an administrator to
+        restore the team, `pending` is an invitation still to be accepted).
       content:
         application/json:
           schema:

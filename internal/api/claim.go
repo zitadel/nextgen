@@ -184,10 +184,10 @@ func claimErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		// #527 auto-creates the personal team at registration.
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrPersonalTeamNotActive("").Code:
-		// Same refusal, different cause: the team exists but is not active, so
-		// #527's auto-creation will not clear it and only an administrator can.
-		// A distinct code so the console can say so instead of implying the user
-		// simply needs to wait.
+		// Same refusal, different cause: the membership exists but is not
+		// active, so #527's auto-creation will not clear it. A distinct code so
+		// the console can say that instead of implying the user needs to wait;
+		// the membership status in the details says what would clear it.
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		// The claim.session_* sentinels only ever leave verifyClaimSession

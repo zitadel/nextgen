@@ -90,10 +90,14 @@ type claimStatements interface {
 
 // noPersonalTeamErr splits the resolver's single not-found into the two states
 // behind it. GetPersonalTeamForUser collapses them because the claim is refused
-// either way, but a caller has to tell them apart: "you have no team yet"
-// resolves itself, since the next sign-in provisions one (#527), while "your
-// team is not active" is an administrative state only an administrator can
-// undo, and no amount of retrying will clear it.
+// either way, but a caller has to tell them apart: "you hold no membership at
+// all" resolves itself, since the next sign-in provisions one (#527), while a
+// membership that exists but is not active will not be provisioned around.
+//
+// What clears the second depends on the status, which is why it travels with
+// the error rather than being summarised in it: `removed` follows a team or
+// user deactivation and needs an administrator, while `pending` is an
+// invitation the user can still accept.
 //
 // The membership status rides along on the second so a client can distinguish a
 // removed team from a pending invitation.
