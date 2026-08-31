@@ -16,8 +16,8 @@ import (
 )
 
 // TestEnvironments covers the environment read surface (#534): every project
-// is seeded with the default runtime slots, the list returns them in pipeline
-// order, and one is addressable by name.
+// is seeded with the default runtime slots, the list returns them ordered by name,
+// and one is addressable by name.
 func TestEnvironments(t *testing.T) {
 	t.Parallel()
 
