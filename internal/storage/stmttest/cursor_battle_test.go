@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -16,7 +17,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/environment"
 )
 
 func sampleFlowDefinition(projectID, id, name string) *domain.FlowDefinition {
@@ -274,25 +274,43 @@ func battleEnvironments(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureEnvironmentProject(t, d.stmts)
 	// Five names, not the three seeded ones: drainIncarnation needs more rows
-	// than the emission limit so the last page is short. They are created in
-	// name order because the seed shares one created_at, so name decides the
-	// order the drain must see.
-	names := []string{"dev", "preview", "prod", "sandbox", "staging"}
-	want := make([]string, 0, len(names))
+	// than the emission limit so the last page is short. Created out of order
+	// and collected in name order, because that is the order the list returns.
+	names := []string{"staging", "dev", "sandbox", "prod", "preview"}
+	byName := make(map[string]string, len(names))
 	for _, name := range names {
-		want = append(want, createEnvironment(t, d.stmts, projectID, name).ID)
+		byName[name] = createEnvironment(t, d.stmts, projectID, name).ID
+	}
+	want := make([]string, 0, len(names))
+	for _, name := range slices.Sorted(maps.Keys(byName)) {
+		want = append(want, byName[name])
 	}
 	filter := database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID)
-	orderAsc := environment.CreationOrder()
+	orderAsc := database.OrderBy[domain.EnvironmentField]{
+		Columns:   []database.Column[domain.EnvironmentField]{database.Col(domain.EnvironmentFieldName)},
+		Direction: database.OrderAsc,
+	}
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error) {
 		return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
 			Filter: filter, Pagination: page,
 		})
 	}, func(e *domain.Environment) string { return e.ID }, 2)
 
-	t.Run("creation_order_helper", func(t *testing.T) {
+	t.Run("name_order_helper", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Environment], error) {
-			return d.stmts.ListEnvironments(unfilteredListCtx(t), environment.ListOptions(projectID, 2, cursor))
+			return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
+				Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
+				Pagination: database.Page[domain.EnvironmentField]{
+					Limit:  2,
+					Cursor: cursor,
+					OrderBy: database.OrderBy[domain.EnvironmentField]{
+						Columns: []database.Column[domain.EnvironmentField]{
+							database.Col(domain.EnvironmentFieldName),
+						},
+						Direction: database.OrderAsc,
+					},
+				},
+			})
 		}, func(e *domain.Environment) string { return e.ID })
 		assertDrainMatch(t, want, got)
 	})

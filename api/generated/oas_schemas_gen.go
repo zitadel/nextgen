@@ -20211,7 +20211,7 @@ func (s *ListEnvironmentsErrorResponseStatusCode) SetResponse(val ListEnvironmen
 
 func (*ListEnvironmentsErrorResponseStatusCode) listEnvironmentsRes() {}
 
-// The project's environments, in pipeline order (oldest first).
+// The project's environments, ordered by name.
 // Ref: #
 type ListEnvironmentsResponse struct {
 	Environments []Environment `json:"environments"`

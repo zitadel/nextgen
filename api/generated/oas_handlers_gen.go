@@ -6903,8 +6903,7 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 
 // handleListEnvironmentsRequest handles listEnvironments operation.
 //
-// Lists the project's environments in pipeline order, which is the order
-// they were created in (`dev`, `staging`, `prod`).
+// Lists the project's environments ordered by name.
 //
 // GET /environments
 func (s *Server) handleListEnvironmentsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

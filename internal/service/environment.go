@@ -7,7 +7,6 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/environment"
 )
 
 // ---- Input / output types ---------------------------------------------------
@@ -86,11 +85,19 @@ func (s *EnvironmentService) GetByName(ctx context.Context, projectID, name stri
 }
 
 func (s *EnvironmentService) List(ctx context.Context, input ListEnvironmentsInput) (*ListEnvironmentsOutput, error) {
-	opts := environment.ListOptions(
-		input.ProjectID,
-		uint32(normalizeLimit(input.Limit)),
-		[]byte(input.PageToken),
-	)
+	opts := &database.ListOptions[domain.EnvironmentField]{
+		Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), input.ProjectID),
+		Pagination: database.Page[domain.EnvironmentField]{
+			Limit:  uint32(normalizeLimit(input.Limit)),
+			Cursor: []byte(input.PageToken),
+			OrderBy: database.OrderBy[domain.EnvironmentField]{
+				Columns: []database.Column[domain.EnvironmentField]{
+					database.Col(domain.EnvironmentFieldName),
+				},
+				Direction: database.OrderAsc,
+			},
+		},
+	}
 
 	result, err := s.v2Pool.Statements().ListEnvironments(ctx, opts)
 	if err != nil {

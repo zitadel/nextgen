@@ -1,5 +1,5 @@
 type: object
-description: The project's environments, in pipeline order (oldest first).
+description: The project's environments, ordered by name.
 required:
   - environments
 properties:

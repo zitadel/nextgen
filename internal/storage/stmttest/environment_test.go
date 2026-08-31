@@ -14,7 +14,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/environment"
 )
 
 func ensureEnvironmentProject(t *testing.T, stmts service.AllStatements) string {
@@ -101,25 +100,32 @@ func TestEnvironmentStatements_NameReusableAcrossProjects(t *testing.T) {
 	})
 }
 
-func TestEnvironmentStatements_ListIsProjectScopedInCreationOrder(t *testing.T) {
+func TestEnvironmentStatements_ListIsProjectScopedInNameOrder(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureEnvironmentProject(t, d.stmts)
 		otherProject := ensureEnvironmentProject(t, d.stmts)
 
-		// Seeded in pipeline order, inside one transaction — so every row
-		// shares a created_at and the name tiebreak decides the result. That
-		// is the point of ordering by name rather than id: id is a monotonic
-		// ULID here but a random UUID on spanner, so an id tiebreak would
-		// answer differently per dialect (ADR 047).
 		for _, name := range domain.DefaultEnvironmentNames {
 			createEnvironment(t, d.stmts, projectID, name)
 		}
 		want := slices.Sorted(slices.Values(domain.DefaultEnvironmentNames))
+		require.NotEqual(t, domain.DefaultEnvironmentNames, want, "fixture must not create in name order, or it proves nothing")
 		createEnvironment(t, d.stmts, otherProject, "prod")
 
 		result, err := d.stmts.ListEnvironments(
 			unfilteredListCtx(t),
-			environment.ListOptions(projectID, 50, nil),
+			&database.ListOptions[domain.EnvironmentField]{
+				Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
+				Pagination: database.Page[domain.EnvironmentField]{
+					Limit: 50,
+					OrderBy: database.OrderBy[domain.EnvironmentField]{
+						Columns: []database.Column[domain.EnvironmentField]{
+							database.Col(domain.EnvironmentFieldName),
+						},
+						Direction: database.OrderAsc,
+					},
+				},
+			},
 		)
 		require.NoError(t, err)
 
@@ -144,7 +150,18 @@ func TestEnvironmentStatements_ProjectDeleteCascades(t *testing.T) {
 
 		result, err := d.stmts.ListEnvironments(
 			unfilteredListCtx(t),
-			environment.ListOptions(projectID, 50, nil),
+			&database.ListOptions[domain.EnvironmentField]{
+				Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
+				Pagination: database.Page[domain.EnvironmentField]{
+					Limit: 50,
+					OrderBy: database.OrderBy[domain.EnvironmentField]{
+						Columns: []database.Column[domain.EnvironmentField]{
+							database.Col(domain.EnvironmentFieldName),
+						},
+						Direction: database.OrderAsc,
+					},
+				},
+			},
 		)
 		require.NoError(t, err)
 		assert.Empty(t, result.Items)

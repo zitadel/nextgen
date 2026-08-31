@@ -373,8 +373,7 @@ type Invoker interface {
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListEnvironments invokes listEnvironments operation.
 	//
-	// Lists the project's environments in pipeline order, which is the order
-	// they were created in (`dev`, `staging`, `prod`).
+	// Lists the project's environments ordered by name.
 	//
 	// GET /environments
 	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
@@ -5378,8 +5377,7 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 
 // ListEnvironments invokes listEnvironments operation.
 //
-// Lists the project's environments in pipeline order, which is the order
-// they were created in (`dev`, `staging`, `prod`).
+// Lists the project's environments ordered by name.
 //
 // GET /environments
 func (c *Client) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error) {

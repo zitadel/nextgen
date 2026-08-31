@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,11 +42,10 @@ func TestEnvironments(t *testing.T) {
 		return names
 	}
 
+	wantListed := slices.Sorted(slices.Values(domain.DefaultEnvironmentNames))
+
 	t.Run("a new project is seeded with the default environments", func(t *testing.T) {
-		// Seeded in pipeline order, and the list preserves it: the promotion
-		// order is the product-visible contract, not an accident of ordering
-		// by name.
-		assert.Equal(t, domain.DefaultEnvironmentNames, listNames(t, api.ListEnvironmentsParams{}))
+		assert.Equal(t, wantListed, listNames(t, api.ListEnvironmentsParams{}))
 	})
 
 	t.Run("get by name returns the environment", func(t *testing.T) {
@@ -68,12 +68,10 @@ func TestEnvironments(t *testing.T) {
 			Name:      "nope",
 		})
 		require.NoError(t, err)
-		// The contract declares the 404 with the env.not_found schema, so the
-		// client decodes it into that type rather than a free-form error
-		// body: the status is pinned by which response matched, and the code
-		// cannot be anything else.
-		require.IsType(t, &api.EnvNotFound{}, res, helpers.MustMarshal(t, res))
-		assert.Equal(t, domain.ErrEnvironmentNotFound().Code, res.(*api.EnvNotFound).Code)
+		status, code, _, ok := errorResponseParts(t, res)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, res))
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrEnvironmentNotFound().Code, code)
 	})
 
 	// The name pattern lives in the contract, so a name that could never have
@@ -108,7 +106,7 @@ func TestEnvironments(t *testing.T) {
 		got = append(got, listNames(t, api.ListEnvironmentsParams{
 			PageToken: api.NewOptPageToken(first.NextPageToken.Value),
 		})...)
-		assert.Equal(t, domain.DefaultEnvironmentNames, got)
+		assert.Equal(t, wantListed, got)
 	})
 }
 

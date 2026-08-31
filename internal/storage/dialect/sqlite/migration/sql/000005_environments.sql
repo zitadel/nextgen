@@ -15,24 +15,15 @@ CREATE TABLE environments (
 -- +goose StatementEnd
 
 -- +goose StatementBegin
--- Environment names are unique per project and address the resource on the
--- wire (GET /environments/{name}). No lowered companion column: the domain
+-- Environment names are unique per project, address the resource on the wire
+-- (GET /environments/{name}), and order the list -- name is the only portable
+-- total order across the three dialects. No lowered companion column: the domain
 -- validator restricts names to a lowercase DNS-style label, so there is no
 -- second casing that could collide.
 CREATE UNIQUE INDEX uq_environments_project_name ON environments (project_id, name);
 -- +goose StatementEnd
 
--- +goose StatementBegin
--- Serves the creation-ordered list (created_at ASC, name ASC). name is the
--- tiebreak, not id: seeded rows share a created_at and id orders differently
--- per dialect (ADR 047).
-CREATE INDEX idx_environments_project_created_at ON environments (project_id, created_at, name);
--- +goose StatementEnd
-
 -- +goose Down
--- +goose StatementBegin
-DROP INDEX IF EXISTS idx_environments_project_created_at;
--- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS uq_environments_project_name;
 -- +goose StatementEnd
