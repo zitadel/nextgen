@@ -174,7 +174,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	// the user import: that import creates a bare, unseeded project row for any
 	// project id a bootstrap user names, and a project row that already exists
 	// would make this a no-op and leave the platform project unseeded.
-	if err := platform.Ensure(ctx, projectService, cfg.Platform.BootstrapProject); err != nil {
+	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
 	}
 

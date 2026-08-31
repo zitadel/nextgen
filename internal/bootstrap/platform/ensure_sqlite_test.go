@@ -55,7 +55,7 @@ func TestEnsureSQLiteIdempotent(t *testing.T) {
 	projects, _ := newTestProjects(t, pool)
 
 	// First run creates the row.
-	require.NoError(t, Ensure(ctx, projects, true))
+	require.NoError(t, Ensure(ctx, projects, pool, true))
 
 	created, err := pool.Statements().GetProjectByID(ctx, projectID)
 	require.NoError(t, err)
@@ -63,7 +63,7 @@ func TestEnsureSQLiteIdempotent(t *testing.T) {
 	require.Equal(t, "Platform", created.Name)
 
 	// Second run is a no-op success; the row is unchanged.
-	require.NoError(t, Ensure(ctx, projects, true))
+	require.NoError(t, Ensure(ctx, projects, pool, true))
 
 	after, err := pool.Statements().GetProjectByID(ctx, projectID)
 	require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 	pool := service.NewPool(dbPool)
 
 	projects, keys := newTestProjects(t, pool)
-	require.NoError(t, Ensure(ctx, projects, true))
+	require.NoError(t, Ensure(ctx, projects, pool, true))
 
 	// Usable keys, not merely present ones: GetProjectCrypter unwraps the KEK
 	// with the master key, which is exactly what the session exchange does
@@ -134,7 +134,7 @@ func TestEnsureSQLiteDisabledCreatesNothing(t *testing.T) {
 
 	pool := service.NewPool(dbPool)
 	projects, _ := newTestProjects(t, pool)
-	require.NoError(t, Ensure(ctx, projects, false))
+	require.NoError(t, Ensure(ctx, projects, pool, false))
 
 	_, err = pool.Statements().GetProjectByID(ctx, domain.PlatformProjectID)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
