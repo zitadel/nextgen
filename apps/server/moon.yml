@@ -166,6 +166,13 @@ tasks:
       runInCI: true
 
   test-spanner:
+    # -count=1 disables go's test-result cache: these tests talk to an external
+    # database (emulator container or real instance) whose state is invisible
+    # to go's cache key, and CI restores GOCACHE across runs (setup-go
+    # cache: true), so a cached "ok" can replay a run made against a different
+    # backend. Proven by run 32741899403: the real-instance step replayed the
+    # emulator lane's go-cached results.
+    #
     # -parallel is deliberately NOT pinned to 1. The emulator serves one
     # transaction at a time, so tests running concurrently within a package force
     # the aborts that prove the abort-retry path still works. Pinning it hid the
@@ -178,6 +185,7 @@ tasks:
     args:
       - "test"
       - "-v"
+      - "-count=1"
       - "-tags"
       - "spanner_integration"
       - "-timeout"
@@ -187,6 +195,10 @@ tasks:
       - "./..."
     inputs:
       - "@group(serverInputs)"
+      # The target instance changes what actually runs (emulator vs real
+      # Spanner), so it must change the task hash: without it, the real-instance
+      # CI step replays the emulator lane's cached result (and vice versa).
+      - "$ZITADEL_TEST_SPANNER_INSTANCE"
     options:
       runFromWorkspaceRoot: true
       # Invoked by the CI Spanner emulator step.
