@@ -174,13 +174,9 @@ func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	assert.Contains(t, w.args, "user_a")
 }
 
-// TestListPredicateLiftsConstantArms pins the shape, because nothing else does.
-// The project-scoped and TTU arms cannot reference the correlated RSI row, so
-// inside the EXISTS they are a query-constant that Spanner's emulator
-// re-evaluates once per listed row: 18.6s of a 22.7s query over ten rows. If a
-// later refactor folds them back inside, every behavioural suite stays green and
-// only the timings move, which is exactly the regression that went unnoticed
-// from #811 until #972.
+// Folding the constant arms back inside the correlated EXISTS changes only
+// timings, so every behavioural suite would stay green. Hence a string-index
+// guard on the emitted shape.
 func TestListPredicateLiftsConstantArms(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
@@ -203,12 +199,8 @@ func TestListPredicateLiftsConstantArms(t *testing.T) {
 	firstRSI := strings.Index(sql, "resource_scope_index r")
 	require.NotEqual(t, -1, firstRSI, "predicate must query resource_scope_index")
 
-	// Assert on the LAST occurrence, not the first. `a.scope_kind = 'project'`
-	// is emitted twice — once by the direct project-scoped arm and once inside
-	// writeFullTTUExists' own project-scope case — so checking the first match
-	// would still pass if the direct arm were folded back into the correlated
-	// subquery while the TTU arm stayed lifted. Requiring the last occurrence to
-	// precede the subquery pins every project-scope arm at once.
+	// LastIndex, not Index: writeFullTTUExists emits `a.scope_kind = 'project'`
+	// too, so the first match would not pin the direct arm's placement.
 	require.Contains(t, sql, "a.scope_kind = 'project'", "project-scoped arm must be emitted")
 	assert.Less(t, strings.LastIndex(sql, "a.scope_kind = 'project'"), firstRSI,
 		"every project-scoped arm must be lifted out of the correlated EXISTS")
@@ -217,17 +209,10 @@ func TestListPredicateLiftsConstantArms(t *testing.T) {
 	assert.Less(t, strings.LastIndex(sql, "tuple_to_userset"), firstRSI,
 		"tuple-to-userset arm must be lifted out of the correlated EXISTS")
 
-	// The lift is only sound because the constant arms are ANDed with an RSI
-	// existence check: an object with no RSI row must stay invisible even when
-	// they are true, so a bare `constant OR EXISTS(...)` would expose rows that
-	// were never registered.
 	assert.Equal(t, 2, strings.Count(sql, "resource_scope_index r"),
 		"both halves of the lifted predicate must require an RSI row")
 
-	// Counting the subqueries is not enough on its own: flipping that AND to an
-	// OR leaves the count and every other assertion above unchanged while
-	// reintroducing exactly that leak. So pin the connector that joins the
-	// constant group to the first RSI subquery.
+	// The count above is blind to the connector, and an OR there is the leak.
 	head := sql[:firstRSI]
 	openingExists := strings.LastIndex(head, "EXISTS (")
 	require.NotEqual(t, -1, openingExists, "the first RSI subquery must be an EXISTS")
@@ -240,17 +225,10 @@ func TestListPredicateLiftsConstantArms(t *testing.T) {
 	assert.Contains(t, sql, "a.scope_resource_id = r.resource_id")
 }
 
-// TestListPredicateConstraintTeamInBothHalves covers the sk_team clause on the
-// EXISTS path, which no test reached before: TestWriteCheckAuthzConstraintTeam
-// sets ConstraintTeamID but drives WriteCheckAuthz and WriteListAuthzObjectIDs,
-// never this predicate.
-//
-// The clause is correlated to r, so the lift has to carry it into *both* halves:
-// (C AND EXISTS(base AND CT)) OR EXISTS(base AND CT AND Q). Emit it only in the
-// correlated half and the first half becomes `C AND EXISTS(base)`, which makes
-// an object outside the token's team visible to anyone holding a project-wide
-// grant. Same class of leak as an AND flipped to OR, reached by a different
-// route, and nothing would have failed.
+// The sk_team clause is correlated to r, so the lift must carry it into both
+// halves. In the correlated half only, the first half becomes `C AND
+// EXISTS(base)` and objects outside the token's team become visible to any
+// project-wide grant.
 func TestListPredicateConstraintTeamInBothHalves(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
@@ -276,11 +254,8 @@ func TestListPredicateConstraintTeamInBothHalves(t *testing.T) {
 	firstRSI := strings.Index(sql, "resource_scope_index r")
 	require.NotEqual(t, firstRSI, secondRSI, "the lift must emit two RSI subqueries")
 
-	// Marker must be unique to writeListedObjectInConstraintTeam. Deliberately
-	// not "authz_membership_edges": that is also emitted by the TTU arm and by
-	// every principal match, so it appears in the lifted section regardless and
-	// would make this test pass with the clause missing entirely. This string is
-	// written once per constraint-team clause and nowhere else.
+	// Unique to writeListedObjectInConstraintTeam. Not "authz_membership_edges",
+	// which the TTU arm and every principal match also emit.
 	const ctClause = `) OR (r.resource_kind <> `
 	assert.Equal(t, 2, strings.Count(sql, ctClause),
 		"the constraint-team clause must be emitted once per half of the lift")
