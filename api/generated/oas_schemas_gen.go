@@ -13447,13 +13447,13 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
-// A related entity to embed on each returned flow definition (ADR 059).
+// A related entity to embed on each returned flow definition.
 // - `user_schema`: the user schema the flow operates on, embedded as
 // `user_schema` on each entry: the same object `GET /schemas/{id}` returns.
 // The property is omitted entirely when not requested and `null` when the
-// referenced schema no longer resolves (for example, the pinned revision
-// was deleted), so "did not ask" stays distinguishable from "cannot
-// resolve". Requesting it requires read access to schemas.
+// referenced schema no longer resolves or the caller may not read it, so
+// "did not ask" stays distinguishable from "cannot resolve". Requesting it
+// requires read access to schemas.
 // Ref: #
 type FlowDefinitionExpand string
 
@@ -13542,8 +13542,8 @@ type FlowDefinitionResponse struct {
 	FlowDefinition FlowDefinition `json:"flow_definition"`
 	// The user schema this flow operates on: the same object
 	// `GET /schemas/{id}` returns. Present only when the request asked for it
-	// with `expand=user_schema` (ADR 059); `null` when it was requested but
-	// the referenced schema no longer resolves.
+	// with `expand=user_schema`; `null` when it was requested but the
+	// referenced schema no longer resolves or the caller may not read it.
 	UserSchema OptNilSchema `json:"user_schema"`
 	CreatedAt  time.Time    `json:"created_at"`
 	UpdatedAt  time.Time    `json:"updated_at"`

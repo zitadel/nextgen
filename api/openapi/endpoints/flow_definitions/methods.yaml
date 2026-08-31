@@ -92,7 +92,7 @@ get:
     - name: expand
       in: query
       required: false
-      description: Related entities to embed on each returned flow definition (ADR 059).
+      description: Related entities to embed on each returned flow definition.
       schema:
         type: array
         items:

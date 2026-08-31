@@ -16,8 +16,8 @@ properties:
     description: |
       The user schema this flow operates on: the same object
       `GET /schemas/{id}` returns. Present only when the request asked for it
-      with `expand=user_schema` (ADR 059); `null` when it was requested but
-      the referenced schema no longer resolves.
+      with `expand=user_schema`; `null` when it was requested but the
+      referenced schema no longer resolves or the caller may not read it.
     oneOf:
       - $ref: ../../endpoints/schemas/schema.yaml
       - type: 'null'

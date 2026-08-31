@@ -3598,7 +3598,7 @@ type ListFlowDefinitionsParams struct {
 	ProjectID ProjectID
 	// Filter flow definitions by purpose (e.g., registration, login).
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
-	// Related entities to embed on each returned flow definition (ADR 059).
+	// Related entities to embed on each returned flow definition.
 	Expand []FlowDefinitionExpand `json:",omitempty"`
 }
 
