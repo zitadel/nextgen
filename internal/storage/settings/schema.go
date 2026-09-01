@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"time"
+
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -12,6 +14,8 @@ type SettingStorage struct {
 	IsFinal       bool
 	Path          string
 	Value         any
+	CreatedAt     time.Time
+	ModifiedAt    time.Time
 }
 
 var schema = database.NewSchema(map[SettingStorageField]database.FieldBinding[SettingStorage]{
@@ -45,6 +49,21 @@ var schema = database.NewSchema(map[SettingStorageField]database.FieldBinding[Se
 		Accessor: func(s *SettingStorage) any { return s.Value },
 		Coerce:   database.CoerceJSON,
 	},
+	SettingStorageFieldPath: {
+		SQLName:  "path",
+		Accessor: func(s *SettingStorage) any { return s.Path },
+		Coerce:   database.CoerceString,
+	},
+	SettingStorageFieldCreatedAt: {
+		SQLName:  "created_at",
+		Accessor: func(s *SettingStorage) any { return s.CreatedAt },
+		Coerce:   database.CoerceTime,
+	},
+	SettingStorageFieldModifiedAt: {
+		SQLName:  "modified_at",
+		Accessor: func(s *SettingStorage) any { return s.ModifiedAt },
+		Coerce:   database.CoerceTime,
+	},
 })
 
 type SettingStorageField uint8
@@ -57,4 +76,6 @@ const (
 	SettingStorageFieldIsFinal
 	SettingStorageFieldValue
 	SettingStorageFieldPath
+	SettingStorageFieldCreatedAt
+	SettingStorageFieldModifiedAt
 )
