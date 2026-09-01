@@ -1206,14 +1206,12 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 // step the user has passed through (history plus current). on_success
 // handlers read this to find attributes by challenge across the full
 // progress, not just the current step.
-//
-// The union keeps definition order — steps in the order they were
-// visited, fields in the order the step declares them. Callers that walk
-// the result positionally depend on it: [uniqueFieldValues] returns
-// its candidates in field order, so a set-ordered union would make the
-// owner pinned on a multi-unique conflict depend on map iteration.
 func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowResolvedFields, error) {
 	ctx, def, state, current := pc.ctx, pc.def, pc.state, pc.currentStep
+	// First-encounter order, not map order: consumers walk these fields
+	// positionally (uniqueFieldValues promises field order), so the union
+	// must be deterministic — visited steps in history order, fields in
+	// their step order.
 	seen := map[Field]struct{}{}
 	names := make([]Field, 0, 8)
 	collect := func(s *FlowDefinitionStep) {
