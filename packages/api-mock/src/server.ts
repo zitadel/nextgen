@@ -271,8 +271,8 @@ export function createMockApp(options: { issuer: string }): express.Express {
         expires_at: expiresAt.toISOString(),
         user: {
           user_id: userId,
-          identifier: claims.sub,
-          identifier_property: "email",
+          // identifier_property travels exactly with identifier (ADR 058 §3).
+          ...(claims.sub ? { identifier: claims.sub, identifier_property: "email" } : {}),
           ...(display ? { display } : {}),
         },
       };

@@ -85,7 +85,13 @@ describe("useAuth()", () => {
     const signedOut: AuthResult = { isAuthenticated: false, session: null };
     const signedIn: AuthResult = {
       isAuthenticated: true,
-      session: { userId: "u2", identifier: "c@c.com", identifierProperty: "email", display: "C", token: "t2" },
+      session: {
+        userId: "u2",
+        identifier: "c@c.com",
+        identifierProperty: "email",
+        display: "C",
+        token: "t2",
+      },
     };
 
     const { Wrapper, getSetSession } = wrapper(signedOut);
