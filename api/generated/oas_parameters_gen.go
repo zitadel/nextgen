@@ -3615,6 +3615,8 @@ type ListFlowDefinitionsParams struct {
 	ProjectID ProjectID
 	// Filter flow definitions by purpose (e.g., registration, login).
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
+	// Related entities to embed on each returned flow definition.
+	Expand []FlowDefinitionExpand `json:",omitempty"`
 }
 
 func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListFlowDefinitionsParams) {
@@ -3650,6 +3652,15 @@ func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListF
 		}
 		if v, ok := packed[key]; ok {
 			params.Purpose = v.(OptListFlowDefinitionsPurpose)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "expand",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Expand = v.([]FlowDefinitionExpand)
 		}
 	}
 	return params
@@ -3876,6 +3887,71 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "purpose",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: expand.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				return d.DecodeArray(func(d uri.Decoder) error {
+					var paramsDotExpandVal FlowDefinitionExpand
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotExpandVal = FlowDefinitionExpand(c)
+						return nil
+					}(); err != nil {
+						return err
+					}
+					params.Expand = append(params.Expand, paramsDotExpandVal)
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				var failures []validate.FieldError
+				for i, elem := range params.Expand {
+					if err := func() error {
+						if err := elem.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						failures = append(failures, validate.FieldError{
+							Name:  fmt.Sprintf("[%d]", i),
+							Error: err,
+						})
+					}
+				}
+				if len(failures) > 0 {
+					return &validate.Error{Fields: failures}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "expand",
 			In:   "query",
 			Err:  err,
 		}
