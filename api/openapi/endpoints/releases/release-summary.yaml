@@ -1,0 +1,24 @@
+title: ReleaseSummary
+description: |
+  A release without its pinned set — the shape `GET /releases` returns.
+
+  Pointers are omitted rather than optional so that a list entry can never be
+  mistaken for a release that pins nothing; fetch them with
+  `GET /releases/{release_id}`.
+type: object
+required:
+  - id
+  - project_id
+  - audit
+properties:
+  id:
+    readOnly: true
+    description: The opaque, immutable resource id, assigned at construction.
+    $ref: ../../components/schemas/release-id.yaml
+  project_id:
+    readOnly: true
+    description: The project this release belongs to.
+    $ref: ../../components/schemas/project-id.yaml
+  audit:
+    readOnly: true
+    $ref: release-audit.yaml

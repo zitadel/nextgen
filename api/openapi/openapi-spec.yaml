@@ -39,6 +39,11 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Releases
+    description: |
+      Immutable, project-scoped configuration snapshots (ADR 035). A release
+      pins one revision of each resource it includes and records who assembled
+      it; it carries pointers and audit metadata, never resource content.
   - name: Events
     description: |
       Project-scoped audit event list and get (ADR 049). Unified surface for
@@ -127,6 +132,10 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /releases:
+    $ref: endpoints/releases/methods.yaml
+  /releases/{release_id}:
+    $ref: endpoints/releases/by_id/methods.yaml
   /events:
     $ref: endpoints/events/methods.yaml
   /events/{id}:

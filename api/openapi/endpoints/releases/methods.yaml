@@ -1,0 +1,76 @@
+post:
+  operationId: createRelease
+  summary: Create a release
+  description: |
+    Bundles a release from revisions that already exist, supplied as
+    `(kind, handle, revision_id)` tuples. No new revisions are allocated — use
+    the per-kind create endpoints for that, then pin the ids here.
+
+    Every referenced `revision_id` must exist in the project, and each declared
+    `handle` must match the handle the referenced revision actually carries.
+
+    Creating a release does not deploy it. A release is environment-agnostic
+    and the same release can later be deployed to any number of environments
+    unchanged.
+
+    Idempotent on the pinned set: audit metadata is excluded from the
+    comparison, so re-submitting the same tuples with a different `message`
+    returns the release that already pins them rather than creating a second
+    one.
+  tags:
+    - Releases
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - release.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-release-request.yaml
+  responses:
+    '200':
+      description: |
+        A release pinning this exact set already existed and was returned
+        unchanged. No new release was created.
+      content:
+        application/json:
+          schema:
+            $ref: release.yaml
+    '201':
+      description: The release was created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: release.yaml
+    default:
+      $ref: createRelease-error-response.yaml
+
+get:
+  operationId: listReleases
+  summary: List releases
+  description: |
+    Lists the project's releases, newest first.
+
+    Entries carry audit metadata only — the pinned set is omitted. Read one
+    release with `GET /releases/{release_id}` to get its pointers.
+  tags:
+    - Releases
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - release.read
+  responses:
+    '200':
+      description: The releases were retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-releases-response.yaml
+    default:
+      $ref: listReleases-error-response.yaml

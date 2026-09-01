@@ -1,0 +1,19 @@
+{
+  "id": "rel_550e8400-e29b-41d4-a716-446655440000",
+  "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+  "audit": {
+    "message": "deploy from CI",
+    "git_sha": "8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912",
+    "git_dirty": true,
+    "created_at": "2026-07-15T11:02:00Z",
+    "created_by": null,
+    "created_by_type": null
+  },
+  "pointers": [
+    {
+      "kind": "schema",
+      "handle": "human-user",
+      "revision_id": "sch_01KWHF18816ZQE7F0N9WD3P2E4"
+    }
+  ]
+}

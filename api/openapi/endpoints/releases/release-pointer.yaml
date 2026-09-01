@@ -1,0 +1,37 @@
+type: object
+description: |
+  One entry of the set a release pins: the revision of a single resource that
+  this release includes.
+required:
+  - kind
+  - handle
+  - revision_id
+properties:
+  kind:
+    type: string
+    description: The kind of resource this pointer pins.
+    enum:
+      - schema
+      - flow
+    example: schema
+  handle:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: |
+      The field the resource kind uses as its stable identifier across
+      revisions — `objectType` for schemas, `name` for flows. Resources inside
+      a release reference each other by handle rather than by revision id, so
+      the same handle names the same resource in every release.
+    example: human-user
+  revision_id:
+    type: string
+    minLength: 1
+    maxLength: 512
+    description: |
+      The revision of that resource this release pins.
+
+      Deliberately not constrained to a prefixed id: for `kind: schema` this is
+      the schema's `$id`, which is a URL whenever the document supplied one and
+      only a generated `sch_*` value otherwise.
+    example: https://example.com/schemas/human-user.json

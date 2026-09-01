@@ -1,0 +1,29 @@
+get:
+  operationId: getReleaseById
+  summary: Get a release by id
+  description: |
+    Reads one release: its audit metadata and the `(kind, handle, revision_id)`
+    tuples it pins.
+
+    Does not embed resource content. Resolve each `revision_id` through the
+    per-kind read endpoints when the bytes are needed.
+
+    The lookup is scoped to the project in `project_id`: a release id belonging
+    to another project answers `rel.not_found` exactly as an unknown id does.
+  tags:
+    - Releases
+  security:
+    - oauth2:
+        - release.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/release-id.yaml
+  responses:
+    '200':
+      description: The release was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../release.yaml
+    default:
+      $ref: getReleaseById-error-response.yaml

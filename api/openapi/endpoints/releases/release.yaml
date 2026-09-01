@@ -1,0 +1,39 @@
+title: Release
+description: |
+  An immutable, project-scoped snapshot that pins one revision of every
+  resource it includes (ADR 035).
+
+  A release owns pointers and audit metadata, not content — it records *which*
+  revisions belong together. Callers that need the resource bytes resolve each
+  `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
+  `GET /flow_definitions/{id}`, …).
+
+  A release exists on its own and is not tied to an environment. Deploying it
+  is a separate call.
+type: object
+required:
+  - id
+  - project_id
+  - audit
+  - pointers
+properties:
+  id:
+    readOnly: true
+    description: The opaque, immutable resource id, assigned at construction.
+    $ref: ../../components/schemas/release-id.yaml
+  project_id:
+    readOnly: true
+    description: The project this release belongs to.
+    $ref: ../../components/schemas/project-id.yaml
+  audit:
+    readOnly: true
+    $ref: release-audit.yaml
+  pointers:
+    readOnly: true
+    type: array
+    minItems: 1
+    description: |
+      The revisions this release pins, one entry per `(kind, handle)`. Never
+      empty: a release must contain at least one resource.
+    items:
+      $ref: release-pointer.yaml

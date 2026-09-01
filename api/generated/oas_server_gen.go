@@ -93,6 +93,23 @@ type Handler interface {
 	//
 	// POST /projects
 	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
+	// CreateRelease implements createRelease operation.
+	//
+	// Bundles a release from revisions that already exist, supplied as
+	// `(kind, handle, revision_id)` tuples. No new revisions are allocated — use
+	// the per-kind create endpoints for that, then pin the ids here.
+	// Every referenced `revision_id` must exist in the project, and each declared
+	// `handle` must match the handle the referenced revision actually carries.
+	// Creating a release does not deploy it. A release is environment-agnostic
+	// and the same release can later be deployed to any number of environments
+	// unchanged.
+	// Idempotent on the pinned set: audit metadata is excluded from the
+	// comparison, so re-submitting the same tuples with a different `message`
+	// returns the release that already pins them rather than creating a second
+	// one.
+	//
+	// POST /releases
+	CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The optional `$id` field is the JSON Schema document
@@ -283,6 +300,17 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetReleaseById implements getReleaseById operation.
+	//
+	// Reads one release: its audit metadata and the `(kind, handle, revision_id)`
+	// tuples it pins.
+	// Does not embed resource content. Resolve each `revision_id` through the
+	// per-kind read endpoints when the bytes are needed.
+	// The lookup is scoped to the project in `project_id`: a release id belonging
+	// to another project answers `rel.not_found` exactly as an unknown id does.
+	//
+	// GET /releases/{release_id}
+	GetReleaseById(ctx context.Context, params GetReleaseByIdParams) (GetReleaseByIdRes, error)
 	// GetSchemaById implements getSchemaById operation.
 	//
 	// Get a schema by its ID. A schema ID identifies one immutable revision, so
@@ -364,6 +392,14 @@ type Handler interface {
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListReleases implements listReleases operation.
+	//
+	// Lists the project's releases, newest first.
+	// Entries carry audit metadata only — the pinned set is omitted. Read one
+	// release with `GET /releases/{release_id}` to get its pointers.
+	//
+	// GET /releases
+	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
 	// ListSchemas implements listSchemas operation.
 	//
 	// Retrieve a list of all schemas available in the system. This endpoint
