@@ -146,7 +146,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
-	userIdentity := service.UserStatementsIdentityReader{Pool: serviceDBPool}
+	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
 	keyService := service.NewKeyService(serviceDBPool, *masterKey)
@@ -157,7 +157,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userLookup,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(serviceDBPool, userIdentity, service.SessionConfig{
+	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})

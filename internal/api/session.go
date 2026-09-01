@@ -104,8 +104,9 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 		return nil, err
 	}
 	input := service.GetSessionInput{
-		ProjectID: projectID,
-		SessionID: string(params.SessionID),
+		ProjectID:        projectID,
+		SessionID:        string(params.SessionID),
+		WithUserIdentity: true,
 	}
 
 	session, err := h.sessionService.Get(ctx, input)
@@ -298,14 +299,24 @@ func sessionToAPI(session *domain.Session) *api.SessionResponse {
 		resp.UserID = api.NewOptNilUserID(api.UserID(*session.UserID))
 	}
 	if session.User != nil {
-		if name := session.User.DisplayName(); name != "" {
-			resp.Name = api.NewOptString(name)
-		}
-		if email := session.User.Email(); email != "" {
-			resp.Email = api.NewOptString(email)
-		}
+		resp.User = api.NewOptUserRef(userRefToAPI(*session.User))
 	}
 	return resp
+}
+
+// userRefToAPI maps the resolved reference (ADR 058 §3): identifier and
+// identifier_property travel together, display independently; empty means
+// absent on the wire.
+func userRefToAPI(ref domain.UserRef) api.UserRef {
+	out := api.UserRef{UserID: api.UserID(ref.UserID)}
+	if ref.Identifier != "" {
+		out.Identifier = api.NewOptString(ref.Identifier)
+		out.IdentifierProperty = api.NewOptString(ref.IdentifierProperty)
+	}
+	if ref.Display != "" {
+		out.Display = api.NewOptString(ref.Display)
+	}
+	return out
 }
 
 func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent {

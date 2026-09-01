@@ -11,8 +11,8 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// seedIdentityUser creates a schema row and a user carrying the conventional
-// identity attributes, returning the user ID.
+// seedIdentityUser creates a designating schema row and a user carrying the
+// designated attributes, returning the user ID.
 func seedIdentityUser(t *testing.T, projectID string) string {
 	t.Helper()
 	ensureProject(t, projectID)
@@ -22,11 +22,10 @@ func seedIdentityUser(t *testing.T, projectID string) string {
 	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
-		Schema:    []byte(`{}`),
+		Kind:      domain.JSONSchemaKindUserSchema,
+		Schema:    []byte(`{"x-identifier": "email", "x-display": ["givenName", "familyName"]}`),
 	}))
 
-	// camelCase name parts: the shape the shipped presets actually collect
-	// (packages/config/defaults/*.json).
 	attrs := make(domain.CreateAttributes, 0, 3)
 	for key, value := range map[domain.AttributeKey]any{
 		"email":      "ada@example.com",
@@ -77,8 +76,12 @@ func TestSessionService_Get_UserIdentity_integration(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, got.User)
-		require.Equal(t, "Ada Lovelace", got.User.DisplayName())
-		require.Equal(t, "ada@example.com", got.User.Email())
+		require.Equal(t, domain.UserRef{
+			UserID:             userID,
+			Identifier:         "ada@example.com",
+			IdentifierProperty: "email",
+			Display:            "Ada Lovelace",
+		}, *got.User)
 	})
 
 	t.Run("plain read stays identity-free", func(t *testing.T) {
