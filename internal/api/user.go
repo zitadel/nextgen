@@ -80,6 +80,13 @@ func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (a
 			return nil, err
 		}
 	}
+	// The owner team is a different resource under a different permission, so
+	// it is gated on its own rather than folded into the membership check.
+	if input.IncludeLifecycleOwnerTeam {
+		if err := requireTeamRead(ctx); err != nil {
+			return nil, err
+		}
+	}
 
 	users, err := h.userService.ListUsers(ctx, input)
 	if err != nil {
@@ -119,8 +126,11 @@ func mapQueryUsersToService(projectID string, req *api.QueryUsersRequest) servic
 		input.Filters = append(input.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
 	}
 	for _, expand := range req.Expand {
-		if expand == api.UserExpandTeams {
+		switch expand {
+		case api.UserExpandTeams:
 			input.IncludeTeams = true
+		case api.UserExpandLifecycleOwnerTeam:
+			input.IncludeLifecycleOwnerTeam = true
 		}
 	}
 	return input
@@ -306,6 +316,18 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 			out.Teams = append(out.Teams, apiUserTeam(team))
 		}
 		out.TeamsTruncated = api.NewOptBool(user.TeamsTruncated)
+	}
+
+	// Same absent-versus-empty rule for the to-one: not asked for stays off the
+	// wire, asked for on a self-owned user serializes as null.
+	// teamResponse is the same mapper getTeam and queryTeams answer with, so the
+	// embedded team cannot drift from the sub-resource's representation.
+	if user.LifecycleOwnerTeamLoaded {
+		if team := user.LifecycleOwnerTeam; team != nil {
+			out.Metadata.LifecycleOwnerTeam.SetTo(*teamResponse(team))
+		} else {
+			out.Metadata.LifecycleOwnerTeam.SetToNull()
+		}
 	}
 
 	return out, nil

@@ -26423,6 +26423,69 @@ func (o OptNilTeamDeactivatedEventActorType) Or(d TeamDeactivatedEventActorType)
 	return d
 }
 
+// NewOptNilTeamResponse returns new OptNilTeamResponse with value set to v.
+func NewOptNilTeamResponse(v TeamResponse) OptNilTeamResponse {
+	return OptNilTeamResponse{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilTeamResponse is optional nullable TeamResponse.
+type OptNilTeamResponse struct {
+	Value TeamResponse
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilTeamResponse was set.
+func (o OptNilTeamResponse) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilTeamResponse) Reset() {
+	var v TeamResponse
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilTeamResponse) SetTo(v TeamResponse) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilTeamResponse) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilTeamResponse) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v TeamResponse
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilTeamResponse) Get() (v TeamResponse, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilTeamResponse) Or(d TeamResponse) TeamResponse {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilTeamUpdatedEventActorType returns new OptNilTeamUpdatedEventActorType with value set to v.
 func NewOptNilTeamUpdatedEventActorType(v TeamUpdatedEventActorType) OptNilTeamUpdatedEventActorType {
 	return OptNilTeamUpdatedEventActorType{
@@ -41396,7 +41459,7 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// A related collection to embed on each returned user (ADR 059).
+// A related object to embed on each returned user (ADR 059).
 // - `teams`: the user's team memberships, as `teams` on each user. The property
 // is omitted entirely when not requested and `[]` when the user has none, so
 // "did not ask" is distinguishable from "there are none". Embedded lists are
@@ -41406,17 +41469,28 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 // Membership is team participation, not lifecycle ownership — the
 // owning team stays at `metadata.lifecycle_owner_team_id` (ADR 024).
 // Requires `team_membership.read` in addition to `user.read`.
+// - `lifecycle_owner_team`: the team that owns the user's identity lifecycle,
+// as `metadata.lifecycle_owner_team`. It resolves the id already carried at
+// `metadata.lifecycle_owner_team_id`, and serves the same representation as
+// `GET /teams/{team_id}`. The property is omitted when not requested and
+// `null` when the user is self-owned. One team, so no cap and no truncation
+// flag.
+// Requires `team.read` in addition to `user.read`.
+// The two are independent: asking for one says nothing about the other, and
+// neither implies the other's permission.
 // Ref: #
 type UserExpand string
 
 const (
-	UserExpandTeams UserExpand = "teams"
+	UserExpandTeams              UserExpand = "teams"
+	UserExpandLifecycleOwnerTeam UserExpand = "lifecycle_owner_team"
 )
 
 // AllValues returns all UserExpand values.
 func (UserExpand) AllValues() []UserExpand {
 	return []UserExpand{
 		UserExpandTeams,
+		UserExpandLifecycleOwnerTeam,
 	}
 }
 
@@ -41424,6 +41498,8 @@ func (UserExpand) AllValues() []UserExpand {
 func (s UserExpand) MarshalText() ([]byte, error) {
 	switch s {
 	case UserExpandTeams:
+		return []byte(s), nil
+	case UserExpandLifecycleOwnerTeam:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -41435,6 +41511,9 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 	switch UserExpand(data) {
 	case UserExpandTeams:
 		*s = UserExpandTeams
+		return nil
+	case UserExpandLifecycleOwnerTeam:
+		*s = UserExpandLifecycleOwnerTeam
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -41599,10 +41678,25 @@ type UserMetadata struct {
 	Status UserMetadataStatus `json:"status"`
 	// The team that owns this user's identity lifecycle, or `null` when the
 	// user is self-owned. This is a single team and a different concept from
-	// the user's team roster: it decides who may deprovision the user, not
-	// which teams the user collaborates in. The roster is its own paginated
+	// the user's team memberships: it decides who may deprovision the user, not
+	// which teams the user collaborates in. Memberships are their own paginated
 	// resource — `GET /users/{user_id}/teams`.
 	LifecycleOwnerTeamID OptNilString `json:"lifecycle_owner_team_id"`
+	// The team named by `lifecycle_owner_team_id`, present only when the
+	// request asked for it with `expand: ["lifecycle_owner_team"]` (ADR 059).
+	// Absent means it was not requested; `null` means the user is self-owned
+	// and there is no owner to resolve.
+	// Requesting it does not guarantee it is present on every user. Today
+	// `team.read` is checked once for the whole request, so it is; once that
+	// check is per team, a page may contain a user whose owner the caller may
+	// not read, and such a row answers with neither the team nor `null` —
+	// `null` already means self-owned. What it answers with instead is decided
+	// with the granular scopes (#420); do not read the two cases above as the
+	// complete set.
+	// This is the same representation `GET /teams/{team_id}` serves. It is a
+	// single team, not a collection, so it carries no cap and no truncation
+	// flag.
+	LifecycleOwnerTeam OptNilTeamResponse `json:"lifecycle_owner_team"`
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -41625,6 +41719,11 @@ func (s *UserMetadata) GetLifecycleOwnerTeamID() OptNilString {
 	return s.LifecycleOwnerTeamID
 }
 
+// GetLifecycleOwnerTeam returns the value of LifecycleOwnerTeam.
+func (s *UserMetadata) GetLifecycleOwnerTeam() OptNilTeamResponse {
+	return s.LifecycleOwnerTeam
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *UserMetadata) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -41643,6 +41742,11 @@ func (s *UserMetadata) SetStatus(val UserMetadataStatus) {
 // SetLifecycleOwnerTeamID sets the value of LifecycleOwnerTeamID.
 func (s *UserMetadata) SetLifecycleOwnerTeamID(val OptNilString) {
 	s.LifecycleOwnerTeamID = val
+}
+
+// SetLifecycleOwnerTeam sets the value of LifecycleOwnerTeam.
+func (s *UserMetadata) SetLifecycleOwnerTeam(val OptNilTeamResponse) {
+	s.LifecycleOwnerTeam = val
 }
 
 // The status of the user.

@@ -59,6 +59,9 @@ type ListUsersInput struct {
 	Filters   []Filter
 	// IncludeTeams embeds each user's team memberships (ADR 059).
 	IncludeTeams bool
+	// IncludeLifecycleOwnerTeam embeds the team that owns each user's
+	// lifecycle (ADR 059).
+	IncludeLifecycleOwnerTeam bool
 }
 
 type ListPasskeysInput struct {
@@ -211,6 +214,7 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 		return nil, err
 	}
 	queryOpts.IncludeTeams = input.IncludeTeams
+	queryOpts.IncludeLifecycleOwnerTeam = input.IncludeLifecycleOwnerTeam
 
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))

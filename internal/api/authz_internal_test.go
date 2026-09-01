@@ -197,6 +197,49 @@ func TestRequireMembershipRead(t *testing.T) {
 	}
 }
 
+func TestRequireTeamRead(t *testing.T) {
+	withScopes := func(scopes ...string) context.Context {
+		return WithScopeContext(context.Background(), ScopeContext{
+			ProjectID:     "proj_a",
+			Scope:         scopes,
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		})
+	}
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		wantErr bool
+	}{
+		{"granular scope", withScopes("user.read", "team.read"), false},
+		// Interim until #420, same as the membership gate beside it.
+		{"operator secret", withScopes("project.write", "project.read"), false},
+		{"preview secret", withScopes("project.read"), true},
+		{"no credential", context.Background(), true},
+		// The two expansion gates are independent: one permission must not
+		// stand in for the other.
+		{"membership scope does not grant team read", withScopes("user.read", "team_membership.read"), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := requireTeamRead(tt.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("requireTeamRead() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				return
+			}
+			var de domain.Error
+			if !errors.As(err, &de) {
+				t.Fatalf("error is not a domain.Error: %v", err)
+			}
+			if !strings.Contains(de.Message, "team.read") {
+				t.Fatalf("message %q does not name the missing permission", de.Message)
+			}
+		})
+	}
+}
+
 func TestMapAuthzDecision(t *testing.T) {
 	res := userAccess
 	if err := mapAuthzDecision(resolver.DecisionAllow, res, opRead); err != nil {

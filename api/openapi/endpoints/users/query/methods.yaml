@@ -9,10 +9,12 @@ post:
     no `project_id`, unlike the other query endpoints.
   tags:
     - Users
-  # user.read alone: scopes in one requirement are ANDed, and
-  # team_membership.read is needed only when the body asks for memberships —
-  # `expand: ["teams"]` or a `team_id` filter — a condition OpenAPI cannot
-  # express. `user-expand.yaml` and `user-filter-field.yaml` state it.
+  # user.read alone: scopes in one requirement are ANDed, and the expansion
+  # scopes are each needed only when the body asks for that relation —
+  # team_membership.read for `expand: ["teams"]` or a `team_id` filter,
+  # team.read for `expand: ["lifecycle_owner_team"]`. OpenAPI cannot express a
+  # condition on the body. `user-expand.yaml` and `user-filter-field.yaml`
+  # state it.
   security:
     - oauth2:
         - user.read
