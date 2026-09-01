@@ -71,10 +71,10 @@ export function AppShell({
   );
 }
 
-/** The signed-in identity as the shell renders it. */
+/** The signed-in identity as the shell renders it (user-ref vocabulary). */
 export interface ShellUser {
-  name?: string;
-  email?: string;
+  display?: string;
+  identifier?: string;
   userId?: string;
 }
 
@@ -277,7 +277,7 @@ function PortalNav() {
  * The gradient is the design's `Gradient/Red` style rather than a token: it is
  * a placeholder portrait, and no avatar image source exists on the session yet.
  */
-function UserIdentity({ name, email }: { name: string; email?: string }) {
+function UserIdentity({ primary, secondary }: { primary: string; secondary?: string }) {
   return (
     <>
       <span
@@ -285,8 +285,8 @@ function UserIdentity({ name, email }: { name: string; email?: string }) {
         className="size-8 shrink-0 rounded-full bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
       />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
-        <span className="truncate text-sm leading-none font-semibold">{name}</span>
-        {email && <span className="truncate text-xs leading-none">{email}</span>}
+        <span className="truncate text-sm leading-none font-semibold">{primary}</span>
+        {secondary && <span className="truncate text-xs leading-none">{secondary}</span>}
       </span>
     </>
   );
@@ -294,8 +294,8 @@ function UserIdentity({ name, email }: { name: string; email?: string }) {
 
 /**
  * Footer account entry: the signed-in identity from `GET /sessions/me`
- * (name → email → user id fallback, per the API's identity-hydration contract),
- * opening the account dropdown (Console ADR 0003).
+ * (display → identifier → user id fallback, the user-ref rendering contract of
+ * ADR 058), opening the account dropdown (Console ADR 0003).
  *
  * The dropdown is the entry point to the Settings view — `Settings` navigates
  * to the route that switches the sidebar over. Console-local chrome by design:
@@ -309,22 +309,23 @@ function UserIdentity({ name, email }: { name: string; email?: string }) {
  * off.
  */
 function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const displayName = user?.name ?? user?.email ?? user?.userId ?? "Signed in";
-  // Show the email as the secondary line only when the name is the primary.
-  const secondary = user?.name ? user.email : undefined;
+  const primary = user?.display ?? user?.identifier ?? user?.userId ?? "Signed in";
+  // Show the identifier as the secondary line only when the display name is
+  // the primary.
+  const secondary = user?.display ? user.identifier : undefined;
 
   return (
     <SidebarMenuItem>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton size="lg" tooltip={displayName} aria-label={`Account: ${displayName}`}>
-            <UserIdentity name={displayName} email={secondary} />
+          <SidebarMenuButton size="lg" tooltip={primary} aria-label={`Account: ${primary}`}>
+            <UserIdentity primary={primary} secondary={secondary} />
             <ChevronsUpDown className="ml-auto text-muted-foreground" aria-hidden />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" className="w-56 border-foreground/10">
           <DropdownMenuLabel className="flex h-11 items-center gap-2 font-normal">
-            <UserIdentity name={displayName} email={secondary} />
+            <UserIdentity primary={primary} secondary={secondary} />
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="mx-px my-0" />
           <DropdownMenuItem asChild>

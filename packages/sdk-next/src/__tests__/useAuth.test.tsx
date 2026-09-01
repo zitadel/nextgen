@@ -38,8 +38,9 @@ describe("useAuth()", () => {
       isAuthenticated: true,
       session: {
         userId: "user-1",
-        email: "bob@example.com",
-        name: "Bob",
+        identifier: "bob@example.com",
+        identifierProperty: "email",
+        display: "Bob",
         token: "tok",
       },
     };
@@ -48,7 +49,7 @@ describe("useAuth()", () => {
     expect(result.current.isAuthenticated).toBe(true);
     if (result.current.isAuthenticated) {
       expect(result.current.session.userId).toBe("user-1");
-      expect(result.current.session.email).toBe("bob@example.com");
+      expect(result.current.session.identifier).toBe("bob@example.com");
     }
   });
 
@@ -57,8 +58,9 @@ describe("useAuth()", () => {
       isAuthenticated: true,
       session: {
         userId: "user-1",
-        email: "bob@example.com",
-        name: "Bob",
+        identifier: "bob@example.com",
+        identifierProperty: "email",
+        display: "Bob",
         token: "raw-session-token-must-not-leak",
       },
     };
@@ -71,8 +73,9 @@ describe("useAuth()", () => {
       // no token property at all (not even undefined).
       expect(result.current.session).toEqual({
         userId: "user-1",
-        email: "bob@example.com",
-        name: "Bob",
+        identifier: "bob@example.com",
+        identifierProperty: "email",
+        display: "Bob",
       });
       expect("token" in result.current.session).toBe(false);
     }
@@ -82,7 +85,7 @@ describe("useAuth()", () => {
     const signedOut: AuthResult = { isAuthenticated: false, session: null };
     const signedIn: AuthResult = {
       isAuthenticated: true,
-      session: { userId: "u2", email: "c@c.com", name: "C", token: "t2" },
+      session: { userId: "u2", identifier: "c@c.com", identifierProperty: "email", display: "C", token: "t2" },
     };
 
     const { Wrapper, getSetSession } = wrapper(signedOut);
@@ -115,7 +118,7 @@ describe("NextgenProvider input shapes", () => {
   it("passes an already client-safe result through unchanged", () => {
     const clientResult: ClientAuthResult = {
       isAuthenticated: true,
-      session: { userId: "u3", email: null, name: null },
+      session: { userId: "u3", identifier: null, identifierProperty: null, display: null },
     };
     const { result } = renderWith(clientResult);
     expect(result.current).toEqual(clientResult);
@@ -124,14 +127,15 @@ describe("NextgenProvider input shapes", () => {
   it("wraps and strips a bare session object", () => {
     const bare: NextgenSession = {
       userId: "u4",
-      email: "d@d.com",
-      name: "D",
+      identifier: "d@d.com",
+      identifierProperty: "email",
+      display: "D",
       token: "server-token",
     };
     const { result } = renderWith(bare);
     expect(result.current).toEqual({
       isAuthenticated: true,
-      session: { userId: "u4", email: "d@d.com", name: "D" },
+      session: { userId: "u4", identifier: "d@d.com", identifierProperty: "email", display: "D" },
     });
   });
 });
@@ -140,7 +144,7 @@ describe("AuthContextProvider (client-side seeding)", () => {
   it("feeds a client-safe value straight to useAuth()", () => {
     const seeded: ClientAuthResult = {
       isAuthenticated: true,
-      session: { userId: "u5", email: "e@e.com", name: null },
+      session: { userId: "u5", identifier: "e@e.com", identifierProperty: "email", display: null },
     };
     const { result } = renderHook(() => useAuth(), {
       wrapper: ({ children }: { children: ReactNode }) => (

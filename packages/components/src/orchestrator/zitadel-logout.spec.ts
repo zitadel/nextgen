@@ -18,7 +18,7 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
 const API_BASE = "https://logout.test.invalid";
 const requestLog: { url: string; method: string; credentials: string }[] = [];
 
-function sessionBody(name: string, email: string, userId: string) {
+function sessionBody(display: string, identifier: string, userId: string) {
   const body: Record<string, unknown> = {
     session_id: "sess_test",
     project_id: "test",
@@ -29,8 +29,13 @@ function sessionBody(name: string, email: string, userId: string) {
     created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 3_600_000).toISOString(),
   };
-  if (name) body.name = name;
-  if (email) body.email = email;
+  const user: Record<string, string> = { user_id: userId };
+  if (display) user.display = display;
+  if (identifier) {
+    user.identifier = identifier;
+    user.identifier_property = "email";
+  }
+  body.user = user;
   return body;
 }
 
@@ -168,7 +173,7 @@ describe("<zitadel-logout>", () => {
     const element = mount(`
       <zitadel-logout>
         <template>
-          <button data-action="logout">Sign out {{name}} ({{email}}) [{{initial}}]</button>
+          <button data-action="logout">Sign out {{display}} ({{identifier}}) [{{initial}}]</button>
         </template>
       </zitadel-logout>
     `);
@@ -230,8 +235,8 @@ describe("<zitadel-logout>", () => {
     expect(requestLog[0]?.credentials).toBe("include");
     expect(signoutEvents).toHaveLength(1);
     expect(signoutEvents[0]?.detail).toEqual({
-      name: "Alice Liddell",
-      email: "alice@acme.com",
+      display: "Alice Liddell",
+      identifier: "alice@acme.com",
     });
   });
 

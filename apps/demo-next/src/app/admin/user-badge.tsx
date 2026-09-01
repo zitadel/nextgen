@@ -24,7 +24,7 @@ export function UserBadge() {
         color: "#374151",
       }}
     >
-      {auth.session.email ?? auth.session.name ?? auth.session.userId}
+      {auth.session.display ?? auth.session.identifier ?? auth.session.userId}
     </span>
   );
 }

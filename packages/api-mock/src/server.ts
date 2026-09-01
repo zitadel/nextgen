@@ -69,9 +69,8 @@ const consumedHandoffJtis = new Set<string>();
 /**
  * In-memory session store. Maps opaque session tokens to session data.
  * Mimics the Go server's encrypted opaque tokens without actual encryption.
- * We extend the API type with an `email` field for client lookups.
  */
-type StoredSession = GetMySession200 & { email?: string | null };
+type StoredSession = GetMySession200;
 const sessionStore = new Map<string, StoredSession>();
 
 /**
@@ -237,8 +236,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
       const userId = `user_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
 
       // Store the session data for GET /sessions/me lookups.
-      // The `email` field is kept alongside the spec-typed fields for
-      // client display purposes (same as the Go server's response).
+      // The `user` ref mirrors the Go server's identity hydration: the mock
+      // signs in by email, so the ref's identifier is the email claim and —
+      // like the shipped default schema, which designates no x-display —
+      // there is no display value.
       // A handoff is issued only after a login completes, so the exchanged
       // session carries a verified factor. The contract now defines `active`
       // as "has at least one verified authentication factor", so an empty
@@ -253,7 +254,11 @@ export function createMockApp(options: { issuer: string }): express.Express {
         assurance_levels: [],
         created_at: createdAt.toISOString(),
         expires_at: expiresAt.toISOString(),
-        email: claims.sub,
+        user: {
+          user_id: userId,
+          identifier: claims.sub,
+          identifier_property: "email",
+        },
       };
       sessionStore.set(opaqueToken, sessionData);
 

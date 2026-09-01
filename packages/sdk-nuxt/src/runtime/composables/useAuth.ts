@@ -19,7 +19,7 @@ import type { ClientAuthResult } from "../types";
  * </script>
  *
  * <template>
- *   <p>{{ auth.isAuthenticated ? auth.session.email : 'Not signed in' }}</p>
+ *   <p>{{ auth.isAuthenticated ? (auth.session.display ?? auth.session.identifier) : 'Not signed in' }}</p>
  * </template>
  * ```
  *
