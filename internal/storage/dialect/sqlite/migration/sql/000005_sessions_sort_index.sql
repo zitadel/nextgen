@@ -3,6 +3,10 @@
 -- Both session indexes are needed: the sort index alone regresses a selective
 -- team filter (ADR 060), because the walk in created_at order has to cross most
 -- of the table before it finds a page worth of matching rows.
+--
+-- SQLite has no CONCURRENTLY: the whole database is locked for the build. That
+-- is the local / small-deployment default, where the table is small enough for
+-- it not to matter.
 
 -- +goose StatementBegin
 -- Serves the default ORDER BY created_at DESC, id DESC and its ASC form: a
