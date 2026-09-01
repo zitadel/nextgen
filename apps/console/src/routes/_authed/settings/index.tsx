@@ -1,7 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Settings } from "lucide-react";
-
-import { ComingSoon } from "../../../components/coming-soon";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 /**
  * Account settings — where the sidebar's account dropdown lands, and the route
@@ -11,29 +8,13 @@ import { ComingSoon } from "../../../components/coming-soon";
  * from the account dropdown, not from the primary sidebar list, so the route is
  * addressable without being advertised as a nav row (Console ADR 0001).
  *
- * The screen is a stub, because nothing the designed Settings view holds is
- * buildable yet:
- *
- *   - `PERSONAL / Profile` needs a call that updates a user. There is no
- *     `PATCH /users/{user_id}`, and neither the SDK nor the console exposes an
- *     update call of any kind (#693).
- *   - `WORKSPACE / Teams` and `Members` need a team reference on the user read
- *     responses. `POST /teams/query` lists teams, but nothing on a user says
- *     which ones they belong to (#735).
- *
- * Those rows arrive with the screens behind them. Until then the Settings view
- * is the header and the back row, and this page says why.
+ * There is no settings landing page to render — the frames always show a
+ * screen selected — so `/settings` forwards to the first settings screen. The
+ * grouped settings nav itself hangs off the screens' own routes
+ * (`nav.section`, see `profile.tsx`).
  */
 export const Route = createFileRoute("/_authed/settings/")({
-  component: SettingsPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/profile" });
+  },
 });
-
-function SettingsPage() {
-  return (
-    <ComingSoon
-      title="Settings"
-      description="Account settings need a call that updates a user, and a team reference on the user read responses. Neither exists yet."
-      icon={Settings}
-    />
-  );
-}

@@ -1,7 +1,7 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 
-import { DESIGN_ONLY_NAV, type NavMeta } from "../../nav";
+import { DESIGN_ONLY_NAV, type NavMeta, SETTINGS_GROUPS } from "../../nav";
 
 export interface NavItem {
   /** Route path, or `undefined` for design-only entries that are not built yet. */
@@ -20,11 +20,38 @@ export interface SubNavItem extends NavItem {
   to: string;
 }
 
+/** One Settings-view group with at least one built screen under it. */
+export interface SettingsNavGroup {
+  section: string;
+  /** Rendered group heading (`Account`, `Workspace`). */
+  label: string;
+  items: SubNavItem[];
+}
+
+/** Every route carrying a `staticData.nav` entry (Console ADR 0001). */
+function routedNavItems(routes: AnyRoute[]): NavItem[] {
+  return routes
+    .map((route): NavItem | undefined => {
+      const nav = route.options.staticData?.nav;
+      if (!nav) return undefined;
+      const fullPath = route.fullPath;
+      const to = fullPath === "/" ? "/" : fullPath.replace(/\/$/, "");
+      return { to, nav, children: [] };
+    })
+    .filter((item): item is NavItem => item !== undefined);
+}
+
+const byOrder = (a: NavItem, b: NavItem) => a.nav.order - b.nav.order;
+
 /**
- * Builds the sidebar list: built routes come from `staticData.nav` on the route
- * tree (Console ADR 0001), merged with the design-only entries that appear in
- * the Figma mock but have no route yet. Each level is sorted by `nav.order` so
- * the sidebar matches the design regardless of route registration order.
+ * Builds the Portal sidebar list: built routes come from `staticData.nav` on
+ * the route tree (Console ADR 0001), merged with the design-only entries that
+ * appear in the Figma mock but have no route yet. Each level is sorted by
+ * `nav.order` so the sidebar matches the design regardless of route
+ * registration order.
+ *
+ * Entries carrying `nav.section` belong to the Settings view and are excluded
+ * here — {@link useSettingsNavItems} is their list.
  *
  * Entries carrying `nav.parent` are nested one level beneath the entry with
  * that path — `User schemas` under `Users` in the `Schema directory` frame. A
@@ -35,15 +62,9 @@ export interface SubNavItem extends NavItem {
 export function useNavItems(): NavItem[] {
   const router = useRouter();
 
-  const routed = (Object.values(router.routesById) as AnyRoute[])
-    .map((route): NavItem | undefined => {
-      const nav = route.options.staticData?.nav;
-      if (!nav) return undefined;
-      const fullPath = route.fullPath;
-      const to = fullPath === "/" ? "/" : fullPath.replace(/\/$/, "");
-      return { to, nav, children: [] };
-    })
-    .filter((item): item is NavItem => item !== undefined);
+  const routed = routedNavItems(Object.values(router.routesById) as AnyRoute[]).filter(
+    (item) => !item.nav.section,
+  );
 
   const designOnly: NavItem[] = DESIGN_ONLY_NAV.map((nav) => ({
     to: undefined,
@@ -64,7 +85,28 @@ export function useNavItems(): NavItem[] {
     else top.push(item);
   }
 
-  const byOrder = (a: NavItem, b: NavItem) => a.nav.order - b.nav.order;
   for (const item of top) item.children.sort(byOrder);
   return top.sort(byOrder);
+}
+
+/**
+ * Builds the Settings sidebar: routed entries carrying `nav.section`, grouped
+ * under `SETTINGS_GROUPS` in design order (`ACCOUNT`, `WORKSPACE` — Figma
+ * `1568:97804`) and sorted by `nav.order` within a group. Groups with nothing
+ * under them are dropped rather than rendered as empty headings, and there are
+ * no design-only entries here — the Settings view lists only screens that work,
+ * for the same reason the portal list does.
+ */
+export function useSettingsNavItems(): SettingsNavGroup[] {
+  const router = useRouter();
+
+  const routed = routedNavItems(Object.values(router.routesById) as AnyRoute[]).filter(
+    (item): item is SubNavItem => !!item.nav.section && !!item.to,
+  );
+
+  return SETTINGS_GROUPS.map(({ section, label }) => ({
+    section,
+    label,
+    items: routed.filter((item) => item.nav.section === section).sort(byOrder),
+  })).filter((group) => group.items.length > 0);
 }
