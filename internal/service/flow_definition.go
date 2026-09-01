@@ -355,7 +355,7 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 	opts := &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
 		Pagination: database.Page[domain.FlowDefinitionField]{
-			Limit:  uint32(req.Limit),
+			Limit:  uint32(normalizeLimit(req.Limit)),
 			Cursor: cursor,
 		},
 	}
