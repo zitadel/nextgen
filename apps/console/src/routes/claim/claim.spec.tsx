@@ -165,13 +165,42 @@ describe("claim page", () => {
     expect(screen.getByText(/terminal/i)).toBeInTheDocument();
   });
 
-  it("explains a 403 — the session user has no personal team", async () => {
+  it("offers a retry on claim.no_personal_team — the contract says it self-clears", async () => {
+    // `claim.no_personal_team` means no membership at all, and the 403's own
+    // contract text says the next sign-in provisions one. Dead-ending here
+    // would tell a developer to give up on the recoverable case.
     fetchSession.mockResolvedValue(makeTestSession());
     stubComplete(() =>
       HttpResponse.json(
         {
-          code: "claim-no_personal_team",
+          code: "claim.no_personal_team",
           message: "The session user has no active personal team in the platform project.",
+        },
+        { status: 403 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "Your account has no team yet" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("The session user has no active personal team in the platform project."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("dead-ends claim.personal_team_not_active and names the remedy", async () => {
+    // The mirror case: the membership exists but is not active, which
+    // provisioning will not fix. `membership_status` decides the copy —
+    // `removed` is about the user's access, not the team's.
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "claim.personal_team_not_active",
+          message: "The user's personal team in the platform project is not active.",
+          details: { membership_status: "removed" },
         },
         { status: 403 },
       ),
@@ -181,9 +210,26 @@ describe("claim page", () => {
     expect(
       await screen.findByRole("heading", { name: "This account cannot claim projects" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("The session user has no active personal team in the platform project."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Restoring this account's access/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  });
+
+  it("drops a dashboard link that is not http(s)", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "proj-already_claimed",
+          message: "The project is already claimed by a team.",
+          details: { team_id: "team_other", dashboard_url: "javascript:alert(1)" },
+        },
+        { status: 409 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByRole("heading", { name: "Already claimed" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /dashboard/i })).not.toBeInTheDocument();
   });
 
   it("dead-ends a 401 instead of re-running sign-in", async () => {

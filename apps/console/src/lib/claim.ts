@@ -15,8 +15,20 @@ export type ClaimOutcome =
   | { kind: "already_claimed"; message: string; teamId?: string; dashboardUrl?: string }
   /** 410 — the challenge aged out; only `claim/init` (the CLI) can mint a new one. */
   | { kind: "expired"; message: string }
-  /** 403 — the session user has no active personal team to attach the project to. */
+  /**
+   * 403 `claim.no_personal_team` — no membership at all. The contract is
+   * explicit that this one clears itself: the next sign-in provisions the team
+   * (the exchange-time ensure), so the page may honestly offer a retry.
+   */
   | { kind: "no_personal_team"; message: string }
+  /**
+   * 403 `claim.personal_team_not_active` — the membership exists but is not
+   * active, and the contract is equally explicit that provisioning will *not*
+   * clear it. `membershipStatus` (`removed` | `inactive` | `pending`) is the
+   * only thing that says who has to do what; it rides an otherwise untyped
+   * details object, so it is read defensively and may be absent.
+   */
+  | { kind: "personal_team_not_active"; message: string; membershipStatus?: string }
   /** 400/404 — the challenge id is malformed or unknown. */
   | { kind: "invalid_challenge"; message: string }
   /**
@@ -62,7 +74,7 @@ export async function completeProjectClaim(
         case 401:
           return { kind: "unauthenticated" };
         case 403:
-          return { kind: "no_personal_team", message };
+          return personalTeamOutcome(message, cause.body);
         case 400:
         case 404:
           return { kind: "invalid_challenge", message };
@@ -92,4 +104,37 @@ function alreadyClaimedDetails(body: unknown): { teamId?: string; dashboardUrl?:
     teamId: typeof record.team_id === "string" ? record.team_id : undefined,
     dashboardUrl: typeof record.dashboard_url === "string" ? record.dashboard_url : undefined,
   };
+}
+
+/**
+ * Splits the 403's two codes (`completeClaim` declares them as a `oneOf`).
+ * They differ in the only thing the developer cares about: whether signing in
+ * again fixes it.
+ *
+ * An unrecognised code degrades to the recoverable branch rather than the dead
+ * end — the server never said this account is permanently stuck, and offering a
+ * retry that fails is kinder than refusing one that would have worked.
+ */
+function personalTeamOutcome(message: string, body: unknown): ClaimOutcome {
+  const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  if (record.code === "claim.personal_team_not_active") {
+    return {
+      kind: "personal_team_not_active",
+      message,
+      membershipStatus: membershipStatus(record),
+    };
+  }
+  return { kind: "no_personal_team", message };
+}
+
+/**
+ * `details.membership_status` from the not-active 403. The details object is
+ * documented but untyped, so read it the same way `alreadyClaimedDetails` reads
+ * its block: a missing value costs the remedy sentence, not the screen.
+ */
+function membershipStatus(body: Record<string, unknown>): string | undefined {
+  const details = body.details;
+  if (!details || typeof details !== "object") return undefined;
+  const value = (details as Record<string, unknown>).membership_status;
+  return typeof value === "string" ? value : undefined;
 }

@@ -80,7 +80,17 @@ function ClaimScreen() {
 
   return (
     <ClaimShell>
-      <CompleteClaim projectId={project_id} challengeId={challenge_id} />
+      {/*
+        Keyed: CompleteClaim gates its single-use spend behind a ref, so a
+        client-side navigation to a *different* claim URL would otherwise reuse
+        the spent-once state and show the previous outcome. The key remounts it
+        instead, which resets the gate without weakening it.
+      */}
+      <CompleteClaim
+        key={`${project_id}:${challenge_id}`}
+        projectId={project_id}
+        challengeId={challenge_id}
+      />
     </ClaimShell>
   );
 }
@@ -192,17 +202,19 @@ function CompleteClaim({ projectId, challengeId }: { projectId: string; challeng
           </Button>
         </StateCard>
       );
-    case "already_claimed":
+    case "already_claimed": {
+      const dashboardUrl = safeHttpUrl(outcome.dashboardUrl);
       return (
         <StateCard title="Already claimed">
           <p className={BODY_TEXT}>{outcome.message}</p>
-          {outcome.dashboardUrl && (
+          {dashboardUrl && (
             <Button asChild variant="outline" className="mx-auto w-fit">
-              <a href={outcome.dashboardUrl}>Open the owning team&rsquo;s dashboard</a>
+              <a href={dashboardUrl}>Open the owning team&rsquo;s dashboard</a>
             </Button>
           )}
         </StateCard>
       );
+    }
     case "expired":
       return (
         <StateCard title="Claim link expired">
@@ -213,9 +225,27 @@ function CompleteClaim({ projectId, challengeId }: { projectId: string; challeng
         </StateCard>
       );
     case "no_personal_team":
+      // The contract states this code clears itself: the next sign-in
+      // provisions the team. A retry is therefore honest here — unlike the
+      // not-active case below, where retrying can only fail again.
+      return (
+        <StateCard title="Your account has no team yet">
+          <p className={BODY_TEXT}>{outcome.message}</p>
+          <p className={BODY_TEXT}>
+            Signing in again normally provisions one. Retry, or reopen the link from your terminal.
+          </p>
+          <Button onClick={run} variant="outline" className="mx-auto w-fit">
+            Try again
+          </Button>
+        </StateCard>
+      );
+    case "personal_team_not_active":
+      // Deliberately no retry: the membership exists and is not active, and
+      // the contract says provisioning will not change that. Only a person can.
       return (
         <StateCard title="This account cannot claim projects">
           <p className={BODY_TEXT}>{outcome.message}</p>
+          <p className={BODY_TEXT}>{membershipRemedy(outcome.membershipStatus)}</p>
         </StateCard>
       );
     case "invalid_challenge":
@@ -253,5 +283,40 @@ function CompleteClaim({ projectId, challengeId }: { projectId: string; challeng
           </Button>
         </StateCard>
       );
+  }
+}
+
+/**
+ * Renders only http(s). The value comes from an error body — our own API,
+ * declared `format: uri` — so this is defence in depth, but React will happily
+ * render a `javascript:` href, and the sibling field is already read
+ * defensively. A rejected URL costs the button, not the screen.
+ */
+function safeHttpUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * What actually unblocks each membership state, from the 403's contract text.
+ * `removed` is the counter-intuitive one: deactivating a *user* cascades to
+ * their memberships without touching the team, so the fix is the account's
+ * access rather than the team's.
+ */
+function membershipRemedy(status: string | undefined): string {
+  switch (status) {
+    case "removed":
+      return "The membership was withdrawn. Restoring this account's access is what unblocks the claim — the team itself may well still be active.";
+    case "inactive":
+      return "The membership is suspended. An administrator has to reactivate it before this account can claim a project.";
+    case "pending":
+      return "There is an invitation waiting to be accepted. Accept it, then reopen the claim link.";
+    default:
+      return "Ask an administrator to restore this account's team membership, then reopen the claim link.";
   }
 }
