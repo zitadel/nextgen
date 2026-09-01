@@ -163,6 +163,10 @@ func (f *fakeProjectService) Create(context.Context, string, []string, bool) (*d
 	panic("unused")
 }
 
+func (f *fakeProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+	panic("unused")
+}
+
 func (f *fakeProjectService) Get(context.Context, string) (*domain.Project, error) {
 	panic("unused")
 }

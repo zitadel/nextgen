@@ -4,19 +4,21 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
-        - $ref: '../../components/schemas/errors/internal.yaml'
-        - $ref: '../../components/schemas/errors/req-invalid.yaml'
-        - $ref: '../../components/schemas/errors/user-not_found.yaml'
-        - $ref: '../../components/schemas/errors/user-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/user-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/user-permission_denied.yaml'
       discriminator:
         propertyName: code
         mapping:
-          auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
-          internal: '../../components/schemas/errors/internal.yaml'
-          req.invalid: '../../components/schemas/errors/req-invalid.yaml'
-          user.not_found: '../../components/schemas/errors/user-not_found.yaml'
-          user.permission_denied: '../../components/schemas/errors/user-permission_denied.yaml'
+          auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
+          internal: '../../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
+          user.permission_denied: '../../../components/schemas/errors/user-permission_denied.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -28,6 +30,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       req.invalid:
         summary: req.invalid
         value:

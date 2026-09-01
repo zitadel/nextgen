@@ -64,6 +64,34 @@ func ErrClaimNoPersonalTeam() Error {
 	return newError(PrefixClaim.ErrorCodePrefix("no_personal_team"), "The user has no active personal team in the platform project.", nil, nil)
 }
 
+// ErrPersonalTeamNotActive covers a platform user whose personal team exists
+// but is not active: the membership was flipped, or the team was deactivated
+// and cascaded the membership to removed.
+//
+// Deliberately distinct from ErrClaimNoPersonalTeam. "You hold no membership"
+// is provisioned automatically on the next sign-in, while a membership that is
+// not active will not be provisioned around, so a UI has to say different
+// things about them.
+//
+// What clears it depends on the status, which is why Details carries it rather
+// than the message summarising one cause: `removed` follows a team or user
+// deactivation and needs an administrator, while `pending` is an invitation
+// the user can still accept.
+func ErrPersonalTeamNotActive(status string) Error {
+	return newError(
+		PrefixClaim.ErrorCodePrefix("personal_team_not_active"),
+		"The user's personal team in the platform project is not active.",
+		PersonalTeamNotActiveDetails{MembershipStatus: status},
+		nil,
+	)
+}
+
+// PersonalTeamNotActiveDetails names the membership state that blocked the
+// personal-team resolution.
+type PersonalTeamNotActiveDetails struct {
+	MembershipStatus string `json:"membership_status"`
+}
+
 // The claim session sentinels are internal diagnostics for the claim/complete
 // session precondition (ADR 046 §2). On the wire they are always wrapped in
 // auth.unauthorized (401): the caller learns only that the session credential

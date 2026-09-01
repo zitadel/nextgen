@@ -41,7 +41,7 @@ export const Route = createFileRoute("/_authed/users/")({
   // Order 3: Teams sits at 2.
   staticData: { nav: { label: "Users", order: 3, icon: User } },
   loader: async () => {
-    const page = await api.listUsers({ limit: PAGE_SIZE });
+    const page = await api.queryUsers({ limit: PAGE_SIZE });
     return {
       users: page.users,
       nextPageToken: page.next_page_token ?? undefined,
@@ -52,7 +52,7 @@ export const Route = createFileRoute("/_authed/users/")({
 });
 
 /**
- * One page of users. `GET /users` is cursor-paginated, so the size is a page
+ * One page of users. `POST /users/query` is cursor-paginated, so the size is a page
  * size rather than a cap on what the operator can reach — `Load more` walks the
  * rest (design decisions log D5: a button, not pagination controls).
  */
@@ -165,7 +165,7 @@ function UsersScreen() {
     const generation = loaded;
     setLoadingMore(true);
     try {
-      const page = await api.listUsers({ limit: PAGE_SIZE, page_token: nextPageToken });
+      const page = await api.queryUsers({ limit: PAGE_SIZE, page_token: nextPageToken });
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
       const nextColumns = await columnsForUsers([...users, ...page.users]);
@@ -202,9 +202,10 @@ function UsersScreen() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Search narrows the rows already fetched. `GET /users` takes no filter (ADR
-  // 031's query endpoint does not exist), so this cannot reach users outside the
-  // loaded page — which is why the table says so beneath it.
+  // Search narrows the rows already fetched. `POST /users/query` does accept
+  // server-side filters, but not a free-text one across schema-driven
+  // attributes, so this cannot reach users outside the loaded page — which is
+  // why the table says so beneath it.
   //
   // It matches every rendered column rather than a fixed name/email/id triple:
   // the columns are schema-driven, so a hardcoded set would silently fail to
