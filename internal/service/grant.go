@@ -16,13 +16,18 @@ var allowedGrantRelations = map[string]struct{}{
 	"admin":  {},
 }
 
-// isManagedGrant is the class this HTTP API may Get or Revoke. Create already
-// allowlists the same principal types and relations. Other authz_assignments
-// rows (project-secret setup, owning-team / claim) live in the same table and
-// must 404 here so a project secret cannot self-lockout or transfer ownership.
+// isManagedGrant is the class this HTTP API may Get or Revoke: principal type
+// user or team, object_type project, and relation in {viewer, editor, admin}.
+// Create already writes that triple. Other authz_assignments rows (project-secret
+// setup, owning-team / claim, and future non-project catalog bindings) live in
+// the same table and must 404 here so a project secret cannot self-lockout,
+// transfer ownership, or revoke an assignment this API would mislabel as project.
 func isManagedGrant(a *domain.AuthzAssignment) bool {
 	switch a.PrincipalType {
 	case domain.AuthzPrincipalTypeUser, domain.AuthzPrincipalTypeTeam:
+		if a.ObjectType != "project" {
+			return false
+		}
 		_, ok := allowedGrantRelations[a.Relation]
 		return ok
 	default:

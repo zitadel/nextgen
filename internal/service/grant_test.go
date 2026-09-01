@@ -275,6 +275,23 @@ func TestGrantService_Get(t *testing.T) {
 		assert.Equal(t, "asgn_exp", got.ID)
 		require.NotNil(t, got.ExpiresAt)
 	})
+
+	t.Run("non-project object type is not found", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_user").Return(&domain.AuthzAssignment{
+				ID:            "asgn_user",
+				ProjectID:     "proj_customer",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   "user_grant01",
+				ObjectType:    "user",
+				Relation:      "viewer",
+			}, nil)
+		})
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_user")
+		require.ErrorIs(t, err, domain.ErrGrantNotFound())
+		assert.Nil(t, got)
+	})
 }
 
 func TestGrantService_Revoke(t *testing.T) {
@@ -289,6 +306,7 @@ func TestGrantService_Revoke(t *testing.T) {
 				ProjectID:     "proj_customer",
 				PrincipalType: domain.AuthzPrincipalTypeUser,
 				PrincipalID:   "user_grant01",
+				ObjectType:    "project",
 				Relation:      "viewer",
 			}, nil)
 			s.EXPECT().RevokeAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(nil)
@@ -331,6 +349,21 @@ func TestGrantService_Revoke(t *testing.T) {
 				domain.NewClaimTeamAssignment("proj_customer", "team_owner"), nil)
 		})
 		require.ErrorIs(t, svc.Revoke(t.Context(), "proj_customer", "asgn_own"), domain.ErrGrantNotFound())
+	})
+
+	t.Run("non-project object type is not found", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_user").Return(&domain.AuthzAssignment{
+				ID:            "asgn_user",
+				ProjectID:     "proj_customer",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   "user_grant01",
+				ObjectType:    "user",
+				Relation:      "viewer",
+			}, nil)
+		})
+		require.ErrorIs(t, svc.Revoke(t.Context(), "proj_customer", "asgn_user"), domain.ErrGrantNotFound())
 	})
 }
 
