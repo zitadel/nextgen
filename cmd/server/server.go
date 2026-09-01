@@ -123,14 +123,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
-	if err := platform.Ensure(ctx, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
-		return fmt.Errorf("failed to bootstrap platform project: %w", err)
-	}
-
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
 	if err != nil {
@@ -175,6 +167,21 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		schemaValidator,
 		keyService,
 	)
+
+	// Bootstrap runs here rather than straight after the migrations because it
+	// now seeds a usable project (keys, user schema, login flows) and so needs
+	// the project service, which needs the key service. It must still precede
+	// the user import: that import creates a bare, unseeded project row for any
+	// project id a bootstrap user names, and a project row that already exists
+	// would make this a no-op and leave the platform project unseeded.
+	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
+		return fmt.Errorf("failed to bootstrap platform project: %w", err)
+	}
+
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
+
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
@@ -197,6 +204,18 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		serviceDBPool,
 		schemaStore,
 		passwordHasher,
+	)
+
+	// The platform project's registration side effect (#527): every flow-created
+	// user on the platform project gets their personal team — the team
+	// claim/complete attaches projects to — ensured idempotently. Gated on the
+	// explicit bootstrap opt-in, never the standalone pin: a pinned deployment's
+	// end-user registrations must not silently mint teams (#605, #736). Note the
+	// deliberate asymmetry with claimService above, which resolves the pin —
+	// a pinned deployment can attempt claims but is never auto-provisioned.
+	personalTeams := service.NewPersonalTeamService(
+		serviceDBPool,
+		cfg.Platform.ProvisioningProjectID(),
 	)
 
 	// ── Flow engine ──────────────────
@@ -277,7 +296,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		),
+		).WithPersonalTeamEnsurer(personalTeams),
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),

@@ -8,11 +8,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
 
-// `status` probes GET /users on configured projects to stage its guidance.
+// `status` probes POST /users/query on configured projects to stage its guidance.
 // Answer with a network error instead of letting the probe hit real DNS for
 // the fixtures' fictional hosts — the probe degrades to "unknown" (today's
 // lifecycle-only output) without depending on resolver timing.
-const server = setupServer(http.get("*/users", () => HttpResponse.error()));
+const server = setupServer(http.post("*/users/query", () => HttpResponse.error()));
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterAll(() => server.close());

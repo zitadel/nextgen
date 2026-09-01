@@ -6890,12 +6890,63 @@ func (s *ClaimNoPersonalTeam) SetDetails(val OptClaimNoPersonalTeamDetails) {
 	s.Details = val
 }
 
-func (*ClaimNoPersonalTeam) completeClaimRes() {}
-
 // Additional error-specific context.
 type ClaimNoPersonalTeamDetails map[string]jx.Raw
 
 func (s *ClaimNoPersonalTeamDetails) init() ClaimNoPersonalTeamDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ClaimPersonalTeamNotActive struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimPersonalTeamNotActiveDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimPersonalTeamNotActive) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimPersonalTeamNotActive) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimPersonalTeamNotActive) GetDetails() OptClaimPersonalTeamNotActiveDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimPersonalTeamNotActive) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimPersonalTeamNotActive) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimPersonalTeamNotActive) SetDetails(val OptClaimPersonalTeamNotActiveDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ClaimPersonalTeamNotActiveDetails map[string]jx.Raw
+
+func (s *ClaimPersonalTeamNotActiveDetails) init() ClaimPersonalTeamNotActiveDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -7124,6 +7175,76 @@ func (*ClaimStatusResponse) getClaimStatusRes() {}
 type CompleteClaimBadRequest ErrorDetails
 
 func (*CompleteClaimBadRequest) completeClaimRes() {}
+
+// CompleteClaimForbidden represents sum type.
+type CompleteClaimForbidden struct {
+	Type                       CompleteClaimForbiddenType // switch on this field
+	ClaimNoPersonalTeam        ClaimNoPersonalTeam
+	ClaimPersonalTeamNotActive ClaimPersonalTeamNotActive
+}
+
+// CompleteClaimForbiddenType is oneOf type of CompleteClaimForbidden.
+type CompleteClaimForbiddenType string
+
+// Possible values for CompleteClaimForbiddenType.
+const (
+	ClaimNoPersonalTeamCompleteClaimForbidden        CompleteClaimForbiddenType = "claim.no_personal_team"
+	ClaimPersonalTeamNotActiveCompleteClaimForbidden CompleteClaimForbiddenType = "claim.personal_team_not_active"
+)
+
+// IsClaimNoPersonalTeam reports whether CompleteClaimForbidden is ClaimNoPersonalTeam.
+func (s CompleteClaimForbidden) IsClaimNoPersonalTeam() bool {
+	return s.Type == ClaimNoPersonalTeamCompleteClaimForbidden
+}
+
+// IsClaimPersonalTeamNotActive reports whether CompleteClaimForbidden is ClaimPersonalTeamNotActive.
+func (s CompleteClaimForbidden) IsClaimPersonalTeamNotActive() bool {
+	return s.Type == ClaimPersonalTeamNotActiveCompleteClaimForbidden
+}
+
+// SetClaimNoPersonalTeam sets CompleteClaimForbidden to ClaimNoPersonalTeam.
+func (s *CompleteClaimForbidden) SetClaimNoPersonalTeam(v ClaimNoPersonalTeam) {
+	s.Type = ClaimNoPersonalTeamCompleteClaimForbidden
+	s.ClaimNoPersonalTeam = v
+}
+
+// GetClaimNoPersonalTeam returns ClaimNoPersonalTeam and true boolean if CompleteClaimForbidden is ClaimNoPersonalTeam.
+func (s CompleteClaimForbidden) GetClaimNoPersonalTeam() (v ClaimNoPersonalTeam, ok bool) {
+	if !s.IsClaimNoPersonalTeam() {
+		return v, false
+	}
+	return s.ClaimNoPersonalTeam, true
+}
+
+// NewClaimNoPersonalTeamCompleteClaimForbidden returns new CompleteClaimForbidden from ClaimNoPersonalTeam.
+func NewClaimNoPersonalTeamCompleteClaimForbidden(v ClaimNoPersonalTeam) CompleteClaimForbidden {
+	var s CompleteClaimForbidden
+	s.SetClaimNoPersonalTeam(v)
+	return s
+}
+
+// SetClaimPersonalTeamNotActive sets CompleteClaimForbidden to ClaimPersonalTeamNotActive.
+func (s *CompleteClaimForbidden) SetClaimPersonalTeamNotActive(v ClaimPersonalTeamNotActive) {
+	s.Type = ClaimPersonalTeamNotActiveCompleteClaimForbidden
+	s.ClaimPersonalTeamNotActive = v
+}
+
+// GetClaimPersonalTeamNotActive returns ClaimPersonalTeamNotActive and true boolean if CompleteClaimForbidden is ClaimPersonalTeamNotActive.
+func (s CompleteClaimForbidden) GetClaimPersonalTeamNotActive() (v ClaimPersonalTeamNotActive, ok bool) {
+	if !s.IsClaimPersonalTeamNotActive() {
+		return v, false
+	}
+	return s.ClaimPersonalTeamNotActive, true
+}
+
+// NewClaimPersonalTeamNotActiveCompleteClaimForbidden returns new CompleteClaimForbidden from ClaimPersonalTeamNotActive.
+func NewClaimPersonalTeamNotActiveCompleteClaimForbidden(v ClaimPersonalTeamNotActive) CompleteClaimForbidden {
+	var s CompleteClaimForbidden
+	s.SetClaimPersonalTeamNotActive(v)
+	return s
+}
+
+func (*CompleteClaimForbidden) completeClaimRes() {}
 
 type CompleteClaimNotFound ErrorDetails
 
@@ -14484,6 +14605,48 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
+// A related entity to embed on each returned flow definition.
+// - `user_schema`: the user schema the flow operates on, embedded as
+// `user_schema` on each entry: the same object `GET /schemas/{id}` returns.
+// The property is omitted entirely when not requested and `null` when the
+// referenced schema no longer resolves or the caller may not read it, so
+// "did not ask" stays distinguishable from "cannot resolve". Requesting it
+// requires read access to schemas.
+// Ref: #
+type FlowDefinitionExpand string
+
+const (
+	FlowDefinitionExpandUserSchema FlowDefinitionExpand = "user_schema"
+)
+
+// AllValues returns all FlowDefinitionExpand values.
+func (FlowDefinitionExpand) AllValues() []FlowDefinitionExpand {
+	return []FlowDefinitionExpand{
+		FlowDefinitionExpandUserSchema,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionExpandUserSchema:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionExpand) UnmarshalText(data []byte) error {
+	switch FlowDefinitionExpand(data) {
+	case FlowDefinitionExpandUserSchema:
+		*s = FlowDefinitionExpandUserSchema
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Ref: #
 type FlowDefinitionListResponse struct {
 	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
@@ -14535,8 +14698,13 @@ type FlowDefinitionResponse struct {
 	// Identifier of the project this flow definition belongs to.
 	ProjectID      string         `json:"project_id"`
 	FlowDefinition FlowDefinition `json:"flow_definition"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	// The user schema this flow operates on: the same object
+	// `GET /schemas/{id}` returns. Present only when the request asked for it
+	// with `expand=user_schema`; `null` when it was requested but the
+	// referenced schema no longer resolves or the caller may not read it.
+	UserSchema OptNilSchema `json:"user_schema"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -14552,6 +14720,11 @@ func (s *FlowDefinitionResponse) GetProjectID() string {
 // GetFlowDefinition returns the value of FlowDefinition.
 func (s *FlowDefinitionResponse) GetFlowDefinition() FlowDefinition {
 	return s.FlowDefinition
+}
+
+// GetUserSchema returns the value of UserSchema.
+func (s *FlowDefinitionResponse) GetUserSchema() OptNilSchema {
+	return s.UserSchema
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -14577,6 +14750,11 @@ func (s *FlowDefinitionResponse) SetProjectID(val string) {
 // SetFlowDefinition sets the value of FlowDefinition.
 func (s *FlowDefinitionResponse) SetFlowDefinition(val FlowDefinition) {
 	s.FlowDefinition = val
+}
+
+// SetUserSchema sets the value of UserSchema.
+func (s *FlowDefinitionResponse) SetUserSchema(val OptNilSchema) {
+	s.UserSchema = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -21199,6 +21377,8 @@ type ListFlowDefinitionsErrorResponse struct {
 	FlowdefNotFound         FlowdefNotFound
 	FlowdefPermissionDenied FlowdefPermissionDenied
 	Internal                Internal
+	SchNotFound             SchNotFound
+	SchPermissionDenied     SchPermissionDenied
 	FlowdefMissingProjectID FlowdefMissingProjectID
 	ReqInvalid              ReqInvalid
 }
@@ -21213,6 +21393,8 @@ const (
 	FlowdefNotFoundListFlowDefinitionsErrorResponse         ListFlowDefinitionsErrorResponseType = "flowdef.not_found"
 	FlowdefPermissionDeniedListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.permission_denied"
 	InternalListFlowDefinitionsErrorResponse                ListFlowDefinitionsErrorResponseType = "internal"
+	SchNotFoundListFlowDefinitionsErrorResponse             ListFlowDefinitionsErrorResponseType = "sch.not_found"
+	SchPermissionDeniedListFlowDefinitionsErrorResponse     ListFlowDefinitionsErrorResponseType = "sch.permission_denied"
 	FlowdefMissingProjectIDListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.missing_project_id"
 	ReqInvalidListFlowDefinitionsErrorResponse              ListFlowDefinitionsErrorResponseType = "req.invalid"
 )
@@ -21240,6 +21422,16 @@ func (s ListFlowDefinitionsErrorResponse) IsFlowdefPermissionDenied() bool {
 // IsInternal reports whether ListFlowDefinitionsErrorResponse is Internal.
 func (s ListFlowDefinitionsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListFlowDefinitionsErrorResponse
+}
+
+// IsSchNotFound reports whether ListFlowDefinitionsErrorResponse is SchNotFound.
+func (s ListFlowDefinitionsErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundListFlowDefinitionsErrorResponse
+}
+
+// IsSchPermissionDenied reports whether ListFlowDefinitionsErrorResponse is SchPermissionDenied.
+func (s ListFlowDefinitionsErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedListFlowDefinitionsErrorResponse
 }
 
 // IsFlowdefMissingProjectID reports whether ListFlowDefinitionsErrorResponse is FlowdefMissingProjectID.
@@ -21354,6 +21546,48 @@ func (s ListFlowDefinitionsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListFlowDefinitionsErrorResponse(v Internal) ListFlowDefinitionsErrorResponse {
 	var s ListFlowDefinitionsErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets ListFlowDefinitionsErrorResponse to SchNotFound.
+func (s *ListFlowDefinitionsErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundListFlowDefinitionsErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if ListFlowDefinitionsErrorResponse is SchNotFound.
+func (s ListFlowDefinitionsErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from SchNotFound.
+func NewSchNotFoundListFlowDefinitionsErrorResponse(v SchNotFound) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets ListFlowDefinitionsErrorResponse to SchPermissionDenied.
+func (s *ListFlowDefinitionsErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedListFlowDefinitionsErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if ListFlowDefinitionsErrorResponse is SchPermissionDenied.
+func (s ListFlowDefinitionsErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedListFlowDefinitionsErrorResponse(v SchPermissionDenied) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetSchPermissionDenied(v)
 	return s
 }
 
@@ -22102,223 +22336,6 @@ func (*ListUserTeamsResponse) listUserTeamsRes() {}
 type ListUserTeamsUnauthorized ErrorDetails
 
 func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
-
-type ListUsersBadRequest ErrorDetails
-
-func (*ListUsersBadRequest) listUsersRes() {}
-
-// ListUsersErrorResponse represents sum type.
-type ListUsersErrorResponse struct {
-	Type                 ListUsersErrorResponseType // switch on this field
-	AuthUnauthorized     AuthUnauthorized
-	Internal             Internal
-	ReqInvalid           ReqInvalid
-	UserNotFound         UserNotFound
-	UserPermissionDenied UserPermissionDenied
-}
-
-// ListUsersErrorResponseType is oneOf type of ListUsersErrorResponse.
-type ListUsersErrorResponseType string
-
-// Possible values for ListUsersErrorResponseType.
-const (
-	AuthUnauthorizedListUsersErrorResponse     ListUsersErrorResponseType = "auth.unauthorized"
-	InternalListUsersErrorResponse             ListUsersErrorResponseType = "internal"
-	ReqInvalidListUsersErrorResponse           ListUsersErrorResponseType = "req.invalid"
-	UserNotFoundListUsersErrorResponse         ListUsersErrorResponseType = "user.not_found"
-	UserPermissionDeniedListUsersErrorResponse ListUsersErrorResponseType = "user.permission_denied"
-)
-
-// IsAuthUnauthorized reports whether ListUsersErrorResponse is AuthUnauthorized.
-func (s ListUsersErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedListUsersErrorResponse
-}
-
-// IsInternal reports whether ListUsersErrorResponse is Internal.
-func (s ListUsersErrorResponse) IsInternal() bool { return s.Type == InternalListUsersErrorResponse }
-
-// IsReqInvalid reports whether ListUsersErrorResponse is ReqInvalid.
-func (s ListUsersErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidListUsersErrorResponse
-}
-
-// IsUserNotFound reports whether ListUsersErrorResponse is UserNotFound.
-func (s ListUsersErrorResponse) IsUserNotFound() bool {
-	return s.Type == UserNotFoundListUsersErrorResponse
-}
-
-// IsUserPermissionDenied reports whether ListUsersErrorResponse is UserPermissionDenied.
-func (s ListUsersErrorResponse) IsUserPermissionDenied() bool {
-	return s.Type == UserPermissionDeniedListUsersErrorResponse
-}
-
-// SetAuthUnauthorized sets ListUsersErrorResponse to AuthUnauthorized.
-func (s *ListUsersErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedListUsersErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListUsersErrorResponse is AuthUnauthorized.
-func (s ListUsersErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedListUsersErrorResponse returns new ListUsersErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedListUsersErrorResponse(v AuthUnauthorized) ListUsersErrorResponse {
-	var s ListUsersErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetInternal sets ListUsersErrorResponse to Internal.
-func (s *ListUsersErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalListUsersErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if ListUsersErrorResponse is Internal.
-func (s ListUsersErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalListUsersErrorResponse returns new ListUsersErrorResponse from Internal.
-func NewInternalListUsersErrorResponse(v Internal) ListUsersErrorResponse {
-	var s ListUsersErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetReqInvalid sets ListUsersErrorResponse to ReqInvalid.
-func (s *ListUsersErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidListUsersErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if ListUsersErrorResponse is ReqInvalid.
-func (s ListUsersErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidListUsersErrorResponse returns new ListUsersErrorResponse from ReqInvalid.
-func NewReqInvalidListUsersErrorResponse(v ReqInvalid) ListUsersErrorResponse {
-	var s ListUsersErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// SetUserNotFound sets ListUsersErrorResponse to UserNotFound.
-func (s *ListUsersErrorResponse) SetUserNotFound(v UserNotFound) {
-	s.Type = UserNotFoundListUsersErrorResponse
-	s.UserNotFound = v
-}
-
-// GetUserNotFound returns UserNotFound and true boolean if ListUsersErrorResponse is UserNotFound.
-func (s ListUsersErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
-	if !s.IsUserNotFound() {
-		return v, false
-	}
-	return s.UserNotFound, true
-}
-
-// NewUserNotFoundListUsersErrorResponse returns new ListUsersErrorResponse from UserNotFound.
-func NewUserNotFoundListUsersErrorResponse(v UserNotFound) ListUsersErrorResponse {
-	var s ListUsersErrorResponse
-	s.SetUserNotFound(v)
-	return s
-}
-
-// SetUserPermissionDenied sets ListUsersErrorResponse to UserPermissionDenied.
-func (s *ListUsersErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
-	s.Type = UserPermissionDeniedListUsersErrorResponse
-	s.UserPermissionDenied = v
-}
-
-// GetUserPermissionDenied returns UserPermissionDenied and true boolean if ListUsersErrorResponse is UserPermissionDenied.
-func (s ListUsersErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
-	if !s.IsUserPermissionDenied() {
-		return v, false
-	}
-	return s.UserPermissionDenied, true
-}
-
-// NewUserPermissionDeniedListUsersErrorResponse returns new ListUsersErrorResponse from UserPermissionDenied.
-func NewUserPermissionDeniedListUsersErrorResponse(v UserPermissionDenied) ListUsersErrorResponse {
-	var s ListUsersErrorResponse
-	s.SetUserPermissionDenied(v)
-	return s
-}
-
-// ListUsersErrorResponseStatusCode wraps ListUsersErrorResponse with StatusCode.
-type ListUsersErrorResponseStatusCode struct {
-	StatusCode int
-	Response   ListUsersErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ListUsersErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *ListUsersErrorResponseStatusCode) GetResponse() ListUsersErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ListUsersErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *ListUsersErrorResponseStatusCode) SetResponse(val ListUsersErrorResponse) {
-	s.Response = val
-}
-
-func (*ListUsersErrorResponseStatusCode) listUsersRes() {}
-
-type ListUsersInternalServerError ErrorDetails
-
-func (*ListUsersInternalServerError) listUsersRes() {}
-
-// Paginated list of users.
-// Ref: #
-type ListUsersResponse struct {
-	Users []User `json:"users"`
-	// Token to pass as `page_token` in the next request to fetch the following page.
-	// Absent when there are no more results.
-	NextPageToken OptNilPageToken `json:"next_page_token"`
-}
-
-// GetUsers returns the value of Users.
-func (s *ListUsersResponse) GetUsers() []User {
-	return s.Users
-}
-
-// GetNextPageToken returns the value of NextPageToken.
-func (s *ListUsersResponse) GetNextPageToken() OptNilPageToken {
-	return s.NextPageToken
-}
-
-// SetUsers sets the value of Users.
-func (s *ListUsersResponse) SetUsers(val []User) {
-	s.Users = val
-}
-
-// SetNextPageToken sets the value of NextPageToken.
-func (s *ListUsersResponse) SetNextPageToken(val OptNilPageToken) {
-	s.NextPageToken = val
-}
-
-func (*ListUsersResponse) listUsersRes() {}
 
 type NextgenSession struct {
 	APIKey string
@@ -23659,6 +23676,52 @@ func (o OptClaimNoPersonalTeamDetails) Get() (v ClaimNoPersonalTeamDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptClaimNoPersonalTeamDetails) Or(d ClaimNoPersonalTeamDetails) ClaimNoPersonalTeamDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimPersonalTeamNotActiveDetails returns new OptClaimPersonalTeamNotActiveDetails with value set to v.
+func NewOptClaimPersonalTeamNotActiveDetails(v ClaimPersonalTeamNotActiveDetails) OptClaimPersonalTeamNotActiveDetails {
+	return OptClaimPersonalTeamNotActiveDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimPersonalTeamNotActiveDetails is optional ClaimPersonalTeamNotActiveDetails.
+type OptClaimPersonalTeamNotActiveDetails struct {
+	Value ClaimPersonalTeamNotActiveDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimPersonalTeamNotActiveDetails was set.
+func (o OptClaimPersonalTeamNotActiveDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimPersonalTeamNotActiveDetails) Reset() {
+	var v ClaimPersonalTeamNotActiveDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimPersonalTeamNotActiveDetails) SetTo(v ClaimPersonalTeamNotActiveDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimPersonalTeamNotActiveDetails) Get() (v ClaimPersonalTeamNotActiveDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimPersonalTeamNotActiveDetails) Or(d ClaimPersonalTeamNotActiveDetails) ClaimPersonalTeamNotActiveDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -28087,6 +28150,69 @@ func (o OptNilRequestAPIEventActorType) Or(d RequestAPIEventActorType) RequestAP
 	return d
 }
 
+// NewOptNilSchema returns new OptNilSchema with value set to v.
+func NewOptNilSchema(v Schema) OptNilSchema {
+	return OptNilSchema{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilSchema is optional nullable Schema.
+type OptNilSchema struct {
+	Value Schema
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilSchema was set.
+func (o OptNilSchema) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilSchema) Reset() {
+	var v Schema
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilSchema) SetTo(v Schema) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilSchema) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilSchema) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v Schema
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilSchema) Get() (v Schema, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilSchema) Or(d Schema) Schema {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilSchemaCreatedEventActorType returns new OptNilSchemaCreatedEventActorType with value set to v.
 func NewOptNilSchemaCreatedEventActorType(v SchemaCreatedEventActorType) OptNilSchemaCreatedEventActorType {
 	return OptNilSchemaCreatedEventActorType{
@@ -28648,6 +28774,69 @@ func (o OptNilTeamDeactivatedEventActorType) Get() (v TeamDeactivatedEventActorT
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilTeamDeactivatedEventActorType) Or(d TeamDeactivatedEventActorType) TeamDeactivatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilTeamResponse returns new OptNilTeamResponse with value set to v.
+func NewOptNilTeamResponse(v TeamResponse) OptNilTeamResponse {
+	return OptNilTeamResponse{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilTeamResponse is optional nullable TeamResponse.
+type OptNilTeamResponse struct {
+	Value TeamResponse
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilTeamResponse was set.
+func (o OptNilTeamResponse) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilTeamResponse) Reset() {
+	var v TeamResponse
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilTeamResponse) SetTo(v TeamResponse) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilTeamResponse) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilTeamResponse) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v TeamResponse
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilTeamResponse) Get() (v TeamResponse, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilTeamResponse) Or(d TeamResponse) TeamResponse {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -29722,6 +29911,52 @@ func (o OptQueryTeamsRequestSorting) Or(d QueryTeamsRequestSorting) QueryTeamsRe
 	return d
 }
 
+// NewOptQueryUsersRequestSorting returns new OptQueryUsersRequestSorting with value set to v.
+func NewOptQueryUsersRequestSorting(v QueryUsersRequestSorting) OptQueryUsersRequestSorting {
+	return OptQueryUsersRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryUsersRequestSorting is optional QueryUsersRequestSorting.
+type OptQueryUsersRequestSorting struct {
+	Value QueryUsersRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryUsersRequestSorting was set.
+func (o OptQueryUsersRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryUsersRequestSorting) Reset() {
+	var v QueryUsersRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryUsersRequestSorting) SetTo(v QueryUsersRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryUsersRequestSorting) Get() (v QueryUsersRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryUsersRequestSorting) Or(d QueryUsersRequestSorting) QueryUsersRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptReqInvalidDetails returns new OptReqInvalidDetails with value set to v.
 func NewOptReqInvalidDetails(v ReqInvalidDetails) OptReqInvalidDetails {
 	return OptReqInvalidDetails{
@@ -29900,6 +30135,52 @@ func (o OptSchNotFoundDetails) Get() (v SchNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSchNotFoundDetails) Or(d SchNotFoundDetails) SchNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchPermissionDeniedDetails returns new OptSchPermissionDeniedDetails with value set to v.
+func NewOptSchPermissionDeniedDetails(v SchPermissionDeniedDetails) OptSchPermissionDeniedDetails {
+	return OptSchPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchPermissionDeniedDetails is optional SchPermissionDeniedDetails.
+type OptSchPermissionDeniedDetails struct {
+	Value SchPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchPermissionDeniedDetails was set.
+func (o OptSchPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchPermissionDeniedDetails) Reset() {
+	var v SchPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchPermissionDeniedDetails) SetTo(v SchPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchPermissionDeniedDetails) Get() (v SchPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchPermissionDeniedDetails) Or(d SchPermissionDeniedDetails) SchPermissionDeniedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -34652,6 +34933,385 @@ type QueryTeamsUnauthorized ErrorDetails
 
 func (*QueryTeamsUnauthorized) queryTeamsRes() {}
 
+type QueryUsersBadRequest ErrorDetails
+
+func (*QueryUsersBadRequest) queryUsersRes() {}
+
+// QueryUsersErrorResponse represents sum type.
+type QueryUsersErrorResponse struct {
+	Type                 QueryUsersErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ReqInvalid           ReqInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// QueryUsersErrorResponseType is oneOf type of QueryUsersErrorResponse.
+type QueryUsersErrorResponseType string
+
+// Possible values for QueryUsersErrorResponseType.
+const (
+	AuthUnauthorizedQueryUsersErrorResponse     QueryUsersErrorResponseType = "auth.unauthorized"
+	InternalQueryUsersErrorResponse             QueryUsersErrorResponseType = "internal"
+	NotImplementedQueryUsersErrorResponse       QueryUsersErrorResponseType = "not_implemented"
+	ReqInvalidQueryUsersErrorResponse           QueryUsersErrorResponseType = "req.invalid"
+	UserNotFoundQueryUsersErrorResponse         QueryUsersErrorResponseType = "user.not_found"
+	UserPermissionDeniedQueryUsersErrorResponse QueryUsersErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether QueryUsersErrorResponse is AuthUnauthorized.
+func (s QueryUsersErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedQueryUsersErrorResponse
+}
+
+// IsInternal reports whether QueryUsersErrorResponse is Internal.
+func (s QueryUsersErrorResponse) IsInternal() bool { return s.Type == InternalQueryUsersErrorResponse }
+
+// IsNotImplemented reports whether QueryUsersErrorResponse is NotImplemented.
+func (s QueryUsersErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryUsersErrorResponse
+}
+
+// IsReqInvalid reports whether QueryUsersErrorResponse is ReqInvalid.
+func (s QueryUsersErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryUsersErrorResponse
+}
+
+// IsUserNotFound reports whether QueryUsersErrorResponse is UserNotFound.
+func (s QueryUsersErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundQueryUsersErrorResponse
+}
+
+// IsUserPermissionDenied reports whether QueryUsersErrorResponse is UserPermissionDenied.
+func (s QueryUsersErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedQueryUsersErrorResponse
+}
+
+// SetAuthUnauthorized sets QueryUsersErrorResponse to AuthUnauthorized.
+func (s *QueryUsersErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedQueryUsersErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if QueryUsersErrorResponse is AuthUnauthorized.
+func (s QueryUsersErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedQueryUsersErrorResponse returns new QueryUsersErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedQueryUsersErrorResponse(v AuthUnauthorized) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets QueryUsersErrorResponse to Internal.
+func (s *QueryUsersErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryUsersErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryUsersErrorResponse is Internal.
+func (s QueryUsersErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryUsersErrorResponse returns new QueryUsersErrorResponse from Internal.
+func NewInternalQueryUsersErrorResponse(v Internal) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryUsersErrorResponse to NotImplemented.
+func (s *QueryUsersErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryUsersErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryUsersErrorResponse is NotImplemented.
+func (s QueryUsersErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryUsersErrorResponse returns new QueryUsersErrorResponse from NotImplemented.
+func NewNotImplementedQueryUsersErrorResponse(v NotImplemented) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets QueryUsersErrorResponse to ReqInvalid.
+func (s *QueryUsersErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryUsersErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryUsersErrorResponse is ReqInvalid.
+func (s QueryUsersErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryUsersErrorResponse returns new QueryUsersErrorResponse from ReqInvalid.
+func NewReqInvalidQueryUsersErrorResponse(v ReqInvalid) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets QueryUsersErrorResponse to UserNotFound.
+func (s *QueryUsersErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundQueryUsersErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if QueryUsersErrorResponse is UserNotFound.
+func (s QueryUsersErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundQueryUsersErrorResponse returns new QueryUsersErrorResponse from UserNotFound.
+func NewUserNotFoundQueryUsersErrorResponse(v UserNotFound) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets QueryUsersErrorResponse to UserPermissionDenied.
+func (s *QueryUsersErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedQueryUsersErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if QueryUsersErrorResponse is UserPermissionDenied.
+func (s QueryUsersErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedQueryUsersErrorResponse returns new QueryUsersErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedQueryUsersErrorResponse(v UserPermissionDenied) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// QueryUsersErrorResponseStatusCode wraps QueryUsersErrorResponse with StatusCode.
+type QueryUsersErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryUsersErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryUsersErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryUsersErrorResponseStatusCode) GetResponse() QueryUsersErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryUsersErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryUsersErrorResponseStatusCode) SetResponse(val QueryUsersErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryUsersErrorResponseStatusCode) queryUsersRes() {}
+
+type QueryUsersForbidden ErrorDetails
+
+func (*QueryUsersForbidden) queryUsersRes() {}
+
+// Request to query the users of a project.
+// Ref: #
+type QueryUsersRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results. Must be sent with the same
+	// `sorting` as the request that issued the token. Omitting `sorting` reuses
+	// the default sort and only succeeds when that default matches the token.
+	PageToken OptNilPageToken `json:"page_token"`
+	// Related collections to embed on each user (ADR 059). Omit it and no
+	// embedded collection is returned. An unrecognised value is rejected.
+	Expand  []UserExpand                `json:"expand"`
+	Sorting OptQueryUsersRequestSorting `json:"sorting"`
+	// Filter criteria for querying users. Criteria are combined with AND.
+	Filter []QueryUsersRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryUsersRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryUsersRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetExpand returns the value of Expand.
+func (s *QueryUsersRequest) GetExpand() []UserExpand {
+	return s.Expand
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryUsersRequest) GetSorting() OptQueryUsersRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryUsersRequest) GetFilter() []QueryUsersRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryUsersRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryUsersRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetExpand sets the value of Expand.
+func (s *QueryUsersRequest) SetExpand(val []UserExpand) {
+	s.Expand = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryUsersRequest) SetSorting(val OptQueryUsersRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryUsersRequest) SetFilter(val []QueryUsersRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryUsersRequestFilterItem struct {
+	// The field to filter by.
+	Field     UserFilterField `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryUsersRequestFilterItem) GetField() UserFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryUsersRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryUsersRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryUsersRequestFilterItem) SetField(val UserFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryUsersRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryUsersRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryUsersRequestSorting struct {
+	// The field to sort by.
+	Field UserSortField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryUsersRequestSorting) GetField() UserSortField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryUsersRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryUsersRequestSorting) SetField(val UserSortField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryUsersRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of users.
+// Ref: #
+type QueryUsersResponse struct {
+	Users []User `json:"users"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetUsers returns the value of Users.
+func (s *QueryUsersResponse) GetUsers() []User {
+	return s.Users
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryUsersResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetUsers sets the value of Users.
+func (s *QueryUsersResponse) SetUsers(val []User) {
+	s.Users = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryUsersResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryUsersResponse) queryUsersRes() {}
+
+type QueryUsersUnauthorized ErrorDetails
+
+func (*QueryUsersUnauthorized) queryUsersRes() {}
+
 // Merged schema.
 // Ref: #
 type ReqInvalid struct {
@@ -35845,6 +36505,59 @@ func (s *SchNotFound) SetDetails(val OptSchNotFoundDetails) {
 type SchNotFoundDetails map[string]jx.Raw
 
 func (s *SchNotFoundDetails) init() SchNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchPermissionDenied) GetDetails() OptSchPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchPermissionDenied) SetDetails(val OptSchPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchPermissionDeniedDetails map[string]jx.Raw
+
+func (s *SchPermissionDeniedDetails) init() SchPermissionDeniedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -41658,6 +42371,17 @@ type User struct {
 	// names and types are determined entirely by that schema.
 	Attributes UserAttributes `json:"attributes"`
 	Metadata   UserMetadata   `json:"metadata"`
+	// The user's team memberships, present only when the request asked for them with
+	// `expand: ["teams"]` (ADR 059). Absent means it was not requested; `[]`
+	// means the user has none.
+	// Deliberately outside `metadata`: memberships are a related collection, not
+	// part of the server-owned envelope, and it is a different concept from
+	// `metadata.lifecycle_owner_team_id` (ADR 024).
+	Teams []UserTeam `json:"teams"`
+	// True when the user is on more teams than the embedded list carries. The
+	// embedded list is capped and cannot be paged; read them all at
+	// `GET /users/{user_id}/teams`. Present only alongside `teams`.
+	TeamsTruncated OptBool `json:"teams_truncated"`
 }
 
 // GetID returns the value of ID.
@@ -41680,6 +42404,16 @@ func (s *User) GetMetadata() UserMetadata {
 	return s.Metadata
 }
 
+// GetTeams returns the value of Teams.
+func (s *User) GetTeams() []UserTeam {
+	return s.Teams
+}
+
+// GetTeamsTruncated returns the value of TeamsTruncated.
+func (s *User) GetTeamsTruncated() OptBool {
+	return s.TeamsTruncated
+}
+
 // SetID sets the value of ID.
 func (s *User) SetID(val UserID) {
 	s.ID = val
@@ -41698,6 +42432,16 @@ func (s *User) SetAttributes(val UserAttributes) {
 // SetMetadata sets the value of Metadata.
 func (s *User) SetMetadata(val UserMetadata) {
 	s.Metadata = val
+}
+
+// SetTeams sets the value of Teams.
+func (s *User) SetTeams(val []UserTeam) {
+	s.Teams = val
+}
+
+// SetTeamsTruncated sets the value of TeamsTruncated.
+func (s *User) SetTeamsTruncated(val OptBool) {
+	s.TeamsTruncated = val
 }
 
 func (*User) createUserRes()  {}
@@ -43171,6 +43915,160 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
+// A related object to embed on each returned user (ADR 059).
+// - `teams`: the user's team memberships, as `teams` on each user. The property
+// is omitted entirely when not requested and `[]` when the user has none, so
+// "did not ask" is distinguishable from "there are none". Embedded lists are
+// capped and are not paginated: past the cap the user carries
+// `teams_truncated: true` and the whole list is read at
+// `GET /users/{user_id}/teams`.
+// Membership is team participation, not lifecycle ownership — the
+// owning team stays at `metadata.lifecycle_owner_team_id` (ADR 024).
+// Requires `team_membership.read` in addition to `user.read`.
+// - `lifecycle_owner_team`: the team that owns the user's identity lifecycle,
+// as `metadata.lifecycle_owner_team`. It resolves the id already carried at
+// `metadata.lifecycle_owner_team_id`, and serves the same representation as
+// `GET /teams/{team_id}`. The property is omitted when not requested and
+// `null` when the user is self-owned. One team, so no cap and no truncation
+// flag.
+// Requires `team.read` in addition to `user.read`.
+// The two are independent: asking for one says nothing about the other, and
+// neither implies the other's permission.
+// Ref: #
+type UserExpand string
+
+const (
+	UserExpandTeams              UserExpand = "teams"
+	UserExpandLifecycleOwnerTeam UserExpand = "lifecycle_owner_team"
+)
+
+// AllValues returns all UserExpand values.
+func (UserExpand) AllValues() []UserExpand {
+	return []UserExpand{
+		UserExpandTeams,
+		UserExpandLifecycleOwnerTeam,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case UserExpandTeams:
+		return []byte(s), nil
+	case UserExpandLifecycleOwnerTeam:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserExpand) UnmarshalText(data []byte) error {
+	switch UserExpand(data) {
+	case UserExpandTeams:
+		*s = UserExpandTeams
+		return nil
+	case UserExpandLifecycleOwnerTeam:
+		*s = UserExpandLifecycleOwnerTeam
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Field to filter users by:
+// - `created_at`: RFC3339 timestamp
+// - `id`: user id
+// - `schema`: the schema the user's attributes satisfy, matched against the
+// value the user carries as `schema`
+// - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
+// - `team_id`: restricts the result to users holding an **active** membership
+// in that team. A user who has been invited but has not accepted does not
+// match. `equals` is the only operation, and the field may be given once —
+// this names one team, not a set.
+// - `lifecycle_owner_team_id`: the team that owns the user's identity
+// lifecycle. The column is nullable for self-owned users, and a null filter
+// value is rejected, so self-owned users cannot be selected by this field.
+// **The two team fields answer different questions.** `team_id` is membership:
+// which team the user collaborates in, readable per user at
+// `GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which
+// team may deprovision the user. A user can belong to many teams while owning
+// their own lifecycle, so the two disagree often and neither implies the other
+// (ADR 024).
+// `team_id` is filterable but not sortable — it is not a column on the user, so
+// it is absent from the sort-field enum.
+// Filtering on `team_id` requires `team_membership.read` in addition to
+// `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
+// Ref: #
+type UserFilterField string
+
+const (
+	UserFilterFieldCreatedAt            UserFilterField = "created_at"
+	UserFilterFieldID                   UserFilterField = "id"
+	UserFilterFieldSchema               UserFilterField = "schema"
+	UserFilterFieldStatus               UserFilterField = "status"
+	UserFilterFieldTeamID               UserFilterField = "team_id"
+	UserFilterFieldLifecycleOwnerTeamID UserFilterField = "lifecycle_owner_team_id"
+)
+
+// AllValues returns all UserFilterField values.
+func (UserFilterField) AllValues() []UserFilterField {
+	return []UserFilterField{
+		UserFilterFieldCreatedAt,
+		UserFilterFieldID,
+		UserFilterFieldSchema,
+		UserFilterFieldStatus,
+		UserFilterFieldTeamID,
+		UserFilterFieldLifecycleOwnerTeamID,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case UserFilterFieldCreatedAt:
+		return []byte(s), nil
+	case UserFilterFieldID:
+		return []byte(s), nil
+	case UserFilterFieldSchema:
+		return []byte(s), nil
+	case UserFilterFieldStatus:
+		return []byte(s), nil
+	case UserFilterFieldTeamID:
+		return []byte(s), nil
+	case UserFilterFieldLifecycleOwnerTeamID:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserFilterField) UnmarshalText(data []byte) error {
+	switch UserFilterField(data) {
+	case UserFilterFieldCreatedAt:
+		*s = UserFilterFieldCreatedAt
+		return nil
+	case UserFilterFieldID:
+		*s = UserFilterFieldID
+		return nil
+	case UserFilterFieldSchema:
+		*s = UserFilterFieldSchema
+		return nil
+	case UserFilterFieldStatus:
+		*s = UserFilterFieldStatus
+		return nil
+	case UserFilterFieldTeamID:
+		*s = UserFilterFieldTeamID
+		return nil
+	case UserFilterFieldLifecycleOwnerTeamID:
+		*s = UserFilterFieldLifecycleOwnerTeamID
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type UserID string
 
 // Merged schema.
@@ -43236,10 +44134,25 @@ type UserMetadata struct {
 	Status UserMetadataStatus `json:"status"`
 	// The team that owns this user's identity lifecycle, or `null` when the
 	// user is self-owned. This is a single team and a different concept from
-	// the user's team roster: it decides who may deprovision the user, not
-	// which teams the user collaborates in. The roster is its own paginated
+	// the user's team memberships: it decides who may deprovision the user, not
+	// which teams the user collaborates in. Memberships are their own paginated
 	// resource — `GET /users/{user_id}/teams`.
 	LifecycleOwnerTeamID OptNilString `json:"lifecycle_owner_team_id"`
+	// The team named by `lifecycle_owner_team_id`, present only when the
+	// request asked for it with `expand: ["lifecycle_owner_team"]` (ADR 059).
+	// Absent means it was not requested; `null` means the user is self-owned
+	// and there is no owner to resolve.
+	// Requesting it does not guarantee it is present on every user. Today
+	// `team.read` is checked once for the whole request, so it is; once that
+	// check is per team, a page may contain a user whose owner the caller may
+	// not read, and such a row answers with neither the team nor `null` —
+	// `null` already means self-owned. What it answers with instead is decided
+	// with the granular scopes (#420); do not read the two cases above as the
+	// complete set.
+	// This is the same representation `GET /teams/{team_id}` serves. It is a
+	// single team, not a collection, so it carries no cap and no truncation
+	// flag.
+	LifecycleOwnerTeam OptNilTeamResponse `json:"lifecycle_owner_team"`
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -43262,6 +44175,11 @@ func (s *UserMetadata) GetLifecycleOwnerTeamID() OptNilString {
 	return s.LifecycleOwnerTeamID
 }
 
+// GetLifecycleOwnerTeam returns the value of LifecycleOwnerTeam.
+func (s *UserMetadata) GetLifecycleOwnerTeam() OptNilTeamResponse {
+	return s.LifecycleOwnerTeam
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *UserMetadata) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -43280,6 +44198,11 @@ func (s *UserMetadata) SetStatus(val UserMetadataStatus) {
 // SetLifecycleOwnerTeamID sets the value of LifecycleOwnerTeamID.
 func (s *UserMetadata) SetLifecycleOwnerTeamID(val OptNilString) {
 	s.LifecycleOwnerTeamID = val
+}
+
+// SetLifecycleOwnerTeam sets the value of LifecycleOwnerTeam.
+func (s *UserMetadata) SetLifecycleOwnerTeam(val OptNilTeamResponse) {
+	s.LifecycleOwnerTeam = val
 }
 
 // The status of the user.
@@ -43603,6 +44526,18 @@ type UserSchema struct {
 	// The user Schema version used for this schema.
 	MetaSchema             url.URL     `json:"metaSchema"`
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
+	// Path of the leaf property whose value identifies a user (nested leaves
+	// are addressed by their dot-joined attribute path). The property must
+	// carry `x-unique` "project". Required when an auth method needing
+	// identifier-first dispatch (password) is enabled. Passkey is exempt:
+	// discoverable credentials identify the user through the assertion
+	// itself, so passkey-only and API-managed schemas may designate nothing;
+	// flows using identifier-first passkey are validated at the flow level
+	// instead.
+	XMinusIdentifier OptString `json:"x-identifier"`
+	// Ordered leaf property paths whose values, joined with a space, render
+	// the user's display name.
+	XMinusDisplay []string `json:"x-display"`
 	// A map of additional properties for the user definition, where the
 	// key is the property name and the value is the property schema.
 	Properties      OptUserSchemaProperties `json:"properties"`
@@ -43632,6 +44567,16 @@ func (s *UserSchema) GetMetaSchema() url.URL {
 // GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
 func (s *UserSchema) GetXMinusAuthMinusMethods() AuthMethods {
 	return s.XMinusAuthMinusMethods
+}
+
+// GetXMinusIdentifier returns the value of XMinusIdentifier.
+func (s *UserSchema) GetXMinusIdentifier() OptString {
+	return s.XMinusIdentifier
+}
+
+// GetXMinusDisplay returns the value of XMinusDisplay.
+func (s *UserSchema) GetXMinusDisplay() []string {
+	return s.XMinusDisplay
 }
 
 // GetProperties returns the value of Properties.
@@ -43669,6 +44614,16 @@ func (s *UserSchema) SetXMinusAuthMinusMethods(val AuthMethods) {
 	s.XMinusAuthMinusMethods = val
 }
 
+// SetXMinusIdentifier sets the value of XMinusIdentifier.
+func (s *UserSchema) SetXMinusIdentifier(val OptString) {
+	s.XMinusIdentifier = val
+}
+
+// SetXMinusDisplay sets the value of XMinusDisplay.
+func (s *UserSchema) SetXMinusDisplay(val []string) {
+	s.XMinusDisplay = val
+}
+
 // SetProperties sets the value of Properties.
 func (s *UserSchema) SetProperties(val OptUserSchemaProperties) {
 	s.Properties = val
@@ -43701,6 +44656,74 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 		*s = m
 	}
 	return m
+}
+
+// Field to sort users by. Only stored columns are sortable: the keyset cursor
+// holds the last row's sort values, so a value computed per request would skip
+// or duplicate rows between pages.
+// Sorting by `lifecycle_owner_team_id` groups self-owned users together, since
+// the column is null for them.
+// Ref: #
+type UserSortField string
+
+const (
+	UserSortFieldCreatedAt            UserSortField = "created_at"
+	UserSortFieldID                   UserSortField = "id"
+	UserSortFieldSchema               UserSortField = "schema"
+	UserSortFieldStatus               UserSortField = "status"
+	UserSortFieldLifecycleOwnerTeamID UserSortField = "lifecycle_owner_team_id"
+)
+
+// AllValues returns all UserSortField values.
+func (UserSortField) AllValues() []UserSortField {
+	return []UserSortField{
+		UserSortFieldCreatedAt,
+		UserSortFieldID,
+		UserSortFieldSchema,
+		UserSortFieldStatus,
+		UserSortFieldLifecycleOwnerTeamID,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserSortField) MarshalText() ([]byte, error) {
+	switch s {
+	case UserSortFieldCreatedAt:
+		return []byte(s), nil
+	case UserSortFieldID:
+		return []byte(s), nil
+	case UserSortFieldSchema:
+		return []byte(s), nil
+	case UserSortFieldStatus:
+		return []byte(s), nil
+	case UserSortFieldLifecycleOwnerTeamID:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserSortField) UnmarshalText(data []byte) error {
+	switch UserSortField(data) {
+	case UserSortFieldCreatedAt:
+		*s = UserSortFieldCreatedAt
+		return nil
+	case UserSortFieldID:
+		*s = UserSortFieldID
+		return nil
+	case UserSortFieldSchema:
+		*s = UserSortFieldSchema
+		return nil
+	case UserSortFieldStatus:
+		*s = UserSortFieldStatus
+		return nil
+	case UserSortFieldLifecycleOwnerTeamID:
+		*s = UserSortFieldLifecycleOwnerTeamID
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // One entry of a user's team roster: a team the user belongs to, with the

@@ -26,7 +26,11 @@ type CreateSchemaByURLInput struct {
 }
 
 type ListSchemasInput struct {
-	ProjectID  string
+	ProjectID string
+	// IDs narrows the list to the given schema ids. Empty means no id filter.
+	// Not exposed on the wire: it serves in-process batch resolution, such as
+	// the flow-definition expand hydrator.
+	IDs        []string
 	ObjectType string
 	// Kind is nil when the caller did not filter by one. It is a pointer rather
 	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
@@ -72,7 +76,14 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
 	if err != nil {
-		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
+		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
+		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
+			// The designation rules are semantic and their text is the only
+			// pointer to which rule fired; Parent is never serialized
+			// (ADR 030), so carry the message to the client.
+			invalid = invalid.WithMessage(err.Error())
+		}
+		return nil, invalid
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
@@ -161,6 +172,16 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
+	}
+	// The ids are ORed with each other and ANDed with everything else, so they
+	// narrow the caller's already-authorized rows rather than reaching outside
+	// them: an id from another project matches nothing, like an unknown one.
+	if len(input.IDs) > 0 {
+		ids := make([]database.Filter[domain.JSONSchemaField], len(input.IDs))
+		for i, id := range input.IDs {
+			ids[i] = database.Equal(database.Col(domain.JSONSchemaFieldURL), id)
+		}
+		filters = append(filters, database.Or(ids...))
 	}
 	if input.ObjectType != "" {
 		filters = append(filters,
