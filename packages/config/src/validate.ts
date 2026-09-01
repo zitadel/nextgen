@@ -713,10 +713,11 @@ function resolveFieldChallenge(
     };
   }
 
-  // Mirrors deriveUnique + deriveIdentifierChallenge: any recognized
-  // non-empty x-unique scope makes the property an identifier.
-  const unique = property["x-unique"];
-  if (unique === "project" || unique === "team") {
+  // Mirrors deriveIdentifierChallenge: the field naming the schema-root
+  // `x-identifier` designation is the identifier (ADR 057); other
+  // properties — unique or not — carry no identifier challenge.
+  const identifier = schema["x-identifier"];
+  if (typeof identifier === "string" && identifier !== "" && field === identifier) {
     return { challenge: "identifier" };
   }
   return { challenge: null };

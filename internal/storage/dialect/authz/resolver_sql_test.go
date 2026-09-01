@@ -173,3 +173,98 @@ func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	assert.Contains(t, w.args, "proj_1")
 	assert.Contains(t, w.args, "user_a")
 }
+
+// Folding the constant arms back inside the correlated EXISTS changes only
+// timings, so every behavioural suite would stay green. Hence a string-index
+// guard on the emitted shape.
+func TestListPredicateLiftsConstantArms(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id",
+		domain.AuthzListObjectsParams{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID:     "cat_sys_1",
+				ProjectID:     "proj_1",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   "user_a",
+				ObjectType:    "project",
+				Relation:      "viewer",
+			},
+			ResourceKind: domain.ResourceKindTeam,
+		})
+	sql := w.b.String()
+
+	// The correlated subquery is the first mention of the RSI alias, so the
+	// lifted arms must appear before it.
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, firstRSI, "predicate must query resource_scope_index")
+
+	// LastIndex, not Index: writeFullTTUExists emits `a.scope_kind = 'project'`
+	// too, so the first match would not pin the direct arm's placement.
+	require.Contains(t, sql, "a.scope_kind = 'project'", "project-scoped arm must be emitted")
+	assert.Less(t, strings.LastIndex(sql, "a.scope_kind = 'project'"), firstRSI,
+		"every project-scoped arm must be lifted out of the correlated EXISTS")
+
+	require.Contains(t, sql, "tuple_to_userset", "tuple-to-userset arm must be emitted")
+	assert.Less(t, strings.LastIndex(sql, "tuple_to_userset"), firstRSI,
+		"tuple-to-userset arm must be lifted out of the correlated EXISTS")
+
+	assert.Equal(t, 2, strings.Count(sql, "resource_scope_index r"),
+		"both halves of the lifted predicate must require an RSI row")
+
+	// The count above is blind to the connector, and an OR there is the leak.
+	head := sql[:firstRSI]
+	openingExists := strings.LastIndex(head, "EXISTS (")
+	require.NotEqual(t, -1, openingExists, "the first RSI subquery must be an EXISTS")
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(head[:openingExists]), "AND"),
+		"the constant arms must be ANDed with the RSI existence check, not ORed: "+
+			"an OR would make objects with no RSI row visible to any project-wide grant")
+
+	// The arms that genuinely depend on the row must stay inside, correlated.
+	assert.Contains(t, sql, "a.scope_team_id = r.team_id")
+	assert.Contains(t, sql, "a.scope_resource_id = r.resource_id")
+}
+
+// The sk_team clause is correlated to r, so the lift must carry it into both
+// halves. In the correlated half only, the first half becomes `C AND
+// EXISTS(base)` and objects outside the token's team become visible to any
+// project-wide grant.
+func TestListPredicateConstraintTeamInBothHalves(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id",
+		domain.AuthzListObjectsParams{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID:        "cat_sys_1",
+				ProjectID:        "proj_1",
+				PrincipalType:    domain.AuthzPrincipalTypeSKTeam,
+				PrincipalID:      "sk_team_1",
+				ObjectType:       "project",
+				Relation:         "viewer",
+				ConstraintTeamID: "team_1",
+			},
+			ResourceKind: domain.ResourceKindTeam,
+		})
+	sql := w.b.String()
+
+	// Split on the top-level OR joining the two halves: it is the OR that
+	// immediately precedes the second RSI subquery.
+	secondRSI := strings.LastIndex(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, secondRSI)
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, firstRSI, secondRSI, "the lift must emit two RSI subqueries")
+
+	// Unique to writeListedObjectInConstraintTeam. Not "authz_membership_edges",
+	// which the TTU arm and every principal match also emit.
+	const ctClause = `) OR (r.resource_kind <> `
+	assert.Equal(t, 2, strings.Count(sql, ctClause),
+		"the constraint-team clause must be emitted once per half of the lift")
+	assert.Less(t, strings.Index(sql, ctClause), secondRSI,
+		"the constraint-team clause must be inside the constant half's RSI subquery; "+
+			"without it a project-wide grant sees objects outside the token's team")
+	assert.Greater(t, strings.LastIndex(sql, ctClause), secondRSI,
+		"the constraint-team clause must be inside the correlated half's RSI subquery")
+
+	// And it must be bound to the token's team, not merely present.
+	assert.Contains(t, w.args, "team_1")
+}

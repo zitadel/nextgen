@@ -222,7 +222,11 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        // Mirrors the server's designation rule (ADR 058 §1): password
+        // requires a designated project-unique identifier.
+        "x-identifier": "email",
         "x-auth-methods": { password: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
       }),
     });
     expect(res.status).toBe(201);
@@ -238,7 +242,11 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        // Mirrors the server's designation rule (ADR 058 §1): password
+        // requires a designated project-unique identifier.
+        "x-identifier": "email",
         "x-auth-methods": { password: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
       }),
     });
     const { id } = (await create.json()) as { id: string };

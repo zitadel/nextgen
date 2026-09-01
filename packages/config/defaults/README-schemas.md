@@ -16,7 +16,13 @@ Here's a simplified example:
 ``` json
 {
   "objectType": "customer",
+  "x-identifier": "email",
   "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "x-unique": "project"
+    },
     "firstName": {
       "type": "string"
     },
@@ -25,6 +31,7 @@ Here's a simplified example:
     }
   },
   "required": [
+    "email",
     "firstName"
   ],
   "x-auth-methods": {

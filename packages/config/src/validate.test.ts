@@ -71,6 +71,18 @@ describe("validateFlowDefinition — valid flows", () => {
     expect(validateFlowDefinition(flow())).toEqual([]);
   });
 
+  it("does not treat an undesignated unique field as an identifier", () => {
+    // Mirrors the Go resolver (ADR 057): x-unique alone no longer carries
+    // the identifier challenge, so the login path loses its identifier and
+    // the on_success manifest fails upstream.
+    const undesignated = structuredClone(schema);
+    delete undesignated["x-identifier"];
+    const msgs = messages(errors(validateFlowDefinition(flow(), undesignated)));
+    expect(msgs.some((m) => m.includes('requires "identifier" to be collected upstream'))).toBe(
+      true,
+    );
+  });
+
   it("accepts a login-only flow without user_not_found (no register purpose)", () => {
     const def = flow();
     def.purposes = { login: "identifier" };

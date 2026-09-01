@@ -76,7 +76,14 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
 	if err != nil {
-		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
+		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
+		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
+			// The designation rules are semantic and their text is the only
+			// pointer to which rule fired; Parent is never serialized
+			// (ADR 030), so carry the message to the client.
+			invalid = invalid.WithMessage(err.Error())
+		}
+		return nil, invalid
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
