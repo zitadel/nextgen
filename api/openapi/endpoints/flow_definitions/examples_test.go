@@ -138,8 +138,9 @@ func TestDefaultLoginFlowDefinition(t *testing.T) {
 	require.NoError(t, err)
 
 	// Regression guard for #1084: convertStepTransitions must preserve each
-	// transition's purpose through the upload path, or the Sign Up / Sign In
-	// navigations lose their re-purposing and the engine desyncs.
+	// transition's purpose through embedded default-flow seeding, or the
+	// Sign Up / Sign In navigations lose their re-purposing and the engine
+	// desyncs.
 	var identifierStep, registerStep *domain.FlowDefinitionStep
 	for i, step := range defs[0].Steps {
 		switch step.Name {
