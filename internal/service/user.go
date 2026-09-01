@@ -57,6 +57,8 @@ type ListUsersInput struct {
 	Limit     int
 	Sorting   *Sorting // optional; defaults to createdAt desc
 	Filters   []Filter
+	// IncludeTeams embeds each user's team memberships (ADR 059).
+	IncludeTeams bool
 }
 
 type ListPasskeysInput struct {
@@ -208,6 +210,7 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 	if err != nil {
 		return nil, err
 	}
+	queryOpts.IncludeTeams = input.IncludeTeams
 
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))

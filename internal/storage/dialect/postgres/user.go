@@ -68,6 +68,24 @@ SELECT 1;
 	userAttributesTable       = "zitadel_nextgen.user_attributes"
 	userUniqueAttributesTable = "zitadel_nextgen.user_unique_attributes"
 
+	// userTeamsByIDsQuery hydrates the team memberships of one page of users
+	// (ADR 059), ordered so each user's rows arrive together and by team name.
+	//
+	// The cap is applied in Go rather than by a per-user ROW_NUMBER window,
+	// which would bound the read to cap+1 rows per user: the Spanner emulator
+	// rejects analytic functions, and stmttest asserts all three dialects
+	// behave alike, so the portable shape wins over the tighter one.
+	userTeamsByIDsQuery = `
+SELECT m.user_id, m.team_id, t.name, m.status, m.created_at, m.updated_at
+FROM zitadel_nextgen.team_memberships m
+JOIN zitadel_nextgen.teams t
+  ON t.project_id = m.project_id AND t.id = m.team_id
+WHERE m.project_id = $1
+  AND m.user_id = ANY ($2::text[])
+  AND m.status = ANY ($3::text[])
+ORDER BY m.user_id, t.name, m.team_id
+`
+
 	userAttributesByIDsQuery = `
 SELECT user_id, key, value
 FROM zitadel_nextgen.user_attributes
@@ -343,7 +361,11 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		attrKeys = []string{}
 	}
 
-	for _, group := range v2user.GroupByProject(users) {
+	// Grouped once and reused: GroupByProject clears Attributes, so a second
+	// pass would wipe the ones this call just hydrated.
+	groups := v2user.GroupByProject(users)
+
+	for _, group := range groups {
 		rows, err := us.client.Query(ctx, userAttributesByIDsQuery, group.ProjectID, group.IDs, attrKeys)
 		if err != nil {
 			return wrapError(err)
@@ -364,6 +386,49 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 				return struct{}{}, fmt.Errorf("decode attribute value for %q: %w", key, err)
 			}
 			user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
+			return struct{}{}, nil
+		})
+		if err != nil {
+			return wrapError(err)
+		}
+	}
+
+	if opts.IncludeTeams {
+		return us.hydrateUserTeams(ctx, groups, opts)
+	}
+	return nil
+}
+
+// hydrateUserTeams loads the team memberships of an already-read page of users (ADR
+// 056): one batched query per project group, keyed on the ids the page already
+// returned. Joining memberships into the user query instead would multiply rows
+// — LIMIT would count memberships rather than users, and the keyset cursor is
+// marshalled from the last row's sort values, so fan-out corrupts it.
+func (us userStatements) hydrateUserTeams(ctx context.Context, groups []v2user.ProjectGroup, opts service.UserQueryOptions) error {
+	limit := opts.TeamsLimit
+	if limit <= 0 {
+		limit = service.DefaultUserTeamsLimit
+	}
+
+	for _, group := range groups {
+		collector := v2user.NewTeamCollector(group, limit)
+		rows, err := us.client.Query(ctx, userTeamsByIDsQuery, group.ProjectID, group.IDs, v2user.MembershipStatusStrings())
+		if err != nil {
+			return wrapError(err)
+		}
+		_, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (struct{}, error) {
+			var (
+				userID string
+				team   domain.UserTeam
+				status string
+			)
+			if err := row.Scan(&userID, &team.TeamID, &team.TeamName, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+				return struct{}{}, err
+			}
+			team.ProjectID = group.ProjectID
+			team.UserID = userID
+			team.Status = domain.MembershipStatus(status)
+			collector.Add(userID, team)
 			return struct{}{}, nil
 		})
 		if err != nil {

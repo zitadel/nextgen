@@ -106,6 +106,11 @@ func mapQueryUsersToService(projectID string, req *api.QueryUsersRequest) servic
 	for _, filter := range req.Filter {
 		input.Filters = append(input.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
 	}
+	for _, expand := range req.Expand {
+		if expand == api.UserExpandTeams {
+			input.IncludeTeams = true
+		}
+	}
 	return input
 }
 
@@ -170,13 +175,7 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
 	}
 	for _, team := range teams.Items {
-		res.Teams = append(res.Teams, api.UserTeam{
-			ID:               team.TeamID,
-			Name:             team.TeamName,
-			MembershipStatus: api.UserTeamMembershipStatus(team.Status),
-			CreatedAt:        team.CreatedAt,
-			UpdatedAt:        team.UpdatedAt,
-		})
+		res.Teams = append(res.Teams, apiUserTeam(*team))
 	}
 
 	return res, nil
@@ -259,7 +258,7 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 		lifecycleOwnerTeamID.SetToNull()
 	}
 
-	return &api.User{
+	out := &api.User{
 		ID:         api.UserID(user.ID),
 		Schema:     user.SchemaURL,
 		Attributes: *attributes,
@@ -269,7 +268,31 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 			Status:               api.UserMetadataStatus(user.Metadata.Status),
 			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
 		},
-	}, nil
+	}
+
+	// Nil means the read was not asked for memberships, so the property stays
+	// off the wire entirely; an empty non-nil slice means it was asked for and
+	// the user has none, which serializes as []. Every other caller of
+	// this mapper leaves Teams nil and is unaffected.
+	if user.Teams != nil {
+		out.Teams = make([]api.UserTeam, 0, len(user.Teams))
+		for _, team := range user.Teams {
+			out.Teams = append(out.Teams, apiUserTeam(team))
+		}
+		out.TeamsTruncated = api.NewOptBool(user.TeamsTruncated)
+	}
+
+	return out, nil
+}
+
+func apiUserTeam(team domain.UserTeam) api.UserTeam {
+	return api.UserTeam{
+		ID:               team.TeamID,
+		Name:             team.TeamName,
+		MembershipStatus: api.UserTeamMembershipStatus(team.Status),
+		CreatedAt:        team.CreatedAt,
+		UpdatedAt:        team.UpdatedAt,
+	}
 }
 
 // ------------------ Errors ---------------

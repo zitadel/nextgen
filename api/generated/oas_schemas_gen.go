@@ -32688,8 +32688,11 @@ type QueryUsersRequest struct {
 	// Token to retrieve the next page of results. Must be sent with the same
 	// `sorting` as the request that issued the token. Omitting `sorting` reuses
 	// the default sort and only succeeds when that default matches the token.
-	PageToken OptNilPageToken             `json:"page_token"`
-	Sorting   OptQueryUsersRequestSorting `json:"sorting"`
+	PageToken OptNilPageToken `json:"page_token"`
+	// Related collections to embed on each user (ADR 059). Omit it and no
+	// embedded collection is returned. An unrecognised value is rejected.
+	Expand  []UserExpand                `json:"expand"`
+	Sorting OptQueryUsersRequestSorting `json:"sorting"`
 	// Filter criteria for querying users. Criteria are combined with AND.
 	Filter []QueryUsersRequestFilterItem `json:"filter"`
 }
@@ -32702,6 +32705,11 @@ func (s *QueryUsersRequest) GetLimit() OptLimit {
 // GetPageToken returns the value of PageToken.
 func (s *QueryUsersRequest) GetPageToken() OptNilPageToken {
 	return s.PageToken
+}
+
+// GetExpand returns the value of Expand.
+func (s *QueryUsersRequest) GetExpand() []UserExpand {
+	return s.Expand
 }
 
 // GetSorting returns the value of Sorting.
@@ -32722,6 +32730,11 @@ func (s *QueryUsersRequest) SetLimit(val OptLimit) {
 // SetPageToken sets the value of PageToken.
 func (s *QueryUsersRequest) SetPageToken(val OptNilPageToken) {
 	s.PageToken = val
+}
+
+// SetExpand sets the value of Expand.
+func (s *QueryUsersRequest) SetExpand(val []UserExpand) {
+	s.Expand = val
 }
 
 // SetSorting sets the value of Sorting.
@@ -39839,6 +39852,17 @@ type User struct {
 	// names and types are determined entirely by that schema.
 	Attributes UserAttributes `json:"attributes"`
 	Metadata   UserMetadata   `json:"metadata"`
+	// The user's team memberships, present only when the request asked for them with
+	// `expand: ["teams"]` (ADR 059). Absent means it was not requested; `[]`
+	// means the user has none.
+	// Deliberately outside `metadata`: memberships are a related collection, not
+	// part of the server-owned envelope, and it is a different concept from
+	// `metadata.lifecycle_owner_team_id` (ADR 024).
+	Teams []UserTeam `json:"teams"`
+	// True when the user is on more teams than the embedded list carries. The
+	// embedded list is capped and cannot be paged; read them all at
+	// `GET /users/{user_id}/teams`. Present only alongside `teams`.
+	TeamsTruncated OptBool `json:"teams_truncated"`
 }
 
 // GetID returns the value of ID.
@@ -39861,6 +39885,16 @@ func (s *User) GetMetadata() UserMetadata {
 	return s.Metadata
 }
 
+// GetTeams returns the value of Teams.
+func (s *User) GetTeams() []UserTeam {
+	return s.Teams
+}
+
+// GetTeamsTruncated returns the value of TeamsTruncated.
+func (s *User) GetTeamsTruncated() OptBool {
+	return s.TeamsTruncated
+}
+
 // SetID sets the value of ID.
 func (s *User) SetID(val UserID) {
 	s.ID = val
@@ -39879,6 +39913,16 @@ func (s *User) SetAttributes(val UserAttributes) {
 // SetMetadata sets the value of Metadata.
 func (s *User) SetMetadata(val UserMetadata) {
 	s.Metadata = val
+}
+
+// SetTeams sets the value of Teams.
+func (s *User) SetTeams(val []UserTeam) {
+	s.Teams = val
+}
+
+// SetTeamsTruncated sets the value of TeamsTruncated.
+func (s *User) SetTeamsTruncated(val OptBool) {
+	s.TeamsTruncated = val
 }
 
 func (*User) createUserRes()  {}
@@ -41346,6 +41390,50 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 		return nil
 	case UserDeletedEventDelegationTypeExchanged:
 		*s = UserDeletedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A related collection to embed on each returned user (ADR 059).
+// - `teams`: the user's team memberships, as `teams` on each user. The property
+// is omitted entirely when not requested and `[]` when the user has none, so
+// "did not ask" is distinguishable from "there are none". Embedded lists are
+// capped and are not paginated: past the cap the user carries
+// `teams_truncated: true` and the whole list is read at
+// `GET /users/{user_id}/teams`.
+// Membership is team participation, not lifecycle ownership — the
+// owning team stays at `metadata.lifecycle_owner_team_id` (ADR 024).
+// Ref: #
+type UserExpand string
+
+const (
+	UserExpandTeams UserExpand = "teams"
+)
+
+// AllValues returns all UserExpand values.
+func (UserExpand) AllValues() []UserExpand {
+	return []UserExpand{
+		UserExpandTeams,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case UserExpandTeams:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserExpand) UnmarshalText(data []byte) error {
+	switch UserExpand(data) {
+	case UserExpandTeams:
+		*s = UserExpandTeams
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

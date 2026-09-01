@@ -37,6 +37,20 @@ WHERE project_id = @p1 AND user_id IN UNNEST(@p2)`
 	userAttributesByIDsAndKeysQuery = userAttributesByIDsQuery + `
 AND key IN UNNEST(@p3)`
 
+	// userTeamsByIDsQuery hydrates the team memberships of one page of users
+	// (ADR 059), ordered so each user's rows arrive together and by team name.
+	//
+	// No per-user ROW_NUMBER window to bound the read: the emulator answers
+	// "Analytic functions not supported", and stmttest holds all three
+	// dialects to the same behavior. The cap is applied in Go instead.
+	userTeamsByIDsQuery = `SELECT m.user_id, m.team_id, t.name, m.status, m.created_at, m.updated_at
+FROM team_memberships m
+JOIN teams t ON t.project_id = m.project_id AND t.id = m.team_id
+WHERE m.project_id = @p1
+  AND m.user_id IN UNNEST(@p2)
+  AND m.status IN UNNEST(@p3)
+ORDER BY m.user_id, t.name, m.team_id`
+
 	deactivateUserStmt = `UPDATE users SET status = @p1, updated_at = CURRENT_TIMESTAMP()
 WHERE project_id = @p2 AND id = @p3`
 
@@ -295,7 +309,11 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		return nil
 	}
 
-	for _, group := range v2user.GroupByProject(users) {
+	// Grouped once and reused: GroupByProject clears Attributes, so a second
+	// pass would wipe the ones this call just hydrated.
+	groups := v2user.GroupByProject(users)
+
+	for _, group := range groups {
 		stmt := buildStatement(userAttributesByIDsQuery, group.ProjectID, group.IDs).statement()
 		if len(opts.AttributeKeys) > 0 {
 			stmt = buildStatement(userAttributesByIDsAndKeysQuery, group.ProjectID, group.IDs, opts.AttributeKeys).statement()
@@ -316,6 +334,47 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 					return nil
 				}
 				user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
+				return nil
+			})
+		}); err != nil {
+			return err
+		}
+	}
+
+	if opts.IncludeTeams {
+		return us.hydrateUserTeams(ctx, groups, opts)
+	}
+	return nil
+}
+
+// hydrateUserTeams loads the team memberships of an already-read page of users (ADR
+// 056): one batched query per project group, keyed on the ids the page already
+// returned. Joining memberships into the user query instead would multiply rows
+// — LIMIT would count memberships rather than users, and the keyset cursor is
+// marshalled from the last row's sort values, so fan-out corrupts it.
+func (us userStatements) hydrateUserTeams(ctx context.Context, groups []v2user.ProjectGroup, opts service.UserQueryOptions) error {
+	limit := opts.TeamsLimit
+	if limit <= 0 {
+		limit = service.DefaultUserTeamsLimit
+	}
+
+	for _, group := range groups {
+		collector := v2user.NewTeamCollector(group, limit)
+		stmt := buildStatement(userTeamsByIDsQuery, group.ProjectID, group.IDs, v2user.MembershipStatusStrings()).statement()
+		if err := us.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+			return iter.Do(func(row *spanner.Row) error {
+				var (
+					userID string
+					team   domain.UserTeam
+					status string
+				)
+				if err := row.Columns(&userID, &team.TeamID, &team.TeamName, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+					return err
+				}
+				team.ProjectID = group.ProjectID
+				team.UserID = userID
+				team.Status = domain.MembershipStatus(status)
+				collector.Add(userID, team)
 				return nil
 			})
 		}); err != nil {

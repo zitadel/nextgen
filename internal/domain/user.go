@@ -62,6 +62,13 @@ type User struct {
 
 	// Attributes are populated by user read statements.
 	Attributes Attributes
+
+	// Teams is the user's team memberships, populated only when the read asked
+	// for it. Nil means it was not asked for; empty means the user has none.
+	Teams []UserTeam
+	// TeamsTruncated reports that the user is on more teams than the read's
+	// cap carries. The whole list is served by ListUserTeams.
+	TeamsTruncated bool
 }
 
 type UserMetadata struct {
@@ -151,11 +158,11 @@ type CreateUser struct {
 	// nil => self-owned: the user survives team deletion and owns their own deprovisioning.
 	// set => team-owned: deleting/deactivating that team can deactivate this user per policy.
 	LifecycleOwnerTeamID *string
-	// InitialMembershipTeamID is optional roster context at create time — not lifecycle ownership.
+	// InitialMembershipTeamID is optional membership context at create time — not lifecycle ownership.
 	// When set, Create also inserts an active team_memberships row for this team and uses it as the
 	// team-scoped EAV uniqueness scope for attributes. A self-owned signup user can still set this
 	// to their default workspace team; an enterprise provisioned user may set both fields to the
-	// same tenant team, but lifecycle ownership and roster membership remain separate concerns.
+	// same tenant team, but lifecycle ownership and team membership remain separate concerns.
 	InitialMembershipTeamID *string
 	Attributes              CreateAttributes
 }
@@ -176,8 +183,8 @@ func (c *CreateUser) AttributeTeamScope() string {
 // them would type-check and write a schema url as the row's primary key.
 type CreateUserParams struct {
 	ProjectID string
-	// TeamID is optional roster context, not lifecycle ownership — it becomes
-	// [CreateUser.InitialMembershipTeamID].
+	// TeamID is optional membership context, not lifecycle ownership — it
+	// becomes [CreateUser.InitialMembershipTeamID].
 	TeamID *string
 	// ID is empty for a server-minted id; non-empty is for ceremony only.
 	ID string
