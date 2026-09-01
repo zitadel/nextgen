@@ -4,7 +4,25 @@ get:
   tags:
     - Users
   parameters:
-    - $ref: ../../../components/parameters/team-id.yaml
+    # Declared here rather than shared: `team_id` is the team parameter across
+    # the API, but what it does is the resource's own business. On a user it is
+    # membership, and saying so is the whole point of spelling it out locally.
+    - name: team_id
+      in: query
+      description: |
+        Serves the user only when they hold an active membership in this team,
+        and answers `404` otherwise.
+
+        This is team membership, not lifecycle ownership: it asks which team
+        the user collaborates in, not which team may deprovision them. The
+        owning team is reported separately as
+        `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
+        while owning their own lifecycle. See ADR 024.
+
+        Only active memberships match. A user who has been invited but has not
+        accepted is not served.
+      schema:
+        $ref: ../../../components/schemas/team-id.yaml
     - name: user_id
       in: path
       required: true

@@ -225,9 +225,15 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzError(t, delResp, "user.not_found")
 
-			listResp, err := preview.ListUsers(t.Context(), api.ListUsersParams{})
+			// queryUsers declares 403 in the contract, so the rejection comes
+			// back as the typed response rather than through the default one.
+			// The type is the status assertion; assertAuthzStatus is for the
+			// undeclared case and would read StatusCode off a struct that has
+			// none.
+			listResp, err := preview.QueryUsers(t.Context(), &api.QueryUsersRequest{})
 			require.NoError(t, err)
-			assertAuthzStatus(t, listResp, 403, "user.permission_denied")
+			require.IsType(t, &api.QueryUsersForbidden{}, listResp, helpers.MustMarshal(t, listResp))
+			assertAuthzError(t, listResp, "user.permission_denied")
 		})
 
 		t.Run("preview secret cannot delete a real user", func(t *testing.T) {
@@ -407,7 +413,7 @@ func TestManagementAuthz(t *testing.T) {
 // grant is team-scoped project.viewer gets a filtered 200, not 403.
 // QueryTeams / ListBranding / ListFlowDefinitions return the granted row and
 // omit the outsider (RSI.team_id stamped after create). ListSchemas is empty
-// because schema RSI rows are project-scoped. ListUsers is 200 [] because
+// because schema RSI rows are project-scoped. QueryUsers is 200 [] because
 // user RSI rows have NULL team_id — by-id user reads deny for the same shape.
 func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	t.Parallel()
@@ -552,10 +558,10 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.True(t, expandedFlows[0].UserSchema.Set, "expand was requested, so the property must be present")
 	assert.True(t, expandedFlows[0].UserSchema.Null, "the caller cannot read the schema, so it embeds as null")
 
-	usersResp, err := client.ListUsers(t.Context(), api.ListUsersParams{})
+	usersResp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{})
 	require.NoError(t, err)
-	require.IsType(t, &api.ListUsersResponse{}, usersResp, helpers.MustMarshal(t, usersResp))
-	assert.Empty(t, usersResp.(*api.ListUsersResponse).Users, "user RSI team_id is NULL so team-scoped lists are empty")
+	require.IsType(t, &api.QueryUsersResponse{}, usersResp, helpers.MustMarshal(t, usersResp))
+	assert.Empty(t, usersResp.(*api.QueryUsersResponse).Users, "user RSI team_id is NULL so team-scoped lists are empty")
 
 	getUser, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userIn)})
 	require.NoError(t, err)

@@ -2,7 +2,7 @@
   "title": "Users",
   "pages": [
     "createUser",
-    "listUsers",
+    "queryUsers",
     "GetUserByID",
     "getMyUser",
     "setUserPassword"

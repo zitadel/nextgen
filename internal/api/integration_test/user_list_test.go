@@ -16,12 +16,12 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// GET /users is the CLI status probe's endpoint: bearer = project secret,
-// no project parameter — the oauth2 principal is the only scope. This is
-// the HTTP e2e for exactly that call shape: empty on a fresh project, the
+// POST /users/query is the CLI status probe's endpoint: bearer = project
+// secret, no project parameter — the oauth2 principal is the only scope. This
+// is the HTTP e2e for exactly that call shape: empty on a fresh project, the
 // created users afterwards newest-first, a page-token window, and no
 // cross-project leakage.
-func TestListUsers(t *testing.T) {
+func TestQueryUsers(t *testing.T) {
 	t.Parallel()
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
@@ -37,16 +37,16 @@ func TestListUsers(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	listUsers := func(t *testing.T, params api.ListUsersParams) *api.ListUsersResponse {
+	queryUsers := func(t *testing.T, req *api.QueryUsersRequest) *api.QueryUsersResponse {
 		t.Helper()
-		res, err := client.ListUsers(t.Context(), params)
+		res, err := client.QueryUsers(t.Context(), req)
 		require.NoError(t, err)
-		require.IsType(t, &api.ListUsersResponse{}, res, helpers.MustMarshal(t, res))
-		return res.(*api.ListUsersResponse)
+		require.IsType(t, &api.QueryUsersResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.QueryUsersResponse)
 	}
-	listIDs := func(t *testing.T, params api.ListUsersParams) []string {
+	listIDs := func(t *testing.T, req *api.QueryUsersRequest) []string {
 		t.Helper()
-		list := listUsers(t, params)
+		list := queryUsers(t, req)
 		ids := make([]string, 0, len(list.Users))
 		for _, item := range list.Users {
 			ids = append(ids, userID(t, item))
@@ -55,7 +55,7 @@ func TestListUsers(t *testing.T) {
 	}
 
 	// A fresh project lists no users — the probe's "verify login first" stage.
-	empty := listUsers(t, api.ListUsersParams{})
+	empty := queryUsers(t, &api.QueryUsersRequest{})
 	assert.Empty(t, empty.Users)
 	assert.False(t, empty.NextPageToken.IsSet(), "a short page carries no cursor")
 
@@ -75,7 +75,7 @@ func TestListUsers(t *testing.T) {
 	}
 
 	// Full list: newest first, attributes hydrated, metadata attached.
-	list := listUsers(t, api.ListUsersParams{})
+	list := queryUsers(t, &api.QueryUsersRequest{})
 	require.Len(t, list.Users, 2)
 	assert.False(t, list.NextPageToken.IsSet(), "the whole result fits in one page")
 
@@ -89,19 +89,19 @@ func TestListUsers(t *testing.T) {
 	assert.False(t, metadata.CreatedAt.IsZero())
 	assert.False(t, metadata.UpdatedAt.Before(metadata.CreatedAt))
 
-	assert.Equal(t, []string{"user_list-user-02", "user_list-user-01"}, listIDs(t, api.ListUsersParams{}),
+	assert.Equal(t, []string{"user_list-user-02", "user_list-user-01"}, listIDs(t, &api.QueryUsersRequest{}),
 		"users are ordered newest first")
 
 	// The window walks backwards through creation time, one page at a time.
-	firstPage := listUsers(t, api.ListUsersParams{Limit: api.NewOptLimit(1)})
+	firstPage := queryUsers(t, &api.QueryUsersRequest{Limit: api.NewOptLimit(1)})
 	require.Len(t, firstPage.Users, 1)
 	assert.Equal(t, "user_list-user-02", userID(t, firstPage.Users[0]))
 	pageToken, ok := firstPage.NextPageToken.Get()
 	require.True(t, ok, "a full page carries a cursor")
 
-	secondPage := listUsers(t, api.ListUsersParams{
+	secondPage := queryUsers(t, &api.QueryUsersRequest{
 		Limit:     api.NewOptLimit(1),
-		PageToken: api.NewOptPageToken(pageToken),
+		PageToken: api.NewOptNilPageToken(pageToken),
 	})
 	require.Len(t, secondPage.Users, 1)
 	assert.Equal(t, "user_list-user-01", userID(t, secondPage.Users[0]))
@@ -111,9 +111,9 @@ func TestListUsers(t *testing.T) {
 	pageToken, ok = secondPage.NextPageToken.Get()
 	require.True(t, ok, "a full page carries a cursor even when it is the last one")
 
-	thirdPage := listUsers(t, api.ListUsersParams{
+	thirdPage := queryUsers(t, &api.QueryUsersRequest{
 		Limit:     api.NewOptLimit(1),
-		PageToken: api.NewOptPageToken(pageToken),
+		PageToken: api.NewOptNilPageToken(pageToken),
 	})
 	assert.Empty(t, thirdPage.Users)
 	assert.False(t, thirdPage.NextPageToken.IsSet())
@@ -126,10 +126,10 @@ func TestListUsers(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, otherClient, other)
 
-	otherRes, err := otherClient.ListUsers(t.Context(), api.ListUsersParams{})
+	otherRes, err := otherClient.QueryUsers(t.Context(), &api.QueryUsersRequest{})
 	require.NoError(t, err)
-	require.IsType(t, &api.ListUsersResponse{}, otherRes, helpers.MustMarshal(t, otherRes))
-	assert.Empty(t, otherRes.(*api.ListUsersResponse).Users)
+	require.IsType(t, &api.QueryUsersResponse{}, otherRes, helpers.MustMarshal(t, otherRes))
+	assert.Empty(t, otherRes.(*api.QueryUsersResponse).Users)
 }
 
 // userID reads the listed user's id, which the API carries on the envelope

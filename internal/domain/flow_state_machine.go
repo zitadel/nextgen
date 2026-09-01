@@ -753,16 +753,21 @@ func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *Flo
 	return false
 }
 
-// identifierFieldValues returns every identifier-class field with a collected
+// uniqueFieldValues returns every uniquely-keyed field with a collected
 // value, in field order and deduplicated by name across the given resolved
-// sets. Every x-unique property resolves as an identifier field, so this is
-// the candidate list for locating the owner of a conflicting unique value.
-func identifierFieldValues(values map[string]any, resolvedSets ...FlowResolvedFields) [][2]string {
+// sets. Conflict re-resolution is about uniqueness, not identification
+// (ADR 058): the race was lost on some unique attribute, designated or
+// not, so the candidate list keys on FlowField.Unique — the designated
+// identifier alone would miss an undesignated unique attribute (a taken
+// username beside a fresh email). The lookup behind SubmitIdentifier goes
+// through the unique-attributes registry, so probing any unique attribute
+// is well-defined regardless of designation.
+func uniqueFieldValues(values map[string]any, resolvedSets ...FlowResolvedFields) [][2]string {
 	var out [][2]string
 	seen := map[string]bool{}
 	for _, resolved := range resolvedSets {
 		for _, field := range resolved.Fields {
-			if field.Challenge != FlowFieldChallengeIdentifier || seen[field.Name] {
+			if field.Unique == AttributeUniquenessUnspecified || seen[field.Name] {
 				continue
 			}
 			raw, present := values[field.Name]
@@ -877,14 +882,14 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				// existing user on the attempt before routing — and the
 				// downstream password step requires a persisted user factor —
 				// so re-resolve the conflicting owner here to land in the
-				// same state. Every x-unique property resolves as an
-				// identifier-class field, so trying each collected one finds
-				// the owner even when the race was lost on a non-identifier
-				// unique attribute (e.g. a fresh email but a taken phone).
+				// same state. Trying every collected uniquely-keyed field
+				// finds the owner even when the race was lost on an
+				// undesignated unique attribute (e.g. a fresh email but a
+				// taken phone).
 				clearUserBoundState(state)
-				candidates := identifierFieldValues(state.CollectedData.UserData, passkeyResolved)
+				candidates := uniqueFieldValues(state.CollectedData.UserData, passkeyResolved)
 				if visited, verr := r.resolveVisitedFields(pc); verr == nil {
-					candidates = identifierFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
+					candidates = uniqueFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
 				}
 				for _, candidate := range candidates {
 					userID, rerr := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
@@ -1203,13 +1208,22 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 // progress, not just the current step.
 func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowResolvedFields, error) {
 	ctx, def, state, current := pc.ctx, pc.def, pc.state, pc.currentStep
+	// First-encounter order, not map order: consumers walk these fields
+	// positionally (uniqueFieldValues promises field order), so the union
+	// must be deterministic — visited steps in history order, fields in
+	// their step order.
 	seen := map[Field]struct{}{}
+	names := make([]Field, 0, 8)
 	collect := func(s *FlowDefinitionStep) {
 		if s == nil {
 			return
 		}
 		for _, f := range s.Fields {
+			if _, ok := seen[f]; ok {
+				continue
+			}
 			seen[f] = struct{}{}
+			names = append(names, f)
 		}
 	}
 	for _, name := range state.History {
@@ -1218,12 +1232,8 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 		}
 	}
 	collect(current)
-	if len(seen) == 0 {
+	if len(names) == 0 {
 		return FlowResolvedFields{}, nil
-	}
-	names := make([]Field, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
 	}
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {

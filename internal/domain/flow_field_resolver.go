@@ -9,8 +9,8 @@ import (
 
 // FlowFieldResolver maps property names referenced by a flow step to
 // fully-resolved [FlowField] payloads, surfaces the implicit transition
-// outcomes the schema implies (a property with `x-unique` set implies a
-// `user_not_found` outcome), and validates submitted values against the
+// outcomes the schema implies (the designated `x-identifier` property
+// implies a `user_not_found` outcome), and validates submitted values against the
 // schema-derived rules.
 //
 // The contract is shaped to the user meta-schema at
@@ -85,10 +85,10 @@ type FlowField struct {
 
 	// Challenge names the auth-attempt challenge the field maps to, or
 	// [FlowFieldChallengeNone] when the field carries neither an
-	// identifier nor a credential proof. Derivation paths: a non-empty
-	// `x-unique` annotation on the property surfaces as
-	// [FlowFieldChallengeIdentifier] (any uniquely-keyed property can
-	// identify a user); the reserved `x-auth-methods#password` field
+	// identifier nor a credential proof. Derivation paths: the field
+	// naming the schema's designated identifier (the schema-root
+	// `x-identifier` path, ADR 058) surfaces as
+	// [FlowFieldChallengeIdentifier]; the reserved `x-auth-methods#password` field
 	// name combined with `x-auth-methods.password.enabled = true` at
 	// the schema root surfaces as [FlowFieldChallengePassword]. Other
 	// credential kinds (passkey, magic_link, sso, otp) do not have
@@ -103,8 +103,8 @@ type FlowField struct {
 // FlowFieldChallenge names the auth-attempt challenge a field maps
 // to. Values mirror the keys of `x-auth-methods` in the user
 // meta-schema (api/openapi/endpoints/schemas/user-schema.yaml).
-// `identifier` is sourced from a non-empty `x-unique` scope on the
-// property; `password` is sourced from the reserved
+// `identifier` is sourced from the schema-root `x-identifier`
+// designation; `password` is sourced from the reserved
 // `x-auth-methods#password` field name combined with
 // `x-auth-methods.password.enabled` at the schema root. The remaining
 // credential values (passkey, magic_link, sso, otp) have no

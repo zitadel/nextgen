@@ -63,7 +63,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true }
+					"passkey": { "enabled": true }
 				}
 			}`),
 		},
@@ -92,7 +92,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind":    "user-schema",
 				"title":   "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true }
+					"passkey": { "enabled": true }
 				},
 				"properties": {
 					"address": {
@@ -205,7 +205,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true }
+					"passkey": { "enabled": true }
 				},
 				"properties": {
 					"email": {
@@ -391,4 +391,222 @@ func TestSchemaValidator_LatestSchemaURI(t *testing.T) {
 		_, err := v.LatestSchemaURI("unknown-kind")
 		require.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
 	})
+}
+
+func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
+	v := newTestValidator(t)
+
+	doc := func(body string) []byte {
+		return []byte(`{
+			"metaSchema": "` + testBuiltinBase + `/user-schema.json",
+			"$id": "https://example.test/schemas/my-user.json",
+			"kind": "user-schema",
+			"title": "My User",
+			` + body + `}`)
+	}
+
+	tests := []struct {
+		name    string
+		input   []byte
+		wantErr error
+	}{
+		{
+			name: "identifier on a project-unique leaf",
+			input: doc(`"x-auth-methods": {"password": {"enabled": true}},
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+		},
+		{
+			name: "identifier on a nested leaf path",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account.handle",
+				"properties": {"account": {"type": "object", "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+		},
+		{
+			name: "password enabled without a designation",
+			input: doc(`"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name:  "passkey-only schema needs no designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}}`),
+		},
+		{
+			name: "identifier naming an unknown property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "username",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a non-unique property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a team-unique property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "username",
+				"properties": {"username": {"type": "string", "x-unique": "team"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier hiding an object behind a $ref is indeterminate",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "profile",
+				"$defs": {"profile": {"type": "object", "properties": {"handle": {"type": "string"}}}},
+				"properties": {"profile": {"$ref": "#/$defs/profile", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier composed via allOf is indeterminate",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"allOf": [{"type": "string"}], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a patternProperties object is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "labels",
+				"properties": {"labels": {"patternProperties": {"^x-": {"type": "string"}}, "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an untyped property is indeterminate",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "allOf constraining a declared scalar stays a valid designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": "string", "allOf": [{"minLength": 3}], "x-unique": "project"}}`),
+		},
+		{
+			name: "inert object-only keywords on a declared scalar stay valid",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": "string", "additionalProperties": false, "x-unique": "project"}}`),
+		},
+		{
+			name: "a nullable scalar union is a valid designation target",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["null", "string"], "x-unique": "project"}}`),
+		},
+		{
+			name: "an all-scalar type union is rejected like the flow resolver rejects it",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["string", "integer"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a null-only type cannot identify anyone",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": "null", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a null-only union cannot identify anyone",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["null"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a scalar-typed schema root cannot carry a designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"type": "string",
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "an intermediate segment on a scalar-typed parent is unreachable",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "a.b",
+				"properties": {"a": {"type": "string", "properties": {
+					"b": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a nullable-object intermediate segment is reachable",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account.handle",
+				"properties": {"account": {"type": ["null", "object"], "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+		},
+		{
+			name: "identifier on an implicit object (properties without type)",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account",
+				"properties": {"account": {"properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an array is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "emails",
+				"properties": {"emails": {"items": {"type": "string"}, "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a nullable-object type union is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "profile",
+				"properties": {"profile": {"type": ["null", "object"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an object is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account",
+				"properties": {"account": {"type": "object", "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "display on leaves without uniqueness",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["givenName", "name.family"],
+				"properties": {
+					"givenName": {"type": "string"},
+					"name": {"type": "object", "properties": {"family": {"type": "string"}}}}`),
+		},
+		{
+			name: "display naming an unknown property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["nickname"],
+				"properties": {"email": {"type": "string"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "display entry must be a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["name"],
+				"properties": {"name": {"type": "object", "properties": {"family": {"type": "string"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.ValidateAgainstMetaSchema(tt.input)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
 }

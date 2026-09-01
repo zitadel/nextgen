@@ -165,10 +165,6 @@ type ListUserTeamsRes interface {
 	listUserTeamsRes()
 }
 
-type ListUsersRes interface {
-	listUsersRes()
-}
-
 type PatchProjectRes interface {
 	patchProjectRes()
 }
@@ -183,6 +179,10 @@ type QuerySessionsRes interface {
 
 type QueryTeamsRes interface {
 	queryTeamsRes()
+}
+
+type QueryUsersRes interface {
+	queryUsersRes()
 }
 
 type RevokeMySessionRes interface {

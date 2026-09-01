@@ -37,6 +37,26 @@ WHERE project_id = @p1 AND user_id IN UNNEST(@p2)`
 	userAttributesByIDsAndKeysQuery = userAttributesByIDsQuery + `
 AND key IN UNNEST(@p3)`
 
+	// userTeamsByIDsQuery hydrates the team memberships of one page of users
+	// (ADR 059), ordered so each user's rows arrive together and by team name.
+	//
+	// No per-user ROW_NUMBER window to bound the read: the emulator answers
+	// "Analytic functions not supported", and stmttest holds all three
+	// dialects to the same behavior. The cap is applied in Go instead.
+	userTeamsByIDsQuery = `SELECT m.user_id, m.team_id, t.name, m.status, m.created_at, m.updated_at
+FROM team_memberships m
+JOIN teams t ON t.project_id = m.project_id AND t.id = m.team_id
+WHERE m.project_id = @p1
+  AND m.user_id IN UNNEST(@p2)
+  AND m.status IN UNNEST(@p3)
+ORDER BY m.user_id, t.name, m.team_id`
+
+	// ownerTeamsByIDsQuery hydrates the lifecycle owner teams of one page of
+	// users (ADR 059), keyed on the distinct owner ids the page returned.
+	ownerTeamsByIDsQuery = `SELECT id, name, status, created_at, updated_at
+FROM teams
+WHERE project_id = @p1 AND id IN UNNEST(@p2)`
+
 	deactivateUserStmt = `UPDATE users SET status = @p1, updated_at = CURRENT_TIMESTAMP()
 WHERE project_id = @p2 AND id = @p3`
 
@@ -295,7 +315,11 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		return nil
 	}
 
-	for _, group := range v2user.GroupByProject(users) {
+	// Grouped once and reused: GroupByProject clears Attributes, so a second
+	// pass would wipe the ones this call just hydrated.
+	groups := v2user.GroupByProject(users)
+
+	for _, group := range groups {
 		stmt := buildStatement(userAttributesByIDsQuery, group.ProjectID, group.IDs).statement()
 		if len(opts.AttributeKeys) > 0 {
 			stmt = buildStatement(userAttributesByIDsAndKeysQuery, group.ProjectID, group.IDs, opts.AttributeKeys).statement()
@@ -316,6 +340,85 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 					return nil
 				}
 				user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
+				return nil
+			})
+		}); err != nil {
+			return err
+		}
+	}
+
+	if opts.IncludeTeams {
+		if err := us.hydrateUserTeams(ctx, groups, opts); err != nil {
+			return err
+		}
+	}
+	if opts.IncludeLifecycleOwnerTeam {
+		return us.hydrateUserOwnerTeams(ctx, groups)
+	}
+	return nil
+}
+
+// hydrateUserTeams loads the team memberships of an already-read page of users
+// (ADR 059): one batched query per project group, keyed on the ids the page already
+// returned. Joining memberships into the user query instead would multiply rows
+// — LIMIT would count memberships rather than users, and the keyset cursor is
+// marshalled from the last row's sort values, so fan-out corrupts it.
+func (us userStatements) hydrateUserTeams(ctx context.Context, groups []v2user.ProjectGroup, opts service.UserQueryOptions) error {
+	limit := opts.TeamsLimit
+	if limit <= 0 {
+		limit = service.DefaultUserTeamsLimit
+	}
+
+	for _, group := range groups {
+		collector := v2user.NewTeamCollector(group, limit)
+		stmt := buildStatement(userTeamsByIDsQuery, group.ProjectID, group.IDs, v2user.MembershipStatusStrings()).statement()
+		if err := us.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+			return iter.Do(func(row *spanner.Row) error {
+				var (
+					userID string
+					team   domain.UserTeam
+					status string
+				)
+				if err := row.Columns(&userID, &team.TeamID, &team.TeamName, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+					return err
+				}
+				team.ProjectID = group.ProjectID
+				team.UserID = userID
+				team.Status = domain.MembershipStatus(status)
+				collector.Add(userID, team)
+				return nil
+			})
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// hydrateUserOwnerTeams loads the lifecycle owner teams of an already-read page
+// of users (ADR 059), keyed on the distinct owner ids the page returned. A
+// group of self-owned users runs no query at all.
+func (us userStatements) hydrateUserOwnerTeams(ctx context.Context, groups []v2user.ProjectGroup) error {
+	for _, group := range groups {
+		collector := v2user.NewOwnerTeamCollector(group)
+		teamIDs := collector.TeamIDs()
+		if len(teamIDs) == 0 {
+			continue
+		}
+
+		stmt := buildStatement(ownerTeamsByIDsQuery, group.ProjectID, teamIDs).statement()
+		if err := us.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+			return iter.Do(func(row *spanner.Row) error {
+				var (
+					team   domain.Team
+					status string
+				)
+				if err := row.Columns(&team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+					return err
+				}
+				team.ProjectID = group.ProjectID
+				team.Status = domain.TeamStatus(status)
+				collector.Add(team)
 				return nil
 			})
 		}); err != nil {

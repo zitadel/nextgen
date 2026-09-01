@@ -22,7 +22,7 @@ export function userAttributes(user: Record<string, unknown>): Record<string, un
  * (`packages/config/defaults/*.json`); snake_case stays accepted for schemas
  * authored that way.
  *
- * User schemas are free-form and `listUsers` returns the attribute tree verbatim,
+ * User schemas are free-form and `queryUsers` returns the attribute tree verbatim,
  * so this reads only the conventional identity keys and returns `undefined` when
  * a schema names its properties differently. Callers fall back to the email and
  * then the id — inventing a name from an unrelated attribute is worse than

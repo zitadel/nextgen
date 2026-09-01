@@ -45,7 +45,7 @@ func conflictSchemaDocument(schemaID string) []byte {
       "metaSchema": "%s/user-schema.json",
       "kind": "user-schema",
       "type": "object",
-      "x-auth-methods": { "password": { "enabled": true } },
+      "x-auth-methods": { "passkey": { "enabled": true } },
       "properties": { "givenName": { "type": "string" } }
     }`, schemaID, conflictSchemaBase)
 }
