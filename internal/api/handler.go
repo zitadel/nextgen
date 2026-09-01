@@ -32,6 +32,9 @@ type Handler struct {
 	// Empty means the platform project is unresolved, so claim/complete rejects
 	// every session.
 	platformProjectID string
+	// personalTeams is optional (see WithPersonalTeamEnsurer); nil skips the
+	// exchange-time ensure.
+	personalTeams service.PersonalTeamEnsurer
 }
 
 func NewHandler(
@@ -68,6 +71,15 @@ func NewHandler(
 		pool:                  pool,
 		platformProjectID:     platformProjectID,
 	}
+}
+
+// WithPersonalTeamEnsurer wires the session-exchange self-heal for platform
+// personal teams (#527). A chainable setter rather than a constructor
+// parameter so the existing NewHandler call sites (tests included) stay
+// untouched; without it the exchange simply skips the ensure.
+func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handler {
+	h.personalTeams = e
+	return h
 }
 
 // NewError implements the api.Handler interface and is used by ogen to convert any error

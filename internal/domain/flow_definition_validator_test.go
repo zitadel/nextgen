@@ -38,6 +38,7 @@ var tenantUserSchemaNoAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/no-auth-methods.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "properties": {
     "email": { "type": "string", "format": "email", "x-unique": "team" }
@@ -48,6 +49,7 @@ var tenantUserSchemaEmptyAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/empty-auth-methods.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {},
   "properties": {
@@ -59,6 +61,7 @@ var tenantUserSchemaDisabledAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/disabled-auth-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": false }
@@ -72,6 +75,7 @@ var userSchemaIDAndPassword = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/idpw-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": true }
@@ -85,6 +89,7 @@ var userSchemaPasskeyEnabled = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/passkey-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": true },
@@ -99,6 +104,7 @@ var userSchemaPasskeyDisabled = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/passkey-disabled-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": true },

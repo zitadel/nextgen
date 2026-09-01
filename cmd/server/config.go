@@ -73,6 +73,24 @@ func (c PlatformConfig) ResolvedProjectID() string {
 	return c.ProjectID
 }
 
+// ProvisioningProjectID is the project that receives platform-plane
+// provisioning side effects (personal teams, #527): the built-in platform id
+// when bootstrap_project opted in, empty otherwise — and an empty id turns
+// the provisioning into a universal no-op.
+//
+// Deliberately NOT ResolvedProjectID: a standalone deployment that pins
+// platform.project_id is naming its console default project (Console ADR
+// 0004 §2), not opting into the platform plane — and its end-user
+// registrations must not mint personal teams. BootstrapProject is the one
+// explicit opt-in (#736), extending #605's rule that no environment gets
+// platform provisioning silently.
+func (c PlatformConfig) ProvisioningProjectID() string {
+	if c.BootstrapProject {
+		return domain.PlatformProjectID
+	}
+	return ""
+}
+
 func (c Config) Validate() error {
 	for _, validate := range []func() error{
 		c.Session.Validate,
