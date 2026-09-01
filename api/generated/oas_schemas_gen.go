@@ -20391,6 +20391,7 @@ type ListUsersErrorResponse struct {
 	Type                 ListUsersErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
@@ -20403,6 +20404,7 @@ type ListUsersErrorResponseType string
 const (
 	AuthUnauthorizedListUsersErrorResponse     ListUsersErrorResponseType = "auth.unauthorized"
 	InternalListUsersErrorResponse             ListUsersErrorResponseType = "internal"
+	NotImplementedListUsersErrorResponse       ListUsersErrorResponseType = "not_implemented"
 	ReqInvalidListUsersErrorResponse           ListUsersErrorResponseType = "req.invalid"
 	UserNotFoundListUsersErrorResponse         ListUsersErrorResponseType = "user.not_found"
 	UserPermissionDeniedListUsersErrorResponse ListUsersErrorResponseType = "user.permission_denied"
@@ -20415,6 +20417,11 @@ func (s ListUsersErrorResponse) IsAuthUnauthorized() bool {
 
 // IsInternal reports whether ListUsersErrorResponse is Internal.
 func (s ListUsersErrorResponse) IsInternal() bool { return s.Type == InternalListUsersErrorResponse }
+
+// IsNotImplemented reports whether ListUsersErrorResponse is NotImplemented.
+func (s ListUsersErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListUsersErrorResponse
+}
 
 // IsReqInvalid reports whether ListUsersErrorResponse is ReqInvalid.
 func (s ListUsersErrorResponse) IsReqInvalid() bool {
@@ -20470,6 +20477,27 @@ func (s ListUsersErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListUsersErrorResponse(v Internal) ListUsersErrorResponse {
 	var s ListUsersErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListUsersErrorResponse to NotImplemented.
+func (s *ListUsersErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListUsersErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListUsersErrorResponse is NotImplemented.
+func (s ListUsersErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListUsersErrorResponse returns new ListUsersErrorResponse from NotImplemented.
+func NewNotImplementedListUsersErrorResponse(v NotImplemented) ListUsersErrorResponse {
+	var s ListUsersErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -27708,6 +27736,52 @@ func (o OptQueryTeamsRequestSorting) Or(d QueryTeamsRequestSorting) QueryTeamsRe
 	return d
 }
 
+// NewOptQueryUsersRequestSorting returns new OptQueryUsersRequestSorting with value set to v.
+func NewOptQueryUsersRequestSorting(v QueryUsersRequestSorting) OptQueryUsersRequestSorting {
+	return OptQueryUsersRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryUsersRequestSorting is optional QueryUsersRequestSorting.
+type OptQueryUsersRequestSorting struct {
+	Value QueryUsersRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryUsersRequestSorting was set.
+func (o OptQueryUsersRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryUsersRequestSorting) Reset() {
+	var v QueryUsersRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryUsersRequestSorting) SetTo(v QueryUsersRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryUsersRequestSorting) Get() (v QueryUsersRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryUsersRequestSorting) Or(d QueryUsersRequestSorting) QueryUsersRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptReqInvalidDetails returns new OptReqInvalidDetails with value set to v.
 func NewOptReqInvalidDetails(v ReqInvalidDetails) OptReqInvalidDetails {
 	return OptReqInvalidDetails{
@@ -32637,6 +32711,372 @@ func (*QueryTeamsTooManyRequests) queryTeamsRes() {}
 type QueryTeamsUnauthorized ErrorDetails
 
 func (*QueryTeamsUnauthorized) queryTeamsRes() {}
+
+type QueryUsersBadRequest ErrorDetails
+
+func (*QueryUsersBadRequest) queryUsersRes() {}
+
+// QueryUsersErrorResponse represents sum type.
+type QueryUsersErrorResponse struct {
+	Type                 QueryUsersErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ReqInvalid           ReqInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// QueryUsersErrorResponseType is oneOf type of QueryUsersErrorResponse.
+type QueryUsersErrorResponseType string
+
+// Possible values for QueryUsersErrorResponseType.
+const (
+	AuthUnauthorizedQueryUsersErrorResponse     QueryUsersErrorResponseType = "auth.unauthorized"
+	InternalQueryUsersErrorResponse             QueryUsersErrorResponseType = "internal"
+	NotImplementedQueryUsersErrorResponse       QueryUsersErrorResponseType = "not_implemented"
+	ReqInvalidQueryUsersErrorResponse           QueryUsersErrorResponseType = "req.invalid"
+	UserNotFoundQueryUsersErrorResponse         QueryUsersErrorResponseType = "user.not_found"
+	UserPermissionDeniedQueryUsersErrorResponse QueryUsersErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether QueryUsersErrorResponse is AuthUnauthorized.
+func (s QueryUsersErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedQueryUsersErrorResponse
+}
+
+// IsInternal reports whether QueryUsersErrorResponse is Internal.
+func (s QueryUsersErrorResponse) IsInternal() bool { return s.Type == InternalQueryUsersErrorResponse }
+
+// IsNotImplemented reports whether QueryUsersErrorResponse is NotImplemented.
+func (s QueryUsersErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryUsersErrorResponse
+}
+
+// IsReqInvalid reports whether QueryUsersErrorResponse is ReqInvalid.
+func (s QueryUsersErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryUsersErrorResponse
+}
+
+// IsUserNotFound reports whether QueryUsersErrorResponse is UserNotFound.
+func (s QueryUsersErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundQueryUsersErrorResponse
+}
+
+// IsUserPermissionDenied reports whether QueryUsersErrorResponse is UserPermissionDenied.
+func (s QueryUsersErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedQueryUsersErrorResponse
+}
+
+// SetAuthUnauthorized sets QueryUsersErrorResponse to AuthUnauthorized.
+func (s *QueryUsersErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedQueryUsersErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if QueryUsersErrorResponse is AuthUnauthorized.
+func (s QueryUsersErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedQueryUsersErrorResponse returns new QueryUsersErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedQueryUsersErrorResponse(v AuthUnauthorized) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets QueryUsersErrorResponse to Internal.
+func (s *QueryUsersErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryUsersErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryUsersErrorResponse is Internal.
+func (s QueryUsersErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryUsersErrorResponse returns new QueryUsersErrorResponse from Internal.
+func NewInternalQueryUsersErrorResponse(v Internal) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryUsersErrorResponse to NotImplemented.
+func (s *QueryUsersErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryUsersErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryUsersErrorResponse is NotImplemented.
+func (s QueryUsersErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryUsersErrorResponse returns new QueryUsersErrorResponse from NotImplemented.
+func NewNotImplementedQueryUsersErrorResponse(v NotImplemented) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets QueryUsersErrorResponse to ReqInvalid.
+func (s *QueryUsersErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryUsersErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryUsersErrorResponse is ReqInvalid.
+func (s QueryUsersErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryUsersErrorResponse returns new QueryUsersErrorResponse from ReqInvalid.
+func NewReqInvalidQueryUsersErrorResponse(v ReqInvalid) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets QueryUsersErrorResponse to UserNotFound.
+func (s *QueryUsersErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundQueryUsersErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if QueryUsersErrorResponse is UserNotFound.
+func (s QueryUsersErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundQueryUsersErrorResponse returns new QueryUsersErrorResponse from UserNotFound.
+func NewUserNotFoundQueryUsersErrorResponse(v UserNotFound) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets QueryUsersErrorResponse to UserPermissionDenied.
+func (s *QueryUsersErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedQueryUsersErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if QueryUsersErrorResponse is UserPermissionDenied.
+func (s QueryUsersErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedQueryUsersErrorResponse returns new QueryUsersErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedQueryUsersErrorResponse(v UserPermissionDenied) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// QueryUsersErrorResponseStatusCode wraps QueryUsersErrorResponse with StatusCode.
+type QueryUsersErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryUsersErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryUsersErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryUsersErrorResponseStatusCode) GetResponse() QueryUsersErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryUsersErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryUsersErrorResponseStatusCode) SetResponse(val QueryUsersErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryUsersErrorResponseStatusCode) queryUsersRes() {}
+
+type QueryUsersForbidden ErrorDetails
+
+func (*QueryUsersForbidden) queryUsersRes() {}
+
+// Request to query the users of a project.
+// Ref: #
+type QueryUsersRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results. Must be sent with the same
+	// `sorting` as the request that issued the token. Omitting `sorting` reuses
+	// the default sort and only succeeds when that default matches the token.
+	PageToken OptNilPageToken             `json:"page_token"`
+	Sorting   OptQueryUsersRequestSorting `json:"sorting"`
+	// Filter criteria for querying users. Criteria are combined with AND.
+	Filter []QueryUsersRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryUsersRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryUsersRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryUsersRequest) GetSorting() OptQueryUsersRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryUsersRequest) GetFilter() []QueryUsersRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryUsersRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryUsersRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryUsersRequest) SetSorting(val OptQueryUsersRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryUsersRequest) SetFilter(val []QueryUsersRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryUsersRequestFilterItem struct {
+	// The field to filter by.
+	Field     UserFilterField `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryUsersRequestFilterItem) GetField() UserFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryUsersRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryUsersRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryUsersRequestFilterItem) SetField(val UserFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryUsersRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryUsersRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryUsersRequestSorting struct {
+	// The field to sort by.
+	Field UserSortField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryUsersRequestSorting) GetField() UserSortField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryUsersRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryUsersRequestSorting) SetField(val UserSortField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryUsersRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of users.
+// Ref: #
+type QueryUsersResponse struct {
+	Users []User `json:"users"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetUsers returns the value of Users.
+func (s *QueryUsersResponse) GetUsers() []User {
+	return s.Users
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryUsersResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetUsers sets the value of Users.
+func (s *QueryUsersResponse) SetUsers(val []User) {
+	s.Users = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryUsersResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryUsersResponse) queryUsersRes() {}
+
+type QueryUsersUnauthorized ErrorDetails
+
+func (*QueryUsersUnauthorized) queryUsersRes() {}
 
 // Merged schema.
 // Ref: #
@@ -41157,6 +41597,81 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
+// Field to filter users by:
+// - `created_at`: RFC3339 timestamp
+// - `id`: user id
+// - `schema`: the schema the user's attributes satisfy, matched against the
+// value the user carries as `schema`
+// - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
+// - `lifecycle_owner_team_id`: the team that owns the user's identity
+// lifecycle — who may deprovision them (ADR 024). This is not team
+// participation: a user's roster is a separate collection, read at
+// `GET /users/{user_id}/teams`. The column is nullable for self-owned users,
+// and a null filter value is rejected, so self-owned users cannot be selected
+// by this field.
+// Ref: #
+type UserFilterField string
+
+const (
+	UserFilterFieldCreatedAt            UserFilterField = "created_at"
+	UserFilterFieldID                   UserFilterField = "id"
+	UserFilterFieldSchema               UserFilterField = "schema"
+	UserFilterFieldStatus               UserFilterField = "status"
+	UserFilterFieldLifecycleOwnerTeamID UserFilterField = "lifecycle_owner_team_id"
+)
+
+// AllValues returns all UserFilterField values.
+func (UserFilterField) AllValues() []UserFilterField {
+	return []UserFilterField{
+		UserFilterFieldCreatedAt,
+		UserFilterFieldID,
+		UserFilterFieldSchema,
+		UserFilterFieldStatus,
+		UserFilterFieldLifecycleOwnerTeamID,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case UserFilterFieldCreatedAt:
+		return []byte(s), nil
+	case UserFilterFieldID:
+		return []byte(s), nil
+	case UserFilterFieldSchema:
+		return []byte(s), nil
+	case UserFilterFieldStatus:
+		return []byte(s), nil
+	case UserFilterFieldLifecycleOwnerTeamID:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserFilterField) UnmarshalText(data []byte) error {
+	switch UserFilterField(data) {
+	case UserFilterFieldCreatedAt:
+		*s = UserFilterFieldCreatedAt
+		return nil
+	case UserFilterFieldID:
+		*s = UserFilterFieldID
+		return nil
+	case UserFilterFieldSchema:
+		*s = UserFilterFieldSchema
+		return nil
+	case UserFilterFieldStatus:
+		*s = UserFilterFieldStatus
+		return nil
+	case UserFilterFieldLifecycleOwnerTeamID:
+		*s = UserFilterFieldLifecycleOwnerTeamID
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type UserID string
 
 // Merged schema.
@@ -41719,6 +42234,74 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 		*s = m
 	}
 	return m
+}
+
+// Field to sort users by. Only stored columns are sortable: the keyset cursor
+// holds the last row's sort values, so a value computed per request would skip
+// or duplicate rows between pages.
+// Sorting by `lifecycle_owner_team_id` groups self-owned users together, since
+// the column is null for them.
+// Ref: #
+type UserSortField string
+
+const (
+	UserSortFieldCreatedAt            UserSortField = "created_at"
+	UserSortFieldID                   UserSortField = "id"
+	UserSortFieldSchema               UserSortField = "schema"
+	UserSortFieldStatus               UserSortField = "status"
+	UserSortFieldLifecycleOwnerTeamID UserSortField = "lifecycle_owner_team_id"
+)
+
+// AllValues returns all UserSortField values.
+func (UserSortField) AllValues() []UserSortField {
+	return []UserSortField{
+		UserSortFieldCreatedAt,
+		UserSortFieldID,
+		UserSortFieldSchema,
+		UserSortFieldStatus,
+		UserSortFieldLifecycleOwnerTeamID,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserSortField) MarshalText() ([]byte, error) {
+	switch s {
+	case UserSortFieldCreatedAt:
+		return []byte(s), nil
+	case UserSortFieldID:
+		return []byte(s), nil
+	case UserSortFieldSchema:
+		return []byte(s), nil
+	case UserSortFieldStatus:
+		return []byte(s), nil
+	case UserSortFieldLifecycleOwnerTeamID:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserSortField) UnmarshalText(data []byte) error {
+	switch UserSortField(data) {
+	case UserSortFieldCreatedAt:
+		*s = UserSortFieldCreatedAt
+		return nil
+	case UserSortFieldID:
+		*s = UserSortFieldID
+		return nil
+	case UserSortFieldSchema:
+		*s = UserSortFieldSchema
+		return nil
+	case UserSortFieldStatus:
+		*s = UserSortFieldStatus
+		return nil
+	case UserSortFieldLifecycleOwnerTeamID:
+		*s = UserSortFieldLifecycleOwnerTeamID
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // One entry of a user's team roster: a team the user belongs to, with the

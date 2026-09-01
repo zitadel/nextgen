@@ -180,6 +180,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryTeamsOperation: []string{
 		"team.read",
 	},
+	QueryUsersOperation: []string{
+		"user.read",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},

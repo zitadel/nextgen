@@ -167,7 +167,7 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `user.create` | `POST /users` | |
-| `user.read` | `GET /users`, `GET /users/{id}` | Get + list; full representation for now. |
+| `user.read` | `POST /users/query`, `GET /users`, `GET /users/{id}` | Get + list; full representation for now. `POST /users/query` is the structured-filter list (ADR 031) and, unlike the other query endpoints, takes no `project_id` — the credential's project is the only authority. |
 | `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` is **not yet exposed**. |
 | `user.set_password` | `PUT /users/{id}/password` | **Credential-tier, account-takeover-grade.** Admin sets/resets *another* user's password. Held separately so a profile-editor / help-desk role can hold `user.write` without it. OpenAPI tags this endpoint `user.write` today (see [Drift notes](#drift-notes)). Reserve `user.reset_mfa` / similar for future admin factor-reset endpoints. |
 | `user.delete` | `DELETE /users/{id}` | **Not yet exposed**. |

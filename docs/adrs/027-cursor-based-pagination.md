@@ -9,6 +9,9 @@
 > `GET /users` takes `limit` + `page_token`, and the storage layer implements
 > keyset pagination via `ListOptions`/`CursorToken`. *(2026-08-22: `GET /schemas`,
 > the last offset/limit holdout, now pages by cursor — #924.)*
+> *(2026-08-26: `POST /users/query` joins the structured-query contract. It is
+> the first one with no `project_id` parameter — the users list takes its
+> project from the credential.)*
 
 ## Decision
 

@@ -37612,6 +37612,22 @@ func (s ListUsersErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListUsersErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -37692,6 +37708,9 @@ func (s *ListUsersErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListUsersErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListUsersErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListUsersErrorResponse
 					found = true
@@ -37721,6 +37740,10 @@ func (s *ListUsersErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalListUsersErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedListUsersErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidListUsersErrorResponse:
@@ -43159,6 +43182,39 @@ func (s OptQueryTeamsRequestSorting) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptQueryTeamsRequestSorting) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes QueryUsersRequestSorting as json.
+func (o OptQueryUsersRequestSorting) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes QueryUsersRequestSorting from json.
+func (o *OptQueryUsersRequestSorting) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptQueryUsersRequestSorting to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptQueryUsersRequestSorting) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptQueryUsersRequestSorting) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -51255,6 +51311,810 @@ func (s *QueryTeamsUnauthorized) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *QueryTeamsUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes QueryUsersBadRequest as json.
+func (s *QueryUsersBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes QueryUsersBadRequest from json.
+func (s *QueryUsersBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = QueryUsersBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryUsersBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes QueryUsersErrorResponse as json.
+func (s QueryUsersErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s QueryUsersErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPermissionDeniedQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.permission_denied")
+		{
+			s := s.UserPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes QueryUsersErrorResponse from json.
+func (s *QueryUsersErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedQueryUsersErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalQueryUsersErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedQueryUsersErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidQueryUsersErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundQueryUsersErrorResponse
+					found = true
+				case "user.permission_denied":
+					s.Type = UserPermissionDeniedQueryUsersErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedQueryUsersErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalQueryUsersErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedQueryUsersErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidQueryUsersErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundQueryUsersErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UserPermissionDeniedQueryUsersErrorResponse:
+		if err := s.UserPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s QueryUsersErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes QueryUsersForbidden as json.
+func (s *QueryUsersForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes QueryUsersForbidden from json.
+func (s *QueryUsersForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = QueryUsersForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryUsersForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *QueryUsersRequest) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryUsersRequest) encodeFields(e *jx.Encoder) {
+	{
+		if s.Limit.Set {
+			e.FieldStart("limit")
+			s.Limit.Encode(e)
+		}
+	}
+	{
+		if s.PageToken.Set {
+			e.FieldStart("page_token")
+			s.PageToken.Encode(e)
+		}
+	}
+	{
+		if s.Sorting.Set {
+			e.FieldStart("sorting")
+			s.Sorting.Encode(e)
+		}
+	}
+	{
+		if s.Filter != nil {
+			e.FieldStart("filter")
+			e.ArrStart()
+			for _, elem := range s.Filter {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+}
+
+var jsonFieldsNameOfQueryUsersRequest = [4]string{
+	0: "limit",
+	1: "page_token",
+	2: "sorting",
+	3: "filter",
+}
+
+// Decode decodes QueryUsersRequest from json.
+func (s *QueryUsersRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersRequest to nil")
+	}
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "limit":
+			if err := func() error {
+				s.Limit.Reset()
+				if err := s.Limit.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"limit\"")
+			}
+		case "page_token":
+			if err := func() error {
+				s.PageToken.Reset()
+				if err := s.PageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"page_token\"")
+			}
+		case "sorting":
+			if err := func() error {
+				s.Sorting.Reset()
+				if err := s.Sorting.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"sorting\"")
+			}
+		case "filter":
+			if err := func() error {
+				s.Filter = make([]QueryUsersRequestFilterItem, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem QueryUsersRequestFilterItem
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Filter = append(s.Filter, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"filter\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryUsersRequest")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryUsersRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *QueryUsersRequestFilterItem) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryUsersRequestFilterItem) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("field")
+		s.Field.Encode(e)
+	}
+	{
+		if s.Value.Set {
+			e.FieldStart("value")
+			s.Value.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("operation")
+		s.Operation.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfQueryUsersRequestFilterItem = [3]string{
+	0: "field",
+	1: "value",
+	2: "operation",
+}
+
+// Decode decodes QueryUsersRequestFilterItem from json.
+func (s *QueryUsersRequestFilterItem) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersRequestFilterItem to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "field":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Field.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"field\"")
+			}
+		case "value":
+			if err := func() error {
+				s.Value.Reset()
+				if err := s.Value.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"value\"")
+			}
+		case "operation":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Operation.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"operation\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryUsersRequestFilterItem")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000101,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfQueryUsersRequestFilterItem) {
+					name = jsonFieldsNameOfQueryUsersRequestFilterItem[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryUsersRequestFilterItem) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersRequestFilterItem) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *QueryUsersRequestSorting) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryUsersRequestSorting) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("field")
+		s.Field.Encode(e)
+	}
+	{
+		e.FieldStart("direction")
+		s.Direction.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfQueryUsersRequestSorting = [2]string{
+	0: "field",
+	1: "direction",
+}
+
+// Decode decodes QueryUsersRequestSorting from json.
+func (s *QueryUsersRequestSorting) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersRequestSorting to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "field":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Field.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"field\"")
+			}
+		case "direction":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Direction.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"direction\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryUsersRequestSorting")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfQueryUsersRequestSorting) {
+					name = jsonFieldsNameOfQueryUsersRequestSorting[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryUsersRequestSorting) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersRequestSorting) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *QueryUsersResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryUsersResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("users")
+		e.ArrStart()
+		for _, elem := range s.Users {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfQueryUsersResponse = [2]string{
+	0: "users",
+	1: "next_page_token",
+}
+
+// Decode decodes QueryUsersResponse from json.
+func (s *QueryUsersResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "users":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Users = make([]User, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem User
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Users = append(s.Users, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"users\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryUsersResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfQueryUsersResponse) {
+					name = jsonFieldsNameOfQueryUsersResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryUsersResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes QueryUsersUnauthorized as json.
+func (s *QueryUsersUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes QueryUsersUnauthorized from json.
+func (s *QueryUsersUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryUsersUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = QueryUsersUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryUsersUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryUsersUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -64932,6 +65792,52 @@ func (s *UserDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes UserFilterField as json.
+func (s UserFilterField) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes UserFilterField from json.
+func (s *UserFilterField) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserFilterField to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch UserFilterField(v) {
+	case UserFilterFieldCreatedAt:
+		*s = UserFilterFieldCreatedAt
+	case UserFilterFieldID:
+		*s = UserFilterFieldID
+	case UserFilterFieldSchema:
+		*s = UserFilterFieldSchema
+	case UserFilterFieldStatus:
+		*s = UserFilterFieldStatus
+	case UserFilterFieldLifecycleOwnerTeamID:
+		*s = UserFilterFieldLifecycleOwnerTeamID
+	default:
+		*s = UserFilterField(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserFilterField) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserFilterField) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes UserID as json.
 func (s UserID) Encode(e *jx.Encoder) {
 	unwrapped := string(s)
@@ -66364,6 +67270,52 @@ func (s UserSchemaProperties) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserSchemaProperties) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserSortField as json.
+func (s UserSortField) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes UserSortField from json.
+func (s *UserSortField) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserSortField to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch UserSortField(v) {
+	case UserSortFieldCreatedAt:
+		*s = UserSortFieldCreatedAt
+	case UserSortFieldID:
+		*s = UserSortFieldID
+	case UserSortFieldSchema:
+		*s = UserSortFieldSchema
+	case UserSortFieldStatus:
+		*s = UserSortFieldStatus
+	case UserSortFieldLifecycleOwnerTeamID:
+		*s = UserSortFieldLifecycleOwnerTeamID
+	default:
+		*s = UserSortField(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserSortField) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserSortField) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

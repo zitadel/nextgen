@@ -52,6 +52,7 @@ const (
 	QueryProjectsOperation                 OperationName = "QueryProjects"
 	QuerySessionsOperation                 OperationName = "QuerySessions"
 	QueryTeamsOperation                    OperationName = "QueryTeams"
+	QueryUsersOperation                    OperationName = "QueryUsers"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"

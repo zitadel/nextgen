@@ -97,6 +97,57 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	return resp, nil
 }
 
+// QueryUsers is the structured-filter list (ADR 031). Like ListUsers it takes
+// no project parameter: the oauth2 principal is the only authority for which
+// project's users are served, so the scope check is what keeps a browser-plane
+// preview secret out.
+func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
+	scopeCtx, _ := GetScopeContext(ctx)
+	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := h.userService.ListUsers(ctx, mapQueryUsersToService(scopeCtx.ProjectID, req))
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &api.QueryUsersResponse{
+		Users: make([]api.User, 0, len(users.Items)),
+	}
+	if users.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(users.NextPageToken))
+	}
+	for _, user := range users.Items {
+		u, err := domainUserToApiUser(user)
+		if err != nil {
+			return nil, err
+		}
+		resp.Users = append(resp.Users, *u)
+	}
+
+	return resp, nil
+}
+
+func mapQueryUsersToService(projectID string, req *api.QueryUsersRequest) service.ListUsersInput {
+	input := service.ListUsersInput{
+		ProjectID: projectID,
+		// The decoder fills this with the schema's default (20) when the body
+		// omits it, and the schema floors it at 1; the service still normalizes,
+		// which is what bounds callers that reach it without going through HTTP.
+		Limit:     int(req.Limit.Or(0)),
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		input.Sorting = sortingToService(sorting.Field, sorting.Direction)
+	}
+	for _, filter := range req.Filter {
+		input.Filters = append(input.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
+	}
+	return input
+}
+
 func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPasskeysParams) (api.ListUserPasskeysRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {

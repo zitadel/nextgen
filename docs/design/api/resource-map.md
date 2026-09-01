@@ -95,7 +95,11 @@ Create/list with explicit scope:
 ```http
 POST /users?project_id=…        # body: { schema, attributes: { email, ... } }
 GET  /users?limit=…&page_token=…   # cursor-paginated list
+POST /users/query               # structured filters + cursor pagination (ADR 031)
 ```
+
+`POST /users/query` takes no `project_id`, unlike the other query endpoints:
+the users list is bound to the token's own project by construction.
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
 and credentials, and deactivates memberships. Teams and resources the user

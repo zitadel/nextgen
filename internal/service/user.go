@@ -3,12 +3,21 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+const (
+	userFieldCreatedAt            = "created_at"
+	userFieldID                   = "id"
+	userFieldSchema               = "schema"
+	userFieldStatus               = "status"
+	userFieldLifecycleOwnerTeamID = "lifecycle_owner_team_id"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -45,6 +54,8 @@ type ListUsersInput struct {
 	ProjectID string
 	PageToken string
 	Limit     int
+	Sorting   *Sorting // optional; defaults to createdAt desc
+	Filters   []Filter
 }
 
 type ListPasskeysInput struct {
@@ -192,18 +203,29 @@ func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) err
 }
 
 func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
+	filters := make([]database.Filter[domain.UserField], 0, len(input.Filters)+1)
+	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
+	for _, f := range input.Filters {
+		filter, err := userFilter(f)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, filter)
+	}
+
+	// Newest-first by default, unlike the ascending default the other list
+	// services use: the users list is read as "who signed up recently".
+	orderBy, err := listOrderBy(input.Sorting, domain.UserFieldCreatedAt, database.OrderDesc, userField, domain.UserFieldID)
+	if err != nil {
+		return nil, err
+	}
+
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
-		Filter: database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		Filter: database.And(filters...),
 		Pagination: database.Page[domain.UserField]{
-			Limit:  uint32(normalizeLimit(input.Limit)),
-			Cursor: []byte(input.PageToken),
-			OrderBy: database.OrderBy[domain.UserField]{
-				Columns: []database.Column[domain.UserField]{
-					database.Col(domain.UserFieldCreatedAt),
-					database.Col(domain.UserFieldID),
-				},
-				Direction: database.OrderDesc,
-			},
+			Limit:   uint32(normalizeLimit(input.Limit)),
+			Cursor:  []byte(input.PageToken),
+			OrderBy: orderBy,
 		},
 	}, UserQueryOptions{})
 	if err != nil {
@@ -214,6 +236,85 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 		Items:         result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+// userFilter maps an API filter predicate to a storage filter. Operations the
+// v2 filter layer cannot express return [domain.ErrNotImplemented];
+// invalid field/operation/value combinations return [domain.ErrRequestInvalid].
+func userFilter(f Filter) (database.Filter[domain.UserField], error) {
+	switch f.Field {
+	case userFieldCreatedAt:
+		return createdAtFilter(f.Operation, database.Col(domain.UserFieldCreatedAt), f.Value)
+	case userFieldID:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldID), value)
+	case userFieldSchema:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
+	case userFieldStatus:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return userStatusFilter(f.Operation, value)
+	case userFieldLifecycleOwnerTeamID:
+		// The column is null for self-owned users. `= NULL` matches nothing in
+		// SQL, so a null value would quietly return an empty page; reject it
+		// instead. Selecting self-owned users needs an is-null filter the
+		// storage layer does not have yet.
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldLifecycleOwnerTeamID), value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
+	}
+}
+
+// userStatusFilter filters on the user's lifecycle status.
+func userStatusFilter(op, status string) (database.Filter[domain.UserField], error) {
+	switch op {
+	case filterOpEquals:
+	case filterOpNotEquals:
+		// todo: update when the operation is supported
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains, filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
+	}
+
+	switch domain.UserStatus(status) {
+	case domain.UserStatusActive, domain.UserStatusSuspended, domain.UserStatusDeactivated, domain.UserStatusPendingPurge:
+		return database.Equal(database.Col(domain.UserFieldStatus), status), nil
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown status %q", status))
+	}
+}
+
+// userField maps an API field name to its [domain.UserField] for sorting.
+func userField(field string) (domain.UserField, error) {
+	switch field {
+	case userFieldCreatedAt:
+		return domain.UserFieldCreatedAt, nil
+	case userFieldID:
+		return domain.UserFieldID, nil
+	case userFieldSchema:
+		return domain.UserFieldSchemaURL, nil
+	case userFieldStatus:
+		return domain.UserFieldStatus, nil
+	case userFieldLifecycleOwnerTeamID:
+		return domain.UserFieldLifecycleOwnerTeamID, nil
+	default:
+		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
+	}
 }
 
 func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
