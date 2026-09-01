@@ -14583,6 +14583,22 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				s.XMinusAuthMinusMethods.Encode(e)
 			}
 			{
+				if s.XMinusIdentifier.Set {
+					e.FieldStart("x-identifier")
+					s.XMinusIdentifier.Encode(e)
+				}
+			}
+			{
+				if s.XMinusDisplay != nil {
+					e.FieldStart("x-display")
+					e.ArrStart()
+					for _, elem := range s.XMinusDisplay {
+						e.Str(elem)
+					}
+					e.ArrEnd()
+				}
+			}
+			{
 				if s.Properties.Set {
 					e.FieldStart("properties")
 					s.Properties.Encode(e)
@@ -55994,6 +56010,22 @@ func (s SchemaDocument) encodeFields(e *jx.Encoder) {
 				s.XMinusAuthMinusMethods.Encode(e)
 			}
 			{
+				if s.XMinusIdentifier.Set {
+					e.FieldStart("x-identifier")
+					s.XMinusIdentifier.Encode(e)
+				}
+			}
+			{
+				if s.XMinusDisplay != nil {
+					e.FieldStart("x-display")
+					e.ArrStart()
+					for _, elem := range s.XMinusDisplay {
+						e.Str(elem)
+					}
+					e.ArrEnd()
+				}
+			}
+			{
 				if s.Properties.Set {
 					e.FieldStart("properties")
 					s.Properties.Encode(e)
@@ -67984,6 +68016,22 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		s.XMinusAuthMinusMethods.Encode(e)
 	}
 	{
+		if s.XMinusIdentifier.Set {
+			e.FieldStart("x-identifier")
+			s.XMinusIdentifier.Encode(e)
+		}
+	}
+	{
+		if s.XMinusDisplay != nil {
+			e.FieldStart("x-display")
+			e.ArrStart()
+			for _, elem := range s.XMinusDisplay {
+				e.Str(elem)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
 		if s.Properties.Set {
 			e.FieldStart("properties")
 			s.Properties.Encode(e)
@@ -67998,13 +68046,15 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserSchema = [6]string{
+var jsonFieldsNameOfUserSchema = [8]string{
 	0: "$schema",
 	1: "objectType",
 	2: "kind",
 	3: "metaSchema",
 	4: "x-auth-methods",
-	5: "properties",
+	5: "x-identifier",
+	6: "x-display",
+	7: "properties",
 }
 
 // Decode decodes UserSchema from json.
@@ -68070,6 +68120,35 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"x-auth-methods\"")
+			}
+		case "x-identifier":
+			if err := func() error {
+				s.XMinusIdentifier.Reset()
+				if err := s.XMinusIdentifier.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-identifier\"")
+			}
+		case "x-display":
+			if err := func() error {
+				s.XMinusDisplay = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.XMinusDisplay = append(s.XMinusDisplay, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-display\"")
 			}
 		case "properties":
 			if err := func() error {

@@ -6,6 +6,7 @@
   "objectType": "human-user",
   "kind": "user-schema",
   "type": "object",
+  "x-identifier": "email",
   "description": "The default editable schema for human users.",
   "x-auth-methods": {
     "password": {
