@@ -42,9 +42,13 @@ export function SessionDetails() {
   return (
     <div style={{ marginTop: "0" }}>
       <p style={{ color: "#6b7280", marginBottom: "24px" }}>
-        {/* Human-facing identity renders the user ref: display -> identifier -> user_id. */}
+        {/* The fuller identity form: display with the identifier as its
+            secondary, degrading down the ref chain when either is absent.
+            The badge in the header renders the compact form of the same ref. */}
         Signed in as{" "}
-        {session.user?.display ?? session.user?.identifier ?? session.user_id ?? session.session_id}
+        {session.user?.display
+          ? `${session.user.display}${session.user.identifier ? ` (${session.user.identifier})` : ""}`
+          : (session.user?.identifier ?? session.user_id ?? session.session_id)}
       </p>
       <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px" }}>Session details</h2>
       <table style={{ width: "100%", fontSize: "14px", borderCollapse: "collapse" }}>

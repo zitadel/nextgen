@@ -71,6 +71,17 @@ const consumedHandoffJtis = new Set<string>();
  * Mimics the Go server's encrypted opaque tokens without actual encryption.
  */
 type StoredSession = GetMySession200;
+
+/**
+ * Demo identities with a resolved display name — the shape a schema
+ * designating `x-display` produces. Any email not listed here signs in with
+ * an identifier-only ref (the shipped default schema designates no display
+ * properties), so both branches of the rendering chain stay exercisable.
+ */
+const DEMO_DISPLAY_NAMES = new Map<string, string>([
+  ["ada@example.com", "Ada Lovelace"],
+  ["grace@example.com", "Grace Hopper"],
+]);
 const sessionStore = new Map<string, StoredSession>();
 
 /**
@@ -237,14 +248,18 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
       // Store the session data for GET /sessions/me lookups.
       // The `user` ref mirrors the Go server's identity hydration: the mock
-      // signs in by email, so the ref's identifier is the email claim and —
-      // like the shipped default schema, which designates no x-display —
-      // there is no display value.
+      // signs in by email, so the ref's identifier is the email claim.
+      // `display` comes from the demo-identity fixture — present for the
+      // known demo identities (a schema designating x-display), absent for
+      // every other email (the shipped default schema designates none) — so
+      // clients can exercise both branches of the display → identifier →
+      // user_id rendering chain.
       // A handoff is issued only after a login completes, so the exchanged
       // session carries a verified factor. The contract now defines `active`
       // as "has at least one verified authentication factor", so an empty
       // factor list would contradict the state we report.
       const verifiedFactors = [{ method: "password" as const, verified_at: createdAt.toISOString() }];
+      const display = claims.sub ? DEMO_DISPLAY_NAMES.get(claims.sub) : undefined;
       const sessionData: StoredSession = {
         session_id: sessionId,
         project_id: projectId,
@@ -258,6 +273,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
           user_id: userId,
           identifier: claims.sub,
           identifier_property: "email",
+          ...(display ? { display } : {}),
         },
       };
       sessionStore.set(opaqueToken, sessionData);

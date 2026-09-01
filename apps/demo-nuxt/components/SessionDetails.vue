@@ -1,16 +1,8 @@
 <template>
   <div>
-    <!-- Human-facing identity renders the user ref: display -> identifier -> user_id. -->
-    <p style="color: #6b7280; margin-bottom: 24px">
-      Signed in as
-      {{
-        session?.user?.display ??
-        session?.user?.identifier ??
-        session?.user_id ??
-        session?.session_id ??
-        "loading…"
-      }}
-    </p>
+    <!-- The fuller identity form: display with the identifier as its secondary,
+         degrading down the ref chain when either is absent. -->
+    <p style="color: #6b7280; margin-bottom: 24px">Signed in as {{ signedInAs }}</p>
 
     <template v-if="error">
       <p style="color: #ef4444; font-size: 14px">Session details: {{ error }}</p>
@@ -69,6 +61,14 @@ interface SessionInfo {
 
 const session = ref<SessionInfo | null>(null);
 const error = ref<string | null>(null);
+
+const signedInAs = computed<string>(() => {
+  const user = session.value?.user;
+  if (user?.display) {
+    return user.identifier ? `${user.display} (${user.identifier})` : user.display;
+  }
+  return user?.identifier ?? session.value?.user_id ?? session.value?.session_id ?? "loading…";
+});
 
 const rows = computed<[string, string][]>(() => {
   if (!session.value) return [];
