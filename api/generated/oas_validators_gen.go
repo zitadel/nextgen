@@ -7131,6 +7131,8 @@ func (s UserFilterField) Validate() error {
 		return nil
 	case "status":
 		return nil
+	case "team_id":
+		return nil
 	case "lifecycle_owner_team_id":
 		return nil
 	default:
