@@ -125,16 +125,6 @@ path are untouched, and both directions are reversible. Why both session indexes
 are load-bearing is Performance below; the short version is that they cover
 opposite team selectivities and neither one alone is enough.
 
-The cost is the build, not the shape. PostgreSQL's plain `CREATE INDEX` takes a
-`SHARE` lock: session **writes** — creation, exchange, token issuance — block
-while each index builds, though reads are unaffected. On the 4M-row `sessions`
-table this ADR measured against, one index took ~4 s on container hardware. That
-is acceptable pre-release, where no deployment carries a session table worth
-protecting. If one ever does, the migration should be re-cut as
-`CREATE INDEX CONCURRENTLY` under `-- +goose NO TRANSACTION` (which trades the
-lock for a second table pass and a possible `INVALID` index to clean up on
-failure) — a deliberate decision, not something to discover during an upgrade.
-
 The filter compiles to a correlated `EXISTS` in the session list's inner
 sub-query, where the alias `s` is the raw `sessions` table:
 
