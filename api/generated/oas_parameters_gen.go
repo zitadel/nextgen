@@ -607,7 +607,16 @@ func decodeCreateTeamParams(args [0]string, argsEscaped bool, r *http.Request) (
 type CreateUserParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The unique identifier of the team.
+	// Adds the new user to this team: creating the user also creates an
+	// active membership in it. Omit it to create a user with no memberships.
+	// This is team membership, not lifecycle ownership. It does not decide
+	// who may deprovision the user, and the created user stays self-owned
+	// either way. The owning team is reported on reads as
+	// `metadata.lifecycle_owner_team_id` and cannot be set through this API.
+	// See ADR 024.
+	// The team also scopes team-unique attributes for this create: an
+	// attribute the schema marks unique per team is checked against this
+	// team's members.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
@@ -2217,7 +2226,15 @@ func decodeGetTeamParams(args [1]string, argsEscaped bool, r *http.Request) (par
 
 // GetUserByIDParams is parameters of GetUserByID operation.
 type GetUserByIDParams struct {
-	// The unique identifier of the team.
+	// Serves the user only when they hold an active membership in this team,
+	// and answers `404` otherwise.
+	// This is team membership, not lifecycle ownership: it asks which team
+	// the user collaborates in, not which team may deprovision them. The
+	// owning team is reported separately as
+	// `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
+	// while owning their own lifecycle. See ADR 024.
+	// Only active memberships match. A user who has been invited but has not
+	// accepted is not served.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 	UserID UserID
 }
