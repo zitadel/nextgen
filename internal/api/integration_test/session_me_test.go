@@ -39,6 +39,7 @@ func TestGetMySession_Identity(t *testing.T) {
 		"type": "object",
 		"x-identifier": "email",
 		"x-display": ["givenName", "familyName"],
+		"x-auth-methods": {"password": {"enabled": true}},
 		"properties": {
 			"email": {"type": "string", "format": "email", "x-unique": "project"},
 			"givenName": {"type": "string"},
