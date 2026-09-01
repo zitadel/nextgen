@@ -163,7 +163,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListUserTeamsOperation: []string{
 		"user.read",
-		"team.read",
+		"team_membership.read",
 	},
 	PatchProjectOperation: []string{
 		"project.write",

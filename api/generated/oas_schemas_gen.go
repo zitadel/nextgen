@@ -41405,6 +41405,7 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 // `GET /users/{user_id}/teams`.
 // Membership is team participation, not lifecycle ownership — the
 // owning team stays at `metadata.lifecycle_owner_team_id` (ADR 024).
+// Requires `team_membership.read` in addition to `user.read`.
 // Ref: #
 type UserExpand string
 
@@ -41461,6 +41462,8 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // (ADR 024).
 // `team_id` is filterable but not sortable — it is not a column on the user, so
 // it is absent from the sort-field enum.
+// Filtering on `team_id` requires `team_membership.read` in addition to
+// `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
 // Ref: #
 type UserFilterField string
 

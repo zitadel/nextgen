@@ -23,6 +23,9 @@ description: |
 
   `team_id` is filterable but not sortable — it is not a column on the user, so
   it is absent from the sort-field enum.
+
+  Filtering on `team_id` requires `team_membership.read` in addition to
+  `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
 enum:
   - created_at
   - id

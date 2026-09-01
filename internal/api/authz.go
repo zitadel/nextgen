@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -312,6 +313,24 @@ func hasOperatorProjectWrite(granted []string) bool {
 		}
 	}
 	return false
+}
+
+// requireMembershipRead gates the membership reads — `expand: ["teams"]` and a
+// `team_id` filter on the users query, and GET /users/{user_id}/teams — because
+// reading users is not reading team memberships (system-permission-catalog.md).
+//
+// The operator fallback is interim: no token carries team_membership.read yet
+// (ADR 036), so requiring it outright would reject every caller.
+// TODO(#420): drop it once granular scopes are minted.
+func requireMembershipRead(ctx context.Context) error {
+	scope, ok := GetScopeContext(ctx)
+	if ok && (slices.Contains(scope.Scope, "team_membership.read") || hasOperatorProjectWrite(scope.Scope)) {
+		return nil
+	}
+	// The sentinel's own message names the project secret, which is not what
+	// this gate is about; WithMessage keeps the code so errors.Is still matches.
+	return domain.ErrUserPermissionDenied().
+		WithMessage("reading a user's team memberships requires team_membership.read")
 }
 
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {

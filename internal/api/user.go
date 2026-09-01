@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -69,7 +70,18 @@ func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (a
 		return nil, err
 	}
 
-	users, err := h.userService.ListUsers(ctx, mapQueryUsersToService(scopeCtx.ProjectID, req))
+	input := mapQueryUsersToService(scopeCtx.ProjectID, req)
+	// Expanding answers 403 rather than a silently missing property: a caller
+	// could not tell that from "this user has no teams". Filtering on team_id
+	// reads the same memberships by a different route — it answers "who is in
+	// this team", one page at a time — so it takes the same gate.
+	if input.IncludeTeams || filtersOnTeamID(req.Filter) {
+		if err := requireMembershipRead(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	users, err := h.userService.ListUsers(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +126,16 @@ func mapQueryUsersToService(projectID string, req *api.QueryUsersRequest) servic
 	return input
 }
 
+// filtersOnTeamID reports whether the request selects users by team membership.
+// The service turns that filter into a storage option rather than a column
+// predicate, so it is read off the request here rather than off the mapped
+// input.
+func filtersOnTeamID(filters []api.QueryUsersRequestFilterItem) bool {
+	return slices.ContainsFunc(filters, func(f api.QueryUsersRequestFilterItem) bool {
+		return f.Field == api.UserFilterFieldTeamID
+	})
+}
+
 func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPasskeysParams) (api.ListUserPasskeysRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {
@@ -155,6 +177,10 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsParams) (api.ListUserTeamsRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {
+		return nil, err
+	}
+	// Same permission as the embedded read, or this becomes the way around it.
+	if err := requireMembershipRead(ctx); err != nil {
 		return nil, err
 	}
 
