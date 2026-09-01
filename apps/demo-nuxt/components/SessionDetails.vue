@@ -1,7 +1,15 @@
 <template>
   <div>
+    <!-- Human-facing identity renders the user ref: display -> identifier -> user_id. -->
     <p style="color: #6b7280; margin-bottom: 24px">
-      Signed in as {{ session?.user_id ?? session?.session_id ?? "loading…" }}
+      Signed in as
+      {{
+        session?.user?.display ??
+        session?.user?.identifier ??
+        session?.user_id ??
+        session?.session_id ??
+        "loading…"
+      }}
     </p>
 
     <template v-if="error">
@@ -53,6 +61,7 @@ interface SessionInfo {
   project_id: string;
   state: string;
   user_id?: string;
+  user?: { user_id: string; identifier?: string; identifier_property?: string; display?: string };
   created_at: string;
   expires_at: string;
   factors?: Array<{ method: string; verified_at: string }>;

@@ -42,7 +42,9 @@ export function SessionDetails() {
   return (
     <div style={{ marginTop: "0" }}>
       <p style={{ color: "#6b7280", marginBottom: "24px" }}>
-        Signed in as {session.user_id ?? session.session_id}
+        {/* Human-facing identity renders the user ref: display -> identifier -> user_id. */}
+        Signed in as{" "}
+        {session.user?.display ?? session.user?.identifier ?? session.user_id ?? session.session_id}
       </p>
       <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px" }}>Session details</h2>
       <table style={{ width: "100%", fontSize: "14px", borderCollapse: "collapse" }}>
