@@ -40,6 +40,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	SettingsStatements
 	ClaimStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
@@ -316,6 +317,13 @@ type BrandingStatements interface {
 // 	Statementer[ClaimStatements]
 // 	Transactioner[ClaimStatements]
 // }
+
+type SettingsStatements interface {
+	Statements
+	GetSettings(ctx context.Context, requester domain.SettingOwner, paths ...domain.SettingsPath) ([]*domain.Setting, error)
+	SetSetting(ctx context.Context, owner domain.SettingOwner, path domain.SettingsPath, value any, isFinal bool) error
+	DeleteSetting(ctx context.Context, owner domain.SettingOwner, path domain.SettingsPath) error
+}
 
 type ClaimStatements interface {
 	Statements

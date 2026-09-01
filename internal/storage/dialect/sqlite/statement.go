@@ -31,6 +31,7 @@ type statements struct {
 	userPasskeyStatements
 	userRecoveryCodesStatements
 	brandingStatements
+	settingsStatements
 	claimStatements
 	resourceScopeStatements
 	authzAssignmentStatements
@@ -64,6 +65,7 @@ func newStatements(client queryExecutor) statements {
 		userPasskeyStatements:         newUserPasskeyStatements(client),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(client),
 		brandingStatements:            newBrandingStatements(client),
+		settingsStatements:            newSettingsStatements(client),
 		claimStatements:               newClaimStatements(client),
 		resourceScopeStatements:       newResourceScopeStatements(client),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(client),

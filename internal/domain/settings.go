@@ -3,6 +3,9 @@ package domain
 import (
 	"cmp"
 	"slices"
+	"strings"
+
+	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 type SettingOwnerLevel int
@@ -57,12 +60,12 @@ type SettingLeaf struct {
 }
 
 type Setting struct {
-	ID    string
+	Path  SettingsPath
 	Leafs []*SettingLeaf
 }
 
-func (s *Setting) Resolve(targetOwner SettingOwner) *SettingLeaf {
-	leafs := filter(s.Leafs, targetOwner.HasAccessTo)
+func (s *Setting) Resolve(requester SettingOwner) *SettingLeaf {
+	leafs := filter(s.Leafs, requester.HasAccessTo)
 
 	if len(leafs) == 0 {
 		return nil
@@ -74,7 +77,7 @@ func (s *Setting) Resolve(targetOwner SettingOwner) *SettingLeaf {
 
 	var leaf *SettingLeaf
 	for _, v := range leafs {
-		if v.Owner.Level() > targetOwner.Level() {
+		if v.Owner.Level() > requester.Level() {
 			return leaf
 		}
 
@@ -95,4 +98,29 @@ func filter[T any](s []T, predicate func(T) bool) []T {
 		}
 	}
 	return ret
+}
+
+type SettingList []*Setting
+
+func (ss SettingList) ToMap(requester SettingOwner) (map[string]any, error) {
+	m := make(map[string]any)
+	for _, s := range ss {
+		if err := maputil.SetNested(m, s.Path.Setgments(), s.Resolve(requester)); err != nil {
+			return nil, err
+		}
+	}
+	return m, nil
+}
+
+type SettingsPath string
+
+func (p SettingsPath) Setgments() []string {
+	return strings.Split(string(p), ".")
+}
+
+func (p SettingsPath) AppendNode(node string) SettingsPath {
+	if len(p) == 0 {
+		return SettingsPath(node)
+	}
+	return SettingsPath(string(p) + "." + node)
 }

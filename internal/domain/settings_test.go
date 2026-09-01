@@ -37,8 +37,23 @@ func TestSettingOwner_Level(t *testing.T) {
 				expected: SettingOwnerLevelTeam,
 			},
 			{
-				name:     "project, team and user id - user level",
-				owner:    SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				name:     "project, team and application id - application level",
+				owner:    SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1"},
+				expected: SettingOwnerLevelApplication,
+			},
+			{
+				name:     "the full chain - user level",
+				owner:    SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
+				expected: SettingOwnerLevelUser,
+			},
+			{
+				name:     "application id without parents - application level",
+				owner:    SettingOwner{ApplicationID: "application-1"},
+				expected: SettingOwnerLevelApplication,
+			},
+			{
+				name:     "user id outranks a set application id",
+				owner:    SettingOwner{ApplicationID: "application-1", UserID: "user-1"},
 				expected: SettingOwnerLevelUser,
 			},
 			{
@@ -89,7 +104,8 @@ func TestSettingOwner_HasAccessTo(t *testing.T) {
 			{name: "root", owner: SettingOwner{}},
 			{name: "project", owner: SettingOwner{ProjectID: "project-1"}},
 			{name: "team", owner: SettingOwner{ProjectID: "project-1", TeamID: "team-1"}},
-			{name: "user", owner: SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"}},
+			{name: "application", owner: SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1"}},
+			{name: "user", owner: SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"}},
 		}
 
 		for ownerIdx, ownerCase := range levels {
@@ -120,19 +136,19 @@ func TestSettingOwner_HasAccessTo(t *testing.T) {
 		testCases := []testCase{
 			{
 				name:      "leaf owned by a sibling project",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				leafOwner: SettingOwner{ProjectID: "project-2"},
 				expected:  false,
 			},
 			{
 				name:      "leaf owned by a sibling team in the same project",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				leafOwner: SettingOwner{ProjectID: "project-1", TeamID: "team-2"},
 				expected:  false,
 			},
 			{
 				name:      "leaf owned by a sibling user in the same team",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				leafOwner: SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-2"},
 				expected:  false,
 			},
@@ -149,34 +165,40 @@ func TestSettingOwner_HasAccessTo(t *testing.T) {
 				expected:  false,
 			},
 			{
+				name:      "leaf owned by a sibling application in the same team",
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
+				leafOwner: SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-2"},
+				expected:  false,
+			},
+			{
 				name:      "leaf owned by the exact same owner",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
-				leafOwner: SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
+				leafOwner: SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				expected:  true,
 			},
 			// An unset id on the leaf matches any value, so a sparsely owned leaf
 			// reaches every branch that agrees on the ids it does set.
 			{
 				name:      "leaf scoped to the user id alone",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				leafOwner: SettingOwner{UserID: "user-1"},
 				expected:  true,
 			},
 			{
 				name:      "leaf scoped to the team id alone",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				leafOwner: SettingOwner{TeamID: "team-1"},
 				expected:  true,
 			},
 			{
 				name:      "leaf scoped to a foreign user id alone",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				leafOwner: SettingOwner{UserID: "user-2"},
 				expected:  false,
 			},
 			{
 				name:      "leaf with a matching project but a foreign user",
-				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", UserID: "user-1"},
+				owner:     SettingOwner{ProjectID: "project-1", TeamID: "team-1", ApplicationID: "application-1", UserID: "user-1"},
 				leafOwner: SettingOwner{ProjectID: "project-1", UserID: "user-2"},
 				expected:  false,
 			},
