@@ -36,3 +36,23 @@ properties:
   metadata:
     readOnly: true
     $ref: user-metadata.yaml
+  teams:
+    readOnly: true
+    type: array
+    description: |
+      The user's team memberships, present only when the request asked for them with
+      `expand: ["teams"]` (ADR 059). Absent means it was not requested; `[]`
+      means the user has none.
+
+      Deliberately outside `metadata`: memberships are a related collection, not
+      part of the server-owned envelope, and it is a different concept from
+      `metadata.lifecycle_owner_team_id` (ADR 024).
+    items:
+      $ref: by_id/teams/user-team.yaml
+  teams_truncated:
+    readOnly: true
+    type: boolean
+    description: |
+      True when the user is on more teams than the embedded list carries. The
+      embedded list is capped and cannot be paged; read them all at
+      `GET /users/{user_id}/teams`. Present only alongside `teams`.

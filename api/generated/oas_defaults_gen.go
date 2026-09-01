@@ -59,6 +59,14 @@ func (s *QueryTeamsRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *QueryUsersRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *StepAction) setDefaults() {
 	{
 		val := bool(false)

@@ -16,6 +16,7 @@ vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_console");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
 const USER_ID = "user_1";
 const server = setupServer();
@@ -210,11 +211,11 @@ describe("user detail", () => {
         deleted = true;
         return new HttpResponse(null, { status: 204 });
       }),
-      // The shape `list-users-response.yaml` requires — `users` is a required
+      // The shape `query-users-response.yaml` requires — `users` is a required
       // property, not an optional one. A bare array sent the list loader into
       // the error boundary on the redirect below, which the assertions could
       // not see because the boundary swallowed it.
-      http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     );
     const router = await renderDetail();
 

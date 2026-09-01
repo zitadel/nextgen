@@ -516,15 +516,6 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 	return r, ht.ErrNotImplemented
 }
 
-// ListUsers implements listUsers operation.
-//
-// List users.
-//
-// GET /users
-func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // PatchProject implements patchProject operation.
 //
 // Updates the state of a project.
@@ -560,6 +551,18 @@ func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySession
 //
 // POST /teams/query
 func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryUsers implements queryUsers operation.
+//
+// Returns the users of a project, paginated with a cursor.
+// The project comes from the credential, not from a parameter: the operation
+// is bound to the token's own project by construction. This is why it takes
+// no `project_id`, unlike the other query endpoints.
+//
+// POST /users/query
+func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest) (r QueryUsersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

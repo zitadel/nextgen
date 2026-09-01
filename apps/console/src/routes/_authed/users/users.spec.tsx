@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
 const server = setupServer();
 
@@ -40,11 +41,11 @@ async function renderUsers() {
 describe("users screen", () => {
   it("renders the page heading and a user row", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             // The shipped `consumer`/`business` presets spell the name parts
-            // camelCase; `listUsers` returns the schema's attribute tree verbatim.
+            // camelCase; `queryUsers` returns the schema's attribute tree verbatim.
             {
               id: "user_1",
               schema: "sch_business",
@@ -70,7 +71,7 @@ describe("users screen", () => {
 
   it("builds the columns from the schema the users reference", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             {
@@ -111,7 +112,7 @@ describe("users screen", () => {
     // Columns union across schemas (D4), so a minimal user sits in a table that
     // also has business columns. The cell must read as empty, not as missing.
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             {
@@ -151,7 +152,7 @@ describe("users screen", () => {
     // wins, else the given/family parts joined, with snake_case accepted for
     // schemas authored that way. A partial name must not render a stray space.
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             {
@@ -182,7 +183,7 @@ describe("users screen", () => {
     // schema defines, so every row silently fell back to the email. Reading an
     // unrelated attribute as the name is worse than having none.
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({ users: [{ id: "user_1", attributes: { username: "nope", email: "kenji@acme.com" } }] }),
       ),
     );
@@ -194,7 +195,7 @@ describe("users screen", () => {
 
   it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({ users: [{ id: "user_1", attributes: { email: "kenji@acme.com", status: "Blocked" } }] }),
       ),
     );
@@ -217,7 +218,7 @@ describe("users screen", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
       server.use(
-        http.get(USERS_URL, () =>
+        http.post(USERS_QUERY_URL, () =>
           HttpResponse.json(
             {
               code: "auth.unauthorized",
@@ -239,7 +240,7 @@ describe("users screen", () => {
 
   it("filters live users across every rendered column, and by id", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             { id: "user_1", attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" } },
@@ -267,7 +268,7 @@ describe("users screen", () => {
 
   it("shows the status the server stamped, and an em dash without one", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
@@ -291,7 +292,7 @@ describe("users screen", () => {
     // `metadata` is the server's own key. Without excluding it the fallback
     // column set would render it as an attribute of the user's schema.
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [{ id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } }],
         }),
@@ -307,8 +308,8 @@ describe("users screen", () => {
   it("loads the next page on demand and stops offering when there is none", async () => {
     let asked: string | null = null;
     server.use(
-      http.get(USERS_URL, ({ request }) => {
-        const token = new URL(request.url).searchParams.get("page_token");
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const { page_token: token = null } = (await request.json()) as { page_token?: string };
         asked = token;
         return token
           ? HttpResponse.json({ users: [{ id: "user_2", attributes: { email: "second@x.com" } }] })
@@ -343,8 +344,8 @@ describe("users screen", () => {
     let firstPageCalls = 0;
 
     server.use(
-      http.get(USERS_URL, async ({ request }) => {
-        const token = new URL(request.url).searchParams.get("page_token");
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const { page_token: token } = (await request.json()) as { page_token?: string };
         if (token) {
           await secondPageSent;
           return HttpResponse.json({ users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }] });
