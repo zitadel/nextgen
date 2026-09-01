@@ -60,6 +60,8 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /users:
     $ref: endpoints/users/methods.yaml
+  /users/query:
+    $ref: endpoints/users/query/methods.yaml
   /users/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml
   /users/{user_id}/passkeys:

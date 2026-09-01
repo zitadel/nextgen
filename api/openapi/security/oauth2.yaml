@@ -15,6 +15,7 @@ flows:
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
       team.delete: Permission to delete teams
+      team_membership.read: Permission to read team memberships
       flow_definition.read: Permission to read flow definitions
       flow_definition.write: Permission to create and manage flow definitions
       flow_definition.delete: Permission to delete flow definitions
@@ -55,6 +56,7 @@ flows:
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
       team.delete: Permission to delete teams
+      team_membership.read: Permission to read team memberships
       flow_definition.read: Permission to read flow definitions
       flow_definition.write: Permission to create and manage flow definitions
       flow_definition.delete: Permission to delete flow definitions

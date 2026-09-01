@@ -11,7 +11,7 @@
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
  *   CONSOLE_PROJECT_SECRET  -> the operator credential the proxy injects, which
- *                              is what authorizes `listUsers` (`user.read`);
+ *                              is what authorizes `queryUsers` (`user.read`);
  *                              the browser-plane publishable key deliberately
  *                              cannot list users (`internal/api/user.go`)
  *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project, so

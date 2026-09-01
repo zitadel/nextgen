@@ -1749,6 +1749,43 @@ func Test_flowDefinitionService_List(t *testing.T) {
 	}
 }
 
+func Test_flowDefinitionService_List_limit(t *testing.T) {
+	tests := []struct {
+		name      string
+		limit     int
+		wantLimit uint32
+	}{
+		{name: "omitted limit uses the default, not storage's no-limit", limit: 0, wantLimit: 20},
+		{name: "negative limit uses the default", limit: -5, wantLimit: 20},
+		{name: "limit is clamped to the maximum", limit: 500, wantLimit: 100},
+		{name: "limit within range is passed through", limit: 25, wantLimit: 25},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			stmts := servicemocks.NewMockAllStatements(ctrl)
+			stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+					assert.Equal(t, tt.wantLimit, opts.Pagination.Limit)
+					return &database.ListResult[*domain.FlowDefinition]{}, nil
+				},
+			).Times(1)
+
+			fd := service.NewFlowDefinitionService(
+				v2PoolFromStatements(t, stmts),
+				&mockSchemaGetter{},
+				&mockBuiltinSchemaProvider{},
+				nil,
+			)
+			_, err := fd.List(context.Background(), service.ListFlowDefinitionsRequest{
+				ProjectID: "project1",
+				Limit:     tt.limit,
+			})
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestFlowDefinitionService_Delete(t *testing.T) {
 	tests := []struct {
 		name             string

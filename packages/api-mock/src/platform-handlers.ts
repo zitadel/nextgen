@@ -57,7 +57,7 @@ import {
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
   ListSchemasQueryParams,
-  ListUsersQueryParams,
+  QueryUsersBody,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
   UpdateFlowDefinitionResponse,
@@ -672,15 +672,12 @@ export function setupPlatformHandlers() {
     // freshly set-up project is in, and what `status` keys its journey-staged
     // guidance on. Auth mirrors the real server: the project secret is the
     // bearer and scopes the (empty) result.
-    http.get("*/users", ({ request }) => {
-      // `limit` is numeric but URLs carry strings and the generated zod does not
-      // coerce, so convert it before parsing. `page_token` is an opaque string —
-      // coercing it too would parse every real cursor to NaN and 400 the request.
-      const { limit, ...rest } = queryRecord(request);
-      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
-      const query = parse(ListUsersQueryParams, raw, "invalid_query");
-      if (!query.ok) {
-        return query.response;
+    http.post("*/users/query", async ({ request }) => {
+      // The query body is JSON, so `limit` arrives already numeric — unlike the
+      // query string this endpoint replaced, which needed it coerced by hand.
+      const body = parse(QueryUsersBody, await request.json(), "invalid_request");
+      if (!body.ok) {
+        return body.response;
       }
       const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       const project = [...store.projects.values()].find((p) => p.projectSecret === token);
