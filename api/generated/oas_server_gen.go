@@ -388,12 +388,6 @@ type Handler interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
-	// ListUsers implements listUsers operation.
-	//
-	// List users.
-	//
-	// GET /users
-	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// PatchProject implements patchProject operation.
 	//
 	// Updates the state of a project.

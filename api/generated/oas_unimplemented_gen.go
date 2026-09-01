@@ -516,15 +516,6 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 	return r, ht.ErrNotImplemented
 }
 
-// ListUsers implements listUsers operation.
-//
-// List users.
-//
-// GET /users
-func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // PatchProject implements patchProject operation.
 //
 // Updates the state of a project.

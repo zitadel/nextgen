@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const USER = {
   id: "user_1",
   schema: "sch_business",
@@ -54,7 +55,7 @@ describe("delete user dialog", () => {
     // The menu used to list Edit user, Reset password and Deactivate, none of
     // which had an endpoint behind them. A menu of dead controls is worse than
     // a short menu — it reads as a feature that is broken rather than absent.
-    server.use(http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })));
+    server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
       import("@tanstack/react-router"),
       import("../router"),
@@ -74,7 +75,7 @@ describe("delete user dialog", () => {
   });
 
   it("names the user in the heading and keeps Delete locked until DELETE is typed", async () => {
-    server.use(http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })));
+    server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     await openDialog();
 
     expect(await screen.findByRole("heading", { name: "Delete Maya Patel?" })).toBeInTheDocument();
@@ -88,7 +89,7 @@ describe("delete user dialog", () => {
   });
 
   it("does not accept the confirmation in the wrong case", async () => {
-    server.use(http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })));
+    server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     await openDialog();
 
     await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "delete");
@@ -98,7 +99,7 @@ describe("delete user dialog", () => {
   it("deletes the user by id and reports success", async () => {
     let deleted: URL | undefined;
     server.use(
-      http.get(USERS_URL, () => HttpResponse.json({ users: deleted ? [] : [USER] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: deleted ? [] : [USER] })),
       http.delete(`${USERS_URL}/:userId`, ({ request, params }) => {
         deleted = new URL(request.url);
         expect(params.userId).toBe("user_1");
@@ -130,7 +131,7 @@ describe("delete user dialog", () => {
     // form and deleted the user. Caught by the real-instance e2e, pinned here.
     let deleteCalls = 0;
     server.use(
-      http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })),
       http.delete(`${USERS_URL}/:userId`, () => {
         deleteCalls += 1;
         return new HttpResponse(null, { status: 204 });
@@ -154,7 +155,7 @@ describe("delete user dialog", () => {
 
   it("keeps the dialog open and shows the server's message when the delete fails", async () => {
     server.use(
-      http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })),
       http.delete(`${USERS_URL}/:userId`, () =>
         HttpResponse.json({ message: "User not found." }, { status: 404 }),
       ),

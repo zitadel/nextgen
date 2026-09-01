@@ -193,7 +193,7 @@ async function detectUserPresence(cwd: string, source: string): Promise<UserPres
       token: secret.project_secret,
     });
     const probe = client
-      .listUsers({ limit: 1 }, { signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
+      .queryUsers({ limit: 1 }, { signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
       .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
       .catch((): UserPresence => "unknown");
     // The abort signal alone is not enough: DNS resolution can outlive it

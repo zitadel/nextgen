@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
 const PROJECTS_QUERY_URL = "http://localhost/api/projects/query";
 const server = setupServer();
@@ -53,7 +54,7 @@ function stubSchemas(
   projects: { id: string; name: string }[] = [],
 ) {
   server.use(
-    http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
+    http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     http.post(PROJECTS_QUERY_URL, () => HttpResponse.json({ projects })),
     // The list carries the documents (#921), so the sheet needs no per-schema
     // stubs — a reintroduced `GET /schemas/{id}` has no handler here.
@@ -182,7 +183,7 @@ describe("add user sheet", () => {
     // from the picker.
     const askedTokens: Array<string | null> = [];
     server.use(
-      http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
       http.get(SCHEMAS_URL, ({ request }) => {
         const token = new URL(request.url).searchParams.get("page_token");
         askedTokens.push(token);

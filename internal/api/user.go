@@ -57,50 +57,11 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 	return &api.DeleteUserByIDNoContent{}, nil
 }
 
-// ListUsers scopes to the bearer's project: the operation carries no
-// project parameter, so the oauth2 principal (the project secret the
-// CLI's status probe sends) is the only authority. It serves the project's
-// users newest-first, windowed by the cursor pagination the service applies.
-func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (api.ListUsersRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-	// No project parameter: the operation is bound to the token's own project
-	// by construction, so only the scope check is live — it keeps the
-	// browser-plane preview secret from listing the project's users.
-	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
-	if err != nil {
-		return nil, err
-	}
-
-	users, err := h.userService.ListUsers(ctx, service.ListUsersInput{
-		ProjectID: scopeCtx.ProjectID,
-		PageToken: string(params.PageToken.Value),
-		Limit:     int(params.Limit.Value),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &api.ListUsersResponse{
-		Users: make([]api.User, 0, len(users.Items)),
-	}
-	if users.NextPageToken != "" {
-		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(users.NextPageToken))
-	}
-	for _, user := range users.Items {
-		u, err := domainUserToApiUser(user)
-		if err != nil {
-			return nil, err
-		}
-		resp.Users = append(resp.Users, *u)
-	}
-
-	return resp, nil
-}
-
-// QueryUsers is the structured-filter list (ADR 031). Like ListUsers it takes
-// no project parameter: the oauth2 principal is the only authority for which
-// project's users are served, so the scope check is what keeps a browser-plane
-// preview secret out.
+// QueryUsers is the users list (ADR 031). It carries no project parameter: the
+// oauth2 principal (the project secret the CLI's status probe sends) is the
+// only authority for which project's users are served, so the scope check is
+// what keeps a browser-plane preview secret out. Results are newest-first
+// unless the request sorts otherwise.
 func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
