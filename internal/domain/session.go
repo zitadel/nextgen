@@ -198,7 +198,7 @@ const (
 	SessionFieldHasVerifiedFactors
 	// SessionFieldLifecycleOwnerTeamID is computed, not stored: a session
 	// belongs to the team that owns its bound user's lifecycle (ADR 024,
-	// ADR 059). A user has at most one lifecycle owner, so a session matches
+	// ADR 060). A user has at most one lifecycle owner, so a session matches
 	// at most one team; a self-owned user's session and a session with no user
 	// match none. It is filter only; not sortable — a team matches many
 	// sessions, and the value lives on another table.

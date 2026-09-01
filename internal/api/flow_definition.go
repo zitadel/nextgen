@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -57,6 +58,11 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	for _, def := range listed.Items {
 		respDefinitions = append(respDefinitions, *flowDefinitionResponse(def))
 	}
+	if slices.Contains(params.Expand, api.FlowDefinitionExpandUserSchema) {
+		if err := h.expandUserSchemas(ctx, string(params.ProjectID), respDefinitions); err != nil {
+			return nil, err
+		}
+	}
 	resp := &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}
 	if listed.NextPageToken != "" {
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
@@ -96,6 +102,66 @@ func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlow
 		return nil, err
 	}
 	return &api.DeleteFlowDefinitionNoContent{}, nil
+}
+
+// expandUserSchemas embeds each listed flow definition's user schema
+// (ADR 059: hydrate, never join — one batched query keyed on the page's
+// distinct schema ids, after the flow query ran, so ordering and page
+// tokens stay untouched).
+//
+// The schema kind gets its own authz stamp first: the flow-definition list
+// consumed the one-shot Allow skip, and reading schemas embedded must gate
+// exactly like reading them at GET /schemas (a caller without schema read
+// access gets an error, not a silently missing property).
+func (h Handler) expandUserSchemas(ctx context.Context, projectID string, definitions []api.FlowDefinitionResponse) error {
+	ctx, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
+	if err != nil {
+		return err
+	}
+
+	seen := make(map[string]struct{}, len(definitions))
+	ids := make([]string, 0, len(definitions))
+	for _, def := range definitions {
+		id := def.FlowDefinition.UserSchema
+		if _, dup := seen[id]; dup || id == "" {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+
+	byID := make(map[string]*api.Schema, len(ids))
+	if len(ids) > 0 {
+		// One batched query suffices: the generated validation caps the flow
+		// page at the shared list maximum (limit defaults to 20, tops out at
+		// 100), so a page can never reference more distinct schemas than one
+		// schema query of the same maximum returns. If either cap ever moves
+		// independently, chunk this loop instead.
+		schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+			ProjectID: projectID,
+			IDs:       ids,
+			Limit:     len(ids),
+		})
+		if err != nil {
+			return err
+		}
+		for _, schema := range schemas.Items {
+			apiSchema, err := domainSchemaToApiSchema(schema)
+			if err != nil {
+				return err
+			}
+			byID[schema.URL] = apiSchema
+		}
+	}
+
+	for i := range definitions {
+		if schema, ok := byID[definitions[i].FlowDefinition.UserSchema]; ok {
+			definitions[i].UserSchema.SetTo(*schema)
+		} else {
+			definitions[i].UserSchema.SetToNull()
+		}
+	}
+	return nil
 }
 
 /* ---------------- CONVERTERS ---------------- */

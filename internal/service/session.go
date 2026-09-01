@@ -264,7 +264,7 @@ func sessionFilter(f Filter, now time.Time) (database.Filter[domain.SessionField
 
 // sessionLifecycleOwnerTeamFilter expresses lifecycle ownership, which is not
 // stored on the session: a session belongs to the team that owns its bound
-// user's lifecycle (ADR 024, ADR 059). A session whose user is self-owned, and
+// user's lifecycle (ADR 024, ADR 060). A session whose user is self-owned, and
 // a session with no user at all, belong to no team.
 //
 // It does not reuse [stringFilter]: the storage binding is a correlated

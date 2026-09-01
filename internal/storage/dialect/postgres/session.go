@@ -447,7 +447,7 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 		Computed: true,
 	},
 	// Not a column: a correlated EXISTS over the session user's lifecycle
-	// owner (ADR 024, ADR 059), split so the filter binds the team id inline.
+	// owner (ADR 024, ADR 060), split so the filter binds the team id inline.
 	// Both correlation columns are the users primary key and the team side is
 	// equality-bound against idx_users_lifecycle_owner_team_id, which leaves
 	// the planner two shapes to pick from by selectivity: probe users per

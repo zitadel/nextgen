@@ -44,11 +44,35 @@ post:
     '403':
       description: |
         The session user has no active personal team in the platform project,
-        so there is no team to attach the claimed project to.
+        so there is no team to attach the claimed project to. Two codes carry
+        this. `claim.no_personal_team` means no membership at all, and clears
+        itself because the next sign-in provisions a team.
+        `claim.personal_team_not_active` means the membership exists but is not
+        active, so provisioning will not clear it. What will depends on
+        `membership_status` in the details. The details object is otherwise
+        untyped, so the values to expect are enumerated here:
+
+          * `removed` — the membership was withdrawn, by deactivating either the
+            team or the user. A user deactivation cascades to that user's
+            memberships without touching their teams, so the team may well still
+            be active: what unblocks the claim is restoring the user's access,
+            not necessarily the team.
+          * `inactive` — the membership is suspended.
+          * `pending` — an invitation the user has not accepted yet.
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
+            # The explicit discriminator is required, not decorative: the two
+            # schemas differ only by a `const` code, so without it ogen cannot
+            # infer one and silently skips the whole operation.
+            oneOf:
+              - $ref: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
+              - $ref: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
+            discriminator:
+              propertyName: code
+              mapping:
+                claim.no_personal_team: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
+                claim.personal_team_not_active: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
     '404':
       description: Challenge not found.
       content:

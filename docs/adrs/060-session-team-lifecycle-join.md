@@ -1,4 +1,4 @@
-# ADR 059: Sessions Join Teams Through Lifecycle Ownership
+# ADR 060: Sessions Join Teams Through Lifecycle Ownership
 
 > **Status:** Accepted
 > **Date:** 2026-09-01
@@ -93,9 +93,13 @@ That permission point is the last argument, and it is why membership is not
 merely redundant here. A help-desk principal may hold `user.read` without
 membership read, and a SIEM key may hold `session.read` alone; an ungated
 membership filter would let either enumerate every team's roster, one bit per
-returned row. Gating it means importing permission machinery this endpoint does
-not otherwise need. The ownership filter needs no gate: it filters along the
-relation that scopes the caller anyway.
+returned row. This is settled elsewhere in the API: the users query's `team_id`
+filter and `expand: ["teams"]` are gated behind `team_membership.read`
+(`requireMembershipRead`, #1004, [system-permission-catalog.md](../design/api/system-permission-catalog.md)),
+so a membership lens on sessions would have to grow the same gate or contradict
+it. The ownership filter needs no gate: it filters along the relation that
+scopes the caller anyway, and the owning team id is already on every user the
+caller can read.
 
 The comparison drawn in review, finally: no comparable product exposes
 roster → global sessions either. GitHub shows org admins only the org-bound SSO
@@ -148,12 +152,22 @@ to match against.
 
 The field is `lifecycle_owner_team_id`, not `team_id`. Three relations can be
 called "a session's team" (above), two of them may eventually be filterable, and
-the released contract cannot take the ambiguous name for one of them. The name
-matches `metadata.lifecycle_owner_team_id` on the user envelope, which is the
-same relation seen from the other side. If a roster filter is ever justified it
-takes `member_of_team_id`, and the explicit binding of
-[#975](https://github.com/zitadel/nextgen/issues/975) can have `team_id` — that
-one really is the session's own team.
+the released contract cannot take the ambiguous name for one of them.
+
+The name matches the users query, which now carries both lenses side by side
+(#984, #1004, #1071): `lifecycle_owner_team_id` for ownership and
+`metadata.lifecycle_owner_team_id` on the envelope — the same relation seen from
+the other side — and `team_id`, gated, for membership.
+
+That leaves one open naming question, deliberately not settled here: on users,
+`team_id` means membership; on sessions this ADR leaves `team_id` unclaimed,
+because unlike a user, a session will get a team relation of its own if the
+explicit binding of [#975](https://github.com/zitadel/nextgen/issues/975) lands,
+and that binding has the better claim to the plain name. A roster filter on
+sessions — should a use case ever justify one — therefore has to pick between
+`member_of_team_id` (leaving room for the binding) and `team_id` (parity with
+users), and whoever adds it owns that call. Nothing shipping here depends on it:
+both names are still free.
 
 ### How the filter reaches the storage layer
 

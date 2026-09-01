@@ -425,7 +425,7 @@ func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
 
 // TestSessionStatements_List_LifecycleOwnerTeamFilter exercises the team
 // filter, which is not a column: a session joins a team through its bound
-// user's lifecycle owner (ADR 024, ADR 059). Roster membership is deliberately
+// user's lifecycle owner (ADR 024, ADR 060). Roster membership is deliberately
 // not the join — the cases below pin that difference, because it is what the
 // team may act on: every session it sees is one it may revoke.
 func TestSessionStatements_List_LifecycleOwnerTeamFilter(t *testing.T) {

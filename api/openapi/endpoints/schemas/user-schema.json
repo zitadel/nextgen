@@ -39,6 +39,20 @@
     "x-auth-methods": {
       "$ref": "auth-methods.json"
     },
+    "x-identifier": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path of the leaf property whose value identifies a user (nested leaves are addressed by their dot-joined attribute path). The property must carry x-unique \"project\". Required when an auth method needing identifier-first dispatch (password) is enabled. Passkey is exempt: discoverable credentials identify the user through the assertion itself, so passkey-only and API-managed schemas may designate nothing; flows using identifier-first passkey are validated at the flow level instead."
+    },
+    "x-display": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Ordered leaf property paths whose values, joined with a space, render the user's display name."
+    },
     "properties": {
       "type": "object",
       "description": "A map of additional properties for the user definition, where the key is the property name and the value is the property schema",

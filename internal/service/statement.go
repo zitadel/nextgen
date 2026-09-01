@@ -226,7 +226,26 @@ type UserQueryOptions struct {
 	UniqueAttributesOnly bool
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
+	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded
+	// by a batched second query keyed on the page's ids, never by joining it
+	// into the user query: a join multiplies rows, which would make LIMIT
+	// count memberships instead of users and corrupt the keyset cursor.
+	IncludeTeams bool
+	// TeamsLimit caps how many membership entries each user carries when
+	// IncludeTeams is set. Zero means [DefaultUserTeamsLimit].
+	TeamsLimit int
+	// IncludeLifecycleOwnerTeam hydrates the team that owns each user's
+	// lifecycle (ADR 059). Like IncludeTeams it is a batched second query,
+	// keyed on the distinct owner ids the page returned; self-owned users
+	// contribute no id and stay nil.
+	IncludeLifecycleOwnerTeam bool
 }
+
+// DefaultUserTeamsLimit caps an embedded membership list. Embedded collections are not
+// paginated, so without a cap one user on thousands of teams would dominate a
+// page whose limit promised twenty users. Past the cap the user is flagged
+// truncated and the full list is read from ListUserTeams.
+const DefaultUserTeamsLimit = 10
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type UserPool interface {
@@ -331,6 +350,14 @@ type ClaimStatements interface {
 	// is not active. It never falls back to a later membership: a deactivated
 	// personal team is not silently replaced by another team the user belongs to.
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
+	// GetEarliestTeamMembership returns the same earliest membership
+	// GetPersonalTeamForUser resolves from, but regardless of its status and
+	// without joining the team. It exists to tell apart the two states
+	// GetPersonalTeamForUser deliberately collapses into NoRowFoundError:
+	// a user who holds no membership at all (NoRowFoundError here too) from one
+	// whose personal team is deactivated (a row with a non-active status).
+	// Provisioning must create a team for the first and leave the second alone.
+	GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error)
 }
 
 // ResourceScopeStatements persists resource_scope_index rows (path.id → project/team).
@@ -380,10 +407,10 @@ type AuthzAssignmentStatements interface {
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
-// The resolver reads these edges, not team_memberships (roster/lifecycle stays separate).
+// The resolver reads these edges, not team_memberships (membership/lifecycle stays separate).
 //
 // Use cases:
-//   - Upsert: low-level row ops. Prefer [SyncUserTeamMembershipEdge] for roster status changes.
+//   - Upsert: low-level row ops. Prefer [SyncUserTeamMembershipEdge] for membership status changes.
 //   - DeleteAuthzMembershipEdges: column-shaped deletes via Filter (single edge, by member, by set).
 //   - DeleteAuthzMembershipEdgesForTeamDeactivate: team deactivate (team set + lifecycle-owned users).
 //   - Get/ListByMember: resolver / dual-write test reads.

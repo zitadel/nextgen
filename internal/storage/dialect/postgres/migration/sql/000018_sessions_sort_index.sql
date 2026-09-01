@@ -5,7 +5,7 @@
 -- applying LIMIT. Measured on 2M sessions: 130ms for an unfiltered first page.
 --
 -- Both indexes are needed, and they cover opposite selectivities of the team
--- filter (ADR 059). With only the sort index, a team owning a handful of a busy
+-- filter (ADR 060). With only the sort index, a team owning a handful of a busy
 -- project's users walks most of the table before finding 20 matching rows —
 -- measurably worse than no index at all (1158ms vs 141ms on 2M sessions).
 

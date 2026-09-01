@@ -152,7 +152,7 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team.create` | `POST /teams` | |
-| `team.read` | `POST /teams/query`, `GET /teams/{id}` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. |
+| `team.read` | `POST /teams/query`, `GET /teams/{id}`, `POST /users/query` with `expand: ["lifecycle_owner_team"]` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Required on top of `user.read` to resolve `metadata.lifecycle_owner_team_id` into the team itself — the id alone is served unconditionally. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. |
 | `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. |
 | `team.delete` | `DELETE /teams/{id}` | Deactivates and tombstones the team, cascading to memberships and lifecycle-owned users (ADR 024). |
 
@@ -167,7 +167,7 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `user.create` | `POST /users` | |
-| `user.read` | `GET /users`, `GET /users/{id}` | Get + list; full representation for now. |
+| `user.read` | `POST /users/query`, `GET /users/{id}` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. Unlike the other query endpoints it takes no `project_id`; the credential's project is the only authority. |
 | `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` is **not yet exposed**. |
 | `user.set_password` | `PUT /users/{id}/password` | **Credential-tier, account-takeover-grade.** Admin sets/resets *another* user's password. Held separately so a profile-editor / help-desk role can hold `user.write` without it. OpenAPI tags this endpoint `user.write` today (see [Drift notes](#drift-notes)). Reserve `user.reset_mfa` / similar for future admin factor-reset endpoints. |
 | `user.delete` | `DELETE /users/{id}` | **Not yet exposed**. |
@@ -190,7 +190,7 @@ their **own** password/factors is self-service (`/me`-gated), **not**
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team_membership.create` | `POST /teams/{id}/memberships`, `POST /team_memberships` | Prefer nested create; flat create with `team_id` in body is legacy. |
-| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}` | |
+| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}`, `GET /users/{id}/teams`, `POST /users/query` with `expand: ["teams"]` or a `team_id` filter | Required on top of `user.read` for the user-side membership reads: reading users is not reading memberships. The `team_id` filter is gated with the expansion — it answers "who is in this team" a page at a time, which is the same read. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet and memberships have no RSI kind, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. |
 | `team_membership.write` | `PATCH /team_memberships/{id}` | Role changes within a membership (replaces old `team.roles.assign`). |
 | `team_membership.delete` | `DELETE /team_memberships/{id}` | |
 

@@ -147,6 +147,11 @@ Behavioral statement parity across dialects lives in
 and/or sqlite, and `forEachDialect` loops dialects. CI still runs one tag per
 job; multiple tags are supported in one process for local parity checks.
 
+Each adapter is already its own cache slot: Moon hashes the three
+`server:test-*` tasks separately, and `go test` hashes a different
+`stmttest` binary per tag (`open_postgres_test.go` vs
+`open_spanner_test.go` vs `open_sqlite_test.go`).
+
 **When you add or fix dialect statement or schema behavior** under
 `dialect/{postgres,spanner,sqlite}/`, you **must** add or extend a portable
 `forEachDialect` suite in [`stmttest/`](stmttest/) for any domain-visible

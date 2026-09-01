@@ -122,7 +122,7 @@ func TestQuerySessions(t *testing.T) {
 	})
 
 	// A session is project-scoped and carries no team; it joins the team that
-	// owns its user's lifecycle (ADR 024, ADR 059). The two anonymous sessions
+	// owns its user's lifecycle (ADR 024, ADR 060). The two anonymous sessions
 	// have no user, so they belong to no team.
 	t.Run("filter by lifecycle_owner_team_id", func(t *testing.T) {
 		teamFilter := func(id string) *api.QuerySessionsRequest {
