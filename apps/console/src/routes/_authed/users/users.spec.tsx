@@ -163,7 +163,10 @@ describe("users screen", () => {
                 email: "a@x.com",
               },
             },
-            { id: "user_2", attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" } },
+            {
+              id: "user_2",
+              attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
+            },
             { id: "user_3", attributes: { givenName: "Radia", email: "r@x.com" } },
           ],
         }),
@@ -183,7 +186,9 @@ describe("users screen", () => {
     // unrelated attribute as the name is worse than having none.
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", attributes: { username: "nope", email: "kenji@acme.com" } }] }),
+        HttpResponse.json({
+          users: [{ id: "user_1", attributes: { username: "nope", email: "kenji@acme.com" } }],
+        }),
       ),
     );
     await renderUsers();
@@ -195,7 +200,9 @@ describe("users screen", () => {
   it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", attributes: { email: "kenji@acme.com", status: "Blocked" } }] }),
+        HttpResponse.json({
+          users: [{ id: "user_1", attributes: { email: "kenji@acme.com", status: "Blocked" } }],
+        }),
       ),
     );
     await renderUsers();
@@ -242,8 +249,14 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-            { id: "user_1", attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" } },
-            { id: "user_2", attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" } },
+            {
+              id: "user_1",
+              attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
+            },
+            {
+              id: "user_2",
+              attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
+            },
           ],
         }),
       ),
@@ -271,7 +284,11 @@ describe("users screen", () => {
         HttpResponse.json({
           users: [
             { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
-            { id: "user_2", metadata: { status: "pending_purge" }, attributes: { email: "b@x.com" } },
+            {
+              id: "user_2",
+              metadata: { status: "pending_purge" },
+              attributes: { email: "b@x.com" },
+            },
             // Written before `metadata` existed: nothing is invented for it.
             { id: "user_3", attributes: { email: "c@x.com" } },
           ],
@@ -293,7 +310,9 @@ describe("users screen", () => {
     server.use(
       http.get(USERS_URL, () =>
         HttpResponse.json({
-          users: [{ id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } }],
+          users: [
+            { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
+          ],
         }),
       ),
     );
@@ -347,7 +366,9 @@ describe("users screen", () => {
         const token = new URL(request.url).searchParams.get("page_token");
         if (token) {
           await secondPageSent;
-          return HttpResponse.json({ users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }] });
+          return HttpResponse.json({
+            users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }],
+          });
         }
         firstPageCalls += 1;
         return HttpResponse.json({
@@ -380,5 +401,101 @@ describe("users screen", () => {
     // The in-flight page is discarded rather than appended to the new list.
     expect(screen.queryByText("stale@x.com")).not.toBeInTheDocument();
     expect(screen.getByText("page1-2@x.com")).toBeInTheDocument();
+  });
+});
+
+/**
+ * The Team column (design `716:14786`): `GET /users` carries no team names, so
+ * the screen fetches each row's roster (`GET /users/{id}/teams`) — one call
+ * per user, best-effort.
+ */
+describe("team column", () => {
+  const TWO_USERS = {
+    users: [
+      { id: "user_1", schema: "sch_business", attributes: { email: "maya@acme.com" } },
+      { id: "user_2", schema: "sch_business", attributes: { email: "oscar@acme.com" } },
+    ],
+  };
+
+  function stubTeams(
+    rosters: Record<string, { teams: { id: string; name: string }[]; next_page_token?: string }>,
+  ) {
+    const calls: Record<string, number> = {};
+    for (const [userId, roster] of Object.entries(rosters)) {
+      server.use(
+        http.get(`${USERS_URL}/${userId}/teams`, () => {
+          calls[userId] = (calls[userId] ?? 0) + 1;
+          return HttpResponse.json(roster);
+        }),
+      );
+    }
+    return calls;
+  }
+
+  it("renders each user's team as a chip, one roster call per row", async () => {
+    server.use(http.get(USERS_URL, () => HttpResponse.json(TWO_USERS)));
+    const calls = stubTeams({
+      user_1: { teams: [{ id: "team_1", name: "Quantum UX" }] },
+      user_2: { teams: [{ id: "team_2", name: "Cedar Logic" }] },
+    });
+
+    await renderUsers();
+
+    expect(await screen.findByText("Quantum UX")).toBeInTheDocument();
+    expect(screen.getByText("Cedar Logic")).toBeInTheDocument();
+    // One roster request per row — the page size bounds the fan-out.
+    expect(calls).toEqual({ user_1: 1, user_2: 1 });
+  });
+
+  it("compresses extra memberships to a +n suffix on a single chip", async () => {
+    // D1: a user can belong to multiple teams, but the design draws one chip.
+    server.use(http.get(USERS_URL, () => HttpResponse.json(TWO_USERS)));
+    stubTeams({
+      user_1: {
+        teams: [
+          { id: "team_1", name: "Quantum UX" },
+          { id: "team_2", name: "Vortex AI" },
+        ],
+      },
+      user_2: { teams: [{ id: "team_3", name: "Cedar Logic" }] },
+    });
+
+    await renderUsers();
+
+    expect(await screen.findByText("Quantum UX")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    // The second team rides the chip's title, not a second chip.
+    expect(screen.queryByText("Vortex AI")).not.toBeInTheDocument();
+  });
+
+  it("costs the cell, not the screen, when a roster cannot be read", async () => {
+    server.use(
+      http.get(USERS_URL, () => HttpResponse.json(TWO_USERS)),
+      http.get(`${USERS_URL}/user_1/teams`, () => new HttpResponse(null, { status: 500 })),
+    );
+    stubTeams({ user_2: { teams: [{ id: "team_3", name: "Cedar Logic" }] } });
+
+    await renderUsers();
+
+    // The failed row still renders; its team cell is an em dash.
+    expect(await screen.findByText("maya@acme.com")).toBeInTheDocument();
+    expect(screen.getByText("Cedar Logic")).toBeInTheDocument();
+    expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
+  });
+
+  it("search matches the team column like every other rendered column", async () => {
+    server.use(http.get(USERS_URL, () => HttpResponse.json(TWO_USERS)));
+    stubTeams({
+      user_1: { teams: [{ id: "team_1", name: "Quantum UX" }] },
+      user_2: { teams: [{ id: "team_3", name: "Cedar Logic" }] },
+    });
+
+    await renderUsers();
+    await screen.findByText("Quantum UX");
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "cedar");
+
+    expect(screen.queryByText("maya@acme.com")).not.toBeInTheDocument();
+    expect(screen.getByText("oscar@acme.com")).toBeInTheDocument();
   });
 });

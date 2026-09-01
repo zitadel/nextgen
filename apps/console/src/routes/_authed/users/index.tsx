@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
+import { Building2, Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
@@ -11,6 +11,8 @@ import {
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
 } from "@/components/resource-list";
+import { StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,7 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatusBadge } from "@/components/status-badge";
 
 import { api } from "../../../api/zitadel";
 import { displayValue, field } from "../../../lib/record";
@@ -42,10 +43,15 @@ export const Route = createFileRoute("/_authed/users/")({
   staticData: { nav: { label: "Users", order: 3, icon: User } },
   loader: async () => {
     const page = await api.listUsers({ limit: PAGE_SIZE });
+    const [columns, teams] = await Promise.all([
+      columnsForUsers(page.users),
+      teamsForUsers(page.users),
+    ]);
     return {
       users: page.users,
       nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(page.users),
+      columns,
+      teams,
     };
   },
   component: UsersScreen,
@@ -83,6 +89,48 @@ async function columnsForUsers(users: Record<string, unknown>[]): Promise<Schema
     }),
   );
   return columnsFor(users, schemas.filter(isPresent));
+}
+
+/** The Team cell's data: the first page of the row's roster. */
+export interface RowTeams {
+  /** Fetched team names — the roster is ordered by team name server-side. */
+  names: string[];
+  /** Whether the roster continues beyond the fetched page. */
+  more: boolean;
+}
+
+/** Rosters are a cell, not a list: a handful covers "chip + exact +n". */
+const TEAM_CELL_LIMIT = 6;
+
+/**
+ * Rosters for a set of users — one `GET /users/{user_id}/teams` per user.
+ *
+ * The design's Team column (`716:14786`) needs team *names*, and `GET /users`
+ * does not carry them: #735's resolution kept the roster a per-user resource,
+ * and `metadata.lifecycle_owner_team_id` is lifecycle ownership, not
+ * membership. So the column costs one roster call per row — bounded by the
+ * page size, fired in parallel, and best-effort: a failed roster costs its
+ * cell, not the screen (the same posture as the schema fetch above).
+ */
+async function teamsForUsers(users: Record<string, unknown>[]): Promise<Map<string, RowTeams>> {
+  const rosters = new Map<string, RowTeams>();
+  await Promise.all(
+    users.map(async (user) => {
+      const id = field(user, "id");
+      if (!id) return;
+      try {
+        const page = await api.listUserTeams(id, { limit: TEAM_CELL_LIMIT });
+        rosters.set(id, {
+          names: page.teams.map((team) => team.name),
+          more: Boolean(page.next_page_token),
+        });
+      } catch {
+        // Absent from the map reads as "could not be loaded"; the cell
+        // renders an em dash rather than failing the row.
+      }
+    }),
+  );
+  return rosters;
 }
 
 interface UserRow {
@@ -141,12 +189,14 @@ function UsersScreen() {
   const [extra, setExtra] = useState<Record<string, unknown>[]>([]);
   const [nextPageToken, setNextPageToken] = useState(loaded.nextPageToken);
   const [columns, setColumns] = useState(loaded.columns);
+  const [teams, setTeams] = useState(loaded.teams);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     setExtra([]);
     setNextPageToken(loaded.nextPageToken);
     setColumns(loaded.columns);
+    setTeams(loaded.teams);
   }, [loaded]);
 
   // The loader hands back a new object on every invalidation, so its identity is
@@ -168,7 +218,10 @@ function UsersScreen() {
       const page = await api.listUsers({ limit: PAGE_SIZE, page_token: nextPageToken });
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
-      const nextColumns = await columnsForUsers([...users, ...page.users]);
+      const [nextColumns, pageTeams] = await Promise.all([
+        columnsForUsers([...users, ...page.users]),
+        teamsForUsers(page.users),
+      ]);
       // A delete or a create while this was in flight has already reset the list
       // to a fresh first page. This page answers a question about the previous
       // one — appending it would re-add rows the server no longer returns — so
@@ -177,6 +230,7 @@ function UsersScreen() {
       setExtra((current) => [...current, ...page.users]);
       setNextPageToken(page.next_page_token ?? undefined);
       setColumns(nextColumns);
+      setTeams((current) => new Map([...current, ...pageTeams]));
     } finally {
       setLoadingMore(false);
     }
@@ -211,17 +265,26 @@ function UsersScreen() {
   // search whatever the project's schema actually defines.
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return users.map((user, index) => toUserRow(user, index, columns)).filter((row) => {
-      if (needle === "") return true;
-      return [row.id, ...columns.map((column) => row.values[column.key] ?? "")].some((value) =>
-        value.toLowerCase().includes(needle),
-      );
-    });
-  }, [users, query, columns]);
+    return users
+      .map((user, index) => toUserRow(user, index, columns))
+      .filter((row) => {
+        if (needle === "") return true;
+        // Team names join the haystack: the Team column is rendered, and search
+        // matches every rendered column.
+        const haystack = [
+          row.id,
+          ...columns.map((column) => row.values[column.key] ?? ""),
+          ...(teams.get(row.id)?.names ?? []),
+        ];
+        return haystack.some((value) => value.toLowerCase().includes(needle));
+      });
+  }, [users, query, columns, teams]);
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
-      <h1 className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}>
+      <h1
+        className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}
+      >
         Users
       </h1>
 
@@ -268,6 +331,7 @@ function UsersScreen() {
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
               <ResourceHeadCell>Status</ResourceHeadCell>
+              <ResourceHeadCell>Team</ResourceHeadCell>
               <ResourceHeadCell>ID</ResourceHeadCell>
               <TableHead className="h-14 w-[60px] px-6" />
             </TableRow>
@@ -276,7 +340,7 @@ function UsersScreen() {
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell
-                  colSpan={columns.length + 2}
+                  colSpan={columns.length + 3}
                   className="text-muted-foreground h-24 text-center"
                 >
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}
@@ -309,6 +373,9 @@ function UsersScreen() {
                   ))}
                   <TableCell className={RESOURCE_CELL}>
                     <StatusBadge status={user.status} />
+                  </TableCell>
+                  <TableCell className={RESOURCE_CELL}>
+                    <TeamCell teams={teams.get(user.id)} />
                   </TableCell>
                   <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
                     {user.id}
@@ -347,11 +414,7 @@ function UsersScreen() {
   );
 }
 
-function toUserRow(
-  user: Record<string, unknown>,
-  index: number,
-  columns: SchemaField[],
-): UserRow {
+function toUserRow(user: Record<string, unknown>, index: number, columns: SchemaField[]): UserRow {
   const id = field(user, "id") ?? `unknown-user-${index}`;
   const attributes = userAttributes(user);
   const values: Record<string, string> = {};
@@ -384,6 +447,33 @@ function userStatus(user: Record<string, unknown>): string | undefined {
   return field(metadata as Record<string, unknown>, "status");
 }
 
+/**
+ * The design's team chip (`716:14789`): an outline Badge — the component's own
+ * base already carries the chip's geometry (`rounded-full`, 12px svg slot,
+ * `text-xs font-medium`) — with the `Lucide Icon / Building2` glyph the node
+ * names, read off the node rather than picked by meaning.
+ *
+ * One chip per row, as the frames draw it. The roster can hold more (D1), so
+ * further memberships compress to an exact `+n` suffix — with a trailing `+`
+ * when the roster continues past the fetched page, because a number the cell
+ * cannot verify would be a guess. No roster (the call failed) and no
+ * memberships both render the em dash the other columns use for absence.
+ */
+function TeamCell({ teams }: { teams?: RowTeams }) {
+  if (!teams || teams.names.length === 0) {
+    return <span className="text-muted-foreground text-sm">—</span>;
+  }
+  const [first, ...rest] = teams.names;
+  const suffix =
+    rest.length > 0 ? `+${rest.length}${teams.more ? "+" : ""}` : teams.more ? "+" : undefined;
+  return (
+    <Badge variant="outline" title={teams.names.join(", ")}>
+      <Building2 aria-hidden />
+      <span className="max-w-[140px] truncate">{first}</span>
+      {suffix && <span className="text-muted-foreground">{suffix}</span>}
+    </Badge>
+  );
+}
 
 /**
  * The row menu carries only actions that reach the API.
