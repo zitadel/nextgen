@@ -113,9 +113,27 @@ session list at all.
 relation, and migration 000011 already indexes it
 ([ADR 024](024-user-team-lifecycle-ownership.md)): PostgreSQL on
 `(project_id, lifecycle_owner_team_id)` where the column is not null, Spanner on
-`(lifecycle_owner_team_id)`. SQLite carried the column without an index and
-gains the peer here. Two indexes were added on `sessions` for the read path —
-see Performance below; they change no shape.
+`(lifecycle_owner_team_id)`.
+
+**It does ship a migration, though** — `000018_sessions_sort_index` on
+PostgreSQL, `000021` on Spanner, `000005` on SQLite. It is index-only: two on
+`sessions`, `(project_id, created_at, id)` for the default sort and
+`(project_id, user_id)` for the drive side of a selective team, plus, on SQLite
+alone, the `users` lifecycle-owner index the other two dialects already had from
+000011. No column, constraint or table changes, so the row shape and the write
+path are untouched, and both directions are reversible. Why both session indexes
+are load-bearing is Performance below; the short version is that they cover
+opposite team selectivities and neither one alone is enough.
+
+The cost is the build, not the shape. PostgreSQL's plain `CREATE INDEX` takes a
+`SHARE` lock: session **writes** — creation, exchange, token issuance — block
+while each index builds, though reads are unaffected. On the 4M-row `sessions`
+table this ADR measured against, one index took ~4 s on container hardware. That
+is acceptable pre-release, where no deployment carries a session table worth
+protecting. If one ever does, the migration should be re-cut as
+`CREATE INDEX CONCURRENTLY` under `-- +goose NO TRANSACTION` (which trades the
+lock for a second table pass and a possible `INVALID` index to clean up on
+failure) — a deliberate decision, not something to discover during an upgrade.
 
 The filter compiles to a correlated `EXISTS` in the session list's inner
 sub-query, where the alias `s` is the raw `sessions` table:
