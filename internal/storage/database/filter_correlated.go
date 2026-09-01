@@ -6,7 +6,7 @@ package database
 // around it, so dialects compile SQLName, the value, then SQLSuffix.
 //
 // It exists for predicates that reach another table and take a parameter —
-// "this session's user is on team X" — which the fixed value-after-column
+// "this session's user is owned by team X" — which the fixed value-after-column
 // shape of [CompareFilter] and [ArrayContainsFilter] cannot express.
 type CorrelatedFilter[F ~uint8] struct {
 	Column Column[F]

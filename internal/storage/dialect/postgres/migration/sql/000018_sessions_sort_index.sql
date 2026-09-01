@@ -5,7 +5,7 @@
 -- applying LIMIT. Measured on 2M sessions: 130ms for an unfiltered first page.
 --
 -- Both indexes are needed, and they cover opposite selectivities of the team
--- filter (ADR 056). With only the sort index, a team holding a handful of a busy
+-- filter (ADR 059). With only the sort index, a team owning a handful of a busy
 -- project's users walks most of the table before finding 20 matching rows —
 -- measurably worse than no index at all (1158ms vs 141ms on 2M sessions).
 
@@ -14,8 +14,9 @@
 CREATE INDEX idx_sessions_created_at
     ON zitadel_nextgen.sessions (project_id, created_at, id);
 
--- Lets a selective team filter drive from team_memberships into sessions
--- instead of scanning sessions and probing membership per row.
+-- Lets a selective team filter drive from users into sessions instead of
+-- scanning sessions and probing the owning team per row. The users side is
+-- already covered by idx_users_lifecycle_owner_team_id (000011).
 CREATE INDEX idx_sessions_user
     ON zitadel_nextgen.sessions (project_id, user_id);
 

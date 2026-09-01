@@ -119,7 +119,7 @@ func TestArrayContainsFilter(t *testing.T) {
 func TestCorrelatedEqualFilter(t *testing.T) {
 	t.Parallel()
 
-	col := database.Col(domain.SessionFieldTeamID)
+	col := database.Col(domain.SessionFieldLifecycleOwnerTeamID)
 	filter := database.CorrelatedEqual(col, "team_01H")
 	assert.Equal(t, col, filter.Column)
 	assert.Equal(t, "team_01H", filter.Value)

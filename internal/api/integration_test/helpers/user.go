@@ -27,19 +27,28 @@ func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
 	return h.userService.value
 }
 
-// CreateUserWithTeam seeds a builtin-schema user in a team of its own and returns
-// its id. The id and email are randomized, so repeated calls in one project
-// stay unique.
+// CreateUserWithTeam seeds a builtin-schema user on the roster of a team of its
+// own and returns its id. The user stays self-owned — see
+// [Harness.CreateUserOwnedByTeam] for the team-owned shape. The id and email
+// are randomized, so repeated calls in one project stay unique.
 func (h *Harness) CreateUserWithTeam(t *testing.T, projectID string) string {
 	t.Helper()
 
-	userID, _ := h.CreateUserWithTeamID(t, projectID)
+	userID, _ := h.createUserInTeam(t, projectID, false)
 	return userID
 }
 
-// CreateUserWithTeamID is [Harness.CreateUserWithTeam] for callers that also
-// need the team the user was seeded into.
-func (h *Harness) CreateUserWithTeamID(t *testing.T, projectID string) (userID, teamID string) {
+// CreateUserOwnedByTeam seeds a builtin-schema user whose lifecycle a team of
+// its own owns (ADR 024) and returns both ids. Ownership is what the session
+// team filter reads, so this is the shape that filter's tests need; roster
+// membership alone is [Harness.CreateUserWithTeam].
+func (h *Harness) CreateUserOwnedByTeam(t *testing.T, projectID string) (userID, teamID string) {
+	t.Helper()
+
+	return h.createUserInTeam(t, projectID, true)
+}
+
+func (h *Harness) createUserInTeam(t *testing.T, projectID string, owned bool) (userID, teamID string) {
 	t.Helper()
 
 	team, err := h.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
@@ -51,13 +60,17 @@ func (h *Harness) CreateUserWithTeamID(t *testing.T, projectID string) (userID, 
 	userID = "user_" + RandString(8)
 	emailAttr, err := domain.NewCreateAttribute("email", RandString(8)+"@example.com", domain.AttributeUniquenessProject)
 	require.NoError(t, err)
-	require.NoError(t, h.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+	user := &domain.CreateUser{
 		ProjectID:               projectID,
 		SchemaURL:               apischemas.DefaultHumanUserSchemaURL(BuiltinSchemaBaseURL),
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
 		Attributes:              domain.CreateAttributes{*emailAttr},
-	}))
+	}
+	if owned {
+		user.LifecycleOwnerTeamID = &team.ID
+	}
+	require.NoError(t, h.EnsureUserFixture(t).Create(t.Context(), user))
 	return userID, team.ID
 }
 

@@ -142,7 +142,7 @@ func TestCompileCompareFilterBoolEqual(t *testing.T) {
 func TestCompileCorrelatedFilterBindsValueInline(t *testing.T) {
 	t.Parallel()
 
-	teamID := database.Col(domain.SessionFieldTeamID)
+	teamID := database.Col(domain.SessionFieldLifecycleOwnerTeamID)
 
 	var c statementCompiler
 	compileFilter(&c, database.CorrelatedEqual(teamID, "team_01H"), sessionSchema)

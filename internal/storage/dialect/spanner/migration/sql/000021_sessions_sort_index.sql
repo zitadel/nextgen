@@ -2,7 +2,7 @@
 -- +goose Up
 -- See the postgres peer (000018_sessions_sort_index.sql) for the measurements.
 -- Both indexes are needed: the sort index alone regresses a selective team
--- filter (ADR 056), because the walk in created_at order has to cross most of
+-- filter (ADR 059), because the walk in created_at order has to cross most of
 -- the table before it finds a page worth of matching rows.
 --
 -- Neither index is NULL_FILTERED. user_id is NULL on anonymous sessions, and
