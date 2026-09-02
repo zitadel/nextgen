@@ -33666,7 +33666,7 @@ type QueryUsersUnauthorized ErrorDetails
 func (*QueryUsersUnauthorized) queryUsersRes() {}
 
 // An immutable, project-scoped snapshot that pins one revision of every
-// resource it includes (ADR 035).
+// resource it includes.
 // A release owns pointers and audit metadata, not content — it records *which*
 // revisions belong together. Callers that need the resource bytes resolve each
 // `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
@@ -33734,9 +33734,9 @@ type ReleaseAudit struct {
 	// A short caller-supplied summary of what the release changes, analogous to
 	// a git commit message.
 	Message OptNilString `json:"message"`
-	// The source commit the caller was operating from. Enables
-	// `git diff <previous-release-sha>..<this-sha> -- .zitadel/` as a
-	// field-level diff between two releases.
+	// The source commit the caller was operating from. Recording it on both
+	// releases is what lets two releases be diffed at field level in the
+	// source repository they were built from.
 	GitSha OptNilString `json:"git_sha"`
 	// True when the working tree had uncommitted changes at construction time.
 	// `git_sha` still points at HEAD, but the release content does not

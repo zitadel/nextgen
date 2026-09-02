@@ -1,7 +1,7 @@
 title: Release
 description: |
   An immutable, project-scoped snapshot that pins one revision of every
-  resource it includes (ADR 035).
+  resource it includes.
 
   A release owns pointers and audit metadata, not content — it records *which*
   revisions belong together. Callers that need the resource bytes resolve each

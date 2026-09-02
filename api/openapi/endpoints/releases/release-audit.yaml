@@ -17,9 +17,9 @@ properties:
     example: add phone_number to human-user
   git_sha:
     description: |
-      The source commit the caller was operating from. Enables
-      `git diff <previous-release-sha>..<this-sha> -- .zitadel/` as a
-      field-level diff between two releases.
+      The source commit the caller was operating from. Recording it on both
+      releases is what lets two releases be diffed at field level in the
+      source repository they were built from.
     oneOf:
       - type: string
         maxLength: 64
