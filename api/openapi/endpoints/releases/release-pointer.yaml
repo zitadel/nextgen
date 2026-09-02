@@ -12,7 +12,7 @@ properties:
     description: The kind of resource this pointer pins.
     enum:
       - schema
-      - flow
+      - flow_definition
       - branding
     example: schema
   handle:
@@ -27,7 +27,8 @@ properties:
 
       - `schema` — the document's `objectType`, so `human-user` and
         `machine-user` are separate resources a release pins separately
-      - `flow` — the flow's `name`, likewise for `default-login` and `b2b-login`
+      - `flow_definition` — the definition's `name`, likewise for
+        `default-login` and `b2b-login`
       - `branding` — always `default`. A project has one branding, so there is
         nothing to distinguish; it is revisioned like everything else, and
         `revision_id` is what varies between releases.

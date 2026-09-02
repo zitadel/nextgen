@@ -10065,16 +10065,16 @@ func (s *CreateReleasePointer) SetRevisionID(val string) {
 type CreateReleasePointerKind string
 
 const (
-	CreateReleasePointerKindSchema   CreateReleasePointerKind = "schema"
-	CreateReleasePointerKindFlow     CreateReleasePointerKind = "flow"
-	CreateReleasePointerKindBranding CreateReleasePointerKind = "branding"
+	CreateReleasePointerKindSchema         CreateReleasePointerKind = "schema"
+	CreateReleasePointerKindFlowDefinition CreateReleasePointerKind = "flow_definition"
+	CreateReleasePointerKindBranding       CreateReleasePointerKind = "branding"
 )
 
 // AllValues returns all CreateReleasePointerKind values.
 func (CreateReleasePointerKind) AllValues() []CreateReleasePointerKind {
 	return []CreateReleasePointerKind{
 		CreateReleasePointerKindSchema,
-		CreateReleasePointerKindFlow,
+		CreateReleasePointerKindFlowDefinition,
 		CreateReleasePointerKindBranding,
 	}
 }
@@ -10084,7 +10084,7 @@ func (s CreateReleasePointerKind) MarshalText() ([]byte, error) {
 	switch s {
 	case CreateReleasePointerKindSchema:
 		return []byte(s), nil
-	case CreateReleasePointerKindFlow:
+	case CreateReleasePointerKindFlowDefinition:
 		return []byte(s), nil
 	case CreateReleasePointerKindBranding:
 		return []byte(s), nil
@@ -10099,8 +10099,8 @@ func (s *CreateReleasePointerKind) UnmarshalText(data []byte) error {
 	case CreateReleasePointerKindSchema:
 		*s = CreateReleasePointerKindSchema
 		return nil
-	case CreateReleasePointerKindFlow:
-		*s = CreateReleasePointerKindFlow
+	case CreateReleasePointerKindFlowDefinition:
+		*s = CreateReleasePointerKindFlowDefinition
 		return nil
 	case CreateReleasePointerKindBranding:
 		*s = CreateReleasePointerKindBranding
@@ -10118,7 +10118,8 @@ func (s *CreateReleasePointerKind) UnmarshalText(data []byte) error {
 type CreateReleaseRequest struct {
 	// The revisions to pin. Must not be empty.
 	// A kind usually appears more than once: a project has several user schemas
-	// and several flows, and each is pinned on its own. What it cannot do is
+	// and several flow definitions, and each is pinned on its own. What it
+	// cannot do is
 	// pin two revisions of the *same* resource — a second revision of the
 	// `human-user` schema is rejected rather than ordered, since a release
 	// describes one state of the project.
@@ -37401,7 +37402,8 @@ type ReleasePointer struct {
 	// the caller:
 	// - `schema` — the document's `objectType`, so `human-user` and
 	// `machine-user` are separate resources a release pins separately
-	// - `flow` — the flow's `name`, likewise for `default-login` and `b2b-login`
+	// - `flow_definition` — the definition's `name`, likewise for
+	// `default-login` and `b2b-login`
 	// - `branding` — always `default`. A project has one branding, so there is
 	// nothing to distinguish; it is revisioned like everything else, and
 	// `revision_id` is what varies between releases.
@@ -37449,16 +37451,16 @@ func (s *ReleasePointer) SetRevisionID(val string) {
 type ReleasePointerKind string
 
 const (
-	ReleasePointerKindSchema   ReleasePointerKind = "schema"
-	ReleasePointerKindFlow     ReleasePointerKind = "flow"
-	ReleasePointerKindBranding ReleasePointerKind = "branding"
+	ReleasePointerKindSchema         ReleasePointerKind = "schema"
+	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
+	ReleasePointerKindBranding       ReleasePointerKind = "branding"
 )
 
 // AllValues returns all ReleasePointerKind values.
 func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 	return []ReleasePointerKind{
 		ReleasePointerKindSchema,
-		ReleasePointerKindFlow,
+		ReleasePointerKindFlowDefinition,
 		ReleasePointerKindBranding,
 	}
 }
@@ -37468,7 +37470,7 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	switch s {
 	case ReleasePointerKindSchema:
 		return []byte(s), nil
-	case ReleasePointerKindFlow:
+	case ReleasePointerKindFlowDefinition:
 		return []byte(s), nil
 	case ReleasePointerKindBranding:
 		return []byte(s), nil
@@ -37483,8 +37485,8 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 	case ReleasePointerKindSchema:
 		*s = ReleasePointerKindSchema
 		return nil
-	case ReleasePointerKindFlow:
-		*s = ReleasePointerKindFlow
+	case ReleasePointerKindFlowDefinition:
+		*s = ReleasePointerKindFlowDefinition
 		return nil
 	case ReleasePointerKindBranding:
 		*s = ReleasePointerKindBranding

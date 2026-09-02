@@ -2382,7 +2382,7 @@ func (s CreateReleasePointerKind) Validate() error {
 	switch s {
 	case "schema":
 		return nil
-	case "flow":
+	case "flow_definition":
 		return nil
 	case "branding":
 		return nil
@@ -6252,7 +6252,7 @@ func (s ReleaseID) Validate() error {
 		MaxLengthSet:  false,
 		Email:         false,
 		Hostname:      false,
-		Regex:         regexMap["^rel_[a-zA-Z0-9-]+$"],
+		Regex:         regexMap["^rel_[a-zA-Z0-9_-]+$"],
 		MinNumeric:    0,
 		MinNumericSet: false,
 		MaxNumeric:    0,
@@ -6441,7 +6441,7 @@ func (s ReleasePointerKind) Validate() error {
 	switch s {
 	case "schema":
 		return nil
-	case "flow":
+	case "flow_definition":
 		return nil
 	case "branding":
 		return nil

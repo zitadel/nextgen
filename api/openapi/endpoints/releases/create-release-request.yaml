@@ -15,7 +15,8 @@ properties:
       The revisions to pin. Must not be empty.
 
       A kind usually appears more than once: a project has several user schemas
-      and several flows, and each is pinned on its own. What it cannot do is
+      and several flow definitions, and each is pinned on its own. What it
+      cannot do is
       pin two revisions of the *same* resource — a second revision of the
       `human-user` schema is rejected rather than ordered, since a release
       describes one state of the project.

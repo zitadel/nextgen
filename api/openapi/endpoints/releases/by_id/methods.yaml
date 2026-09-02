@@ -9,7 +9,9 @@ get:
     per-kind read endpoints when the bytes are needed.
 
     The lookup is scoped to the project in `project_id`: a release id belonging
-    to another project answers `rel.not_found` exactly as an unknown id does.
+    to another project answers not found exactly as an unknown id does, so the
+    endpoint cannot be used to probe for releases in projects the caller cannot
+    read.
   tags:
     - Releases
   security:
@@ -30,7 +32,7 @@ get:
               summary: A release pinning every resource of a project
               description: |
                 `handle` names the resource and `revision_id` the revision of
-                it, which is why `schema` and `flow` can each appear twice:
+                it, which is why `schema` and `flow_definition` each appear twice:
                 `human-user` and `machine-user` are different resources, as are
                 `default-login` and `b2b-login`.
               value:
@@ -50,10 +52,10 @@ get:
                   - kind: schema
                     handle: machine-user
                     revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
-                  - kind: flow
+                  - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: flow
+                  - kind: flow_definition
                     handle: b2b-login
                     revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding
@@ -83,10 +85,10 @@ get:
                   - kind: schema
                     handle: machine-user
                     revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
-                  - kind: flow
+                  - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: flow
+                  - kind: flow_definition
                     handle: b2b-login
                     revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding

@@ -6370,7 +6370,9 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
-// to another project answers `rel.not_found` exactly as an unknown id does.
+// to another project answers not found exactly as an unknown id does, so the
+// endpoint cannot be used to probe for releases in projects the caller cannot
+// read.
 //
 // GET /releases/{release_id}
 func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

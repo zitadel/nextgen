@@ -15,7 +15,7 @@ properties:
       on its own.
     enum:
       - schema
-      - flow
+      - flow_definition
       - branding
     example: schema
   revision_id:

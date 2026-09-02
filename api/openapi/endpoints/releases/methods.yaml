@@ -34,18 +34,18 @@ post:
           wholeProject:
             summary: Pin every configurable resource of a project
             description: |
-              A project has several user schemas and several flows, so `schema`
-              and `flow` each appear more than once. Branding appears once
-              because a project has one.
+              A project has several user schemas and several flow definitions,
+              so `schema` and `flow_definition` each appear more than once.
+              Branding appears once because a project has one.
             value:
               pointers:
                 - kind: schema
                   revision_id: https://example.com/schemas/default-human-user.json
                 - kind: schema
                   revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
-                - kind: flow
+                - kind: flow_definition
                   revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                - kind: flow
+                - kind: flow_definition
                   revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                 - kind: branding
                   revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -94,10 +94,10 @@ post:
                   - kind: schema
                     handle: machine-user
                     revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
-                  - kind: flow
+                  - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: flow
+                  - kind: flow_definition
                     handle: b2b-login
                     revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding
@@ -114,8 +114,8 @@ post:
               summary: A newly assembled release
               description: |
                 Each pointer carries the handle the server read from the
-                revision it pins — `objectType` for a schema, `name` for a
-                flow, and `default` for branding.
+                revision it pins — `objectType` for a schema, `name` for a flow
+                definition, and `default` for branding.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -133,10 +133,10 @@ post:
                   - kind: schema
                     handle: machine-user
                     revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
-                  - kind: flow
+                  - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: flow
+                  - kind: flow_definition
                     handle: b2b-login
                     revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding
@@ -163,7 +163,7 @@ post:
                   - kind: schema
                     handle: human-user
                     revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
-                  - kind: flow
+                  - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
                   - kind: branding
