@@ -34,6 +34,12 @@ func (s *refResolverStub) ResolveUserRefs(ctx context.Context, projectID string,
 	return s.resolveFunc(ctx, projectID, userIDs)
 }
 
+// ResolveRefsForUsers satisfies the widened port; the session service
+// resolves by id only, so any call here is a test failure.
+func (s *refResolverStub) ResolveRefsForUsers(context.Context, string, []*domain.User) (map[string]domain.UserRef, error) {
+	panic("unexpected refs.ResolveRefsForUsers call")
+}
+
 func sessionConfigForTest() service.SessionConfig {
 	return service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
 }
