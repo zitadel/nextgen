@@ -9115,16 +9115,98 @@ type CreateReleaseOK Release
 
 func (*CreateReleaseOK) createReleaseRes() {}
 
+// One revision to pin. The handle is not supplied: it is the resource's own
+// identifying field, so the server reads it from the revision being pinned and
+// records it on the release.
+// Ref: #
+type CreateReleasePointer struct {
+	// The kind of resource being pinned. Required rather than inferred: a
+	// `revision_id` is not always shaped distinctly enough to identify its kind
+	// on its own.
+	Kind CreateReleasePointerKind `json:"kind"`
+	// The revision of that resource to pin. Must already exist in the project —
+	// this endpoint pins revisions, it does not create them.
+	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
+	// the schema's `$id`, which is a URL whenever the document supplied one and
+	// only a generated `sch_*` value otherwise.
+	RevisionID string `json:"revision_id"`
+}
+
+// GetKind returns the value of Kind.
+func (s *CreateReleasePointer) GetKind() CreateReleasePointerKind {
+	return s.Kind
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *CreateReleasePointer) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// SetKind sets the value of Kind.
+func (s *CreateReleasePointer) SetKind(val CreateReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *CreateReleasePointer) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// The kind of resource being pinned. Required rather than inferred: a
+// `revision_id` is not always shaped distinctly enough to identify its kind
+// on its own.
+type CreateReleasePointerKind string
+
+const (
+	CreateReleasePointerKindSchema CreateReleasePointerKind = "schema"
+	CreateReleasePointerKindFlow   CreateReleasePointerKind = "flow"
+)
+
+// AllValues returns all CreateReleasePointerKind values.
+func (CreateReleasePointerKind) AllValues() []CreateReleasePointerKind {
+	return []CreateReleasePointerKind{
+		CreateReleasePointerKindSchema,
+		CreateReleasePointerKindFlow,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateReleasePointerKind) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateReleasePointerKindSchema:
+		return []byte(s), nil
+	case CreateReleasePointerKindFlow:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateReleasePointerKind) UnmarshalText(data []byte) error {
+	switch CreateReleasePointerKind(data) {
+	case CreateReleasePointerKindSchema:
+		*s = CreateReleasePointerKindSchema
+		return nil
+	case CreateReleasePointerKindFlow:
+		*s = CreateReleasePointerKindFlow
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // The set of revisions to bundle into a release, plus the audit metadata to
 // record alongside it.
 // `created_at` and `created_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
 type CreateReleaseRequest struct {
-	// The revisions to pin, one entry per `(kind, handle)`. A `(kind, handle)`
-	// may appear at most once — a release pins a single revision of any given
-	// resource. Must not be empty.
-	Pointers []ReleasePointer `json:"pointers"`
+	// The revisions to pin. Must not be empty.
+	// A release pins a single revision of any given resource, so two revisions
+	// that resolve to the same resource cannot be pinned together — pinning two
+	// revisions of the `human-user` schema is rejected rather than ordered.
+	Pointers []CreateReleasePointer `json:"pointers"`
 	// A short summary of what the release changes, analogous to a git commit
 	// message. Recorded on the release and shown when listing releases.
 	Message OptString `json:"message"`
@@ -9136,7 +9218,7 @@ type CreateReleaseRequest struct {
 }
 
 // GetPointers returns the value of Pointers.
-func (s *CreateReleaseRequest) GetPointers() []ReleasePointer {
+func (s *CreateReleaseRequest) GetPointers() []CreateReleasePointer {
 	return s.Pointers
 }
 
@@ -9156,7 +9238,7 @@ func (s *CreateReleaseRequest) GetGitDirty() OptBool {
 }
 
 // SetPointers sets the value of Pointers.
-func (s *CreateReleaseRequest) SetPointers(val []ReleasePointer) {
+func (s *CreateReleaseRequest) SetPointers(val []CreateReleasePointer) {
 	s.Pointers = val
 }
 
@@ -33877,9 +33959,10 @@ type ReleasePointer struct {
 	// The kind of resource this pointer pins.
 	Kind ReleasePointerKind `json:"kind"`
 	// The field the resource kind uses as its stable identifier across
-	// revisions — `objectType` for schemas, `name` for flows. Resources inside
-	// a release reference each other by handle rather than by revision id, so
-	// the same handle names the same resource in every release.
+	// revisions — `objectType` for schemas, `name` for flows. Read from the
+	// revision when the release was assembled, not supplied by the caller.
+	// Resources inside a release reference each other by handle rather than by
+	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`
 	// The revision of that resource this release pins.
 	// Deliberately not constrained to a prefixed id: for `kind: schema` this is

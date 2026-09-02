@@ -2,12 +2,10 @@
   "pointers": [
     {
       "kind": "schema",
-      "handle": "human-user",
       "revision_id": "https://example.com/schemas/default-human-user.json"
     },
     {
       "kind": "flow",
-      "handle": "default-login",
       "revision_id": "flowdef_01KWHG09JXA7F0N9WD3P2E4YM5"
     }
   ],

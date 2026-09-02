@@ -116,10 +116,11 @@ type Invoker interface {
 	// CreateRelease invokes createRelease operation.
 	//
 	// Bundles a release from revisions that already exist, supplied as
-	// `(kind, handle, revision_id)` tuples. No new revisions are allocated — use
-	// the per-kind create endpoints for that, then pin the ids here.
-	// Every referenced `revision_id` must exist in the project, and each declared
-	// `handle` must match the handle the referenced revision actually carries.
+	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
+	// per-kind create endpoints for that, then pin the ids here.
+	// Every referenced `revision_id` must exist in the project. Each one's handle
+	// is read from the revision itself and recorded on the release, so a resource
+	// is always pinned under the identity it declares.
 	// Creating a release does not deploy it. A release is environment-agnostic
 	// and the same release can later be deployed to any number of environments
 	// unchanged.
@@ -1611,10 +1612,11 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // CreateRelease invokes createRelease operation.
 //
 // Bundles a release from revisions that already exist, supplied as
-// `(kind, handle, revision_id)` tuples. No new revisions are allocated — use
-// the per-kind create endpoints for that, then pin the ids here.
-// Every referenced `revision_id` must exist in the project, and each declared
-// `handle` must match the handle the referenced revision actually carries.
+// `(kind, revision_id)` pairs. No new revisions are allocated — use the
+// per-kind create endpoints for that, then pin the ids here.
+// Every referenced `revision_id` must exist in the project. Each one's handle
+// is read from the revision itself and recorded on the release, so a resource
+// is always pinned under the identity it declares.
 // Creating a release does not deploy it. A release is environment-agnostic
 // and the same release can later be deployed to any number of environments
 // unchanged.

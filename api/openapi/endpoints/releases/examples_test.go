@@ -48,10 +48,10 @@ func TestCreateReleaseRequestAcceptsURLRevisionID(t *testing.T) {
 	require.NoError(t, req.Validate())
 
 	require.Len(t, req.Pointers, 2)
-	assert.Equal(t, api.ReleasePointerKindSchema, req.Pointers[0].Kind)
+	assert.Equal(t, api.CreateReleasePointerKindSchema, req.Pointers[0].Kind)
 	assert.True(t, strings.HasPrefix(req.Pointers[0].RevisionID, "https://"),
 		"the schema pointer example must exercise a URL revision id")
-	assert.Equal(t, api.ReleasePointerKindFlow, req.Pointers[1].Kind)
+	assert.Equal(t, api.CreateReleasePointerKindFlow, req.Pointers[1].Kind)
 }
 
 func TestReleaseExamples(t *testing.T) {
@@ -63,7 +63,15 @@ func TestReleaseExamples(t *testing.T) {
 			var rel api.Release
 			require.NoError(t, rel.UnmarshalJSON(readExample(t, name)))
 			require.NoError(t, rel.Validate())
-			assert.NotEmpty(t, rel.Pointers, "a release always reports the set it pins")
+			require.NotEmpty(t, rel.Pointers, "a release always reports the set it pins")
+
+			// The caller never sends a handle, so the response is the only
+			// place it comes from: the server reads it off each pinned
+			// revision. A pointer without one would leave the pinned set
+			// unreadable without resolving every revision.
+			for _, pointer := range rel.Pointers {
+				assert.NotEmpty(t, pointer.Handle, "every pinned revision reports its handle")
+			}
 		})
 	}
 }

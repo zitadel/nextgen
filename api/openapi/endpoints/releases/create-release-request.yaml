@@ -12,11 +12,13 @@ properties:
     type: array
     minItems: 1
     description: |
-      The revisions to pin, one entry per `(kind, handle)`. A `(kind, handle)`
-      may appear at most once — a release pins a single revision of any given
-      resource. Must not be empty.
+      The revisions to pin. Must not be empty.
+
+      A release pins a single revision of any given resource, so two revisions
+      that resolve to the same resource cannot be pinned together — pinning two
+      revisions of the `human-user` schema is rejected rather than ordered.
     items:
-      $ref: release-pointer.yaml
+      $ref: create-release-pointer.yaml
   message:
     type: string
     maxLength: 1024
