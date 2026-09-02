@@ -9210,9 +9210,11 @@ func (s *CreateReleasePointerKind) UnmarshalText(data []byte) error {
 // Ref: #
 type CreateReleaseRequest struct {
 	// The revisions to pin. Must not be empty.
-	// A release pins a single revision of any given resource, so two revisions
-	// that resolve to the same resource cannot be pinned together — pinning two
-	// revisions of the `human-user` schema is rejected rather than ordered.
+	// A kind usually appears more than once: a project has several user schemas
+	// and several flows, and each is pinned on its own. What it cannot do is
+	// pin two revisions of the *same* resource — a second revision of the
+	// `human-user` schema is rejected rather than ordered, since a release
+	// describes one state of the project.
 	Pointers []CreateReleasePointer `json:"pointers"`
 	// A short summary of what the release changes, analogous to a git commit
 	// message. Recorded on the release and shown when listing releases.
@@ -33965,11 +33967,16 @@ func (s *ReleaseMetadataCreatedByType) UnmarshalText(data []byte) error {
 type ReleasePointer struct {
 	// The kind of resource this pointer pins.
 	Kind ReleasePointerKind `json:"kind"`
-	// What the resource is called, independent of which revision is pinned.
-	// Determined when the release is assembled, not supplied by the caller:
-	// - `schema` — the document's `objectType`
-	// - `flow` — the flow's `name`
-	// - `branding` — always `default`, since a project has a single branding
+	// Which resource this pointer pins, independent of which revision of it.
+	// `revision_id` chooses the revision; `handle` says what the revision is a
+	// revision *of*. Determined when the release is assembled, not supplied by
+	// the caller:
+	// - `schema` — the document's `objectType`, so `human-user` and
+	// `machine-user` are separate resources a release pins separately
+	// - `flow` — the flow's `name`, likewise for `default-login` and `b2b-login`
+	// - `branding` — always `default`. A project has one branding, so there is
+	// nothing to distinguish; it is revisioned like everything else, and
+	// `revision_id` is what varies between releases.
 	// Resources inside a release reference each other by handle rather than by
 	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`

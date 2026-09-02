@@ -20,12 +20,17 @@ properties:
     minLength: 1
     maxLength: 256
     description: |
-      What the resource is called, independent of which revision is pinned.
-      Determined when the release is assembled, not supplied by the caller:
+      Which resource this pointer pins, independent of which revision of it.
+      `revision_id` chooses the revision; `handle` says what the revision is a
+      revision *of*. Determined when the release is assembled, not supplied by
+      the caller:
 
-      - `schema` — the document's `objectType`
-      - `flow` — the flow's `name`
-      - `branding` — always `default`, since a project has a single branding
+      - `schema` — the document's `objectType`, so `human-user` and
+        `machine-user` are separate resources a release pins separately
+      - `flow` — the flow's `name`, likewise for `default-login` and `b2b-login`
+      - `branding` — always `default`. A project has one branding, so there is
+        nothing to distinguish; it is revisioned like everything else, and
+        `revision_id` is what varies between releases.
 
       Resources inside a release reference each other by handle rather than by
       revision id, so the same handle names the same resource in every release.

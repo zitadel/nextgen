@@ -16,14 +16,24 @@
       "revision_id": "sch_01KWHF18816ZQE7F0N9WD3P2E4"
     },
     {
+      "kind": "schema",
+      "handle": "machine-user",
+      "revision_id": "sch_01KWHF2XY6RN7F0N9WD3P2E4YM"
+    },
+    {
       "kind": "flow",
       "handle": "default-login",
       "revision_id": "flowdef_01KWHG09JXA7F0N9WD3P2E4YM5"
     },
     {
+      "kind": "flow",
+      "handle": "b2b-login",
+      "revision_id": "flowdef_01KWHG3B72K7M7F0N9WD3P2E4"
+    },
+    {
       "kind": "branding",
       "handle": "default",
-      "revision_id": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"
+      "revision_id": "brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6"
     }
   ]
 }

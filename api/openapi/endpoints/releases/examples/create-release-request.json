@@ -5,8 +5,16 @@
       "revision_id": "https://example.com/schemas/default-human-user.json"
     },
     {
+      "kind": "schema",
+      "revision_id": "sch_01KWHF2XY6RN7F0N9WD3P2E4YM"
+    },
+    {
       "kind": "flow",
       "revision_id": "flowdef_01KWHG09JXA7F0N9WD3P2E4YM5"
+    },
+    {
+      "kind": "flow",
+      "revision_id": "flowdef_01KWHG3B72K7M7F0N9WD3P2E4"
     },
     {
       "kind": "branding",

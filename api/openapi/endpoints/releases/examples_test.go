@@ -93,6 +93,54 @@ func TestReleaseExamples(t *testing.T) {
 	}
 }
 
+// TestReleaseExamplesPinManyResourcesPerKind covers what the handle is for. A
+// project has several user schemas and several flows, so a kind appearing more
+// than once is the normal case, and the handle is the only thing telling two
+// pointers of the same kind apart.
+func TestReleaseExamplesPinManyResourcesPerKind(t *testing.T) {
+	var rel api.Release
+	require.NoError(t, rel.UnmarshalJSON(readExample(t, "release.json")))
+	require.NoError(t, rel.Validate())
+
+	handles := map[api.ReleasePointerKind][]string{}
+	for _, pointer := range rel.Pointers {
+		handles[pointer.Kind] = append(handles[pointer.Kind], pointer.Handle)
+	}
+
+	assert.ElementsMatch(t, []string{"human-user", "machine-user"},
+		handles[api.ReleasePointerKindSchema])
+	assert.ElementsMatch(t, []string{"default-login", "b2b-login"},
+		handles[api.ReleasePointerKindFlow])
+	assert.Equal(t, []string{"default"}, handles[api.ReleasePointerKindBranding],
+		"a project has one branding, so it is the one kind that cannot repeat")
+}
+
+// TestBrandingHandleIsStableAcrossReleases separates the two things a pointer
+// carries. Branding is revisioned like every other kind: the handle names the
+// resource and never moves, while revision_id is what differs between one
+// release and the next.
+func TestBrandingHandleIsStableAcrossReleases(t *testing.T) {
+	brandingOf := func(name string) api.ReleasePointer {
+		t.Helper()
+		var rel api.Release
+		require.NoError(t, rel.UnmarshalJSON(readExample(t, name)))
+		for _, pointer := range rel.Pointers {
+			if pointer.Kind == api.ReleasePointerKindBranding {
+				return pointer
+			}
+		}
+		t.Fatalf("%s pins no branding revision", name)
+		return api.ReleasePointer{}
+	}
+
+	first := brandingOf("release.json")
+	second := brandingOf("release-machine-principal.json")
+
+	assert.Equal(t, first.Handle, second.Handle, "the branding handle is constant")
+	assert.NotEqual(t, first.RevisionID, second.RevisionID,
+		"but the pinned branding revision moves between releases")
+}
+
 // TestReleaseMetadataCreatedByIsNullable covers the case the created_by shape
 // exists for: a release assembled by a project secret carries no user
 // identity, so the field is explicitly null rather than omitted.
