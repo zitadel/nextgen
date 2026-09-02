@@ -64,11 +64,13 @@ func TestCreateFlowDefinition(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	_, err = client.CreateFlowDefinition(
+	existingResp, err := client.CreateFlowDefinition(
 		t.Context(),
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", userSchemaURI)),
 	)
 	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, existingResp, helpers.MustMarshal(t, existingResp))
+	existing := existingResp.(*api.FlowDefinitionResponse)
 
 	tests := []struct {
 		name     string
@@ -99,7 +101,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 		{
 			name: "unknown user schema",
 			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow-2", unknownUserSchemaURI)),
-			wantResp: &api.CreateFlowDefinitionBadRequest{
+			wantResp: &api.ErrorDetails{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
 				Details: api.OptErrorDetailsDetails{
@@ -111,11 +113,11 @@ func TestCreateFlowDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "already existing flow definition",
+			name: "same name publishes a new revision",
 			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", userSchemaURI)),
-			wantResp: &api.CreateFlowDefinitionConflict{
-				Code:    "flowdef.already_exists",
-				Message: "flow definition: already exists",
+			wantResp: &api.FlowDefinitionResponse{
+				ProjectID:      project.ID,
+				FlowDefinition: newFlowDefinitionFixture("existing-flow", userSchemaURI),
 			},
 		},
 		{
@@ -154,7 +156,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantResp: &api.CreateFlowDefinitionBadRequest{
+			wantResp: &api.ErrorDetails{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
 				Details: api.OptErrorDetailsDetails{
@@ -201,7 +203,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantResp: &api.CreateFlowDefinitionBadRequest{
+			wantResp: &api.ErrorDetails{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
 				Details: api.OptErrorDetailsDetails{
@@ -248,7 +250,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantResp: &api.CreateFlowDefinitionBadRequest{
+			wantResp: &api.ErrorDetails{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
 				Details: api.OptErrorDetailsDetails{
@@ -266,6 +268,9 @@ func TestCreateFlowDefinition(t *testing.T) {
 			resp, err := client.CreateFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
 			assertFlowDefinitionResponse(t, tt.wantResp, resp)
+			if created, ok := resp.(*api.FlowDefinitionResponse); ok {
+				assert.NotEqual(t, existing.ID, created.ID, "every create allocates a new revision id")
+			}
 		})
 	}
 }
@@ -565,19 +570,13 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		assert.Equal(t, expected.FlowDefinition, actual.FlowDefinition)
 		assert.False(t, actual.CreatedAt.IsZero())
 		assert.False(t, actual.UpdatedAt.IsZero())
-	case *api.CreateFlowDefinitionBadRequest:
-		require.IsType(t, &api.CreateFlowDefinitionBadRequest{}, got, helpers.MustMarshal(t, got))
-		actual := got.(*api.CreateFlowDefinitionBadRequest)
+	case *api.ErrorDetails:
+		require.IsType(t, &api.ErrorDetails{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.ErrorDetails)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 		assert.Equal(t, expected.Details, actual.Details)
-	case *api.CreateFlowDefinitionConflict:
-		require.IsType(t, &api.CreateFlowDefinitionConflict{}, got, helpers.MustMarshal(t, got))
-		actual := got.(*api.CreateFlowDefinitionConflict)
-
-		assert.Equal(t, expected.Code, actual.Code)
-		assert.Equal(t, expected.Message, actual.Message)
 	case *api.UpdateFlowDefinitionBadRequest:
 		require.IsType(t, &api.UpdateFlowDefinitionBadRequest{}, got, helpers.MustMarshal(t, got))
 		actual := got.(*api.UpdateFlowDefinitionBadRequest)
@@ -944,6 +943,21 @@ func TestListFlowDefinitions(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, resp2, helpers.MustMarshal(t, resp2))
 	flowDef2 := resp2.(*api.FlowDefinitionResponse)
 
+	// A second revision of flow-1: same name, new id, created last.
+	resp1b, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID: api.ProjectID(project1.ID),
+		FlowDefinition: api.FlowDefinition{
+			Name:       "flow-1",
+			Status:     "active",
+			UserSchema: userSchemaURI,
+			Purposes:   map[string]string{"login": "step_1"},
+			Steps:      validSteps(),
+		},
+	})
+	require.IsType(t, &api.FlowDefinitionResponse{}, resp1b, helpers.MustMarshal(t, resp1b))
+	flowDef1b := resp1b.(*api.FlowDefinitionResponse)
+	require.NotEqual(t, flowDef1.ID, flowDef1b.ID)
+
 	harness.SetProjectSecretOnApiClient(t, client, project2)
 	resp3, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project2.ID),
@@ -973,6 +987,9 @@ func TestListFlowDefinitions(t *testing.T) {
 		// document and timestamps are not knowable here.
 		wantDefault bool
 		want        []api.FlowDefinitionResponse
+		// The name filter lists a flow's revisions newest first, so for
+		// those cases the order is part of the contract.
+		ordered bool
 	}{
 		{
 			name:    "list all flow definitions in a project",
@@ -984,6 +1001,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			want: []api.FlowDefinitionResponse{
 				*flowDef1,
 				*flowDef2,
+				*flowDef1b,
 			},
 		},
 		{
@@ -1025,6 +1043,40 @@ func TestListFlowDefinitions(t *testing.T) {
 			wantDefault: true,
 			want: []api.FlowDefinitionResponse{
 				*flowDef1,
+				*flowDef1b,
+			},
+		},
+		{
+			name:    "revisions of one flow, newest first",
+			project: project1,
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project1.ID),
+				Name:      api.NewOptString("flow-1"),
+			},
+			want: []api.FlowDefinitionResponse{
+				*flowDef1b,
+				*flowDef1,
+			},
+			ordered: true,
+		},
+		{
+			name:    "name combined with a purpose the flow does not serve",
+			project: project1,
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project1.ID),
+				Name:      api.NewOptString("flow-1"),
+				Purpose: api.OptListFlowDefinitionsPurpose{
+					Value: "profiling",
+					Set:   true,
+				},
+			},
+		},
+		{
+			name:    "unknown name",
+			project: project1,
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project1.ID),
+				Name:      api.NewOptString("no-such-flow"),
 			},
 		},
 		{
@@ -1066,6 +1118,10 @@ func TestListFlowDefinitions(t *testing.T) {
 			// The list and the by-id read describe a flow definition the
 			// same way (#939): document, purposes, audience, steps and
 			// timestamps all match the create response.
+			if tt.ordered {
+				assert.Equal(t, tt.want, others)
+				return
+			}
 			assert.ElementsMatch(t, tt.want, others)
 		})
 	}

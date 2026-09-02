@@ -86,11 +86,15 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 
 // CreateFlowDefinition implements createFlowDefinition operation.
 //
-// Creates a new flow definition.
+// Publishes a new flow definition revision.
 // Flow definitions are templates that define the sequence of steps (capabilities)
 // for a particular user journey (e.g., registration, login, password reset).
 // Flow definitions are created based on the flow definition schema, which includes the flow's
 // purpose, audience, and the steps involved.
+// Every call allocates a new opaque id. Revisions of one flow share its
+// `name`; posting a definition under an existing `name` publishes a new
+// revision of that flow, it is not a conflict. List with `name` to see a
+// flow's revisions, newest first.
 //
 // POST /flow_definitions
 func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (r CreateFlowDefinitionRes, _ error) {
@@ -517,8 +521,9 @@ func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsPar
 
 // ListFlowDefinitions implements listFlowDefinitions operation.
 //
-// Retrieves a list of all flow definitions.
+// Retrieves a list of all flow definitions, newest first.
 // This endpoint can be used to view existing flow definitions and their configurations.
+// Filter by `name` to list the revisions of one flow.
 //
 // GET /flow_definitions
 func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (r ListFlowDefinitionsRes, _ error) {

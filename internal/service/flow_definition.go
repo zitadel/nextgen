@@ -72,20 +72,6 @@ func NewFlowDefinitionService(
 }
 
 func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	existing, err := fd.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-			database.Equal(database.Col(domain.FlowDefinitionFieldName), req.Name),
-			database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), req.SchemaVersion),
-		),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(existing.Items) > 0 {
-		return nil, domain.ErrFlowDefinitionAlreadyExists()
-	}
-
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
@@ -324,6 +310,7 @@ func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) 
 type ListFlowDefinitionsRequest struct {
 	ProjectID string
 	Purpose   string
+	Name      string
 	Limit     int
 	PageToken string
 }
@@ -347,6 +334,9 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
 		}
 		filters = append(filters, database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()))
+	}
+	if req.Name != "" {
+		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldName), req.Name))
 	}
 	var cursor []byte
 	if req.PageToken != "" {

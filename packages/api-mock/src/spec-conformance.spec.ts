@@ -428,6 +428,37 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.details).toContain('must wire "user_not_found" transition');
   });
 
+  test("POST /flow_definitions with a repeated name publishes a new revision", async () => {
+    const publish = async () => {
+      const res = await fetch(`${BASE}/flow_definitions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          project_id: "proj_conformance_revisions",
+          flow_definition: validFlowDefinitionBody(),
+        }),
+      });
+      expect(res.status).toBe(201);
+      return ((await res.json()) as { id: string }).id;
+    };
+    const first = await publish();
+    const second = await publish();
+    expect(second).not.toBe(first);
+
+    // The name filter lists that flow's revisions, newest first.
+    const res = await fetch(
+      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=login-flow`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { flow_definitions: { id: string }[] };
+    expect(body.flow_definitions.map((entry) => entry.id)).toEqual([second, first]);
+
+    const none = await fetch(
+      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=no-such-flow`,
+    );
+    expect(((await none.json()) as { flow_definitions: unknown[] }).flow_definitions).toEqual([]);
+  });
+
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
     const create = await fetch(`${BASE}/flow_definitions`, {

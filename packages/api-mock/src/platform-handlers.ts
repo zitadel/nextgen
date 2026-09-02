@@ -305,10 +305,13 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
 /**
  * `created_at DESC, id DESC`, the order the server lists in. The comparator has
  * to be a total order: `createdAt` is millisecond-resolution here, so two
- * schemas can share one, and a tie that resolved arbitrarily would let
+ * records can share one, and a tie that resolved arbitrarily would let
  * `revisions=latest` pick a different revision from one call to the next.
  */
-function compareSchemasNewestFirst(a: SchemaRecord, b: SchemaRecord): number {
+function compareNewestFirst(
+  a: { createdAt: string; id: string },
+  b: { createdAt: string; id: string },
+): number {
   if (a.createdAt !== b.createdAt) {
     return a.createdAt < b.createdAt ? 1 : -1;
   }
@@ -730,7 +733,7 @@ export function setupPlatformHandlers() {
       const matching = [...store.schemas.values()]
         .filter((r) => r.projectId === query.data.project_id)
         .filter((r) => !query.data.object_type || r.objectType === query.data.object_type)
-        .sort(compareSchemasNewestFirst);
+        .sort(compareNewestFirst);
       // The server's anti-join repeats none of the caller's filters, and only
       // object_type can correlate a suppressing row — so narrowing by
       // object_type before selecting the latest is equivalent, while narrowing
@@ -845,9 +848,13 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
+      // Newest first: under a name filter the first entry is the flow's
+      // current revision, which callers rely on.
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()]
           .filter((record) => record.projectId === query.data.project_id)
+          .filter((record) => !query.data.name || record.body.name === query.data.name)
+          .sort(compareNewestFirst)
           .map(flowResponse),
         next_page_token: null,
       };

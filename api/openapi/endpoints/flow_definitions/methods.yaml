@@ -2,11 +2,16 @@ post:
   operationId: createFlowDefinition
   summary: Create a new flow definition
   description: |
-    Creates a new flow definition. 
-    Flow definitions are templates that define the sequence of steps (capabilities) 
-    for a particular user journey (e.g., registration, login, password reset). 
-    
+    Publishes a new flow definition revision.
+    Flow definitions are templates that define the sequence of steps (capabilities)
+    for a particular user journey (e.g., registration, login, password reset).
+
     Flow definitions are created based on the flow definition schema, which includes the flow's purpose, audience, and the steps involved.
+
+    Every call allocates a new opaque id. Revisions of one flow share its
+    `name`; posting a definition under an existing `name` publishes a new
+    revision of that flow, it is not a conflict. List with `name` to see a
+    flow's revisions, newest first.
   tags:
     - Flow Definitions
   security:
@@ -53,12 +58,6 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
-    '409':
-      description: Conflict (e.g., flow definition with the same name already exists in the project).
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
     default:
       $ref: createFlowDefinition-error-response.yaml
 
@@ -66,8 +65,9 @@ get:
   operationId: listFlowDefinitions
   summary: List flow definitions
   description: |
-    Retrieves a list of all flow definitions. 
+    Retrieves a list of all flow definitions, newest first.
     This endpoint can be used to view existing flow definitions and their configurations.
+    Filter by `name` to list the revisions of one flow.
   tags:
     - Flow Definitions
   security:
@@ -89,6 +89,16 @@ get:
       schema:
         type: string
         enum: [ login, register, recovery, profiling, reauth, link_account ]
+    - name: name
+      in: query
+      required: false
+      description: |
+        The flow name to filter by. Every revision of a flow shares its
+        `name`, so the result is that flow's revisions, newest first.
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9-]*$'
+        maxLength: 256
     - name: expand
       in: query
       required: false
