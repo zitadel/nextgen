@@ -25,6 +25,10 @@ type CreateFlowRes interface {
 	createFlowRes()
 }
 
+type CreateGrantRes interface {
+	createGrantRes()
+}
+
 type CreateHandoffRes interface {
 	createHandoffRes()
 }
@@ -51,6 +55,10 @@ type CreateUserRes interface {
 
 type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
+}
+
+type DeleteGrantRes interface {
+	deleteGrantRes()
 }
 
 type DeleteTeamRes interface {
@@ -81,6 +89,10 @@ type GetClaimStatusRes interface {
 	getClaimStatusRes()
 }
 
+type GetEnvironmentByNameRes interface {
+	getEnvironmentByNameRes()
+}
+
 type GetEventRes interface {
 	getEventRes()
 }
@@ -91,6 +103,10 @@ type GetFlowDefinitionRes interface {
 
 type GetFlowStepRes interface {
 	getFlowStepRes()
+}
+
+type GetGrantRes interface {
+	getGrantRes()
 }
 
 type GetHealthRes interface {
@@ -143,6 +159,10 @@ type IssueChallengeRes interface {
 
 type ListBrandingRes interface {
 	listBrandingRes()
+}
+
+type ListEnvironmentsRes interface {
+	listEnvironmentsRes()
 }
 
 type ListEventsRes interface {

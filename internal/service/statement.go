@@ -29,6 +29,7 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
+	EnvironmentStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -115,6 +116,19 @@ type JSONSchemaStatements interface {
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type EnvironmentPool interface {
+// 	Statementer[EnvironmentStatements]
+// 	Transactioner[EnvironmentStatements]
+// }
+
+type EnvironmentStatements interface {
+	Statements
+	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
+	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
+	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type TeamPool interface {
 // 	Statementer[TeamStatements]
 // 	Transactioner[TeamStatements]
@@ -124,6 +138,7 @@ type TeamStatements interface {
 	Statements
 	CreateTeam(ctx context.Context, entity *domain.Team) error
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error)
 	UpdateTeam(ctx context.Context, entity *domain.Team) error
 	ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle

@@ -1,0 +1,70 @@
+post:
+  operationId: createGrant
+  summary: Create grant
+  description: |
+    Bind a user or team to `project.viewer`, `project.editor`, or
+    `project.admin` on the project identified by the `project-id` header.
+    IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
+    created here — claim owns that path. An unrevoked grant with the same
+    principal and relation occupies the unique key even after `expires_at`;
+    DELETE it before re-creating.
+  tags:
+    - Grants
+  security:
+    - oauth2:
+        - project.write
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-grant-request.yaml
+  responses:
+    '201':
+      description: The grant was created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: grant.yaml
+    '400':
+      description: The provided parameters were not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found, or the principal could not be resolved.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: An unrevoked grant with this principal and relation already exists on the project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '429':
+      description: |
+        Too many requests, the client has sent too many requests in a given
+        amount of time.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createGrant-error-response.yaml

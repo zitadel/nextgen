@@ -117,6 +117,17 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
+// environmentAccess gates the project's runtime slots (ADR 035, #534).
+// Reads are project-scoped: the list carries a project_id and the get
+// addresses an environment by name, so no route resolves a path id through
+// RSI and the kind is only used to narrow a partial-access list.
+var environmentAccess = resourceAccess{
+	kind:      domain.ResourceKindEnvironment,
+	readMiss:  domain.ErrEnvironmentNotFound,
+	writeMiss: domain.ErrEnvironmentProjectNotFound,
+	denied:    domain.ErrEnvironmentPermissionDenied,
+}
+
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
 // project-scoped (no RSI kind); credential ceiling is project.write like other
 // management resources until #420 mints a fine-grained events relation.
@@ -124,6 +135,14 @@ var eventsAccess = resourceAccess{
 	readMiss:  domain.ErrEventNotFound,
 	writeMiss: domain.ErrEventNotFound,
 	denied:    domain.ErrEventPermissionDenied,
+}
+
+// grantAccess gates create/get/revoke. Grants are not in resource_scope_index;
+// every op takes project_id from the header (same as events).
+var grantAccess = resourceAccess{
+	readMiss:  domain.ErrGrantNotFound,
+	writeMiss: domain.ErrGrantNotFound,
+	denied:    domain.ErrGrantPermissionDenied,
 }
 
 var projectAccess = resourceAccess{

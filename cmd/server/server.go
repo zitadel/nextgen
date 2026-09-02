@@ -197,7 +197,9 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	// deployment configuration lands.
 	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
+	grantService := service.NewGrantService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
+	environmentService := service.NewEnvironmentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
@@ -286,10 +288,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
+			environmentService,
 			eventService,
 			tokenService,
 			keyService,
 			claimService,
+			grantService,
 			serviceDBPool,
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.

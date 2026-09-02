@@ -66,20 +66,28 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 }
 
 func (s *TeamService) Get(ctx context.Context, projectID string, teamID string) (*domain.Team, error) {
-	team, err := s.v2Pool.Statements().GetTeamByID(ctx, projectID, teamID)
+	team, err := s.v2Pool.Statements().GetTeam(ctx, database.And(
+		database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+		database.Equal(database.Col(domain.TeamFieldID), teamID),
+		visibleTeamStatusFilter(),
+	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrTeamNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get team")
 	}
-	// A pending_purge team is awaiting deletion by the cleanup job (#622
-	// dropped that status from the team lifecycle), so reads treat it as
-	// already gone.
-	if team.Status == domain.TeamStatusPendingPurge {
-		return nil, domain.ErrTeamNotFound()
-	}
 	return team, nil
+}
+
+// visibleTeamStatusFilter is the read-side allowlist for HTTP get and list.
+// A pending_purge team is awaiting deletion by the cleanup job (#622 dropped
+// that status from the team lifecycle), so reads treat it as already gone.
+func visibleTeamStatusFilter() database.Filter[domain.TeamField] {
+	return database.Or(
+		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusActive.String()),
+		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusDeactivated.String()),
+	)
 }
 
 // ListTeamsRequest is the input for listing the teams of a project.
@@ -109,13 +117,7 @@ func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeam
 
 	filters := make([]database.Filter[domain.TeamField], 0, len(req.Filters)+2)
 	filters = append(filters, database.Equal(database.Col(domain.TeamFieldProjectID), req.ProjectID))
-	// A pending_purge team is awaiting deletion by the cleanup job (#622
-	// dropped that status from the team lifecycle), so reads treat it as
-	// already gone.
-	filters = append(filters, database.Or(
-		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusActive.String()),
-		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusDeactivated.String()),
-	))
+	filters = append(filters, visibleTeamStatusFilter())
 	for _, f := range req.Filters {
 		filter, err := teamFilter(f)
 		if err != nil {
