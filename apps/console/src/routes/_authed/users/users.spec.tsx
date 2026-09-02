@@ -65,7 +65,7 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
-    // the identifier renders as its muted second line. Schema-driven
+    // the identifier has its own column (asserted below). Schema-driven
     // attribute columns follow (design `277:288291`, decisions log D4).
     expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
     // The designated identifier is its own platform-derived column (like

@@ -391,7 +391,7 @@ function toUserRow(
     // The server-resolved identity chain (ADR 058): display → identifier →
     // id. Also the row menu's accessible name and the delete dialog's
     // heading, so every surface labels the user identically.
-    name: userIdentity(user) || id,
+    name: userIdentity(user) ?? id,
     identifier: userIdentifier(user),
     identifierProperty: field(user, "identifier_property"),
     status: userStatus(user),

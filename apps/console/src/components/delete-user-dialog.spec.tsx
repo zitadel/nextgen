@@ -125,7 +125,7 @@ describe("delete user dialog", () => {
     // row is gone from the invalidated list.
     expect(await screen.findByText("Maya Patel deleted")).toBeInTheDocument();
     await waitFor(() =>
-      // The row's link is its first schema-driven column, not a combined name.
+      // The row's link lives on the User identity column.
       expect(screen.queryByRole("link", { name: "Maya Patel" })).not.toBeInTheDocument(),
     );
   });

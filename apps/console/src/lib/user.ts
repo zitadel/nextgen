@@ -24,8 +24,8 @@ export function userAttributes(user: Record<string, unknown>): Record<string, un
  * Takes the whole user record: `display`/`identifier` are envelope fields,
  * not schema properties.
  */
-export function userIdentity(user: Record<string, unknown>): string {
-  return field(user, "display") ?? field(user, "identifier") ?? (field(user, "id") ?? "");
+export function userIdentity(user: Record<string, unknown>): string | undefined {
+  return field(user, "display") ?? field(user, "identifier") ?? field(user, "id");
 }
 
 /** The envelope's designated identifier value, when the schema designates one. */

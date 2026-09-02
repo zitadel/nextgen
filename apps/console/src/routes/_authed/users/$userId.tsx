@@ -84,7 +84,7 @@ function UserDetail() {
   const router = useRouter();
   const attributes = userAttributes(user);
   // The server-resolved identity chain (ADR 058): display → identifier → id.
-  const name = userIdentity(user) || userId;
+  const name = userIdentity(user) ?? userId;
   const secondary = userIdentitySecondary(user);
   const fields = schema ? schemaFields(schema) : [];
   const metadata = userMetadata(user);
