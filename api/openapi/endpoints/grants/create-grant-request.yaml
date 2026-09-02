@@ -1,0 +1,32 @@
+type: object
+required:
+  - principal_type
+  - principal_id
+  - relation
+properties:
+  principal_type:
+    type: string
+    enum:
+      - user
+      - team
+    description: Kind of principal to bind. `sk_proj` and owning-team grants are not accepted.
+  principal_id:
+    type: string
+    minLength: 1
+    description: |
+      Principal id (`user_<opaque>` or `team_<opaque>`). The principal must
+      exist in the platform project when a platform project is configured.
+  relation:
+    type: string
+    enum:
+      - viewer
+      - editor
+      - admin
+    description: Catalog relation on `object_type` `project`. `team` (owning-team) is not allowed.
+  expires_at:
+    type: string
+    format: date-time
+    description: |
+      Optional expiry. Must be in the future when set. Expiry stops
+      authorization but does not free the unique binding; DELETE the grant
+      before posting the same principal and relation again.

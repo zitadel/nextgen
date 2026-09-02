@@ -70,6 +70,7 @@ const (
 	EventTypeBrandingCreated EventType = "branding.created"
 
 	EventTypeAuthzGranted EventType = "authz.granted"
+	EventTypeAuthzRevoked EventType = "authz.revoked"
 
 	EventTypeAuthFactorPasswordSet     EventType = "auth.factor.password.set"
 	EventTypeAuthFactorPasskeyEnrolled EventType = "auth.factor.passkey.enrolled"

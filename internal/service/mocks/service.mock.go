@@ -2630,6 +2630,45 @@ func (c *MockAllStatementsGetSigningKeyCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// GetTeam mocks base method.
+func (m *MockAllStatements) GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTeam", ctx, filter)
+	ret0, _ := ret[0].(*domain.Team)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTeam indicates an expected call of GetTeam.
+func (mr *MockAllStatementsMockRecorder) GetTeam(ctx, filter any) *MockAllStatementsGetTeamCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTeam", reflect.TypeOf((*MockAllStatements)(nil).GetTeam), ctx, filter)
+	return &MockAllStatementsGetTeamCall{Call: call}
+}
+
+// MockAllStatementsGetTeamCall wrap *gomock.Call
+type MockAllStatementsGetTeamCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetTeamCall) Return(arg0 *domain.Team, arg1 error) *MockAllStatementsGetTeamCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetTeamCall) Do(f func(context.Context, database.Filter[domain.TeamField]) (*domain.Team, error)) *MockAllStatementsGetTeamCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetTeamCall) DoAndReturn(f func(context.Context, database.Filter[domain.TeamField]) (*domain.Team, error)) *MockAllStatementsGetTeamCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetTeamByID mocks base method.
 func (m *MockAllStatements) GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error) {
 	m.ctrl.T.Helper()
@@ -5841,6 +5880,45 @@ func (c *MockTeamStatementsDeactivateTeamCall) Do(f func(context.Context, string
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockTeamStatementsDeactivateTeamCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockTeamStatementsDeactivateTeamCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetTeam mocks base method.
+func (m *MockTeamStatements) GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTeam", ctx, filter)
+	ret0, _ := ret[0].(*domain.Team)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTeam indicates an expected call of GetTeam.
+func (mr *MockTeamStatementsMockRecorder) GetTeam(ctx, filter any) *MockTeamStatementsGetTeamCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTeam", reflect.TypeOf((*MockTeamStatements)(nil).GetTeam), ctx, filter)
+	return &MockTeamStatementsGetTeamCall{Call: call}
+}
+
+// MockTeamStatementsGetTeamCall wrap *gomock.Call
+type MockTeamStatementsGetTeamCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTeamStatementsGetTeamCall) Return(arg0 *domain.Team, arg1 error) *MockTeamStatementsGetTeamCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTeamStatementsGetTeamCall) Do(f func(context.Context, database.Filter[domain.TeamField]) (*domain.Team, error)) *MockTeamStatementsGetTeamCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTeamStatementsGetTeamCall) DoAndReturn(f func(context.Context, database.Filter[domain.TeamField]) (*domain.Team, error)) *MockTeamStatementsGetTeamCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

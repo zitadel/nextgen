@@ -25,6 +25,10 @@ type CreateFlowRes interface {
 	createFlowRes()
 }
 
+type CreateGrantRes interface {
+	createGrantRes()
+}
+
 type CreateHandoffRes interface {
 	createHandoffRes()
 }
@@ -51,6 +55,10 @@ type CreateUserRes interface {
 
 type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
+}
+
+type DeleteGrantRes interface {
+	deleteGrantRes()
 }
 
 type DeleteTeamRes interface {
@@ -91,6 +99,10 @@ type GetFlowDefinitionRes interface {
 
 type GetFlowStepRes interface {
 	getFlowStepRes()
+}
+
+type GetGrantRes interface {
+	getGrantRes()
 }
 
 type GetHealthRes interface {

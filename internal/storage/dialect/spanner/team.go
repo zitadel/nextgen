@@ -90,6 +90,27 @@ func (ts teamStatements) GetTeamByID(ctx context.Context, projectID, id string) 
 	return ts.scanTeam(row)
 }
 
+// GetTeam implements [service.TeamStatements].
+func (ts teamStatements) GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, teamQuery, &database.ListOptions[domain.TeamField]{
+		Filter: filter,
+	}, teamSchema); err != nil {
+		return nil, err
+	}
+
+	var team *domain.Team
+	err := ts.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		team, err = collectOneRow(iter, ts.scanTeam)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return team, nil
+}
+
 // UpdateTeam implements [service.TeamStatements].
 // The whole team is returned after the update.
 // Only active teams are updated.
