@@ -117,12 +117,16 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return schemaErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixBranding.ErrorCodePrefix("")):
 		return brandingErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixEnvironment.ErrorCodePrefix("")):
+		return environmentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEvent.ErrorCodePrefix("")):
 		return eventErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
 		return teamErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixGrant.ErrorCodePrefix("")):
+		return grantErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
 		return projectErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),

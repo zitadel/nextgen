@@ -48,6 +48,16 @@ tags:
 
       Assembling a release does not deploy it: the same release can later be
       run on any number of environments unchanged.
+  - name: Environments
+    description: |
+      Endpoints for a project's runtime slots (ADR 035). Identity only:
+      the release an environment runs and its deployment history arrive with
+      the deployments endpoints, and environment lifecycle with its own ADR.
+  - name: Grants
+    description: |
+      Collaboration grants that bind a user or team to project.viewer,
+      project.editor, or project.admin. Create, get, and revoke; listing and
+      role-change PATCH are follow-ups.
   - name: Events
     description: |
       Project-scoped audit event list and get (ADR 049). Unified surface for
@@ -132,6 +142,10 @@ paths:
     $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
+  /environments:
+    $ref: endpoints/environments/methods.yaml
+  /environments/{name}:
+    $ref: endpoints/environments/by_name/methods.yaml
   /branding:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
@@ -140,6 +154,10 @@ paths:
     $ref: endpoints/releases/methods.yaml
   /releases/{release_id}:
     $ref: endpoints/releases/by_id/methods.yaml
+  /grants:
+    $ref: endpoints/grants/methods.yaml
+  /grants/{id}:
+    $ref: endpoints/grants/by_id/methods.yaml
   /events:
     $ref: endpoints/events/methods.yaml
   /events/{id}:

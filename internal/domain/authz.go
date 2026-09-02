@@ -24,6 +24,7 @@ const (
 	ResourceKindBranding       ResourceKind = "branding"
 	ResourceKindFlowDefinition ResourceKind = "flow_definition"
 	ResourceKindSession        ResourceKind = "session"
+	ResourceKindEnvironment    ResourceKind = "environment"
 )
 
 func (k ResourceKind) String() string { return string(k) }
