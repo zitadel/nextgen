@@ -130,3 +130,55 @@ func TestStatementsUserRefResolver_ResolveUserRefs(t *testing.T) {
 		assert.Empty(t, refs)
 	})
 }
+
+func TestStatementsUserRefResolver_ResolveRefsForUsers(t *testing.T) {
+	newResolver := func(t *testing.T, stmts *mocks.MockAllStatements) service.StatementsUserRefResolver {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		pool := mocks.NewMockPool(ctrl)
+		pool.EXPECT().Statements().Return(stmts).AnyTimes()
+		return service.StatementsUserRefResolver{Pool: service.NewPool(pool)}
+	}
+
+	t.Run("resolves already-listed users without a user query", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		// Only ListJSONSchemas may run — a ListUsers call would fail the
+		// mock: the callers already hold fully hydrated users (§3a).
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: []*domain.JSONSchema{{
+				ProjectID: "proj",
+				URL:       "https://s/human",
+				Kind:      domain.JSONSchemaKindUserSchema,
+				Schema:    []byte(`{"x-identifier":"email","x-display":["givenName"]}`),
+			}}}, nil)
+
+		users := []*domain.User{
+			{ProjectID: "proj", SchemaURL: "https://s/human", ID: "user-1", Attributes: domain.AttributesFromMap(map[string]any{
+				"email": "ada@example.com", "givenName": "Ada",
+			})},
+			{ProjectID: "proj", SchemaURL: "https://s/unstored", ID: "user-2", Attributes: domain.AttributesFromMap(map[string]any{
+				"email": "b@example.com",
+			})},
+		}
+		refs, err := newResolver(t, stmts).ResolveRefsForUsers(t.Context(), "proj", users)
+
+		require.NoError(t, err)
+		assert.Equal(t, domain.UserRef{
+			UserID: "user-1", Identifier: "ada@example.com",
+			IdentifierProperty: "email", Display: "Ada",
+		}, refs["user-1"])
+		assert.Equal(t, domain.UserRef{UserID: "user-2"}, refs["user-2"],
+			"a user of an unstored schema resolves to a bare id ref")
+	})
+
+	t.Run("empty input short-circuits without queries", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+
+		refs, err := newResolver(t, stmts).ResolveRefsForUsers(t.Context(), "proj", nil)
+
+		require.NoError(t, err)
+		assert.Empty(t, refs)
+	})
+}

@@ -14,6 +14,9 @@ import (
 // from the result; their refs degrade to the user id at the caller.
 type UserRefResolver interface {
 	ResolveUserRefs(ctx context.Context, projectID string, userIDs []string) (map[string]domain.UserRef, error)
+	// ResolveRefsForUsers resolves refs for users the caller already holds
+	// fully hydrated (ADR 058 §3a) — one schema-list query, no user query.
+	ResolveRefsForUsers(ctx context.Context, projectID string, users []*domain.User) (map[string]domain.UserRef, error)
 }
 
 // refSchemaPageSize pages the user-schema listing during ref resolution.
@@ -72,6 +75,29 @@ func (r StatementsUserRefResolver) ResolveUserRefs(ctx context.Context, projectI
 
 	refs := make(map[string]domain.UserRef, len(listed.Items))
 	for _, user := range listed.Items {
+		refs[user.ID] = domain.ResolveUserRef(user, documents[user.SchemaURL])
+	}
+	return refs, nil
+}
+
+// ResolveRefsForUsers maps already-listed users through their own schema's
+// designations (ADR 058 §3a). The callers' read paths hydrate the full
+// attribute document, a superset of the designated keys, so resolution
+// needs only the schema documents — one schema-list query per page, zero
+// additional user queries (§4: list endpoints must not resolve per row).
+// Users whose schema URL has no stored document resolve to a bare id ref.
+func (r StatementsUserRefResolver) ResolveRefsForUsers(ctx context.Context, projectID string, users []*domain.User) (map[string]domain.UserRef, error) {
+	refs := make(map[string]domain.UserRef, len(users))
+	if len(users) == 0 {
+		return refs, nil
+	}
+	// Nested read keyed on rows the caller already holds — not a management
+	// list; skip the authz list-filter tripwire like GetUser does (#839).
+	documents, _, err := r.designatingSchemas(WithAuthzListUnrestricted(ctx), projectID)
+	if err != nil {
+		return nil, err
+	}
+	for _, user := range users {
 		refs[user.ID] = domain.ResolveUserRef(user, documents[user.SchemaURL])
 	}
 	return refs, nil

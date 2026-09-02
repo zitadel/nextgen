@@ -63,6 +63,11 @@ type User struct {
 	// Attributes are populated by user read statements.
 	Attributes Attributes
 
+	// Ref is the derived identity of ADR 058 §3a, resolved live from the
+	// schema's x-identifier/x-display designations. Populated by service
+	// reads that resolve it; nil on plain statement-level reads.
+	Ref *UserRef
+
 	// Teams is the user's team memberships, populated only when the read asked
 	// for it. Nil means it was not asked for; empty means the user has none.
 	Teams []UserTeam
