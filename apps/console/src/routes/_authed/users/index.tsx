@@ -290,7 +290,7 @@ function UsersScreen() {
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell
-                  colSpan={columns.length + 4}
+                  colSpan={columns.length + 5}
                   className="text-muted-foreground h-24 text-center"
                 >
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}

@@ -202,8 +202,14 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 			WithMessage("The user was created but could not be read back. Fetch it by id rather than retrying the create.").
 			WithDetails(domain.CreatedUserDetails{UserID: action.CreateUser.ID})
 	}
-	if err := s.attachUserRefs(ctx, input.ProjectID, user); err != nil {
-		return nil, err
+	// The identity ref is derived decoration and the create has already
+	// committed: a resolution failure must not fail the create — the caller
+	// would retry and hit the unique constraints — so the response simply
+	// carries no ref fields and clients fall back to the id (ADR 058).
+	if refs, err := s.refs.ResolveRefsForUsers(ctx, input.ProjectID, []*domain.User{user}); err == nil {
+		if ref, ok := refs[user.ID]; ok {
+			user.Ref = &ref
+		}
 	}
 
 	return user, nil
