@@ -125,6 +125,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
 		return teamErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixGrant.ErrorCodePrefix("")):
+		return grantErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
 		return projectErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),

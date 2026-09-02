@@ -80,6 +80,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateFlowDefinitionOperation: []string{
 		"flow_definition.write",
 	},
+	CreateGrantOperation: []string{
+		"project.write",
+	},
 	CreateHandoffOperation: []string{
 		"auth_attempt.write",
 	},
@@ -97,6 +100,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	DeleteFlowDefinitionOperation: []string{
 		"flow_definition.delete",
+	},
+	DeleteGrantOperation: []string{
+		"project.write",
 	},
 	DeleteTeamOperation: []string{
 		"team.delete",
@@ -127,6 +133,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetFlowDefinitionOperation: []string{
 		"flow_definition.read",
+	},
+	GetGrantOperation: []string{
+		"project.read",
 	},
 	GetProjectOperation: []string{
 		"project.write",

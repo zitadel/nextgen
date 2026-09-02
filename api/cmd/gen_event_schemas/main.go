@@ -59,6 +59,7 @@ var payloadByEventType = map[string]string{
 	"environment.created": "environment-created-payload.yaml",
 
 	"authz.granted": "authz-granted-payload.yaml",
+	"authz.revoked": "authz-granted-payload.yaml",
 
 	"auth.factor.password.set":     "auth-factor-payload.yaml",
 	"auth.factor.passkey.enrolled": "auth-factor-payload.yaml",
