@@ -304,21 +304,6 @@ func sessionToAPI(session *domain.Session) *api.SessionResponse {
 	return resp
 }
 
-// userRefToAPI maps the resolved reference (ADR 058 §3): identifier and
-// identifier_property travel together, display independently; empty means
-// absent on the wire.
-func userRefToAPI(ref domain.UserRef) api.UserRef {
-	out := api.UserRef{UserID: api.UserID(ref.UserID)}
-	if ref.Identifier != "" {
-		out.Identifier = api.NewOptString(ref.Identifier)
-		out.IdentifierProperty = api.NewOptString(ref.IdentifierProperty)
-	}
-	if ref.Display != "" {
-		out.Display = api.NewOptString(ref.Display)
-	}
-	return out
-}
-
 func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent {
 	if agent == nil {
 		return api.OptNilSessionResponseUserAgent{}
