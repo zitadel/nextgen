@@ -9158,8 +9158,9 @@ func (s *CreateReleasePointer) SetRevisionID(val string) {
 type CreateReleasePointerKind string
 
 const (
-	CreateReleasePointerKindSchema CreateReleasePointerKind = "schema"
-	CreateReleasePointerKindFlow   CreateReleasePointerKind = "flow"
+	CreateReleasePointerKindSchema   CreateReleasePointerKind = "schema"
+	CreateReleasePointerKindFlow     CreateReleasePointerKind = "flow"
+	CreateReleasePointerKindBranding CreateReleasePointerKind = "branding"
 )
 
 // AllValues returns all CreateReleasePointerKind values.
@@ -9167,6 +9168,7 @@ func (CreateReleasePointerKind) AllValues() []CreateReleasePointerKind {
 	return []CreateReleasePointerKind{
 		CreateReleasePointerKindSchema,
 		CreateReleasePointerKindFlow,
+		CreateReleasePointerKindBranding,
 	}
 }
 
@@ -9176,6 +9178,8 @@ func (s CreateReleasePointerKind) MarshalText() ([]byte, error) {
 	case CreateReleasePointerKindSchema:
 		return []byte(s), nil
 	case CreateReleasePointerKindFlow:
+		return []byte(s), nil
+	case CreateReleasePointerKindBranding:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -9190,6 +9194,9 @@ func (s *CreateReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case CreateReleasePointerKindFlow:
 		*s = CreateReleasePointerKindFlow
+		return nil
+	case CreateReleasePointerKindBranding:
+		*s = CreateReleasePointerKindBranding
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -33958,9 +33965,11 @@ func (s *ReleaseMetadataCreatedByType) UnmarshalText(data []byte) error {
 type ReleasePointer struct {
 	// The kind of resource this pointer pins.
 	Kind ReleasePointerKind `json:"kind"`
-	// The field the resource kind uses as its stable identifier across
-	// revisions — `objectType` for schemas, `name` for flows. Read from the
-	// revision when the release was assembled, not supplied by the caller.
+	// What the resource is called, independent of which revision is pinned.
+	// Determined when the release is assembled, not supplied by the caller:
+	// - `schema` — the document's `objectType`
+	// - `flow` — the flow's `name`
+	// - `branding` — always `default`, since a project has a single branding
 	// Resources inside a release reference each other by handle rather than by
 	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`
@@ -34005,8 +34014,9 @@ func (s *ReleasePointer) SetRevisionID(val string) {
 type ReleasePointerKind string
 
 const (
-	ReleasePointerKindSchema ReleasePointerKind = "schema"
-	ReleasePointerKindFlow   ReleasePointerKind = "flow"
+	ReleasePointerKindSchema   ReleasePointerKind = "schema"
+	ReleasePointerKindFlow     ReleasePointerKind = "flow"
+	ReleasePointerKindBranding ReleasePointerKind = "branding"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -34014,6 +34024,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 	return []ReleasePointerKind{
 		ReleasePointerKindSchema,
 		ReleasePointerKindFlow,
+		ReleasePointerKindBranding,
 	}
 }
 
@@ -34023,6 +34034,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindSchema:
 		return []byte(s), nil
 	case ReleasePointerKindFlow:
+		return []byte(s), nil
+	case ReleasePointerKindBranding:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -34037,6 +34050,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindFlow:
 		*s = ReleasePointerKindFlow
+		return nil
+	case ReleasePointerKindBranding:
+		*s = ReleasePointerKindBranding
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

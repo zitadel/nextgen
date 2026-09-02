@@ -7,6 +7,10 @@
     {
       "kind": "flow",
       "revision_id": "flowdef_01KWHG09JXA7F0N9WD3P2E4YM5"
+    },
+    {
+      "kind": "branding",
+      "revision_id": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"
     }
   ],
   "message": "add phone_number to human-user",

@@ -16,6 +16,7 @@ properties:
     enum:
       - schema
       - flow
+      - branding
     example: schema
   revision_id:
     type: string

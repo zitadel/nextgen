@@ -2184,6 +2184,8 @@ func (s CreateReleasePointerKind) Validate() error {
 		return nil
 	case "flow":
 		return nil
+	case "branding":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
@@ -5939,6 +5941,8 @@ func (s ReleasePointerKind) Validate() error {
 	case "schema":
 		return nil
 	case "flow":
+		return nil
+	case "branding":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

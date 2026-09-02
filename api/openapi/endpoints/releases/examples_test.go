@@ -47,11 +47,28 @@ func TestCreateReleaseRequestAcceptsURLRevisionID(t *testing.T) {
 	require.NoError(t, req.UnmarshalJSON(readExample(t, "create-release-request.json")))
 	require.NoError(t, req.Validate())
 
-	require.Len(t, req.Pointers, 2)
+	require.NotEmpty(t, req.Pointers)
 	assert.Equal(t, api.CreateReleasePointerKindSchema, req.Pointers[0].Kind)
 	assert.True(t, strings.HasPrefix(req.Pointers[0].RevisionID, "https://"),
 		"the schema pointer example must exercise a URL revision id")
-	assert.Equal(t, api.CreateReleasePointerKindFlow, req.Pointers[1].Kind)
+}
+
+// TestCreateReleaseRequestCoversEveryKind keeps the worked example honest: a
+// release spans the configurable resources of a project rather than a single
+// kind, and every kind the enum accepts is exercised by a payload somewhere.
+func TestCreateReleaseRequestCoversEveryKind(t *testing.T) {
+	var req api.CreateReleaseRequest
+	require.NoError(t, req.UnmarshalJSON(readExample(t, "create-release-request.json")))
+	require.NoError(t, req.Validate())
+
+	pinned := make(map[api.CreateReleasePointerKind]string, len(req.Pointers))
+	for _, pointer := range req.Pointers {
+		pinned[pointer.Kind] = pointer.RevisionID
+	}
+
+	for _, kind := range (api.CreateReleasePointerKind("")).AllValues() {
+		assert.Contains(t, pinned, kind, "no example pins a %q revision", kind)
+	}
 }
 
 func TestReleaseExamples(t *testing.T) {

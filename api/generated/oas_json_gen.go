@@ -14818,6 +14818,8 @@ func (s *CreateReleasePointerKind) Decode(d *jx.Decoder) error {
 		*s = CreateReleasePointerKindSchema
 	case CreateReleasePointerKindFlow:
 		*s = CreateReleasePointerKindFlow
+	case CreateReleasePointerKindBranding:
+		*s = CreateReleasePointerKindBranding
 	default:
 		*s = CreateReleasePointerKind(v)
 	}
@@ -53470,6 +53472,8 @@ func (s *ReleasePointerKind) Decode(d *jx.Decoder) error {
 		*s = ReleasePointerKindSchema
 	case ReleasePointerKindFlow:
 		*s = ReleasePointerKindFlow
+	case ReleasePointerKindBranding:
+		*s = ReleasePointerKindBranding
 	default:
 		*s = ReleasePointerKind(v)
 	}

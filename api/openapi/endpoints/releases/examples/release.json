@@ -19,6 +19,11 @@
       "kind": "flow",
       "handle": "default-login",
       "revision_id": "flowdef_01KWHG09JXA7F0N9WD3P2E4YM5"
+    },
+    {
+      "kind": "branding",
+      "handle": "default",
+      "revision_id": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"
     }
   ]
 }

@@ -13,15 +13,19 @@ properties:
     enum:
       - schema
       - flow
+      - branding
     example: schema
   handle:
     type: string
     minLength: 1
     maxLength: 256
     description: |
-      The field the resource kind uses as its stable identifier across
-      revisions — `objectType` for schemas, `name` for flows. Read from the
-      revision when the release was assembled, not supplied by the caller.
+      What the resource is called, independent of which revision is pinned.
+      Determined when the release is assembled, not supplied by the caller:
+
+      - `schema` — the document's `objectType`
+      - `flow` — the flow's `name`
+      - `branding` — always `default`, since a project has a single branding
 
       Resources inside a release reference each other by handle rather than by
       revision id, so the same handle names the same resource in every release.
