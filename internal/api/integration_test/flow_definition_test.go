@@ -986,10 +986,8 @@ func TestListFlowDefinitions(t *testing.T) {
 		// The server seeds default-login into every project; its id,
 		// document and timestamps are not knowable here.
 		wantDefault bool
-		want        []api.FlowDefinitionResponse
-		// The name filter lists a flow's revisions newest first, so for
-		// those cases the order is part of the contract.
-		ordered bool
+		// Newest first, as documented; order is part of the contract.
+		want []api.FlowDefinitionResponse
 	}{
 		{
 			name:    "list all flow definitions in a project",
@@ -999,9 +997,9 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 			wantDefault: true,
 			want: []api.FlowDefinitionResponse{
-				*flowDef1,
-				*flowDef2,
 				*flowDef1b,
+				*flowDef2,
+				*flowDef1,
 			},
 		},
 		{
@@ -1042,8 +1040,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 			wantDefault: true,
 			want: []api.FlowDefinitionResponse{
-				*flowDef1,
 				*flowDef1b,
+				*flowDef1,
 			},
 		},
 		{
@@ -1057,7 +1055,6 @@ func TestListFlowDefinitions(t *testing.T) {
 				*flowDef1b,
 				*flowDef1,
 			},
-			ordered: true,
 		},
 		{
 			name:    "name combined with a purpose the flow does not serve",
@@ -1118,11 +1115,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			// The list and the by-id read describe a flow definition the
 			// same way (#939): document, purposes, audience, steps and
 			// timestamps all match the create response.
-			if tt.ordered {
-				assert.Equal(t, tt.want, others)
-				return
-			}
-			assert.ElementsMatch(t, tt.want, others)
+			assert.Equal(t, tt.want, others)
 		})
 	}
 }

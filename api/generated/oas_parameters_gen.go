@@ -4268,8 +4268,8 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 						if err := (validate.String{
 							MinLength:     0,
 							MinLengthSet:  false,
-							MaxLength:     256,
-							MaxLengthSet:  true,
+							MaxLength:     0,
+							MaxLengthSet:  false,
 							Email:         false,
 							Hostname:      false,
 							Regex:         regexMap["^[a-z][a-z0-9-]*$"],

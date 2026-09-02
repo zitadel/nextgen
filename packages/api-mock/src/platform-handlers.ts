@@ -86,6 +86,15 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+// Publication order. `nowIso()` is millisecond-resolution and ids are random,
+// so two records minted back to back would otherwise tie with no way to say
+// which came first; the server never ties because its ids are time-ordered.
+let lastSeq = 0;
+function nextSeq(): number {
+  lastSeq += 1;
+  return lastSeq;
+}
+
 /**
  * Spec-defined error envelope. Matches `api/openapi/components/error-details.yaml`
  * and the structural shape of every per-endpoint `*Default`/`*4xx` error type
@@ -177,6 +186,7 @@ type FlowDefinitionRecord = {
   status: string;
   createdAt: string;
   updatedAt: string;
+  seq: number;
   body: Record<string, unknown>;
 };
 
@@ -191,6 +201,7 @@ type SchemaRecord = {
   projectId: string;
   objectType?: string;
   createdAt: string;
+  seq: number;
   body: GetSchemaById200Schema;
 };
 
@@ -279,15 +290,17 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     projectId: projectID,
     objectType: schemaObjectType(body),
     createdAt,
+    seq: nextSeq(),
     body,
   });
-  const id = `flow_${shortId()}`;
+  const id = `flowdef_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
     projectId: projectID,
     status: "active",
     createdAt,
     updatedAt: createdAt,
+    seq: nextSeq(),
     body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
   });
 }
@@ -303,22 +316,17 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
 }
 
 /**
- * `created_at DESC, id DESC`, the order the server lists in. The comparator has
- * to be a total order: `createdAt` is millisecond-resolution here, so two
- * records can share one, and a tie that resolved arbitrarily would let
- * `revisions=latest` pick a different revision from one call to the next.
+ * `created_at DESC, id DESC`, the order the server lists in. `seq` stands in
+ * for the id tiebreak, since the mock's ids carry no time.
  */
 function compareNewestFirst(
-  a: { createdAt: string; id: string },
-  b: { createdAt: string; id: string },
+  a: { createdAt: string; seq: number },
+  b: { createdAt: string; seq: number },
 ): number {
   if (a.createdAt !== b.createdAt) {
     return a.createdAt < b.createdAt ? 1 : -1;
   }
-  if (a.id === b.id) {
-    return 0;
-  }
-  return a.id < b.id ? 1 : -1;
+  return b.seq - a.seq;
 }
 
 /**
@@ -714,6 +722,7 @@ export function setupPlatformHandlers() {
         projectId: query.data.project_id,
         objectType: schemaObjectType(schemaBody),
         createdAt: nowIso(),
+        seq: nextSeq(),
         body: schemaBody,
       });
       const responseBody: CreateSchema201 = { id };
@@ -823,7 +832,7 @@ export function setupPlatformHandlers() {
         return invalid;
       }
 
-      const id = `flow_${shortId()}`;
+      const id = `flowdef_${shortId()}`;
       const now = nowIso();
       const record: FlowDefinitionRecord = {
         id,
@@ -831,6 +840,7 @@ export function setupPlatformHandlers() {
         status: "active",
         createdAt: now,
         updatedAt: now,
+        seq: nextSeq(),
         body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);

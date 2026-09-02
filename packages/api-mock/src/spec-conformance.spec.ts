@@ -444,6 +444,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const first = await publish();
     const second = await publish();
     expect(second).not.toBe(first);
+    // The server mints flow definition ids under the `flowdef` prefix (ADR 047).
+    expect([first, second].every((id) => id.startsWith("flowdef_"))).toBe(true);
 
     // The name filter lists that flow's revisions, newest first.
     const res = await fetch(

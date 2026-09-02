@@ -98,7 +98,6 @@ get:
       schema:
         type: string
         pattern: '^[a-z][a-z0-9-]*$'
-        maxLength: 256
     - name: expand
       in: query
       required: false
