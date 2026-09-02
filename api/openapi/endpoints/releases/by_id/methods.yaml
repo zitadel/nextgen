@@ -25,5 +25,72 @@ get:
         application/json:
           schema:
             $ref: ../release.yaml
+          examples:
+            wholeProject:
+              summary: A release pinning every resource of a project
+              description: |
+                `handle` names the resource and `revision_id` the revision of
+                it, which is why `schema` and `flow` can each appear twice:
+                `human-user` and `machine-user` are different resources, as are
+                `default-login` and `b2b-login`.
+              value:
+                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                metadata:
+                  message: add phone_number to human-user
+                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                  git_dirty: false
+                  created_at: '2026-07-14T09:11:00Z'
+                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  created_by_type: human
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: https://example.com/schemas/default-human-user.json
+                  - kind: schema
+                    handle: machine-user
+                    revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                  - kind: flow
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: flow
+                    handle: b2b-login
+                    revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+            laterRelease:
+              summary: A later release of the same project
+              description: |
+                Only the branding revision moved. The handle stayed `default` —
+                a project has one branding, and it is revisioned like every
+                other resource, so the handle is stable while `revision_id` is
+                what differs between releases.
+              value:
+                id: rel_01KX5N7C9D2E7F0N9WD3P2E4YM
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                metadata:
+                  message: soften the sign-in page contrast
+                  git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
+                  git_dirty: false
+                  created_at: '2026-07-16T14:20:00Z'
+                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  created_by_type: human
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: https://example.com/schemas/default-human-user.json
+                  - kind: schema
+                    handle: machine-user
+                    revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                  - kind: flow
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: flow
+                    handle: b2b-login
+                    revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
     default:
       $ref: getReleaseById-error-response.yaml
