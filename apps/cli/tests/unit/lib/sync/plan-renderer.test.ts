@@ -540,6 +540,26 @@ describe("renderPlan — re-pin messaging", () => {
     const out = renderPlan(actions, false);
     expect(out).toContain('~ user_schema = "sch_A" -> "sch_B"');
   });
+
+  it("renders a repin revision with the user_schema the executor will POST", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "revise",
+        path: ".zitadel/flows/default.json",
+        syncer: makeSyncer("flow", ".zitadel/flows", { revisioned: true }),
+        content: { name: "login", user_schema: "sch_A" },
+        hash: "h",
+        previousId: "flow-001",
+        oldContent: { name: "login", user_schema: "sch_A" },
+        affectedPaths: [],
+        repin: { previousId: "sch_A", schemaPath: ".zitadel/schemas/user.json" },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain("will publish a new revision (re-pin user_schema)");
+    expect(out).toContain('~ user_schema = "sch_A" -> (known after apply)');
+  });
 });
 
 describe("renderPlan — validation warnings", () => {

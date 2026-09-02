@@ -78,8 +78,8 @@ project creation, but CLI-created projects are authored from local files first.
 Login templates are supported: scaffold them with the `branding eject` command
 (`--design centered|split|split-right|hero|minimal`) or `setup --design <name>`;
 every edit publishes a new immutable branding revision and the login serves
-the newest one. Flow create, read, list, update, and delete are available; the
-server enforces flow lifecycle rules such as draft-only edits.
+the newest one. Flows work the same way: every edit publishes a new immutable
+flow revision, and the login serves the newest revision of each flow name.
 
 For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
 separately. The CLI contract is one parseable JSON object on stdout; terminals

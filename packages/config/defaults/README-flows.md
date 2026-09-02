@@ -30,6 +30,10 @@ The common workflow:
 2. Run `zitadel plan` to preview the change.
 3. Run `zitadel apply` to publish it.
 
+Every apply of an edited flow publishes a new immutable revision. Earlier
+revisions stay readable by id, and the login serves the newest revision of
+the flow's name.
+
 Typical edits:
 
 - **Change which fields a step collects** — edit `steps[].fields[]`.
@@ -97,7 +101,7 @@ anything here afterwards.
 
 Editing a schema publishes a new immutable revision. When you `apply` a
 schema edit, the CLI rewrites `user_schema` in the flow files pinned to
-the old revision and updates the flows in the same run — the plan
-announces the re-pin beforehand, and the rewrite shows up in your git
-diff. Remember to update `steps[].fields[]` yourself when the edit
-added or removed properties the flow should collect.
+the old revision and publishes new revisions of those flows in the same
+run — the plan announces the re-pin beforehand, and the rewrite shows up
+in your git diff. Remember to update `steps[].fields[]` yourself when the
+edit added or removed properties the flow should collect.

@@ -15,8 +15,8 @@ import type { ResourceEntry, SyncAction } from "./types.js";
  * (a schema revision would otherwise publish before the flow update
  * fails).
  *
- * Only actions that upload a flow (create/update, including repin-forced
- * updates) are validated: an unchanged flow is never re-judged, so a
+ * Only actions that upload a flow (create/revise, including repin-forced
+ * revisions) are validated: an unchanged flow is never re-judged, so a
  * validator behavior change cannot break an already-applied project.
  *
  * Warning-severity issues ANNOTATE the actions in place (`action.warnings`)
@@ -52,7 +52,7 @@ export function validatePlannedFlows(opts: {
   );
 
   for (const action of opts.actions) {
-    if (action.kind !== "create" && action.kind !== "update") {
+    if (action.kind !== "create" && action.kind !== "update" && action.kind !== "revise") {
       continue;
     }
     if (action.syncer.kind !== "flow") {
@@ -118,12 +118,14 @@ export function validatePlannedFlows(opts: {
  * exempt — becoming the default is the point of creating it.
  */
 function defaultSwapWarning(
-  action: Extract<SyncAction, { kind: "create" | "update" }>,
+  action: Extract<SyncAction, { kind: "create" | "update" | "revise" }>,
   flowCreatePaths: readonly string[],
   trackedFlowPaths: readonly string[],
 ): { rule: string; message: string } | undefined {
   if (action.kind !== "create") {
-    return undefined; // updates keep their created_at; the default cannot move
+    // A new revision of a tracked flow replaces itself as the newest of its
+    // name; the default cannot move to a different flow.
+    return undefined;
   }
   const body = action.content as {
     status?: unknown;
@@ -173,7 +175,7 @@ function humanList(items: readonly string[]): string {
  * run, schema-dependent rules are skipped.
  */
 function resolveSchemaContent(
-  action: Extract<SyncAction, { kind: "create" | "update" }>,
+  action: Extract<SyncAction, { kind: "create" | "update" | "revise" }>,
   scannedContents: ReadonlyMap<string, object>,
   stateResources: Readonly<Record<string, ResourceEntry>>,
 ): object | undefined {

@@ -731,7 +731,9 @@ describe("auto-repin on schema revise", () => {
     return makeSyncer({
       kind: "flow",
       directory: ".zitadel/flows",
-      mutable: true,
+      mutable: false,
+      revisioned: true,
+      create: vi.fn().mockResolvedValue({ id: "flow-002" }),
       normalize: normalizeFlowBody,
       normalizeWrite: normalizeFlowBody,
       ...overrides,
@@ -751,7 +753,7 @@ describe("auto-repin on schema revise", () => {
     return JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
   }
 
-  it("re-pins an edited flow and updates it with the new revision in one apply", async () => {
+  it("re-pins an edited flow and publishes its new revision in one apply", async () => {
     const cwd = makeCwd();
     try {
       await writeState(cwd, {
@@ -765,16 +767,13 @@ describe("auto-repin on schema revise", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", validFlowBody("sch_A", { version: 2 }));
 
       const schemaSyncer = makeSchemaSyncer();
-      const update = vi.fn().mockResolvedValue({});
-      const flowSyncer = makeFlowSyncer({ update });
+      const create = vi.fn().mockResolvedValue({ id: "flow-002" });
+      const flowSyncer = makeFlowSyncer({ create });
 
       const { filesUpdated } = await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
 
       // The wire request adopted the new revision without a second apply.
-      expect(update).toHaveBeenCalledWith(
-        "flow-001",
-        expect.objectContaining({ user_schema: "sch_B" }),
-      );
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ user_schema: "sch_B" }));
       const flowFile = await readJson(join(cwd, FLOW_PATH));
       expect(flowFile.user_schema).toBe("sch_B");
       expect(filesUpdated).toContain(FLOW_PATH);
@@ -782,6 +781,7 @@ describe("auto-repin on schema revise", () => {
       const state = await readJson(join(cwd, ".zitadel/state.json"));
       const resources = state.resources as Record<string, { id?: string; previousId?: string }>;
       expect(resources[SCHEMA_PATH]?.id).toBe("sch_B");
+      expect(resources[FLOW_PATH]?.id).toBe("flow-002");
       // The re-pin completed, so the recovery marker is cleaned up — a later
       // deliberate pin of sch_A must not be force-bumped.
       expect(resources[SCHEMA_PATH]?.previousId).toBeUndefined();
@@ -793,10 +793,10 @@ describe("auto-repin on schema revise", () => {
     }
   });
 
-  it("emits a repin update for an untouched flow pinned to a revised schema", async () => {
+  it("emits a repin revision for an untouched flow pinned to a revised schema", async () => {
     const cwd = makeCwd();
     try {
-      const flowSyncer = makeFlowSyncer({ update: vi.fn().mockResolvedValue({}) });
+      const flowSyncer = makeFlowSyncer();
       const flowBody = validFlowBody("sch_A");
       await writeState(cwd, {
         framework: "next",
@@ -811,14 +811,21 @@ describe("auto-repin on schema revise", () => {
       const schemaSyncer = makeSchemaSyncer();
       const actions = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
       const flowAction = actions.find((a) => a.path === FLOW_PATH);
-      expect(flowAction?.kind).toBe("update");
-      if (flowAction?.kind === "update") {
+      expect(flowAction?.kind).toBe("revise");
+      if (flowAction?.kind === "revise") {
+        expect(flowAction.previousId).toBe("flow-001");
         expect(flowAction.repin).toEqual({ previousId: "sch_A", schemaPath: SCHEMA_PATH });
       }
 
       await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
+      expect(flowSyncer.create).toHaveBeenCalledWith(
+        expect.objectContaining({ user_schema: "sch_B" }),
+      );
       const flowFile = await readJson(join(cwd, FLOW_PATH));
       expect(flowFile.user_schema).toBe("sch_B");
+      const state = await readJson(join(cwd, ".zitadel/state.json"));
+      const resources = state.resources as Record<string, { id?: string }>;
+      expect(resources[FLOW_PATH]?.id).toBe("flow-002");
 
       const followUp = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
       expect(followUp.every((a) => a.kind === "skip")).toBe(true);
@@ -830,7 +837,7 @@ describe("auto-repin on schema revise", () => {
   it("recovers a re-pin from state.previousId when a prior run died mid-apply", async () => {
     const cwd = makeCwd();
     try {
-      const flowSyncer = makeFlowSyncer({ update: vi.fn().mockResolvedValue({}) });
+      const flowSyncer = makeFlowSyncer();
       const schemaSyncer = makeSchemaSyncer({
         create: vi.fn().mockRejectedValue(new Error("must not revise again")),
       });
@@ -854,8 +861,8 @@ describe("auto-repin on schema revise", () => {
 
       const actions = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
       const flowAction = actions.find((a) => a.path === FLOW_PATH);
-      expect(flowAction?.kind).toBe("update");
-      if (flowAction?.kind === "update") {
+      expect(flowAction?.kind).toBe("revise");
+      if (flowAction?.kind === "revise") {
         expect(flowAction.repin).toEqual({
           previousId: "sch_A",
           schemaPath: SCHEMA_PATH,
@@ -865,6 +872,9 @@ describe("auto-repin on schema revise", () => {
 
       await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
       expect(schemaSyncer.create).not.toHaveBeenCalled();
+      expect(flowSyncer.create).toHaveBeenCalledWith(
+        expect.objectContaining({ user_schema: "sch_B" }),
+      );
       const flowFile = await readJson(join(cwd, FLOW_PATH));
       expect(flowFile.user_schema).toBe("sch_B");
 
@@ -902,16 +912,16 @@ describe("auto-repin on schema revise", () => {
       );
 
       const schemaSyncer = makeSchemaSyncer();
-      const update = vi.fn().mockResolvedValue({});
-      const flowSyncer = makeFlowSyncer({ update });
+      const create = vi.fn().mockResolvedValue({ id: "flow-new" });
+      const flowSyncer = makeFlowSyncer({ create });
 
       await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
 
       expect((await readJson(join(cwd, FLOW_PATH))).user_schema).toBe("sch_B");
       expect((await readJson(join(cwd, ".zitadel/flows/admin.json"))).user_schema).toBe("sch_B");
-      expect(update).toHaveBeenCalledTimes(2);
-      for (const call of update.mock.calls) {
-        expect((call[1] as { user_schema: string }).user_schema).toBe("sch_B");
+      expect(create).toHaveBeenCalledTimes(2);
+      for (const call of create.mock.calls) {
+        expect((call[0] as { user_schema: string }).user_schema).toBe("sch_B");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -1011,7 +1021,7 @@ describe("auto-repin on schema revise", () => {
   it("allows the re-pin when every plain flow field exists in the edited schema", async () => {
     const cwd = makeCwd();
     try {
-      const flowSyncer = makeFlowSyncer({ update: vi.fn().mockResolvedValue({}) });
+      const flowSyncer = makeFlowSyncer();
       const flowBody = validFlowBody("sch_A", {}, ["email", "x-auth-methods#password"]);
       await writeState(cwd, {
         framework: "next",
@@ -1030,7 +1040,7 @@ describe("auto-repin on schema revise", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", flowBody);
 
       const actions = await buildSyncPlan(cwd, [makeSchemaSyncer(), flowSyncer]);
-      expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("update");
+      expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("revise");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -1069,7 +1079,8 @@ describe("plan-time flow validation", () => {
     return makeSyncer({
       kind: "flow",
       directory: ".zitadel/flows",
-      mutable: true,
+      mutable: false,
+      revisioned: true,
       normalize: normalizeFlowBody,
       normalizeWrite: normalizeFlowBody,
       ...overrides,
