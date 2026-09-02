@@ -312,6 +312,17 @@ func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimS
 	return r, ht.ErrNotImplemented
 }
 
+// GetEnvironmentByName implements getEnvironmentByName operation.
+//
+// Reads one environment of the project by its name.
+// The lookup is scoped to the project in `project_id`: a name that exists in
+// another project answers `env.not_found` exactly as an unused name does.
+//
+// GET /environments/{name}
+func (UnimplementedHandler) GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (r GetEnvironmentByNameRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetEvent implements getEvent operation.
 //
 // Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -495,6 +506,15 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 //
 // GET /branding
 func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandingParams) (r ListBrandingRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListEnvironments implements listEnvironments operation.
+//
+// Lists the project's environments ordered by name.
+//
+// GET /environments
+func (UnimplementedHandler) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (r ListEnvironmentsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

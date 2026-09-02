@@ -39,6 +39,11 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Environments
+    description: |
+      Endpoints for a project's runtime slots (ADR 035). Identity only:
+      the release an environment runs and its deployment history arrive with
+      the deployments endpoints, and environment lifecycle with its own ADR.
   - name: Grants
     description: |
       Collaboration grants that bind a user or team to project.viewer,
@@ -128,6 +133,10 @@ paths:
     $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
+  /environments:
+    $ref: endpoints/environments/methods.yaml
+  /environments/{name}:
+    $ref: endpoints/environments/by_name/methods.yaml
   /branding:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:

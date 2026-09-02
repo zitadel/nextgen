@@ -199,6 +199,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
+	environmentService := service.NewEnvironmentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
@@ -287,6 +288,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
+			environmentService,
 			eventService,
 			tokenService,
 			keyService,
