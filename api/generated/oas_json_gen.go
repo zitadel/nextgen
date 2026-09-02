@@ -42508,8 +42508,8 @@ func (s *OptNilProjectUpdatedEventActorType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes ReleaseAuditCreatedByType as json.
-func (o OptNilReleaseAuditCreatedByType) Encode(e *jx.Encoder) {
+// Encode encodes ReleaseMetadataCreatedByType as json.
+func (o OptNilReleaseMetadataCreatedByType) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
@@ -42520,17 +42520,17 @@ func (o OptNilReleaseAuditCreatedByType) Encode(e *jx.Encoder) {
 	e.Str(string(o.Value))
 }
 
-// Decode decodes ReleaseAuditCreatedByType from json.
-func (o *OptNilReleaseAuditCreatedByType) Decode(d *jx.Decoder) error {
+// Decode decodes ReleaseMetadataCreatedByType from json.
+func (o *OptNilReleaseMetadataCreatedByType) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptNilReleaseAuditCreatedByType to nil")
+		return errors.New("invalid: unable to decode OptNilReleaseMetadataCreatedByType to nil")
 	}
 	if d.Next() == jx.Null {
 		if err := d.Null(); err != nil {
 			return err
 		}
 
-		var v ReleaseAuditCreatedByType
+		var v ReleaseMetadataCreatedByType
 		o.Value = v
 		o.Set = true
 		o.Null = true
@@ -42545,14 +42545,14 @@ func (o *OptNilReleaseAuditCreatedByType) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptNilReleaseAuditCreatedByType) MarshalJSON() ([]byte, error) {
+func (s OptNilReleaseMetadataCreatedByType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptNilReleaseAuditCreatedByType) UnmarshalJSON(data []byte) error {
+func (s *OptNilReleaseMetadataCreatedByType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -52923,8 +52923,8 @@ func (s *Release) encodeFields(e *jx.Encoder) {
 		s.ProjectID.Encode(e)
 	}
 	{
-		e.FieldStart("audit")
-		s.Audit.Encode(e)
+		e.FieldStart("metadata")
+		s.Metadata.Encode(e)
 	}
 	{
 		e.FieldStart("pointers")
@@ -52939,7 +52939,7 @@ func (s *Release) encodeFields(e *jx.Encoder) {
 var jsonFieldsNameOfRelease = [4]string{
 	0: "id",
 	1: "project_id",
-	2: "audit",
+	2: "metadata",
 	3: "pointers",
 }
 
@@ -52972,15 +52972,15 @@ func (s *Release) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"project_id\"")
 			}
-		case "audit":
+		case "metadata":
 			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				if err := s.Audit.Decode(d); err != nil {
+				if err := s.Metadata.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"audit\"")
+				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "pointers":
 			requiredBitSet[0] |= 1 << 3
@@ -53056,15 +53056,55 @@ func (s *Release) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ReleaseID as json.
+func (s ReleaseID) Encode(e *jx.Encoder) {
+	unwrapped := string(s)
+
+	e.Str(unwrapped)
+}
+
+// Decode decodes ReleaseID from json.
+func (s *ReleaseID) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReleaseID to nil")
+	}
+	var unwrapped string
+	if err := func() error {
+		v, err := d.Str()
+		unwrapped = string(v)
+		if err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ReleaseID(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ReleaseID) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReleaseID) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
-func (s *ReleaseAudit) Encode(e *jx.Encoder) {
+func (s *ReleaseMetadata) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *ReleaseAudit) encodeFields(e *jx.Encoder) {
+func (s *ReleaseMetadata) encodeFields(e *jx.Encoder) {
 	{
 		if s.Message.Set {
 			e.FieldStart("message")
@@ -53099,7 +53139,7 @@ func (s *ReleaseAudit) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReleaseAudit = [6]string{
+var jsonFieldsNameOfReleaseMetadata = [6]string{
 	0: "message",
 	1: "git_sha",
 	2: "git_dirty",
@@ -53108,10 +53148,10 @@ var jsonFieldsNameOfReleaseAudit = [6]string{
 	5: "created_by_type",
 }
 
-// Decode decodes ReleaseAudit from json.
-func (s *ReleaseAudit) Decode(d *jx.Decoder) error {
+// Decode decodes ReleaseMetadata from json.
+func (s *ReleaseMetadata) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ReleaseAudit to nil")
+		return errors.New("invalid: unable to decode ReleaseMetadata to nil")
 	}
 	var requiredBitSet [1]uint8
 	s.setDefaults()
@@ -53187,7 +53227,7 @@ func (s *ReleaseAudit) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ReleaseAudit")
+		return errors.Wrap(err, "decode ReleaseMetadata")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
@@ -53204,8 +53244,8 @@ func (s *ReleaseAudit) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfReleaseAudit) {
-					name = jsonFieldsNameOfReleaseAudit[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfReleaseMetadata) {
+					name = jsonFieldsNameOfReleaseMetadata[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -53226,98 +53266,58 @@ func (s *ReleaseAudit) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ReleaseAudit) MarshalJSON() ([]byte, error) {
+func (s *ReleaseMetadata) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ReleaseAudit) UnmarshalJSON(data []byte) error {
+func (s *ReleaseMetadata) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes ReleaseAuditCreatedByType as json.
-func (s ReleaseAuditCreatedByType) Encode(e *jx.Encoder) {
+// Encode encodes ReleaseMetadataCreatedByType as json.
+func (s ReleaseMetadataCreatedByType) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes ReleaseAuditCreatedByType from json.
-func (s *ReleaseAuditCreatedByType) Decode(d *jx.Decoder) error {
+// Decode decodes ReleaseMetadataCreatedByType from json.
+func (s *ReleaseMetadataCreatedByType) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ReleaseAuditCreatedByType to nil")
+		return errors.New("invalid: unable to decode ReleaseMetadataCreatedByType to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch ReleaseAuditCreatedByType(v) {
-	case ReleaseAuditCreatedByTypeHuman:
-		*s = ReleaseAuditCreatedByTypeHuman
-	case ReleaseAuditCreatedByTypeService:
-		*s = ReleaseAuditCreatedByTypeService
-	case ReleaseAuditCreatedByTypeSystem:
-		*s = ReleaseAuditCreatedByTypeSystem
-	case ReleaseAuditCreatedByTypeAgent:
-		*s = ReleaseAuditCreatedByTypeAgent
+	switch ReleaseMetadataCreatedByType(v) {
+	case ReleaseMetadataCreatedByTypeHuman:
+		*s = ReleaseMetadataCreatedByTypeHuman
+	case ReleaseMetadataCreatedByTypeService:
+		*s = ReleaseMetadataCreatedByTypeService
+	case ReleaseMetadataCreatedByTypeSystem:
+		*s = ReleaseMetadataCreatedByTypeSystem
+	case ReleaseMetadataCreatedByTypeAgent:
+		*s = ReleaseMetadataCreatedByTypeAgent
 	default:
-		*s = ReleaseAuditCreatedByType(v)
+		*s = ReleaseMetadataCreatedByType(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s ReleaseAuditCreatedByType) MarshalJSON() ([]byte, error) {
+func (s ReleaseMetadataCreatedByType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ReleaseAuditCreatedByType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ReleaseID as json.
-func (s ReleaseID) Encode(e *jx.Encoder) {
-	unwrapped := string(s)
-
-	e.Str(unwrapped)
-}
-
-// Decode decodes ReleaseID from json.
-func (s *ReleaseID) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ReleaseID to nil")
-	}
-	var unwrapped string
-	if err := func() error {
-		v, err := d.Str()
-		unwrapped = string(v)
-		if err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = ReleaseID(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s ReleaseID) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ReleaseID) UnmarshalJSON(data []byte) error {
+func (s *ReleaseMetadataCreatedByType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -53508,15 +53508,15 @@ func (s *ReleaseSummary) encodeFields(e *jx.Encoder) {
 		s.ProjectID.Encode(e)
 	}
 	{
-		e.FieldStart("audit")
-		s.Audit.Encode(e)
+		e.FieldStart("metadata")
+		s.Metadata.Encode(e)
 	}
 }
 
 var jsonFieldsNameOfReleaseSummary = [3]string{
 	0: "id",
 	1: "project_id",
-	2: "audit",
+	2: "metadata",
 }
 
 // Decode decodes ReleaseSummary from json.
@@ -53548,15 +53548,15 @@ func (s *ReleaseSummary) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"project_id\"")
 			}
-		case "audit":
+		case "metadata":
 			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				if err := s.Audit.Decode(d); err != nil {
+				if err := s.Metadata.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"audit\"")
+				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		default:
 			return d.Skip()

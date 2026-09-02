@@ -5688,13 +5688,13 @@ func (s *Release) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Audit.Validate(); err != nil {
+		if err := s.Metadata.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "audit",
+			Name:  "metadata",
 			Error: err,
 		})
 	}
@@ -5740,7 +5740,27 @@ func (s *Release) Validate() error {
 	return nil
 }
 
-func (s *ReleaseAudit) Validate() error {
+func (s ReleaseID) Validate() error {
+	alias := (string)(s)
+	if err := (validate.String{
+		MinLength:     0,
+		MinLengthSet:  false,
+		MaxLength:     0,
+		MaxLengthSet:  false,
+		Email:         false,
+		Hostname:      false,
+		Regex:         regexMap["^rel_[a-zA-Z0-9-]+$"],
+		MinNumeric:    0,
+		MinNumericSet: false,
+		MaxNumeric:    0,
+		MaxNumericSet: false,
+	}).Validate(string(alias)); err != nil {
+		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *ReleaseMetadata) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -5830,7 +5850,7 @@ func (s *ReleaseAudit) Validate() error {
 	return nil
 }
 
-func (s ReleaseAuditCreatedByType) Validate() error {
+func (s ReleaseMetadataCreatedByType) Validate() error {
 	switch s {
 	case "human":
 		return nil
@@ -5843,26 +5863,6 @@ func (s ReleaseAuditCreatedByType) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
-}
-
-func (s ReleaseID) Validate() error {
-	alias := (string)(s)
-	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
-		MaxLength:     0,
-		MaxLengthSet:  false,
-		Email:         false,
-		Hostname:      false,
-		Regex:         regexMap["^rel_[a-zA-Z0-9-]+$"],
-		MinNumeric:    0,
-		MinNumericSet: false,
-		MaxNumeric:    0,
-		MaxNumericSet: false,
-	}).Validate(string(alias)); err != nil {
-		return errors.Wrap(err, "string")
-	}
-	return nil
 }
 
 func (s *ReleasePointer) Validate() error {
@@ -5974,13 +5974,13 @@ func (s *ReleaseSummary) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Audit.Validate(); err != nil {
+		if err := s.Metadata.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "audit",
+			Name:  "metadata",
 			Error: err,
 		})
 	}

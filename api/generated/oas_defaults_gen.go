@@ -75,7 +75,7 @@ func (s *QueryUsersRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *ReleaseAudit) setDefaults() {
+func (s *ReleaseMetadata) setDefaults() {
 	{
 		val := bool(false)
 		s.GitDirty = val

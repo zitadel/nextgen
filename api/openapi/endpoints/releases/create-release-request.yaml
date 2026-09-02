@@ -1,7 +1,7 @@
 type: object
 description: |
-  The set of revisions to bundle into a release, plus the audit metadata to
-  record alongside it.
+  The set of revisions to bundle into a release, plus the metadata to record
+  alongside it.
 
   `created_at` and `created_by` are derived server-side from the caller's
   authentication context and are not accepted here.

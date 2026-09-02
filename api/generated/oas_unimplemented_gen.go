@@ -133,10 +133,9 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 // Creating a release does not deploy it. A release is environment-agnostic
 // and the same release can later be deployed to any number of environments
 // unchanged.
-// Idempotent on the pinned set: audit metadata is excluded from the
-// comparison, so re-submitting the same tuples with a different `message`
-// returns the release that already pins them rather than creating a second
-// one.
+// Idempotent on the pinned set: metadata is excluded from the comparison, so
+// re-submitting the same revisions with a different `message` returns the
+// release that already pins them rather than creating a second one.
 //
 // POST /releases
 func (UnimplementedHandler) CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
@@ -398,7 +397,7 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 
 // GetReleaseById implements getReleaseById operation.
 //
-// Reads one release: its audit metadata and the `(kind, handle, revision_id)`
+// Reads one release: its metadata and the `(kind, handle, revision_id)`
 // tuples it pins.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
@@ -521,8 +520,8 @@ func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params List
 // ListReleases implements listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry audit metadata only — the pinned set is omitted. Read one
-// release with `GET /releases/{release_id}` to get its pointers.
+// Entries carry metadata only — the pinned set is omitted. Read one release
+// with `GET /releases/{release_id}` to get its pointers.
 //
 // GET /releases
 func (UnimplementedHandler) ListReleases(ctx context.Context, params ListReleasesParams) (r ListReleasesRes, _ error) {

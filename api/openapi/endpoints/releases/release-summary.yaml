@@ -9,7 +9,7 @@ type: object
 required:
   - id
   - project_id
-  - audit
+  - metadata
 properties:
   id:
     readOnly: true
@@ -19,6 +19,6 @@ properties:
     readOnly: true
     description: The project this release belongs to.
     $ref: ../../components/schemas/project-id.yaml
-  audit:
+  metadata:
     readOnly: true
-    $ref: release-audit.yaml
+    $ref: release-metadata.yaml

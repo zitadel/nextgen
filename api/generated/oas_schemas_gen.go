@@ -9196,8 +9196,8 @@ func (s *CreateReleasePointerKind) UnmarshalText(data []byte) error {
 	}
 }
 
-// The set of revisions to bundle into a release, plus the audit metadata to
-// record alongside it.
+// The set of revisions to bundle into a release, plus the metadata to record
+// alongside it.
 // `created_at` and `created_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
@@ -26459,52 +26459,52 @@ func (o OptNilProjectUpdatedEventActorType) Or(d ProjectUpdatedEventActorType) P
 	return d
 }
 
-// NewOptNilReleaseAuditCreatedByType returns new OptNilReleaseAuditCreatedByType with value set to v.
-func NewOptNilReleaseAuditCreatedByType(v ReleaseAuditCreatedByType) OptNilReleaseAuditCreatedByType {
-	return OptNilReleaseAuditCreatedByType{
+// NewOptNilReleaseMetadataCreatedByType returns new OptNilReleaseMetadataCreatedByType with value set to v.
+func NewOptNilReleaseMetadataCreatedByType(v ReleaseMetadataCreatedByType) OptNilReleaseMetadataCreatedByType {
+	return OptNilReleaseMetadataCreatedByType{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptNilReleaseAuditCreatedByType is optional nullable ReleaseAuditCreatedByType.
-type OptNilReleaseAuditCreatedByType struct {
-	Value ReleaseAuditCreatedByType
+// OptNilReleaseMetadataCreatedByType is optional nullable ReleaseMetadataCreatedByType.
+type OptNilReleaseMetadataCreatedByType struct {
+	Value ReleaseMetadataCreatedByType
 	Set   bool
 	Null  bool
 }
 
-// IsSet returns true if OptNilReleaseAuditCreatedByType was set.
-func (o OptNilReleaseAuditCreatedByType) IsSet() bool { return o.Set }
+// IsSet returns true if OptNilReleaseMetadataCreatedByType was set.
+func (o OptNilReleaseMetadataCreatedByType) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptNilReleaseAuditCreatedByType) Reset() {
-	var v ReleaseAuditCreatedByType
+func (o *OptNilReleaseMetadataCreatedByType) Reset() {
+	var v ReleaseMetadataCreatedByType
 	o.Value = v
 	o.Set = false
 	o.Null = false
 }
 
 // SetTo sets value to v.
-func (o *OptNilReleaseAuditCreatedByType) SetTo(v ReleaseAuditCreatedByType) {
+func (o *OptNilReleaseMetadataCreatedByType) SetTo(v ReleaseMetadataCreatedByType) {
 	o.Set = true
 	o.Null = false
 	o.Value = v
 }
 
 // IsNull returns true if value is Null.
-func (o OptNilReleaseAuditCreatedByType) IsNull() bool { return o.Null }
+func (o OptNilReleaseMetadataCreatedByType) IsNull() bool { return o.Null }
 
 // SetToNull sets value to null.
-func (o *OptNilReleaseAuditCreatedByType) SetToNull() {
+func (o *OptNilReleaseMetadataCreatedByType) SetToNull() {
 	o.Set = true
 	o.Null = true
-	var v ReleaseAuditCreatedByType
+	var v ReleaseMetadataCreatedByType
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptNilReleaseAuditCreatedByType) Get() (v ReleaseAuditCreatedByType, ok bool) {
+func (o OptNilReleaseMetadataCreatedByType) Get() (v ReleaseMetadataCreatedByType, ok bool) {
 	if o.Null {
 		return v, false
 	}
@@ -26515,7 +26515,7 @@ func (o OptNilReleaseAuditCreatedByType) Get() (v ReleaseAuditCreatedByType, ok 
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptNilReleaseAuditCreatedByType) Or(d ReleaseAuditCreatedByType) ReleaseAuditCreatedByType {
+func (o OptNilReleaseMetadataCreatedByType) Or(d ReleaseMetadataCreatedByType) ReleaseMetadataCreatedByType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -33749,7 +33749,7 @@ func (*QueryUsersUnauthorized) queryUsersRes() {}
 
 // An immutable, project-scoped snapshot that pins one revision of every
 // resource it includes.
-// A release owns pointers and audit metadata, not content — it records *which*
+// A release owns pointers and metadata, not content — it records *which*
 // revisions belong together. Callers that need the resource bytes resolve each
 // `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
 // `GET /flow_definitions/{id}`, …).
@@ -33760,8 +33760,8 @@ type Release struct {
 	// The opaque, immutable resource id, assigned at construction.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
-	ProjectID ProjectID    `json:"project_id"`
-	Audit     ReleaseAudit `json:"audit"`
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
 	// The revisions this release pins, one entry per `(kind, handle)`. Never
 	// empty: a release must contain at least one resource.
 	Pointers []ReleasePointer `json:"pointers"`
@@ -33777,9 +33777,9 @@ func (s *Release) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
-// GetAudit returns the value of Audit.
-func (s *Release) GetAudit() ReleaseAudit {
-	return s.Audit
+// GetMetadata returns the value of Metadata.
+func (s *Release) GetMetadata() ReleaseMetadata {
+	return s.Metadata
 }
 
 // GetPointers returns the value of Pointers.
@@ -33797,9 +33797,9 @@ func (s *Release) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
-// SetAudit sets the value of Audit.
-func (s *Release) SetAudit(val ReleaseAudit) {
-	s.Audit = val
+// SetMetadata sets the value of Metadata.
+func (s *Release) SetMetadata(val ReleaseMetadata) {
+	s.Metadata = val
 }
 
 // SetPointers sets the value of Pointers.
@@ -33809,10 +33809,12 @@ func (s *Release) SetPointers(val []ReleasePointer) {
 
 func (*Release) getReleaseByIdRes() {}
 
-// Who assembled the release, when, and from what source. Set at construction
-// time and never mutated.
+type ReleaseID string
+
+// Who assembled the release, when, and from what source. Set when the release
+// is assembled and never mutated afterwards.
 // Ref: #
-type ReleaseAudit struct {
+type ReleaseMetadata struct {
 	// A short caller-supplied summary of what the release changes, analogous to
 	// a git commit message.
 	Message OptNilString `json:"message"`
@@ -33832,98 +33834,98 @@ type ReleaseAudit struct {
 	// releases constructed from CI or the CLI.
 	CreatedBy OptNilString `json:"created_by"`
 	// What kind of principal `created_by` names.
-	CreatedByType OptNilReleaseAuditCreatedByType `json:"created_by_type"`
+	CreatedByType OptNilReleaseMetadataCreatedByType `json:"created_by_type"`
 }
 
 // GetMessage returns the value of Message.
-func (s *ReleaseAudit) GetMessage() OptNilString {
+func (s *ReleaseMetadata) GetMessage() OptNilString {
 	return s.Message
 }
 
 // GetGitSha returns the value of GitSha.
-func (s *ReleaseAudit) GetGitSha() OptNilString {
+func (s *ReleaseMetadata) GetGitSha() OptNilString {
 	return s.GitSha
 }
 
 // GetGitDirty returns the value of GitDirty.
-func (s *ReleaseAudit) GetGitDirty() bool {
+func (s *ReleaseMetadata) GetGitDirty() bool {
 	return s.GitDirty
 }
 
 // GetCreatedAt returns the value of CreatedAt.
-func (s *ReleaseAudit) GetCreatedAt() time.Time {
+func (s *ReleaseMetadata) GetCreatedAt() time.Time {
 	return s.CreatedAt
 }
 
 // GetCreatedBy returns the value of CreatedBy.
-func (s *ReleaseAudit) GetCreatedBy() OptNilString {
+func (s *ReleaseMetadata) GetCreatedBy() OptNilString {
 	return s.CreatedBy
 }
 
 // GetCreatedByType returns the value of CreatedByType.
-func (s *ReleaseAudit) GetCreatedByType() OptNilReleaseAuditCreatedByType {
+func (s *ReleaseMetadata) GetCreatedByType() OptNilReleaseMetadataCreatedByType {
 	return s.CreatedByType
 }
 
 // SetMessage sets the value of Message.
-func (s *ReleaseAudit) SetMessage(val OptNilString) {
+func (s *ReleaseMetadata) SetMessage(val OptNilString) {
 	s.Message = val
 }
 
 // SetGitSha sets the value of GitSha.
-func (s *ReleaseAudit) SetGitSha(val OptNilString) {
+func (s *ReleaseMetadata) SetGitSha(val OptNilString) {
 	s.GitSha = val
 }
 
 // SetGitDirty sets the value of GitDirty.
-func (s *ReleaseAudit) SetGitDirty(val bool) {
+func (s *ReleaseMetadata) SetGitDirty(val bool) {
 	s.GitDirty = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
-func (s *ReleaseAudit) SetCreatedAt(val time.Time) {
+func (s *ReleaseMetadata) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
 // SetCreatedBy sets the value of CreatedBy.
-func (s *ReleaseAudit) SetCreatedBy(val OptNilString) {
+func (s *ReleaseMetadata) SetCreatedBy(val OptNilString) {
 	s.CreatedBy = val
 }
 
 // SetCreatedByType sets the value of CreatedByType.
-func (s *ReleaseAudit) SetCreatedByType(val OptNilReleaseAuditCreatedByType) {
+func (s *ReleaseMetadata) SetCreatedByType(val OptNilReleaseMetadataCreatedByType) {
 	s.CreatedByType = val
 }
 
-type ReleaseAuditCreatedByType string
+type ReleaseMetadataCreatedByType string
 
 const (
-	ReleaseAuditCreatedByTypeHuman   ReleaseAuditCreatedByType = "human"
-	ReleaseAuditCreatedByTypeService ReleaseAuditCreatedByType = "service"
-	ReleaseAuditCreatedByTypeSystem  ReleaseAuditCreatedByType = "system"
-	ReleaseAuditCreatedByTypeAgent   ReleaseAuditCreatedByType = "agent"
+	ReleaseMetadataCreatedByTypeHuman   ReleaseMetadataCreatedByType = "human"
+	ReleaseMetadataCreatedByTypeService ReleaseMetadataCreatedByType = "service"
+	ReleaseMetadataCreatedByTypeSystem  ReleaseMetadataCreatedByType = "system"
+	ReleaseMetadataCreatedByTypeAgent   ReleaseMetadataCreatedByType = "agent"
 )
 
-// AllValues returns all ReleaseAuditCreatedByType values.
-func (ReleaseAuditCreatedByType) AllValues() []ReleaseAuditCreatedByType {
-	return []ReleaseAuditCreatedByType{
-		ReleaseAuditCreatedByTypeHuman,
-		ReleaseAuditCreatedByTypeService,
-		ReleaseAuditCreatedByTypeSystem,
-		ReleaseAuditCreatedByTypeAgent,
+// AllValues returns all ReleaseMetadataCreatedByType values.
+func (ReleaseMetadataCreatedByType) AllValues() []ReleaseMetadataCreatedByType {
+	return []ReleaseMetadataCreatedByType{
+		ReleaseMetadataCreatedByTypeHuman,
+		ReleaseMetadataCreatedByTypeService,
+		ReleaseMetadataCreatedByTypeSystem,
+		ReleaseMetadataCreatedByTypeAgent,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s ReleaseAuditCreatedByType) MarshalText() ([]byte, error) {
+func (s ReleaseMetadataCreatedByType) MarshalText() ([]byte, error) {
 	switch s {
-	case ReleaseAuditCreatedByTypeHuman:
+	case ReleaseMetadataCreatedByTypeHuman:
 		return []byte(s), nil
-	case ReleaseAuditCreatedByTypeService:
+	case ReleaseMetadataCreatedByTypeService:
 		return []byte(s), nil
-	case ReleaseAuditCreatedByTypeSystem:
+	case ReleaseMetadataCreatedByTypeSystem:
 		return []byte(s), nil
-	case ReleaseAuditCreatedByTypeAgent:
+	case ReleaseMetadataCreatedByTypeAgent:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -33931,26 +33933,24 @@ func (s ReleaseAuditCreatedByType) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ReleaseAuditCreatedByType) UnmarshalText(data []byte) error {
-	switch ReleaseAuditCreatedByType(data) {
-	case ReleaseAuditCreatedByTypeHuman:
-		*s = ReleaseAuditCreatedByTypeHuman
+func (s *ReleaseMetadataCreatedByType) UnmarshalText(data []byte) error {
+	switch ReleaseMetadataCreatedByType(data) {
+	case ReleaseMetadataCreatedByTypeHuman:
+		*s = ReleaseMetadataCreatedByTypeHuman
 		return nil
-	case ReleaseAuditCreatedByTypeService:
-		*s = ReleaseAuditCreatedByTypeService
+	case ReleaseMetadataCreatedByTypeService:
+		*s = ReleaseMetadataCreatedByTypeService
 		return nil
-	case ReleaseAuditCreatedByTypeSystem:
-		*s = ReleaseAuditCreatedByTypeSystem
+	case ReleaseMetadataCreatedByTypeSystem:
+		*s = ReleaseMetadataCreatedByTypeSystem
 		return nil
-	case ReleaseAuditCreatedByTypeAgent:
-		*s = ReleaseAuditCreatedByTypeAgent
+	case ReleaseMetadataCreatedByTypeAgent:
+		*s = ReleaseMetadataCreatedByTypeAgent
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-type ReleaseID string
 
 // One entry of the set a release pins: the revision of a single resource that
 // this release includes.
@@ -34052,8 +34052,8 @@ type ReleaseSummary struct {
 	// The opaque, immutable resource id, assigned at construction.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
-	ProjectID ProjectID    `json:"project_id"`
-	Audit     ReleaseAudit `json:"audit"`
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
 }
 
 // GetID returns the value of ID.
@@ -34066,9 +34066,9 @@ func (s *ReleaseSummary) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
-// GetAudit returns the value of Audit.
-func (s *ReleaseSummary) GetAudit() ReleaseAudit {
-	return s.Audit
+// GetMetadata returns the value of Metadata.
+func (s *ReleaseSummary) GetMetadata() ReleaseMetadata {
+	return s.Metadata
 }
 
 // SetID sets the value of ID.
@@ -34081,9 +34081,9 @@ func (s *ReleaseSummary) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
-// SetAudit sets the value of Audit.
-func (s *ReleaseSummary) SetAudit(val ReleaseAudit) {
-	s.Audit = val
+// SetMetadata sets the value of Metadata.
+func (s *ReleaseSummary) SetMetadata(val ReleaseMetadata) {
+	s.Metadata = val
 }
 
 // Merged schema.

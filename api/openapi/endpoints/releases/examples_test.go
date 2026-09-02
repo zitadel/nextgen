@@ -76,17 +76,17 @@ func TestReleaseExamples(t *testing.T) {
 	}
 }
 
-// TestReleaseAuditCreatedByIsNullable covers the case the created_by shape
+// TestReleaseMetadataCreatedByIsNullable covers the case the created_by shape
 // exists for: a release assembled by a project secret carries no user
 // identity, so the field is explicitly null rather than omitted.
-func TestReleaseAuditCreatedByIsNullable(t *testing.T) {
+func TestReleaseMetadataCreatedByIsNullable(t *testing.T) {
 	var rel api.Release
 	require.NoError(t, rel.UnmarshalJSON(readExample(t, "release-machine-principal.json")))
 	require.NoError(t, rel.Validate())
 
-	assert.True(t, rel.Audit.CreatedBy.Null, "created_by is null for a machine principal")
-	assert.True(t, rel.Audit.CreatedByType.Null, "created_by_type is null alongside it")
-	assert.True(t, rel.Audit.GitDirty, "a dirty tree is recorded on the release")
+	assert.True(t, rel.Metadata.CreatedBy.Null, "created_by is null for a machine principal")
+	assert.True(t, rel.Metadata.CreatedByType.Null, "created_by_type is null alongside it")
+	assert.True(t, rel.Metadata.GitDirty, "a dirty tree is recorded on the release")
 }
 
 func TestListReleasesResponseExamples(t *testing.T) {

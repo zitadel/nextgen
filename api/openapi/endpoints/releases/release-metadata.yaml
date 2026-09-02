@@ -1,7 +1,8 @@
+title: ReleaseMetadata
 type: object
 description: |
-  Who assembled the release, when, and from what source. Set at construction
-  time and never mutated.
+  Who assembled the release, when, and from what source. Set when the release
+  is assembled and never mutated afterwards.
 required:
   - git_dirty
   - created_at

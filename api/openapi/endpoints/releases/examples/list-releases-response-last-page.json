@@ -3,7 +3,7 @@
     {
       "id": "rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5",
       "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
-      "audit": {
+      "metadata": {
         "git_dirty": false,
         "created_at": "2026-07-13T08:00:00Z"
       }

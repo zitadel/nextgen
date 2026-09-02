@@ -3,7 +3,7 @@
     {
       "id": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
       "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
-      "audit": {
+      "metadata": {
         "message": "add phone_number to human-user",
         "git_sha": "4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7",
         "git_dirty": false,
@@ -15,7 +15,7 @@
     {
       "id": "rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5",
       "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
-      "audit": {
+      "metadata": {
         "message": "initial import",
         "git_sha": "0f1e2d3c4b5a69788796a5b4c3d2e1f009182736",
         "git_dirty": false,

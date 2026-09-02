@@ -43,8 +43,8 @@ tags:
     description: |
       Immutable, project-scoped configuration snapshots. A release pins one
       revision of each resource it includes and records who assembled it, when,
-      and from which commit. It carries those pointers and that audit metadata
-      only — never resource content, which stays with the per-kind endpoints.
+      and from which commit. It carries those pointers and that metadata only —
+      never resource content, which stays with the per-kind endpoints.
 
       Assembling a release does not deploy it: the same release can later be
       run on any number of environments unchanged.

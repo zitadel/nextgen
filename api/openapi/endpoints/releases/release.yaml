@@ -3,7 +3,7 @@ description: |
   An immutable, project-scoped snapshot that pins one revision of every
   resource it includes.
 
-  A release owns pointers and audit metadata, not content — it records *which*
+  A release owns pointers and metadata, not content — it records *which*
   revisions belong together. Callers that need the resource bytes resolve each
   `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
   `GET /flow_definitions/{id}`, …).
@@ -14,7 +14,7 @@ type: object
 required:
   - id
   - project_id
-  - audit
+  - metadata
   - pointers
 properties:
   id:
@@ -25,9 +25,9 @@ properties:
     readOnly: true
     description: The project this release belongs to.
     $ref: ../../components/schemas/project-id.yaml
-  audit:
+  metadata:
     readOnly: true
-    $ref: release-audit.yaml
+    $ref: release-metadata.yaml
   pointers:
     readOnly: true
     type: array

@@ -2,7 +2,7 @@ get:
   operationId: getReleaseById
   summary: Get a release by id
   description: |
-    Reads one release: its audit metadata and the `(kind, handle, revision_id)`
+    Reads one release: its metadata and the `(kind, handle, revision_id)`
     tuples it pins.
 
     Does not embed resource content. Resolve each `revision_id` through the
