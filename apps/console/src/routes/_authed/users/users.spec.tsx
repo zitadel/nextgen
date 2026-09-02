@@ -68,8 +68,9 @@ describe("users screen", () => {
     // the identifier renders as its muted second line. Schema-driven
     // attribute columns follow (design `277:288291`, decisions log D4).
     expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
-    // The identifier appears twice by design: the User column's secondary
-    // line and the schema's own email column.
+    // The designated identifier is its own platform-derived column (like
+    // Status and ID), role-named so mixed-schema lists read down one column.
+    expect(screen.getByRole("columnheader", { name: "Identifier" })).toBeInTheDocument();
     expect(screen.getAllByText("maya.patel@acme.com").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Maya")).toBeInTheDocument();
     expect(screen.getByText("Patel")).toBeInTheDocument();

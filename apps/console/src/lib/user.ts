@@ -28,10 +28,15 @@ export function userIdentity(user: Record<string, unknown>): string {
   return field(user, "display") ?? field(user, "identifier") ?? (field(user, "id") ?? "");
 }
 
+/** The envelope's designated identifier value, when the schema designates one. */
+export function userIdentifier(user: Record<string, unknown>): string | undefined {
+  return field(user, "identifier");
+}
+
 /**
- * The muted secondary line shown next to the identity: the identifier, but
- * only when a display name is the primary (rendering the identifier twice
- * says nothing).
+ * The muted secondary line shown under a heading: the identifier, but only
+ * when a display name is the primary (rendering the identifier twice says
+ * nothing). The users list shows the identifier as its own column instead.
  */
 export function userIdentitySecondary(user: Record<string, unknown>): string | undefined {
   return field(user, "display") ? field(user, "identifier") : undefined;

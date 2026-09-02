@@ -33,7 +33,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { api } from "../../../api/zitadel";
 import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
-import { userAttributes, userIdentity, userIdentitySecondary } from "../../../lib/user";
+import { userAttributes, userIdentifier, userIdentity } from "../../../lib/user";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
@@ -89,12 +89,14 @@ interface UserRow {
   id: string;
   /**
    * The rendered identity (display → identifier → id, ADR 058) — the User
-   * column's primary line, the row menu's accessible name, and the delete
-   * dialog's heading.
+   * column, the row menu's accessible name, and the delete dialog's heading.
    */
   name: string;
-  /** The identifier as the User column's muted second line, only when the display is the primary. */
-  secondary?: string;
+  /** The designated identifier — its own column: platform-derived like Status
+   * and ID, so it sits outside the schema-driven set (D4). */
+  identifier?: string;
+  /** The schema property the identifier came from (e.g. "email"), as the cell's tooltip. */
+  identifierProperty?: string;
   /** Rendered cell values, keyed by schema property. */
   values: Record<string, string>;
   /** `metadata.status`, absent on a record the server has not stamped. */
@@ -223,7 +225,7 @@ function UsersScreen() {
       return [
         row.id,
         row.name,
-        row.secondary ?? "",
+        row.identifier ?? "",
         ...columns.map((column) => row.values[column.key] ?? ""),
       ].some((value) => value.toLowerCase().includes(needle));
     });
@@ -275,6 +277,7 @@ function UsersScreen() {
           <TableHeader>
             <TableRow className="border-border border-b hover:bg-transparent">
               <ResourceHeadCell>User</ResourceHeadCell>
+              <ResourceHeadCell>Identifier</ResourceHeadCell>
               {columns.map((column) => (
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
@@ -287,7 +290,7 @@ function UsersScreen() {
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell
-                  colSpan={columns.length + 3}
+                  colSpan={columns.length + 4}
                   className="text-muted-foreground h-24 text-center"
                 >
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}
@@ -308,11 +311,16 @@ function UsersScreen() {
                     >
                       {user.name}
                     </Link>
-                    {user.secondary && (
-                      <span className="text-muted-foreground block truncate text-xs">
-                        {user.secondary}
-                      </span>
-                    )}
+                  </TableCell>
+                  {/* The designated identifier (x-identifier) — role-named, so a
+                      mixed-schema list reads down one column whether a row's
+                      identifier is an email or a loginname; the tooltip names
+                      the property it came from. */}
+                  <TableCell
+                    className={`${RESOURCE_CELL} text-muted-foreground max-w-[280px] truncate text-sm`}
+                    title={user.identifierProperty}
+                  >
+                    {user.identifier ?? "—"}
                   </TableCell>
                   {columns.map((column) => (
                     <TableCell
@@ -384,7 +392,8 @@ function toUserRow(
     // id. Also the row menu's accessible name and the delete dialog's
     // heading, so every surface labels the user identically.
     name: userIdentity(user) || id,
-    secondary: userIdentitySecondary(user),
+    identifier: userIdentifier(user),
+    identifierProperty: field(user, "identifier_property"),
     status: userStatus(user),
   };
 }
