@@ -38,6 +38,12 @@ func (r StatementsUserRefResolver) ResolveUserRefs(ctx context.Context, projectI
 		return map[string]domain.UserRef{}, nil
 	}
 
+	// Both queries below are nested reads keyed on rows the caller already
+	// holds (the page's user ids, the project's schemas) — not management
+	// lists — so the authz list-filter tripwire and any inherited filter are
+	// deliberately skipped, the same choice GetUser makes (#839).
+	ctx = WithAuthzListUnrestricted(ctx)
+
 	documents, attributeKeys, err := r.designatingSchemas(ctx, projectID)
 	if err != nil {
 		return nil, err
@@ -47,10 +53,7 @@ func (r StatementsUserRefResolver) ResolveUserRefs(ctx context.Context, projectI
 	for _, userID := range userIDs {
 		idFilters = append(idFilters, database.Equal(database.Col(domain.UserFieldID), userID))
 	}
-	// By-id lookup shape: the ids come from rows the caller already read, so
-	// the management list gate does not apply (same deliberate choice as
-	// GetUser, #839).
-	listed, err := r.Pool.Statements().ListUsers(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.UserField]{
+	listed, err := r.Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 			database.Or(idFilters...),
