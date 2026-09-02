@@ -514,16 +514,24 @@ function fillTemplateTokens(
   identifier: string,
   initial: string,
 ): void {
+  // Single pass with a callback: substituted values are never rescanned, so
+  // an identity value containing a token-like substring (or a `$&`-style
+  // replacement pattern) renders literally instead of being re-substituted.
+  const values: Record<string, string> = {
+    display,
+    identifier,
+    name: display,
+    email: identifier,
+    initial,
+  };
   const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode() as Text | null;
   while (node) {
     if (node.textContent) {
-      node.textContent = node.textContent
-        .replace(/\{\{display\}\}/g, display)
-        .replace(/\{\{identifier\}\}/g, identifier)
-        .replace(/\{\{name\}\}/g, display)
-        .replace(/\{\{email\}\}/g, identifier)
-        .replace(/\{\{initial\}\}/g, initial);
+      node.textContent = node.textContent.replace(
+        /\{\{(display|identifier|name|email|initial)\}\}/g,
+        (_, token: string) => values[token] ?? "",
+      );
     }
     node = walker.nextNode() as Text | null;
   }

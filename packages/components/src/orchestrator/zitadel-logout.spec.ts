@@ -183,6 +183,23 @@ describe("<zitadel-logout>", () => {
     expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
 
+  it("renders identity values containing token-like substrings literally", async () => {
+    // A display name that embeds "{{email}}" must not get re-substituted by
+    // a later replacement pass — substitution is single-pass by contract.
+    currentName = "Evil {{email}} Person";
+    currentEmail = "evil@example.com";
+    const element = mount(`
+      <zitadel-logout>
+        <template>
+          <button data-action="logout">Sign out {{display}}</button>
+        </template>
+      </zitadel-logout>
+    `);
+    await flush(element);
+    const button = element.querySelector("button[data-action='logout']") as HTMLButtonElement;
+    expect(button.textContent).toBe("Sign out Evil {{email}} Person");
+  });
+
   it("re-projects the template with identity when project is assigned after mount", async () => {
     // No config resolvable at connect: the control still renders, but with a
     // blank identity. When a framework assigns `project` post-mount and the
