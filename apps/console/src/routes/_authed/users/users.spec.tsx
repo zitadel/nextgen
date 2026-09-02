@@ -44,11 +44,14 @@ describe("users screen", () => {
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
-            // The shipped `consumer`/`business` presets spell the name parts
-            // camelCase; `queryUsers` returns the schema's attribute tree verbatim.
+            // The envelope carries the server-resolved identity (ADR 058
+            // §3a); `attributes` stays the schema's verbatim tree.
             {
               id: "user_1",
               schema: "sch_business",
+              identifier: "maya.patel@acme.com",
+              identifier_property: "email",
+              display: "Maya Patel",
               attributes: {
                 givenName: "Maya",
                 familyName: "Patel",
@@ -61,10 +64,13 @@ describe("users screen", () => {
     );
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
-    // Columns are the schema's properties (design `277:288291`, decisions log
-    // D4), so there is no combined "Name" column — the first property carries
-    // the link to the detail screen.
-    expect(await screen.findByRole("link", { name: "maya.patel@acme.com" })).toBeInTheDocument();
+    // The User column leads with the resolved display and carries the link;
+    // the identifier renders as its muted second line. Schema-driven
+    // attribute columns follow (design `277:288291`, decisions log D4).
+    expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
+    // The identifier appears twice by design: the User column's secondary
+    // line and the schema's own email column.
+    expect(screen.getAllByText("maya.patel@acme.com").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Maya")).toBeInTheDocument();
     expect(screen.getByText("Patel")).toBeInTheDocument();
   });
@@ -139,64 +145,64 @@ describe("users screen", () => {
     );
     await renderUsers();
 
-    // `schemaFields` orders properties by key, so `companyName` is the first
-    // column and therefore the linked one. The user without a company falls back
-    // to its id rather than rendering an empty link.
-    expect(await screen.findByRole("link", { name: "Acme" })).toBeInTheDocument();
+    // The link lives on the User identity column now. Neither fixture
+    // carries envelope identity, so both rows degrade to their id — the
+    // schema-driven cells render values and placeholders unchanged.
+    expect(await screen.findByRole("link", { name: "user_1" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "user_2" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("Acme")).toBeInTheDocument();
     expect(within(screen.getByRole("table")).getByText("min@acme.com")).toBeInTheDocument();
   });
 
-  it("derives the display name the way the platform does", async () => {
-    // Mirrors `User.DisplayName` (internal/domain/user.go): explicit `name`
-    // wins, else the given/family parts joined, with snake_case accepted for
-    // schemas authored that way. A partial name must not render a stray space.
+  it("renders the server-resolved identity chain, never deriving from attributes", async () => {
+    // ADR 058: the envelope's display → identifier → id, resolved by the
+    // server from the schema's own designations. The console carries zero
+    // derivation logic — attributes that *look* like identity (name,
+    // givenName, username) are never read.
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             {
               id: "user_1",
-              attributes: {
-                name: "Ada L.",
-                givenName: "Ada",
-                familyName: "Lovelace",
-                email: "a@x.com",
-              },
+              identifier: "a@x.com",
+              identifier_property: "email",
+              display: "Ada L.",
+              attributes: { name: "WRONG name attr", givenName: "Ada", email: "a@x.com" },
             },
-            { id: "user_2", attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" } },
-            { id: "user_3", attributes: { givenName: "Radia", email: "r@x.com" } },
+            {
+              id: "user_2",
+              identifier: "g@x.com",
+              identifier_property: "email",
+              attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
+            },
+            { id: "user_3", attributes: { username: "nope", givenName: "Radia", email: "r@x.com" } },
           ],
         }),
       ),
     );
     await renderUsers();
-    // The derived name is no longer a column; it names the row's actions and
-    // titles the delete dialog, which is where a wrong derivation would show.
+    // Display when designated; identifier when not; the id when the schema
+    // designates nothing. The identity also names the row's actions, which
+    // titles the delete dialog.
     expect(await screen.findByRole("button", { name: "Actions for Ada L." })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Actions for Grace Hopper" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Actions for Radia" })).toBeInTheDocument();
-  });
-
-  it("ignores non-identity attributes when deriving the name", async () => {
-    // Regression: the screen used to read a `username` property that no shipped
-    // schema defines, so every row silently fell back to the email. Reading an
-    // unrelated attribute as the name is worse than having none.
-    server.use(
-      http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", attributes: { username: "nope", email: "kenji@acme.com" } }] }),
-      ),
-    );
-    await renderUsers();
-    expect(
-      await screen.findByRole("button", { name: "Actions for kenji@acme.com" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for g@x.com" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for user_3" })).toBeInTheDocument();
+    // The `name` attribute still renders as a schema-driven column value —
+    // the assertions above prove it is never *promoted* to the identity.
   });
 
   it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", attributes: { email: "kenji@acme.com", status: "Blocked" } }] }),
+        HttpResponse.json({
+          users: [{
+            id: "user_1",
+            identifier: "kenji@acme.com",
+            identifier_property: "email",
+            attributes: { email: "kenji@acme.com", status: "Blocked" },
+          }],
+        }),
       ),
     );
     await renderUsers();
