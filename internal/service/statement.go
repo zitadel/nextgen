@@ -40,7 +40,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
-	SettingsStatements
+	VariableStatements
 	ClaimStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
@@ -318,11 +318,25 @@ type BrandingStatements interface {
 // 	Transactioner[ClaimStatements]
 // }
 
-type SettingsStatements interface {
+type VariableStatements interface {
 	Statements
-	GetSettings(ctx context.Context, requester domain.SettingOwner, paths ...domain.SettingsPath) ([]*domain.Setting, error)
-	SetSetting(ctx context.Context, owner domain.SettingOwner, path domain.SettingsPath, value any, isFinal bool) error
-	DeleteSetting(ctx context.Context, owner domain.SettingOwner, path domain.SettingsPath) error
+	// GetVariables returns every variable the requester can read, for the given
+	// names (all names when none are given). Variables do not override one
+	// another, so all of them come back: a name held at several owner levels
+	// yields one entry per level, ordered by name and then broadest owner first.
+	// This is the only place the owner predicate is enforced, so a caller never
+	// sees a variable entered for somebody else.
+	GetVariables(ctx context.Context, requester domain.VariableOwner, names ...string) ([]*domain.Variable, error)
+	// SetVariable writes variable under its own name and owner, replacing the
+	// value and IsSecret flag of an existing variable with the same name and
+	// owner. An owner whose ancestors are unset (a team with no project, say) is
+	// rejected by the owner-chain constraint.
+	SetVariable(ctx context.Context, variable *domain.Variable) error
+	// DeleteVariable removes the variable owner entered under name. Removing one
+	// that is not there returns NoRowFoundError; it never deletes a variable
+	// with a different owner, since every owner column must match exactly, so
+	// an inherited variable cannot be deleted from further down the hierarchy.
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
 }
 
 type ClaimStatements interface {
