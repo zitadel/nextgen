@@ -116,10 +116,11 @@ func (r StatementsUserRefResolver) designatingSchemas(ctx context.Context, proje
 			}
 		}
 	}
-	if attributeKeys == nil {
-		// AttributeKeys nil means "hydrate everything"; no designation
-		// anywhere means nothing to read — hydrate a key no property can
-		// use so the query returns no attribute rows.
+	if len(attributeKeys) == 0 {
+		// Empty AttributeKeys — nil or not — means "hydrate everything"
+		// (UserQueryOptions contract); no designation anywhere means
+		// nothing to read, so hydrate a key no property can use and the
+		// query returns no attribute rows.
 		attributeKeys = []string{""}
 	}
 	return documents, attributeKeys, nil
