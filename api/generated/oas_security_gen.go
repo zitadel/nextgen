@@ -125,6 +125,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetClaimStatusOperation: []string{
 		"project.write",
 	},
+	GetEnvironmentByNameOperation: []string{
+		"environment.read",
+	},
 	GetEventOperation: []string{
 		"events.read",
 	},
@@ -157,6 +160,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListBrandingOperation: []string{
 		"branding.read",
+	},
+	ListEnvironmentsOperation: []string{
+		"environment.read",
 	},
 	ListEventsOperation: []string{
 		"events.read",

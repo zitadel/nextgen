@@ -11669,6 +11669,635 @@ func (s *EncKeyUnknownAlgDetails) init() EncKeyUnknownAlgDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type EnvNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvNotFound) GetDetails() OptEnvNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvNotFound) SetDetails(val OptEnvNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvNotFoundDetails map[string]jx.Raw
+
+func (s *EnvNotFoundDetails) init() EnvNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EnvPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvPermissionDenied) GetDetails() OptEnvPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvPermissionDenied) SetDetails(val OptEnvPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvPermissionDeniedDetails map[string]jx.Raw
+
+func (s *EnvPermissionDeniedDetails) init() EnvPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// A runtime slot on a project (ADR 035).
+// This is identity only. The release an environment currently runs, and its
+// deployment history, arrive with the deployments endpoints; environment
+// lifecycle (create, rename, retire) arrives with its own ADR. Until then
+// every project is seeded with a fixed set of environments at creation and
+// the set cannot be changed.
+// Ref: #
+type Environment struct {
+	// The opaque, immutable resource id.
+	ID string `json:"id"`
+	// The project this environment is a runtime slot of.
+	ProjectID ProjectID       `json:"project_id"`
+	Name      EnvironmentName `json:"name"`
+	// When the environment was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *Environment) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *Environment) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetName returns the value of Name.
+func (s *Environment) GetName() EnvironmentName {
+	return s.Name
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Environment) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *Environment) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *Environment) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetName sets the value of Name.
+func (s *Environment) SetName(val EnvironmentName) {
+	s.Name = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Environment) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*Environment) getEnvironmentByNameRes() {}
+
+// Merged schema.
+// Ref: #
+type EnvironmentCreatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category EnvironmentCreatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilEnvironmentCreatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptEnvironmentCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  EnvironmentCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *EnvironmentCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *EnvironmentCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *EnvironmentCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *EnvironmentCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *EnvironmentCreatedEvent) GetCategory() EnvironmentCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *EnvironmentCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *EnvironmentCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *EnvironmentCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *EnvironmentCreatedEvent) GetActorType() OptNilEnvironmentCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *EnvironmentCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *EnvironmentCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *EnvironmentCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *EnvironmentCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *EnvironmentCreatedEvent) GetDelegationType() OptEnvironmentCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *EnvironmentCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *EnvironmentCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *EnvironmentCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *EnvironmentCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *EnvironmentCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *EnvironmentCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *EnvironmentCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *EnvironmentCreatedEvent) GetPayload() EnvironmentCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *EnvironmentCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *EnvironmentCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *EnvironmentCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *EnvironmentCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *EnvironmentCreatedEvent) SetCategory(val EnvironmentCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *EnvironmentCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *EnvironmentCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *EnvironmentCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *EnvironmentCreatedEvent) SetActorType(val OptNilEnvironmentCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *EnvironmentCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *EnvironmentCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *EnvironmentCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *EnvironmentCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *EnvironmentCreatedEvent) SetDelegationType(val OptEnvironmentCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *EnvironmentCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *EnvironmentCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *EnvironmentCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *EnvironmentCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *EnvironmentCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *EnvironmentCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *EnvironmentCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *EnvironmentCreatedEvent) SetPayload(val EnvironmentCreatedPayload) {
+	s.Payload = val
+}
+
+type EnvironmentCreatedEventActorType string
+
+const (
+	EnvironmentCreatedEventActorTypeHuman   EnvironmentCreatedEventActorType = "human"
+	EnvironmentCreatedEventActorTypeService EnvironmentCreatedEventActorType = "service"
+	EnvironmentCreatedEventActorTypeSystem  EnvironmentCreatedEventActorType = "system"
+	EnvironmentCreatedEventActorTypeAgent   EnvironmentCreatedEventActorType = "agent"
+)
+
+// AllValues returns all EnvironmentCreatedEventActorType values.
+func (EnvironmentCreatedEventActorType) AllValues() []EnvironmentCreatedEventActorType {
+	return []EnvironmentCreatedEventActorType{
+		EnvironmentCreatedEventActorTypeHuman,
+		EnvironmentCreatedEventActorTypeService,
+		EnvironmentCreatedEventActorTypeSystem,
+		EnvironmentCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EnvironmentCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case EnvironmentCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case EnvironmentCreatedEventActorTypeService:
+		return []byte(s), nil
+	case EnvironmentCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case EnvironmentCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EnvironmentCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch EnvironmentCreatedEventActorType(data) {
+	case EnvironmentCreatedEventActorTypeHuman:
+		*s = EnvironmentCreatedEventActorTypeHuman
+		return nil
+	case EnvironmentCreatedEventActorTypeService:
+		*s = EnvironmentCreatedEventActorTypeService
+		return nil
+	case EnvironmentCreatedEventActorTypeSystem:
+		*s = EnvironmentCreatedEventActorTypeSystem
+		return nil
+	case EnvironmentCreatedEventActorTypeAgent:
+		*s = EnvironmentCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type EnvironmentCreatedEventCategory string
+
+const (
+	EnvironmentCreatedEventCategoryRequest EnvironmentCreatedEventCategory = "request"
+	EnvironmentCreatedEventCategoryAuth    EnvironmentCreatedEventCategory = "auth"
+	EnvironmentCreatedEventCategorySession EnvironmentCreatedEventCategory = "session"
+	EnvironmentCreatedEventCategoryAdmin   EnvironmentCreatedEventCategory = "admin"
+	EnvironmentCreatedEventCategoryEntity  EnvironmentCreatedEventCategory = "entity"
+	EnvironmentCreatedEventCategorySignal  EnvironmentCreatedEventCategory = "signal"
+)
+
+// AllValues returns all EnvironmentCreatedEventCategory values.
+func (EnvironmentCreatedEventCategory) AllValues() []EnvironmentCreatedEventCategory {
+	return []EnvironmentCreatedEventCategory{
+		EnvironmentCreatedEventCategoryRequest,
+		EnvironmentCreatedEventCategoryAuth,
+		EnvironmentCreatedEventCategorySession,
+		EnvironmentCreatedEventCategoryAdmin,
+		EnvironmentCreatedEventCategoryEntity,
+		EnvironmentCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EnvironmentCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case EnvironmentCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case EnvironmentCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case EnvironmentCreatedEventCategorySession:
+		return []byte(s), nil
+	case EnvironmentCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case EnvironmentCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case EnvironmentCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EnvironmentCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch EnvironmentCreatedEventCategory(data) {
+	case EnvironmentCreatedEventCategoryRequest:
+		*s = EnvironmentCreatedEventCategoryRequest
+		return nil
+	case EnvironmentCreatedEventCategoryAuth:
+		*s = EnvironmentCreatedEventCategoryAuth
+		return nil
+	case EnvironmentCreatedEventCategorySession:
+		*s = EnvironmentCreatedEventCategorySession
+		return nil
+	case EnvironmentCreatedEventCategoryAdmin:
+		*s = EnvironmentCreatedEventCategoryAdmin
+		return nil
+	case EnvironmentCreatedEventCategoryEntity:
+		*s = EnvironmentCreatedEventCategoryEntity
+		return nil
+	case EnvironmentCreatedEventCategorySignal:
+		*s = EnvironmentCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type EnvironmentCreatedEventDelegationType string
+
+const (
+	EnvironmentCreatedEventDelegationTypeDirect    EnvironmentCreatedEventDelegationType = "direct"
+	EnvironmentCreatedEventDelegationTypeDelegated EnvironmentCreatedEventDelegationType = "delegated"
+	EnvironmentCreatedEventDelegationTypePatShared EnvironmentCreatedEventDelegationType = "pat_shared"
+	EnvironmentCreatedEventDelegationTypeExchanged EnvironmentCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all EnvironmentCreatedEventDelegationType values.
+func (EnvironmentCreatedEventDelegationType) AllValues() []EnvironmentCreatedEventDelegationType {
+	return []EnvironmentCreatedEventDelegationType{
+		EnvironmentCreatedEventDelegationTypeDirect,
+		EnvironmentCreatedEventDelegationTypeDelegated,
+		EnvironmentCreatedEventDelegationTypePatShared,
+		EnvironmentCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EnvironmentCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case EnvironmentCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case EnvironmentCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case EnvironmentCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case EnvironmentCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EnvironmentCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch EnvironmentCreatedEventDelegationType(data) {
+	case EnvironmentCreatedEventDelegationTypeDirect:
+		*s = EnvironmentCreatedEventDelegationTypeDirect
+		return nil
+	case EnvironmentCreatedEventDelegationTypeDelegated:
+		*s = EnvironmentCreatedEventDelegationTypeDelegated
+		return nil
+	case EnvironmentCreatedEventDelegationTypePatShared:
+		*s = EnvironmentCreatedEventDelegationTypePatShared
+		return nil
+	case EnvironmentCreatedEventDelegationTypeExchanged:
+		*s = EnvironmentCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Allowlisted fields for `environment.created`. The environment id is already
+// the event's `entity_id`, so the name is the only field carried here.
+// Ref: #
+type EnvironmentCreatedPayload struct {
+	Name OptString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *EnvironmentCreatedPayload) GetName() OptString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *EnvironmentCreatedPayload) SetName(val OptString) {
+	s.Name = val
+}
+
+type EnvironmentName string
+
 type ErrorCode string
 
 // Standard error payload returned for failed API requests.
@@ -11798,6 +12427,7 @@ type Event struct {
 	AuthzGrantedEvent              AuthzGrantedEvent
 	AuthzRevokedEvent              AuthzRevokedEvent
 	BrandingCreatedEvent           BrandingCreatedEvent
+	EnvironmentCreatedEvent        EnvironmentCreatedEvent
 	FlowdefCreatedEvent            FlowdefCreatedEvent
 	FlowdefDeletedEvent            FlowdefDeletedEvent
 	FlowdefUpdatedEvent            FlowdefUpdatedEvent
@@ -11832,6 +12462,7 @@ const (
 	AuthzGrantedEventEvent              EventType = "authz.granted"
 	AuthzRevokedEventEvent              EventType = "authz.revoked"
 	BrandingCreatedEventEvent           EventType = "branding.created"
+	EnvironmentCreatedEventEvent        EventType = "environment.created"
 	FlowdefCreatedEventEvent            EventType = "flowdef.created"
 	FlowdefDeletedEventEvent            EventType = "flowdef.deleted"
 	FlowdefUpdatedEventEvent            EventType = "flowdef.updated"
@@ -11884,6 +12515,9 @@ func (s Event) IsAuthzRevokedEvent() bool { return s.Type == AuthzRevokedEventEv
 
 // IsBrandingCreatedEvent reports whether Event is BrandingCreatedEvent.
 func (s Event) IsBrandingCreatedEvent() bool { return s.Type == BrandingCreatedEventEvent }
+
+// IsEnvironmentCreatedEvent reports whether Event is EnvironmentCreatedEvent.
+func (s Event) IsEnvironmentCreatedEvent() bool { return s.Type == EnvironmentCreatedEventEvent }
 
 // IsFlowdefCreatedEvent reports whether Event is FlowdefCreatedEvent.
 func (s Event) IsFlowdefCreatedEvent() bool { return s.Type == FlowdefCreatedEventEvent }
@@ -12161,6 +12795,27 @@ func (s Event) GetBrandingCreatedEvent() (v BrandingCreatedEvent, ok bool) {
 func NewBrandingCreatedEventEvent(v BrandingCreatedEvent) Event {
 	var s Event
 	s.SetBrandingCreatedEvent(v)
+	return s
+}
+
+// SetEnvironmentCreatedEvent sets Event to EnvironmentCreatedEvent.
+func (s *Event) SetEnvironmentCreatedEvent(v EnvironmentCreatedEvent) {
+	s.Type = EnvironmentCreatedEventEvent
+	s.EnvironmentCreatedEvent = v
+}
+
+// GetEnvironmentCreatedEvent returns EnvironmentCreatedEvent and true boolean if Event is EnvironmentCreatedEvent.
+func (s Event) GetEnvironmentCreatedEvent() (v EnvironmentCreatedEvent, ok bool) {
+	if !s.IsEnvironmentCreatedEvent() {
+		return v, false
+	}
+	return s.EnvironmentCreatedEvent, true
+}
+
+// NewEnvironmentCreatedEventEvent returns new Event from EnvironmentCreatedEvent.
+func NewEnvironmentCreatedEventEvent(v EnvironmentCreatedEvent) Event {
+	var s Event
+	s.SetEnvironmentCreatedEvent(v)
 	return s
 }
 
@@ -18264,6 +18919,186 @@ type GetClaimStatusUnauthorized ErrorDetails
 
 func (*GetClaimStatusUnauthorized) getClaimStatusRes() {}
 
+// GetEnvironmentByNameErrorResponse represents sum type.
+type GetEnvironmentByNameErrorResponse struct {
+	Type                GetEnvironmentByNameErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EnvNotFound         EnvNotFound
+	EnvPermissionDenied EnvPermissionDenied
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+}
+
+// GetEnvironmentByNameErrorResponseType is oneOf type of GetEnvironmentByNameErrorResponse.
+type GetEnvironmentByNameErrorResponseType string
+
+// Possible values for GetEnvironmentByNameErrorResponseType.
+const (
+	AuthUnauthorizedGetEnvironmentByNameErrorResponse    GetEnvironmentByNameErrorResponseType = "auth.unauthorized"
+	EnvNotFoundGetEnvironmentByNameErrorResponse         GetEnvironmentByNameErrorResponseType = "env.not_found"
+	EnvPermissionDeniedGetEnvironmentByNameErrorResponse GetEnvironmentByNameErrorResponseType = "env.permission_denied"
+	InternalGetEnvironmentByNameErrorResponse            GetEnvironmentByNameErrorResponseType = "internal"
+	ReqInvalidGetEnvironmentByNameErrorResponse          GetEnvironmentByNameErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetEnvironmentByNameErrorResponse is AuthUnauthorized.
+func (s GetEnvironmentByNameErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetEnvironmentByNameErrorResponse
+}
+
+// IsEnvNotFound reports whether GetEnvironmentByNameErrorResponse is EnvNotFound.
+func (s GetEnvironmentByNameErrorResponse) IsEnvNotFound() bool {
+	return s.Type == EnvNotFoundGetEnvironmentByNameErrorResponse
+}
+
+// IsEnvPermissionDenied reports whether GetEnvironmentByNameErrorResponse is EnvPermissionDenied.
+func (s GetEnvironmentByNameErrorResponse) IsEnvPermissionDenied() bool {
+	return s.Type == EnvPermissionDeniedGetEnvironmentByNameErrorResponse
+}
+
+// IsInternal reports whether GetEnvironmentByNameErrorResponse is Internal.
+func (s GetEnvironmentByNameErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetEnvironmentByNameErrorResponse
+}
+
+// IsReqInvalid reports whether GetEnvironmentByNameErrorResponse is ReqInvalid.
+func (s GetEnvironmentByNameErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetEnvironmentByNameErrorResponse
+}
+
+// SetAuthUnauthorized sets GetEnvironmentByNameErrorResponse to AuthUnauthorized.
+func (s *GetEnvironmentByNameErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetEnvironmentByNameErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetEnvironmentByNameErrorResponse is AuthUnauthorized.
+func (s GetEnvironmentByNameErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetEnvironmentByNameErrorResponse returns new GetEnvironmentByNameErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetEnvironmentByNameErrorResponse(v AuthUnauthorized) GetEnvironmentByNameErrorResponse {
+	var s GetEnvironmentByNameErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEnvNotFound sets GetEnvironmentByNameErrorResponse to EnvNotFound.
+func (s *GetEnvironmentByNameErrorResponse) SetEnvNotFound(v EnvNotFound) {
+	s.Type = EnvNotFoundGetEnvironmentByNameErrorResponse
+	s.EnvNotFound = v
+}
+
+// GetEnvNotFound returns EnvNotFound and true boolean if GetEnvironmentByNameErrorResponse is EnvNotFound.
+func (s GetEnvironmentByNameErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
+	if !s.IsEnvNotFound() {
+		return v, false
+	}
+	return s.EnvNotFound, true
+}
+
+// NewEnvNotFoundGetEnvironmentByNameErrorResponse returns new GetEnvironmentByNameErrorResponse from EnvNotFound.
+func NewEnvNotFoundGetEnvironmentByNameErrorResponse(v EnvNotFound) GetEnvironmentByNameErrorResponse {
+	var s GetEnvironmentByNameErrorResponse
+	s.SetEnvNotFound(v)
+	return s
+}
+
+// SetEnvPermissionDenied sets GetEnvironmentByNameErrorResponse to EnvPermissionDenied.
+func (s *GetEnvironmentByNameErrorResponse) SetEnvPermissionDenied(v EnvPermissionDenied) {
+	s.Type = EnvPermissionDeniedGetEnvironmentByNameErrorResponse
+	s.EnvPermissionDenied = v
+}
+
+// GetEnvPermissionDenied returns EnvPermissionDenied and true boolean if GetEnvironmentByNameErrorResponse is EnvPermissionDenied.
+func (s GetEnvironmentByNameErrorResponse) GetEnvPermissionDenied() (v EnvPermissionDenied, ok bool) {
+	if !s.IsEnvPermissionDenied() {
+		return v, false
+	}
+	return s.EnvPermissionDenied, true
+}
+
+// NewEnvPermissionDeniedGetEnvironmentByNameErrorResponse returns new GetEnvironmentByNameErrorResponse from EnvPermissionDenied.
+func NewEnvPermissionDeniedGetEnvironmentByNameErrorResponse(v EnvPermissionDenied) GetEnvironmentByNameErrorResponse {
+	var s GetEnvironmentByNameErrorResponse
+	s.SetEnvPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets GetEnvironmentByNameErrorResponse to Internal.
+func (s *GetEnvironmentByNameErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetEnvironmentByNameErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetEnvironmentByNameErrorResponse is Internal.
+func (s GetEnvironmentByNameErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetEnvironmentByNameErrorResponse returns new GetEnvironmentByNameErrorResponse from Internal.
+func NewInternalGetEnvironmentByNameErrorResponse(v Internal) GetEnvironmentByNameErrorResponse {
+	var s GetEnvironmentByNameErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetEnvironmentByNameErrorResponse to ReqInvalid.
+func (s *GetEnvironmentByNameErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetEnvironmentByNameErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetEnvironmentByNameErrorResponse is ReqInvalid.
+func (s GetEnvironmentByNameErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetEnvironmentByNameErrorResponse returns new GetEnvironmentByNameErrorResponse from ReqInvalid.
+func NewReqInvalidGetEnvironmentByNameErrorResponse(v ReqInvalid) GetEnvironmentByNameErrorResponse {
+	var s GetEnvironmentByNameErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetEnvironmentByNameErrorResponseStatusCode wraps GetEnvironmentByNameErrorResponse with StatusCode.
+type GetEnvironmentByNameErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetEnvironmentByNameErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetEnvironmentByNameErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetEnvironmentByNameErrorResponseStatusCode) GetResponse() GetEnvironmentByNameErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetEnvironmentByNameErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetEnvironmentByNameErrorResponseStatusCode) SetResponse(val GetEnvironmentByNameErrorResponse) {
+	s.Response = val
+}
+
+func (*GetEnvironmentByNameErrorResponseStatusCode) getEnvironmentByNameRes() {}
+
 type GetEventForbidden ErrorDetails
 
 func (*GetEventForbidden) getEventRes() {}
@@ -21130,6 +21965,217 @@ func (s *ListBrandingResponseItem) SetID(val string) {
 func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
+
+// ListEnvironmentsErrorResponse represents sum type.
+type ListEnvironmentsErrorResponse struct {
+	Type                ListEnvironmentsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EnvNotFound         EnvNotFound
+	EnvPermissionDenied EnvPermissionDenied
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+}
+
+// ListEnvironmentsErrorResponseType is oneOf type of ListEnvironmentsErrorResponse.
+type ListEnvironmentsErrorResponseType string
+
+// Possible values for ListEnvironmentsErrorResponseType.
+const (
+	AuthUnauthorizedListEnvironmentsErrorResponse    ListEnvironmentsErrorResponseType = "auth.unauthorized"
+	EnvNotFoundListEnvironmentsErrorResponse         ListEnvironmentsErrorResponseType = "env.not_found"
+	EnvPermissionDeniedListEnvironmentsErrorResponse ListEnvironmentsErrorResponseType = "env.permission_denied"
+	InternalListEnvironmentsErrorResponse            ListEnvironmentsErrorResponseType = "internal"
+	ReqInvalidListEnvironmentsErrorResponse          ListEnvironmentsErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListEnvironmentsErrorResponse is AuthUnauthorized.
+func (s ListEnvironmentsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListEnvironmentsErrorResponse
+}
+
+// IsEnvNotFound reports whether ListEnvironmentsErrorResponse is EnvNotFound.
+func (s ListEnvironmentsErrorResponse) IsEnvNotFound() bool {
+	return s.Type == EnvNotFoundListEnvironmentsErrorResponse
+}
+
+// IsEnvPermissionDenied reports whether ListEnvironmentsErrorResponse is EnvPermissionDenied.
+func (s ListEnvironmentsErrorResponse) IsEnvPermissionDenied() bool {
+	return s.Type == EnvPermissionDeniedListEnvironmentsErrorResponse
+}
+
+// IsInternal reports whether ListEnvironmentsErrorResponse is Internal.
+func (s ListEnvironmentsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListEnvironmentsErrorResponse
+}
+
+// IsReqInvalid reports whether ListEnvironmentsErrorResponse is ReqInvalid.
+func (s ListEnvironmentsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListEnvironmentsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListEnvironmentsErrorResponse to AuthUnauthorized.
+func (s *ListEnvironmentsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListEnvironmentsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListEnvironmentsErrorResponse is AuthUnauthorized.
+func (s ListEnvironmentsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListEnvironmentsErrorResponse returns new ListEnvironmentsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListEnvironmentsErrorResponse(v AuthUnauthorized) ListEnvironmentsErrorResponse {
+	var s ListEnvironmentsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEnvNotFound sets ListEnvironmentsErrorResponse to EnvNotFound.
+func (s *ListEnvironmentsErrorResponse) SetEnvNotFound(v EnvNotFound) {
+	s.Type = EnvNotFoundListEnvironmentsErrorResponse
+	s.EnvNotFound = v
+}
+
+// GetEnvNotFound returns EnvNotFound and true boolean if ListEnvironmentsErrorResponse is EnvNotFound.
+func (s ListEnvironmentsErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
+	if !s.IsEnvNotFound() {
+		return v, false
+	}
+	return s.EnvNotFound, true
+}
+
+// NewEnvNotFoundListEnvironmentsErrorResponse returns new ListEnvironmentsErrorResponse from EnvNotFound.
+func NewEnvNotFoundListEnvironmentsErrorResponse(v EnvNotFound) ListEnvironmentsErrorResponse {
+	var s ListEnvironmentsErrorResponse
+	s.SetEnvNotFound(v)
+	return s
+}
+
+// SetEnvPermissionDenied sets ListEnvironmentsErrorResponse to EnvPermissionDenied.
+func (s *ListEnvironmentsErrorResponse) SetEnvPermissionDenied(v EnvPermissionDenied) {
+	s.Type = EnvPermissionDeniedListEnvironmentsErrorResponse
+	s.EnvPermissionDenied = v
+}
+
+// GetEnvPermissionDenied returns EnvPermissionDenied and true boolean if ListEnvironmentsErrorResponse is EnvPermissionDenied.
+func (s ListEnvironmentsErrorResponse) GetEnvPermissionDenied() (v EnvPermissionDenied, ok bool) {
+	if !s.IsEnvPermissionDenied() {
+		return v, false
+	}
+	return s.EnvPermissionDenied, true
+}
+
+// NewEnvPermissionDeniedListEnvironmentsErrorResponse returns new ListEnvironmentsErrorResponse from EnvPermissionDenied.
+func NewEnvPermissionDeniedListEnvironmentsErrorResponse(v EnvPermissionDenied) ListEnvironmentsErrorResponse {
+	var s ListEnvironmentsErrorResponse
+	s.SetEnvPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets ListEnvironmentsErrorResponse to Internal.
+func (s *ListEnvironmentsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListEnvironmentsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListEnvironmentsErrorResponse is Internal.
+func (s ListEnvironmentsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListEnvironmentsErrorResponse returns new ListEnvironmentsErrorResponse from Internal.
+func NewInternalListEnvironmentsErrorResponse(v Internal) ListEnvironmentsErrorResponse {
+	var s ListEnvironmentsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListEnvironmentsErrorResponse to ReqInvalid.
+func (s *ListEnvironmentsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListEnvironmentsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListEnvironmentsErrorResponse is ReqInvalid.
+func (s ListEnvironmentsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListEnvironmentsErrorResponse returns new ListEnvironmentsErrorResponse from ReqInvalid.
+func NewReqInvalidListEnvironmentsErrorResponse(v ReqInvalid) ListEnvironmentsErrorResponse {
+	var s ListEnvironmentsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListEnvironmentsErrorResponseStatusCode wraps ListEnvironmentsErrorResponse with StatusCode.
+type ListEnvironmentsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListEnvironmentsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListEnvironmentsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListEnvironmentsErrorResponseStatusCode) GetResponse() ListEnvironmentsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListEnvironmentsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListEnvironmentsErrorResponseStatusCode) SetResponse(val ListEnvironmentsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListEnvironmentsErrorResponseStatusCode) listEnvironmentsRes() {}
+
+// The project's environments, ordered by name.
+// Ref: #
+type ListEnvironmentsResponse struct {
+	Environments []Environment `json:"environments"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetEnvironments returns the value of Environments.
+func (s *ListEnvironmentsResponse) GetEnvironments() []Environment {
+	return s.Environments
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListEnvironmentsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetEnvironments sets the value of Environments.
+func (s *ListEnvironmentsResponse) SetEnvironments(val []Environment) {
+	s.Environments = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListEnvironmentsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListEnvironmentsResponse) listEnvironmentsRes() {}
 
 type ListEventsBadRequest ErrorDetails
 
@@ -24005,6 +25051,144 @@ func (o OptEncKeyUnknownAlgDetails) Get() (v EncKeyUnknownAlgDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEncKeyUnknownAlgDetails) Or(d EncKeyUnknownAlgDetails) EncKeyUnknownAlgDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvNotFoundDetails returns new OptEnvNotFoundDetails with value set to v.
+func NewOptEnvNotFoundDetails(v EnvNotFoundDetails) OptEnvNotFoundDetails {
+	return OptEnvNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvNotFoundDetails is optional EnvNotFoundDetails.
+type OptEnvNotFoundDetails struct {
+	Value EnvNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvNotFoundDetails was set.
+func (o OptEnvNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvNotFoundDetails) Reset() {
+	var v EnvNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvNotFoundDetails) SetTo(v EnvNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvNotFoundDetails) Get() (v EnvNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvNotFoundDetails) Or(d EnvNotFoundDetails) EnvNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvPermissionDeniedDetails returns new OptEnvPermissionDeniedDetails with value set to v.
+func NewOptEnvPermissionDeniedDetails(v EnvPermissionDeniedDetails) OptEnvPermissionDeniedDetails {
+	return OptEnvPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvPermissionDeniedDetails is optional EnvPermissionDeniedDetails.
+type OptEnvPermissionDeniedDetails struct {
+	Value EnvPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvPermissionDeniedDetails was set.
+func (o OptEnvPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvPermissionDeniedDetails) Reset() {
+	var v EnvPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvPermissionDeniedDetails) SetTo(v EnvPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvPermissionDeniedDetails) Get() (v EnvPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvPermissionDeniedDetails) Or(d EnvPermissionDeniedDetails) EnvPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvironmentCreatedEventDelegationType returns new OptEnvironmentCreatedEventDelegationType with value set to v.
+func NewOptEnvironmentCreatedEventDelegationType(v EnvironmentCreatedEventDelegationType) OptEnvironmentCreatedEventDelegationType {
+	return OptEnvironmentCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvironmentCreatedEventDelegationType is optional EnvironmentCreatedEventDelegationType.
+type OptEnvironmentCreatedEventDelegationType struct {
+	Value EnvironmentCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptEnvironmentCreatedEventDelegationType was set.
+func (o OptEnvironmentCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvironmentCreatedEventDelegationType) Reset() {
+	var v EnvironmentCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvironmentCreatedEventDelegationType) SetTo(v EnvironmentCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvironmentCreatedEventDelegationType) Get() (v EnvironmentCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvironmentCreatedEventDelegationType) Or(d EnvironmentCreatedEventDelegationType) EnvironmentCreatedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -27383,6 +28567,69 @@ func (o OptNilDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilEnvironmentCreatedEventActorType returns new OptNilEnvironmentCreatedEventActorType with value set to v.
+func NewOptNilEnvironmentCreatedEventActorType(v EnvironmentCreatedEventActorType) OptNilEnvironmentCreatedEventActorType {
+	return OptNilEnvironmentCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilEnvironmentCreatedEventActorType is optional nullable EnvironmentCreatedEventActorType.
+type OptNilEnvironmentCreatedEventActorType struct {
+	Value EnvironmentCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilEnvironmentCreatedEventActorType was set.
+func (o OptNilEnvironmentCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilEnvironmentCreatedEventActorType) Reset() {
+	var v EnvironmentCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilEnvironmentCreatedEventActorType) SetTo(v EnvironmentCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilEnvironmentCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilEnvironmentCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v EnvironmentCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilEnvironmentCreatedEventActorType) Get() (v EnvironmentCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilEnvironmentCreatedEventActorType) Or(d EnvironmentCreatedEventActorType) EnvironmentCreatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
