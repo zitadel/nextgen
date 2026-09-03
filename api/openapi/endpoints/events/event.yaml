@@ -16,8 +16,6 @@ oneOf:
   - $ref: types/branding-created-event.yaml
   - $ref: types/environment-created-event.yaml
   - $ref: types/flowdef-created-event.yaml
-  - $ref: types/flowdef-deleted-event.yaml
-  - $ref: types/flowdef-updated-event.yaml
   - $ref: types/project-created-event.yaml
   - $ref: types/project-deleted-event.yaml
   - $ref: types/project-updated-event.yaml
@@ -47,8 +45,6 @@ discriminator:
     branding.created: types/branding-created-event.yaml
     environment.created: types/environment-created-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
-    flowdef.deleted: types/flowdef-deleted-event.yaml
-    flowdef.updated: types/flowdef-updated-event.yaml
     project.created: types/project-created-event.yaml
     project.deleted: types/project-deleted-event.yaml
     project.updated: types/project-updated-event.yaml

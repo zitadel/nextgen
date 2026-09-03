@@ -53,10 +53,6 @@ type CreateUserRes interface {
 	createUserRes()
 }
 
-type DeleteFlowDefinitionRes interface {
-	deleteFlowDefinitionRes()
-}
-
 type DeleteGrantRes interface {
 	deleteGrantRes()
 }
@@ -219,10 +215,6 @@ type SetUserPasswordRes interface {
 
 type SubmitFlowStepRes interface {
 	submitFlowStepRes()
-}
-
-type UpdateFlowDefinitionRes interface {
-	updateFlowDefinitionRes()
 }
 
 type UpdateTeamRes interface {

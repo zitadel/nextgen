@@ -23,10 +23,6 @@ const (
 
 	deleteFlowDefinitionStmt = `DELETE FROM zitadel_nextgen.flow_definitions WHERE project_id = $1 AND id = $2`
 
-	updateFlowDefinitionStmt = `UPDATE zitadel_nextgen.flow_definitions SET ` +
-		`name = $1, schema_version = $2, status = $3` + statusCast + `, purposes = $4` + purposeArrCast + `, ` +
-		`definition = $5, updated_at = NOW() WHERE project_id = $6 AND id = $7 RETURNING created_at, updated_at`
-
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
 		`FROM zitadel_nextgen.flow_definitions`
 )
@@ -90,29 +86,6 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, pro
 		return nil, wrapError(err)
 	}
 	return def, nil
-}
-
-// UpdateFlowDefinition implements [service.FlowDefinitionStatements].
-func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	content, err := flowdefinition.Marshal(entity)
-	if err != nil {
-		return err
-	}
-	purposes := flowdefinition.PurposeStrings(entity)
-	if err := f.client.QueryRow(ctx, updateFlowDefinitionStmt,
-		entity.Name,
-		entity.SchemaVersion,
-		entity.Status.String(),
-		purposes,
-		content,
-		entity.ProjectID,
-		entity.ID,
-	).Scan(&entity.CreatedAt, &entity.UpdatedAt); err != nil {
-		return wrapError(err)
-	}
-	// pgx scans timestamptz in Local; reads go through ToDomain, which is UTC.
-	entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
-	return nil
 }
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].

@@ -35,7 +35,6 @@ import type {
   InitClaim201,
   ListFlowDefinitions200,
   ListSchemas200,
-  UpdateFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import {
   CompleteClaimResponse,
@@ -43,7 +42,6 @@ import {
   CreateProjectBody,
   CreateSchemaBody,
   CreateSchemaQueryParams,
-  DeleteFlowDefinitionParams,
   GetClaimStatusParams,
   GetClaimStatusQueryParams,
   GetClaimStatusResponse,
@@ -58,9 +56,6 @@ import {
   ListFlowDefinitionsResponse,
   ListSchemasQueryParams,
   QueryUsersBody,
-  UpdateFlowDefinitionBody,
-  UpdateFlowDefinitionParams,
-  UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
@@ -893,58 +888,6 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
-    }),
-
-    http.put("*/flow_definitions/:id", async ({ params, request }) => {
-      const path = parse(UpdateFlowDefinitionParams, params, "invalid_request");
-      if (!path.ok) {
-        return path.response;
-      }
-
-      const record = store.flowDefinitions.get(path.data.id);
-      if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
-      const raw = await readJson(request);
-      if (raw === null) {
-        return HttpResponse.json(INVALID_JSON, { status: 400 });
-      }
-      const body = parse(UpdateFlowDefinitionBody, raw, "invalid_request");
-      if (!body.ok) {
-        return body.response;
-      }
-      const invalid = invalidFlowDefinitionResponse(
-        body.data.flow_definition as unknown as Record<string, unknown>,
-      );
-      if (invalid) {
-        return invalid;
-      }
-
-      const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
-      record.body = flowDefinition;
-      record.status =
-        typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
-      record.updatedAt = nowIso();
-      const responseBody: UpdateFlowDefinition200 = flowResponse(record);
-      const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
-      if (!out.ok) {
-        return out.response;
-      }
-      return HttpResponse.json(out.data, { status: 200 });
-    }),
-
-    http.delete("*/flow_definitions/:id", ({ params }) => {
-      const path = parse(DeleteFlowDefinitionParams, params, "invalid_request");
-      if (!path.ok) {
-        return path.response;
-      }
-
-      const record = store.flowDefinitions.get(path.data.id);
-      if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
-      store.flowDefinitions.delete(path.data.id);
-      return new HttpResponse(null, { status: 204 });
     }),
   ];
 }

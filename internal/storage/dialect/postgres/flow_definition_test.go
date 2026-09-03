@@ -101,27 +101,6 @@ func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
-func TestFlowDefinitionStatements_Update(t *testing.T) {
-	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
-	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-
-	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
-	t.Cleanup(func() { _ = testPool.DeleteFlowDefinitionByID(context.Background(), projectID, def.ID) })
-	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), def))
-
-	def.Name = "Updated Login"
-	def.Status = domain.FlowDefinitionStatusActive
-	def.SchemaVersion = "2.0.0"
-	require.NoError(t, testPool.UpdateFlowDefinition(t.Context(), def))
-
-	got, err := testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "Updated Login", got.Name)
-	assert.Equal(t, domain.FlowDefinitionStatusActive, got.Status)
-	assert.Equal(t, "2.0.0", got.SchemaVersion)
-}
-
 func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 	projectID := uniqueProjectID(t)
 	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })

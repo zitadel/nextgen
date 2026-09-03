@@ -121,8 +121,6 @@ tracked below.
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
-| Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | delta of allowlisted fields that changed |
-| Flow definition delete | `flowdef.deleted` | `admin` | `flow_definition` | _(empty)_ |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | Project create seed `CreateEnvironment` (one per default environment) | `environment.created` | `admin` | `environment` | `name` |
@@ -148,4 +146,5 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
+| `flowdef.updated` / `flowdef.deleted` | [#530](https://github.com/zitadel/nextgen/issues/530) made flow definitions revisions: a change publishes a new revision, and retirement waits for releases ([#536](https://github.com/zitadel/nextgen/issues/536)) |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

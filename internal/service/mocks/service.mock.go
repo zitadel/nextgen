@@ -4374,44 +4374,6 @@ func (c *MockAllStatementsSetUserPasswordCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
-// UpdateFlowDefinition mocks base method.
-func (m *MockAllStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateFlowDefinition", ctx, entity)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateFlowDefinition indicates an expected call of UpdateFlowDefinition.
-func (mr *MockAllStatementsMockRecorder) UpdateFlowDefinition(ctx, entity any) *MockAllStatementsUpdateFlowDefinitionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFlowDefinition", reflect.TypeOf((*MockAllStatements)(nil).UpdateFlowDefinition), ctx, entity)
-	return &MockAllStatementsUpdateFlowDefinitionCall{Call: call}
-}
-
-// MockAllStatementsUpdateFlowDefinitionCall wrap *gomock.Call
-type MockAllStatementsUpdateFlowDefinitionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsUpdateFlowDefinitionCall) Return(arg0 error) *MockAllStatementsUpdateFlowDefinitionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateFlowDefinitionCall) Do(f func(context.Context, *domain.FlowDefinition) error) *MockAllStatementsUpdateFlowDefinitionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateFlowDefinitionCall) DoAndReturn(f func(context.Context, *domain.FlowDefinition) error) *MockAllStatementsUpdateFlowDefinitionCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // UpdateKey mocks base method.
 func (m *MockAllStatements) UpdateKey(ctx context.Context, id, key string) error {
 	m.ctrl.T.Helper()
@@ -5352,44 +5314,6 @@ func (c *MockFlowDefinitionStatementsListFlowDefinitionsCall) Do(f func(context.
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockFlowDefinitionStatementsListFlowDefinitionsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)) *MockFlowDefinitionStatementsListFlowDefinitionsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// UpdateFlowDefinition mocks base method.
-func (m *MockFlowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateFlowDefinition", ctx, entity)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateFlowDefinition indicates an expected call of UpdateFlowDefinition.
-func (mr *MockFlowDefinitionStatementsMockRecorder) UpdateFlowDefinition(ctx, entity any) *MockFlowDefinitionStatementsUpdateFlowDefinitionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFlowDefinition", reflect.TypeOf((*MockFlowDefinitionStatements)(nil).UpdateFlowDefinition), ctx, entity)
-	return &MockFlowDefinitionStatementsUpdateFlowDefinitionCall{Call: call}
-}
-
-// MockFlowDefinitionStatementsUpdateFlowDefinitionCall wrap *gomock.Call
-type MockFlowDefinitionStatementsUpdateFlowDefinitionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockFlowDefinitionStatementsUpdateFlowDefinitionCall) Return(arg0 error) *MockFlowDefinitionStatementsUpdateFlowDefinitionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockFlowDefinitionStatementsUpdateFlowDefinitionCall) Do(f func(context.Context, *domain.FlowDefinition) error) *MockFlowDefinitionStatementsUpdateFlowDefinitionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowDefinitionStatementsUpdateFlowDefinitionCall) DoAndReturn(f func(context.Context, *domain.FlowDefinition) error) *MockFlowDefinitionStatementsUpdateFlowDefinitionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

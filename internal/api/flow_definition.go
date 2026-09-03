@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"slices"
@@ -68,40 +67,6 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
 	}
 	return resp, nil
-}
-
-func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opWrite)
-	if err != nil {
-		return nil, err
-	}
-	svcReq, err := mapUpdateRequestToService(projectID, params, req)
-	if err != nil {
-		return nil, err
-	}
-
-	flowDefinition, err := h.flowDefinitionService.Update(ctx, svcReq)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := flowDefinitionResponse(flowDefinition)
-	return resp, nil
-}
-
-func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opDelete)
-	if err != nil {
-		if errors.Is(err, errResourceGone) {
-			return &api.DeleteFlowDefinitionNoContent{}, nil
-		}
-		return nil, err
-	}
-	err = h.flowDefinitionService.Delete(ctx, projectID, params.ID)
-	if err != nil {
-		return nil, err
-	}
-	return &api.DeleteFlowDefinitionNoContent{}, nil
 }
 
 // expandUserSchemas embeds each listed flow definition's user schema
@@ -169,25 +134,11 @@ func (h Handler) expandUserSchemas(ctx context.Context, projectID string, defini
 /* API request to service/domain converters */
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.FlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
-	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), strings.ToLower(string(definition.GetStatus())))
-}
-
-func mapUpdateRequestToService(projectID string, params api.UpdateFlowDefinitionParams, req *api.FlowDefinitionUpdateRequest) (service.FlowDefinitionRequest, error) {
-	definition := req.GetFlowDefinition()
-	svcReq, err := mapFlowDefinitionRequestToService(projectID, req.GetSchemaURI(), definition, strings.ToLower(string(definition.GetStatus())))
-	if err != nil {
-		return svcReq, err
-	}
-	svcReq.FlowDefinitionID = params.ID
-	return svcReq, nil
-}
-
-func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchemaURI, definition api.FlowDefinition, status string) (service.FlowDefinitionRequest, error) {
 	svcReq := service.FlowDefinitionRequest{
-		ProjectID:     projectID,
+		ProjectID:     string(req.GetProjectID()),
 		Name:          definition.GetName(),
 		UserSchema:    definition.GetUserSchema(),
-		Status:        status,
+		Status:        strings.ToLower(string(definition.GetStatus())),
 		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
@@ -197,7 +148,7 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 	}
 	svcReq.Purposes = purposes
 
-	reqFlowSchemaURI, ok := schemaURI.Get()
+	reqFlowSchemaURI, ok := req.GetSchemaURI().Get()
 	if ok {
 		u := (url.URL)(reqFlowSchemaURI)
 		svcReq.FlowSchemaURI = u.String()

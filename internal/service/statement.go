@@ -77,7 +77,6 @@ type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
