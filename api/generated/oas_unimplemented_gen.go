@@ -595,7 +595,10 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 // DELETE before re-granting. Project-secret setup (`sk_proj`) and
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
-// get). Requires `project.read`.
+// get). Requires `project.read`. `expand: ["principal"]` additionally
+// requires `user.read` and `team.read` (documented on the expand enum;
+// those scopes cannot be ANDed onto this security block because they are
+// body-conditional).
 //
 // POST /grants/query
 func (UnimplementedHandler) QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (r QueryGrantsRes, _ error) {

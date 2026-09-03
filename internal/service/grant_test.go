@@ -484,6 +484,81 @@ func TestGrantService_List(t *testing.T) {
 		assert.Nil(t, got.Grants[1].User)
 	})
 
+	t.Run("expand off hydrates identity attributes only", func(t *testing.T) {
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+				Items: []*domain.AuthzAssignment{userAsgn},
+			}, nil)
+			s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, _ *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+					require.Equal(t, domain.IdentityAttributeKeys, opts.AttributeKeys)
+					return &database.ListResult[*domain.User]{Items: []*domain.User{{ID: userID}}}, nil
+				})
+		})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"})
+		require.NoError(t, err)
+		require.Len(t, got.Grants, 1)
+		assert.False(t, got.Grants[0].PrincipalRequested)
+		assert.Nil(t, got.Grants[0].PrincipalUser)
+		require.NotNil(t, got.Grants[0].User)
+		assert.Equal(t, userID, got.Grants[0].User.UserID)
+	})
+
+	t.Run("expand hydrates full user and team bodies", func(t *testing.T) {
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+				Items: []*domain.AuthzAssignment{userAsgn, teamAsgn},
+			}, nil)
+			s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, _ *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+					require.Empty(t, opts.AttributeKeys)
+					return &database.ListResult[*domain.User]{
+						Items: []*domain.User{{
+							ID:        userID,
+							SchemaURL: "urn:zitadel:schema:user",
+							Attributes: []domain.Attribute{
+								{Key: "email", Value: "ada@example.com"},
+								{Key: "name", Value: "Ada Lovelace"},
+							},
+						}},
+					}, nil
+				})
+			s.EXPECT().ListTeams(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Team]{
+				Items: []*domain.Team{{ID: teamID, Name: "Platform admins", Status: domain.TeamStatusActive}},
+			}, nil)
+		})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true})
+		require.NoError(t, err)
+		require.Len(t, got.Grants, 2)
+		assert.True(t, got.Grants[0].PrincipalRequested)
+		require.NotNil(t, got.Grants[0].PrincipalUser)
+		assert.Equal(t, userID, got.Grants[0].PrincipalUser.ID)
+		require.NotNil(t, got.Grants[0].User)
+		assert.Equal(t, "ada@example.com", got.Grants[0].User.Identifier)
+		assert.True(t, got.Grants[1].PrincipalRequested)
+		require.NotNil(t, got.Grants[1].PrincipalTeam)
+		assert.Equal(t, teamID, got.Grants[1].PrincipalTeam.ID)
+		require.NotNil(t, got.Grants[1].Team)
+		assert.Equal(t, "Platform admins", got.Grants[1].Team.Name)
+	})
+
+	t.Run("expand missing principal is requested but empty", func(t *testing.T) {
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+				Items: []*domain.AuthzAssignment{expiredAsgn},
+			}, nil)
+			s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.User]{}, nil)
+		})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true})
+		require.NoError(t, err)
+		require.Len(t, got.Grants, 1)
+		assert.True(t, got.Grants[0].PrincipalRequested)
+		assert.Nil(t, got.Grants[0].PrincipalUser)
+		require.NotNil(t, got.Grants[0].User)
+		assert.Equal(t, "user_gone", got.Grants[0].User.UserID)
+		assert.Empty(t, got.Grants[0].User.Identifier)
+	})
+
 	t.Run("missing principal degrades to id-only", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{

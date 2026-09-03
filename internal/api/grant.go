@@ -34,7 +34,7 @@ func (h *Handler) CreateGrant(ctx context.Context, req *api.CreateGrantRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return grantResponse(hydrated[0]), nil
+	return grantResponse(hydrated[0])
 }
 
 func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.GetGrantRes, error) {
@@ -49,20 +49,36 @@ func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.
 	if err != nil {
 		return nil, err
 	}
-	return grantResponse(hydrated[0]), nil
+	return grantResponse(hydrated[0])
 }
 
 func (h *Handler) QueryGrants(ctx context.Context, req *api.QueryGrantsRequest, params api.QueryGrantsParams) (api.QueryGrantsRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), grantAccess, opRead); err != nil {
 		return nil, err
 	}
-	listed, err := h.grantService.List(ctx, mapQueryGrantsToService(string(params.ProjectID), req))
+	svcReq := mapQueryGrantsToService(string(params.ProjectID), req)
+	// expand: ["principal"] is one enum value but two resources. Both gates
+	// run on the whole request before the list; a mixed page is the common
+	// case, and a silently missing principal would look like "not requested".
+	if svcReq.IncludePrincipal {
+		if err := requireUserRead(ctx); err != nil {
+			return nil, err
+		}
+		if err := requireGrantPrincipalTeamRead(ctx); err != nil {
+			return nil, err
+		}
+	}
+	listed, err := h.grantService.List(ctx, svcReq)
 	if err != nil {
 		return nil, err
 	}
 	grants := make([]api.Grant, 0, len(listed.Grants))
 	for _, g := range listed.Grants {
-		grants = append(grants, *grantResponse(g))
+		mapped, err := grantResponse(g)
+		if err != nil {
+			return nil, err
+		}
+		grants = append(grants, *mapped)
 	}
 	resp := &api.QueryGrantsResponse{Grants: grants}
 	if listed.NextPageToken != "" {
@@ -83,6 +99,12 @@ func mapQueryGrantsToService(projectID string, req *api.QueryGrantsRequest) serv
 	for _, filter := range req.Filter {
 		svcReq.Filters = append(svcReq.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
 	}
+	for _, expand := range req.Expand {
+		switch expand {
+		case api.GrantExpandPrincipal:
+			svcReq.IncludePrincipal = true
+		}
+	}
 	return svcReq
 }
 
@@ -96,7 +118,7 @@ func (h *Handler) DeleteGrant(ctx context.Context, params api.DeleteGrantParams)
 	return &api.DeleteGrantNoContent{}, nil
 }
 
-func grantResponse(g *service.Grant) *api.Grant {
+func grantResponse(g *service.Grant) (*api.Grant, error) {
 	asgn := g.Assignment
 	resp := &api.Grant{
 		ID:            asgn.ID,
@@ -128,7 +150,28 @@ func grantResponse(g *service.Grant) *api.Grant {
 		}
 		resp.Team = api.NewOptTeamRef(ref)
 	}
-	return resp
+	if g.PrincipalRequested {
+		if err := setGrantPrincipal(resp, g); err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
+}
+
+func setGrantPrincipal(resp *api.Grant, g *service.Grant) error {
+	switch {
+	case g.PrincipalUser != nil:
+		u, err := domainUserToApiUser(g.PrincipalUser)
+		if err != nil {
+			return err
+		}
+		resp.Principal.SetTo(api.NewUserGrantExpandedPrincipal(*u))
+	case g.PrincipalTeam != nil:
+		resp.Principal.SetTo(api.NewTeamResponseGrantExpandedPrincipal(*teamResponse(g.PrincipalTeam)))
+	default:
+		resp.Principal.SetToNull()
+	}
+	return nil
 }
 
 func grantPrincipalType(t api.CreateGrantRequestPrincipalType) (domain.AuthzPrincipalType, error) {

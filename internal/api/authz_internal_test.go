@@ -240,6 +240,92 @@ func TestRequireTeamRead(t *testing.T) {
 	}
 }
 
+func TestRequireUserRead(t *testing.T) {
+	withScopes := func(scopes ...string) context.Context {
+		return WithScopeContext(context.Background(), ScopeContext{
+			ProjectID:     "proj_a",
+			Scope:         scopes,
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		})
+	}
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		wantErr bool
+	}{
+		{"granular scope", withScopes("user.read"), false},
+		{"operator secret", withScopes("project.write", "project.read"), false},
+		{"preview secret", withScopes("project.read"), true},
+		{"no credential", context.Background(), true},
+		{"team read does not grant user read", withScopes("team.read"), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := requireUserRead(tt.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("requireUserRead() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				return
+			}
+			var de domain.Error
+			if !errors.As(err, &de) {
+				t.Fatalf("error is not a domain.Error: %v", err)
+			}
+			if de.Code != domain.ErrUserPermissionDenied().Code {
+				t.Fatalf("code %q, want %q", de.Code, domain.ErrUserPermissionDenied().Code)
+			}
+			if !strings.Contains(de.Message, "user.read") {
+				t.Fatalf("message %q does not name the missing permission", de.Message)
+			}
+		})
+	}
+}
+
+func TestRequireGrantPrincipalTeamRead(t *testing.T) {
+	withScopes := func(scopes ...string) context.Context {
+		return WithScopeContext(context.Background(), ScopeContext{
+			ProjectID:     "proj_a",
+			Scope:         scopes,
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		})
+	}
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		wantErr bool
+	}{
+		{"granular scope", withScopes("team.read"), false},
+		{"operator secret", withScopes("project.write", "project.read"), false},
+		{"preview secret", withScopes("project.read"), true},
+		{"no credential", context.Background(), true},
+		{"user read does not grant team read", withScopes("user.read"), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := requireGrantPrincipalTeamRead(tt.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("requireGrantPrincipalTeamRead() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				return
+			}
+			var de domain.Error
+			if !errors.As(err, &de) {
+				t.Fatalf("error is not a domain.Error: %v", err)
+			}
+			if de.Code != domain.ErrTeamPermissionDenied().Code {
+				t.Fatalf("code %q, want %q", de.Code, domain.ErrTeamPermissionDenied().Code)
+			}
+			if !strings.Contains(de.Message, "team.read") {
+				t.Fatalf("message %q does not name the missing permission", de.Message)
+			}
+		})
+	}
+}
+
 func TestMapAuthzDecision(t *testing.T) {
 	res := userAccess
 	if err := mapAuthzDecision(resolver.DecisionAllow, res, opRead); err != nil {

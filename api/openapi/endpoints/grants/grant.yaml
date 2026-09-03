@@ -61,3 +61,21 @@ properties:
       the team can no longer be loaded. This is a label ref, not the full
       Team body.
     $ref: ../../components/schemas/team-ref.yaml
+  principal:
+    readOnly: true
+    description: |
+      The principal named by `principal_id`, present only when the request
+      asked for it with `expand: ["principal"]` (ADR 059). Absent means it
+      was not requested; `null` means the principal cannot be loaded
+      (deleted or missing). GET and create never set this field.
+
+      When present, the body is the same representation `GET /users/{id}`
+      serves for `principal_type=user`, or `GET /teams/{id}` for
+      `principal_type=team`. Discriminate with the grant's existing
+      `principal_type`.
+
+      Requires `user.read` and `team.read` in addition to `project.read`.
+      Both are checked on the whole request before the list.
+    oneOf:
+      - $ref: grant-expanded-principal.yaml
+      - type: 'null'

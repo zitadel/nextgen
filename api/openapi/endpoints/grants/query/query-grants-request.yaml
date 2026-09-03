@@ -11,6 +11,14 @@ properties:
     oneOf:
       - $ref: ../../../components/schemas/page-token.yaml
       - type: 'null'
+  expand:
+    type: array
+    description: |
+      Related objects to embed on each grant (ADR 059). Omit it and no
+      embedded object is returned. An unrecognised value is rejected.
+    uniqueItems: true
+    items:
+      $ref: grant-expand.yaml
   sorting:
     type: object
     required:

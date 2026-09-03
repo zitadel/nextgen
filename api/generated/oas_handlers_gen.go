@@ -8971,7 +8971,10 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 // DELETE before re-granting. Project-secret setup (`sk_proj`) and
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
-// get). Requires `project.read`.
+// get). Requires `project.read`. `expand: ["principal"]` additionally
+// requires `user.read` and `team.read` (documented on the expand enum;
+// those scopes cannot be ANDed onto this security block because they are
+// body-conditional).
 //
 // POST /grants/query
 func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
