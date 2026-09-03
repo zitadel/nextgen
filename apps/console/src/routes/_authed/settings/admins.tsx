@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { MoreVertical, Plus, UserRound } from "lucide-react";
+import { Ellipsis, Plus, UserRound } from "lucide-react";
 import { useState } from "react";
 
 import { AddAdminDialog } from "@/components/add-admin-dialog";
@@ -93,7 +93,7 @@ function AdminsScreen() {
   const rows = grants.map(toAdminRow);
 
   return (
-    <div className={`${RESOURCE_PAGE} pt-4`}>
+    <div className={`${RESOURCE_PAGE} pt-11`}>
       <div className={SETTINGS_COLUMN}>
       <div className="flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Admins</h1>
@@ -183,7 +183,9 @@ function RowActions({ row, onRemoved }: { row: AdminRow; onRemoved: () => void }
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label={`Actions for ${row.name}`}>
-            <MoreVertical aria-hidden />
+            {/* Horizontal dots, as this frame draws them. The portal tables
+                use the vertical glyph; the two surfaces differ in the design. */}
+            <Ellipsis aria-hidden />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

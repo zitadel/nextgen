@@ -42,7 +42,9 @@ import { useNavItems } from "./use-nav-items";
  * frame, `j3qqriDab6WQfrlgLujf4Y`). `collapsible="icon"` gives the 256px →
  * icon-rail collapse with tooltips, ⌘/Ctrl+B, mobile off-canvas, and rail —
  * all from the component. The context bar (sidebar trigger + org/project
- * switchers + theme toggle) sits at the top of the content column. Colours come
+ * switchers + theme toggle) sits at the top of the content column in the portal
+ * view, and is absent from the Settings view, which the frames draw without one.
+ * Colours come
  * from `@zitadel/design-tokens` via the shadcn utility names; the sidebar
  * surface uses `background` per the design (see `ui/sidebar.tsx`).
  */
@@ -57,6 +59,9 @@ export function AppShell({
   /** Sign-out action for the footer user menu. */
   onSignOut?: () => void;
 }) {
+  const matchRoute = useMatchRoute();
+  const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
+
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
       <AppSidebar user={user} onSignOut={onSignOut} />
@@ -66,7 +71,11 @@ export function AppShell({
           stretches the whole page and the window scrolls sideways, rather than
           the table scrolling inside its own card. */}
       <SidebarInset className="min-w-0">
-        <ContextBar />
+        {/* No context bar in the Settings view: the settings frames draw none,
+            and the switcher it carries is a *project* control that says nothing
+            about an account screen. The sidebar's own header keeps a trigger, so
+            collapsing still works without it. */}
+        {!inSettings && <ContextBar />}
         {children}
       </SidebarInset>
     </SidebarProvider>

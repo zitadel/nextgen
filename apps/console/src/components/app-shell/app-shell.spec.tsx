@@ -134,6 +134,20 @@ describe("settings view", () => {
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
   });
+
+  it("drops the context bar in the settings view", async () => {
+    // The settings frames draw no bar. Its project switcher and theme toggle
+    // are portal chrome; the sidebar keeps a trigger of its own, so the
+    // collapse is not lost with them.
+    renderShell("/settings");
+    await screen.findByRole("link", { name: "Back to app" });
+
+    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Dark" })).not.toBeInTheDocument();
+    // The sidebar keeps its own triggers (header row and rail), so the
+    // collapse survives the bar going away.
+    expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
+  });
 });
 
 describe("theme toggle", () => {
