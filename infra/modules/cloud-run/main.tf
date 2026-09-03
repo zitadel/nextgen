@@ -25,9 +25,13 @@ resource "google_cloud_run_v2_service" "zitadel" {
     }
 
     containers {
-      # Placeholder — the deploy workflow replaces image, command, args,
-      # env, secret references, and probes via gcloud/manual release
-      # operations.
+      # `image` is required to create the service, but the deploy workflow —
+      # not OpenTofu — owns which release runs here, so it is listed under
+      # ignore_changes below. That makes this placeholder a create-time
+      # bootstrap value, read once when the service does not yet exist and
+      # never again: the live service runs the released image and `tofu plan`
+      # proposes no change to it. Same terms for command, args, env, secret
+      # references and probes. See .github/workflows/deploy.yml.
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       ports {
@@ -89,6 +93,10 @@ resource "google_cloud_run_v2_job" "migrate" {
       }
 
       containers {
+        # Create-time bootstrap value, for the same reason as the service
+        # above. Note the job is not wired to anything yet: the binary has no
+        # `migrate` subcommand (#1138), so this placeholder is what the job
+        # still runs.
         image = "us-docker.pkg.dev/cloudrun/container/hello-job"
 
         resources {
