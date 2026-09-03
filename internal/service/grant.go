@@ -83,7 +83,11 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*dom
 		if err := tx.Statements().CreateAuthzAssignment(ctx, asgn); err != nil {
 			return err
 		}
-		if err := emitAuthzGranted(ctx, tx.Statements(), asgn); err != nil {
+		if err := emitManagedGrant(ctx, tx.Statements(), domain.EventTypeAuthzGranted, asgn, domain.AuthzGrantedPayload{
+			PrincipalType: asgn.PrincipalType.String(),
+			PrincipalID:   asgn.PrincipalID,
+			Relation:      asgn.Relation,
+		}); err != nil {
 			return err
 		}
 		created = asgn
@@ -227,16 +231,26 @@ func (s *GrantService) loadPrincipal(ctx context.Context, stmts AllStatements, h
 }
 
 func emitAuthzRevoked(ctx context.Context, stmts EventStatements, a *domain.AuthzAssignment) error {
+	return emitManagedGrant(ctx, stmts, domain.EventTypeAuthzRevoked, a, domain.AuthzRevokedPayload{
+		PrincipalType: a.PrincipalType.String(),
+		PrincipalID:   a.PrincipalID,
+		Relation:      a.Relation,
+	})
+}
+
+// emitManagedGrant stamps grant-API events on the assignment's project.
+// Grants are project-scoped (no team_id). Force the resource project and
+// drop actor home team so a Console session does not write its home onto
+// the protected project's audit row.
+func emitManagedGrant(ctx context.Context, stmts EventStatements, typ domain.EventType, a *domain.AuthzAssignment, payload any) error {
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
-		Type:       domain.EventTypeAuthzRevoked,
-		Category:   domain.EventCategoryAdmin,
-		ProjectID:  a.ProjectID,
-		EntityType: "authz_assignment",
-		EntityID:   a.ID,
-		Payload: domain.AuthzRevokedPayload{
-			PrincipalType: a.PrincipalType.String(),
-			PrincipalID:   a.PrincipalID,
-			Relation:      a.Relation,
-		},
+		Type:           typ,
+		Category:       domain.EventCategoryAdmin,
+		ProjectID:      a.ProjectID,
+		EntityType:     "authz_assignment",
+		EntityID:       a.ID,
+		Payload:        payload,
+		ForceProjectID: true,
+		ClearTeamID:    true,
 	})
 }

@@ -361,6 +361,74 @@ func TestRequireProjectAccess(t *testing.T) {
 	})
 }
 
+func TestRequireProjectAccess_UserPrincipalCrossProject(t *testing.T) {
+	human := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		Scope:         nil,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+
+	t.Run("foothold on foreign project allows write", func(t *testing.T) {
+		allow := true
+		foothold := true
+		stmts := stubAuthzStmts{allowCheck: &allow, foothold: &foothold}
+		if err := requireProjectAccess(human, stmts, "proj_customer", grantAccess, opWrite); err != nil {
+			t.Fatalf("user with foothold should pass without project.write: %v", err)
+		}
+	})
+
+	t.Run("no foothold is not found", func(t *testing.T) {
+		deny := false
+		foothold := false
+		stmts := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
+		err := requireProjectAccess(human, stmts, "proj_customer", grantAccess, opWrite)
+		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
+	})
+
+	t.Run("foothold without permission is forbidden", func(t *testing.T) {
+		deny := false
+		foothold := true
+		stmts := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
+		err := requireProjectAccess(human, stmts, "proj_customer", grantAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrGrantPermissionDenied().Code)
+	})
+
+	t.Run("missing home project fails closed", func(t *testing.T) {
+		orphan := WithScopeContext(context.Background(), ScopeContext{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		})
+		err := requireProjectAccess(orphan, stubAuthzStmts{}, "proj_customer", grantAccess, opWrite)
+		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
+	})
+}
+
+func TestCredentialCeiling(t *testing.T) {
+	t.Run("user principal skips secret ceiling", func(t *testing.T) {
+		err := credentialCeiling(ScopeContext{
+			ProjectID:     "proj_platform",
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		}, "proj_customer")
+		if err != nil {
+			t.Fatalf("unexpected: %v", err)
+		}
+	})
+
+	t.Run("project secret still needs write on own project", func(t *testing.T) {
+		err := credentialCeiling(ScopeContext{
+			ProjectID:     "proj_a",
+			Scope:         []string{"project.read"},
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		}, "proj_a")
+		if !errors.Is(err, errAuthzPreviewDenied) {
+			t.Fatalf("got %v, want preview denied", err)
+		}
+	})
+}
+
 func TestRequireProjectListAccess(t *testing.T) {
 	stmts := stubAuthzStmts{}
 	operator := WithScopeContext(context.Background(), ScopeContext{

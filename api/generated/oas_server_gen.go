@@ -86,6 +86,10 @@ type Handler interface {
 	// created here — claim owns that path. An unrevoked grant with the same
 	// principal and relation occupies the unique key even after `expires_at`;
 	// DELETE it before re-creating.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the target project (home may differ). CSRF/Origin
+	// for cookie mutations is a follow-up (#1140).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -187,6 +191,9 @@ type Handler interface {
 	// Already-revoked, missing, project-secret setup, and owning-team grants
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -302,6 +309,9 @@ type Handler interface {
 	// `resource_scope_index`; project scope is required on the query (same as
 	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
 	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)

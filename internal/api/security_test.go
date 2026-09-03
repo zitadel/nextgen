@@ -149,6 +149,34 @@ func TestHandleNextgenSession(t *testing.T) {
 		got, ok := sessionTokenFromContext(ctx)
 		require.True(t, ok)
 		require.Equal(t, token, got)
+		_, ok = GetScopeContext(ctx)
+		require.False(t, ok, "anonymous session must not mint ScopeContext")
+	})
+
+	t.Run("user-bound session mints user ScopeContext", func(t *testing.T) {
+		t.Parallel()
+
+		token := &domain.Token{
+			ProjectID: "project-1",
+			TokenID:   "token-1",
+			UserID:    "user-1",
+			Type:      domain.TokenTypeSessionToken,
+			SessionID: new("session-1"),
+		}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
+
+		handler := NewSecurityHandler(tokenService)
+		ctx, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		require.NoError(t, err)
+
+		scope, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, "project-1", scope.ProjectID)
+		require.Equal(t, domain.AuthzPrincipalTypeUser, scope.PrincipalType)
+		require.Equal(t, "user-1", scope.PrincipalID)
 	})
 
 	t.Run("invalid token is an unsatisfied requirement", func(t *testing.T) {

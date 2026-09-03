@@ -18,6 +18,13 @@ type FakeSecuritySource struct {
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
+	// Dual-scheme OR (e.g. grants): when the test authenticates via session
+	// cookie only, skip empty oauth2 so we do not send `Authorization: Bearer `
+	// and fail HandleOAuth2 before the cookie is tried. Leave both empty so
+	// oauth2-only unauthenticated tests still reach the server and assert 401.
+	if f.Token == "" && f.SessionToken != "" {
+		return api.OAuth2{}, ogenerrors.ErrSkipClientSecurity
+	}
 	return api.OAuth2{
 		Token:  f.Token,
 		Scopes: f.Scopes,

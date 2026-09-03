@@ -20,6 +20,13 @@ type EmitSpec struct {
 	// (anonymous session mint, token issue before AuthGate, etc.).
 	ActorID   *string
 	ActorType *domain.EventActorType
+	// ForceProjectID makes ProjectID win over the actor context's project.
+	// Use when the event is scoped to a resource whose project may differ
+	// from the actor home (grant create/revoke).
+	ForceProjectID bool
+	// ClearTeamID drops actor TeamID so the column is the grant's team
+	// scope only. Project-scoped grants have no team: pair with ForceProjectID.
+	ClearTeamID bool
 }
 
 // Emit builds and inserts a Path B event. Empty ProjectID skips the insert
@@ -27,6 +34,12 @@ type EmitSpec struct {
 func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	ev := WithEntity(FromContext(ctx, spec.Type, spec.Category), spec.EntityType, spec.EntityID)
 	ev = WithProjectID(ev, spec.ProjectID)
+	if spec.ForceProjectID && spec.ProjectID != "" {
+		ev.ProjectID = spec.ProjectID
+	}
+	if spec.ClearTeamID {
+		ev.TeamID = nil
+	}
 	if spec.SessionID != nil {
 		ev.SessionID = spec.SessionID
 	}

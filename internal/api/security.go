@@ -58,9 +58,10 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 }
 
 // HandleNextgenSession handles the nextgenSession security scheme: the
-// __nextgen_session cookie on the sessions/me and users/me operations.
+// __nextgen_session cookie on /me, claim/complete, and grant management ops.
 // It verifies that the cookie value decrypts to a session token and stashes
-// the parsed token in the context for the handlers.
+// the parsed token in the context for the handlers. User-bound sessions also
+// mint ScopeContext so the management gate can authorize the human (ADR 053 §5).
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
@@ -72,6 +73,16 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	}
 	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
 	ctx = withActorFromToken(ctx, token)
+	// ProjectID on ScopeContext is the principal's home project (session
+	// project). Target comes from the request; do not treat them as equal.
+	if token.UserID != "" {
+		ctx = WithScopeContext(ctx, ScopeContext{
+			ProjectID:     token.ProjectID,
+			Scope:         token.Scope,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   token.UserID,
+		})
+	}
 	return ctx, nil
 }
 
@@ -86,6 +97,9 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.RevokeMySessionOperation: true,
 	api.GetMyUserOperation:       true,
 	api.CompleteClaimOperation:   true,
+	api.CreateGrantOperation:     true,
+	api.GetGrantOperation:        true,
+	api.DeleteGrantOperation:     true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
@@ -189,14 +203,18 @@ func isLoopbackHost(host string) bool {
 }
 
 type ScopeContext struct {
+	// ProjectID is the credential's home project. For project secrets it equals
+	// the managed project; for a Console session it is the session user's
+	// project and may differ from the request target (ADR 053).
 	ProjectID string
 	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
 	// project secrets hold project.write + project.read, preview secrets hold
-	// project.read only. The authz gate requires project.write as a ceiling on
-	// top of resolver.Check — preview cannot call management APIs at all.
+	// project.read only. Session tokens mint an empty Scope — the authz gate
+	// does not use a project.write ceiling for user principals.
 	Scope []string
 	// PrincipalType / PrincipalID identify the authz principal for resolver.Check.
 	// OAuth2 project secrets are sk_proj with PrincipalID == ProjectID.
+	// User-bound sessions are user with PrincipalID == token.UserID.
 	PrincipalType domain.AuthzPrincipalType
 	PrincipalID   string
 	// TeamID is the token team for sk_team_ principals (resolver ConstraintTeamID).
