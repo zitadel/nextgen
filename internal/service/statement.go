@@ -408,6 +408,10 @@ type AuthzAssignmentStatements interface {
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
 	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	// ListManagedGrants lists unrevoked collaboration grants (user/team
+	// viewer|editor|admin) with cursor pagination. Setup and owning-team
+	// rows are excluded in SQL.
+	ListManagedGrants(ctx context.Context, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is

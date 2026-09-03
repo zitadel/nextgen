@@ -30,7 +30,11 @@ func (h *Handler) CreateGrant(ctx context.Context, req *api.CreateGrantRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return grantResponse(asgn), nil
+	hydrated, err := h.grantService.Hydrate(ctx, asgn)
+	if err != nil {
+		return nil, err
+	}
+	return grantResponse(hydrated[0]), nil
 }
 
 func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.GetGrantRes, error) {
@@ -41,7 +45,45 @@ func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.
 	if err != nil {
 		return nil, err
 	}
-	return grantResponse(asgn), nil
+	hydrated, err := h.grantService.Hydrate(ctx, asgn)
+	if err != nil {
+		return nil, err
+	}
+	return grantResponse(hydrated[0]), nil
+}
+
+func (h *Handler) QueryGrants(ctx context.Context, req *api.QueryGrantsRequest, params api.QueryGrantsParams) (api.QueryGrantsRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), grantAccess, opRead); err != nil {
+		return nil, err
+	}
+	listed, err := h.grantService.List(ctx, mapQueryGrantsToService(string(params.ProjectID), req))
+	if err != nil {
+		return nil, err
+	}
+	grants := make([]api.Grant, 0, len(listed.Grants))
+	for _, g := range listed.Grants {
+		grants = append(grants, *grantResponse(g))
+	}
+	resp := &api.QueryGrantsResponse{Grants: grants}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
+func mapQueryGrantsToService(projectID string, req *api.QueryGrantsRequest) service.ListGrantsRequest {
+	svcReq := service.ListGrantsRequest{
+		ProjectID: projectID,
+		Limit:     int(req.Limit.Or(0)),
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		svcReq.Sorting = sortingToService(sorting.Field, sorting.Direction)
+	}
+	for _, filter := range req.Filter {
+		svcReq.Filters = append(svcReq.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
+	}
+	return svcReq
 }
 
 func (h *Handler) DeleteGrant(ctx context.Context, params api.DeleteGrantParams) (api.DeleteGrantRes, error) {
@@ -54,7 +96,8 @@ func (h *Handler) DeleteGrant(ctx context.Context, params api.DeleteGrantParams)
 	return &api.DeleteGrantNoContent{}, nil
 }
 
-func grantResponse(asgn *domain.AuthzAssignment) *api.Grant {
+func grantResponse(g *service.Grant) *api.Grant {
+	asgn := g.Assignment
 	resp := &api.Grant{
 		ID:            asgn.ID,
 		ProjectID:     asgn.ProjectID,
@@ -66,6 +109,24 @@ func grantResponse(asgn *domain.AuthzAssignment) *api.Grant {
 	}
 	if asgn.ExpiresAt != nil {
 		resp.ExpiresAt = api.NewOptNilDateTime(*asgn.ExpiresAt)
+	}
+	if g.User != nil {
+		ref := api.UserRef{UserID: api.UserID(g.User.UserID)}
+		if g.User.Identifier != "" {
+			ref.Identifier = api.NewOptString(g.User.Identifier)
+			ref.IdentifierProperty = api.NewOptString(g.User.IdentifierProperty)
+		}
+		if g.User.Display != "" {
+			ref.Display = api.NewOptString(g.User.Display)
+		}
+		resp.User = api.NewOptUserRef(ref)
+	}
+	if g.Team != nil {
+		ref := api.TeamRef{TeamID: g.Team.TeamID}
+		if g.Team.Name != "" {
+			ref.Name = api.NewOptString(g.Team.Name)
+		}
+		resp.Team = api.NewOptTeamRef(ref)
 	}
 	return resp
 }

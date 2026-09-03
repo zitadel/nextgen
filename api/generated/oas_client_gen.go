@@ -461,6 +461,18 @@ type Invoker interface {
 	//
 	// PATCH /projects/{project_id}
 	PatchProject(ctx context.Context, request *PatchProjectRequest, params PatchProjectParams) (PatchProjectRes, error)
+	// QueryGrants invokes queryGrants operation.
+	//
+	// Returns the collaboration grants of a project, paginated with a cursor.
+	// Only unrevoked grants this API manages are listed (user or team bound to
+	// viewer, editor, or admin), including expired grants so a client can
+	// DELETE before re-granting. Project-secret setup (`sk_proj`) and
+	// owning-team (`relation=team`) rows are not returned. Grants are not in
+	// `resource_scope_index`; project scope is required on the header (same as
+	// get). Requires `project.read`.
+	//
+	// POST /grants/query
+	QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
 	// QueryProjects invokes queryProjects operation.
 	//
 	// Query projects.
@@ -7365,6 +7377,152 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 
 	stage = "DecodeResponse"
 	result, err := decodePatchProjectResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// QueryGrants invokes queryGrants operation.
+//
+// Returns the collaboration grants of a project, paginated with a cursor.
+// Only unrevoked grants this API manages are listed (user or team bound to
+// viewer, editor, or admin), including expired grants so a client can
+// DELETE before re-granting. Project-secret setup (`sk_proj`) and
+// owning-team (`relation=team`) rows are not returned. Grants are not in
+// `resource_scope_index`; project scope is required on the header (same as
+// get). Requires `project.read`.
+//
+// POST /grants/query
+func (c *Client) QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error) {
+	res, err := c.sendQueryGrants(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (res QueryGrantsRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("queryGrants"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/grants/query"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, QueryGrantsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/grants/query"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeQueryGrantsRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, QueryGrantsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeQueryGrantsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

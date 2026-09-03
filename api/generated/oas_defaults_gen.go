@@ -35,6 +35,14 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *QueryGrantsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *QueryProjectsRequest) setDefaults() {
 	{
 		val := int(20)

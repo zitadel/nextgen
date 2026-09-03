@@ -63,6 +63,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("projects", func(t *testing.T) { battleProjects(t, d) })
 		t.Run("teams", func(t *testing.T) { battleTeams(t, d) })
+		t.Run("grants", func(t *testing.T) { battleGrants(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
@@ -129,6 +130,28 @@ func battleTeams(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(team *domain.Team) string { return team.ID }, 2)
+}
+
+func battleGrants(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	want := make([]string, 0, 5)
+	for i := range 5 {
+		a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_battle_"+uniqueSuffix(t)+string(rune('a'+i)), "project", "viewer", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
+		want = append(want, a.ID)
+	}
+	filter := database.Equal(database.Col(domain.AuthzAssignmentFieldProjectID), projectID)
+	orderAsc := database.OrderBy[domain.AuthzAssignmentField]{
+		Columns:   []database.Column[domain.AuthzAssignmentField]{database.Col(domain.AuthzAssignmentFieldID)},
+		Direction: database.OrderAsc,
+	}
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+		return d.stmts.ListManagedGrants(t.Context(), &database.ListOptions[domain.AuthzAssignmentField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(a *domain.AuthzAssignment) string { return a.ID }, 2)
 }
 
 func battleUsers(t *testing.T, d dialect) {

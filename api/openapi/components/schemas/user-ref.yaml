@@ -1,0 +1,34 @@
+type: object
+title: UserRef
+description: |
+  A resolved reference to a user (ADR 058). Fields are role-named, not
+  property-named, so responses can mix users from different schemas.
+  Clients render `display`, falling back to `identifier`, then `user_id`.
+  Missing or deleted users degrade to `user_id` only.
+required:
+  - user_id
+properties:
+  user_id:
+    $ref: ./user-id.yaml
+    description: The referenced user's id. Always present.
+  identifier:
+    type: string
+    description: |
+      The current value of the schema's designated identifier
+      (`x-identifier`). Absent when the schema designates no identifier or
+      the user carries no value for it. Until designation plumbing ships,
+      this is the conventional `email` attribute when present.
+    example: ada@example.com
+  identifier_property:
+    type: string
+    description: |
+      The schema property `identifier` came from. Present exactly when
+      `identifier` is.
+    example: email
+  display:
+    type: string
+    description: |
+      The friendly display name. Absent when the user carries no display
+      properties. Until designation plumbing ships, this is the conventional
+      `name` / given+family attributes when present.
+    example: Ada Lovelace

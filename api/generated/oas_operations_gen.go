@@ -53,6 +53,7 @@ const (
 	ListUserPasskeysOperation              OperationName = "ListUserPasskeys"
 	ListUserTeamsOperation                 OperationName = "ListUserTeams"
 	PatchProjectOperation                  OperationName = "PatchProject"
+	QueryGrantsOperation                   OperationName = "QueryGrants"
 	QueryProjectsOperation                 OperationName = "QueryProjects"
 	QuerySessionsOperation                 OperationName = "QuerySessions"
 	QueryTeamsOperation                    OperationName = "QueryTeams"

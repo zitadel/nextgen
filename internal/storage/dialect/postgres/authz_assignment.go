@@ -8,7 +8,9 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
 const (
@@ -35,6 +37,14 @@ SELECT id, project_id, catalog_id,
        expires_at, revoked_at, created_at, updated_at
 FROM zitadel_nextgen.authz_assignments
 WHERE project_id = $1 AND id = $2`
+
+	listManagedGrantsQuery = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM zitadel_nextgen.authz_assignments`
 
 	listAuthzAssignmentsStmt = `
 SELECT id, project_id, catalog_id,
@@ -129,7 +139,31 @@ func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, pro
 	return assignments, nil
 }
 
-// RevokeAuthzAssignment implements [service.AuthzAssignmentStatements].
+// ListManagedGrants implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, filter *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+	var compiler statementCompiler
+	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+		return nil, err
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	assignments, err := pgx.CollectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		assignments,
+		authzAssignmentSchema,
+		filter.Pagination.Limit,
+	)
+	return &database.ListResult[*domain.AuthzAssignment]{
+		Items:      assignments,
+		NextCursor: nextCursor,
+	}, nil
+}
 func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	var revokedAt, updatedAt time.Time
 	return wrapError(s.client.QueryRow(ctx, revokeAuthzAssignmentStmt, projectID, id).Scan(&revokedAt, &updatedAt))
@@ -181,5 +215,44 @@ func scanAuthzAssignment(row pgx.CollectableRow) (*domain.AuthzAssignment, error
 	}
 	return a, nil
 }
+
+var authzAssignmentSchema = database.NewSchema(map[domain.AuthzAssignmentField]database.FieldBinding[domain.AuthzAssignment]{
+	domain.AuthzAssignmentFieldProjectID: {
+		SQLName:  "project_id",
+		Accessor: func(a *domain.AuthzAssignment) any { return a.ProjectID },
+		Coerce:   database.CoerceString,
+	},
+	domain.AuthzAssignmentFieldID: {
+		SQLName:  "id",
+		Accessor: func(a *domain.AuthzAssignment) any { return a.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.AuthzAssignmentFieldPrincipalType: {
+		SQLName:  "principal_type",
+		Accessor: func(a *domain.AuthzAssignment) any { return a.PrincipalType.String() },
+		Coerce:   database.CoerceString,
+	},
+	domain.AuthzAssignmentFieldPrincipalID: {
+		SQLName:  "principal_id",
+		Accessor: func(a *domain.AuthzAssignment) any { return a.PrincipalID },
+		Coerce:   database.CoerceString,
+	},
+	domain.AuthzAssignmentFieldRelation: {
+		SQLName:  "relation",
+		Accessor: func(a *domain.AuthzAssignment) any { return a.Relation },
+		Coerce:   database.CoerceString,
+	},
+	domain.AuthzAssignmentFieldCreatedAt: {
+		SQLName:  "created_at",
+		Accessor: func(a *domain.AuthzAssignment) any { return a.CreatedAt },
+		Coerce:   database.CoerceTime,
+	},
+	domain.AuthzAssignmentFieldExpiresAt: {
+		SQLName:  "expires_at",
+		Accessor: func(a *domain.AuthzAssignment) any { return database.NullableValue(a.ExpiresAt) },
+		Coerce:   database.CoerceTime,
+		Nullable: true,
+	},
+})
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)

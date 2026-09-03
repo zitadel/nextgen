@@ -5,6 +5,7 @@ package stmttest
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,6 +92,54 @@ func TestAuthzAssignmentStatements_CRUD(t *testing.T) {
 			a.GrantorType = strPtr(domain.AuthzPrincipalTypeUser.String())
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
 		})
+	})
+}
+
+func TestAuthzAssignmentStatements_ListManagedGrants(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		teamID := "team-mgr-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+
+		userGrant := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_mgr_"+uniqueSuffix(t), "project", "viewer", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), userGrant))
+
+		teamGrant := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, teamID, "project", "editor", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), teamGrant))
+
+		expired := time.Now().Add(-time.Hour)
+		expiredGrant := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_exp_"+uniqueSuffix(t), "project", "admin", domain.NewProjectAssignmentScope())
+		expiredGrant.ExpiresAt = &expired
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), expiredGrant))
+
+		revokedGrant := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_rev_"+uniqueSuffix(t), "project", "viewer", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), revokedGrant))
+		require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, revokedGrant.ID))
+
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewSKProjProjectSetupAssignment(projectID)))
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(projectID, teamID)))
+
+		listed, err := d.stmts.ListManagedGrants(t.Context(), &database.ListOptions[domain.AuthzAssignmentField]{
+			Filter: database.Equal(database.Col(domain.AuthzAssignmentFieldProjectID), projectID),
+			Pagination: database.Page[domain.AuthzAssignmentField]{
+				Limit: 20,
+				OrderBy: database.OrderBy[domain.AuthzAssignmentField]{
+					Columns:   []database.Column[domain.AuthzAssignmentField]{database.Col(domain.AuthzAssignmentFieldID)},
+					Direction: database.OrderAsc,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		got := make(map[string]*domain.AuthzAssignment, len(listed.Items))
+		for _, a := range listed.Items {
+			got[a.ID] = a
+		}
+		assert.Contains(t, got, userGrant.ID)
+		assert.Contains(t, got, teamGrant.ID)
+		assert.Contains(t, got, expiredGrant.ID)
+		assert.NotContains(t, got, revokedGrant.ID)
+		assert.Len(t, listed.Items, 3)
 	})
 }
 

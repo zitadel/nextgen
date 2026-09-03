@@ -183,6 +183,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	PatchProjectOperation: []string{
 		"project.write",
 	},
+	QueryGrantsOperation: []string{
+		"project.read",
+	},
 	QueryProjectsOperation: []string{
 		"project.write",
 	},

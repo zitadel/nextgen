@@ -48,3 +48,16 @@ properties:
       - type: string
         format: date-time
       - type: 'null'
+  user:
+    description: |
+      Resolved identity of a user principal (ADR 058). Present when
+      `principal_type` is `user`; omitted for team grants. Degrades to
+      `user_id` only when the user can no longer be loaded.
+    $ref: ../../components/schemas/user-ref.yaml
+  team:
+    description: |
+      Resolved identity of a team principal. Present when `principal_type`
+      is `team`; omitted for user grants. Degrades to `team_id` only when
+      the team can no longer be loaded. This is a label ref, not the full
+      Team body.
+    $ref: ../../components/schemas/team-ref.yaml
