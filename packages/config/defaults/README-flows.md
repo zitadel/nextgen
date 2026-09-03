@@ -31,8 +31,9 @@ The common workflow:
 3. Run `zitadel apply` to publish it.
 
 Every apply of an edited flow publishes a new immutable revision. Earlier
-revisions stay readable by id, and the login serves the newest revision of
-the flow's name.
+revisions stay readable by id. A login that pins the flow's name serves its
+newest revision. A login without a pin serves the project's newest active
+unscoped flow, whatever its name, so revising a flow can make it the default.
 
 Typical edits:
 

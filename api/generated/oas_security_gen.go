@@ -86,6 +86,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateHandoffOperation: []string{
 		"auth_attempt.write",
 	},
+	CreateReleaseOperation: []string{
+		"release.write",
+	},
 	CreateSchemaOperation: []string{
 		"schema.write",
 	},
@@ -137,6 +140,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetProjectOperation: []string{
 		"project.write",
 	},
+	GetReleaseByIdOperation: []string{
+		"release.read",
+	},
 	GetSchemaByIdOperation: []string{
 		"schema.read",
 	},
@@ -166,6 +172,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definition.read",
+	},
+	ListReleasesOperation: []string{
+		"release.read",
 	},
 	ListSchemasOperation: []string{
 		"schema.read",

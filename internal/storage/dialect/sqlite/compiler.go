@@ -106,6 +106,8 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileStringFilter(c, f, schema)
 	case *database.ArrayContainsFilter[F]:
 		compileArrayContainsFilter(c, f, schema)
+	case *database.CorrelatedFilter[F]:
+		compileCorrelatedFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
@@ -187,6 +189,12 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		writeArg(c, term.Value)
 	}
 	c.WriteString(")")
+}
+
+func compileCorrelatedFilter[F ~uint8, T any](c *statementCompiler, filter *database.CorrelatedFilter[F], schema database.Schema[F, T]) {
+	compare.CompileCorrelated(c, filter, schema, func(_ compare.Writer, arg any, _ database.Column[F]) {
+		writeArg(c, arg)
+	})
 }
 
 // compileArrayContainsFilter for SQLite uses json_each on the stored JSON TEXT column.

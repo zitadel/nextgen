@@ -332,7 +332,9 @@ Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
 revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
 immutable flow revision; a schema revise re-publishes the flows pinned to it with
-the new `user_schema` in the same run. Removing a flow file does not retire the
+the new `user_schema` in the same run. A login pinned by `flow-name` serves that
+flow's newest revision; an unpinned login serves the newest active unscoped flow
+in the project, whatever its name. Removing a flow file does not retire the
 flow. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
