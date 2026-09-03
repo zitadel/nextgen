@@ -6,8 +6,48 @@ import {
 import { z } from "zod";
 
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
+import { validateUserSchemaDesignations } from "./schema-validate.js";
 
-export const schemaConfigSchema = CreateSchemaBody;
+/**
+ * The generated wire shape plus the server's designation rules
+ * (`validateUserSchemaDesignations` in `internal/domain/schema_designation.go`,
+ * ADR 058 §1–§2), mirrored so plan rejects what apply would — the same
+ * doctrine as the branding refine below.
+ *
+ * The designation check runs on the RAW document, not the parsed output:
+ * the generated Zod strips schema keywords it does not model (`type` on
+ * property leaves, the root `type`) and injects annotation defaults, while
+ * the server stores and validates schema bytes verbatim (see SchemaSyncer's
+ * deliberate lack of `normalizeWrite`). Shape first, designations second —
+ * the server's own order (`schema_validator.go` runs the meta-schema before
+ * the designation rules); the `schema-url` union arm carries no document to
+ * check and is gated out identically.
+ */
+export const schemaConfigSchema = z
+  .custom<z.infer<typeof CreateSchemaBody>>(() => true)
+  .superRefine((raw, ctx) => {
+    const parsed = CreateSchemaBody.safeParse(raw);
+    if (!parsed.success) {
+      // Re-emitted as custom issues: zod's own issue objects are not
+      // assignable to addIssue's input type, and only path + message reach
+      // any renderer (doctor, the syncer's folded message).
+      for (const issue of parsed.error.issues) {
+        ctx.addIssue({
+          code: "custom",
+          path: issue.path as (string | number)[],
+          message: issue.message,
+        });
+      }
+      return;
+    }
+    if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+      const document = raw as Record<string, unknown>;
+      if (document.kind !== "user-schema") return;
+      for (const issue of validateUserSchemaDesignations(document)) {
+        ctx.addIssue({ code: "custom", path: issue.path, message: issue.message });
+      }
+    }
+  });
 export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
 export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
 
