@@ -196,4 +196,11 @@ const (
 	// whether the session has verified factors, the test State() uses to
 	// separate building from active. Filter only; not sortable.
 	SessionFieldHasVerifiedFactors
+	// SessionFieldLifecycleOwnerTeamID is computed, not stored: a session
+	// belongs to the team that owns its bound user's lifecycle (ADR 024,
+	// ADR 060). A user has at most one lifecycle owner, so a session matches
+	// at most one team; a self-owned user's session and a session with no user
+	// match none. It is filter only; not sortable — a team matches many
+	// sessions, and the value lives on another table.
+	SessionFieldLifecycleOwnerTeamID
 )
