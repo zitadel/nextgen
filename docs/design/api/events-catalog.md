@@ -134,6 +134,17 @@ tracked below.
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist.
 
+## Retired
+
+Types with no live producer today. They stay in `domain.EventType` and the
+events API so stored rows keep decoding. A type moves back to Path B when a
+producer appears again.
+
+| `event_type` | Retired by | Return |
+|--------------|------------|--------|
+| `flowdef.updated` | [#530](https://github.com/zitadel/nextgen/issues/530): a flow definition is an immutable revision, a change publishes a new one | none planned |
+| `flowdef.deleted` | [#530](https://github.com/zitadel/nextgen/issues/530): no delete endpoint | with retirement under releases ([#536](https://github.com/zitadel/nextgen/issues/536)) |
+
 ## Deferred
 
 Types planned but not yet emitted by a live producer. Follow-up issues:
@@ -146,5 +157,4 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
-| `flowdef.updated` / `flowdef.deleted` | [#530](https://github.com/zitadel/nextgen/issues/530) made flow definitions revisions: a change publishes a new revision, and retirement waits for releases ([#536](https://github.com/zitadel/nextgen/issues/536)) |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

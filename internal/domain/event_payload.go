@@ -120,8 +120,8 @@ func SchemaCreatedPayloadSnapshot(schema *JSONSchema) SchemaCreatedPayload {
 	return payload
 }
 
-// FlowdefPayload is the flowdef.created snapshot. Steps are intentionally
-// omitted (large graph).
+// FlowdefPayload is the flowdef.created snapshot. Retired flowdef.updated rows
+// carry a delta in the same shape. Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {
 	Name       string                  `json:"name,omitempty"`
 	Status     string                  `json:"status,omitempty"`
