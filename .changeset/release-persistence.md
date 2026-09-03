@@ -2,6 +2,6 @@
 "@zitadel/server": minor
 ---
 
-Adds **releases** — immutable, project-scoped configuration snapshots that pin one revision of each resource they include.
+Adds persistence support for **releases** — immutable, project-scoped configuration snapshots that pin one revision of each resource they include.
 
-A release records the revisions it pins and who assembled it, when, from which commit, and why. Assembling the same set of revisions twice returns the release that already pins them rather than a duplicate, so re-running a deploy on unchanged configuration is a no-op even when the message differs.
+Release records store their pinned revisions and assembly metadata. A project-scoped content-hash index prevents duplicate snapshots and provides the storage contract needed for idempotent release orchestration in a follow-up.

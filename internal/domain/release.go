@@ -44,9 +44,9 @@ type ReleasePointer struct {
 // ReleaseMetadata records who assembled a release and from what source. Set at
 // construction and never mutated.
 //
-// CreatedBy and CreatedByType mirror the actor recording on events: a project
-// secret carries no user identity, so both are nil for releases assembled from
-// CI or the CLI.
+// CreatedBy and CreatedByType mirror the actor recording on events: a caller
+// without a user identity (for example, a project secret used from CI) leaves
+// both fields nil.
 type ReleaseMetadata struct {
 	Message       *string
 	GitSHA        *string
