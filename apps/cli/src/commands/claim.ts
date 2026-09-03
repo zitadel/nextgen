@@ -150,25 +150,42 @@ export default class Claim extends BaseCommand {
       now: Date.now(),
     });
 
+    // `--json` silences consola so stdout stays one parseable envelope. The
+    // narration below is not decoration, though: the link is the whole
+    // instruction, and an agent driving this command has nothing to hand the
+    // human without it — the command would just block until the link died.
+    // stderr is the documented home for narration under `--json`, so the
+    // link and the one warning that can change where it should point go
+    // there instead of vanishing.
+    const json = this.jsonEnabled();
+
     // A local server left on the default public base advertises a claim page
     // on a remote origin — the exact confusion this warning names. Cloud
     // servers legitimately use a console origin different from the API one,
     // so only a loopback API paired with a non-loopback claim page warns.
     if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
-      consola.warn(
+      const warning =
         `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
-          "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
-      );
+        "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).";
+      if (json) {
+        process.stderr.write(`Warning: ${warning}\n`);
+      } else {
+        consola.warn(warning);
+      }
     }
 
     // Always show the link first, before attempting anything: it is the whole
     // instruction on its own, so a launch that never happens (headless box,
     // no `xdg-open`, `--no-open`, an agent) needs no separate path.
-    consola.box({
-      title: "Finish in your browser",
-      message: `${challenge.claim_url}\n\nSign in there to attach this project to your team.`,
-      style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
-    });
+    if (json) {
+      process.stderr.write(claimLinkNarration(challenge));
+    } else {
+      consola.box({
+        title: "Finish in your browser",
+        message: `${challenge.claim_url}\n\nSign in there to attach this project to your team.`,
+        style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
+      });
+    }
 
     const skipLaunch = flags["no-open"] || nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
@@ -277,6 +294,22 @@ export default class Claim extends BaseCommand {
       data: { title: "Zitadel project already belongs to a team.", ...data },
     });
   }
+}
+
+/**
+ * The link as `--json` mode narrates it on stderr: one line an agent can
+ * forward verbatim, plus the expiry so it knows how long the line stays true.
+ * Plain text rather than a JSON line on purpose — stdout is the single
+ * envelope, and a second machine format on stderr would only invite parsing
+ * what is meant to be read.
+ */
+export function claimLinkNarration(challenge: { claim_url: string; expires_at?: string }): string {
+  const expiry =
+    typeof challenge.expires_at === "string" ? ` The link expires at ${challenge.expires_at}.` : "";
+  return (
+    `Finish in your browser: ${challenge.claim_url}\n` +
+    `Sign in there to attach this project to your team.${expiry}\n`
+  );
 }
 
 /**

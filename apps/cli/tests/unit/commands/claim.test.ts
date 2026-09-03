@@ -164,6 +164,26 @@ describe("claim", () => {
     expect(`${res.stdout}${res.stderr}`).toContain("/claim/ch_");
   });
 
+  // The agent contract mandates `--json`, which silences consola — and the
+  // link is the one thing the human needs from this command. It has to reach
+  // them somewhere, and stderr is the only stream the envelope leaves free.
+  it("surfaces the link on stderr under --json, keeping stdout to the envelope", async () => {
+    const { cwd, project } = await makeProject();
+
+    const [res] = await Promise.all([
+      claim(cwd, ["--no-open"]),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain("Finish in your browser: ");
+    expect(res.stderr).toContain("/claim/ch_");
+    expect(res.stderr).toContain("The link expires at ");
+    expect(res.stdout).not.toContain("/claim/ch_");
+    const json = parseJson(res.stdout) as { status: string };
+    expect(json.status).toBe("ok");
+  });
+
   it("skips without a network call when the secret already records a team", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
     tempDirs.push(cwd);
@@ -330,6 +350,32 @@ describe("claim", () => {
 
       expect(res.exitCode).toBe(0);
       expect(`${res.stdout}${res.stderr}`).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
+    });
+
+    // Under `--json` the warning would otherwise be silenced with the rest of
+    // consola, but an agent is exactly who needs to learn that the link it is
+    // about to forward points at the wrong origin.
+    it("keeps the warning on stderr under --json", async () => {
+      const { cwd } = await makeProject();
+      const serverUrl = await startClaimServer(
+        "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_localstub",
+      );
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+      const res = await runCliForTest([
+        "claim",
+        "--cwd",
+        cwd,
+        "--json",
+        "--server",
+        "local",
+        "--no-open",
+      ]);
+
+      expect(res.exitCode).toBe(0);
+      expect(res.stderr).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
+      expect(res.stdout).not.toContain("NEXTGEN_SERVER_PUBLIC_BASE");
+      expect((parseJson(res.stdout) as { status: string }).status).toBe("ok");
     });
 
     it("does not warn when the claim page is on the local server itself", async () => {

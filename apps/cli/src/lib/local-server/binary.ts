@@ -73,6 +73,13 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
         // Browser-facing URLs (claim, dashboard) must point at this local
         // server, not the cloud default the server config falls back to.
         NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
+        // The platform project hosts the console's own sign-in and the
+        // personal teams a claim attaches to. Without it the console falls
+        // back to the app's own project: the claim page's sign-in is then
+        // rejected on origin and `claim/complete` refuses every session, while
+        // the CLI waits out the link. A CLI-owned data dir is the one place
+        // enabling it is safe — nothing else provisions projects there.
+        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
       },
       stdio: ["ignore", log.fd, log.fd],
     });

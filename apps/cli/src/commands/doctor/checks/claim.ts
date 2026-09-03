@@ -63,9 +63,9 @@ export class ClaimCheck implements SanityCheck {
       message:
         state.kind === "attached"
           ? `Project is attached to team ${state.team_id}`
-          : // Local and self-hosted servers have no team to attach to, so the
-            // check passes rather than warning about an impossible action.
-            "Project is not on a server where teams apply",
+          : // Off the cloud a missing team carries no urgency (nothing expires),
+            // so the check passes rather than nudging for the life of the project.
+            "No owning team recorded; the claim nudge applies to Zitadel Cloud projects only",
       path: this.path,
     };
   }

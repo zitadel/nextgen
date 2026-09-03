@@ -23,7 +23,7 @@ describe("local server binary helpers", () => {
     vi.unstubAllEnvs();
   });
 
-  it("spawns the server with the address, data dir, and public base env", async () => {
+  it("spawns the server with the address, data dir, public base, and platform bootstrap env", async () => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
     const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
@@ -42,6 +42,9 @@ describe("local server binary helpers", () => {
     ];
     expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
     expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
+    // Without the platform project the claim page cannot sign anyone in and
+    // `claim/complete` refuses every session, so a local claim never lands.
+    expect(options.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT).toBe("true");
   });
 
   it("records an explicit source build version with a binary override", () => {

@@ -40,6 +40,11 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
     // published above, not the cloud default the server config falls back to.
     "--env",
     `NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:${spec.port}`,
+    // The platform project hosts the console's own sign-in and the personal
+    // teams a claim attaches to; the binary launcher explains why the
+    // CLI-owned runtime is the one place to enable it.
+    "--env",
+    "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
   ];
 
   if (spec.identity) {

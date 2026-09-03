@@ -1039,7 +1039,20 @@ describe("ClaimCheck", () => {
     expect(outcome.message).toContain("team-001");
   });
 
-  // Local and self-hosted servers have no platform team, so there is nothing to
+  // The record is the fact: the local runtime can take a claim, and the team
+  // it recorded is reported wherever the project lives.
+  it("names the team once attached, on any server", async () => {
+    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
+      const cwd = await makeProject();
+      await writeServer(cwd, server);
+      await writeSecret(cwd, { claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" });
+      const outcome = await new ClaimCheck().run(ctxFor(cwd));
+      expect(outcome.status).toBe("pass");
+      expect(outcome.message).toContain("team-001");
+    }
+  });
+
+  // Off the cloud a missing team carries no urgency, so there is nothing to
   // nudge toward and a warning would be permanent noise.
   it("passes without a nudge off the cloud", async () => {
     for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {

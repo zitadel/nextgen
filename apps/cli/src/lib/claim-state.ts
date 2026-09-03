@@ -42,10 +42,16 @@ export function isAttached(
  * stay fast and work offline. `zitadel claim` reaches the same conclusion the
  * same way before it decides to skip.
  *
- * **Why cloud only.** Claiming attaches a project to a team on the platform.
- * A local or self-hosted server has no such platform, and `--server local` is
- * the documented dev loop, so an ungated nudge would advertise an impossible
- * action for the entire life of a local project.
+ * **Why the nudge is cloud only.** The nudge frames a project with no team as
+ * temporary, which is only true on the cloud; `--server local` is the
+ * documented dev loop, so an ungated nudge would advertise urgency that does
+ * not exist for the entire life of a local project.
+ *
+ * **Why an attached record is not.** The record is a fact about this project
+ * wherever it lives: the local runtime `zitadel start` launches carries the
+ * platform project and can take a claim, and `zitadel claim` writes this very
+ * file when it does. Answering `not-applicable` to a claim the CLI recorded a
+ * moment earlier would contradict its own output.
  *
  * The local record can be stale in one direction: a project claimed from
  * another machine, or a `.zitadel/secret` restored from a backup, reads as
@@ -57,15 +63,15 @@ export function claimState(input: {
   secret: Pick<ZitadelSecret, "claimed_at" | "team_id">;
   server: string;
 }): ClaimState {
-  if (serverKind.value(input.server) !== "cloud") {
-    return { kind: "not-applicable" };
-  }
   if (isAttached(input.secret)) {
     return {
       kind: "attached",
       team_id: input.secret.team_id,
       claimed_at: input.secret.claimed_at,
     };
+  }
+  if (serverKind.value(input.server) !== "cloud") {
+    return { kind: "not-applicable" };
   }
   return { kind: "detached" };
 }
