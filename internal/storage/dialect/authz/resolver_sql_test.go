@@ -94,6 +94,13 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 	assert.Contains(t, w.args, "user_a")
 	assert.Contains(t, w.args, "proj_home")
 	assert.Contains(t, w.args, domain.AuthzPrincipalTypeUser.String())
+	homeBinds := 0
+	for _, arg := range w.args {
+		if arg == "proj_home" {
+			homeBinds++
+		}
+	}
+	assert.GreaterOrEqual(t, homeBinds, 2, "home must bind in both the allowed arm and the foothold arm")
 }
 
 func TestWriteActiveSystemCatalogID(t *testing.T) {
@@ -168,10 +175,31 @@ func TestWriteCheckAuthzConstraintTeam(t *testing.T) {
 func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
-	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", domain.AuthzPrincipalTypeUser, "user_a")
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", "", domain.AuthzPrincipalTypeUser, "user_a")
 	assert.Contains(t, w.b.String(), "NOW_SENTINEL")
 	assert.Contains(t, w.args, "proj_1")
 	assert.Contains(t, w.args, "user_a")
+}
+
+func TestWriteHasAuthzProjectFootholdDistinctHome(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_customer", "proj_platform", domain.AuthzPrincipalTypeUser, "user_a")
+	assert.Contains(t, w.args, "proj_customer")
+	assert.Contains(t, w.args, "proj_platform")
+	assert.Contains(t, w.args, "user_a")
+	protectedBinds := 0
+	homeBinds := 0
+	for _, arg := range w.args {
+		switch arg {
+		case "proj_customer":
+			protectedBinds++
+		case "proj_platform":
+			homeBinds++
+		}
+	}
+	assert.GreaterOrEqual(t, protectedBinds, 1, "assignment filter stays on the protected project")
+	assert.GreaterOrEqual(t, homeBinds, 1, "team expand binds the home project")
 }
 
 // Folding the constant arms back inside the correlated EXISTS changes only
