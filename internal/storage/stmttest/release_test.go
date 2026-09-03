@@ -50,7 +50,7 @@ func createRelease(t *testing.T, stmts service.AllStatements, projectID, revisio
 	t.Helper()
 	entity, err := domain.NewRelease(projectID, releasePointers(revision), metadata)
 	require.NoError(t, err)
-require.NoError(t, stmts.CreateRelease(t.Context(), entity))
+	require.NoError(t, stmts.CreateRelease(t.Context(), entity))
 	scope, err := stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindRelease, projectID, entity.ID)
 	require.NoError(t, err)
 	assert.Equal(t, domain.ResourceKindRelease, scope.ResourceKind)
