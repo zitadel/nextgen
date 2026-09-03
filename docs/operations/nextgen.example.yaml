@@ -20,6 +20,10 @@ server:
   console_path: /ui/console
   login_enabled: true
   login_path: /ui/login
+  # Public origin browsers reach this deployment at; feeds the claim and
+  # dashboard URLs. Set to http://localhost:8080 when running the server
+  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE).
+  public_base: https://nextgen.zitadel.cloud
 
 # Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
 # Configure exactly one dialect to override the default:
