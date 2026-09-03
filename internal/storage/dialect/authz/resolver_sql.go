@@ -276,10 +276,7 @@ func writeExprOrArg(w ArgWriter, expr, arg string) {
 
 func writeFoothold(w ArgWriter, env Env, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) {
 	ptype := principalType.String()
-	home := homeProjectID
-	if home == "" {
-		home = projectID
-	}
+	home := domain.AuthzHomeProjectID(homeProjectID, projectID)
 	w.WriteString(`(
     EXISTS (
         SELECT 1
