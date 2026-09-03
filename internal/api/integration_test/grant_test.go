@@ -250,9 +250,8 @@ func assertGrantAlreadyExists(t *testing.T, resp any) {
 	assert.Equal(t, api.ErrorCode("grant.already_exists"), conflict.Code)
 }
 
-// TestGrantSessionCaller exercises ADR 053 §5 for grant ops: a platform-homed
-// Console session may create/get/revoke grants on a customer project when it
-// holds a foothold there. CSRF/Origin are out of scope (#1140).
+// TestGrantSessionCaller: a platform-homed Console session may create/get/revoke
+// grants on a customer project when it holds a foothold there.
 func TestGrantSessionCaller(t *testing.T) {
 	t.Parallel()
 

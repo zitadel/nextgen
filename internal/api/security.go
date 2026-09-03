@@ -58,10 +58,9 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 }
 
 // HandleNextgenSession handles the nextgenSession security scheme: the
-// __nextgen_session cookie on /me, claim/complete, and grant management ops.
-// It verifies that the cookie value decrypts to a session token and stashes
-// the parsed token in the context for the handlers. User-bound sessions also
-// mint ScopeContext so the management gate can authorize the human (ADR 053 §5).
+// __nextgen_session cookie. It verifies the cookie decrypts to a session
+// token and stashes it for handlers. User-bound sessions also mint
+// ScopeContext so management ops can authorize the human.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
@@ -73,8 +72,6 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	}
 	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
 	ctx = withActorFromToken(ctx, token)
-	// ProjectID on ScopeContext is the principal's home project (session
-	// project). Target comes from the request; do not treat them as equal.
 	if token.UserID != "" {
 		ctx = WithScopeContext(ctx, ScopeContext{
 			ProjectID:     token.ProjectID,

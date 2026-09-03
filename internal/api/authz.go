@@ -320,12 +320,11 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 
 // credentialCeiling is the pre-resolver gate on the credential plane.
 // Project secrets still need project.write (preview stays denied). User
-// principals from a Console session skip the secret ceiling: home may
-// differ from target, and resolver.Check decides Allow / Forbidden /
+// principals skip that ceiling; resolver.Check decides Allow / Forbidden /
 // NotFound (ADR 053 §5).
 func credentialCeiling(scope ScopeContext, targetProjectID string) error {
 	if scope.PrincipalType == domain.AuthzPrincipalTypeUser {
-		if scope.ProjectID == "" || scope.PrincipalID == "" {
+		if scope.ProjectID == "" {
 			return errAuthzNoScope
 		}
 		return nil
