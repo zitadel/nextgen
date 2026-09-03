@@ -316,6 +316,32 @@ describe("claim", () => {
       expect(json.data).toMatchObject({ team_id: "team-local-stub" });
       expect((await readSecret(cwd)).team_id).toBe("team-local-stub");
     });
+
+    // No `--json` in the next two: the warning is consola narration, and the
+    // envelope silences it.
+    it("warns when a local server advertises a remote claim page", async () => {
+      const { cwd } = await makeProject();
+      const serverUrl = await startClaimServer(
+        "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_localstub",
+      );
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+      const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
+
+      expect(res.exitCode).toBe(0);
+      expect(`${res.stdout}${res.stderr}`).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
+    });
+
+    it("does not warn when the claim page is on the local server itself", async () => {
+      const { cwd } = await makeProject();
+      const serverUrl = await startClaimServer();
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+      const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
+
+      expect(res.exitCode).toBe(0);
+      expect(`${res.stdout}${res.stderr}`).not.toContain("advertised a claim page");
+    });
   });
 });
 
@@ -326,7 +352,9 @@ describe("claim", () => {
  * a port only known at runtime; a real socket is simpler than reshaping the
  * handlers.
  */
-async function startClaimServer(): Promise<string> {
+async function startClaimServer(
+  claimUrl = "http://localhost/claim/ch_localstub",
+): Promise<string> {
   const httpServer = createServer((req, res) => {
     const url = req.url ?? "";
     if (url === "/healthz") {
@@ -336,7 +364,7 @@ async function startClaimServer(): Promise<string> {
     if (url.endsWith("/claim/init")) {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
-          claim_url: "http://localhost/claim/ch_localstub",
+          claim_url: claimUrl,
           challenge_id: "ch_localstub",
           expires_at: new Date(Date.now() + 600_000).toISOString(),
         }),
