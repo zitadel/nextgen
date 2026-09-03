@@ -1297,6 +1297,86 @@ describe("plan-time flow validation", () => {
     }
   });
 
+  it("warns when revising an active unscoped flow while other flows exist", async () => {
+    const cwd = makeCwd();
+    try {
+      const flowSyncer = makeFlowSyncer();
+      const login = combinedFlow();
+      login.user_schema = "sch_REMOTE";
+      const experiment = combinedFlow();
+      experiment.name = "experiment";
+      experiment.user_schema = "sch_REMOTE";
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [FLOW_PATH]: { id: "flow_A", hash: hashForState(flowSyncer, login) },
+          ".zitadel/flows/experiment.json": {
+            id: "flow_B",
+            hash: hashForState(flowSyncer, experiment),
+          },
+        },
+      });
+      await writeResource(cwd, ".zitadel/flows", "experiment.json", experiment);
+      // Editing the older flow publishes a row newer than flow_B: the
+      // engine ranks unscoped flows by created_at across names.
+      stepOf(login, "done").complete = "redirect";
+      await writeResource(cwd, ".zitadel/flows", "default.json", login);
+
+      const actions = await buildSyncPlan(cwd, [flowSyncer]);
+      const revised = actions.find((a) => a.path === FLOW_PATH);
+      expect(revised?.kind).toBe("revise");
+      if (revised?.kind === "revise") {
+        expect(revised.warnings?.map((w) => w.rule)).toContain("warn/default-flow-swap");
+        expect(revised.warnings?.at(-1)?.message).toContain(
+          "this revision becomes the newest active flow and the default for login and register",
+        );
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("warns on every repin revision a schema edit republishes", async () => {
+    const cwd = makeCwd();
+    try {
+      const flowSyncer = makeFlowSyncer();
+      const schemaSyncer = makeSyncer({ revisioned: true, normalize: normalizeSchemaBody });
+      const schemaBody = {
+        kind: "user-schema",
+        properties: { email: { type: "string", "x-unique": "project" } },
+      };
+      const login = combinedFlow();
+      const experiment = combinedFlow();
+      experiment.name = "experiment";
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: { id: "sch_A", hash: "old-hash" },
+          [FLOW_PATH]: { id: "flow_A", hash: hashForState(flowSyncer, login) },
+          ".zitadel/flows/experiment.json": {
+            id: "flow_B",
+            hash: hashForState(flowSyncer, experiment),
+          },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", schemaBody);
+      await writeResource(cwd, ".zitadel/flows", "default.json", login);
+      await writeResource(cwd, ".zitadel/flows", "experiment.json", experiment);
+
+      const actions = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
+      for (const path of [FLOW_PATH, ".zitadel/flows/experiment.json"]) {
+        const repinned = actions.find((a) => a.path === path);
+        expect(repinned?.kind).toBe("revise");
+        if (repinned?.kind === "revise") {
+          expect(repinned.repin?.previousId).toBe("sch_A");
+          expect(repinned.warnings?.map((w) => w.rule)).toContain("warn/default-flow-swap");
+        }
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("does not warn about the default for a project's first flow", async () => {
     const cwd = makeCwd();
     try {
