@@ -10027,10 +10027,7 @@ func (*CreateReleaseOK) createReleaseRes() {}
 // records it on the release.
 // Ref: #
 type CreateReleasePointer struct {
-	// The kind of resource being pinned. Required rather than inferred: a
-	// `revision_id` is not always shaped distinctly enough to identify its kind
-	// on its own.
-	Kind CreateReleasePointerKind `json:"kind"`
+	Kind ReleasePointerKind `json:"kind"`
 	// The revision of that resource to pin. Must already exist in the project —
 	// this endpoint pins revisions, it does not create them.
 	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
@@ -10040,7 +10037,7 @@ type CreateReleasePointer struct {
 }
 
 // GetKind returns the value of Kind.
-func (s *CreateReleasePointer) GetKind() CreateReleasePointerKind {
+func (s *CreateReleasePointer) GetKind() ReleasePointerKind {
 	return s.Kind
 }
 
@@ -10050,64 +10047,13 @@ func (s *CreateReleasePointer) GetRevisionID() string {
 }
 
 // SetKind sets the value of Kind.
-func (s *CreateReleasePointer) SetKind(val CreateReleasePointerKind) {
+func (s *CreateReleasePointer) SetKind(val ReleasePointerKind) {
 	s.Kind = val
 }
 
 // SetRevisionID sets the value of RevisionID.
 func (s *CreateReleasePointer) SetRevisionID(val string) {
 	s.RevisionID = val
-}
-
-// The kind of resource being pinned. Required rather than inferred: a
-// `revision_id` is not always shaped distinctly enough to identify its kind
-// on its own.
-type CreateReleasePointerKind string
-
-const (
-	CreateReleasePointerKindSchema         CreateReleasePointerKind = "schema"
-	CreateReleasePointerKindFlowDefinition CreateReleasePointerKind = "flow_definition"
-	CreateReleasePointerKindBranding       CreateReleasePointerKind = "branding"
-)
-
-// AllValues returns all CreateReleasePointerKind values.
-func (CreateReleasePointerKind) AllValues() []CreateReleasePointerKind {
-	return []CreateReleasePointerKind{
-		CreateReleasePointerKindSchema,
-		CreateReleasePointerKindFlowDefinition,
-		CreateReleasePointerKindBranding,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s CreateReleasePointerKind) MarshalText() ([]byte, error) {
-	switch s {
-	case CreateReleasePointerKindSchema:
-		return []byte(s), nil
-	case CreateReleasePointerKindFlowDefinition:
-		return []byte(s), nil
-	case CreateReleasePointerKindBranding:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *CreateReleasePointerKind) UnmarshalText(data []byte) error {
-	switch CreateReleasePointerKind(data) {
-	case CreateReleasePointerKindSchema:
-		*s = CreateReleasePointerKindSchema
-		return nil
-	case CreateReleasePointerKindFlowDefinition:
-		*s = CreateReleasePointerKindFlowDefinition
-		return nil
-	case CreateReleasePointerKindBranding:
-		*s = CreateReleasePointerKindBranding
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // The set of revisions to bundle into a release, plus the metadata to record
@@ -37394,7 +37340,6 @@ func (s *ReleaseMetadataCreatedByType) UnmarshalText(data []byte) error {
 // this release includes.
 // Ref: #
 type ReleasePointer struct {
-	// The kind of resource this pointer pins.
 	Kind ReleasePointerKind `json:"kind"`
 	// Which resource this pointer pins, independent of which revision of it.
 	// `revision_id` chooses the revision; `handle` says what the revision is a
@@ -37447,7 +37392,13 @@ func (s *ReleasePointer) SetRevisionID(val string) {
 	s.RevisionID = val
 }
 
-// The kind of resource this pointer pins.
+// The kind of resource a release pointer pins.
+// Carried explicitly rather than inferred from `revision_id`, because a
+// revision id is not always shaped distinctly enough to identify its kind: a
+// schema's is its `$id`, which may be any URL.
+// `flow_definition` rather than `flow`: a release pins the definitions served
+// at `/flow_definitions`, not the runtime flows at `/flow`.
+// Ref: #
 type ReleasePointerKind string
 
 const (

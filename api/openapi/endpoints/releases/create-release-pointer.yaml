@@ -8,16 +8,7 @@ required:
   - revision_id
 properties:
   kind:
-    type: string
-    description: |
-      The kind of resource being pinned. Required rather than inferred: a
-      `revision_id` is not always shaped distinctly enough to identify its kind
-      on its own.
-    enum:
-      - schema
-      - flow_definition
-      - branding
-    example: schema
+    $ref: ../../components/schemas/release-pointer-kind.yaml
   revision_id:
     type: string
     minLength: 1

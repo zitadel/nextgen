@@ -16111,48 +16111,6 @@ func (s *CreateReleasePointer) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes CreateReleasePointerKind as json.
-func (s CreateReleasePointerKind) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes CreateReleasePointerKind from json.
-func (s *CreateReleasePointerKind) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateReleasePointerKind to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch CreateReleasePointerKind(v) {
-	case CreateReleasePointerKindSchema:
-		*s = CreateReleasePointerKindSchema
-	case CreateReleasePointerKindFlowDefinition:
-		*s = CreateReleasePointerKindFlowDefinition
-	case CreateReleasePointerKindBranding:
-		*s = CreateReleasePointerKindBranding
-	default:
-		*s = CreateReleasePointerKind(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateReleasePointerKind) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateReleasePointerKind) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *CreateReleaseRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()

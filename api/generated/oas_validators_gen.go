@@ -2378,19 +2378,6 @@ func (s *CreateReleasePointer) Validate() error {
 	return nil
 }
 
-func (s CreateReleasePointerKind) Validate() error {
-	switch s {
-	case "schema":
-		return nil
-	case "flow_definition":
-		return nil
-	case "branding":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
 func (s *CreateReleaseRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

@@ -8,13 +8,7 @@ required:
   - revision_id
 properties:
   kind:
-    type: string
-    description: The kind of resource this pointer pins.
-    enum:
-      - schema
-      - flow_definition
-      - branding
-    example: schema
+    $ref: ../../components/schemas/release-pointer-kind.yaml
   handle:
     type: string
     minLength: 1
