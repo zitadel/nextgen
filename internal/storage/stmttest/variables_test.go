@@ -53,17 +53,28 @@ func (f variableFixture) set(t *testing.T, stmts service.AllStatements, owner do
 	return v
 }
 
+// ownerLevel is how deep into the owner chain a variable is entered. The chain
+// is a prefix, so a level names every id above it too.
+type ownerLevel int
+
+const (
+	levelProject ownerLevel = iota + 1
+	levelTeam
+	levelUserSchema
+	levelUser
+)
+
 // ownerAt truncates the requester to the given level, which is how a variable
 // entered further up the hierarchy is addressed.
-func (f variableFixture) ownerAt(level domain.VariableScope) domain.VariableOwner {
+func (f variableFixture) ownerAt(level ownerLevel) domain.VariableOwner {
 	owner := domain.VariableOwner{ProjectID: f.requester.ProjectID}
-	if level >= domain.VariableScopeTeam {
+	if level >= levelTeam {
 		owner.TeamID = f.requester.TeamID
 	}
-	if level >= domain.VariableScopeUserSchema {
+	if level >= levelUserSchema {
 		owner.UserSchemaID = f.requester.UserSchemaID
 	}
-	if level >= domain.VariableScopeUser {
+	if level >= levelUser {
 		owner.UserID = f.requester.UserID
 	}
 	return owner
@@ -81,7 +92,7 @@ func (f variableFixture) get(t *testing.T, stmts service.AllStatements, requeste
 func TestVariablesRoundTrip(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
-		owner := f.ownerAt(domain.VariableScopeProject)
+		owner := f.ownerAt(levelProject)
 
 		f.set(t, d.stmts, owner, map[string]any{"theme": "dark"}, true)
 
@@ -109,11 +120,11 @@ func TestVariablesRoundTrip(t *testing.T) {
 func TestVariablesDoNotOverride(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
-		levels := []domain.VariableScope{
-			domain.VariableScopeProject,
-			domain.VariableScopeTeam,
-			domain.VariableScopeUserSchema,
-			domain.VariableScopeUser,
+		levels := []ownerLevel{
+			levelProject,
+			levelTeam,
+			levelUserSchema,
+			levelUser,
 		}
 		for _, level := range levels {
 			f.set(t, d.stmts, f.ownerAt(level), int(level), false)
@@ -136,11 +147,11 @@ func TestVariablesVisibility(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
 
-		f.set(t, d.stmts, f.ownerAt(domain.VariableScopeProject), "project", false)
-		f.set(t, d.stmts, f.ownerAt(domain.VariableScopeTeam), "team", false)
+		f.set(t, d.stmts, f.ownerAt(levelProject), "project", false)
+		f.set(t, d.stmts, f.ownerAt(levelTeam), "team", false)
 
 		// A sibling team under the same project is off the requester's branch.
-		sibling := f.ownerAt(domain.VariableScopeTeam)
+		sibling := f.ownerAt(levelTeam)
 		sibling.TeamID = f.requester.TeamID + "-sibling"
 		f.set(t, d.stmts, sibling, "sibling", false)
 
@@ -176,7 +187,7 @@ func TestVariablesVisibility(t *testing.T) {
 func TestVariablesNameFilter(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
-		owner := f.ownerAt(domain.VariableScopeProject)
+		owner := f.ownerAt(levelProject)
 		f.set(t, d.stmts, owner, "wanted", false)
 
 		other := variableFixture{name: f.name + ".other", requester: f.requester}
@@ -198,12 +209,12 @@ func TestVariablesNameFilter(t *testing.T) {
 func TestVariablesDelete(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
-		owner := f.ownerAt(domain.VariableScopeProject)
+		owner := f.ownerAt(levelProject)
 		f.set(t, d.stmts, owner, "value", false)
 
 		// A descendant inherits the variable but does not own it, so it cannot
 		// delete it -- every owner column has to match.
-		err := d.stmts.DeleteVariable(t.Context(), f.ownerAt(domain.VariableScopeTeam), f.name)
+		err := d.stmts.DeleteVariable(t.Context(), f.ownerAt(levelTeam), f.name)
 		require.Error(t, err)
 		_, ok := errorsAsNoRowFound(err)
 		assert.True(t, ok, "deleting an inherited variable should report NoRowFoundError, got %v", err)

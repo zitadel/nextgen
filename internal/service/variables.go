@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -30,6 +31,7 @@ type VariableService interface {
 	// includes the case where owner can only see one it inherited: a variable
 	// is deletable only by the owner that entered it.
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+	ReplaceVariables(ctx context.Context, requester domain.VariableOwner, doc map[string]any) (map[string]any, error)
 }
 
 type variableService struct {
@@ -60,6 +62,7 @@ func (s *variableService) SetVariable(ctx context.Context,
 	value any, isSecret bool,
 ) error {
 	var variable *domain.Variable
+	var err error
 
 	if isSecret {
 		crypter, err := s.keys.GetProjectCrypter(ctx, owner.ProjectID, domain.EncryptionKeyPurposeSecret)
@@ -71,7 +74,10 @@ func (s *variableService) SetVariable(ctx context.Context,
 			return err
 		}
 	} else {
-		variable = domain.NewVariable(name, owner, value)
+		variable, err = domain.NewVariable(name, owner, value)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := s.v2Pool.Statements().SetVariable(ctx, variable); err != nil {
@@ -88,4 +94,58 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 		return domain.ErrInternal(err).WithMessage("failed to delete variable from database")
 	}
 	return nil
+}
+
+func (s *variableService) ReplaceVariables(ctx context.Context, requester domain.VariableOwner, doc map[string]any) (map[string]any, error) {
+	toReplace, err := domain.ScanDocumentForVariables(doc)
+	if err != nil {
+		return nil, err
+	}
+	if len(toReplace) == 0 {
+		return doc, nil
+	}
+
+	// One name per query term, however many addresses reference it.
+	placeholders := make([]string, 0, len(toReplace))
+	seen := make(map[string]bool, len(toReplace))
+	for _, v := range toReplace {
+		if seen[v.Placeholder] {
+			continue
+		}
+		seen[v.Placeholder] = true
+		placeholders = append(placeholders, v.Placeholder)
+	}
+
+	varList, err := s.v2Pool.Statements().GetVariables(ctx, requester, placeholders...)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
+	}
+	varMap := domain.VariableListToMap(varList)
+
+	var containsSecrets bool
+	for _, v := range varMap {
+		if v.IsSecret {
+			containsSecrets = true
+			break
+		}
+	}
+
+	var decrypter crypto.Decrypter
+	if containsSecrets {
+		decrypter, err = s.keys.GetProjectCrypter(ctx, requester.ProjectID, domain.EncryptionKeyPurposeSecret)
+		if err != nil {
+			return nil, err
+		}
+
+		varMap, err = domain.Variables(varMap).DecryptAll(decrypter)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := domain.ReplaceVariablesInDocument(doc, toReplace, varMap); err != nil {
+		return nil, err
+	}
+
+	return doc, nil
 }
