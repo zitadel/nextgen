@@ -100,7 +100,7 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			assert.Equalf(t, wantAllow, gotAllow, "check viewer user=%s decision=%s", u, dec)
 
 			if !gotAllow {
-				wantFoot := g.OracleFoothold(projectID, domain.AuthzPrincipalTypeUser, u)
+				wantFoot := g.OracleFoothold(projectID, "", domain.AuthzPrincipalTypeUser, u)
 				if wantFoot {
 					assert.Equal(t, resolver.DecisionForbidden, dec, "user=%s", u)
 				} else {

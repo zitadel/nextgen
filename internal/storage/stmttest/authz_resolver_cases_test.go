@@ -71,7 +71,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		})
 
 		t.Run("foothold none", func(t *testing.T) {
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, "user_none_"+uniqueSuffix(t))
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, "user_none_"+uniqueSuffix(t))
 			require.NoError(t, err)
 			assert.False(t, ok)
 		})
@@ -80,7 +80,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_fh_asgn_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.True(t, ok)
 		})
@@ -88,7 +88,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		t.Run("foothold via membership edge only", func(t *testing.T) {
 			u := "user_fh_edge_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, teamT, u)))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.True(t, ok)
 		})
@@ -98,7 +98,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
 			require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, a.ID))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.False(t, ok)
 		})
@@ -673,6 +673,79 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
 			assert.False(t, allowed)
+		})
+
+		t.Run("foreign team grant allow via home membership", func(t *testing.T) {
+			platform := ensureProject(t, d.stmts)
+			customer := ensureProject(t, d.stmts)
+			u := "user_home_allow_" + uniqueSuffix(t)
+			team := "team_agency_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(platform, team)))
+			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(platform, team, u)))
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(customer, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
+			params := domain.AuthzCheckParams{
+				CatalogID:              domain.SystemCatalogID,
+				ProjectID:              customer,
+				PrincipalHomeProjectID: platform,
+				PrincipalType:          domain.AuthzPrincipalTypeUser,
+				PrincipalID:            u,
+				ObjectType:             "project",
+				Relation:               "viewer",
+			}
+			allowed, foothold := check(t, params)
+			assert.True(t, allowed)
+			assert.True(t, foothold)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), customer, platform, domain.AuthzPrincipalTypeUser, u)
+			require.NoError(t, err)
+			assert.True(t, ok)
+		})
+
+		t.Run("foreign team grant foothold without allow", func(t *testing.T) {
+			platform := ensureProject(t, d.stmts)
+			customer := ensureProject(t, d.stmts)
+			u := "user_home_forb_" + uniqueSuffix(t)
+			team := "team_agency_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(platform, team)))
+			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(platform, team, u)))
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(customer, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
+			params := domain.AuthzCheckParams{
+				CatalogID:              domain.SystemCatalogID,
+				ProjectID:              customer,
+				PrincipalHomeProjectID: platform,
+				PrincipalType:          domain.AuthzPrincipalTypeUser,
+				PrincipalID:            u,
+				ObjectType:             "team",
+				Relation:               "member",
+			}
+			allowed, foothold := check(t, params)
+			assert.False(t, allowed)
+			assert.True(t, foothold)
+		})
+
+		t.Run("home membership without assignment is not foothold", func(t *testing.T) {
+			platform := ensureProject(t, d.stmts)
+			customer := ensureProject(t, d.stmts)
+			u := "user_home_none_" + uniqueSuffix(t)
+			team := "team_agency_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(platform, team)))
+			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(platform, team, u)))
+			params := domain.AuthzCheckParams{
+				CatalogID:              domain.SystemCatalogID,
+				ProjectID:              customer,
+				PrincipalHomeProjectID: platform,
+				PrincipalType:          domain.AuthzPrincipalTypeUser,
+				PrincipalID:            u,
+				ObjectType:             "project",
+				Relation:               "viewer",
+			}
+			allowed, foothold := check(t, params)
+			assert.False(t, allowed)
+			assert.False(t, foothold)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), customer, platform, domain.AuthzPrincipalTypeUser, u)
+			require.NoError(t, err)
+			assert.False(t, ok)
 		})
 	})
 }
