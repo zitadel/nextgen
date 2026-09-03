@@ -31207,7 +31207,7 @@ func (s *FlowSubmitRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"sso_provider_id\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {

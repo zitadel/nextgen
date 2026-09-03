@@ -1,5 +1,6 @@
 type: object
 required: [action]
+additionalProperties: false
 properties:
   session_token:
     type: string
