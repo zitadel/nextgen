@@ -62,6 +62,36 @@ func v2PoolFromStatements(t *testing.T, stmts service.AllStatements) *service.DB
 	return service.NewPool(pool)
 }
 
+// expectListFlowDefinitions stubs one ListFlowDefinitions call and asserts the
+// filter the service built, so a dropped or widened filter fails the test.
+func expectListFlowDefinitions(t *testing.T, stmts *servicemocks.MockAllStatements, wantFilter database.Filter[domain.FlowDefinitionField], items []*domain.FlowDefinition) {
+	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+			assert.Equal(t, wantFilter, opts.Filter)
+			return &database.ListResult[*domain.FlowDefinition]{Items: items}, nil
+		},
+	).Times(1)
+}
+
+// activeFlowDefinitionsFilter is the filter isUpdateAllowed builds to count a
+// project's other active definitions.
+func activeFlowDefinitionsFilter(projectID string) database.Filter[domain.FlowDefinitionField] {
+	return database.And(
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+	)
+}
+
+// pivotingTargetFilter is the filter validatePivotingTargets builds to look up
+// a transition's target flow.
+func pivotingTargetFilter(projectID, name string) database.Filter[domain.FlowDefinitionField] {
+	return database.And(
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+		database.Equal(database.Col(domain.FlowDefinitionFieldName), name),
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+	)
+}
+
 func (m *mockSchemaGetter) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 	return m.getSchema(ctx, projectID, teamID, schemaID)
 }
@@ -218,14 +248,12 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						fd.ID = "flowdef_test01"
 						return nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
-							{
-								Name:   "external-flow",
-								Status: domain.FlowDefinitionStatusActive,
-							},
-						}}, nil,
-					).Times(1)
+					expectListFlowDefinitions(t, stmts, pivotingTargetFilter("project1", "external-flow"), []*domain.FlowDefinition{
+						{
+							Name:   "external-flow",
+							Status: domain.FlowDefinitionStatusActive,
+						},
+					})
 					return stmts
 				},
 			},
@@ -326,9 +354,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
-						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
-					}).Times(1)
+					expectListFlowDefinitions(t, stmts, pivotingTargetFilter("project1", "external-flow"), []*domain.FlowDefinition{})
 					return stmts
 				},
 			},
@@ -862,17 +888,15 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 							},
 						}, nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
-							{
-								ID:     "flowdef_123",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeLogin: "step_1",
-								},
+					expectListFlowDefinitions(t, stmts, activeFlowDefinitionsFilter("project1"), []*domain.FlowDefinition{
+						{
+							ID:     "flowdef_123",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin: "step_1",
 							},
-						}}, nil,
-					).Times(1)
+						},
+					})
 					return stmts
 				},
 			},
@@ -911,25 +935,23 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 							},
 						}, nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
-							{
-								ID:     "flowdef_123",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeLogin:    "step_1",
-									domain.FlowDefinitionPurposeRegister: "step_1",
-								},
+					expectListFlowDefinitions(t, stmts, activeFlowDefinitionsFilter("project1"), []*domain.FlowDefinition{
+						{
+							ID:     "flowdef_123",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRegister: "step_1",
 							},
-							{
-								ID:     "flowdef_other_login",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeLogin: "step_1",
-								},
+						},
+						{
+							ID:     "flowdef_other_login",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin: "step_1",
 							},
-						}}, nil,
-					).Times(1)
+						},
+					})
 					return stmts
 				},
 			},
@@ -974,26 +996,24 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					stmts.EXPECT().UpdateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.FlowDefinition) error {
 						return nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
-							{
-								ID:     "flowdef_123",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeLogin:    "step_1",
-									domain.FlowDefinitionPurposeRegister: "step_1",
-								},
+					expectListFlowDefinitions(t, stmts, activeFlowDefinitionsFilter("project1"), []*domain.FlowDefinition{
+						{
+							ID:     "flowdef_123",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRegister: "step_1",
 							},
-							{
-								ID:     "flowdef_other",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeLogin:    "step_1",
-									domain.FlowDefinitionPurposeRegister: "step_1",
-								},
+						},
+						{
+							ID:     "flowdef_other",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRegister: "step_1",
 							},
-						}}, nil,
-					).Times(1)
+						},
+					})
 					return stmts
 				},
 			},
@@ -1046,18 +1066,16 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 							},
 						}, nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
-							{
-								ID:     "flowdef_123",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeLogin:    "step_1",
-									domain.FlowDefinitionPurposeRecovery: "step_1",
-								},
+					expectListFlowDefinitions(t, stmts, activeFlowDefinitionsFilter("project1"), []*domain.FlowDefinition{
+						{
+							ID:     "flowdef_123",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRecovery: "step_1",
 							},
-						}}, nil,
-					).Times(1)
+						},
+					})
 					return stmts
 				},
 			},
@@ -1101,25 +1119,23 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					stmts.EXPECT().UpdateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.FlowDefinition) error {
 						return nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
-							{
-								ID:     "flowdef_123",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeLogin:    "step_1",
-									domain.FlowDefinitionPurposeRecovery: "step_1",
-								},
+					expectListFlowDefinitions(t, stmts, activeFlowDefinitionsFilter("project1"), []*domain.FlowDefinition{
+						{
+							ID:     "flowdef_123",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRecovery: "step_1",
 							},
-							{
-								ID:     "flowdef_other_recovery",
-								Status: domain.FlowDefinitionStatusActive,
-								Purposes: map[domain.FlowDefinitionPurpose]string{
-									domain.FlowDefinitionPurposeRecovery: "step_1",
-								},
+						},
+						{
+							ID:     "flowdef_other_recovery",
+							Status: domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeRecovery: "step_1",
 							},
-						}}, nil,
-					).Times(1)
+						},
+					})
 					return stmts
 				},
 			},
