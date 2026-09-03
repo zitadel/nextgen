@@ -42,9 +42,9 @@ func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (str
 }
 
 // HasAuthzProjectFoothold implements [service.AuthzResolverStatements].
-func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
+func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
 	var c statementCompiler
-	authz.WriteHasAuthzProjectFoothold(&c, spannerAuthzEnv(), projectID, principalType, principalID)
+	authz.WriteHasAuthzProjectFoothold(&c, spannerAuthzEnv(), projectID, homeProjectID, principalType, principalID)
 	var ok bool
 	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
