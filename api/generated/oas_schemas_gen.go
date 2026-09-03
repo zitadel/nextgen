@@ -9854,6 +9854,236 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
+type CreateReleaseCreated Release
+
+func (*CreateReleaseCreated) createReleaseRes() {}
+
+// CreateReleaseErrorResponse represents sum type.
+type CreateReleaseErrorResponse struct {
+	Type             CreateReleaseErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// CreateReleaseErrorResponseType is oneOf type of CreateReleaseErrorResponse.
+type CreateReleaseErrorResponseType string
+
+// Possible values for CreateReleaseErrorResponseType.
+const (
+	AuthUnauthorizedCreateReleaseErrorResponse CreateReleaseErrorResponseType = "auth.unauthorized"
+	InternalCreateReleaseErrorResponse         CreateReleaseErrorResponseType = "internal"
+	ReqInvalidCreateReleaseErrorResponse       CreateReleaseErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether CreateReleaseErrorResponse is AuthUnauthorized.
+func (s CreateReleaseErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateReleaseErrorResponse
+}
+
+// IsInternal reports whether CreateReleaseErrorResponse is Internal.
+func (s CreateReleaseErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateReleaseErrorResponse
+}
+
+// IsReqInvalid reports whether CreateReleaseErrorResponse is ReqInvalid.
+func (s CreateReleaseErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateReleaseErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateReleaseErrorResponse to AuthUnauthorized.
+func (s *CreateReleaseErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateReleaseErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateReleaseErrorResponse is AuthUnauthorized.
+func (s CreateReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateReleaseErrorResponse(v AuthUnauthorized) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateReleaseErrorResponse to Internal.
+func (s *CreateReleaseErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateReleaseErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateReleaseErrorResponse is Internal.
+func (s CreateReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from Internal.
+func NewInternalCreateReleaseErrorResponse(v Internal) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets CreateReleaseErrorResponse to ReqInvalid.
+func (s *CreateReleaseErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateReleaseErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateReleaseErrorResponse is ReqInvalid.
+func (s CreateReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from ReqInvalid.
+func NewReqInvalidCreateReleaseErrorResponse(v ReqInvalid) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateReleaseErrorResponseStatusCode wraps CreateReleaseErrorResponse with StatusCode.
+type CreateReleaseErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateReleaseErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateReleaseErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateReleaseErrorResponseStatusCode) GetResponse() CreateReleaseErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateReleaseErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateReleaseErrorResponseStatusCode) SetResponse(val CreateReleaseErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateReleaseErrorResponseStatusCode) createReleaseRes() {}
+
+type CreateReleaseOK Release
+
+func (*CreateReleaseOK) createReleaseRes() {}
+
+// One revision to pin. The handle is not supplied: it is the resource's own
+// identifying field, so the server reads it from the revision being pinned and
+// records it on the release.
+// Ref: #
+type CreateReleasePointer struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// The revision of that resource to pin. Must already exist in the project —
+	// this endpoint pins revisions, it does not create them.
+	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
+	// the schema's `$id`, which is a URL whenever the document supplied one and
+	// only a generated `sch_*` value otherwise.
+	RevisionID string `json:"revision_id"`
+}
+
+// GetKind returns the value of Kind.
+func (s *CreateReleasePointer) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *CreateReleasePointer) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// SetKind sets the value of Kind.
+func (s *CreateReleasePointer) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *CreateReleasePointer) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// The set of revisions to bundle into a release, plus the metadata to record
+// alongside it.
+// `created_at` and `created_by` are derived server-side from the caller's
+// authentication context and are not accepted here.
+// Ref: #
+type CreateReleaseRequest struct {
+	// The revisions to pin. Must not be empty.
+	// A kind usually appears more than once: a project has several user schemas
+	// and several flow definitions, and each is pinned on its own. What it
+	// cannot do is
+	// pin two revisions of the *same* resource — a second revision of the
+	// `human-user` schema is rejected rather than ordered, since a release
+	// describes one state of the project.
+	Pointers []CreateReleasePointer `json:"pointers"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetPointers returns the value of Pointers.
+func (s *CreateReleaseRequest) GetPointers() []CreateReleasePointer {
+	return s.Pointers
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseRequest) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *CreateReleaseRequest) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *CreateReleaseRequest) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetPointers sets the value of Pointers.
+func (s *CreateReleaseRequest) SetPointers(val []CreateReleasePointer) {
+	s.Pointers = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseRequest) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *CreateReleaseRequest) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
 type CreateSchemaBadRequest ErrorDetails
 
 func (*CreateSchemaBadRequest) createSchemaRes() {}
@@ -20511,6 +20741,130 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 
 func (*GetReadyOK) getReadyRes() {}
 
+// GetReleaseByIdErrorResponse represents sum type.
+type GetReleaseByIdErrorResponse struct {
+	Type             GetReleaseByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// GetReleaseByIdErrorResponseType is oneOf type of GetReleaseByIdErrorResponse.
+type GetReleaseByIdErrorResponseType string
+
+// Possible values for GetReleaseByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetReleaseByIdErrorResponse GetReleaseByIdErrorResponseType = "auth.unauthorized"
+	InternalGetReleaseByIdErrorResponse         GetReleaseByIdErrorResponseType = "internal"
+	ReqInvalidGetReleaseByIdErrorResponse       GetReleaseByIdErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetReleaseByIdErrorResponse is AuthUnauthorized.
+func (s GetReleaseByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetReleaseByIdErrorResponse
+}
+
+// IsInternal reports whether GetReleaseByIdErrorResponse is Internal.
+func (s GetReleaseByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetReleaseByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetReleaseByIdErrorResponse is ReqInvalid.
+func (s GetReleaseByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetReleaseByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetReleaseByIdErrorResponse to AuthUnauthorized.
+func (s *GetReleaseByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetReleaseByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetReleaseByIdErrorResponse is AuthUnauthorized.
+func (s GetReleaseByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetReleaseByIdErrorResponse(v AuthUnauthorized) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetReleaseByIdErrorResponse to Internal.
+func (s *GetReleaseByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetReleaseByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetReleaseByIdErrorResponse is Internal.
+func (s GetReleaseByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from Internal.
+func NewInternalGetReleaseByIdErrorResponse(v Internal) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetReleaseByIdErrorResponse to ReqInvalid.
+func (s *GetReleaseByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetReleaseByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetReleaseByIdErrorResponse is ReqInvalid.
+func (s GetReleaseByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetReleaseByIdErrorResponse(v ReqInvalid) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetReleaseByIdErrorResponseStatusCode wraps GetReleaseByIdErrorResponse with StatusCode.
+type GetReleaseByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetReleaseByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetReleaseByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetReleaseByIdErrorResponseStatusCode) GetResponse() GetReleaseByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetReleaseByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetReleaseByIdErrorResponseStatusCode) SetResponse(val GetReleaseByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetReleaseByIdErrorResponseStatusCode) getReleaseByIdRes() {}
+
 type GetSchemaByIdBadRequest ErrorDetails
 
 func (*GetSchemaByIdBadRequest) getSchemaByIdRes() {}
@@ -22690,6 +23044,161 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// ListReleasesErrorResponse represents sum type.
+type ListReleasesErrorResponse struct {
+	Type             ListReleasesErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// ListReleasesErrorResponseType is oneOf type of ListReleasesErrorResponse.
+type ListReleasesErrorResponseType string
+
+// Possible values for ListReleasesErrorResponseType.
+const (
+	AuthUnauthorizedListReleasesErrorResponse ListReleasesErrorResponseType = "auth.unauthorized"
+	InternalListReleasesErrorResponse         ListReleasesErrorResponseType = "internal"
+	ReqInvalidListReleasesErrorResponse       ListReleasesErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListReleasesErrorResponse is AuthUnauthorized.
+func (s ListReleasesErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListReleasesErrorResponse
+}
+
+// IsInternal reports whether ListReleasesErrorResponse is Internal.
+func (s ListReleasesErrorResponse) IsInternal() bool {
+	return s.Type == InternalListReleasesErrorResponse
+}
+
+// IsReqInvalid reports whether ListReleasesErrorResponse is ReqInvalid.
+func (s ListReleasesErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListReleasesErrorResponse
+}
+
+// SetAuthUnauthorized sets ListReleasesErrorResponse to AuthUnauthorized.
+func (s *ListReleasesErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListReleasesErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListReleasesErrorResponse is AuthUnauthorized.
+func (s ListReleasesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListReleasesErrorResponse returns new ListReleasesErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListReleasesErrorResponse(v AuthUnauthorized) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListReleasesErrorResponse to Internal.
+func (s *ListReleasesErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListReleasesErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListReleasesErrorResponse is Internal.
+func (s ListReleasesErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListReleasesErrorResponse returns new ListReleasesErrorResponse from Internal.
+func NewInternalListReleasesErrorResponse(v Internal) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListReleasesErrorResponse to ReqInvalid.
+func (s *ListReleasesErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListReleasesErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListReleasesErrorResponse is ReqInvalid.
+func (s ListReleasesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListReleasesErrorResponse returns new ListReleasesErrorResponse from ReqInvalid.
+func NewReqInvalidListReleasesErrorResponse(v ReqInvalid) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListReleasesErrorResponseStatusCode wraps ListReleasesErrorResponse with StatusCode.
+type ListReleasesErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListReleasesErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListReleasesErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListReleasesErrorResponseStatusCode) GetResponse() ListReleasesErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListReleasesErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListReleasesErrorResponseStatusCode) SetResponse(val ListReleasesErrorResponse) {
+	s.Response = val
+}
+
+func (*ListReleasesErrorResponseStatusCode) listReleasesRes() {}
+
+// The project's releases, newest first.
+// Ref: #
+type ListReleasesResponse struct {
+	Releases []ReleaseSummary `json:"releases"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetReleases returns the value of Releases.
+func (s *ListReleasesResponse) GetReleases() []ReleaseSummary {
+	return s.Releases
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListReleasesResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetReleases sets the value of Releases.
+func (s *ListReleasesResponse) SetReleases(val []ReleaseSummary) {
+	s.Releases = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListReleasesResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListReleasesResponse) listReleasesRes() {}
 
 type ListSchemasKind string
 
@@ -29197,6 +29706,69 @@ func (o OptNilProjectUpdatedEventActorType) Get() (v ProjectUpdatedEventActorTyp
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilProjectUpdatedEventActorType) Or(d ProjectUpdatedEventActorType) ProjectUpdatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilReleaseMetadataCreatedByType returns new OptNilReleaseMetadataCreatedByType with value set to v.
+func NewOptNilReleaseMetadataCreatedByType(v ReleaseMetadataCreatedByType) OptNilReleaseMetadataCreatedByType {
+	return OptNilReleaseMetadataCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilReleaseMetadataCreatedByType is optional nullable ReleaseMetadataCreatedByType.
+type OptNilReleaseMetadataCreatedByType struct {
+	Value ReleaseMetadataCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilReleaseMetadataCreatedByType was set.
+func (o OptNilReleaseMetadataCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilReleaseMetadataCreatedByType) Reset() {
+	var v ReleaseMetadataCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilReleaseMetadataCreatedByType) SetTo(v ReleaseMetadataCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilReleaseMetadataCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilReleaseMetadataCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ReleaseMetadataCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilReleaseMetadataCreatedByType) Get() (v ReleaseMetadataCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilReleaseMetadataCreatedByType) Or(d ReleaseMetadataCreatedByType) ReleaseMetadataCreatedByType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -36428,6 +37000,365 @@ type QueryUsersUnauthorized ErrorDetails
 
 func (*QueryUsersUnauthorized) queryUsersRes() {}
 
+// An immutable, project-scoped snapshot that pins one revision of every
+// resource it includes.
+// A release owns pointers and metadata, not content — it records *which*
+// revisions belong together. Callers that need the resource bytes resolve each
+// `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
+// `GET /flow_definitions/{id}`, …).
+// A release exists on its own and is not tied to an environment. Deploying it
+// is a separate call.
+// Ref: #
+type Release struct {
+	// The opaque, immutable resource id, assigned at construction.
+	ID ReleaseID `json:"id"`
+	// The project this release belongs to.
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
+	// The revisions this release pins, one entry per `(kind, handle)`. Never
+	// empty: a release must contain at least one resource.
+	Pointers []ReleasePointer `json:"pointers"`
+}
+
+// GetID returns the value of ID.
+func (s *Release) GetID() ReleaseID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *Release) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *Release) GetMetadata() ReleaseMetadata {
+	return s.Metadata
+}
+
+// GetPointers returns the value of Pointers.
+func (s *Release) GetPointers() []ReleasePointer {
+	return s.Pointers
+}
+
+// SetID sets the value of ID.
+func (s *Release) SetID(val ReleaseID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *Release) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *Release) SetMetadata(val ReleaseMetadata) {
+	s.Metadata = val
+}
+
+// SetPointers sets the value of Pointers.
+func (s *Release) SetPointers(val []ReleasePointer) {
+	s.Pointers = val
+}
+
+func (*Release) getReleaseByIdRes() {}
+
+type ReleaseID string
+
+// Who assembled the release, when, and from what source. Set when the release
+// is assembled and never mutated afterwards.
+// Ref: #
+type ReleaseMetadata struct {
+	// A short caller-supplied summary of what the release changes, analogous to
+	// a git commit message.
+	Message OptNilString `json:"message"`
+	// The source commit the caller was operating from. Recording it on both
+	// releases is what lets two releases be diffed at field level in the
+	// source repository they were built from.
+	GitSha OptNilString `json:"git_sha"`
+	// True when the working tree had uncommitted changes at construction time.
+	// `git_sha` still points at HEAD, but the release content does not
+	// correspond to that commit exactly, so consumers of the git-diff mechanism
+	// should skip it when either side is dirty.
+	GitDirty bool `json:"git_dirty"`
+	// When the release was assembled.
+	CreatedAt time.Time `json:"created_at"`
+	// The identity that assembled the release. Absent when the caller is a
+	// machine principal carrying no user identity, which is the common case for
+	// releases constructed from CI or the CLI.
+	CreatedBy OptNilString `json:"created_by"`
+	// What kind of principal `created_by` names.
+	CreatedByType OptNilReleaseMetadataCreatedByType `json:"created_by_type"`
+}
+
+// GetMessage returns the value of Message.
+func (s *ReleaseMetadata) GetMessage() OptNilString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *ReleaseMetadata) GetGitSha() OptNilString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *ReleaseMetadata) GetGitDirty() bool {
+	return s.GitDirty
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ReleaseMetadata) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *ReleaseMetadata) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *ReleaseMetadata) GetCreatedByType() OptNilReleaseMetadataCreatedByType {
+	return s.CreatedByType
+}
+
+// SetMessage sets the value of Message.
+func (s *ReleaseMetadata) SetMessage(val OptNilString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *ReleaseMetadata) SetGitSha(val OptNilString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *ReleaseMetadata) SetGitDirty(val bool) {
+	s.GitDirty = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ReleaseMetadata) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *ReleaseMetadata) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *ReleaseMetadata) SetCreatedByType(val OptNilReleaseMetadataCreatedByType) {
+	s.CreatedByType = val
+}
+
+type ReleaseMetadataCreatedByType string
+
+const (
+	ReleaseMetadataCreatedByTypeHuman   ReleaseMetadataCreatedByType = "human"
+	ReleaseMetadataCreatedByTypeService ReleaseMetadataCreatedByType = "service"
+	ReleaseMetadataCreatedByTypeSystem  ReleaseMetadataCreatedByType = "system"
+	ReleaseMetadataCreatedByTypeAgent   ReleaseMetadataCreatedByType = "agent"
+)
+
+// AllValues returns all ReleaseMetadataCreatedByType values.
+func (ReleaseMetadataCreatedByType) AllValues() []ReleaseMetadataCreatedByType {
+	return []ReleaseMetadataCreatedByType{
+		ReleaseMetadataCreatedByTypeHuman,
+		ReleaseMetadataCreatedByTypeService,
+		ReleaseMetadataCreatedByTypeSystem,
+		ReleaseMetadataCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ReleaseMetadataCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case ReleaseMetadataCreatedByTypeHuman:
+		return []byte(s), nil
+	case ReleaseMetadataCreatedByTypeService:
+		return []byte(s), nil
+	case ReleaseMetadataCreatedByTypeSystem:
+		return []byte(s), nil
+	case ReleaseMetadataCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ReleaseMetadataCreatedByType) UnmarshalText(data []byte) error {
+	switch ReleaseMetadataCreatedByType(data) {
+	case ReleaseMetadataCreatedByTypeHuman:
+		*s = ReleaseMetadataCreatedByTypeHuman
+		return nil
+	case ReleaseMetadataCreatedByTypeService:
+		*s = ReleaseMetadataCreatedByTypeService
+		return nil
+	case ReleaseMetadataCreatedByTypeSystem:
+		*s = ReleaseMetadataCreatedByTypeSystem
+		return nil
+	case ReleaseMetadataCreatedByTypeAgent:
+		*s = ReleaseMetadataCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// One entry of the set a release pins: the revision of a single resource that
+// this release includes.
+// Ref: #
+type ReleasePointer struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// Which resource this pointer pins, independent of which revision of it.
+	// `revision_id` chooses the revision; `handle` says what the revision is a
+	// revision *of*. Determined when the release is assembled, not supplied by
+	// the caller:
+	// - `schema` — the document's `objectType`, so `human-user` and
+	// `machine-user` are separate resources a release pins separately
+	// - `flow_definition` — the definition's `name`, likewise for
+	// `default-login` and `b2b-login`
+	// - `branding` — always `default`. A project has one branding, so there is
+	// nothing to distinguish; it is revisioned like everything else, and
+	// `revision_id` is what varies between releases.
+	// Resources inside a release reference each other by handle rather than by
+	// revision id, so the same handle names the same resource in every release.
+	Handle string `json:"handle"`
+	// The revision of that resource this release pins.
+	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
+	// the schema's `$id`, which is a URL whenever the document supplied one and
+	// only a generated `sch_*` value otherwise.
+	RevisionID string `json:"revision_id"`
+}
+
+// GetKind returns the value of Kind.
+func (s *ReleasePointer) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetHandle returns the value of Handle.
+func (s *ReleasePointer) GetHandle() string {
+	return s.Handle
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *ReleasePointer) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// SetKind sets the value of Kind.
+func (s *ReleasePointer) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetHandle sets the value of Handle.
+func (s *ReleasePointer) SetHandle(val string) {
+	s.Handle = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *ReleasePointer) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// The kind of resource a release pointer pins.
+// Carried explicitly rather than inferred from `revision_id`, because a
+// revision id is not always shaped distinctly enough to identify its kind: a
+// schema's is its `$id`, which may be any URL.
+// `flow_definition` rather than `flow`: a release pins the definitions served
+// at `/flow_definitions`, not the runtime flows at `/flow`.
+// Ref: #
+type ReleasePointerKind string
+
+const (
+	ReleasePointerKindSchema         ReleasePointerKind = "schema"
+	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
+	ReleasePointerKindBranding       ReleasePointerKind = "branding"
+)
+
+// AllValues returns all ReleasePointerKind values.
+func (ReleasePointerKind) AllValues() []ReleasePointerKind {
+	return []ReleasePointerKind{
+		ReleasePointerKindSchema,
+		ReleasePointerKindFlowDefinition,
+		ReleasePointerKindBranding,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ReleasePointerKind) MarshalText() ([]byte, error) {
+	switch s {
+	case ReleasePointerKindSchema:
+		return []byte(s), nil
+	case ReleasePointerKindFlowDefinition:
+		return []byte(s), nil
+	case ReleasePointerKindBranding:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
+	switch ReleasePointerKind(data) {
+	case ReleasePointerKindSchema:
+		*s = ReleasePointerKindSchema
+		return nil
+	case ReleasePointerKindFlowDefinition:
+		*s = ReleasePointerKindFlowDefinition
+		return nil
+	case ReleasePointerKindBranding:
+		*s = ReleasePointerKindBranding
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A release without its pinned set — the shape `GET /releases` returns.
+// Pointers are omitted rather than optional so that a list entry can never be
+// mistaken for a release that pins nothing; fetch them with
+// `GET /releases/{release_id}`.
+// Ref: #
+type ReleaseSummary struct {
+	// The opaque, immutable resource id, assigned at construction.
+	ID ReleaseID `json:"id"`
+	// The project this release belongs to.
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
+}
+
+// GetID returns the value of ID.
+func (s *ReleaseSummary) GetID() ReleaseID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ReleaseSummary) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ReleaseSummary) GetMetadata() ReleaseMetadata {
+	return s.Metadata
+}
+
+// SetID sets the value of ID.
+func (s *ReleaseSummary) SetID(val ReleaseID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ReleaseSummary) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ReleaseSummary) SetMetadata(val ReleaseMetadata) {
+	s.Metadata = val
+}
+
 // Merged schema.
 // Ref: #
 type ReqInvalid struct {
@@ -39623,13 +40554,22 @@ func (s *SessionEstablishedPayload) SetUserID(val OptString) {
 // - `user_id`: user id
 // - `state`: one of `building`, `active`, `expired`. State is computed at read
 // time, so a session expiring mid-request can match `active` but return `expired`.
+// - `lifecycle_owner_team_id`: team id. Matches the sessions of the users whose
+// lifecycle that team owns — the same users it can deactivate and whose
+// sessions it can revoke. Roster membership does not match: a collaborator on
+// the team's roster whose lifecycle another team (or the user themselves)
+// owns is not returned. A session is project-scoped and is not bound to a
+// team, so the link is read from the user at query time; a session of a
+// self-owned user, and a session with no user, match no team. Only `equals`
+// is supported.
 // Ref: #
 type SessionFilterField string
 
 const (
-	SessionFilterFieldCreatedAt SessionFilterField = "created_at"
-	SessionFilterFieldUserID    SessionFilterField = "user_id"
-	SessionFilterFieldState     SessionFilterField = "state"
+	SessionFilterFieldCreatedAt            SessionFilterField = "created_at"
+	SessionFilterFieldUserID               SessionFilterField = "user_id"
+	SessionFilterFieldState                SessionFilterField = "state"
+	SessionFilterFieldLifecycleOwnerTeamID SessionFilterField = "lifecycle_owner_team_id"
 )
 
 // AllValues returns all SessionFilterField values.
@@ -39638,6 +40578,7 @@ func (SessionFilterField) AllValues() []SessionFilterField {
 		SessionFilterFieldCreatedAt,
 		SessionFilterFieldUserID,
 		SessionFilterFieldState,
+		SessionFilterFieldLifecycleOwnerTeamID,
 	}
 }
 
@@ -39649,6 +40590,8 @@ func (s SessionFilterField) MarshalText() ([]byte, error) {
 	case SessionFilterFieldUserID:
 		return []byte(s), nil
 	case SessionFilterFieldState:
+		return []byte(s), nil
+	case SessionFilterFieldLifecycleOwnerTeamID:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -39666,6 +40609,9 @@ func (s *SessionFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case SessionFilterFieldState:
 		*s = SessionFilterFieldState
+		return nil
+	case SessionFilterFieldLifecycleOwnerTeamID:
+		*s = SessionFilterFieldLifecycleOwnerTeamID
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
