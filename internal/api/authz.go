@@ -138,7 +138,7 @@ var eventsAccess = resourceAccess{
 }
 
 // grantAccess gates create/get/query/revoke. Grants are not in resource_scope_index;
-// every op takes project_id from the header (same as events).
+// every op takes project_id from the query (same as events).
 var grantAccess = resourceAccess{
 	readMiss:  domain.ErrGrantNotFound,
 	writeMiss: domain.ErrGrantNotFound,

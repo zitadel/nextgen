@@ -468,7 +468,7 @@ type Invoker interface {
 	// viewer, editor, or admin), including expired grants so a client can
 	// DELETE before re-granting. Project-secret setup (`sk_proj`) and
 	// owning-team (`relation=team`) rows are not returned. Grants are not in
-	// `resource_scope_index`; project scope is required on the header (same as
+	// `resource_scope_index`; project scope is required on the query (same as
 	// get). Requires `project.read`.
 	//
 	// POST /grants/query
@@ -7391,7 +7391,7 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 // viewer, editor, or admin), including expired grants so a client can
 // DELETE before re-granting. Project-secret setup (`sk_proj`) and
 // owning-team (`relation=team`) rows are not returned. Grants are not in
-// `resource_scope_index`; project scope is required on the header (same as
+// `resource_scope_index`; project scope is required on the query (same as
 // get). Requires `project.read`.
 //
 // POST /grants/query
