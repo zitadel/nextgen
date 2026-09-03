@@ -37,6 +37,10 @@ type CreateProjectRes interface {
 	createProjectRes()
 }
 
+type CreateReleaseRes interface {
+	createReleaseRes()
+}
+
 type CreateSchemaRes interface {
 	createSchemaRes()
 }
@@ -133,6 +137,10 @@ type GetReadyRes interface {
 	getReadyRes()
 }
 
+type GetReleaseByIdRes interface {
+	getReleaseByIdRes()
+}
+
 type GetSchemaByIdRes interface {
 	getSchemaByIdRes()
 }
@@ -171,6 +179,10 @@ type ListEventsRes interface {
 
 type ListFlowDefinitionsRes interface {
 	listFlowDefinitionsRes()
+}
+
+type ListReleasesRes interface {
+	listReleasesRes()
 }
 
 type ListSchemasRes interface {
