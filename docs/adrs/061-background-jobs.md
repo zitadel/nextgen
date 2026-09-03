@@ -28,9 +28,9 @@ One `jobs` table. Columns (logical; DDL is dialect-owned):
 | Column | Role |
 |--------|------|
 | `id` | dialect-minted `job_<opaque>` ([ADR 047](047-dialect-id-generation.md) §3). Not an HTTP resource. |
-| `name` | handler key. A column, not a queue. |
+| `name` | handler to run. Not unique. Many queued rows share one `name`. |
 | `payload` | opaque bytes; empty for sweeps. |
-| `unique_key` | optional. Periodic rows use the job name. Queued rows may use e.g. `email.send:{user_id}:welcome`. |
+| `unique_key` | uniqueness constraint, nullable. `UNIQUE` where not null (multiple nulls allowed). Periodic: required, equal to `name`. Queued: optional (set for idempotent enqueue). |
 | `run_at` | due instant (database clock). |
 | `period` | set on unique periodic rows; null on queued rows. |
 | `claimed_until`, `claimed_by` | lease. |
@@ -46,7 +46,7 @@ Periodic sweeps and queued work are both rows.
 
 | Kind | Rows due at once | In flight cluster-wide |
 |------|------------------|------------------------|
-| Unique periodic (`jobs.gc`, later `sessions.gc`) | one row per name | at most one of that name |
+| Unique periodic (`jobs.gc`, later `sessions.gc`) | one row (`unique_key` = `name`) | at most one of that name |
 | Queued (`email.send`) | one per unit of work | up to remaining claimers |
 
 Parallelism is in-flight `Perform`s: `replicas × jobs.concurrency`. Named queues, per-name concurrency caps, and fair mixing are out of v1. A flood of queued rows can delay a due periodic row; that starvation is accepted.
@@ -97,15 +97,17 @@ The Go API is `time.Duration`. Column types follow sessions: Postgres `INTERVAL`
 
 ### 5. Periodic jobs are one unique row
 
-One row keyed by unique name (for example `unique_key = 'jobs.gc'`). `period` lives on the row so Complete can reschedule in SQL without the completing replica’s in-memory catalog.
+Uniqueness is the `unique_key` column, not `name`. Periodic registration sets `unique_key = name` (for example both `jobs.gc`) and a non-null `period`. Boot upserts on that key. Config (viper) remains the knob; replicas overwrite `period` from config. The row is the shared cursor, not a second config store.
 
-Boot upserts name and period when the handler is registered. Config (viper) remains the knob; replicas overwrite `period` from config. The row is the shared cursor, not a second config store.
+`period` lives on the row so Complete can reschedule in SQL without the completing replica’s in-memory catalog.
 
 Handlers and boot-time period come from registration. The unique row owns `run_at` / `period` for Claim and Complete.
 
 ### 6. Queued work is inserted in the product transaction
 
-A service calls `Enqueue` on the statements of the transaction that wrote the entity (user create + `email.send`). Rollback drops the job. After commit, any replica can Claim the row. Optional `unique_key` so a retried mutate does not insert a second row.
+A service calls `Enqueue` on the statements of the transaction that wrote the entity (user create + `email.send`). Rollback drops the job. After commit, any replica can Claim the row.
+
+Queued rows share `name` (`email.send`) and usually leave `unique_key` null — each Enqueue inserts. If `unique_key` is set (for example `email.send:{user_id}:welcome`), Enqueue is idempotent: a conflict keeps the existing row.
 
 ### 7. Retain, then `jobs.gc`; metrics instead of a dead-letter table
 
