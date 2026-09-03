@@ -18,6 +18,12 @@ type FakeSecuritySource struct {
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
+	// Dual-scheme ops (e.g. grants) OR oauth2 and nextgenSession. An empty
+	// Token must skip so the client does not send `Authorization: Bearer `
+	// and fail the server's HandleOAuth2 before the session cookie is tried.
+	if f.Token == "" {
+		return api.OAuth2{}, ogenerrors.ErrSkipClientSecurity
+	}
 	return api.OAuth2{
 		Token:  f.Token,
 		Scopes: f.Scopes,
