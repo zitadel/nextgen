@@ -242,13 +242,12 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   `projects.project_secret`, so changing the stored value would not invalidate
   the old secret). **Accepted trade-off:** the pre-claim secret stays valid after
   claim, so anyone who held it pre-claim retains API access until rotation ships.
-- **Automated expiry and deletion of unclaimed projects.** This claim contract
-  still does not delete or expire unclaimed projects. Instance scheduling now
-  lives in [ADR 061](061-background-jobs.md); it does not add an unclaimed-project
-  sweeper. CLI messaging frames unclaimed projects as temporary without promising
-  deletion; an expired-unclaimed project stays cheaply derivable (created long
-  ago with no claim grant). **Accepted trade-off:** unclaimed projects accumulate
-  until an expiry mechanism exists.
+- **Automated expiry and deletion of unclaimed projects.** Unclaimed projects
+  still persist unenforced. [ADR 061](061-background-jobs.md) adds instance
+  scheduling; it does not add an unclaimed-project sweeper. CLI messaging frames
+  them as temporary without promising deletion; an expired-unclaimed project stays
+  cheaply derivable (created long ago with no claim grant). **Accepted
+  trade-off:** unclaimed projects accumulate until an expiry mechanism exists.
 - **Claim metrics and telemetry.** Claim volumes are answerable with ad-hoc
   queries over the grant data until a metrics surface is added.
 - **Claim attributes on `GET /projects/{id}`.** `claimed_at` and `team_id` are
