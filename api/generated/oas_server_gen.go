@@ -82,6 +82,10 @@ type Handler interface {
 	// created here — claim owns that path. An unrevoked grant with the same
 	// principal and relation occupies the unique key even after `expires_at`;
 	// DELETE it before re-creating.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the target project (home may differ); CSRF/Origin
+	// for cookie mutations is a follow-up to ADR 053 §5.
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)

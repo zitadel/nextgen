@@ -15,6 +15,7 @@ get:
   security:
     - oauth2:
         - project.read
+    - nextgenSession: []
   parameters:
     - name: id
       in: path
@@ -66,6 +67,7 @@ delete:
   security:
     - oauth2:
         - project.write
+    - nextgenSession: []
   parameters:
     - name: id
       in: path

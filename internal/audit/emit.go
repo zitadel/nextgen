@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -20,6 +21,14 @@ type EmitSpec struct {
 	// (anonymous session mint, token issue before AuthGate, etc.).
 	ActorID   *string
 	ActorType *domain.EventActorType
+	// ForceProjectID makes ProjectID win over the actor context's project.
+	// Use for protected-project mutations by a foreign human (ADR 053 §8).
+	ForceProjectID bool
+	// ClearTeamID drops actor TeamID so the column stays protected-resource
+	// scope only (ADR 053 §8). Pair with ForceProjectID for foreign actors.
+	ClearTeamID bool
+	// Metadata merges into events.metadata (authorization path, etc.).
+	Metadata *domain.EventMetadata
 }
 
 // Emit builds and inserts a Path B event. Empty ProjectID skips the insert
@@ -27,6 +36,12 @@ type EmitSpec struct {
 func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	ev := WithEntity(FromContext(ctx, spec.Type, spec.Category), spec.EntityType, spec.EntityID)
 	ev = WithProjectID(ev, spec.ProjectID)
+	if spec.ForceProjectID && spec.ProjectID != "" {
+		ev.ProjectID = spec.ProjectID
+	}
+	if spec.ClearTeamID {
+		ev.TeamID = nil
+	}
 	if spec.SessionID != nil {
 		ev.SessionID = spec.SessionID
 	}
@@ -38,6 +53,13 @@ func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	}
 	if spec.ActorType != nil {
 		ev.ActorType = spec.ActorType
+	}
+	if spec.Metadata != nil {
+		raw, err := json.Marshal(spec.Metadata)
+		if err != nil {
+			return err
+		}
+		ev.Metadata = raw
 	}
 	ev, err := WithPayload(ev, spec.Payload)
 	if err != nil {

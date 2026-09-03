@@ -227,16 +227,33 @@ func (s *GrantService) loadPrincipal(ctx context.Context, stmts AllStatements, h
 }
 
 func emitAuthzRevoked(ctx context.Context, stmts EventStatements, a *domain.AuthzAssignment) error {
-	return audit.Emit(ctx, stmts, audit.EmitSpec{
-		Type:       domain.EventTypeAuthzRevoked,
-		Category:   domain.EventCategoryAdmin,
-		ProjectID:  a.ProjectID,
-		EntityType: "authz_assignment",
-		EntityID:   a.ID,
-		Payload: domain.AuthzRevokedPayload{
-			PrincipalType: a.PrincipalType.String(),
-			PrincipalID:   a.PrincipalID,
-			Relation:      a.Relation,
-		},
-	})
+	return audit.Emit(ctx, stmts, authzAssignmentEmitSpec(ctx, domain.EventTypeAuthzRevoked, a, domain.AuthzRevokedPayload{
+		PrincipalType: a.PrincipalType.String(),
+		PrincipalID:   a.PrincipalID,
+		Relation:      a.Relation,
+	}))
+}
+
+// authzAssignmentEmitSpec stamps grant events on the protected project
+// (ADR 053 §8). Actor home may differ; team_id stays empty for project-scoped
+// grants; foreign humans get actor_home_project_id in authorization metadata.
+func authzAssignmentEmitSpec(ctx context.Context, typ domain.EventType, a *domain.AuthzAssignment, payload any) audit.EmitSpec {
+	spec := audit.EmitSpec{
+		Type:           typ,
+		Category:       domain.EventCategoryAdmin,
+		ProjectID:      a.ProjectID,
+		EntityType:     "authz_assignment",
+		EntityID:       a.ID,
+		Payload:        payload,
+		ForceProjectID: true,
+		ClearTeamID:    true,
+	}
+	if ac, ok := audit.ActorFromContext(ctx); ok && ac.ProjectID != "" && ac.ProjectID != a.ProjectID {
+		spec.Metadata = &domain.EventMetadata{
+			Authorization: &domain.EventAuthorizationMetadata{
+				ActorHomeProjectID: ac.ProjectID,
+			},
+		}
+	}
+	return spec
 }

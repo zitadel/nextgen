@@ -1194,6 +1194,10 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 // created here — claim owns that path. An unrevoked grant with the same
 // principal and relation occupies the unique key even after `expires_at`;
 // DELETE it before re-creating.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). Session callers are authorized as
+// the human against the target project (home may differ); CSRF/Origin
+// for cookie mutations is a follow-up to ADR 053 §5.
 //
 // POST /grants
 func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1287,11 +1291,29 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, CreateGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2847,11 +2869,29 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, DeleteGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -5148,11 +5188,29 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, GetGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

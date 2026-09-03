@@ -123,9 +123,19 @@ type EventClientMetadata struct {
 	Origin    string `json:"origin,omitempty"`
 }
 
+// EventAuthorizationMetadata is non-PII explanation of how a foreign actor was
+// allowed (ADR 053 §8). It does not change access.
+type EventAuthorizationMetadata struct {
+	ActorHomeProjectID string   `json:"actor_home_project_id,omitempty"`
+	AssignmentIDs      []string `json:"assignment_ids,omitempty"`
+	Path               string   `json:"path,omitempty"`
+	TeamID             string   `json:"team_id,omitempty"`
+}
+
 // EventMetadata is the events.metadata JSON object.
 type EventMetadata struct {
-	Client *EventClientMetadata `json:"client,omitempty"`
+	Client        *EventClientMetadata        `json:"client,omitempty"`
+	Authorization *EventAuthorizationMetadata `json:"authorization,omitempty"`
 }
 
 // EventField enumerates filterable/sortable Event columns.

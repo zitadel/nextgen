@@ -249,18 +249,11 @@ func emitProjectCreated(ctx context.Context, stmts EventStatements, project *dom
 }
 
 func emitAuthzGranted(ctx context.Context, stmts EventStatements, a *domain.AuthzAssignment) error {
-	return audit.Emit(ctx, stmts, audit.EmitSpec{
-		Type:       domain.EventTypeAuthzGranted,
-		Category:   domain.EventCategoryAdmin,
-		ProjectID:  a.ProjectID,
-		EntityType: "authz_assignment",
-		EntityID:   a.ID,
-		Payload: domain.AuthzGrantedPayload{
-			PrincipalType: a.PrincipalType.String(),
-			PrincipalID:   a.PrincipalID,
-			Relation:      a.Relation,
-		},
-	})
+	return audit.Emit(ctx, stmts, authzAssignmentEmitSpec(ctx, domain.EventTypeAuthzGranted, a, domain.AuthzGrantedPayload{
+		PrincipalType: a.PrincipalType.String(),
+		PrincipalID:   a.PrincipalID,
+		Relation:      a.Relation,
+	}))
 }
 
 func emitSchemaCreated(ctx context.Context, stmts EventStatements, schema *domain.JSONSchema) error {

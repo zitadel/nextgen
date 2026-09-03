@@ -249,3 +249,75 @@ func assertGrantAlreadyExists(t *testing.T, resp any) {
 	require.True(t, ok, helpers.MustMarshal(t, resp))
 	assert.Equal(t, api.ErrorCode("grant.already_exists"), conflict.Code)
 }
+
+// TestGrantSessionCaller exercises ADR 053 §5 for grant ops: a platform-homed
+// Console session may create/get/revoke grants on a customer project when it
+// holds project.admin there. CSRF/Origin are out of scope (follow-up).
+func TestGrantSessionCaller(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	operatorID := harness.CreateUserWithTeam(t, platform.ID)
+	operatorAsgn := &domain.AuthzAssignment{
+		ProjectID:     project.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   operatorID,
+		ObjectType:    "project",
+		Relation:      "admin",
+	}
+	operatorAsgn.ApplyScope(domain.NewProjectAssignmentScope())
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), operatorAsgn))
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(platformSessionCookie(t, operatorID).Value)
+
+	subjectID := harness.CreateUserWithTeam(t, platform.ID)
+	params := api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)}
+
+	createResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
+		PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
+		PrincipalID:   subjectID,
+		Relation:      api.CreateGrantRequestRelationViewer,
+	}, params)
+	require.NoError(t, err)
+	created, ok := createResp.(*api.Grant)
+	require.True(t, ok, helpers.MustMarshal(t, createResp))
+	assert.Equal(t, project.ID, created.ProjectID)
+	assert.Equal(t, subjectID, created.PrincipalID)
+
+	getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+		ID:        created.ID,
+		ProjectID: api.ProjectID(project.ID),
+	})
+	require.NoError(t, err)
+	got, ok := getResp.(*api.Grant)
+	require.True(t, ok, helpers.MustMarshal(t, getResp))
+	assert.Equal(t, created.ID, got.ID)
+
+	delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
+		ID:        created.ID,
+		ProjectID: api.ProjectID(project.ID),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
+
+	t.Run("no foothold is not found", func(t *testing.T) {
+		t.Parallel()
+		strangerID := harness.CreateUserWithTeam(t, platform.ID)
+		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		stranger.SetSessionToken(platformSessionCookie(t, strangerID).Value)
+		resp, err := stranger.CreateGrant(t.Context(), &api.CreateGrantRequest{
+			PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
+			PrincipalID:   harness.CreateUserWithTeam(t, platform.ID),
+			Relation:      api.CreateGrantRequestRelationViewer,
+		}, params)
+		require.NoError(t, err)
+		assertGrantNotFound(t, resp)
+	})
+}

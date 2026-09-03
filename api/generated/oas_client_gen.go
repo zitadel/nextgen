@@ -102,6 +102,10 @@ type Invoker interface {
 	// created here — claim owns that path. An unrevoked grant with the same
 	// principal and relation occupies the unique key even after `expires_at`;
 	// DELETE it before re-creating.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the target project (home may differ); CSRF/Origin
+	// for cookie mutations is a follow-up to ADR 053 §5.
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -1397,6 +1401,10 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // created here — claim owns that path. An unrevoked grant with the same
 // principal and relation occupies the unique key even after `expires_at`;
 // DELETE it before re-creating.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). Session callers are authorized as
+// the human against the target project (home may differ); CSRF/Origin
+// for cookie mutations is a follow-up to ADR 053 §5.
 //
 // POST /grants
 func (c *Client) CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error) {
@@ -1498,11 +1506,23 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, CreateGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2607,11 +2627,23 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, DeleteGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4281,11 +4313,23 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

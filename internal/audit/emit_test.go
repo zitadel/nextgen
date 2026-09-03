@@ -77,3 +77,35 @@ func TestEmit_CopiesRequestIDFromMiddleware(t *testing.T) {
 	require.Equal(t, "req_api", *cap.last.RequestID)
 	require.Equal(t, json.RawMessage("{}"), cap.last.Metadata)
 }
+
+func TestEmit_ForceProjectIDOverridesActorHome(t *testing.T) {
+	t.Parallel()
+	cap := &insertEventCapture{}
+	homeTeam := "team_home"
+	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
+		ProjectID: "proj_platform",
+		TeamID:    &homeTeam,
+	})
+	require.NoError(t, audit.Emit(ctx, cap, audit.EmitSpec{
+		Type:           domain.EventTypeAuthzGranted,
+		Category:       domain.EventCategoryAdmin,
+		ProjectID:      "proj_customer",
+		EntityType:     "authz_assignment",
+		EntityID:       "asgn_1",
+		Payload:        domain.AuthzGrantedPayload{PrincipalType: "user", PrincipalID: "user_1", Relation: "viewer"},
+		ForceProjectID: true,
+		ClearTeamID:    true,
+		Metadata: &domain.EventMetadata{
+			Authorization: &domain.EventAuthorizationMetadata{
+				ActorHomeProjectID: "proj_platform",
+			},
+		},
+	}))
+	require.Equal(t, 1, cap.called)
+	require.Equal(t, "proj_customer", cap.last.ProjectID)
+	require.Nil(t, cap.last.TeamID)
+	var meta domain.EventMetadata
+	require.NoError(t, json.Unmarshal(cap.last.Metadata, &meta))
+	require.NotNil(t, meta.Authorization)
+	require.Equal(t, "proj_platform", meta.Authorization.ActorHomeProjectID)
+}
