@@ -20965,10 +20965,12 @@ func (*GetReadyOK) getReadyRes() {}
 
 // GetReleaseByIdErrorResponse represents sum type.
 type GetReleaseByIdErrorResponse struct {
-	Type             GetReleaseByIdErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                GetReleaseByIdErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	RelNotFound         RelNotFound
+	RelPermissionDenied RelPermissionDenied
+	ReqInvalid          ReqInvalid
 }
 
 // GetReleaseByIdErrorResponseType is oneOf type of GetReleaseByIdErrorResponse.
@@ -20976,9 +20978,11 @@ type GetReleaseByIdErrorResponseType string
 
 // Possible values for GetReleaseByIdErrorResponseType.
 const (
-	AuthUnauthorizedGetReleaseByIdErrorResponse GetReleaseByIdErrorResponseType = "auth.unauthorized"
-	InternalGetReleaseByIdErrorResponse         GetReleaseByIdErrorResponseType = "internal"
-	ReqInvalidGetReleaseByIdErrorResponse       GetReleaseByIdErrorResponseType = "req.invalid"
+	AuthUnauthorizedGetReleaseByIdErrorResponse    GetReleaseByIdErrorResponseType = "auth.unauthorized"
+	InternalGetReleaseByIdErrorResponse            GetReleaseByIdErrorResponseType = "internal"
+	RelNotFoundGetReleaseByIdErrorResponse         GetReleaseByIdErrorResponseType = "rel.not_found"
+	RelPermissionDeniedGetReleaseByIdErrorResponse GetReleaseByIdErrorResponseType = "rel.permission_denied"
+	ReqInvalidGetReleaseByIdErrorResponse          GetReleaseByIdErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether GetReleaseByIdErrorResponse is AuthUnauthorized.
@@ -20989,6 +20993,16 @@ func (s GetReleaseByIdErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetReleaseByIdErrorResponse is Internal.
 func (s GetReleaseByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetReleaseByIdErrorResponse
+}
+
+// IsRelNotFound reports whether GetReleaseByIdErrorResponse is RelNotFound.
+func (s GetReleaseByIdErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundGetReleaseByIdErrorResponse
+}
+
+// IsRelPermissionDenied reports whether GetReleaseByIdErrorResponse is RelPermissionDenied.
+func (s GetReleaseByIdErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedGetReleaseByIdErrorResponse
 }
 
 // IsReqInvalid reports whether GetReleaseByIdErrorResponse is ReqInvalid.
@@ -21035,6 +21049,48 @@ func (s GetReleaseByIdErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetReleaseByIdErrorResponse(v Internal) GetReleaseByIdErrorResponse {
 	var s GetReleaseByIdErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetRelNotFound sets GetReleaseByIdErrorResponse to RelNotFound.
+func (s *GetReleaseByIdErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundGetReleaseByIdErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if GetReleaseByIdErrorResponse is RelNotFound.
+func (s GetReleaseByIdErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from RelNotFound.
+func NewRelNotFoundGetReleaseByIdErrorResponse(v RelNotFound) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets GetReleaseByIdErrorResponse to RelPermissionDenied.
+func (s *GetReleaseByIdErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedGetReleaseByIdErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if GetReleaseByIdErrorResponse is RelPermissionDenied.
+func (s GetReleaseByIdErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedGetReleaseByIdErrorResponse(v RelPermissionDenied) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetRelPermissionDenied(v)
 	return s
 }
 
@@ -23269,10 +23325,12 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {
-	Type             ListReleasesErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                ListReleasesErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	RelNotFound         RelNotFound
+	RelPermissionDenied RelPermissionDenied
+	ReqInvalid          ReqInvalid
 }
 
 // ListReleasesErrorResponseType is oneOf type of ListReleasesErrorResponse.
@@ -23280,9 +23338,11 @@ type ListReleasesErrorResponseType string
 
 // Possible values for ListReleasesErrorResponseType.
 const (
-	AuthUnauthorizedListReleasesErrorResponse ListReleasesErrorResponseType = "auth.unauthorized"
-	InternalListReleasesErrorResponse         ListReleasesErrorResponseType = "internal"
-	ReqInvalidListReleasesErrorResponse       ListReleasesErrorResponseType = "req.invalid"
+	AuthUnauthorizedListReleasesErrorResponse    ListReleasesErrorResponseType = "auth.unauthorized"
+	InternalListReleasesErrorResponse            ListReleasesErrorResponseType = "internal"
+	RelNotFoundListReleasesErrorResponse         ListReleasesErrorResponseType = "rel.not_found"
+	RelPermissionDeniedListReleasesErrorResponse ListReleasesErrorResponseType = "rel.permission_denied"
+	ReqInvalidListReleasesErrorResponse          ListReleasesErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether ListReleasesErrorResponse is AuthUnauthorized.
@@ -23293,6 +23353,16 @@ func (s ListReleasesErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether ListReleasesErrorResponse is Internal.
 func (s ListReleasesErrorResponse) IsInternal() bool {
 	return s.Type == InternalListReleasesErrorResponse
+}
+
+// IsRelNotFound reports whether ListReleasesErrorResponse is RelNotFound.
+func (s ListReleasesErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundListReleasesErrorResponse
+}
+
+// IsRelPermissionDenied reports whether ListReleasesErrorResponse is RelPermissionDenied.
+func (s ListReleasesErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedListReleasesErrorResponse
 }
 
 // IsReqInvalid reports whether ListReleasesErrorResponse is ReqInvalid.
@@ -23339,6 +23409,48 @@ func (s ListReleasesErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListReleasesErrorResponse(v Internal) ListReleasesErrorResponse {
 	var s ListReleasesErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetRelNotFound sets ListReleasesErrorResponse to RelNotFound.
+func (s *ListReleasesErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundListReleasesErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if ListReleasesErrorResponse is RelNotFound.
+func (s ListReleasesErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundListReleasesErrorResponse returns new ListReleasesErrorResponse from RelNotFound.
+func NewRelNotFoundListReleasesErrorResponse(v RelNotFound) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets ListReleasesErrorResponse to RelPermissionDenied.
+func (s *ListReleasesErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedListReleasesErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if ListReleasesErrorResponse is RelPermissionDenied.
+func (s ListReleasesErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedListReleasesErrorResponse returns new ListReleasesErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedListReleasesErrorResponse(v RelPermissionDenied) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetRelPermissionDenied(v)
 	return s
 }
 

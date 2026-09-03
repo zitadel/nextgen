@@ -248,3 +248,17 @@ func TestReleaseServiceCreateRejectsSameResourceTwice(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, domErr.Code)
 }
+
+func TestReleaseServiceGetUnknownIsNotFound(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	statements.EXPECT().
+		GetReleaseByID(gomock.Any(), "proj_1", "rel_gone").
+		Return(nil, new(database.NoRowFoundError))
+
+	_, err := svc.Get(t.Context(), "proj_1", "rel_gone")
+	require.Error(t, err)
+
+	domErr, ok := errors.AsType[domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, domain.ErrReleaseNotFound().Code, domErr.Code)
+}

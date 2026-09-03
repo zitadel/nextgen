@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
 // ---- Input / output types ---------------------------------------------------
@@ -35,8 +36,21 @@ type CreateReleaseOutput struct {
 	Created bool
 }
 
+type ListReleasesInput struct {
+	ProjectID string
+	PageToken string
+	Limit     int
+}
+
+type ListReleasesOutput struct {
+	Items         []*domain.Release
+	NextPageToken string
+}
+
 type ReleaseService interface {
 	Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error)
+	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
+	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
 }
 
 type releaseService struct {
@@ -113,6 +127,32 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	}
 
 	return &CreateReleaseOutput{Release: entity, Created: true}, nil
+}
+
+func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	entity, err := s.v2Pool.Statements().GetReleaseByID(ctx, projectID, id)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrReleaseNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get release from database")
+	}
+	return entity, nil
+}
+
+func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error) {
+	opts := release.ListOptions(input.ProjectID, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+
+	result, err := s.v2Pool.Statements().ListReleases(ctx, opts)
+	if err != nil {
+		return nil, mapListError(err, "failed to list releases")
+	}
+
+	return &ListReleasesOutput{
+		Items:         result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
 }
 
 // getByContentHash returns nil without an error when the project holds no

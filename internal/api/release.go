@@ -52,6 +52,51 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	return &reused, nil
 }
 
+func (h *Handler) GetReleaseById(ctx context.Context, params api.GetReleaseByIdParams) (api.GetReleaseByIdRes, error) {
+	// Releases are addressed by a path id, but the read is scoped to the
+	// project the caller named, so a release of another project reads as an
+	// unknown id rather than a forbidden one and is no existence oracle.
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opRead); err != nil {
+		return nil, err
+	}
+
+	entity, err := h.releaseService.Get(ctx, string(params.ProjectID), string(params.ReleaseID))
+	if err != nil {
+		return nil, err
+	}
+	release := toAPIRelease(entity)
+	return &release, nil
+}
+
+func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParams) (api.ListReleasesRes, error) {
+	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), releaseAccess, domain.ResourceKindRelease)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.releaseService.List(ctx, service.ListReleasesInput{
+		ProjectID: string(params.ProjectID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resp := api.ListReleasesResponse{Releases: make([]api.ReleaseSummary, len(result.Items))}
+	for i, entity := range result.Items {
+		resp.Releases[i] = api.ReleaseSummary{
+			ID:        api.ReleaseID(entity.ID),
+			ProjectID: api.ProjectID(entity.ProjectID),
+			Metadata:  toAPIReleaseMetadata(entity),
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return &resp, nil
+}
+
 /* ---------------- CONVERTERS ---------------- */
 
 func toAPIRelease(entity *domain.Release) api.Release {
