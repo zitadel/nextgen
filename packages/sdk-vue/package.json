@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-vue",
-  "version": "0.1.0-alpha.19",
+  "version": "1.0.0-alpha.20",
   "description": "Vue 3 components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-vue#readme",
   "bugs": {

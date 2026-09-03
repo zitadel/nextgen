@@ -39,6 +39,15 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Releases
+    description: |
+      Immutable, project-scoped configuration snapshots. A release pins one
+      revision of each resource it includes and records who assembled it, when,
+      and from which commit. It carries those pointers and that metadata only —
+      never resource content, which stays with the per-kind endpoints.
+
+      Assembling a release does not deploy it: the same release can later be
+      run on any number of environments unchanged.
   - name: Environments
     description: |
       Endpoints for a project's runtime slots (ADR 035). Identity only:
@@ -141,6 +150,10 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /releases:
+    $ref: endpoints/releases/methods.yaml
+  /releases/{release_id}:
+    $ref: endpoints/releases/by_id/methods.yaml
   /grants:
     $ref: endpoints/grants/methods.yaml
   /grants/query:

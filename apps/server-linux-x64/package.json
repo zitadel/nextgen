@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server-linux-x64",
-  "version": "0.1.0-alpha.19",
+  "version": "1.0.0-alpha.20",
   "description": "Linux x64 Zitadel server binary.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
