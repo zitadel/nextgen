@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "1.0.0-alpha.20",
+  "version": "1.0.0-alpha.21",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
