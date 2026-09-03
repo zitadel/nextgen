@@ -33,7 +33,8 @@ export function mockGrants(): Plugin | undefined {
 /**
  * A roster shaped like the design's rows, plus the two cases the design does
  * not draw: a relation this screen never creates, and a grant whose principal
- * could not be loaded.
+ * could not be loaded (`principal: null`, which is what a deleted user's
+ * surviving grant looks like — the row falls back to the raw principal id).
  */
 const GRANTS = [
   {
@@ -63,7 +64,7 @@ const GRANTS = [
   {
     id: "asgn_mock4",
     principal_type: "user",
-    principal_id: "user_deleted",
+    principal_id: "user_01M1KF8BF7G5ARWJ9PWJJQ0WQK",
     relation: "admin",
     created_at: "2026-09-01T10:15:00Z",
     principal: null,
