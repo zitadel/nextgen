@@ -28,8 +28,41 @@ const (
 	ReleasePointerKindBranding
 )
 
+// ReleaseBrandingHandle is the handle every branding pointer carries. Branding
+// is the one kind with no identifying field of its own — a project has exactly
+// one — so the handle is a constant, and pinning two branding revisions in one
+// release collides on it, which is the intended answer.
+const ReleaseBrandingHandle = "default"
+
 func ErrReleaseInvalid(details any, parent error) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("invalid"), "release: invalid", details, parent)
+}
+
+func ErrReleaseNotFound() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("not_found"), "release: not found", nil, nil)
+}
+
+func ErrReleaseProjectNotFound() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("project_not_found"), "release: project not found", nil, nil)
+}
+
+func ErrReleasePermissionDenied() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("permission_denied"), "release: requires an operator-grade token bound to the project (project.write or a release.* scope)", nil, nil)
+}
+
+// ErrReleaseRevisionNotFound reports a pinned revision that the project does
+// not hold. The detail names the pointer, since a release pins many and the
+// caller cannot tell which one failed from the code alone.
+func ErrReleaseRevisionNotFound(details any) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("revision_not_found"), "release: pinned revision does not exist", details, nil)
+}
+
+// ErrReleaseRevisionUnpinnable reports a revision that exists but declares no
+// handle, so nothing says which resource it is a revision of. A schema
+// registered by URL whose document was never parsed has no objectType and is
+// unpinnable until it is.
+func ErrReleaseRevisionUnpinnable(details any) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("revision_unpinnable"), "release: pinned revision declares no handle", details, nil)
 }
 
 // ReleasePointer pins one revision of one resource. Handle names the resource
@@ -44,9 +77,9 @@ type ReleasePointer struct {
 // ReleaseMetadata records who assembled a release and from what source. Set at
 // construction and never mutated.
 //
-// CreatedBy and CreatedByType mirror the actor recording on events: a caller
-// without a user identity (for example, a project secret used from CI) leaves
-// both fields nil.
+// CreatedBy and CreatedByType mirror the actor recording on events. A project
+// secret names no user, so CreatedBy is nil for releases assembled from CI or
+// the CLI while CreatedByType still reports a service principal.
 type ReleaseMetadata struct {
 	Message       *string
 	GitSHA        *string
