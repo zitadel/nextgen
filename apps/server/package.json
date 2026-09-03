@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server",
-  "version": "0.1.0-alpha.19",
+  "version": "1.0.0-alpha.20",
   "description": "Zitadel server binary launcher.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
