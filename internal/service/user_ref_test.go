@@ -2,11 +2,13 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
+	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -129,4 +131,100 @@ func TestStatementsUserRefResolver_ResolveUserRefs(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, refs)
 	})
+}
+
+func TestStatementsUserRefResolver_ResolveRefsForUsers(t *testing.T) {
+	newResolver := func(t *testing.T, stmts *mocks.MockAllStatements) service.StatementsUserRefResolver {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		pool := mocks.NewMockPool(ctrl)
+		pool.EXPECT().Statements().Return(stmts).AnyTimes()
+		return service.StatementsUserRefResolver{Pool: service.NewPool(pool)}
+	}
+
+	t.Run("resolves already-listed users without a user query", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		// Only ListJSONSchemas may run — a ListUsers call would fail the
+		// mock: the callers already hold fully hydrated users (§3a).
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: []*domain.JSONSchema{{
+				ProjectID: "proj",
+				URL:       "https://s/human",
+				Kind:      domain.JSONSchemaKindUserSchema,
+				Schema:    []byte(`{"x-identifier":"email","x-display":["givenName"]}`),
+			}}}, nil)
+
+		users := []*domain.User{
+			{ProjectID: "proj", SchemaURL: "https://s/human", ID: "user-1", Attributes: domain.AttributesFromMap(map[string]any{
+				"email": "ada@example.com", "givenName": "Ada",
+			})},
+			{ProjectID: "proj", SchemaURL: "https://s/unstored", ID: "user-2", Attributes: domain.AttributesFromMap(map[string]any{
+				"email": "b@example.com",
+			})},
+		}
+		refs, err := newResolver(t, stmts).ResolveRefsForUsers(t.Context(), "proj", users)
+
+		require.NoError(t, err)
+		assert.Equal(t, domain.UserRef{
+			UserID: "user-1", Identifier: "ada@example.com",
+			IdentifierProperty: "email", Display: "Ada",
+		}, refs["user-1"])
+		assert.Equal(t, domain.UserRef{UserID: "user-2"}, refs["user-2"],
+			"a user of an unstored schema resolves to a bare id ref")
+	})
+
+	t.Run("empty input short-circuits without queries", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+
+		refs, err := newResolver(t, stmts).ResolveRefsForUsers(t.Context(), "proj", nil)
+
+		require.NoError(t, err)
+		assert.Empty(t, refs)
+	})
+}
+
+func TestCreateUser_SurvivesRefResolutionFailure(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := mocks.NewMockPool(ctrl)
+	stmts := mocks.NewMockAllStatements(ctrl)
+	statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		}).AnyTimes()
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj", gomock.Any()).Return(&domain.JSONSchema{
+		ProjectID: "proj",
+		URL:       "https://s/human",
+		Kind:      domain.JSONSchemaKindUserSchema,
+		Schema:    []byte(`{"type":"object","properties":{"email":{"type":"string"}}}`),
+	}, nil)
+	stmts.EXPECT().NewManagedID(gomock.Any()).Return("user_new", nil).AnyTimes()
+	stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(nil)
+	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+		ProjectID: "proj", SchemaURL: "https://s/human", ID: "user_new",
+		Attributes: domain.AttributesFromMap(map[string]any{"email": "a@example.com"}),
+	}, nil)
+	// The create has committed; the decoration query failing must not fail
+	// the create — the response simply carries no ref.
+	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("schema listing down"))
+
+	svcPool := service.NewPool(pool)
+	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool})
+	user, err := svc.CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  "proj",
+		SchemaURL:  "https://s/human",
+		Attributes: map[string]any{"email": "a@example.com"},
+	})
+
+	require.NoError(t, err, "a ref-resolution failure must not fail the committed create")
+	require.NotNil(t, user)
+	assert.Nil(t, user.Ref)
 }

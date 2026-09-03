@@ -205,6 +205,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		serviceDBPool,
 		schemaStore,
 		passwordHasher,
+		service.StatementsUserRefResolver{Pool: serviceDBPool},
 	)
 
 	// The platform project's registration side effect (#527): every flow-created

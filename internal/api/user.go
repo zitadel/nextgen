@@ -322,6 +322,19 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 		},
 	}
 
+	// The derived identity of ADR 058 §3a: identifier and identifier_property
+	// travel together, display independently; empty means absent on the wire
+	// (the userRefToAPI pairing rule).
+	if user.Ref != nil {
+		if user.Ref.Identifier != "" {
+			out.Identifier = api.NewOptString(user.Ref.Identifier)
+			out.IdentifierProperty = api.NewOptString(user.Ref.IdentifierProperty)
+		}
+		if user.Ref.Display != "" {
+			out.Display = api.NewOptString(user.Ref.Display)
+		}
+	}
+
 	// Nil means the read was not asked for memberships, so the property stays
 	// off the wire entirely; an empty non-nil slice means it was asked for and
 	// the user has none, which serializes as []. Every other caller of

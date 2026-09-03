@@ -44592,6 +44592,21 @@ type User struct {
 	// names and types are determined entirely by that schema.
 	Attributes UserAttributes `json:"attributes"`
 	Metadata   UserMetadata   `json:"metadata"`
+	// The current value of the user schema's designated identifier
+	// (`x-identifier`), resolved live at read time. Absent when the schema
+	// designates no identifier or the user carries no value for it.
+	Identifier OptString `json:"identifier"`
+	// The schema property `identifier` came from, so clients can reach the
+	// property's schema for semantics (a mailto link, a field label)
+	// instead of guessing from the value. Present exactly when
+	// `identifier` is.
+	IdentifierProperty OptString `json:"identifier_property"`
+	// The `x-display` rendering — the designated properties' values joined
+	// in list order, resolved live at read time. Purely presentational.
+	// Absent when the schema designates no display properties or the user
+	// carries no values for them. Clients render `display`, falling back
+	// to `identifier`, then `id`.
+	Display OptString `json:"display"`
 	// The user's team memberships, present only when the request asked for them with
 	// `expand: ["teams"]` (ADR 059). Absent means it was not requested; `[]`
 	// means the user has none.
@@ -44625,6 +44640,21 @@ func (s *User) GetMetadata() UserMetadata {
 	return s.Metadata
 }
 
+// GetIdentifier returns the value of Identifier.
+func (s *User) GetIdentifier() OptString {
+	return s.Identifier
+}
+
+// GetIdentifierProperty returns the value of IdentifierProperty.
+func (s *User) GetIdentifierProperty() OptString {
+	return s.IdentifierProperty
+}
+
+// GetDisplay returns the value of Display.
+func (s *User) GetDisplay() OptString {
+	return s.Display
+}
+
 // GetTeams returns the value of Teams.
 func (s *User) GetTeams() []UserTeam {
 	return s.Teams
@@ -44653,6 +44683,21 @@ func (s *User) SetAttributes(val UserAttributes) {
 // SetMetadata sets the value of Metadata.
 func (s *User) SetMetadata(val UserMetadata) {
 	s.Metadata = val
+}
+
+// SetIdentifier sets the value of Identifier.
+func (s *User) SetIdentifier(val OptString) {
+	s.Identifier = val
+}
+
+// SetIdentifierProperty sets the value of IdentifierProperty.
+func (s *User) SetIdentifierProperty(val OptString) {
+	s.IdentifierProperty = val
+}
+
+// SetDisplay sets the value of Display.
+func (s *User) SetDisplay(val OptString) {
+	s.Display = val
 }
 
 // SetTeams sets the value of Teams.

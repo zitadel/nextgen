@@ -41,6 +41,10 @@ function stub({
   user = {
     id: USER_ID,
     schema: "sch_business",
+    // The heading renders the envelope's resolved identity (ADR 058):
+    // this schema designates email and no display properties.
+    identifier: "maya@acme.com",
+    identifier_property: "email",
     attributes: { email: "maya@acme.com", companyName: "Acme" },
     metadata: { status: "active", created_at: "2026-07-12T09:00:00Z", updated_at: "2026-07-12T09:00:00Z" },
   },
@@ -101,6 +105,8 @@ describe("user detail", () => {
         HttpResponse.json({
           id: USER_ID,
           schema: "sch_business",
+          identifier: "maya@acme.com",
+          identifier_property: "email",
           attributes: { email: "maya@acme.com", headcount: 42, verified: false },
         }),
       ),
@@ -156,11 +162,33 @@ describe("user detail", () => {
     expect(screen.getByText(expected)).toBeInTheDocument();
   });
 
+  it("leads with the display and subtitles the identifier when both resolve", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        identifier: "maya@acme.com",
+        identifier_property: "email",
+        display: "Maya Patel",
+        attributes: { email: "maya@acme.com" },
+      },
+    });
+    await renderDetail();
+    expect(await screen.findByRole("heading", { name: "Maya Patel" })).toBeInTheDocument();
+    expect(screen.getAllByText("maya@acme.com").length).toBeGreaterThanOrEqual(1);
+  });
+
   it("omits status and created on a record the server has not stamped", async () => {
     // `metadata` sits on an otherwise open record, so a user written before it
     // existed simply has none. Nothing is invented for it.
     stub({
-      user: { id: USER_ID, schema: "sch_business", attributes: { email: "maya@acme.com" } },
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        identifier: "maya@acme.com",
+        identifier_property: "email",
+        attributes: { email: "maya@acme.com" },
+      },
     });
     await renderDetail();
     await screen.findByRole("heading", { name: "maya@acme.com" });
