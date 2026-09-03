@@ -10,11 +10,51 @@
 - [ ] **Projects in navigation** — main nav (key-resource consistency) vs. top context dropdown only. Depends on whether the API can list multiple projects (no API design yet); may be skipped for MVP since there's only one project. *(owner: Julia / eng)*
 - [ ] **"Team" naming** — overloaded (customer-portal team vs. organization/tenant); consider "organization" or "tenant" instead. Note: a Teams API is already built. *(owner: team)*
 - [ ] **Project name scheme** — nature words (e.g. "River") vs. random words for generated project names. *(owner: Julia)*
+- [ ] **Font loading for Zitadel-served login** — `font_url` property vs. a hosted font picker vs. custom CSS overrides; needs a CSP answer before it can be designed. *(owner: Max)*
+- [ ] **Relative vs. absolute asset paths** — a relative logo path typed into the console resolves against the customer's app, not the console; decide what we validate and how the field explains it. *(owner: Max)*
+- [ ] **Code ↔ console sync** — the CLI can publish but has no `fetch`/`pull`, so a console edit and a local `branding.json` can silently diverge. Blocks making branding editable (D16). *(owner: eng)*
+- [ ] **Environments & releases** — how a branding change travels deploy → environment → production, and what that means for the branding screen. Workshop being scheduled. *(owner: Vitor)*
+- [ ] **Named themes beyond light/dark** — the schema should later take e.g. a "navy" theme; not in this iteration, but the contract must not close the door. *(owner: Max)*
 - [ ] **Later** — user-list filter to distinguish end-users from admin/account users. *(future)*
 
 ---
 
 ## Decisions
+
+### D26 · Branding customization targets the login widget, not the page — 2026-09-02 · [standing]
+Everything in the branding scope applies to `<zitadel-login>` — the card, its fields, buttons and type. The page around it (split screen, hero, marketing copy) belongs to the customer in the embedded model and to page templates/chrome in the Zitadel-served model. Two different products; don't mix their knobs into one settings screen.
+
+### D25 · Ship the whole branding property set at once — 2026-09-02
+Drop the idea of staging the API by customization level (the L1 / L2 / full-control tiering). The design system and palette already exist, so a "basic subset" API saves no implementation time — and every property we hold back is a future contract conflict. Ship the full object from #1046, designed for extensibility (named themes, per-element shape), and let the console expose a subset. *(Max)*
+→ Max adds the follow-ups to #1046 and marks it ready to implement; Vitor reviews before the API work starts.
+
+### D24 · Basic vs. advanced is a console grouping, not a permission or API split — 2026-09-02
+Anyone allowed to edit branding may edit every property — no restricted tier. The console instead hides the secondary palette (surface, muted, border, link, success/warning/error) behind collapsibles/an advanced mode, grouped by where the colors are actually used and with a short description each. Success/warning/error get a hint that leaving the defaults means leaving the accessible path.
+
+### D23 · Basic is a subset, not combined inputs — 2026-09-02
+The basic view shows the real properties (primary color, logo per mode, body font, radius), just fewer of them. Anything hidden stays at its maintained default — no derived or bundled inputs behind a single control. A primary color on the default background has to look fine on its own.
+
+### D22 · Theme mode decides which palette sections the console shows — 2026-09-02
+`theme.mode` isn't only a preview toggle: light-only hides the dark palette, dark-only hides the light one, auto/system shows both. Today's screen always shows both, which is how customers ended up tuning dark values into the light theme and shipping black text on a dark surface.
+
+### D21 · The console warns on contrast, it doesn't block — 2026-09-02
+We own the design system and know which token lands on which surface, so the console can compute the contrast for each pair and flag the ones that fail. Show a warning next to the offending value ("you're using the light theme with a dark background") — no hard validation, no auto-correction.
+
+### D20 · No asset uploads — logos and images are strings — 2026-09-02 · [standing]
+`logo_url` and any later image property take a path or URL that the customer hosts, following Auth0. Avoids blob upload APIs, size limits, format rules and SVG script injection — and the embedded widget only ever applies the string anyway. The console therefore shows the path, not a thumbnail.
+
+### D19 · Font family is a name; the customer loads the font — 2026-09-02
+`typography.font_family` is a free-text input (not a dropdown of hosted fonts). The widget renders inside the customer's application, so the font is already loaded there and their CSP governs it — we only say which family the headings and body use. No font hosting and no `font_url` for embedded login in this iteration.
+
+### D18 · No branding preview in the console (embedded login) — 2026-09-02
+The console can't render a truthful preview: it doesn't have the customer's fonts, relative asset paths resolve against their app, and local code overrides always win. Editing loop is: change the value in the console, reload your own login route — the widget pulls the config from the API. Preview becomes a real question once Zitadel-served login exists.
+
+### D17 · Page background stays out of branding — 2026-09-02
+Repeated Auth0/login-v2 request, but in the embedded model we don't own the page background. What customers actually want to restyle is the card, which is `surface`. Background belongs to the page templates/chrome and is authored in Liquid.
+
+### D16 · Branding ships read-only in the console — 2026-09-02
+Same posture as schemas and flows (D0b): code is the source of truth, the console displays. Editable branding needs the revision/deploy lifecycle and a CLI `fetch`/`pull` — without them, editing in both places drifts and there's no answer for out-of-sync. Design the full editable screen now and ship it with the controls disabled, so it can be switched on as soon as revisions land. *(Vitor)*
+→ Vitor schedules the environments & releases workshop (Fri or next week) so design knows the lifecycle.
 
 ### D15 · Create uses a right-side drawer — 2026-07-31 · [standing]
 Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui default interaction pattern. Fields relevant to the current context (e.g. team) are preselected.
@@ -75,7 +115,7 @@ Users/teams/projects are resources; schemas are configuration, not resources —
 
 <!-- New decision: copy this, bump the ID.
 
-### D16 · <decision> — YYYY-MM-DD
+### D27 · <decision> — YYYY-MM-DD
 <one line on why>
 → <next step, who>
 
