@@ -1,5 +1,5 @@
 -- +goose Up
--- See the postgres peer (000018_sessions_sort_index.sql) for the measurements.
+-- See the postgres peer (000019_sessions_sort_index.sql) for the measurements.
 -- Both session indexes are needed: the sort index alone regresses a selective
 -- team filter (ADR 060), because the walk in created_at order has to cross most
 -- of the table before it finds a page worth of matching rows.

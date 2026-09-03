@@ -115,7 +115,7 @@ relation, and migration 000011 already indexes it
 `(project_id, lifecycle_owner_team_id)` where the column is not null, Spanner on
 `(lifecycle_owner_team_id)`.
 
-**It does ship a migration, though** — `000018_sessions_sort_index` on
+**It does ship a migration, though** — `000019_sessions_sort_index` on
 PostgreSQL, `000021` on Spanner, `000005` on SQLite. It is index-only: two on
 `sessions`, `(project_id, created_at, id)` for the default sort and
 `(project_id, user_id)` for the drive side of a selective team, plus, on SQLite
@@ -228,7 +228,7 @@ thing: `sessions` carried only `PRIMARY KEY (project_id, id)` and the partial
 unique index on `token_id`, so **every** page of `POST /sessions/query` scanned
 and sorted a project's whole session table before applying `LIMIT`.
 
-Migration `000018_sessions_sort_index` (and its Spanner/SQLite peers) therefore
+Migration `000019_sessions_sort_index` (and its Spanner/SQLite peers) therefore
 adds **two** indexes, and both are load-bearing because they serve opposite
 selectivities of this filter:
 
