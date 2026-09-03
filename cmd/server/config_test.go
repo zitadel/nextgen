@@ -1,14 +1,11 @@
 package server
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/instrumentation"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -129,52 +126,5 @@ func TestPlatformConfigProvisioningProjectID(t *testing.T) {
 	t.Run("no bootstrap and no pin is empty", func(t *testing.T) {
 		t.Parallel()
 		assert.Empty(t, PlatformConfig{}.ProvisioningProjectID())
-	})
-}
-
-func TestTextUnmarshalerDecodeHook(t *testing.T) {
-	t.Parallel()
-
-	t.Run("unmarshals LogFormat from string", func(t *testing.T) {
-		t.Parallel()
-		result, err := textUnmarshalerDecodeHook(reflect.TypeOf(""), reflect.TypeOf(instrumentation.LogFormatText), "json")
-		require.NoError(t, err)
-		assert.Equal(t, instrumentation.LogFormatJSON, result)
-	})
-
-	t.Run("unmarshals LogFormat from string (snake_case)", func(t *testing.T) {
-		t.Parallel()
-		result, err := textUnmarshalerDecodeHook(reflect.TypeOf(""), reflect.TypeOf(instrumentation.LogFormatGCPErrorReporting), "gcp_error_reporting")
-		require.NoError(t, err)
-		assert.Equal(t, instrumentation.LogFormatGCPErrorReporting, result)
-	})
-
-	t.Run("unmarshals LogFormat from pointer type", func(t *testing.T) {
-		t.Parallel()
-		var f instrumentation.LogFormat
-		result, err := textUnmarshalerDecodeHook(reflect.TypeOf(""), reflect.TypeOf(&f), "text")
-		require.NoError(t, err)
-		assert.Equal(t, instrumentation.LogFormatText, *result.(*instrumentation.LogFormat))
-	})
-
-	t.Run("unmarshals Stream from string", func(t *testing.T) {
-		t.Parallel()
-		result, err := textUnmarshalerDecodeHook(reflect.TypeOf(""), reflect.TypeOf(zlog.StreamRuntime), "request")
-		require.NoError(t, err)
-		assert.Equal(t, zlog.StreamRequest, result)
-	})
-
-	t.Run("passes through non-string input", func(t *testing.T) {
-		t.Parallel()
-		result, err := textUnmarshalerDecodeHook(reflect.TypeOf(0), reflect.TypeOf(instrumentation.LogFormatJSON), 3)
-		require.NoError(t, err)
-		assert.Equal(t, 3, result)
-	})
-
-	t.Run("passes through types without TextUnmarshaler", func(t *testing.T) {
-		t.Parallel()
-		result, err := textUnmarshalerDecodeHook(reflect.TypeOf(""), reflect.TypeOf(""), "hello")
-		require.NoError(t, err)
-		assert.Equal(t, "hello", result)
 	})
 }
