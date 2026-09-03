@@ -116,15 +116,36 @@ Queued rows share `name` (`email.send`) and usually leave `unique_key` null — 
 
 Enqueue may set `not_after` from the entity TTL in the same transaction (do not send a verification mail after the code is dead).
 
-### 7. Retain, then `jobs.gc`; metrics instead of a dead-letter table
+### 7. Retain, then `jobs.gc`
 
 `done` and `dead` linger until unique periodic `jobs.gc` deletes them by `completed_at` older than a retain window (time-only, same idea as [ADR 049](049-events-api-retention-export.md)). `jobs.gc` also drops leftover `pending` rows with `not_after < now()` if Claim did not mark them `dead`.
 
 No dead-letter table. `dead` stays queryable until GC.
 
-The engine emits at least: claimed, completed, failed, dead, perform duration, claim lag (`now() - run_at` at claim), `jobs_expired_unrun` (skipped because `not_after` had passed).
+### 8. Observability (metrics, not an API)
 
-### 8. Every replica runs the loop; the lease is the lock
+Operators watch the engine. There is no job HTTP API and no dead-letter table.
+
+Every series is labeled by handler `name` (`jobs.gc`, `email.send`, …). No other v1 labels (`status`, replica, dialect). Outcome lives in the series name, not a `status` label. Increment one per row, not per batch.
+
+Counters:
+
+- `jobs_claimed` — Claim leased a row that will Perform.
+- `jobs_completed` — Complete succeeded (queued → `done`, or periodic reschedule).
+- `jobs_failed` — Fail with retry (backoff; row stays claimable).
+- `jobs_dead` — Fail exhausted retries, or retry would next run at or after `not_after`.
+- `jobs_expired_unrun` — Claim found `not_after <= now()` and marked `dead` without Perform, or `jobs.gc` dropped leftover `pending` with `not_after < now()`.
+
+`jobs_expired_unrun` does not also increment `jobs_dead`. `jobs_dead` is the Perform/Fail path; `jobs_expired_unrun` is never-started.
+
+Histograms:
+
+- `jobs_perform_duration` — handler wall time from Claim commit to Complete or Fail.
+- `jobs_claim_lag` — `now() - run_at` at claim, same database clock as due checks (§4).
+
+v1 does not emit a pending-depth gauge (`COUNT(*)` of due `pending` every poll). Operators infer backup from claim lag and `jobs_claimed`.
+
+### 9. Every replica runs the loop; the lease is the lock
 
 The engine starts with the HTTP server on `zitadel start`. No `zitadel worker` command, no leader election, no job HTTP API, not an OpenAPI resource.
 
@@ -148,11 +169,11 @@ SQLite stays at concurrency 1. Postgres/Spanner may raise concurrency when queue
 
 On a rolling deploy, a row whose `name` has no handler on this binary stays and retries with backoff. Old binaries must not delete unknown job types.
 
-### 9. Background Path B uses `system` actor
+### 10. Background Path B uses `system` actor
 
 Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primitive.md)) stamp `EventActorTypeSystem`. A reaper `session.expired` must not look like a missing request `ActorContext`.
 
-### 10. v1 cutover
+### 11. v1 cutover
 
 - Jobs table, `JobStatements`, in-process loop, unique periodic `jobs.gc`
 - Cut [`RetentionJob`](../../internal/audit/retention.go) over to unique periodic `events.retention` that still calls `DeleteEventsOlderThan` ([ADR 049](049-events-api-retention-export.md))
