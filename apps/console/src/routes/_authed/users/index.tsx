@@ -1,5 +1,6 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
+import { Box, Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
@@ -41,15 +42,36 @@ export const Route = createFileRoute("/_authed/users/")({
   // Order 3: Teams sits at 2.
   staticData: { nav: { label: "Users", order: 3, icon: User } },
   loader: async () => {
-    const page = await api.queryUsers({ limit: PAGE_SIZE });
+    const page = await fetchUsers();
     return {
       users: page.users,
+      teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
       columns: await columnsForUsers(page.users),
     };
   },
   component: UsersScreen,
 });
+
+type UsersPage = Awaited<ReturnType<typeof api.queryUsers>>;
+
+/**
+ * One page of users, with each user's team memberships embedded.
+ *
+ * `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and a
+ * credential carrying one without the other is refused the whole request rather
+ * than just the relation (ADR 059). The refusal therefore falls back to the
+ * unexpanded read: the screen loses its Team column, not its users.
+ */
+async function fetchUsers(pageToken?: string): Promise<UsersPage & { teamsExpanded: boolean }> {
+  const body = { limit: PAGE_SIZE, page_token: pageToken };
+  try {
+    return { ...(await api.queryUsers({ ...body, expand: ["teams"] })), teamsExpanded: true };
+  } catch (cause) {
+    if (!(cause instanceof ApiError) || cause.status !== 403) throw cause;
+    return { ...(await api.queryUsers(body)), teamsExpanded: false };
+  }
+}
 
 /**
  * One page of users. `POST /users/query` is cursor-paginated, so the size is a page
@@ -101,6 +123,10 @@ interface UserRow {
   values: Record<string, string>;
   /** `metadata.status`, absent on a record the server has not stamped. */
   status?: string;
+  /** The teams the user belongs to, empty when the user is on none. */
+  teams: UserTeam[];
+  /** True when the user is on more teams than the embedded list carries. */
+  teamsTruncated: boolean;
 }
 
 /**
@@ -149,12 +175,14 @@ function UsersScreen() {
   const [extra, setExtra] = useState<Record<string, unknown>[]>([]);
   const [nextPageToken, setNextPageToken] = useState(loaded.nextPageToken);
   const [columns, setColumns] = useState(loaded.columns);
+  const [teamsExpanded, setTeamsExpanded] = useState(loaded.teamsExpanded);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     setExtra([]);
     setNextPageToken(loaded.nextPageToken);
     setColumns(loaded.columns);
+    setTeamsExpanded(loaded.teamsExpanded);
   }, [loaded]);
 
   // The loader hands back a new object on every invalidation, so its identity is
@@ -173,7 +201,7 @@ function UsersScreen() {
     const generation = loaded;
     setLoadingMore(true);
     try {
-      const page = await api.queryUsers({ limit: PAGE_SIZE, page_token: nextPageToken });
+      const page = await fetchUsers(nextPageToken);
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
       const nextColumns = await columnsForUsers([...users, ...page.users]);
@@ -185,6 +213,10 @@ function UsersScreen() {
       setExtra((current) => [...current, ...page.users]);
       setNextPageToken(page.next_page_token ?? undefined);
       setColumns(nextColumns);
+      // A later page can be served without the expansion the first page carried
+      // — a permission revoked mid-list — and a Team column standing over blank
+      // cells would read as "these users are on no team".
+      setTeamsExpanded((current) => current && page.teamsExpanded);
     } finally {
       setLoadingMore(false);
     }
@@ -222,14 +254,20 @@ function UsersScreen() {
     const needle = query.trim().toLowerCase();
     return users.map((user, index) => toUserRow(user, index, columns)).filter((row) => {
       if (needle === "") return true;
+      // Team names only while the column is on screen. A later page served
+      // without the expansion drops the column while the rows fetched before it
+      // keep their memberships, and searching those would filter the table on
+      // something the operator cannot see.
+      const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
       return [
         row.id,
         row.name,
         row.identifier ?? "",
+        ...teams,
         ...columns.map((column) => row.values[column.key] ?? ""),
       ].some((value) => value.toLowerCase().includes(needle));
     });
-  }, [users, query, columns]);
+  }, [users, query, columns, teamsExpanded]);
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
@@ -282,6 +320,8 @@ function UsersScreen() {
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
               <ResourceHeadCell>Status</ResourceHeadCell>
+              {/* After `Status`, where the design's column order puts it. */}
+              {teamsExpanded && <ResourceHeadCell>Team</ResourceHeadCell>}
               <ResourceHeadCell>ID</ResourceHeadCell>
               <TableHead className="h-14 w-[60px] px-6" />
             </TableRow>
@@ -290,7 +330,7 @@ function UsersScreen() {
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell
-                  colSpan={columns.length + 5}
+                  colSpan={columns.length + (teamsExpanded ? 6 : 5)}
                   className="text-muted-foreground h-24 text-center"
                 >
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}
@@ -333,6 +373,13 @@ function UsersScreen() {
                   <TableCell className={RESOURCE_CELL}>
                     <StatusBadge status={user.status} />
                   </TableCell>
+                  {teamsExpanded && (
+                    <TableCell
+                      className={`${RESOURCE_CELL} text-muted-foreground max-w-[280px] truncate text-sm`}
+                    >
+                      <TeamCell teams={user.teams} truncated={user.teamsTruncated} />
+                    </TableCell>
+                  )}
                   <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
                     {user.id}
                   </TableCell>
@@ -395,7 +442,40 @@ function toUserRow(
     identifier: userIdentifier(user),
     identifierProperty: field(user, "identifier_property"),
     status: userStatus(user),
+    teams: userTeams(user),
+    teamsTruncated: user.teams_truncated === true,
   };
+}
+
+/** One embedded membership, reduced to what the cell renders and links to. */
+interface UserTeam {
+  id: string;
+  name: string;
+}
+
+/**
+ * The teams `expand: ["teams"]` embedded.
+ *
+ * Read defensively for the same reason `metadata` is: `teams` is absent when the
+ * request did not ask for it and `[]` when the user is on none, and the rows
+ * this walks are typed as an open record.
+ *
+ * Every membership the endpoint returns is kept, `pending` ones included — it
+ * omits the ones the user was removed from, so what arrives is the roster. An
+ * entry missing either half is dropped: a name with no id cannot be linked, and
+ * an id with no name has nothing to render.
+ */
+function userTeams(user: Record<string, unknown>): UserTeam[] {
+  if (!Array.isArray(user.teams)) return [];
+  return user.teams
+    .map((team) => {
+      if (!team || typeof team !== "object") return undefined;
+      const record = team as Record<string, unknown>;
+      const id = field(record, "id");
+      const name = field(record, "name");
+      return id && name ? { id, name } : undefined;
+    })
+    .filter(isPresent);
 }
 
 /**
@@ -409,6 +489,49 @@ function userStatus(user: Record<string, unknown>): string | undefined {
   return field(metadata as Record<string, unknown>, "status");
 }
 
+
+/**
+ * The teams a user belongs to, glyphed the way the design draws the cell and the
+ * way the Teams directory draws a team row.
+ *
+ * Each name opens its team, as the Teams directory's own rows do — the embedded
+ * entry carries the id, so the link costs no extra read.
+ *
+ * `+more` is deliberately not a link. The response carries the capped list and a
+ * boolean, not the names past the cap, so there is nothing to expand inline
+ * without the per-row roster read that `expand` exists to avoid; and the user
+ * detail screen does not render teams yet (decisions log D3), so there is no
+ * screen to send the operator to. It becomes a link to that screen when the
+ * screen lists them.
+ */
+function TeamCell({ teams, truncated }: { teams: UserTeam[]; truncated: boolean }) {
+  if (teams.length === 0) return <>—</>;
+  return (
+    <span className="flex items-center gap-1.5">
+      <Box aria-hidden strokeWidth={1.5} className="size-3.5 shrink-0" />
+      {/* The names truncate; the marker does not. Inside the truncating span it
+          is the first thing CSS clips — and a roster long enough to overflow is
+          exactly the one that has more teams to report. */}
+      <span className="truncate">
+        {teams.map((team, index) => (
+          <span key={team.id}>
+            {/* The separator sits outside the anchor: it belongs to the list,
+                not to either team it divides. */}
+            {index > 0 && ", "}
+            <Link
+              to="/teams/$teamId"
+              params={{ teamId: team.id }}
+              className="hover:text-foreground underline-offset-2 hover:underline"
+            >
+              {team.name}
+            </Link>
+          </span>
+        ))}
+      </span>
+      {truncated && <span className="shrink-0">+more</span>}
+    </span>
+  );
+}
 
 /**
  * The row menu carries only actions that reach the API.
