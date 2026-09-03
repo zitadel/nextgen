@@ -106,6 +106,8 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileStringFilter(c, f, schema)
 	case *database.ArrayContainsFilter[F]:
 		compileArrayContainsFilter(c, f, schema)
+	case *database.CorrelatedFilter[F]:
+		compileCorrelatedFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
@@ -202,6 +204,12 @@ func writeCompareTerm[F ~uint8, T any](c *statementCompiler, term database.Compa
 	c.WriteString(schema.SQLName(term.Column))
 	c.WriteString(op)
 	writeArg(c, term.Value)
+}
+
+func compileCorrelatedFilter[F ~uint8, T any](c *statementCompiler, filter *database.CorrelatedFilter[F], schema database.Schema[F, T]) {
+	compare.CompileCorrelated(c, filter, schema, func(_ compare.Writer, arg any, _ database.Column[F]) {
+		writeArg(c, arg)
+	})
 }
 
 func compileArrayContainsFilter[F ~uint8, T any](c *statementCompiler, filter *database.ArrayContainsFilter[F], schema database.Schema[F, T]) {

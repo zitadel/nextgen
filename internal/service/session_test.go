@@ -498,6 +498,20 @@ func TestSessionService_List(t *testing.T) {
 			},
 		},
 		{
+			name: "filter by lifecycle_owner_team_id builds the correlated ownership predicate",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "equals", Value: "team_1"}},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+					database.CorrelatedEqual(database.Col(domain.SessionFieldLifecycleOwnerTeamID), "team_1"),
+				), opts.Filter)
+			},
+		},
+		{
 			name: "filter greater_than createdAt parses RFC3339",
 			input: service.ListSessionInput{
 				ProjectID: "proj_a",
@@ -674,6 +688,58 @@ func TestSessionService_List_ValidationErrors(t *testing.T) {
 			input: service.ListSessionInput{
 				ProjectID: "proj_a",
 				Filters:   []service.Filter{{Field: "state", Operation: "like", Value: "active"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string lifecycle_owner_team_id value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "lifecycle_owner_team_id not_equals not implemented",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "not_equals", Value: "team_1"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
+			// The binding is a correlated sub-query taking one team id, so
+			// there is nothing for a substring match to match against.
+			name: "contains operation on lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "contains", Value: "team"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "greater_than", Value: "team_1"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown operation on lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "like", Value: "team_1"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			// lifecycle_owner_team_id matches many sessions per team and
+			// lives on another table, so it must never become a cursor column.
+			name: "sort by lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "lifecycle_owner_team_id", Direction: "asc"},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
