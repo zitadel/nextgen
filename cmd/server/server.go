@@ -190,12 +190,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
-	// The claim and dashboard URLs hang off the console. builtin_public_base is
-	// the only public-origin config today and carries the /api/schemas path, so
-	// strip it down to the origin before appending the console path; a
-	// dedicated server public-base setting should replace this when cloud
-	// deployment configuration lands.
-	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
+	// The claim and dashboard URLs hang off the console, reached at the
+	// deployment's public base (not at schema.builtin_public_base, which is an
+	// identifier namespace and must not follow the deployment address).
+	consoleBase, err := consoleBaseURL(cfg.Server.PublicBase, cfg.Server.ConsolePath)
+	if err != nil {
+		return err
+	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
@@ -365,6 +366,20 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 }
 
+// consoleBaseURL joins the deployment's public base with the console mount
+// path. The public base may carry a path prefix (a proxy mounting the server
+// under a subpath); only a trailing slash is trimmed before the join.
+func consoleBaseURL(publicBase, consolePath string) (string, error) {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server public base: %w", err)
+	}
+	if base.Scheme == "" || base.Host == "" {
+		return "", fmt.Errorf("server public base %q must be an absolute URL", publicBase)
+	}
+	return strings.TrimRight(publicBase, "/") + consolePath, nil
+}
+
 // ----------------------------- CONFIG --------------------------------------
 
 func loadConfig(configPath string) (Config, error) {
@@ -381,6 +396,7 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.data_dir", dataDir)
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
+	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
 	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
