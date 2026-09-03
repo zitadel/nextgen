@@ -70,6 +70,9 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
         ...process.env,
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
+        // Browser-facing URLs (claim, dashboard) must point at this local
+        // server, not the cloud default the server config falls back to.
+        NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
       },
       stdio: ["ignore", log.fd, log.fd],
     });

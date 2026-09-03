@@ -240,6 +240,12 @@ async function runFrameworkJourney(context) {
         JOURNEY_RUNTIME: options.runtime,
         JOURNEY_WORK_DIR: context.frameworkWorkDir,
         NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+        // The claim spec completes in the embedded console, which needs a
+        // platform project (claim/complete 401s without one) and the
+        // personal teams provisioned at session exchange. Framework lane
+        // only — the testkit lane's contract is a scrubbed, unconfigured
+        // binary. Reaches the server through prepare-app's `start` step env.
+        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
         ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },
     });
@@ -280,6 +286,9 @@ async function runFrameworkJourney(context) {
           JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
           JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
           JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+          // The claim spec spawns the CLI through the journey registry, which
+          // needs the same npmrc the prepare-app steps used.
+          NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
           // Always explicit ("" = default preset / fresh scaffold): see the
           // prepare-app note.
           JOURNEY_PREEXISTING_APP: options.preexistingApp ? "1" : "",
