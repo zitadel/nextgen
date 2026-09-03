@@ -56,7 +56,7 @@ type CreateGrantInput struct {
 	ExpiresAt     *time.Time
 }
 
-func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*domain.AuthzAssignment, error) {
+func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Grant, error) {
 	if err := validateCreateGrant(input); err != nil {
 		return nil, err
 	}
@@ -102,10 +102,10 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*dom
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create grant")
 	}
-	return created, nil
+	return s.hydrateOne(ctx, created)
 }
 
-func (s *GrantService) Get(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error) {
+func (s *GrantService) Get(ctx context.Context, projectID, id string) (*Grant, error) {
 	asgn, err := s.v2Pool.Statements().GetAuthzAssignment(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -116,7 +116,7 @@ func (s *GrantService) Get(ctx context.Context, projectID, id string) (*domain.A
 	if asgn.RevokedAt != nil || !isManagedGrant(asgn) {
 		return nil, domain.ErrGrantNotFound()
 	}
-	return asgn, nil
+	return s.hydrateOne(ctx, asgn)
 }
 
 func (s *GrantService) Revoke(ctx context.Context, projectID, id string) error {
@@ -236,17 +236,49 @@ const (
 	grantFieldID            = "id"
 )
 
+// GrantPrincipal is the GET-user or GET-team body for expand: ["principal"].
+// Both pointers nil means the principal was requested but could not be loaded.
+type GrantPrincipal struct {
+	User *domain.User
+	Team *domain.Team
+}
+
 // Grant is an assignment plus the resolved principal label for the HTTP API.
-// When PrincipalRequested is set, PrincipalUser / PrincipalTeam carry the
-// GET-user / GET-team body (nil means requested but the principal could not
-// be loaded). Create and Get never set PrincipalRequested.
+// Principal is nil unless expand was requested; a non-nil Principal with both
+// User and Team nil is the ADR 059 missing-principal case (wire null).
 type Grant struct {
-	Assignment         *domain.AuthzAssignment
-	User               *UserRef
-	Team               *TeamRef
-	PrincipalRequested bool
-	PrincipalUser      *domain.User
-	PrincipalTeam      *domain.Team
+	Assignment *domain.AuthzAssignment
+	User       *UserRef
+	Team       *TeamRef
+	Principal  *GrantPrincipal
+}
+
+func (g *Grant) attachUser(user *domain.User) {
+	if g == nil || g.Assignment == nil || g.Assignment.PrincipalType != domain.AuthzPrincipalTypeUser {
+		return
+	}
+	if user != nil {
+		g.User = userRefFrom(user)
+		if g.Principal != nil {
+			g.Principal.User = user
+		}
+		return
+	}
+	g.User = &UserRef{UserID: g.Assignment.PrincipalID}
+}
+
+func (g *Grant) attachTeam(team *domain.Team) {
+	if g == nil || g.Assignment == nil || g.Assignment.PrincipalType != domain.AuthzPrincipalTypeTeam {
+		return
+	}
+	if team != nil {
+		g.Team = teamRefFrom(team)
+		if g.Principal != nil {
+			g.Principal.Team = team
+		}
+		return
+	}
+	g.Team = &TeamRef{TeamID: g.Assignment.PrincipalID}
 }
 
 // UserRef is the ADR 058 label for a user principal. Identifier/display are
@@ -331,18 +363,22 @@ func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (*ListGr
 	}, nil
 }
 
-// Hydrate attaches user-ref or team-ref labels to assignments. Missing
-// principals degrade to id-only; the rest of the page is unaffected.
-// Create and Get use this path; query expand uses [hydrate] with
-// includePrincipal so the same rows also fill the GET-user / GET-team body.
-func (s *GrantService) Hydrate(ctx context.Context, asgns ...*domain.AuthzAssignment) ([]*Grant, error) {
-	return s.hydrate(ctx, false, asgns...)
+func (s *GrantService) hydrateOne(ctx context.Context, asgn *domain.AuthzAssignment) (*Grant, error) {
+	grants, err := s.hydrate(ctx, false, asgn)
+	if err != nil {
+		return nil, err
+	}
+	return grants[0], nil
 }
 
 func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns ...*domain.AuthzAssignment) ([]*Grant, error) {
 	out := make([]*Grant, 0, len(asgns))
 	for _, a := range asgns {
-		out = append(out, &Grant{Assignment: a, PrincipalRequested: includePrincipal})
+		g := &Grant{Assignment: a}
+		if includePrincipal {
+			g.Principal = &GrantPrincipal{}
+		}
+		out = append(out, g)
 	}
 	if len(out) == 0 {
 		return out, nil
@@ -357,8 +393,6 @@ func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns
 	ctx = WithAuthzListUnrestricted(ctx)
 	attrKeys := domain.IdentityAttributeKeys
 	if includePrincipal {
-		// Empty keys load every attribute so domainUserToApiUser can emit
-		// the GET-user body. Nested user expand is out of scope.
 		attrKeys = nil
 	}
 	users, err := s.loadUsers(ctx, home, userIDs, attrKeys)
@@ -373,23 +407,9 @@ func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns
 	for _, g := range out {
 		switch g.Assignment.PrincipalType {
 		case domain.AuthzPrincipalTypeUser:
-			if user, ok := users[g.Assignment.PrincipalID]; ok {
-				g.User = userRefFrom(user)
-				if includePrincipal {
-					g.PrincipalUser = user
-				}
-			} else {
-				g.User = &UserRef{UserID: g.Assignment.PrincipalID}
-			}
+			g.attachUser(users[g.Assignment.PrincipalID])
 		case domain.AuthzPrincipalTypeTeam:
-			if team, ok := teams[g.Assignment.PrincipalID]; ok {
-				g.Team = teamRefFrom(team)
-				if includePrincipal {
-					g.PrincipalTeam = team
-				}
-			} else {
-				g.Team = &TeamRef{TeamID: g.Assignment.PrincipalID}
-			}
+			g.attachTeam(teams[g.Assignment.PrincipalID])
 		}
 	}
 	return out, nil
@@ -421,14 +441,10 @@ func (s *GrantService) loadUsers(ctx context.Context, projectID string, userIDs 
 	if len(userIDs) == 0 {
 		return nil, nil
 	}
-	idFilters := make([]database.Filter[domain.UserField], 0, len(userIDs))
-	for _, id := range userIDs {
-		idFilters = append(idFilters, database.Equal(database.Col(domain.UserFieldID), id))
-	}
 	listed, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
-			database.Or(idFilters...),
+			database.Or(equalIDFilters(domain.UserFieldID, userIDs)...),
 		),
 		Pagination: database.Page[domain.UserField]{
 			Limit: uint32(len(userIDs)),
@@ -441,11 +457,7 @@ func (s *GrantService) loadUsers(ctx context.Context, projectID string, userIDs 
 	if err != nil {
 		return nil, err
 	}
-	users := make(map[string]*domain.User, len(listed.Items))
-	for _, user := range listed.Items {
-		users[user.ID] = user
-	}
-	return users, nil
+	return indexByID(listed.Items, func(u *domain.User) string { return u.ID }), nil
 }
 
 func userRefFrom(user *domain.User) *UserRef {
@@ -461,14 +473,10 @@ func (s *GrantService) loadTeams(ctx context.Context, projectID string, teamIDs 
 	if len(teamIDs) == 0 {
 		return nil, nil
 	}
-	idFilters := make([]database.Filter[domain.TeamField], 0, len(teamIDs))
-	for _, id := range teamIDs {
-		idFilters = append(idFilters, database.Equal(database.Col(domain.TeamFieldID), id))
-	}
 	listed, err := s.v2Pool.Statements().ListTeams(ctx, &database.ListOptions[domain.TeamField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
-			database.Or(idFilters...),
+			database.Or(equalIDFilters(domain.TeamFieldID, teamIDs)...),
 		),
 		Pagination: database.Page[domain.TeamField]{
 			Limit: uint32(len(teamIDs)),
@@ -481,11 +489,28 @@ func (s *GrantService) loadTeams(ctx context.Context, projectID string, teamIDs 
 	if err != nil {
 		return nil, err
 	}
-	teams := make(map[string]*domain.Team, len(listed.Items))
-	for _, team := range listed.Items {
-		teams[team.ID] = team
+	return indexByID(listed.Items, func(t *domain.Team) string { return t.ID }), nil
+}
+
+func equalIDFilters[F ~uint8](field F, ids []string) []database.Filter[F] {
+	filters := make([]database.Filter[F], 0, len(ids))
+	for _, id := range ids {
+		filters = append(filters, database.Equal(database.Col(field), id))
 	}
-	return teams, nil
+	return filters
+}
+
+func indexByID[T any](items []*T, id func(*T) string) map[string]*T {
+	out := make(map[string]*T, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if key := id(item); key != "" {
+			out[key] = item
+		}
+	}
+	return out
 }
 
 func teamRefFrom(team *domain.Team) *TeamRef {

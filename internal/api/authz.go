@@ -339,62 +339,29 @@ func hasGranularOrOperator(ctx context.Context, scope string) bool {
 	return ok && (slices.Contains(sc.Scope, scope) || hasOperatorProjectWrite(sc.Scope))
 }
 
-// requireMembershipRead gates the membership reads — `expand: ["teams"]` and a
-// `team_id` filter on the users query, and GET /users/{user_id}/teams — because
-// reading users is not reading team memberships (system-permission-catalog.md).
-//
-// The operator fallback is interim: no token carries team_membership.read yet
-// (ADR 036), so requiring it outright would reject every caller.
-// TODO(#420): drop it once granular scopes are minted.
+// requireExpandScope gates an ADR 059 expand that reads a related resource.
+// The operator project.write fallback is interim until #420 mints granular
+// scopes. WithMessage keeps the sentinel code so errors.Is still matches.
+func requireExpandScope(ctx context.Context, scope string, denied func() domain.Error, msg string) error {
+	if hasGranularOrOperator(ctx, scope) {
+		return nil
+	}
+	return denied().WithMessage(msg)
+}
+
 func requireMembershipRead(ctx context.Context) error {
-	if hasGranularOrOperator(ctx, "team_membership.read") {
-		return nil
-	}
-	// The sentinel's own message names the project secret, which is not what
-	// this gate is about; WithMessage keeps the code so errors.Is still matches.
-	return domain.ErrUserPermissionDenied().
-		WithMessage("reading a user's team memberships requires team_membership.read")
+	return requireExpandScope(ctx, "team_membership.read", domain.ErrUserPermissionDenied,
+		"reading a user's team memberships requires team_membership.read")
 }
 
-// requireUserRead gates `expand: ["principal"]` on the grants query. Embedding
-// the GET-user body reads the user resource, which project.read / grant
-// listing does not cover (ADR 059 rule 8).
-//
-// Same interim operator fallback as requireMembershipRead: user.read is not
-// minted yet (ADR 036). TODO(#420): drop it once granular scopes are.
 func requireUserRead(ctx context.Context) error {
-	if hasGranularOrOperator(ctx, "user.read") {
-		return nil
-	}
-	return domain.ErrUserPermissionDenied().
-		WithMessage("expanding a grant principal requires user.read")
+	return requireExpandScope(ctx, "user.read", domain.ErrUserPermissionDenied,
+		"expanding a grant principal requires user.read")
 }
 
-// requireTeamRead gates `expand: ["lifecycle_owner_team"]` on the users query.
-// The id is already on every user; resolving it to the team's name and status
-// reads the team resource, which user.read does not cover
-// (system-permission-catalog.md).
-//
-// Same interim fallback as requireMembershipRead, for the same reason: team.read
-// is not minted yet (ADR 036). TODO(#420): drop it once granular scopes are.
 func requireTeamRead(ctx context.Context) error {
-	if hasGranularOrOperator(ctx, "team.read") {
-		return nil
-	}
-	return domain.ErrUserPermissionDenied().
-		WithMessage("expanding a user's lifecycle owner team requires team.read")
-}
-
-// requireGrantPrincipalTeamRead is the team half of `expand: ["principal"]` on
-// the grants query. A mixed page is the common case, so the request needs
-// team.read as well as user.read; the related-resource sentinel is
-// team.permission_denied, not grant.permission_denied.
-func requireGrantPrincipalTeamRead(ctx context.Context) error {
-	if hasGranularOrOperator(ctx, "team.read") {
-		return nil
-	}
-	return domain.ErrTeamPermissionDenied().
-		WithMessage("expanding a grant principal requires team.read")
+	return requireExpandScope(ctx, "team.read", domain.ErrUserPermissionDenied,
+		"expanding a user's lifecycle owner team requires team.read")
 }
 
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {
