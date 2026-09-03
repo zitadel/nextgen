@@ -150,7 +150,6 @@ func TestOracle_HandBuilt(t *testing.T) {
 			},
 		}
 		assert.True(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", "project", "viewer"))
-		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
 		assert.False(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", "team", "member"))
 		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
 		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "bob"))
