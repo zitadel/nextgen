@@ -43,7 +43,8 @@ infra/
 
 | Resource                            | Owner                          | Lifecycle         |
 | ----------------------------------- | ------------------------------ | ----------------- |
-| AR, state bucket, CI SAs, WIF       | `infra/mgmt/` (OpenTofu)       | Rare changes      |
+| AR, CI SAs, WIF                     | `infra/mgmt/` (OpenTofu)       | Rare changes      |
+| GCS state bucket                    | `infra/bootstrap.sh` (manual)  | One-time          |
 | LB, CDN, IAM, DNS                   | `infra/` (OpenTofu, per env)   | Infra changes     |
 | Cloud SQL instance + database       | `infra/` (OpenTofu, per env)   | Infra changes     |
 | Cloud Run image, command, env, probes | GitHub Actions deploy workflow | App releases    |
