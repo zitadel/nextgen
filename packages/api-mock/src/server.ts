@@ -69,9 +69,19 @@ const consumedHandoffJtis = new Set<string>();
 /**
  * In-memory session store. Maps opaque session tokens to session data.
  * Mimics the Go server's encrypted opaque tokens without actual encryption.
- * We extend the API type with an `email` field for client lookups.
  */
-type StoredSession = GetMySession200 & { email?: string | null };
+type StoredSession = GetMySession200;
+
+/**
+ * Demo identities with a resolved display name — the shape a schema
+ * designating `x-display` produces. Any email not listed here signs in with
+ * an identifier-only ref (the shipped default schema designates no display
+ * properties), so both branches of the rendering chain stay exercisable.
+ */
+const DEMO_DISPLAY_NAMES = new Map<string, string>([
+  ["ada@example.com", "Ada Lovelace"],
+  ["grace@example.com", "Grace Hopper"],
+]);
 const sessionStore = new Map<string, StoredSession>();
 
 /**
@@ -237,13 +247,19 @@ export function createMockApp(options: { issuer: string }): express.Express {
       const userId = `user_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
 
       // Store the session data for GET /sessions/me lookups.
-      // The `email` field is kept alongside the spec-typed fields for
-      // client display purposes (same as the Go server's response).
+      // The `user` ref mirrors the Go server's identity hydration: the mock
+      // signs in by email, so the ref's identifier is the email claim.
+      // `display` comes from the demo-identity fixture — present for the
+      // known demo identities (a schema designating x-display), absent for
+      // every other email (the shipped default schema designates none) — so
+      // clients can exercise both branches of the display → identifier →
+      // user_id rendering chain.
       // A handoff is issued only after a login completes, so the exchanged
       // session carries a verified factor. The contract now defines `active`
       // as "has at least one verified authentication factor", so an empty
       // factor list would contradict the state we report.
       const verifiedFactors = [{ method: "password" as const, verified_at: createdAt.toISOString() }];
+      const display = claims.sub ? DEMO_DISPLAY_NAMES.get(claims.sub) : undefined;
       const sessionData: StoredSession = {
         session_id: sessionId,
         project_id: projectId,
@@ -253,7 +269,12 @@ export function createMockApp(options: { issuer: string }): express.Express {
         assurance_levels: [],
         created_at: createdAt.toISOString(),
         expires_at: expiresAt.toISOString(),
-        email: claims.sub,
+        user: {
+          user_id: userId,
+          // identifier_property travels exactly with identifier (ADR 058 §3).
+          ...(claims.sub ? { identifier: claims.sub, identifier_property: "email" } : {}),
+          ...(display ? { display } : {}),
+        },
       };
       sessionStore.set(opaqueToken, sessionData);
 

@@ -15,7 +15,7 @@ import type { ZitadelSession } from "./zitadel-session.js";
 const API_BASE = "https://session.test.invalid";
 const deleteLog: { url: string; method: string; credentials: string }[] = [];
 
-function sessionBody(email: string, userId: string) {
+function sessionBody(identifier: string, userId: string) {
   const body: Record<string, unknown> = {
     session_id: "sess_test",
     project_id: "test",
@@ -26,7 +26,12 @@ function sessionBody(email: string, userId: string) {
     created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 3_600_000).toISOString(),
   };
-  if (email) body.email = email;
+  const user: Record<string, string> = { user_id: userId };
+  if (identifier) {
+    user.identifier = identifier;
+    user.identifier_property = "email";
+  }
+  body.user = user;
   return body;
 }
 
@@ -116,7 +121,7 @@ describe("<zitadel-session>", () => {
     return host.querySelector("zitadel-session") as ZitadelSession;
   }
 
-  it("renders the heading and the email fetched from GET /sessions/me", async () => {
+  it("renders the heading and the resolved identifier fetched from GET /sessions/me", async () => {
     currentEmail = "alice@acme.com";
     const element = mount();
     await flush(element);
@@ -124,7 +129,7 @@ describe("<zitadel-session>", () => {
     expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe("alice@acme.com");
   });
 
-  it("falls back to user_id when the session response has no email", async () => {
+  it("falls back to user_id when the session ref carries no identifier", async () => {
     currentEmail = "";
     currentUserId = "user_01ABC";
     const element = mount();
@@ -194,7 +199,7 @@ describe("<zitadel-session>", () => {
     expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
     expect(deleteLog[0]?.credentials).toBe("include");
     expect(events).toHaveLength(1);
-    expect(events[0]?.detail).toEqual({ name: "", email: "alice@acme.com" });
+    expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
   });
 
   it("navigates to post-sign-out-url after a successful revoke", async () => {

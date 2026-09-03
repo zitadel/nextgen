@@ -34,7 +34,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { api } from "../../../api/zitadel";
 import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
-import { userAttributes, userDisplayName } from "../../../lib/user";
+import { userAttributes, userIdentifier, userIdentity } from "../../../lib/user";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
@@ -109,8 +109,16 @@ async function columnsForUsers(users: Record<string, unknown>[]): Promise<Schema
 
 interface UserRow {
   id: string;
-  /** Display name for the row menu and the delete dialog — not a column. */
+  /**
+   * The rendered identity (display → identifier → id, ADR 058) — the User
+   * column, the row menu's accessible name, and the delete dialog's heading.
+   */
   name: string;
+  /** The designated identifier — its own column: platform-derived like Status
+   * and ID, so it sits outside the schema-driven set (D4). */
+  identifier?: string;
+  /** The schema property the identifier came from (e.g. "email"), as the cell's tooltip. */
+  identifierProperty?: string;
   /** Rendered cell values, keyed by schema property. */
   values: Record<string, string>;
   /** `metadata.status`, absent on a record the server has not stamped. */
@@ -253,6 +261,8 @@ function UsersScreen() {
       const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
       return [
         row.id,
+        row.name,
+        row.identifier ?? "",
         ...teams,
         ...columns.map((column) => row.values[column.key] ?? ""),
       ].some((value) => value.toLowerCase().includes(needle));
@@ -304,6 +314,8 @@ function UsersScreen() {
         <Table className="text-xs">
           <TableHeader>
             <TableRow className="border-border border-b hover:bg-transparent">
+              <ResourceHeadCell>User</ResourceHeadCell>
+              <ResourceHeadCell>Identifier</ResourceHeadCell>
               {columns.map((column) => (
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
@@ -318,7 +330,7 @@ function UsersScreen() {
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell
-                  colSpan={columns.length + (teamsExpanded ? 4 : 3)}
+                  colSpan={columns.length + (teamsExpanded ? 6 : 5)}
                   className="text-muted-foreground h-24 text-center"
                 >
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}
@@ -327,26 +339,35 @@ function UsersScreen() {
             ) : (
               rows.map((user) => (
                 <TableRow key={user.id} className="hover:bg-muted/40 border-0">
-                  {columns.map((column, index) => (
+                  {/* The User column renders the server-resolved identity
+                      (display → identifier → id, ADR 058 §3a) and carries the
+                      link to the detail screen — schema-driven columns cannot
+                      promise a meaningful leading value, this cell always can. */}
+                  <TableCell className={`${RESOURCE_CELL} max-w-[280px] text-sm`}>
+                    <Link
+                      to="/users/$userId"
+                      params={{ userId: user.id }}
+                      className="text-foreground block truncate font-medium underline-offset-2 hover:underline"
+                    >
+                      {user.name}
+                    </Link>
+                  </TableCell>
+                  {/* The designated identifier (x-identifier) — role-named, so a
+                      mixed-schema list reads down one column whether a row's
+                      identifier is an email or a loginname; the tooltip names
+                      the property it came from. */}
+                  <TableCell
+                    className={`${RESOURCE_CELL} text-muted-foreground max-w-[280px] truncate text-sm`}
+                    title={user.identifierProperty}
+                  >
+                    {user.identifier ?? "—"}
+                  </TableCell>
+                  {columns.map((column) => (
                     <TableCell
                       key={column.key}
                       className={`${RESOURCE_CELL} text-muted-foreground max-w-[280px] truncate text-sm`}
                     >
-                      {/* The first column carries the link to the detail screen.
-                          There is no separate name column to hang it on — the
-                          design's columns are the schema's own properties, and
-                          which one comes first depends on the schema. */}
-                      {index === 0 ? (
-                        <Link
-                          to="/users/$userId"
-                          params={{ userId: user.id }}
-                          className="text-foreground truncate font-medium underline-offset-2 hover:underline"
-                        >
-                          {user.values[column.key] || user.id}
-                        </Link>
-                      ) : (
-                        (user.values[column.key] ?? "—")
-                      )}
+                      {user.values[column.key] ?? "—"}
                     </TableCell>
                   ))}
                   <TableCell className={RESOURCE_CELL}>
@@ -414,10 +435,12 @@ function toUserRow(
   return {
     id,
     values,
-    // Used for the row menu's accessible name and the delete dialog's heading,
-    // not as a column. Falls back to the email and then the id: a `minimal`
-    // schema defines only `email`, so a name is genuinely absent, not missing.
-    name: userDisplayName(attributes) ?? field(attributes, "email") ?? id,
+    // The server-resolved identity chain (ADR 058): display → identifier →
+    // id. Also the row menu's accessible name and the delete dialog's
+    // heading, so every surface labels the user identically.
+    name: userIdentity(user) ?? id,
+    identifier: userIdentifier(user),
+    identifierProperty: field(user, "identifier_property"),
     status: userStatus(user),
     teams: userTeams(user),
     teamsTruncated: user.teams_truncated === true,

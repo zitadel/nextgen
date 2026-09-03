@@ -166,8 +166,9 @@ describe("createNextgenMiddleware (H3)", () => {
       isAuthenticated: true,
       session: {
         userId: "user-nuxt",
-        email: "nuxt@example.com",
-        name: null,
+        identifier: "nuxt@example.com",
+        identifierProperty: null,
+        display: null,
         token,
       },
     });
@@ -212,8 +213,9 @@ describe("createNextgenMiddleware (H3)", () => {
       isAuthenticated: true,
       session: {
         userId: "user-nuxt",
-        email: "nuxt@example.com",
-        name: null,
+        identifier: "nuxt@example.com",
+        identifierProperty: null,
+        display: null,
         token,
       },
     });
@@ -563,7 +565,13 @@ describe("createNextgenMiddleware (H3)", () => {
     await handler(makeWebRequest("http://localhost:3000/", "__nextgen_session=opaque-token"));
     expect(capturedAuth).toEqual({
       isAuthenticated: true,
-      session: { userId: "user-opaque", email: null, name: null, token: "opaque-token" },
+      session: {
+        userId: "user-opaque",
+        identifier: null,
+        identifierProperty: null,
+        display: null,
+        token: "opaque-token",
+      },
     });
   });
 
