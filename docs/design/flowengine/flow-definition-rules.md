@@ -16,8 +16,8 @@ Validation runs in two layers:
 
 | Field | Required | Notes |
 |---|:-:|---|
-| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name, and resolution by name picks the newest active one. |
-| `schema_version` | ✓ | Monotonic per `(project_id, name)`. The repository picks the highest active version. |
+| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. Resolution by name prefers the highest active `schema_version`, then the newest revision of it. |
+| `schema_version` | ✓ | Monotonic per `(project_id, name)`. First key of resolution by name (see `name`); the server hard-codes it today, so the newest revision decides. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
 | `user_schema` | ✓ | URL of the user schema this flow's `fields` resolve against. Captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
