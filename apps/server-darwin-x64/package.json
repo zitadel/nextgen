@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server-darwin-x64",
-  "version": "1.0.0-alpha.20",
+  "version": "1.0.0-alpha.21",
   "description": "macOS x64 Zitadel server binary.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
