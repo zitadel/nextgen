@@ -216,18 +216,14 @@ func TestVariablesDecryptAll(t *testing.T) {
 		require.NoError(t, err)
 
 		vars := domain.Variables{"token": secret, "theme": plain}
-		require.NoError(t, vars.DecryptAll(crypter))
+		decrypted, err := vars.DecryptAll(crypter)
+		require.NoError(t, err)
 
-		assert.Equal(t, "s3cret", vars["token"].Value)
-		assert.Equal(t, "dark", vars["theme"].Value)
+		assert.Equal(t, "s3cret", decrypted["token"].Value)
+		assert.Equal(t, "dark", decrypted["theme"].Value)
 	})
 
-	// DecryptAll rewrites the variables it is given rather than returning new
-	// ones, and clears IsSecret along with the ciphertext. That is safe only
-	// because GetVariables hands back freshly scanned rows: if these pointers
-	// were ever shared or cached, the plaintext would outlive the call and the
-	// flag marking it sensitive would be gone.
-	t.Run("mutates the variables in place and clears IsSecret", func(t *testing.T) {
+	t.Run("returns a copy and does not mutate variables in place", func(t *testing.T) {
 		t.Parallel()
 		crypter := &crypto.InverseCrypter{}
 
@@ -235,11 +231,14 @@ func TestVariablesDecryptAll(t *testing.T) {
 		require.NoError(t, err)
 		ciphertext := secret.Value
 
-		require.NoError(t, domain.Variables{"token": secret}.DecryptAll(crypter))
+		decrypted, err := domain.Variables{"token": secret}.DecryptAll(crypter)
+		require.NoError(t, err)
 
-		assert.Equal(t, "s3cret", secret.Value, "the caller's variable now holds plaintext")
-		assert.NotEqual(t, ciphertext, secret.Value)
-		assert.False(t, secret.IsSecret, "and no longer reports itself as a secret")
+		assert.Equal(t, "s3cret", decrypted["token"].Value, "the decrypted variable holds plaintext")
+		assert.False(t, decrypted["token"].IsSecret, "and no longer reports itself as a secret")
+
+		assert.Equal(t, ciphertext, secret.Value, "the caller's original variable still holds ciphertext")
+		assert.True(t, secret.IsSecret, "and still reports itself as a secret")
 	})
 
 	t.Run("reports a secret it cannot decrypt", func(t *testing.T) {
@@ -247,7 +246,7 @@ func TestVariablesDecryptAll(t *testing.T) {
 
 		broken := &domain.Variable{Name: "token", Owner: variableOwner, Value: "not-ciphertext", IsSecret: true}
 
-		err := domain.Variables{"token": broken}.DecryptAll(&crypto.InverseCrypter{})
+		_, err := domain.Variables{"token": broken}.DecryptAll(&crypto.InverseCrypter{})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrFailedToDecryptVariable(nil))
 	})

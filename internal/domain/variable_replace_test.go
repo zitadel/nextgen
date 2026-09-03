@@ -136,10 +136,11 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		found, err := ScanDocumentForVariables(doc)
 		require.NoError(t, err)
 		vm := VariableListToMap(vars)
-		if err := Variables(vm).DecryptAll(&crypto.InverseCrypter{}); err != nil {
+		decrypted, err := Variables(vm).DecryptAll(&crypto.InverseCrypter{})
+		if err != nil {
 			return err
 		}
-		return ReplaceVariablesInDocument(doc, found, vm)
+		return ReplaceVariablesInDocument(doc, found, decrypted)
 	}
 
 	t.Run("writes values at every address, keeping their type", func(t *testing.T) {
@@ -193,8 +194,9 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		require.NoError(t, err)
 
 		vars := VariableListToMap([]*Variable{secret})
-		require.NoError(t, Variables(vars).DecryptAll(crypter))
-		require.NoError(t, ReplaceVariablesInDocument(doc, found, vars))
+		decrypted, err := Variables(vars).DecryptAll(crypter)
+		require.NoError(t, err)
+		require.NoError(t, ReplaceVariablesInDocument(doc, found, decrypted))
 		assert.Equal(t, "s3cret", doc["token"])
 	})
 
@@ -207,7 +209,7 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		// Flagged secret, but the value is not something the crypter produced.
 		broken := &Variable{Name: "token", Owner: VariableOwner{ProjectID: "p"}, Value: "not-ciphertext", IsSecret: true}
 
-		err := Variables(VariableListToMap([]*Variable{broken})).DecryptAll(&crypto.InverseCrypter{})
+		_, err := Variables(VariableListToMap([]*Variable{broken})).DecryptAll(&crypto.InverseCrypter{})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFailedToDecryptVariable(nil))
 	})
