@@ -53,7 +53,7 @@ export type GetSessionOptions = {
  *   if (failed) return <span role="alert">Session unavailable</span>;
  *   if (!auth) return null;
  *   return auth.isAuthenticated
- *     ? <a href="/profile">{auth.session.name ?? auth.session.email ?? "Account"}</a>
+ *     ? <a href="/profile">{auth.session.display ?? auth.session.identifier ?? "Account"}</a>
  *     : <a href="/login">Sign in</a>;
  * }
  * ```
@@ -119,8 +119,9 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
     isAuthenticated: true,
     session: {
       userId: session.user_id,
-      email: session.email ?? null,
-      name: session.name ?? null,
+      identifier: session.user?.identifier ?? null,
+      identifierProperty: session.user?.identifier_property ?? null,
+      display: session.user?.display ?? null,
     },
   };
 }

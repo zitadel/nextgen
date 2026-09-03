@@ -679,15 +679,3 @@ func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID str
 		UserQueryOptions{Attributes: attrs, UniqueAttributesOnly: true},
 	)
 }
-
-// UserStatementsIdentityReader adapts [UserStatements] to [UserIdentityReader].
-type UserStatementsIdentityReader struct {
-	Pool StatementPool
-}
-
-func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	return r.Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
-		database.Equal(database.Col(domain.UserFieldID), userID),
-	), UserQueryOptions{AttributeKeys: attributeKeys})
-}

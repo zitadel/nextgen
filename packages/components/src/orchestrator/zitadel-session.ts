@@ -42,7 +42,7 @@ import "../atoms/index.js";
  *   than throwing.
  * - **Sign out** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
- *   the element fires `zitadel-signout` (detail `{ name, email }`, matching the
+ *   the element fires `zitadel-signout` (detail `{ display, identifier }`, matching the
  *   shared SPA contract) and optionally navigates to `post-sign-out-url`.
  *
  * A "Continue" action is intentionally omitted for now: the post-sign-in
@@ -124,11 +124,11 @@ export class ZitadelSession extends ZitadelSurface {
   /** Sign-out action label. */
   @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
 
-  @state() private accessor displayName = "";
+  @state() private accessor userDisplay = "";
 
-  @state() private accessor displayEmail = "";
+  @state() private accessor userIdentifier = "";
 
-  @state() private accessor displayUserId = "";
+  @state() private accessor userId = "";
 
   @state() private accessor loading = false;
 
@@ -146,7 +146,7 @@ export class ZitadelSession extends ZitadelSurface {
 
   /** Single identity line: human-readable name, then email, then user_id. */
   private get identityLabel(): string {
-    return this.displayName || this.displayEmail || this.displayUserId;
+    return this.userDisplay || this.userIdentifier || this.userId;
   }
 
   override willUpdate(): void {
@@ -184,9 +184,9 @@ export class ZitadelSession extends ZitadelSurface {
   private async fetchIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
     try {
       const session = await getSession(api);
-      this.displayName = session.name ?? "";
-      this.displayEmail = session.email ?? "";
-      this.displayUserId = session.user_id ?? "";
+      this.userDisplay = session.user?.display ?? "";
+      this.userIdentifier = session.user?.identifier ?? "";
+      this.userId = session.user_id ?? "";
     } catch {
       // No active session, or not configured — render without an identity line.
     }
@@ -212,7 +212,7 @@ export class ZitadelSession extends ZitadelSurface {
     }
 
     this.loading = false;
-    emit(this, "zitadel-signout", { name: this.displayName, email: this.displayEmail });
+    emit(this, "zitadel-signout", { display: this.userDisplay, identifier: this.userIdentifier });
 
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.assign(this.postSignOutUrl);

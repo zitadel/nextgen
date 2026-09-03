@@ -101,63 +101,12 @@ func (u *User) OwningTeamID() (string, bool) {
 	return *u.LifecycleOwnerTeamID, true
 }
 
-// IdentityAttributeKeys are the conventional user-schema property names the
-// platform reads to render a user's identity (e.g. `name` and `email` on
-// `GET /sessions/me`). The shipped presets spell the name parts camelCase
-// (`givenName`/`familyName` — see packages/config/defaults/*.json); the
-// snake_case spellings stay accepted for schemas authored that way. Schemas
-// remain free-form: one that names these properties differently simply
-// yields no display name or email, and callers fall back to the user ID.
-var IdentityAttributeKeys = []string{
-	"email",
-	"familyName",
-	"family_name",
-	"givenName",
-	"given_name",
-	"name",
-}
-
 // StringAttribute returns the value of the attribute with the given key when
 // it is a non-empty string, and "" otherwise (absent key or non-string value).
 func (u *User) StringAttribute(key AttributeKey) string {
 	value, _ := u.Attributes.Get(key)
 	s, _ := value.(string)
 	return s
-}
-
-// DisplayName resolves the user's human-readable name from the conventional
-// identity attributes: `name` when present, otherwise the given and family
-// name parts joined — camelCase spelling first (the shipped presets'
-// convention), snake_case as fallback. Returns "" when the loaded
-// attributes carry none of them.
-func (u *User) DisplayName() string {
-	if name := u.StringAttribute("name"); name != "" {
-		return name
-	}
-	name := u.firstStringAttribute("givenName", "given_name")
-	if familyName := u.firstStringAttribute("familyName", "family_name"); familyName != "" {
-		if name != "" {
-			name += " "
-		}
-		name += familyName
-	}
-	return name
-}
-
-// firstStringAttribute returns the first key's non-empty string value.
-func (u *User) firstStringAttribute(keys ...AttributeKey) string {
-	for _, key := range keys {
-		if value := u.StringAttribute(key); value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-// Email returns the conventional `email` identity attribute, or "" when the
-// loaded attributes do not carry one.
-func (u *User) Email() string {
-	return u.StringAttribute("email")
 }
 
 type CreateUser struct {
