@@ -49,9 +49,10 @@ WHERE catalog_kind = `)
 }
 
 // WriteHasAuthzProjectFoothold emits SELECT (foothold).
-func WriteHasAuthzProjectFoothold(w ArgWriter, env Env, projectID string, principalType domain.AuthzPrincipalType, principalID string) {
+// homeProjectID is the membership-edge project (empty falls back to projectID).
+func WriteHasAuthzProjectFoothold(w ArgWriter, env Env, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) {
 	w.WriteString("SELECT ")
-	writeFoothold(w, env, projectID, principalType, principalID)
+	writeFoothold(w, env, projectID, homeProjectID, principalType, principalID)
 }
 
 // WriteCheckAuthz emits SELECT (allowed), (foothold) in one round-trip.
@@ -59,7 +60,7 @@ func WriteCheckAuthz(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString("SELECT (")
 	writeCheckAllowed(w, env, params)
 	w.WriteString("), ")
-	writeFoothold(w, env, params.ProjectID, params.PrincipalType, params.PrincipalID)
+	writeFoothold(w, env, params.ProjectID, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 }
 
 func writeCheckAllowed(w ArgWriter, env Env, params domain.AuthzCheckParams) {
@@ -273,8 +274,12 @@ func writeExprOrArg(w ArgWriter, expr, arg string) {
 	w.WriteArg(arg)
 }
 
-func writeFoothold(w ArgWriter, env Env, projectID string, principalType domain.AuthzPrincipalType, principalID string) {
+func writeFoothold(w ArgWriter, env Env, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) {
 	ptype := principalType.String()
+	home := homeProjectID
+	if home == "" {
+		home = projectID
+	}
 	w.WriteString(`(
     EXISTS (
         SELECT 1
@@ -289,8 +294,9 @@ func writeFoothold(w ArgWriter, env Env, projectID string, principalType domain.
 	writeExpiresActive(w, env, "a")
 	w.WriteString(`
           AND `)
-	// Foothold is project-local: membership home is the protected project.
-	writePrincipalMatch(w, env, "a", ptype, principalID, projectID)
+	// Assignments stay on the protected project. Team expand reads
+	// authz_membership_edges in the principal's home project (ADR 053).
+	writePrincipalMatch(w, env, "a", ptype, principalID, home)
 	w.WriteString(`
     )
     OR EXISTS (
