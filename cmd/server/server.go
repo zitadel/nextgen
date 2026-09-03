@@ -368,16 +368,25 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 // consoleBaseURL joins the deployment's public base with the console mount
 // path. The public base may carry a path prefix (a proxy mounting the server
-// under a subpath); only a trailing slash is trimmed before the join.
+// under a subpath) but nothing else: query, fragment, or userinfo would leak
+// into every minted claim and dashboard URL, so misconfiguration fails at
+// startup instead. The result never ends in a slash — callers append paths.
 func consoleBaseURL(publicBase, consolePath string) (string, error) {
 	base, err := url.Parse(publicBase)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse server public base: %w", err)
 	}
-	if base.Scheme == "" || base.Host == "" {
-		return "", fmt.Errorf("server public base %q must be an absolute URL", publicBase)
+	if (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" {
+		return "", fmt.Errorf("server public base %q must be an absolute http(s) URL", publicBase)
 	}
-	return strings.TrimRight(publicBase, "/") + consolePath, nil
+	if base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return "", fmt.Errorf("server public base %q must carry only an origin and an optional path prefix", publicBase)
+	}
+	if consolePath != "" && !strings.HasPrefix(consolePath, "/") {
+		return "", fmt.Errorf("server console path %q must start with a slash", consolePath)
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + strings.TrimRight(consolePath, "/")
+	return base.String(), nil
 }
 
 // ----------------------------- CONFIG --------------------------------------

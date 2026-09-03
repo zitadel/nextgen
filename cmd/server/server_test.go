@@ -30,20 +30,31 @@ func TestLoadConfigReadsPostgresDatabaseEnv(t *testing.T) {
 
 func TestConsoleBaseURL(t *testing.T) {
 	tests := []struct {
-		name       string
-		publicBase string
-		want       string
-		wantErr    bool
+		name        string
+		publicBase  string
+		consolePath string
+		want        string
+		wantErr     bool
 	}{
 		{name: "plain origin", publicBase: "http://localhost:8080", want: "http://localhost:8080/ui/console"},
 		{name: "trailing slash trimmed", publicBase: "https://nextgen.zitadel.cloud/", want: "https://nextgen.zitadel.cloud/ui/console"},
 		{name: "path prefix kept", publicBase: "https://proxy.example.com/nextgen", want: "https://proxy.example.com/nextgen/ui/console"},
+		{name: "console path trailing slash trimmed", publicBase: "http://localhost:8080", consolePath: "/ui/console/", want: "http://localhost:8080/ui/console"},
 		{name: "missing scheme", publicBase: "localhost:8080", wantErr: true},
 		{name: "empty", publicBase: "", wantErr: true},
+		{name: "non-http scheme", publicBase: "ftp://example.com", wantErr: true},
+		{name: "query rejected", publicBase: "https://example.com?x=y", wantErr: true},
+		{name: "fragment rejected", publicBase: "https://example.com#frag", wantErr: true},
+		{name: "userinfo rejected", publicBase: "https://user:pass@example.com", wantErr: true},
+		{name: "console path without leading slash", publicBase: "http://localhost:8080", consolePath: "ui/console", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := consoleBaseURL(tt.publicBase, "/ui/console")
+			consolePath := tt.consolePath
+			if consolePath == "" {
+				consolePath = "/ui/console"
+			}
+			got, err := consoleBaseURL(tt.publicBase, consolePath)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
