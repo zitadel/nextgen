@@ -353,6 +353,25 @@ describe("SchemaCheck", () => {
     const outcome = await new SchemaCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("fail");
   });
+
+  it("fails for a designation the server would reject, rendering path and message", async () => {
+    const cwd = await makeProject();
+    // Shape-valid user schema whose `x-identifier` names a property that does
+    // not exist — the server's designation validator (ported into
+    // `schemaConfigSchema`) rejects it, so doctor must too.
+    await writeFile(
+      join(cwd, ".zitadel/schemas/user.json"),
+      JSON.stringify({
+        ...VALID_USER_SCHEMA,
+        "x-identifier": "username",
+      }),
+    );
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain(
+      'x-identifier schema designation invalid: "x-identifier" names unknown property "username"',
+    );
+  });
 });
 
 describe("DependencyCheck", () => {
