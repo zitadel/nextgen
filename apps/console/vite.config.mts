@@ -76,6 +76,12 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     passWithNoTests: true,
     globals: true,
     environment: "jsdom",
+    // CI's first run after a large change transforms the whole module graph
+    // cold, and that startup cost lands inside the first specs' clocks: the
+    // suite then fails en masse with ~5s findBy timeouts on screens that are
+    // green locally and on every warm rerun. Give CI the headroom; keep the
+    // tight local budget so a genuinely hung test still fails fast at a desk.
+    testTimeout: process.env.CI ? 20_000 : 5_000,
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.spec.{ts,tsx}"],
     reporters: ["default"],

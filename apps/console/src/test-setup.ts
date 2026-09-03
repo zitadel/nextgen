@@ -1,4 +1,12 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
+
+// Companion to the CI-only vitest testTimeout in vite.config.mts: the async
+// utils (findBy*, waitFor) default to 1s, which the cold-cache transform of
+// the first CI run eats before the screen under test ever renders.
+if (process.env.CI) {
+  configure({ asyncUtilTimeout: 5_000 });
+}
 
 // @ts-expect-error Needed for tests
 global.IS_REACT_ACT_ENVIRONMENT = true;
