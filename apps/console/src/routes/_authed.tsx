@@ -52,7 +52,11 @@ function AuthedLayout() {
 
   return (
     <AppShell
-      user={{ name: session.name, email: session.email, userId: session.user_id ?? undefined }}
+      user={{
+        display: session.user?.display,
+        identifier: session.user?.identifier,
+        userId: session.user_id ?? undefined,
+      }}
       onSignOut={handleSignOut}
     >
       <Outlet />

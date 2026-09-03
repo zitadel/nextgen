@@ -300,6 +300,11 @@ func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.Mock
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	// Ref resolution lists the project's schemas on every read path; an empty
+	// listing resolves every user to a bare id ref without further queries.
+	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
 
-	return service.NewUserService(service.NewPool(pool), nil, nil), stmts
+	svcPool := service.NewPool(pool)
+	return service.NewUserService(svcPool, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}), stmts
 }

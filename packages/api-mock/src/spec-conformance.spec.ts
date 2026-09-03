@@ -38,6 +38,7 @@ import {
   ExchangeHandoffResponse,
   GetClaimStatusResponse,
   GetFlowDefinitionResponse,
+  GetMySessionResponse,
   GetProjectResponse,
   ListFlowDefinitionsResponse,
   UpdateFlowDefinitionResponse,
@@ -110,6 +111,59 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ExchangeHandoffResponse.parse(body)).not.toThrow();
+  });
+
+  test("GET /sessions/me resolves a display for the known demo identities", async () => {
+    const handoff = await signHandoffToken({ sub: "ada@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_display`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="))
+      ?.split(";")[0];
+
+    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
+    expect(body.user).toMatchObject({
+      identifier: "ada@example.com",
+      identifier_property: "email",
+      display: "Ada Lovelace",
+    });
+  });
+
+  test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
+    const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="))
+      ?.split(";")[0];
+    expect(cookie).toBeDefined();
+
+    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
+    // The identity contract (ADR 058): the ref carries the sign-in email as
+    // the designated identifier; the mock, like the shipped default schema,
+    // designates no display properties.
+    expect(body.user).toMatchObject({
+      user_id: body.user_id,
+      identifier: "me@example.com",
+      identifier_property: "email",
+    });
+    expect(body.user).not.toHaveProperty("display");
   });
 
   test("POST /sessions/exchange without project_id returns 400", async () => {

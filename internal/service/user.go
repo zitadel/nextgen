@@ -119,6 +119,7 @@ type userService struct {
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
 	hasher      crypto.Hasher
+	refs        UserRefResolver
 }
 
 // NewUserService returns the interface rather than *userService, deliberately
@@ -131,11 +132,13 @@ func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
 	hasher crypto.Hasher,
+	refs UserRefResolver,
 ) UserService {
 	return &userService{
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
 		hasher:      hasher,
+		refs:        refs,
 	}
 }
 
@@ -199,8 +202,32 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 			WithMessage("The user was created but could not be read back. Fetch it by id rather than retrying the create.").
 			WithDetails(domain.CreatedUserDetails{UserID: action.CreateUser.ID})
 	}
+	// The identity ref is derived decoration and the create has already
+	// committed: a resolution failure must not fail the create — the caller
+	// would retry and hit the unique constraints — so the response simply
+	// carries no ref fields and clients fall back to the id (ADR 058).
+	if refs, err := s.refs.ResolveRefsForUsers(ctx, input.ProjectID, []*domain.User{user}); err == nil {
+		if ref, ok := refs[user.ID]; ok {
+			user.Ref = &ref
+		}
+	}
 
 	return user, nil
+}
+
+// attachUserRefs resolves the derived identity (ADR 058 §3a) onto each
+// user's Ref — one batch per page, per §4.
+func (s *userService) attachUserRefs(ctx context.Context, projectID string, users ...*domain.User) error {
+	refs, err := s.refs.ResolveRefsForUsers(ctx, projectID, users)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to resolve user identities")
+	}
+	for _, user := range users {
+		if ref, ok := refs[user.ID]; ok {
+			user.Ref = &ref
+		}
+	}
+	return nil
 }
 
 func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
@@ -243,6 +270,9 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 	}, queryOpts)
 	if err != nil {
 		return nil, mapListError(err, "failed to list users from database")
+	}
+	if err := s.attachUserRefs(ctx, input.ProjectID, result.Items...); err != nil {
+		return nil, err
 	}
 
 	return &ListUsersOutput{
@@ -468,6 +498,9 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
+	if err := s.attachUserRefs(ctx, input.ProjectID, user); err != nil {
+		return nil, err
+	}
 
 	return user, nil
 }
@@ -495,6 +528,9 @@ func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*dom
 			return nil, domain.ErrUserNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+	if err := s.attachUserRefs(ctx, sessionToken.ProjectID, user); err != nil {
+		return nil, err
 	}
 
 	return user, nil
@@ -678,16 +714,4 @@ func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID str
 		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		UserQueryOptions{Attributes: attrs, UniqueAttributesOnly: true},
 	)
-}
-
-// UserStatementsIdentityReader adapts [UserStatements] to [UserIdentityReader].
-type UserStatementsIdentityReader struct {
-	Pool StatementPool
-}
-
-func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	return r.Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
-		database.Equal(database.Col(domain.UserFieldID), userID),
-	), UserQueryOptions{AttributeKeys: attributeKeys})
 }

@@ -276,6 +276,22 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 
 // ------------------ Mappers ---------------
 
+// userRefToAPI maps the resolved reference (ADR 058 §3): identifier and
+// identifier_property travel together, display independently; empty means
+// absent on the wire. Lives with the user mapping because every
+// user-linked resource embeds the same reference.
+func userRefToAPI(ref domain.UserRef) api.UserRef {
+	out := api.UserRef{UserID: api.UserID(ref.UserID)}
+	if ref.Identifier != "" {
+		out.Identifier = api.NewOptString(ref.Identifier)
+		out.IdentifierProperty = api.NewOptString(ref.IdentifierProperty)
+	}
+	if ref.Display != "" {
+		out.Display = api.NewOptString(ref.Display)
+	}
+	return out
+}
+
 func domainUserToApiUser(user *domain.User) (*api.User, error) {
 	userData, err := user.Attributes.ToMap()
 	if err != nil {
@@ -304,6 +320,19 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 			Status:               api.UserMetadataStatus(user.Metadata.Status),
 			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
 		},
+	}
+
+	// The derived identity of ADR 058 §3a: identifier and identifier_property
+	// travel together, display independently; empty means absent on the wire
+	// (the userRefToAPI pairing rule).
+	if user.Ref != nil {
+		if user.Ref.Identifier != "" {
+			out.Identifier = api.NewOptString(user.Ref.Identifier)
+			out.IdentifierProperty = api.NewOptString(user.Ref.IdentifierProperty)
+		}
+		if user.Ref.Display != "" {
+			out.Display = api.NewOptString(user.Ref.Display)
+		}
 	}
 
 	// Nil means the read was not asked for memberships, so the property stays
