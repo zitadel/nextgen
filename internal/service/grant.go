@@ -254,9 +254,6 @@ type Grant struct {
 }
 
 func (g *Grant) attachUser(user *domain.User) {
-	if g == nil || g.Assignment == nil || g.Assignment.PrincipalType != domain.AuthzPrincipalTypeUser {
-		return
-	}
 	if user != nil {
 		g.User = userRefFrom(user)
 		if g.Principal != nil {
@@ -268,9 +265,6 @@ func (g *Grant) attachUser(user *domain.User) {
 }
 
 func (g *Grant) attachTeam(team *domain.Team) {
-	if g == nil || g.Assignment == nil || g.Assignment.PrincipalType != domain.AuthzPrincipalTypeTeam {
-		return
-	}
 	if team != nil {
 		g.Team = teamRefFrom(team)
 		if g.Principal != nil {
