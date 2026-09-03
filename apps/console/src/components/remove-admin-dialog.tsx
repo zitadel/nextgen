@@ -65,7 +65,11 @@ export function RemoveAdminDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      {/* 384px, per the frame. The important suffix is required: the
+          primitive's own `data-[size=default]:sm:max-w-lg` compiles to a
+          higher-specificity selector and would otherwise leave this 512px
+          (same trap as the delete-user dialog). */}
+      <AlertDialogContent className="sm:max-w-sm!">
         <AlertDialogHeader>
           <AlertDialogTitle>Remove admin?</AlertDialogTitle>
           <AlertDialogDescription>

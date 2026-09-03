@@ -6,7 +6,6 @@ import { AddAdminDialog } from "@/components/add-admin-dialog";
 import { RemoveAdminDialog } from "@/components/remove-admin-dialog";
 import {
   RESOURCE_CELL,
-  RESOURCE_HEADER,
   RESOURCE_PAGE,
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
@@ -61,6 +60,17 @@ export const Route = createFileRoute("/_authed/settings/admins")({
 });
 
 /**
+ * Settings content is a fixed column centred in the main area, narrower than a
+ * portal screen: the design measures 704px against the portal's full width.
+ * Named as a design token in #1064; until that lands the value lives here
+ * rather than being spread across the settings screens as it arrives.
+ */
+const SETTINGS_COLUMN = "mx-auto w-full max-w-[704px]";
+
+// `RESOURCE_HEADER`'s `px-2` is deliberately not used here: the design puts the
+// heading flush with the card's own edge rather than inset from it.
+
+/**
  * One page of grants. `POST /grants/query` is cursor-paginated like the other
  * list reads, but this screen does not page yet: a project's administrators are
  * a handful of people, and `Load more` with nothing past the first page is a
@@ -84,12 +94,11 @@ function AdminsScreen() {
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
-      <div
-        className={`${RESOURCE_HEADER} flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-between`}
-      >
+      <div className={SETTINGS_COLUMN}>
+      <div className="flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Admins</h1>
         <AddAdminDialog onAdded={() => router.invalidate()}>
-          <Button variant="secondary" className="w-full gap-1.5 px-2.5 lg:w-auto">
+          <Button className="w-full gap-1.5 px-2.5 lg:w-auto">
             <Plus aria-hidden />
             Add admin
           </Button>
@@ -132,6 +141,7 @@ function AdminsScreen() {
             )}
           </TableBody>
         </Table>
+      </div>
       </div>
     </div>
   );

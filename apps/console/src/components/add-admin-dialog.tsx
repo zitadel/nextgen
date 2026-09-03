@@ -55,7 +55,9 @@ export function AddAdminDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
+      {/* 384px, matching the remove dialog and the frame. The important suffix
+          beats the primitive's own `sm:max-w-lg`. */}
+      <DialogContent className="sm:max-w-sm!">
         <DialogHeader>
           <DialogTitle>Add admin</DialogTitle>
           <DialogDescription>
