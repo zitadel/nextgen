@@ -246,13 +246,18 @@ function UsersScreen() {
     const needle = query.trim().toLowerCase();
     return users.map((user, index) => toUserRow(user, index, columns)).filter((row) => {
       if (needle === "") return true;
+      // Team names only while the column is on screen. A later page served
+      // without the expansion drops the column while the rows fetched before it
+      // keep their memberships, and searching those would filter the table on
+      // something the operator cannot see.
+      const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
       return [
         row.id,
-        ...row.teams.map((team) => team.name),
+        ...teams,
         ...columns.map((column) => row.values[column.key] ?? ""),
       ].some((value) => value.toLowerCase().includes(needle));
     });
-  }, [users, query, columns]);
+  }, [users, query, columns, teamsExpanded]);
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>

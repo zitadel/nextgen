@@ -480,6 +480,50 @@ describe("users screen", () => {
     expect(marker.className).not.toMatch(/truncate/);
   });
 
+  it("stops searching team names once the column is dropped mid-list", async () => {
+    // The first page is expanded and its rows keep their memberships; the
+    // second is refused, which drops the column. Searching a team name would
+    // otherwise filter the table on something no longer on screen.
+    server.use(
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        if (body.page_token) {
+          return body.expand
+            ? HttpResponse.json({ message: "not permitted" }, { status: 403 })
+            : HttpResponse.json({
+                users: [{ id: "user_2", attributes: { email: "second@x.com" } }],
+              });
+        }
+        return HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              attributes: { email: "first@x.com" },
+              teams: [{ id: "team_1", name: "Acme Web", membership_status: "active" }],
+            },
+          ],
+          next_page_token: "tok_2",
+        });
+      }),
+    );
+    await renderUsers();
+
+    // While the column is on screen, its names are searchable.
+    await userEvent.type(await screen.findByLabelText("Search users"), "Acme Web");
+    expect(await screen.findByText("first@x.com")).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("Search users"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await screen.findByText("second@x.com");
+    const table = within(screen.getByRole("table"));
+    expect(table.queryByText("Team")).not.toBeInTheDocument();
+
+    // The column is gone, so the team name no longer matches anything.
+    await userEvent.type(screen.getByLabelText("Search users"), "Acme Web");
+    await waitFor(() => expect(screen.queryByText("first@x.com")).not.toBeInTheDocument());
+    expect(screen.getByText("No users match the current filters.")).toBeInTheDocument();
+  });
+
   it("drops the Team column when the credential may not read memberships", async () => {
     // `expand: ["teams"]` needs `team_membership.read` on top of `user.read`,
     // and the refusal covers the whole request. Losing the column is the honest
