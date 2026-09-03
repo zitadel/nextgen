@@ -150,6 +150,17 @@ export default class Claim extends BaseCommand {
       now: Date.now(),
     });
 
+    // A local server left on the default public base advertises a claim page
+    // on a remote origin — the exact confusion this warning names. Cloud
+    // servers legitimately use a console origin different from the API one,
+    // so only a loopback API paired with a non-loopback claim page warns.
+    if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
+      consola.warn(
+        `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
+          "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
+      );
+    }
+
     // Always show the link first, before attempting anything: it is the whole
     // instruction on its own, so a launch that never happens (headless box,
     // no `xdg-open`, `--no-open`, an agent) needs no separate path.
@@ -295,4 +306,13 @@ function expiredError(message: string): ZitadelError {
     hint: "Links are valid for 10 minutes. Start a new one.",
     nextCommands: ["zitadel claim"],
   });
+}
+
+/** Loopback check on the URL's hostname; `[::1]` is how WHATWG URLs spell IPv6 loopback. */
+function isLoopbackUrl(value: string): boolean {
+  try {
+    return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(value).hostname);
+  } catch {
+    return false;
+  }
 }
