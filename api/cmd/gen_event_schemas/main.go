@@ -49,6 +49,8 @@ var payloadByEventType = map[string]string{
 	"auth.check.succeeded":    "auth-check-payload.yaml",
 
 	"flowdef.created": "flowdef-payload.yaml",
+	"flowdef.updated": "flowdef-payload.yaml",
+	"flowdef.deleted": "empty-event-payload.yaml",
 
 	"schema.created": "schema-created-payload.yaml",
 

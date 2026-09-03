@@ -62,6 +62,8 @@ const (
 	EventTypeAuthCheckSucceeded   EventType = "auth.check.succeeded"
 
 	EventTypeFlowdefCreated EventType = "flowdef.created"
+	EventTypeFlowdefUpdated EventType = "flowdef.updated"
+	EventTypeFlowdefDeleted EventType = "flowdef.deleted"
 
 	EventTypeSchemaCreated EventType = "schema.created"
 

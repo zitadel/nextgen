@@ -15688,6 +15688,488 @@ func (s *CreateProjectResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes CreateReleaseCreated as json.
+func (s *CreateReleaseCreated) Encode(e *jx.Encoder) {
+	unwrapped := (*Release)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateReleaseCreated from json.
+func (s *CreateReleaseCreated) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateReleaseCreated to nil")
+	}
+	var unwrapped Release
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateReleaseCreated(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateReleaseCreated) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateReleaseCreated) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateReleaseErrorResponse as json.
+func (s CreateReleaseErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CreateReleaseErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedCreateReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalCreateReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidCreateReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CreateReleaseErrorResponse from json.
+func (s *CreateReleaseErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateReleaseErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedCreateReleaseErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalCreateReleaseErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidCreateReleaseErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedCreateReleaseErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalCreateReleaseErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidCreateReleaseErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CreateReleaseErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateReleaseErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateReleaseOK as json.
+func (s *CreateReleaseOK) Encode(e *jx.Encoder) {
+	unwrapped := (*Release)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateReleaseOK from json.
+func (s *CreateReleaseOK) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateReleaseOK to nil")
+	}
+	var unwrapped Release
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateReleaseOK(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateReleaseOK) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateReleaseOK) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *CreateReleasePointer) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *CreateReleasePointer) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
+	{
+		e.FieldStart("revision_id")
+		e.Str(s.RevisionID)
+	}
+}
+
+var jsonFieldsNameOfCreateReleasePointer = [2]string{
+	0: "kind",
+	1: "revision_id",
+}
+
+// Decode decodes CreateReleasePointer from json.
+func (s *CreateReleasePointer) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateReleasePointer to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "kind":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "revision_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.RevisionID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"revision_id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode CreateReleasePointer")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfCreateReleasePointer) {
+					name = jsonFieldsNameOfCreateReleasePointer[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateReleasePointer) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateReleasePointer) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *CreateReleaseRequest) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *CreateReleaseRequest) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("pointers")
+		e.ArrStart()
+		for _, elem := range s.Pointers {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+	{
+		if s.Message.Set {
+			e.FieldStart("message")
+			s.Message.Encode(e)
+		}
+	}
+	{
+		if s.GitSha.Set {
+			e.FieldStart("git_sha")
+			s.GitSha.Encode(e)
+		}
+	}
+	{
+		if s.GitDirty.Set {
+			e.FieldStart("git_dirty")
+			s.GitDirty.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfCreateReleaseRequest = [4]string{
+	0: "pointers",
+	1: "message",
+	2: "git_sha",
+	3: "git_dirty",
+}
+
+// Decode decodes CreateReleaseRequest from json.
+func (s *CreateReleaseRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateReleaseRequest to nil")
+	}
+	var requiredBitSet [1]uint8
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "pointers":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Pointers = make([]CreateReleasePointer, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem CreateReleasePointer
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Pointers = append(s.Pointers, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"pointers\"")
+			}
+		case "message":
+			if err := func() error {
+				s.Message.Reset()
+				if err := s.Message.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "git_sha":
+			if err := func() error {
+				s.GitSha.Reset()
+				if err := s.GitSha.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"git_sha\"")
+			}
+		case "git_dirty":
+			if err := func() error {
+				s.GitDirty.Reset()
+				if err := s.GitDirty.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"git_dirty\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode CreateReleaseRequest")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfCreateReleaseRequest) {
+					name = jsonFieldsNameOfCreateReleaseRequest[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateReleaseRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateReleaseRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes CreateSchemaBadRequest as json.
 func (s *CreateSchemaBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
@@ -21994,6 +22476,242 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				s.Payload.Encode(e)
 			}
 		}
+	case FlowdefDeletedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("flowdef.deleted")
+		{
+			s := s.FlowdefDeletedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeDateTime(e, s.OccurredAt)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
+	case FlowdefUpdatedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("flowdef.updated")
+		{
+			s := s.FlowdefUpdatedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeDateTime(e, s.OccurredAt)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
 	case ProjectCreatedEventEvent:
 		e.FieldStart("event_type")
 		e.Str("project.created")
@@ -23593,6 +24311,12 @@ func (s *Event) Decode(d *jx.Decoder) error {
 				case "flowdef.created":
 					s.Type = FlowdefCreatedEventEvent
 					found = true
+				case "flowdef.deleted":
+					s.Type = FlowdefDeletedEventEvent
+					found = true
+				case "flowdef.updated":
+					s.Type = FlowdefUpdatedEventEvent
+					found = true
 				case "project.created":
 					s.Type = ProjectCreatedEventEvent
 					found = true
@@ -23696,6 +24420,14 @@ func (s *Event) Decode(d *jx.Decoder) error {
 		}
 	case FlowdefCreatedEventEvent:
 		if err := s.FlowdefCreatedEvent.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefDeletedEventEvent:
+		if err := s.FlowdefDeletedEvent.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefUpdatedEventEvent:
+		if err := s.FlowdefUpdatedEvent.Decode(d); err != nil {
 			return err
 		}
 	case ProjectCreatedEventEvent:
@@ -31111,6 +31843,591 @@ func (s *FlowdefCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *FlowdefDeletedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("flowdef.deleted")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeDateTime(e, s.OccurredAt)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfFlowdefDeletedEvent = [22]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "client_id",
+	12: "token_id",
+	13: "delegation_type",
+	14: "delegation_id",
+	15: "grantor",
+	16: "fingerprint",
+	17: "request_id",
+	18: "session_id",
+	19: "flow_id",
+	20: "metadata",
+	21: "payload",
+}
+
+// Decode decodes FlowdefDeletedEvent from json.
+func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefDeletedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 5
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowdefDeletedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00001000,
+		0b00100000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowdefDeletedEvent) {
+					name = jsonFieldsNameOfFlowdefDeletedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *FlowdefDeletedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefDeletedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefDeletedEventActorType as json.
+func (s FlowdefDeletedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowdefDeletedEventActorType from json.
+func (s *FlowdefDeletedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefDeletedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowdefDeletedEventActorType(v) {
+	case FlowdefDeletedEventActorTypeHuman:
+		*s = FlowdefDeletedEventActorTypeHuman
+	case FlowdefDeletedEventActorTypeService:
+		*s = FlowdefDeletedEventActorTypeService
+	case FlowdefDeletedEventActorTypeSystem:
+		*s = FlowdefDeletedEventActorTypeSystem
+	case FlowdefDeletedEventActorTypeAgent:
+		*s = FlowdefDeletedEventActorTypeAgent
+	default:
+		*s = FlowdefDeletedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowdefDeletedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefDeletedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefDeletedEventCategory as json.
+func (s FlowdefDeletedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowdefDeletedEventCategory from json.
+func (s *FlowdefDeletedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefDeletedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowdefDeletedEventCategory(v) {
+	case FlowdefDeletedEventCategoryRequest:
+		*s = FlowdefDeletedEventCategoryRequest
+	case FlowdefDeletedEventCategoryAuth:
+		*s = FlowdefDeletedEventCategoryAuth
+	case FlowdefDeletedEventCategorySession:
+		*s = FlowdefDeletedEventCategorySession
+	case FlowdefDeletedEventCategoryAdmin:
+		*s = FlowdefDeletedEventCategoryAdmin
+	case FlowdefDeletedEventCategoryEntity:
+		*s = FlowdefDeletedEventCategoryEntity
+	case FlowdefDeletedEventCategorySignal:
+		*s = FlowdefDeletedEventCategorySignal
+	default:
+		*s = FlowdefDeletedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowdefDeletedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefDeletedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefDeletedEventDelegationType as json.
+func (s FlowdefDeletedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowdefDeletedEventDelegationType from json.
+func (s *FlowdefDeletedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefDeletedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowdefDeletedEventDelegationType(v) {
+	case FlowdefDeletedEventDelegationTypeDirect:
+		*s = FlowdefDeletedEventDelegationTypeDirect
+	case FlowdefDeletedEventDelegationTypeDelegated:
+		*s = FlowdefDeletedEventDelegationTypeDelegated
+	case FlowdefDeletedEventDelegationTypePatShared:
+		*s = FlowdefDeletedEventDelegationTypePatShared
+	case FlowdefDeletedEventDelegationTypeExchanged:
+		*s = FlowdefDeletedEventDelegationTypeExchanged
+	default:
+		*s = FlowdefDeletedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowdefDeletedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *FlowdefInvalid) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -32715,6 +34032,591 @@ func (s FlowdefSchemaFetchFailedDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowdefSchemaFetchFailedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *FlowdefUpdatedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("flowdef.updated")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeDateTime(e, s.OccurredAt)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfFlowdefUpdatedEvent = [22]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "client_id",
+	12: "token_id",
+	13: "delegation_type",
+	14: "delegation_id",
+	15: "grantor",
+	16: "fingerprint",
+	17: "request_id",
+	18: "session_id",
+	19: "flow_id",
+	20: "metadata",
+	21: "payload",
+}
+
+// Decode decodes FlowdefUpdatedEvent from json.
+func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefUpdatedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 5
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowdefUpdatedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00001000,
+		0b00100000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowdefUpdatedEvent) {
+					name = jsonFieldsNameOfFlowdefUpdatedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *FlowdefUpdatedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefUpdatedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefUpdatedEventActorType as json.
+func (s FlowdefUpdatedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowdefUpdatedEventActorType from json.
+func (s *FlowdefUpdatedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefUpdatedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowdefUpdatedEventActorType(v) {
+	case FlowdefUpdatedEventActorTypeHuman:
+		*s = FlowdefUpdatedEventActorTypeHuman
+	case FlowdefUpdatedEventActorTypeService:
+		*s = FlowdefUpdatedEventActorTypeService
+	case FlowdefUpdatedEventActorTypeSystem:
+		*s = FlowdefUpdatedEventActorTypeSystem
+	case FlowdefUpdatedEventActorTypeAgent:
+		*s = FlowdefUpdatedEventActorTypeAgent
+	default:
+		*s = FlowdefUpdatedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowdefUpdatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefUpdatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefUpdatedEventCategory as json.
+func (s FlowdefUpdatedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowdefUpdatedEventCategory from json.
+func (s *FlowdefUpdatedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefUpdatedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowdefUpdatedEventCategory(v) {
+	case FlowdefUpdatedEventCategoryRequest:
+		*s = FlowdefUpdatedEventCategoryRequest
+	case FlowdefUpdatedEventCategoryAuth:
+		*s = FlowdefUpdatedEventCategoryAuth
+	case FlowdefUpdatedEventCategorySession:
+		*s = FlowdefUpdatedEventCategorySession
+	case FlowdefUpdatedEventCategoryAdmin:
+		*s = FlowdefUpdatedEventCategoryAdmin
+	case FlowdefUpdatedEventCategoryEntity:
+		*s = FlowdefUpdatedEventCategoryEntity
+	case FlowdefUpdatedEventCategorySignal:
+		*s = FlowdefUpdatedEventCategorySignal
+	default:
+		*s = FlowdefUpdatedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowdefUpdatedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefUpdatedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefUpdatedEventDelegationType as json.
+func (s FlowdefUpdatedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowdefUpdatedEventDelegationType from json.
+func (s *FlowdefUpdatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowdefUpdatedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowdefUpdatedEventDelegationType(v) {
+	case FlowdefUpdatedEventDelegationTypeDirect:
+		*s = FlowdefUpdatedEventDelegationTypeDirect
+	case FlowdefUpdatedEventDelegationTypeDelegated:
+		*s = FlowdefUpdatedEventDelegationTypeDelegated
+	case FlowdefUpdatedEventDelegationTypePatShared:
+		*s = FlowdefUpdatedEventDelegationTypePatShared
+	case FlowdefUpdatedEventDelegationTypeExchanged:
+		*s = FlowdefUpdatedEventDelegationTypeExchanged
+	default:
+		*s = FlowdefUpdatedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowdefUpdatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowdefUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -35081,6 +36983,143 @@ func (s *GetProjectUnauthorized) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetProjectUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetReleaseByIdErrorResponse as json.
+func (s GetReleaseByIdErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedGetReleaseByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalGetReleaseByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidGetReleaseByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetReleaseByIdErrorResponse from json.
+func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetReleaseByIdErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedGetReleaseByIdErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalGetReleaseByIdErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidGetReleaseByIdErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedGetReleaseByIdErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalGetReleaseByIdErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidGetReleaseByIdErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetReleaseByIdErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetReleaseByIdErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -39238,6 +41277,266 @@ func (s *ListFlowDefinitionsErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ListReleasesErrorResponse as json.
+func (s ListReleasesErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListReleasesErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListReleasesErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListReleasesErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListReleasesErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListReleasesErrorResponse from json.
+func (s *ListReleasesErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListReleasesErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListReleasesErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListReleasesErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListReleasesErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListReleasesErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalListReleasesErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListReleasesErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListReleasesErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListReleasesErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ListReleasesResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ListReleasesResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("releases")
+		e.ArrStart()
+		for _, elem := range s.Releases {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfListReleasesResponse = [2]string{
+	0: "releases",
+	1: "next_page_token",
+}
+
+// Decode decodes ListReleasesResponse from json.
+func (s *ListReleasesResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListReleasesResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "releases":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Releases = make([]ReleaseSummary, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem ReleaseSummary
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Releases = append(s.Releases, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"releases\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ListReleasesResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfListReleasesResponse) {
+					name = jsonFieldsNameOfListReleasesResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListReleasesResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListReleasesResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *ListSchemasResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -42987,6 +45286,39 @@ func (s *OptFlowdefCreatedEventDelegationType) UnmarshalJSON(data []byte) error 
 	return s.Decode(d)
 }
 
+// Encode encodes FlowdefDeletedEventDelegationType as json.
+func (o OptFlowdefDeletedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FlowdefDeletedEventDelegationType from json.
+func (o *OptFlowdefDeletedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFlowdefDeletedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFlowdefDeletedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFlowdefDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes FlowdefInvalidDetails as json.
 func (o OptFlowdefInvalidDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -43288,6 +45620,39 @@ func (s OptFlowdefSchemaFetchFailedDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFlowdefSchemaFetchFailedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefUpdatedEventDelegationType as json.
+func (o OptFlowdefUpdatedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FlowdefUpdatedEventDelegationType from json.
+func (o *OptFlowdefUpdatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFlowdefUpdatedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFlowdefUpdatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFlowdefUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -44450,6 +46815,104 @@ func (s *OptNilFlowdefCreatedEventActorType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FlowdefDeletedEventActorType as json.
+func (o OptNilFlowdefDeletedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FlowdefDeletedEventActorType from json.
+func (o *OptNilFlowdefDeletedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilFlowdefDeletedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v FlowdefDeletedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilFlowdefDeletedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilFlowdefDeletedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowdefUpdatedEventActorType as json.
+func (o OptNilFlowdefUpdatedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FlowdefUpdatedEventActorType from json.
+func (o *OptNilFlowdefUpdatedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilFlowdefUpdatedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v FlowdefUpdatedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilFlowdefUpdatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilFlowdefUpdatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes PageToken as json.
 func (o OptNilPageToken) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -44642,6 +47105,55 @@ func (s OptNilProjectUpdatedEventActorType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptNilProjectUpdatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ReleaseMetadataCreatedByType as json.
+func (o OptNilReleaseMetadataCreatedByType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ReleaseMetadataCreatedByType from json.
+func (o *OptNilReleaseMetadataCreatedByType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilReleaseMetadataCreatedByType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v ReleaseMetadataCreatedByType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilReleaseMetadataCreatedByType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilReleaseMetadataCreatedByType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -54995,6 +57507,717 @@ func (s *QueryUsersUnauthorized) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *Release) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *Release) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("metadata")
+		s.Metadata.Encode(e)
+	}
+	{
+		e.FieldStart("pointers")
+		e.ArrStart()
+		for _, elem := range s.Pointers {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+}
+
+var jsonFieldsNameOfRelease = [4]string{
+	0: "id",
+	1: "project_id",
+	2: "metadata",
+	3: "pointers",
+}
+
+// Decode decodes Release from json.
+func (s *Release) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode Release to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "metadata":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "pointers":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				s.Pointers = make([]ReleasePointer, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem ReleasePointer
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Pointers = append(s.Pointers, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"pointers\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode Release")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00001111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfRelease) {
+					name = jsonFieldsNameOfRelease[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *Release) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *Release) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ReleaseID as json.
+func (s ReleaseID) Encode(e *jx.Encoder) {
+	unwrapped := string(s)
+
+	e.Str(unwrapped)
+}
+
+// Decode decodes ReleaseID from json.
+func (s *ReleaseID) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReleaseID to nil")
+	}
+	var unwrapped string
+	if err := func() error {
+		v, err := d.Str()
+		unwrapped = string(v)
+		if err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ReleaseID(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ReleaseID) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReleaseID) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ReleaseMetadata) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ReleaseMetadata) encodeFields(e *jx.Encoder) {
+	{
+		if s.Message.Set {
+			e.FieldStart("message")
+			s.Message.Encode(e)
+		}
+	}
+	{
+		if s.GitSha.Set {
+			e.FieldStart("git_sha")
+			s.GitSha.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("git_dirty")
+		e.Bool(s.GitDirty)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		if s.CreatedBy.Set {
+			e.FieldStart("created_by")
+			s.CreatedBy.Encode(e)
+		}
+	}
+	{
+		if s.CreatedByType.Set {
+			e.FieldStart("created_by_type")
+			s.CreatedByType.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfReleaseMetadata = [6]string{
+	0: "message",
+	1: "git_sha",
+	2: "git_dirty",
+	3: "created_at",
+	4: "created_by",
+	5: "created_by_type",
+}
+
+// Decode decodes ReleaseMetadata from json.
+func (s *ReleaseMetadata) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReleaseMetadata to nil")
+	}
+	var requiredBitSet [1]uint8
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "message":
+			if err := func() error {
+				s.Message.Reset()
+				if err := s.Message.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "git_sha":
+			if err := func() error {
+				s.GitSha.Reset()
+				if err := s.GitSha.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"git_sha\"")
+			}
+		case "git_dirty":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Bool()
+				s.GitDirty = bool(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"git_dirty\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "created_by":
+			if err := func() error {
+				s.CreatedBy.Reset()
+				if err := s.CreatedBy.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_by\"")
+			}
+		case "created_by_type":
+			if err := func() error {
+				s.CreatedByType.Reset()
+				if err := s.CreatedByType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_by_type\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ReleaseMetadata")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00001100,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfReleaseMetadata) {
+					name = jsonFieldsNameOfReleaseMetadata[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ReleaseMetadata) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReleaseMetadata) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ReleaseMetadataCreatedByType as json.
+func (s ReleaseMetadataCreatedByType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ReleaseMetadataCreatedByType from json.
+func (s *ReleaseMetadataCreatedByType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReleaseMetadataCreatedByType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ReleaseMetadataCreatedByType(v) {
+	case ReleaseMetadataCreatedByTypeHuman:
+		*s = ReleaseMetadataCreatedByTypeHuman
+	case ReleaseMetadataCreatedByTypeService:
+		*s = ReleaseMetadataCreatedByTypeService
+	case ReleaseMetadataCreatedByTypeSystem:
+		*s = ReleaseMetadataCreatedByTypeSystem
+	case ReleaseMetadataCreatedByTypeAgent:
+		*s = ReleaseMetadataCreatedByTypeAgent
+	default:
+		*s = ReleaseMetadataCreatedByType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ReleaseMetadataCreatedByType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReleaseMetadataCreatedByType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ReleasePointer) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ReleasePointer) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
+	{
+		e.FieldStart("handle")
+		e.Str(s.Handle)
+	}
+	{
+		e.FieldStart("revision_id")
+		e.Str(s.RevisionID)
+	}
+}
+
+var jsonFieldsNameOfReleasePointer = [3]string{
+	0: "kind",
+	1: "handle",
+	2: "revision_id",
+}
+
+// Decode decodes ReleasePointer from json.
+func (s *ReleasePointer) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReleasePointer to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "kind":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "handle":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Handle = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"handle\"")
+			}
+		case "revision_id":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Str()
+				s.RevisionID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"revision_id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ReleasePointer")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfReleasePointer) {
+					name = jsonFieldsNameOfReleasePointer[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ReleasePointer) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReleasePointer) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ReleasePointerKind as json.
+func (s ReleasePointerKind) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ReleasePointerKind from json.
+func (s *ReleasePointerKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReleasePointerKind to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ReleasePointerKind(v) {
+	case ReleasePointerKindSchema:
+		*s = ReleasePointerKindSchema
+	case ReleasePointerKindFlowDefinition:
+		*s = ReleasePointerKindFlowDefinition
+	case ReleasePointerKindBranding:
+		*s = ReleasePointerKindBranding
+	default:
+		*s = ReleasePointerKind(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ReleasePointerKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReleasePointerKind) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ReleaseSummary) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ReleaseSummary) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("metadata")
+		s.Metadata.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfReleaseSummary = [3]string{
+	0: "id",
+	1: "project_id",
+	2: "metadata",
+}
+
+// Decode decodes ReleaseSummary from json.
+func (s *ReleaseSummary) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ReleaseSummary to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "metadata":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ReleaseSummary")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfReleaseSummary) {
+					name = jsonFieldsNameOfReleaseSummary[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ReleaseSummary) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ReleaseSummary) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *ReqInvalid) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -60940,6 +64163,8 @@ func (s *SessionFilterField) Decode(d *jx.Decoder) error {
 		*s = SessionFilterFieldUserID
 	case SessionFilterFieldState:
 		*s = SessionFilterFieldState
+	case SessionFilterFieldLifecycleOwnerTeamID:
+		*s = SessionFilterFieldLifecycleOwnerTeamID
 	default:
 		*s = SessionFilterField(v)
 	}

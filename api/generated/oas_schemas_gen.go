@@ -9854,6 +9854,236 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
+type CreateReleaseCreated Release
+
+func (*CreateReleaseCreated) createReleaseRes() {}
+
+// CreateReleaseErrorResponse represents sum type.
+type CreateReleaseErrorResponse struct {
+	Type             CreateReleaseErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// CreateReleaseErrorResponseType is oneOf type of CreateReleaseErrorResponse.
+type CreateReleaseErrorResponseType string
+
+// Possible values for CreateReleaseErrorResponseType.
+const (
+	AuthUnauthorizedCreateReleaseErrorResponse CreateReleaseErrorResponseType = "auth.unauthorized"
+	InternalCreateReleaseErrorResponse         CreateReleaseErrorResponseType = "internal"
+	ReqInvalidCreateReleaseErrorResponse       CreateReleaseErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether CreateReleaseErrorResponse is AuthUnauthorized.
+func (s CreateReleaseErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateReleaseErrorResponse
+}
+
+// IsInternal reports whether CreateReleaseErrorResponse is Internal.
+func (s CreateReleaseErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateReleaseErrorResponse
+}
+
+// IsReqInvalid reports whether CreateReleaseErrorResponse is ReqInvalid.
+func (s CreateReleaseErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateReleaseErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateReleaseErrorResponse to AuthUnauthorized.
+func (s *CreateReleaseErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateReleaseErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateReleaseErrorResponse is AuthUnauthorized.
+func (s CreateReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateReleaseErrorResponse(v AuthUnauthorized) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateReleaseErrorResponse to Internal.
+func (s *CreateReleaseErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateReleaseErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateReleaseErrorResponse is Internal.
+func (s CreateReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from Internal.
+func NewInternalCreateReleaseErrorResponse(v Internal) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets CreateReleaseErrorResponse to ReqInvalid.
+func (s *CreateReleaseErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateReleaseErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateReleaseErrorResponse is ReqInvalid.
+func (s CreateReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from ReqInvalid.
+func NewReqInvalidCreateReleaseErrorResponse(v ReqInvalid) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateReleaseErrorResponseStatusCode wraps CreateReleaseErrorResponse with StatusCode.
+type CreateReleaseErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateReleaseErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateReleaseErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateReleaseErrorResponseStatusCode) GetResponse() CreateReleaseErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateReleaseErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateReleaseErrorResponseStatusCode) SetResponse(val CreateReleaseErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateReleaseErrorResponseStatusCode) createReleaseRes() {}
+
+type CreateReleaseOK Release
+
+func (*CreateReleaseOK) createReleaseRes() {}
+
+// One revision to pin. The handle is not supplied: it is the resource's own
+// identifying field, so the server reads it from the revision being pinned and
+// records it on the release.
+// Ref: #
+type CreateReleasePointer struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// The revision of that resource to pin. Must already exist in the project —
+	// this endpoint pins revisions, it does not create them.
+	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
+	// the schema's `$id`, which is a URL whenever the document supplied one and
+	// only a generated `sch_*` value otherwise.
+	RevisionID string `json:"revision_id"`
+}
+
+// GetKind returns the value of Kind.
+func (s *CreateReleasePointer) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *CreateReleasePointer) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// SetKind sets the value of Kind.
+func (s *CreateReleasePointer) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *CreateReleasePointer) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// The set of revisions to bundle into a release, plus the metadata to record
+// alongside it.
+// `created_at` and `created_by` are derived server-side from the caller's
+// authentication context and are not accepted here.
+// Ref: #
+type CreateReleaseRequest struct {
+	// The revisions to pin. Must not be empty.
+	// A kind usually appears more than once: a project has several user schemas
+	// and several flow definitions, and each is pinned on its own. What it
+	// cannot do is
+	// pin two revisions of the *same* resource — a second revision of the
+	// `human-user` schema is rejected rather than ordered, since a release
+	// describes one state of the project.
+	Pointers []CreateReleasePointer `json:"pointers"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetPointers returns the value of Pointers.
+func (s *CreateReleaseRequest) GetPointers() []CreateReleasePointer {
+	return s.Pointers
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseRequest) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *CreateReleaseRequest) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *CreateReleaseRequest) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetPointers sets the value of Pointers.
+func (s *CreateReleaseRequest) SetPointers(val []CreateReleasePointer) {
+	s.Pointers = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseRequest) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *CreateReleaseRequest) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
 type CreateSchemaBadRequest ErrorDetails
 
 func (*CreateSchemaBadRequest) createSchemaRes() {}
@@ -12159,6 +12389,8 @@ type Event struct {
 	BrandingCreatedEvent           BrandingCreatedEvent
 	EnvironmentCreatedEvent        EnvironmentCreatedEvent
 	FlowdefCreatedEvent            FlowdefCreatedEvent
+	FlowdefDeletedEvent            FlowdefDeletedEvent
+	FlowdefUpdatedEvent            FlowdefUpdatedEvent
 	ProjectCreatedEvent            ProjectCreatedEvent
 	ProjectDeletedEvent            ProjectDeletedEvent
 	ProjectUpdatedEvent            ProjectUpdatedEvent
@@ -12192,6 +12424,8 @@ const (
 	BrandingCreatedEventEvent           EventType = "branding.created"
 	EnvironmentCreatedEventEvent        EventType = "environment.created"
 	FlowdefCreatedEventEvent            EventType = "flowdef.created"
+	FlowdefDeletedEventEvent            EventType = "flowdef.deleted"
+	FlowdefUpdatedEventEvent            EventType = "flowdef.updated"
 	ProjectCreatedEventEvent            EventType = "project.created"
 	ProjectDeletedEventEvent            EventType = "project.deleted"
 	ProjectUpdatedEventEvent            EventType = "project.updated"
@@ -12247,6 +12481,12 @@ func (s Event) IsEnvironmentCreatedEvent() bool { return s.Type == EnvironmentCr
 
 // IsFlowdefCreatedEvent reports whether Event is FlowdefCreatedEvent.
 func (s Event) IsFlowdefCreatedEvent() bool { return s.Type == FlowdefCreatedEventEvent }
+
+// IsFlowdefDeletedEvent reports whether Event is FlowdefDeletedEvent.
+func (s Event) IsFlowdefDeletedEvent() bool { return s.Type == FlowdefDeletedEventEvent }
+
+// IsFlowdefUpdatedEvent reports whether Event is FlowdefUpdatedEvent.
+func (s Event) IsFlowdefUpdatedEvent() bool { return s.Type == FlowdefUpdatedEventEvent }
 
 // IsProjectCreatedEvent reports whether Event is ProjectCreatedEvent.
 func (s Event) IsProjectCreatedEvent() bool { return s.Type == ProjectCreatedEventEvent }
@@ -12557,6 +12797,48 @@ func (s Event) GetFlowdefCreatedEvent() (v FlowdefCreatedEvent, ok bool) {
 func NewFlowdefCreatedEventEvent(v FlowdefCreatedEvent) Event {
 	var s Event
 	s.SetFlowdefCreatedEvent(v)
+	return s
+}
+
+// SetFlowdefDeletedEvent sets Event to FlowdefDeletedEvent.
+func (s *Event) SetFlowdefDeletedEvent(v FlowdefDeletedEvent) {
+	s.Type = FlowdefDeletedEventEvent
+	s.FlowdefDeletedEvent = v
+}
+
+// GetFlowdefDeletedEvent returns FlowdefDeletedEvent and true boolean if Event is FlowdefDeletedEvent.
+func (s Event) GetFlowdefDeletedEvent() (v FlowdefDeletedEvent, ok bool) {
+	if !s.IsFlowdefDeletedEvent() {
+		return v, false
+	}
+	return s.FlowdefDeletedEvent, true
+}
+
+// NewFlowdefDeletedEventEvent returns new Event from FlowdefDeletedEvent.
+func NewFlowdefDeletedEventEvent(v FlowdefDeletedEvent) Event {
+	var s Event
+	s.SetFlowdefDeletedEvent(v)
+	return s
+}
+
+// SetFlowdefUpdatedEvent sets Event to FlowdefUpdatedEvent.
+func (s *Event) SetFlowdefUpdatedEvent(v FlowdefUpdatedEvent) {
+	s.Type = FlowdefUpdatedEventEvent
+	s.FlowdefUpdatedEvent = v
+}
+
+// GetFlowdefUpdatedEvent returns FlowdefUpdatedEvent and true boolean if Event is FlowdefUpdatedEvent.
+func (s Event) GetFlowdefUpdatedEvent() (v FlowdefUpdatedEvent, ok bool) {
+	if !s.IsFlowdefUpdatedEvent() {
+		return v, false
+	}
+	return s.FlowdefUpdatedEvent, true
+}
+
+// NewFlowdefUpdatedEventEvent returns new Event from FlowdefUpdatedEvent.
+func NewFlowdefUpdatedEventEvent(v FlowdefUpdatedEvent) Event {
+	var s Event
+	s.SetFlowdefUpdatedEvent(v)
 	return s
 }
 
@@ -16896,6 +17178,451 @@ func (s *FlowdefCreatedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Merged schema.
 // Ref: #
+type FlowdefDeletedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category FlowdefDeletedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilFlowdefDeletedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptFlowdefDeletedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                            `json:"delegation_id"`
+	Grantor        OptString                            `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowdefDeletedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *FlowdefDeletedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowdefDeletedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *FlowdefDeletedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *FlowdefDeletedEvent) GetCategory() FlowdefDeletedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *FlowdefDeletedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FlowdefDeletedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *FlowdefDeletedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *FlowdefDeletedEvent) GetActorType() OptNilFlowdefDeletedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *FlowdefDeletedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *FlowdefDeletedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *FlowdefDeletedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *FlowdefDeletedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *FlowdefDeletedEvent) GetDelegationType() OptFlowdefDeletedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *FlowdefDeletedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *FlowdefDeletedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *FlowdefDeletedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *FlowdefDeletedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowdefDeletedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *FlowdefDeletedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *FlowdefDeletedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowdefDeletedEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *FlowdefDeletedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowdefDeletedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowdefDeletedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *FlowdefDeletedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *FlowdefDeletedEvent) SetCategory(val FlowdefDeletedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *FlowdefDeletedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FlowdefDeletedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *FlowdefDeletedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *FlowdefDeletedEvent) SetActorType(val OptNilFlowdefDeletedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *FlowdefDeletedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *FlowdefDeletedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *FlowdefDeletedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *FlowdefDeletedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *FlowdefDeletedEvent) SetDelegationType(val OptFlowdefDeletedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *FlowdefDeletedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *FlowdefDeletedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *FlowdefDeletedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *FlowdefDeletedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowdefDeletedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *FlowdefDeletedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *FlowdefDeletedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowdefDeletedEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type FlowdefDeletedEventActorType string
+
+const (
+	FlowdefDeletedEventActorTypeHuman   FlowdefDeletedEventActorType = "human"
+	FlowdefDeletedEventActorTypeService FlowdefDeletedEventActorType = "service"
+	FlowdefDeletedEventActorTypeSystem  FlowdefDeletedEventActorType = "system"
+	FlowdefDeletedEventActorTypeAgent   FlowdefDeletedEventActorType = "agent"
+)
+
+// AllValues returns all FlowdefDeletedEventActorType values.
+func (FlowdefDeletedEventActorType) AllValues() []FlowdefDeletedEventActorType {
+	return []FlowdefDeletedEventActorType{
+		FlowdefDeletedEventActorTypeHuman,
+		FlowdefDeletedEventActorTypeService,
+		FlowdefDeletedEventActorTypeSystem,
+		FlowdefDeletedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowdefDeletedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowdefDeletedEventActorTypeHuman:
+		return []byte(s), nil
+	case FlowdefDeletedEventActorTypeService:
+		return []byte(s), nil
+	case FlowdefDeletedEventActorTypeSystem:
+		return []byte(s), nil
+	case FlowdefDeletedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowdefDeletedEventActorType) UnmarshalText(data []byte) error {
+	switch FlowdefDeletedEventActorType(data) {
+	case FlowdefDeletedEventActorTypeHuman:
+		*s = FlowdefDeletedEventActorTypeHuman
+		return nil
+	case FlowdefDeletedEventActorTypeService:
+		*s = FlowdefDeletedEventActorTypeService
+		return nil
+	case FlowdefDeletedEventActorTypeSystem:
+		*s = FlowdefDeletedEventActorTypeSystem
+		return nil
+	case FlowdefDeletedEventActorTypeAgent:
+		*s = FlowdefDeletedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type FlowdefDeletedEventCategory string
+
+const (
+	FlowdefDeletedEventCategoryRequest FlowdefDeletedEventCategory = "request"
+	FlowdefDeletedEventCategoryAuth    FlowdefDeletedEventCategory = "auth"
+	FlowdefDeletedEventCategorySession FlowdefDeletedEventCategory = "session"
+	FlowdefDeletedEventCategoryAdmin   FlowdefDeletedEventCategory = "admin"
+	FlowdefDeletedEventCategoryEntity  FlowdefDeletedEventCategory = "entity"
+	FlowdefDeletedEventCategorySignal  FlowdefDeletedEventCategory = "signal"
+)
+
+// AllValues returns all FlowdefDeletedEventCategory values.
+func (FlowdefDeletedEventCategory) AllValues() []FlowdefDeletedEventCategory {
+	return []FlowdefDeletedEventCategory{
+		FlowdefDeletedEventCategoryRequest,
+		FlowdefDeletedEventCategoryAuth,
+		FlowdefDeletedEventCategorySession,
+		FlowdefDeletedEventCategoryAdmin,
+		FlowdefDeletedEventCategoryEntity,
+		FlowdefDeletedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowdefDeletedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowdefDeletedEventCategoryRequest:
+		return []byte(s), nil
+	case FlowdefDeletedEventCategoryAuth:
+		return []byte(s), nil
+	case FlowdefDeletedEventCategorySession:
+		return []byte(s), nil
+	case FlowdefDeletedEventCategoryAdmin:
+		return []byte(s), nil
+	case FlowdefDeletedEventCategoryEntity:
+		return []byte(s), nil
+	case FlowdefDeletedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowdefDeletedEventCategory) UnmarshalText(data []byte) error {
+	switch FlowdefDeletedEventCategory(data) {
+	case FlowdefDeletedEventCategoryRequest:
+		*s = FlowdefDeletedEventCategoryRequest
+		return nil
+	case FlowdefDeletedEventCategoryAuth:
+		*s = FlowdefDeletedEventCategoryAuth
+		return nil
+	case FlowdefDeletedEventCategorySession:
+		*s = FlowdefDeletedEventCategorySession
+		return nil
+	case FlowdefDeletedEventCategoryAdmin:
+		*s = FlowdefDeletedEventCategoryAdmin
+		return nil
+	case FlowdefDeletedEventCategoryEntity:
+		*s = FlowdefDeletedEventCategoryEntity
+		return nil
+	case FlowdefDeletedEventCategorySignal:
+		*s = FlowdefDeletedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type FlowdefDeletedEventDelegationType string
+
+const (
+	FlowdefDeletedEventDelegationTypeDirect    FlowdefDeletedEventDelegationType = "direct"
+	FlowdefDeletedEventDelegationTypeDelegated FlowdefDeletedEventDelegationType = "delegated"
+	FlowdefDeletedEventDelegationTypePatShared FlowdefDeletedEventDelegationType = "pat_shared"
+	FlowdefDeletedEventDelegationTypeExchanged FlowdefDeletedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all FlowdefDeletedEventDelegationType values.
+func (FlowdefDeletedEventDelegationType) AllValues() []FlowdefDeletedEventDelegationType {
+	return []FlowdefDeletedEventDelegationType{
+		FlowdefDeletedEventDelegationTypeDirect,
+		FlowdefDeletedEventDelegationTypeDelegated,
+		FlowdefDeletedEventDelegationTypePatShared,
+		FlowdefDeletedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowdefDeletedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowdefDeletedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case FlowdefDeletedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case FlowdefDeletedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case FlowdefDeletedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowdefDeletedEventDelegationType) UnmarshalText(data []byte) error {
+	switch FlowdefDeletedEventDelegationType(data) {
+	case FlowdefDeletedEventDelegationTypeDirect:
+		*s = FlowdefDeletedEventDelegationTypeDirect
+		return nil
+	case FlowdefDeletedEventDelegationTypeDelegated:
+		*s = FlowdefDeletedEventDelegationTypeDelegated
+		return nil
+	case FlowdefDeletedEventDelegationTypePatShared:
+		*s = FlowdefDeletedEventDelegationTypePatShared
+		return nil
+	case FlowdefDeletedEventDelegationTypeExchanged:
+		*s = FlowdefDeletedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
 type FlowdefInvalid struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -17106,7 +17833,8 @@ func (s *FlowdefNotFoundDetails) init() FlowdefNotFoundDetails {
 	return m
 }
 
-// Allowlisted fields of the created revision. Steps are omitted.
+// Allowlisted fields of the created revision. Retired `flowdef.updated`
+// rows carry a delta in the same shape. Steps are omitted.
 // Ref: #
 type FlowdefPayload struct {
 	Name       OptString                 `json:"name"`
@@ -17359,6 +18087,451 @@ func (s *FlowdefSchemaFetchFailedDetails) init() FlowdefSchemaFetchFailedDetails
 		*s = m
 	}
 	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefUpdatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category FlowdefUpdatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilFlowdefUpdatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptFlowdefUpdatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                            `json:"delegation_id"`
+	Grantor        OptString                            `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  FlowdefPayload   `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowdefUpdatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *FlowdefUpdatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowdefUpdatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *FlowdefUpdatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *FlowdefUpdatedEvent) GetCategory() FlowdefUpdatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *FlowdefUpdatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FlowdefUpdatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *FlowdefUpdatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *FlowdefUpdatedEvent) GetActorType() OptNilFlowdefUpdatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *FlowdefUpdatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *FlowdefUpdatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *FlowdefUpdatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *FlowdefUpdatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *FlowdefUpdatedEvent) GetDelegationType() OptFlowdefUpdatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *FlowdefUpdatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *FlowdefUpdatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *FlowdefUpdatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *FlowdefUpdatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowdefUpdatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *FlowdefUpdatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *FlowdefUpdatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowdefUpdatedEvent) GetPayload() FlowdefPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *FlowdefUpdatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowdefUpdatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowdefUpdatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *FlowdefUpdatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *FlowdefUpdatedEvent) SetCategory(val FlowdefUpdatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *FlowdefUpdatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FlowdefUpdatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *FlowdefUpdatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *FlowdefUpdatedEvent) SetActorType(val OptNilFlowdefUpdatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *FlowdefUpdatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *FlowdefUpdatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *FlowdefUpdatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *FlowdefUpdatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *FlowdefUpdatedEvent) SetDelegationType(val OptFlowdefUpdatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *FlowdefUpdatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *FlowdefUpdatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *FlowdefUpdatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *FlowdefUpdatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowdefUpdatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *FlowdefUpdatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *FlowdefUpdatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowdefUpdatedEvent) SetPayload(val FlowdefPayload) {
+	s.Payload = val
+}
+
+type FlowdefUpdatedEventActorType string
+
+const (
+	FlowdefUpdatedEventActorTypeHuman   FlowdefUpdatedEventActorType = "human"
+	FlowdefUpdatedEventActorTypeService FlowdefUpdatedEventActorType = "service"
+	FlowdefUpdatedEventActorTypeSystem  FlowdefUpdatedEventActorType = "system"
+	FlowdefUpdatedEventActorTypeAgent   FlowdefUpdatedEventActorType = "agent"
+)
+
+// AllValues returns all FlowdefUpdatedEventActorType values.
+func (FlowdefUpdatedEventActorType) AllValues() []FlowdefUpdatedEventActorType {
+	return []FlowdefUpdatedEventActorType{
+		FlowdefUpdatedEventActorTypeHuman,
+		FlowdefUpdatedEventActorTypeService,
+		FlowdefUpdatedEventActorTypeSystem,
+		FlowdefUpdatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowdefUpdatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowdefUpdatedEventActorTypeHuman:
+		return []byte(s), nil
+	case FlowdefUpdatedEventActorTypeService:
+		return []byte(s), nil
+	case FlowdefUpdatedEventActorTypeSystem:
+		return []byte(s), nil
+	case FlowdefUpdatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowdefUpdatedEventActorType) UnmarshalText(data []byte) error {
+	switch FlowdefUpdatedEventActorType(data) {
+	case FlowdefUpdatedEventActorTypeHuman:
+		*s = FlowdefUpdatedEventActorTypeHuman
+		return nil
+	case FlowdefUpdatedEventActorTypeService:
+		*s = FlowdefUpdatedEventActorTypeService
+		return nil
+	case FlowdefUpdatedEventActorTypeSystem:
+		*s = FlowdefUpdatedEventActorTypeSystem
+		return nil
+	case FlowdefUpdatedEventActorTypeAgent:
+		*s = FlowdefUpdatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type FlowdefUpdatedEventCategory string
+
+const (
+	FlowdefUpdatedEventCategoryRequest FlowdefUpdatedEventCategory = "request"
+	FlowdefUpdatedEventCategoryAuth    FlowdefUpdatedEventCategory = "auth"
+	FlowdefUpdatedEventCategorySession FlowdefUpdatedEventCategory = "session"
+	FlowdefUpdatedEventCategoryAdmin   FlowdefUpdatedEventCategory = "admin"
+	FlowdefUpdatedEventCategoryEntity  FlowdefUpdatedEventCategory = "entity"
+	FlowdefUpdatedEventCategorySignal  FlowdefUpdatedEventCategory = "signal"
+)
+
+// AllValues returns all FlowdefUpdatedEventCategory values.
+func (FlowdefUpdatedEventCategory) AllValues() []FlowdefUpdatedEventCategory {
+	return []FlowdefUpdatedEventCategory{
+		FlowdefUpdatedEventCategoryRequest,
+		FlowdefUpdatedEventCategoryAuth,
+		FlowdefUpdatedEventCategorySession,
+		FlowdefUpdatedEventCategoryAdmin,
+		FlowdefUpdatedEventCategoryEntity,
+		FlowdefUpdatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowdefUpdatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowdefUpdatedEventCategoryRequest:
+		return []byte(s), nil
+	case FlowdefUpdatedEventCategoryAuth:
+		return []byte(s), nil
+	case FlowdefUpdatedEventCategorySession:
+		return []byte(s), nil
+	case FlowdefUpdatedEventCategoryAdmin:
+		return []byte(s), nil
+	case FlowdefUpdatedEventCategoryEntity:
+		return []byte(s), nil
+	case FlowdefUpdatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowdefUpdatedEventCategory) UnmarshalText(data []byte) error {
+	switch FlowdefUpdatedEventCategory(data) {
+	case FlowdefUpdatedEventCategoryRequest:
+		*s = FlowdefUpdatedEventCategoryRequest
+		return nil
+	case FlowdefUpdatedEventCategoryAuth:
+		*s = FlowdefUpdatedEventCategoryAuth
+		return nil
+	case FlowdefUpdatedEventCategorySession:
+		*s = FlowdefUpdatedEventCategorySession
+		return nil
+	case FlowdefUpdatedEventCategoryAdmin:
+		*s = FlowdefUpdatedEventCategoryAdmin
+		return nil
+	case FlowdefUpdatedEventCategoryEntity:
+		*s = FlowdefUpdatedEventCategoryEntity
+		return nil
+	case FlowdefUpdatedEventCategorySignal:
+		*s = FlowdefUpdatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type FlowdefUpdatedEventDelegationType string
+
+const (
+	FlowdefUpdatedEventDelegationTypeDirect    FlowdefUpdatedEventDelegationType = "direct"
+	FlowdefUpdatedEventDelegationTypeDelegated FlowdefUpdatedEventDelegationType = "delegated"
+	FlowdefUpdatedEventDelegationTypePatShared FlowdefUpdatedEventDelegationType = "pat_shared"
+	FlowdefUpdatedEventDelegationTypeExchanged FlowdefUpdatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all FlowdefUpdatedEventDelegationType values.
+func (FlowdefUpdatedEventDelegationType) AllValues() []FlowdefUpdatedEventDelegationType {
+	return []FlowdefUpdatedEventDelegationType{
+		FlowdefUpdatedEventDelegationTypeDirect,
+		FlowdefUpdatedEventDelegationTypeDelegated,
+		FlowdefUpdatedEventDelegationTypePatShared,
+		FlowdefUpdatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowdefUpdatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowdefUpdatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case FlowdefUpdatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case FlowdefUpdatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case FlowdefUpdatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowdefUpdatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch FlowdefUpdatedEventDelegationType(data) {
+	case FlowdefUpdatedEventDelegationTypeDirect:
+		*s = FlowdefUpdatedEventDelegationTypeDirect
+		return nil
+	case FlowdefUpdatedEventDelegationTypeDelegated:
+		*s = FlowdefUpdatedEventDelegationTypeDelegated
+		return nil
+	case FlowdefUpdatedEventDelegationTypePatShared:
+		*s = FlowdefUpdatedEventDelegationTypePatShared
+		return nil
+	case FlowdefUpdatedEventDelegationTypeExchanged:
+		*s = FlowdefUpdatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // A security challenge that must be satisfied before this step's submission
@@ -19214,6 +20387,130 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+// GetReleaseByIdErrorResponse represents sum type.
+type GetReleaseByIdErrorResponse struct {
+	Type             GetReleaseByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// GetReleaseByIdErrorResponseType is oneOf type of GetReleaseByIdErrorResponse.
+type GetReleaseByIdErrorResponseType string
+
+// Possible values for GetReleaseByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetReleaseByIdErrorResponse GetReleaseByIdErrorResponseType = "auth.unauthorized"
+	InternalGetReleaseByIdErrorResponse         GetReleaseByIdErrorResponseType = "internal"
+	ReqInvalidGetReleaseByIdErrorResponse       GetReleaseByIdErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetReleaseByIdErrorResponse is AuthUnauthorized.
+func (s GetReleaseByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetReleaseByIdErrorResponse
+}
+
+// IsInternal reports whether GetReleaseByIdErrorResponse is Internal.
+func (s GetReleaseByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetReleaseByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetReleaseByIdErrorResponse is ReqInvalid.
+func (s GetReleaseByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetReleaseByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetReleaseByIdErrorResponse to AuthUnauthorized.
+func (s *GetReleaseByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetReleaseByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetReleaseByIdErrorResponse is AuthUnauthorized.
+func (s GetReleaseByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetReleaseByIdErrorResponse(v AuthUnauthorized) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetReleaseByIdErrorResponse to Internal.
+func (s *GetReleaseByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetReleaseByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetReleaseByIdErrorResponse is Internal.
+func (s GetReleaseByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from Internal.
+func NewInternalGetReleaseByIdErrorResponse(v Internal) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetReleaseByIdErrorResponse to ReqInvalid.
+func (s *GetReleaseByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetReleaseByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetReleaseByIdErrorResponse is ReqInvalid.
+func (s GetReleaseByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetReleaseByIdErrorResponse(v ReqInvalid) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetReleaseByIdErrorResponseStatusCode wraps GetReleaseByIdErrorResponse with StatusCode.
+type GetReleaseByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetReleaseByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetReleaseByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetReleaseByIdErrorResponseStatusCode) GetResponse() GetReleaseByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetReleaseByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetReleaseByIdErrorResponseStatusCode) SetResponse(val GetReleaseByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetReleaseByIdErrorResponseStatusCode) getReleaseByIdRes() {}
 
 type GetSchemaByIdBadRequest ErrorDetails
 
@@ -21394,6 +22691,161 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// ListReleasesErrorResponse represents sum type.
+type ListReleasesErrorResponse struct {
+	Type             ListReleasesErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// ListReleasesErrorResponseType is oneOf type of ListReleasesErrorResponse.
+type ListReleasesErrorResponseType string
+
+// Possible values for ListReleasesErrorResponseType.
+const (
+	AuthUnauthorizedListReleasesErrorResponse ListReleasesErrorResponseType = "auth.unauthorized"
+	InternalListReleasesErrorResponse         ListReleasesErrorResponseType = "internal"
+	ReqInvalidListReleasesErrorResponse       ListReleasesErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListReleasesErrorResponse is AuthUnauthorized.
+func (s ListReleasesErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListReleasesErrorResponse
+}
+
+// IsInternal reports whether ListReleasesErrorResponse is Internal.
+func (s ListReleasesErrorResponse) IsInternal() bool {
+	return s.Type == InternalListReleasesErrorResponse
+}
+
+// IsReqInvalid reports whether ListReleasesErrorResponse is ReqInvalid.
+func (s ListReleasesErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListReleasesErrorResponse
+}
+
+// SetAuthUnauthorized sets ListReleasesErrorResponse to AuthUnauthorized.
+func (s *ListReleasesErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListReleasesErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListReleasesErrorResponse is AuthUnauthorized.
+func (s ListReleasesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListReleasesErrorResponse returns new ListReleasesErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListReleasesErrorResponse(v AuthUnauthorized) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListReleasesErrorResponse to Internal.
+func (s *ListReleasesErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListReleasesErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListReleasesErrorResponse is Internal.
+func (s ListReleasesErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListReleasesErrorResponse returns new ListReleasesErrorResponse from Internal.
+func NewInternalListReleasesErrorResponse(v Internal) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListReleasesErrorResponse to ReqInvalid.
+func (s *ListReleasesErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListReleasesErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListReleasesErrorResponse is ReqInvalid.
+func (s ListReleasesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListReleasesErrorResponse returns new ListReleasesErrorResponse from ReqInvalid.
+func NewReqInvalidListReleasesErrorResponse(v ReqInvalid) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListReleasesErrorResponseStatusCode wraps ListReleasesErrorResponse with StatusCode.
+type ListReleasesErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListReleasesErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListReleasesErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListReleasesErrorResponseStatusCode) GetResponse() ListReleasesErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListReleasesErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListReleasesErrorResponseStatusCode) SetResponse(val ListReleasesErrorResponse) {
+	s.Response = val
+}
+
+func (*ListReleasesErrorResponseStatusCode) listReleasesRes() {}
+
+// The project's releases, newest first.
+// Ref: #
+type ListReleasesResponse struct {
+	Releases []ReleaseSummary `json:"releases"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetReleases returns the value of Releases.
+func (s *ListReleasesResponse) GetReleases() []ReleaseSummary {
+	return s.Releases
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListReleasesResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetReleases sets the value of Releases.
+func (s *ListReleasesResponse) SetReleases(val []ReleaseSummary) {
+	s.Releases = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListReleasesResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListReleasesResponse) listReleasesRes() {}
 
 type ListSchemasKind string
 
@@ -25279,6 +26731,52 @@ func (o OptFlowdefCreatedEventDelegationType) Or(d FlowdefCreatedEventDelegation
 	return d
 }
 
+// NewOptFlowdefDeletedEventDelegationType returns new OptFlowdefDeletedEventDelegationType with value set to v.
+func NewOptFlowdefDeletedEventDelegationType(v FlowdefDeletedEventDelegationType) OptFlowdefDeletedEventDelegationType {
+	return OptFlowdefDeletedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefDeletedEventDelegationType is optional FlowdefDeletedEventDelegationType.
+type OptFlowdefDeletedEventDelegationType struct {
+	Value FlowdefDeletedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefDeletedEventDelegationType was set.
+func (o OptFlowdefDeletedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefDeletedEventDelegationType) Reset() {
+	var v FlowdefDeletedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefDeletedEventDelegationType) SetTo(v FlowdefDeletedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefDeletedEventDelegationType) Get() (v FlowdefDeletedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefDeletedEventDelegationType) Or(d FlowdefDeletedEventDelegationType) FlowdefDeletedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowdefInvalidDetails returns new OptFlowdefInvalidDetails with value set to v.
 func NewOptFlowdefInvalidDetails(v FlowdefInvalidDetails) OptFlowdefInvalidDetails {
 	return OptFlowdefInvalidDetails{
@@ -25687,6 +27185,52 @@ func (o OptFlowdefSchemaFetchFailedDetails) Get() (v FlowdefSchemaFetchFailedDet
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowdefSchemaFetchFailedDetails) Or(d FlowdefSchemaFetchFailedDetails) FlowdefSchemaFetchFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefUpdatedEventDelegationType returns new OptFlowdefUpdatedEventDelegationType with value set to v.
+func NewOptFlowdefUpdatedEventDelegationType(v FlowdefUpdatedEventDelegationType) OptFlowdefUpdatedEventDelegationType {
+	return OptFlowdefUpdatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefUpdatedEventDelegationType is optional FlowdefUpdatedEventDelegationType.
+type OptFlowdefUpdatedEventDelegationType struct {
+	Value FlowdefUpdatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefUpdatedEventDelegationType was set.
+func (o OptFlowdefUpdatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefUpdatedEventDelegationType) Reset() {
+	var v FlowdefUpdatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefUpdatedEventDelegationType) SetTo(v FlowdefUpdatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefUpdatedEventDelegationType) Get() (v FlowdefUpdatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefUpdatedEventDelegationType) Or(d FlowdefUpdatedEventDelegationType) FlowdefUpdatedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -27391,6 +28935,132 @@ func (o OptNilFlowdefCreatedEventActorType) Or(d FlowdefCreatedEventActorType) F
 	return d
 }
 
+// NewOptNilFlowdefDeletedEventActorType returns new OptNilFlowdefDeletedEventActorType with value set to v.
+func NewOptNilFlowdefDeletedEventActorType(v FlowdefDeletedEventActorType) OptNilFlowdefDeletedEventActorType {
+	return OptNilFlowdefDeletedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowdefDeletedEventActorType is optional nullable FlowdefDeletedEventActorType.
+type OptNilFlowdefDeletedEventActorType struct {
+	Value FlowdefDeletedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowdefDeletedEventActorType was set.
+func (o OptNilFlowdefDeletedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowdefDeletedEventActorType) Reset() {
+	var v FlowdefDeletedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowdefDeletedEventActorType) SetTo(v FlowdefDeletedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowdefDeletedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowdefDeletedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowdefDeletedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowdefDeletedEventActorType) Get() (v FlowdefDeletedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowdefDeletedEventActorType) Or(d FlowdefDeletedEventActorType) FlowdefDeletedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilFlowdefUpdatedEventActorType returns new OptNilFlowdefUpdatedEventActorType with value set to v.
+func NewOptNilFlowdefUpdatedEventActorType(v FlowdefUpdatedEventActorType) OptNilFlowdefUpdatedEventActorType {
+	return OptNilFlowdefUpdatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowdefUpdatedEventActorType is optional nullable FlowdefUpdatedEventActorType.
+type OptNilFlowdefUpdatedEventActorType struct {
+	Value FlowdefUpdatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowdefUpdatedEventActorType was set.
+func (o OptNilFlowdefUpdatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowdefUpdatedEventActorType) Reset() {
+	var v FlowdefUpdatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowdefUpdatedEventActorType) SetTo(v FlowdefUpdatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowdefUpdatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowdefUpdatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowdefUpdatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowdefUpdatedEventActorType) Get() (v FlowdefUpdatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowdefUpdatedEventActorType) Or(d FlowdefUpdatedEventActorType) FlowdefUpdatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilPageToken returns new OptNilPageToken with value set to v.
 func NewOptNilPageToken(v PageToken) OptNilPageToken {
 	return OptNilPageToken{
@@ -27637,6 +29307,69 @@ func (o OptNilProjectUpdatedEventActorType) Get() (v ProjectUpdatedEventActorTyp
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilProjectUpdatedEventActorType) Or(d ProjectUpdatedEventActorType) ProjectUpdatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilReleaseMetadataCreatedByType returns new OptNilReleaseMetadataCreatedByType with value set to v.
+func NewOptNilReleaseMetadataCreatedByType(v ReleaseMetadataCreatedByType) OptNilReleaseMetadataCreatedByType {
+	return OptNilReleaseMetadataCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilReleaseMetadataCreatedByType is optional nullable ReleaseMetadataCreatedByType.
+type OptNilReleaseMetadataCreatedByType struct {
+	Value ReleaseMetadataCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilReleaseMetadataCreatedByType was set.
+func (o OptNilReleaseMetadataCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilReleaseMetadataCreatedByType) Reset() {
+	var v ReleaseMetadataCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilReleaseMetadataCreatedByType) SetTo(v ReleaseMetadataCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilReleaseMetadataCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilReleaseMetadataCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ReleaseMetadataCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilReleaseMetadataCreatedByType) Get() (v ReleaseMetadataCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilReleaseMetadataCreatedByType) Or(d ReleaseMetadataCreatedByType) ReleaseMetadataCreatedByType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -34868,6 +36601,365 @@ type QueryUsersUnauthorized ErrorDetails
 
 func (*QueryUsersUnauthorized) queryUsersRes() {}
 
+// An immutable, project-scoped snapshot that pins one revision of every
+// resource it includes.
+// A release owns pointers and metadata, not content — it records *which*
+// revisions belong together. Callers that need the resource bytes resolve each
+// `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
+// `GET /flow_definitions/{id}`, …).
+// A release exists on its own and is not tied to an environment. Deploying it
+// is a separate call.
+// Ref: #
+type Release struct {
+	// The opaque, immutable resource id, assigned at construction.
+	ID ReleaseID `json:"id"`
+	// The project this release belongs to.
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
+	// The revisions this release pins, one entry per `(kind, handle)`. Never
+	// empty: a release must contain at least one resource.
+	Pointers []ReleasePointer `json:"pointers"`
+}
+
+// GetID returns the value of ID.
+func (s *Release) GetID() ReleaseID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *Release) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *Release) GetMetadata() ReleaseMetadata {
+	return s.Metadata
+}
+
+// GetPointers returns the value of Pointers.
+func (s *Release) GetPointers() []ReleasePointer {
+	return s.Pointers
+}
+
+// SetID sets the value of ID.
+func (s *Release) SetID(val ReleaseID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *Release) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *Release) SetMetadata(val ReleaseMetadata) {
+	s.Metadata = val
+}
+
+// SetPointers sets the value of Pointers.
+func (s *Release) SetPointers(val []ReleasePointer) {
+	s.Pointers = val
+}
+
+func (*Release) getReleaseByIdRes() {}
+
+type ReleaseID string
+
+// Who assembled the release, when, and from what source. Set when the release
+// is assembled and never mutated afterwards.
+// Ref: #
+type ReleaseMetadata struct {
+	// A short caller-supplied summary of what the release changes, analogous to
+	// a git commit message.
+	Message OptNilString `json:"message"`
+	// The source commit the caller was operating from. Recording it on both
+	// releases is what lets two releases be diffed at field level in the
+	// source repository they were built from.
+	GitSha OptNilString `json:"git_sha"`
+	// True when the working tree had uncommitted changes at construction time.
+	// `git_sha` still points at HEAD, but the release content does not
+	// correspond to that commit exactly, so consumers of the git-diff mechanism
+	// should skip it when either side is dirty.
+	GitDirty bool `json:"git_dirty"`
+	// When the release was assembled.
+	CreatedAt time.Time `json:"created_at"`
+	// The identity that assembled the release. Absent when the caller is a
+	// machine principal carrying no user identity, which is the common case for
+	// releases constructed from CI or the CLI.
+	CreatedBy OptNilString `json:"created_by"`
+	// What kind of principal `created_by` names.
+	CreatedByType OptNilReleaseMetadataCreatedByType `json:"created_by_type"`
+}
+
+// GetMessage returns the value of Message.
+func (s *ReleaseMetadata) GetMessage() OptNilString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *ReleaseMetadata) GetGitSha() OptNilString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *ReleaseMetadata) GetGitDirty() bool {
+	return s.GitDirty
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ReleaseMetadata) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *ReleaseMetadata) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *ReleaseMetadata) GetCreatedByType() OptNilReleaseMetadataCreatedByType {
+	return s.CreatedByType
+}
+
+// SetMessage sets the value of Message.
+func (s *ReleaseMetadata) SetMessage(val OptNilString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *ReleaseMetadata) SetGitSha(val OptNilString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *ReleaseMetadata) SetGitDirty(val bool) {
+	s.GitDirty = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ReleaseMetadata) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *ReleaseMetadata) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *ReleaseMetadata) SetCreatedByType(val OptNilReleaseMetadataCreatedByType) {
+	s.CreatedByType = val
+}
+
+type ReleaseMetadataCreatedByType string
+
+const (
+	ReleaseMetadataCreatedByTypeHuman   ReleaseMetadataCreatedByType = "human"
+	ReleaseMetadataCreatedByTypeService ReleaseMetadataCreatedByType = "service"
+	ReleaseMetadataCreatedByTypeSystem  ReleaseMetadataCreatedByType = "system"
+	ReleaseMetadataCreatedByTypeAgent   ReleaseMetadataCreatedByType = "agent"
+)
+
+// AllValues returns all ReleaseMetadataCreatedByType values.
+func (ReleaseMetadataCreatedByType) AllValues() []ReleaseMetadataCreatedByType {
+	return []ReleaseMetadataCreatedByType{
+		ReleaseMetadataCreatedByTypeHuman,
+		ReleaseMetadataCreatedByTypeService,
+		ReleaseMetadataCreatedByTypeSystem,
+		ReleaseMetadataCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ReleaseMetadataCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case ReleaseMetadataCreatedByTypeHuman:
+		return []byte(s), nil
+	case ReleaseMetadataCreatedByTypeService:
+		return []byte(s), nil
+	case ReleaseMetadataCreatedByTypeSystem:
+		return []byte(s), nil
+	case ReleaseMetadataCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ReleaseMetadataCreatedByType) UnmarshalText(data []byte) error {
+	switch ReleaseMetadataCreatedByType(data) {
+	case ReleaseMetadataCreatedByTypeHuman:
+		*s = ReleaseMetadataCreatedByTypeHuman
+		return nil
+	case ReleaseMetadataCreatedByTypeService:
+		*s = ReleaseMetadataCreatedByTypeService
+		return nil
+	case ReleaseMetadataCreatedByTypeSystem:
+		*s = ReleaseMetadataCreatedByTypeSystem
+		return nil
+	case ReleaseMetadataCreatedByTypeAgent:
+		*s = ReleaseMetadataCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// One entry of the set a release pins: the revision of a single resource that
+// this release includes.
+// Ref: #
+type ReleasePointer struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// Which resource this pointer pins, independent of which revision of it.
+	// `revision_id` chooses the revision; `handle` says what the revision is a
+	// revision *of*. Determined when the release is assembled, not supplied by
+	// the caller:
+	// - `schema` — the document's `objectType`, so `human-user` and
+	// `machine-user` are separate resources a release pins separately
+	// - `flow_definition` — the definition's `name`, likewise for
+	// `default-login` and `b2b-login`
+	// - `branding` — always `default`. A project has one branding, so there is
+	// nothing to distinguish; it is revisioned like everything else, and
+	// `revision_id` is what varies between releases.
+	// Resources inside a release reference each other by handle rather than by
+	// revision id, so the same handle names the same resource in every release.
+	Handle string `json:"handle"`
+	// The revision of that resource this release pins.
+	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
+	// the schema's `$id`, which is a URL whenever the document supplied one and
+	// only a generated `sch_*` value otherwise.
+	RevisionID string `json:"revision_id"`
+}
+
+// GetKind returns the value of Kind.
+func (s *ReleasePointer) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetHandle returns the value of Handle.
+func (s *ReleasePointer) GetHandle() string {
+	return s.Handle
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *ReleasePointer) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// SetKind sets the value of Kind.
+func (s *ReleasePointer) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetHandle sets the value of Handle.
+func (s *ReleasePointer) SetHandle(val string) {
+	s.Handle = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *ReleasePointer) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// The kind of resource a release pointer pins.
+// Carried explicitly rather than inferred from `revision_id`, because a
+// revision id is not always shaped distinctly enough to identify its kind: a
+// schema's is its `$id`, which may be any URL.
+// `flow_definition` rather than `flow`: a release pins the definitions served
+// at `/flow_definitions`, not the runtime flows at `/flow`.
+// Ref: #
+type ReleasePointerKind string
+
+const (
+	ReleasePointerKindSchema         ReleasePointerKind = "schema"
+	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
+	ReleasePointerKindBranding       ReleasePointerKind = "branding"
+)
+
+// AllValues returns all ReleasePointerKind values.
+func (ReleasePointerKind) AllValues() []ReleasePointerKind {
+	return []ReleasePointerKind{
+		ReleasePointerKindSchema,
+		ReleasePointerKindFlowDefinition,
+		ReleasePointerKindBranding,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ReleasePointerKind) MarshalText() ([]byte, error) {
+	switch s {
+	case ReleasePointerKindSchema:
+		return []byte(s), nil
+	case ReleasePointerKindFlowDefinition:
+		return []byte(s), nil
+	case ReleasePointerKindBranding:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
+	switch ReleasePointerKind(data) {
+	case ReleasePointerKindSchema:
+		*s = ReleasePointerKindSchema
+		return nil
+	case ReleasePointerKindFlowDefinition:
+		*s = ReleasePointerKindFlowDefinition
+		return nil
+	case ReleasePointerKindBranding:
+		*s = ReleasePointerKindBranding
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A release without its pinned set — the shape `GET /releases` returns.
+// Pointers are omitted rather than optional so that a list entry can never be
+// mistaken for a release that pins nothing; fetch them with
+// `GET /releases/{release_id}`.
+// Ref: #
+type ReleaseSummary struct {
+	// The opaque, immutable resource id, assigned at construction.
+	ID ReleaseID `json:"id"`
+	// The project this release belongs to.
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
+}
+
+// GetID returns the value of ID.
+func (s *ReleaseSummary) GetID() ReleaseID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ReleaseSummary) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ReleaseSummary) GetMetadata() ReleaseMetadata {
+	return s.Metadata
+}
+
+// SetID sets the value of ID.
+func (s *ReleaseSummary) SetID(val ReleaseID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ReleaseSummary) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ReleaseSummary) SetMetadata(val ReleaseMetadata) {
+	s.Metadata = val
+}
+
 // Merged schema.
 // Ref: #
 type ReqInvalid struct {
@@ -38063,13 +40155,22 @@ func (s *SessionEstablishedPayload) SetUserID(val OptString) {
 // - `user_id`: user id
 // - `state`: one of `building`, `active`, `expired`. State is computed at read
 // time, so a session expiring mid-request can match `active` but return `expired`.
+// - `lifecycle_owner_team_id`: team id. Matches the sessions of the users whose
+// lifecycle that team owns — the same users it can deactivate and whose
+// sessions it can revoke. Roster membership does not match: a collaborator on
+// the team's roster whose lifecycle another team (or the user themselves)
+// owns is not returned. A session is project-scoped and is not bound to a
+// team, so the link is read from the user at query time; a session of a
+// self-owned user, and a session with no user, match no team. Only `equals`
+// is supported.
 // Ref: #
 type SessionFilterField string
 
 const (
-	SessionFilterFieldCreatedAt SessionFilterField = "created_at"
-	SessionFilterFieldUserID    SessionFilterField = "user_id"
-	SessionFilterFieldState     SessionFilterField = "state"
+	SessionFilterFieldCreatedAt            SessionFilterField = "created_at"
+	SessionFilterFieldUserID               SessionFilterField = "user_id"
+	SessionFilterFieldState                SessionFilterField = "state"
+	SessionFilterFieldLifecycleOwnerTeamID SessionFilterField = "lifecycle_owner_team_id"
 )
 
 // AllValues returns all SessionFilterField values.
@@ -38078,6 +40179,7 @@ func (SessionFilterField) AllValues() []SessionFilterField {
 		SessionFilterFieldCreatedAt,
 		SessionFilterFieldUserID,
 		SessionFilterFieldState,
+		SessionFilterFieldLifecycleOwnerTeamID,
 	}
 }
 
@@ -38089,6 +40191,8 @@ func (s SessionFilterField) MarshalText() ([]byte, error) {
 	case SessionFilterFieldUserID:
 		return []byte(s), nil
 	case SessionFilterFieldState:
+		return []byte(s), nil
+	case SessionFilterFieldLifecycleOwnerTeamID:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -38106,6 +40210,9 @@ func (s *SessionFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case SessionFilterFieldState:
 		*s = SessionFilterFieldState
+		return nil
+	case SessionFilterFieldLifecycleOwnerTeamID:
+		*s = SessionFilterFieldLifecycleOwnerTeamID
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

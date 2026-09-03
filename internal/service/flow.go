@@ -113,7 +113,7 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 
-	def := pickLatestFlowVersion(result.Items)
+	def := pickNewestFlowRevision(result.Items)
 	if !flowServesPurpose(def, req.Purpose) {
 		return nil, domain.ErrFlowDefinitionPurposeMismatch()
 	}
@@ -182,7 +182,7 @@ func flowAudienceScore(def *domain.FlowDefinition, hint ResolveFlowHint) int {
 	}
 }
 
-// flowCreatedAfter reports whether a was created after b (id as the
+// flowCreatedAfter reports whether the flow definition `a` was created after `b` (id as the
 // timestamp tie-break).
 func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
 	if !a.CreatedAt.Equal(b.CreatedAt) {
@@ -306,12 +306,16 @@ func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinition
 	return ok
 }
 
-// pickLatestFlowVersion is a lexicographic compare — sufficient while
-// versions stay zero-padded MAJOR.MINOR.PATCH. Caller ensures defs non-empty.
-func pickLatestFlowVersion(defs []*domain.FlowDefinition) *domain.FlowDefinition {
+// pickNewestFlowRevision prefers the highest schema version (a lexicographic
+// compare, sufficient while versions stay zero-padded MAJOR.MINOR.PATCH) and,
+// among revisions of one version, the newest created. Revisions of a name
+// share a version, so the pick must not depend on list order. Caller ensures
+// defs non-empty.
+func pickNewestFlowRevision(defs []*domain.FlowDefinition) *domain.FlowDefinition {
 	winner := defs[0]
 	for _, def := range defs[1:] {
-		if def.SchemaVersion > winner.SchemaVersion {
+		if def.SchemaVersion > winner.SchemaVersion ||
+			(def.SchemaVersion == winner.SchemaVersion && flowCreatedAfter(def, winner)) {
 			winner = def
 		}
 	}

@@ -22,7 +22,7 @@ func TestPayloadMapCoversDomainEventTypes(t *testing.T) {
 
 	eventTypes, err := extractEventTypes(domainEventPath)
 	require.NoError(t, err)
-	require.Len(t, eventTypes, 26, "domain EventType constant count changed; update payloadByEventType")
+	require.Len(t, eventTypes, 28, "domain EventType constant count changed; update payloadByEventType")
 	require.NoError(t, validateMappings(eventTypes, payloadsDir))
 }
 
@@ -43,8 +43,8 @@ func TestCatalogEventTypesMatchDomain(t *testing.T) {
 
 	catalogRaw, err := os.ReadFile(catalogPath)
 	require.NoError(t, err)
-	// Only Path A / Path B tables must match domain constants; Deferred may
-	// list future types that are not yet constants.
+	// Path A, Path B, and Retired tables must match domain constants;
+	// Deferred may list future types that are not yet constants.
 	active := string(catalogRaw)
 	if i := strings.Index(active, "## Deferred"); i >= 0 {
 		active = active[:i]

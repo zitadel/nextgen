@@ -1,0 +1,241 @@
+post:
+  operationId: createRelease
+  summary: Create a release
+  description: |
+    Bundles a release from revisions that already exist, supplied as
+    `(kind, revision_id)` pairs. No new revisions are allocated — use the
+    per-kind create endpoints for that, then pin the ids here.
+
+    Every referenced `revision_id` must exist in the project. Each one's handle
+    is read from the revision itself and recorded on the release, so a resource
+    is always pinned under the identity it declares.
+
+    Creating a release does not deploy it. A release is environment-agnostic
+    and the same release can later be deployed to any number of environments
+    unchanged.
+
+    Idempotent on the pinned set: metadata is excluded from the comparison, so
+    re-submitting the same revisions with a different `message` returns the
+    release that already pins them rather than creating a second one.
+  tags:
+    - Releases
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - release.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-release-request.yaml
+        examples:
+          wholeProject:
+            summary: Pin every configurable resource of a project
+            description: |
+              A project has several user schemas and several flow definitions,
+              so `schema` and `flow_definition` each appear more than once.
+              Branding appears once because a project has one.
+            value:
+              pointers:
+                - kind: schema
+                  revision_id: https://example.com/schemas/default-human-user.json
+                - kind: schema
+                  revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                - kind: flow_definition
+                  revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                - kind: flow_definition
+                  revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
+                - kind: branding
+                  revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+              message: add phone_number to human-user
+              git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+              git_dirty: false
+          singleSchema:
+            summary: The smallest valid release
+            description: |
+              One pointer, no metadata. A release must pin at least one
+              revision; everything else is optional.
+            value:
+              pointers:
+                - kind: schema
+                  revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+  responses:
+    '200':
+      description: |
+        A release pinning this exact set already existed and was returned
+        unchanged. No new release was created.
+      content:
+        application/json:
+          schema:
+            $ref: release.yaml
+          examples:
+            reused:
+              summary: The same set was submitted again under a new message
+              description: |
+                The pinned set matched an existing release, so that release is
+                returned — note the message it was originally created with,
+                not the one just submitted.
+              value:
+                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                metadata:
+                  message: add phone_number to human-user
+                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                  git_dirty: false
+                  created_at: '2026-07-14T09:11:00Z'
+                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  created_by_type: human
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: https://example.com/schemas/default-human-user.json
+                  - kind: schema
+                    handle: machine-user
+                    revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                  - kind: flow_definition
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: flow_definition
+                    handle: b2b-login
+                    revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+    '201':
+      description: The release was created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: release.yaml
+          examples:
+            created:
+              summary: A newly assembled release
+              description: |
+                Each pointer carries the handle the server read from the
+                revision it pins — `objectType` for a schema, `name` for a flow
+                definition, and `default` for branding.
+              value:
+                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                metadata:
+                  message: add phone_number to human-user
+                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                  git_dirty: false
+                  created_at: '2026-07-14T09:11:00Z'
+                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  created_by_type: human
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: https://example.com/schemas/default-human-user.json
+                  - kind: schema
+                    handle: machine-user
+                    revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                  - kind: flow_definition
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: flow_definition
+                    handle: b2b-login
+                    revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+            createdByCI:
+              summary: Assembled from a pipeline, with a dirty tree
+              description: |
+                A project secret carries no user identity, so `created_by` and
+                `created_by_type` are null. `git_dirty` records that the
+                working tree had uncommitted changes, so the content does not
+                correspond exactly to `git_sha`.
+              value:
+                id: rel_550e8400-e29b-41d4-a716-446655440000
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                metadata:
+                  message: deploy from CI
+                  git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
+                  git_dirty: true
+                  created_at: '2026-07-15T11:02:00Z'
+                  created_by: null
+                  created_by_type: null
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                  - kind: flow_definition
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
+    default:
+      $ref: createRelease-error-response.yaml
+
+get:
+  operationId: listReleases
+  summary: List releases
+  description: |
+    Lists the project's releases, newest first.
+
+    Entries carry metadata only — the pinned set is omitted. Read one release
+    with `GET /releases/{release_id}` to get its pointers.
+  tags:
+    - Releases
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - release.read
+  responses:
+    '200':
+      description: The releases were retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-releases-response.yaml
+          examples:
+            firstPage:
+              summary: A page with more results behind it
+              value:
+                releases:
+                  - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    metadata:
+                      message: add phone_number to human-user
+                      git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                      git_dirty: false
+                      created_at: '2026-07-14T09:11:00Z'
+                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      created_by_type: human
+                  - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    metadata:
+                      message: initial import
+                      git_sha: 0f1e2d3c4b5a69788796a5b4c3d2e1f009182736
+                      git_dirty: false
+                      created_at: '2026-07-13T08:00:00Z'
+                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      created_by_type: human
+                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+            lastPage:
+              summary: The final page
+              description: |
+                `next_page_token` is null when there are no further results.
+                Metadata fields the caller never supplied are null too.
+              value:
+                releases:
+                  - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    metadata:
+                      message: initial import
+                      git_sha: null
+                      git_dirty: false
+                      created_at: '2026-07-13T08:00:00Z'
+                      created_by: null
+                      created_by_type: null
+                next_page_token: null
+    default:
+      $ref: listReleases-error-response.yaml

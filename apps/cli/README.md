@@ -79,7 +79,9 @@ Login templates are supported: scaffold them with the `branding eject` command
 (`--design centered|split|split-right|hero|minimal`) or `setup --design <name>`;
 every edit publishes a new immutable branding revision and the login serves
 the newest one. Flows work the same way: every edit publishes a new immutable
-flow revision, and the login serves the newest revision of each flow name.
+flow revision. A page that pins `flow-name` gets that flow's newest revision. A
+page without a pin gets the project's newest active unscoped flow, whatever its
+name, so revising a flow can make it the default.
 
 For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
 separately. The CLI contract is one parseable JSON object on stdout; terminals
