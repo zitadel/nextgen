@@ -203,6 +203,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	grantService := service.NewGrantService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	environmentService := service.NewEnvironmentService(serviceDBPool)
+	releaseService := service.NewReleaseService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
@@ -293,6 +294,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			teamService,
 			brandingService,
 			environmentService,
+			releaseService,
 			eventService,
 			tokenService,
 			keyService,

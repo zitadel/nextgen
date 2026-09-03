@@ -9860,10 +9860,17 @@ func (*CreateReleaseCreated) createReleaseRes() {}
 
 // CreateReleaseErrorResponse represents sum type.
 type CreateReleaseErrorResponse struct {
-	Type             CreateReleaseErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                  CreateReleaseErrorResponseType // switch on this field
+	AuthUnauthorized      AuthUnauthorized
+	EvtInvalid            EvtInvalid
+	Internal              Internal
+	RelInvalid            RelInvalid
+	RelNotFound           RelNotFound
+	RelPermissionDenied   RelPermissionDenied
+	RelProjectNotFound    RelProjectNotFound
+	RelRevisionNotFound   RelRevisionNotFound
+	RelRevisionUnpinnable RelRevisionUnpinnable
+	ReqInvalid            ReqInvalid
 }
 
 // CreateReleaseErrorResponseType is oneOf type of CreateReleaseErrorResponse.
@@ -9871,9 +9878,16 @@ type CreateReleaseErrorResponseType string
 
 // Possible values for CreateReleaseErrorResponseType.
 const (
-	AuthUnauthorizedCreateReleaseErrorResponse CreateReleaseErrorResponseType = "auth.unauthorized"
-	InternalCreateReleaseErrorResponse         CreateReleaseErrorResponseType = "internal"
-	ReqInvalidCreateReleaseErrorResponse       CreateReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedCreateReleaseErrorResponse      CreateReleaseErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "evt.invalid"
+	InternalCreateReleaseErrorResponse              CreateReleaseErrorResponseType = "internal"
+	RelInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "rel.invalid"
+	RelNotFoundCreateReleaseErrorResponse           CreateReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedCreateReleaseErrorResponse   CreateReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundCreateReleaseErrorResponse    CreateReleaseErrorResponseType = "rel.project_not_found"
+	RelRevisionNotFoundCreateReleaseErrorResponse   CreateReleaseErrorResponseType = "rel.revision_not_found"
+	RelRevisionUnpinnableCreateReleaseErrorResponse CreateReleaseErrorResponseType = "rel.revision_unpinnable"
+	ReqInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether CreateReleaseErrorResponse is AuthUnauthorized.
@@ -9881,9 +9895,44 @@ func (s CreateReleaseErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateReleaseErrorResponse
 }
 
+// IsEvtInvalid reports whether CreateReleaseErrorResponse is EvtInvalid.
+func (s CreateReleaseErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateReleaseErrorResponse
+}
+
 // IsInternal reports whether CreateReleaseErrorResponse is Internal.
 func (s CreateReleaseErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateReleaseErrorResponse
+}
+
+// IsRelInvalid reports whether CreateReleaseErrorResponse is RelInvalid.
+func (s CreateReleaseErrorResponse) IsRelInvalid() bool {
+	return s.Type == RelInvalidCreateReleaseErrorResponse
+}
+
+// IsRelNotFound reports whether CreateReleaseErrorResponse is RelNotFound.
+func (s CreateReleaseErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateReleaseErrorResponse
+}
+
+// IsRelPermissionDenied reports whether CreateReleaseErrorResponse is RelPermissionDenied.
+func (s CreateReleaseErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedCreateReleaseErrorResponse
+}
+
+// IsRelProjectNotFound reports whether CreateReleaseErrorResponse is RelProjectNotFound.
+func (s CreateReleaseErrorResponse) IsRelProjectNotFound() bool {
+	return s.Type == RelProjectNotFoundCreateReleaseErrorResponse
+}
+
+// IsRelRevisionNotFound reports whether CreateReleaseErrorResponse is RelRevisionNotFound.
+func (s CreateReleaseErrorResponse) IsRelRevisionNotFound() bool {
+	return s.Type == RelRevisionNotFoundCreateReleaseErrorResponse
+}
+
+// IsRelRevisionUnpinnable reports whether CreateReleaseErrorResponse is RelRevisionUnpinnable.
+func (s CreateReleaseErrorResponse) IsRelRevisionUnpinnable() bool {
+	return s.Type == RelRevisionUnpinnableCreateReleaseErrorResponse
 }
 
 // IsReqInvalid reports whether CreateReleaseErrorResponse is ReqInvalid.
@@ -9912,6 +9961,27 @@ func NewAuthUnauthorizedCreateReleaseErrorResponse(v AuthUnauthorized) CreateRel
 	return s
 }
 
+// SetEvtInvalid sets CreateReleaseErrorResponse to EvtInvalid.
+func (s *CreateReleaseErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateReleaseErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateReleaseErrorResponse is EvtInvalid.
+func (s CreateReleaseErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateReleaseErrorResponse(v EvtInvalid) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets CreateReleaseErrorResponse to Internal.
 func (s *CreateReleaseErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateReleaseErrorResponse
@@ -9930,6 +10000,132 @@ func (s CreateReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateReleaseErrorResponse(v Internal) CreateReleaseErrorResponse {
 	var s CreateReleaseErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetRelInvalid sets CreateReleaseErrorResponse to RelInvalid.
+func (s *CreateReleaseErrorResponse) SetRelInvalid(v RelInvalid) {
+	s.Type = RelInvalidCreateReleaseErrorResponse
+	s.RelInvalid = v
+}
+
+// GetRelInvalid returns RelInvalid and true boolean if CreateReleaseErrorResponse is RelInvalid.
+func (s CreateReleaseErrorResponse) GetRelInvalid() (v RelInvalid, ok bool) {
+	if !s.IsRelInvalid() {
+		return v, false
+	}
+	return s.RelInvalid, true
+}
+
+// NewRelInvalidCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from RelInvalid.
+func NewRelInvalidCreateReleaseErrorResponse(v RelInvalid) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetRelInvalid(v)
+	return s
+}
+
+// SetRelNotFound sets CreateReleaseErrorResponse to RelNotFound.
+func (s *CreateReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateReleaseErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateReleaseErrorResponse is RelNotFound.
+func (s CreateReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from RelNotFound.
+func NewRelNotFoundCreateReleaseErrorResponse(v RelNotFound) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets CreateReleaseErrorResponse to RelPermissionDenied.
+func (s *CreateReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedCreateReleaseErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if CreateReleaseErrorResponse is RelPermissionDenied.
+func (s CreateReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedCreateReleaseErrorResponse(v RelPermissionDenied) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetRelPermissionDenied(v)
+	return s
+}
+
+// SetRelProjectNotFound sets CreateReleaseErrorResponse to RelProjectNotFound.
+func (s *CreateReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
+	s.Type = RelProjectNotFoundCreateReleaseErrorResponse
+	s.RelProjectNotFound = v
+}
+
+// GetRelProjectNotFound returns RelProjectNotFound and true boolean if CreateReleaseErrorResponse is RelProjectNotFound.
+func (s CreateReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
+	if !s.IsRelProjectNotFound() {
+		return v, false
+	}
+	return s.RelProjectNotFound, true
+}
+
+// NewRelProjectNotFoundCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from RelProjectNotFound.
+func NewRelProjectNotFoundCreateReleaseErrorResponse(v RelProjectNotFound) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetRelProjectNotFound(v)
+	return s
+}
+
+// SetRelRevisionNotFound sets CreateReleaseErrorResponse to RelRevisionNotFound.
+func (s *CreateReleaseErrorResponse) SetRelRevisionNotFound(v RelRevisionNotFound) {
+	s.Type = RelRevisionNotFoundCreateReleaseErrorResponse
+	s.RelRevisionNotFound = v
+}
+
+// GetRelRevisionNotFound returns RelRevisionNotFound and true boolean if CreateReleaseErrorResponse is RelRevisionNotFound.
+func (s CreateReleaseErrorResponse) GetRelRevisionNotFound() (v RelRevisionNotFound, ok bool) {
+	if !s.IsRelRevisionNotFound() {
+		return v, false
+	}
+	return s.RelRevisionNotFound, true
+}
+
+// NewRelRevisionNotFoundCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from RelRevisionNotFound.
+func NewRelRevisionNotFoundCreateReleaseErrorResponse(v RelRevisionNotFound) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetRelRevisionNotFound(v)
+	return s
+}
+
+// SetRelRevisionUnpinnable sets CreateReleaseErrorResponse to RelRevisionUnpinnable.
+func (s *CreateReleaseErrorResponse) SetRelRevisionUnpinnable(v RelRevisionUnpinnable) {
+	s.Type = RelRevisionUnpinnableCreateReleaseErrorResponse
+	s.RelRevisionUnpinnable = v
+}
+
+// GetRelRevisionUnpinnable returns RelRevisionUnpinnable and true boolean if CreateReleaseErrorResponse is RelRevisionUnpinnable.
+func (s CreateReleaseErrorResponse) GetRelRevisionUnpinnable() (v RelRevisionUnpinnable, ok bool) {
+	if !s.IsRelRevisionUnpinnable() {
+		return v, false
+	}
+	return s.RelRevisionUnpinnable, true
+}
+
+// NewRelRevisionUnpinnableCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from RelRevisionUnpinnable.
+func NewRelRevisionUnpinnableCreateReleaseErrorResponse(v RelRevisionUnpinnable) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetRelRevisionUnpinnable(v)
 	return s
 }
 
@@ -31734,6 +31930,282 @@ func (o OptQueryUsersRequestSorting) Or(d QueryUsersRequestSorting) QueryUsersRe
 	return d
 }
 
+// NewOptRelInvalidDetails returns new OptRelInvalidDetails with value set to v.
+func NewOptRelInvalidDetails(v RelInvalidDetails) OptRelInvalidDetails {
+	return OptRelInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelInvalidDetails is optional RelInvalidDetails.
+type OptRelInvalidDetails struct {
+	Value RelInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelInvalidDetails was set.
+func (o OptRelInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelInvalidDetails) Reset() {
+	var v RelInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelInvalidDetails) SetTo(v RelInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelInvalidDetails) Get() (v RelInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelInvalidDetails) Or(d RelInvalidDetails) RelInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelNotFoundDetails returns new OptRelNotFoundDetails with value set to v.
+func NewOptRelNotFoundDetails(v RelNotFoundDetails) OptRelNotFoundDetails {
+	return OptRelNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelNotFoundDetails is optional RelNotFoundDetails.
+type OptRelNotFoundDetails struct {
+	Value RelNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelNotFoundDetails was set.
+func (o OptRelNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelNotFoundDetails) Reset() {
+	var v RelNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelNotFoundDetails) SetTo(v RelNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelNotFoundDetails) Get() (v RelNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelNotFoundDetails) Or(d RelNotFoundDetails) RelNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelPermissionDeniedDetails returns new OptRelPermissionDeniedDetails with value set to v.
+func NewOptRelPermissionDeniedDetails(v RelPermissionDeniedDetails) OptRelPermissionDeniedDetails {
+	return OptRelPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelPermissionDeniedDetails is optional RelPermissionDeniedDetails.
+type OptRelPermissionDeniedDetails struct {
+	Value RelPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelPermissionDeniedDetails was set.
+func (o OptRelPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelPermissionDeniedDetails) Reset() {
+	var v RelPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelPermissionDeniedDetails) SetTo(v RelPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelPermissionDeniedDetails) Get() (v RelPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelPermissionDeniedDetails) Or(d RelPermissionDeniedDetails) RelPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelProjectNotFoundDetails returns new OptRelProjectNotFoundDetails with value set to v.
+func NewOptRelProjectNotFoundDetails(v RelProjectNotFoundDetails) OptRelProjectNotFoundDetails {
+	return OptRelProjectNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelProjectNotFoundDetails is optional RelProjectNotFoundDetails.
+type OptRelProjectNotFoundDetails struct {
+	Value RelProjectNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelProjectNotFoundDetails was set.
+func (o OptRelProjectNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelProjectNotFoundDetails) Reset() {
+	var v RelProjectNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelProjectNotFoundDetails) SetTo(v RelProjectNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelProjectNotFoundDetails) Get() (v RelProjectNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelProjectNotFoundDetails) Or(d RelProjectNotFoundDetails) RelProjectNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelRevisionNotFoundDetails returns new OptRelRevisionNotFoundDetails with value set to v.
+func NewOptRelRevisionNotFoundDetails(v RelRevisionNotFoundDetails) OptRelRevisionNotFoundDetails {
+	return OptRelRevisionNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelRevisionNotFoundDetails is optional RelRevisionNotFoundDetails.
+type OptRelRevisionNotFoundDetails struct {
+	Value RelRevisionNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelRevisionNotFoundDetails was set.
+func (o OptRelRevisionNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelRevisionNotFoundDetails) Reset() {
+	var v RelRevisionNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelRevisionNotFoundDetails) SetTo(v RelRevisionNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelRevisionNotFoundDetails) Get() (v RelRevisionNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelRevisionNotFoundDetails) Or(d RelRevisionNotFoundDetails) RelRevisionNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelRevisionUnpinnableDetails returns new OptRelRevisionUnpinnableDetails with value set to v.
+func NewOptRelRevisionUnpinnableDetails(v RelRevisionUnpinnableDetails) OptRelRevisionUnpinnableDetails {
+	return OptRelRevisionUnpinnableDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelRevisionUnpinnableDetails is optional RelRevisionUnpinnableDetails.
+type OptRelRevisionUnpinnableDetails struct {
+	Value RelRevisionUnpinnableDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelRevisionUnpinnableDetails was set.
+func (o OptRelRevisionUnpinnableDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelRevisionUnpinnableDetails) Reset() {
+	var v RelRevisionUnpinnableDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelRevisionUnpinnableDetails) SetTo(v RelRevisionUnpinnableDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelRevisionUnpinnableDetails) Get() (v RelRevisionUnpinnableDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelRevisionUnpinnableDetails) Or(d RelRevisionUnpinnableDetails) RelRevisionUnpinnableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptReleaseCreatedEventDelegationType returns new OptReleaseCreatedEventDelegationType with value set to v.
 func NewOptReleaseCreatedEventDelegationType(v ReleaseCreatedEventDelegationType) OptReleaseCreatedEventDelegationType {
 	return OptReleaseCreatedEventDelegationType{
@@ -37180,6 +37652,324 @@ func (*QueryUsersResponse) queryUsersRes() {}
 type QueryUsersUnauthorized ErrorDetails
 
 func (*QueryUsersUnauthorized) queryUsersRes() {}
+
+// Merged schema.
+// Ref: #
+type RelInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelInvalid) GetDetails() OptRelInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelInvalid) SetDetails(val OptRelInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelInvalidDetails map[string]jx.Raw
+
+func (s *RelInvalidDetails) init() RelInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelNotFound) GetDetails() OptRelNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelNotFound) SetDetails(val OptRelNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelNotFoundDetails map[string]jx.Raw
+
+func (s *RelNotFoundDetails) init() RelNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelPermissionDenied) GetDetails() OptRelPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelPermissionDenied) SetDetails(val OptRelPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelPermissionDeniedDetails map[string]jx.Raw
+
+func (s *RelPermissionDeniedDetails) init() RelPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelProjectNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelProjectNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelProjectNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelProjectNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelProjectNotFound) GetDetails() OptRelProjectNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelProjectNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelProjectNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelProjectNotFound) SetDetails(val OptRelProjectNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelProjectNotFoundDetails map[string]jx.Raw
+
+func (s *RelProjectNotFoundDetails) init() RelProjectNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelRevisionNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelRevisionNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelRevisionNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelRevisionNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelRevisionNotFound) GetDetails() OptRelRevisionNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelRevisionNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelRevisionNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelRevisionNotFound) SetDetails(val OptRelRevisionNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelRevisionNotFoundDetails map[string]jx.Raw
+
+func (s *RelRevisionNotFoundDetails) init() RelRevisionNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelRevisionUnpinnable struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelRevisionUnpinnableDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelRevisionUnpinnable) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelRevisionUnpinnable) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelRevisionUnpinnable) GetDetails() OptRelRevisionUnpinnableDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelRevisionUnpinnable) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelRevisionUnpinnable) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelRevisionUnpinnable) SetDetails(val OptRelRevisionUnpinnableDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelRevisionUnpinnableDetails map[string]jx.Raw
+
+func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // An immutable, project-scoped snapshot that pins one revision of every
 // resource it includes.
