@@ -116,13 +116,18 @@ func (g *Graph) listedObjectInConstraintTeam(p domain.AuthzListObjectsParams, id
 }
 
 // OracleFoothold mirrors HasAuthzProjectFoothold.
-func (g *Graph) OracleFoothold(projectID string, principalType domain.AuthzPrincipalType, principalID string) bool {
+// homeProjectID is the membership-edge project (empty falls back to projectID).
+func (g *Graph) OracleFoothold(projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) bool {
+	home := homeProjectID
+	if home == "" {
+		home = projectID
+	}
 	now := time.Now()
 	for _, a := range g.Assignments {
 		if a.ProjectID != projectID || !assignmentActive(a, now) {
 			continue
 		}
-		if g.principalMatches(projectID, principalType, principalID, a) {
+		if g.principalMatches(home, principalType, principalID, a) {
 			return true
 		}
 	}

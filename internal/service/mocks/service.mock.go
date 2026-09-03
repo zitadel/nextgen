@@ -3213,18 +3213,18 @@ func (c *MockAllStatementsHandoffAuthAttemptCall) DoAndReturn(f func(context.Con
 }
 
 // HasAuthzProjectFoothold mocks base method.
-func (m *MockAllStatements) HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
+func (m *MockAllStatements) HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasAuthzProjectFoothold", ctx, projectID, principalType, principalID)
+	ret := m.ctrl.Call(m, "HasAuthzProjectFoothold", ctx, projectID, homeProjectID, principalType, principalID)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HasAuthzProjectFoothold indicates an expected call of HasAuthzProjectFoothold.
-func (mr *MockAllStatementsMockRecorder) HasAuthzProjectFoothold(ctx, projectID, principalType, principalID any) *MockAllStatementsHasAuthzProjectFootholdCall {
+func (mr *MockAllStatementsMockRecorder) HasAuthzProjectFoothold(ctx, projectID, homeProjectID, principalType, principalID any) *MockAllStatementsHasAuthzProjectFootholdCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasAuthzProjectFoothold", reflect.TypeOf((*MockAllStatements)(nil).HasAuthzProjectFoothold), ctx, projectID, principalType, principalID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasAuthzProjectFoothold", reflect.TypeOf((*MockAllStatements)(nil).HasAuthzProjectFoothold), ctx, projectID, homeProjectID, principalType, principalID)
 	return &MockAllStatementsHasAuthzProjectFootholdCall{Call: call}
 }
 
@@ -3240,13 +3240,13 @@ func (c *MockAllStatementsHasAuthzProjectFootholdCall) Return(arg0 bool, arg1 er
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsHasAuthzProjectFootholdCall) Do(f func(context.Context, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAllStatementsHasAuthzProjectFootholdCall {
+func (c *MockAllStatementsHasAuthzProjectFootholdCall) Do(f func(context.Context, string, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAllStatementsHasAuthzProjectFootholdCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsHasAuthzProjectFootholdCall) DoAndReturn(f func(context.Context, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAllStatementsHasAuthzProjectFootholdCall {
+func (c *MockAllStatementsHasAuthzProjectFootholdCall) DoAndReturn(f func(context.Context, string, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAllStatementsHasAuthzProjectFootholdCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -10373,18 +10373,18 @@ func (c *MockAuthzResolverStatementsCheckAuthzCall) DoAndReturn(f func(context.C
 }
 
 // HasAuthzProjectFoothold mocks base method.
-func (m *MockAuthzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
+func (m *MockAuthzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasAuthzProjectFoothold", ctx, projectID, principalType, principalID)
+	ret := m.ctrl.Call(m, "HasAuthzProjectFoothold", ctx, projectID, homeProjectID, principalType, principalID)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HasAuthzProjectFoothold indicates an expected call of HasAuthzProjectFoothold.
-func (mr *MockAuthzResolverStatementsMockRecorder) HasAuthzProjectFoothold(ctx, projectID, principalType, principalID any) *MockAuthzResolverStatementsHasAuthzProjectFootholdCall {
+func (mr *MockAuthzResolverStatementsMockRecorder) HasAuthzProjectFoothold(ctx, projectID, homeProjectID, principalType, principalID any) *MockAuthzResolverStatementsHasAuthzProjectFootholdCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasAuthzProjectFoothold", reflect.TypeOf((*MockAuthzResolverStatements)(nil).HasAuthzProjectFoothold), ctx, projectID, principalType, principalID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasAuthzProjectFoothold", reflect.TypeOf((*MockAuthzResolverStatements)(nil).HasAuthzProjectFoothold), ctx, projectID, homeProjectID, principalType, principalID)
 	return &MockAuthzResolverStatementsHasAuthzProjectFootholdCall{Call: call}
 }
 
@@ -10400,13 +10400,13 @@ func (c *MockAuthzResolverStatementsHasAuthzProjectFootholdCall) Return(arg0 boo
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAuthzResolverStatementsHasAuthzProjectFootholdCall) Do(f func(context.Context, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAuthzResolverStatementsHasAuthzProjectFootholdCall {
+func (c *MockAuthzResolverStatementsHasAuthzProjectFootholdCall) Do(f func(context.Context, string, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAuthzResolverStatementsHasAuthzProjectFootholdCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzResolverStatementsHasAuthzProjectFootholdCall) DoAndReturn(f func(context.Context, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAuthzResolverStatementsHasAuthzProjectFootholdCall {
+func (c *MockAuthzResolverStatementsHasAuthzProjectFootholdCall) DoAndReturn(f func(context.Context, string, string, domain.AuthzPrincipalType, string) (bool, error)) *MockAuthzResolverStatementsHasAuthzProjectFootholdCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

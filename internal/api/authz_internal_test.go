@@ -33,7 +33,7 @@ func (s stubAuthzStmts) ActiveSystemCatalogID(context.Context) (string, error) {
 	return domain.SystemCatalogID, nil
 }
 
-func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID string, _ domain.AuthzPrincipalType, principalID string) (bool, error) {
+func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID, _ string, _ domain.AuthzPrincipalType, principalID string) (bool, error) {
 	if s.foothold != nil {
 		return *s.foothold, nil
 	}
@@ -41,7 +41,7 @@ func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID str
 }
 
 func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
-	foothold, err := s.HasAuthzProjectFoothold(ctx, params.ProjectID, params.PrincipalType, params.PrincipalID)
+	foothold, err := s.HasAuthzProjectFoothold(ctx, params.ProjectID, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 	if err != nil {
 		return false, false, err
 	}
