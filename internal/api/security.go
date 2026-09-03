@@ -85,18 +85,16 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
-// sessionCookieOperations lists the operations secured by the nextgenSession
-// scheme. ogen reports an absent credential as a scheme-anonymous
-// "security requirement is not satisfied" error, so OgenErrorHandler decides
-// the 401 message by operation name instead.
+// sessionCookieOperations is the session-only 401-copy allowlist.
+// OgenErrorHandler rewrites those ops to sessionUnauthorizedMessage because
+// ogen reports an absent cookie without naming the scheme. Dual-scheme
+// routes (oauth2 OR nextgenSession) must stay off this map so a bad Bearer
+// is not rewritten as a missing session cookie.
 var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionOperation:    true,
 	api.RevokeMySessionOperation: true,
 	api.GetMyUserOperation:       true,
 	api.CompleteClaimOperation:   true,
-	api.CreateGrantOperation:     true,
-	api.GetGrantOperation:        true,
-	api.DeleteGrantOperation:     true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
