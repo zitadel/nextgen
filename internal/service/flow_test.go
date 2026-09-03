@@ -217,6 +217,59 @@ func TestResolve_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
 	}
 }
 
+// Revisions of one name share a schema version, so the pick must not
+// depend on the order storage returns them in.
+func TestResolve_ResolveByName_SameVersionPicksNewest(t *testing.T) {
+	older := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	older.ID = "flowdef_older"
+	older.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	newer := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	newer.ID = "flowdef_newer"
+	newer.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	for _, defs := range [][]*domain.FlowDefinition{{older, newer}, {newer, older}} {
+		repo := stubListFlowDefinitions(t, defs)
+		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+			ProjectID: "proj",
+			Purpose:   domain.FlowDefinitionPurposeLogin,
+			Name:      ptr("login"),
+		})
+		if err != nil {
+			t.Fatalf("Resolve returned error: %v", err)
+		}
+		if got != newer {
+			t.Fatalf("Resolve = %v, want the newest revision", got.ID)
+		}
+	}
+}
+
+// Colliding created_at timestamps within one name still yield a stable
+// pick: the higher id wins.
+func TestResolve_ResolveByName_TimestampCollisionBreaksOnID(t *testing.T) {
+	at := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	a := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	a.ID = "flowdef_aaa"
+	a.CreatedAt = at
+	b := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	b.ID = "flowdef_bbb"
+	b.CreatedAt = at
+
+	for _, defs := range [][]*domain.FlowDefinition{{a, b}, {b, a}} {
+		repo := stubListFlowDefinitions(t, defs)
+		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+			ProjectID: "proj",
+			Purpose:   domain.FlowDefinitionPurposeLogin,
+			Name:      ptr("login"),
+		})
+		if err != nil {
+			t.Fatalf("Resolve returned error: %v", err)
+		}
+		if got != b {
+			t.Fatalf("Resolve = %v, want the revision with the higher id", got.ID)
+		}
+	}
+}
+
 func TestResolve_ResolveByName_NotFound(t *testing.T) {
 	repo := stubListFlowDefinitions(t, nil)
 
