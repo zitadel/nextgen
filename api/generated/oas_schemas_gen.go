@@ -39754,13 +39754,22 @@ func (s *SessionEstablishedPayload) SetUserID(val OptString) {
 // - `user_id`: user id
 // - `state`: one of `building`, `active`, `expired`. State is computed at read
 // time, so a session expiring mid-request can match `active` but return `expired`.
+// - `lifecycle_owner_team_id`: team id. Matches the sessions of the users whose
+// lifecycle that team owns — the same users it can deactivate and whose
+// sessions it can revoke. Roster membership does not match: a collaborator on
+// the team's roster whose lifecycle another team (or the user themselves)
+// owns is not returned. A session is project-scoped and is not bound to a
+// team, so the link is read from the user at query time; a session of a
+// self-owned user, and a session with no user, match no team. Only `equals`
+// is supported.
 // Ref: #
 type SessionFilterField string
 
 const (
-	SessionFilterFieldCreatedAt SessionFilterField = "created_at"
-	SessionFilterFieldUserID    SessionFilterField = "user_id"
-	SessionFilterFieldState     SessionFilterField = "state"
+	SessionFilterFieldCreatedAt            SessionFilterField = "created_at"
+	SessionFilterFieldUserID               SessionFilterField = "user_id"
+	SessionFilterFieldState                SessionFilterField = "state"
+	SessionFilterFieldLifecycleOwnerTeamID SessionFilterField = "lifecycle_owner_team_id"
 )
 
 // AllValues returns all SessionFilterField values.
@@ -39769,6 +39778,7 @@ func (SessionFilterField) AllValues() []SessionFilterField {
 		SessionFilterFieldCreatedAt,
 		SessionFilterFieldUserID,
 		SessionFilterFieldState,
+		SessionFilterFieldLifecycleOwnerTeamID,
 	}
 }
 
@@ -39780,6 +39790,8 @@ func (s SessionFilterField) MarshalText() ([]byte, error) {
 	case SessionFilterFieldUserID:
 		return []byte(s), nil
 	case SessionFilterFieldState:
+		return []byte(s), nil
+	case SessionFilterFieldLifecycleOwnerTeamID:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -39797,6 +39809,9 @@ func (s *SessionFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case SessionFilterFieldState:
 		*s = SessionFilterFieldState
+		return nil
+	case SessionFilterFieldLifecycleOwnerTeamID:
+		*s = SessionFilterFieldLifecycleOwnerTeamID
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
