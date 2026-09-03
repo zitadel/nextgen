@@ -76,8 +76,10 @@ POST   /flow_definitions/{id}/simulate    Dry-run with mock input
 
 A definition is an immutable revision: every `POST` assigns a new id, and a
 repeated `name` is a new revision of that flow, not a conflict. There is no
-update or delete. Among the revisions of one name, resolution picks the
-newest (step 4 above).
+update or delete. Resolution by `name` picks the newest active revision of
+that name. Audience resolution (steps 1-4 above) ranks every active
+definition regardless of name, so a new revision of an unscoped flow becomes
+the project default the same way a new flow does.
 
 ## Schema-Driven Steps
 

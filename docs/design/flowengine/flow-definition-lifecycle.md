@@ -15,7 +15,7 @@ A flow definition can have the following states:
 - `active`: The flow definition is in an active state and is used by the flow resolver to resolve flows.
 
 ## Transitioning Between States
-A flow definition is an immutable revision and its state is fixed at creation. To take a draft live, publish a new revision of the same `name` with `status: active`. An active revision stays resolvable until a newer active revision of the same `name` outranks it; there is no way to retire one today. Retirement waits for releases ([ADR 035](../../adrs/035-configuration-environments.md), [#536](https://github.com/zitadel/nextgen/issues/536)).
+A flow definition is an immutable revision and its state is fixed at creation. To take a draft live, publish a new revision of the same `name` with `status: active`. An active revision stays resolvable until a newer one outranks it: for a login pinned by `name`, a newer active revision of that name; for audience resolution, any newer active flow with an equal or better audience match, whatever its name. There is no way to retire one today. Retirement waits for releases ([ADR 035](../../adrs/035-configuration-environments.md), [#536](https://github.com/zitadel/nextgen/issues/536)).
 
 ## Endpoints to Support Lifecycle States
 - `POST /flow_definitions`: Publish a new revision, in the `active` state by default. The flow definition can include a `status` attribute to specify the state to support creating a flow definition via CLI.
