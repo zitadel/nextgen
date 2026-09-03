@@ -1,5 +1,28 @@
 # @zitadel/testing
 
+## 1.0.0-alpha.20
+
+### Minor Changes
+
+- [#905](https://github.com/zitadel/nextgen/pull/905) [`401655b`](https://github.com/zitadel/nextgen/commit/401655b74305ef7ef7178549395378ddfb7c77fc) Thanks [@fforootd](https://github.com/fforootd)! - Boot-captured credentials are now a documented contract on the instance
+  handle. `handle.projectSecret` and `handle.previewSecret` are captured the
+  one time the server mints them at provisioning, and a new `handle.platform`
+  slot reserves the upcoming platform-plane credentials (platform project id
+  and publishable key) — fixtures written against it today won't churn when
+  platform provisioning ships; until then the slot stays unset, and further
+  platform credentials will join it as optional fields once their design
+  lands. `AppEnvTemplate` now accepts only the handle's string fields, so
+  mapping a structured field into an env var fails at compile time instead of
+  at app boot, and handshake files reject malformed `platform` blocks on read
+  with the offending field named.
+
+### Patch Changes
+
+- Updated dependencies [[`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`0a9a5af`](https://github.com/zitadel/nextgen/commit/0a9a5afd0336382ca8ebef9c646f09acde2d7ada), [`4a8d546`](https://github.com/zitadel/nextgen/commit/4a8d546d8abd6902f2e19c50e8b980f91451bbfd), [`1ef3c32`](https://github.com/zitadel/nextgen/commit/1ef3c32fd6fa7091f2300fa9e210f43040dbd143), [`19fc783`](https://github.com/zitadel/nextgen/commit/19fc7835e23d04da9c458bda2fda39c4aa9dbc00), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b)]:
+  - @zitadel/cli@1.0.0-alpha.20
+  - @zitadel/config@1.0.0-alpha.20
+  - @zitadel/api@1.0.0-alpha.20
+
 ## 0.1.0-alpha.19
 
 ### Minor Changes

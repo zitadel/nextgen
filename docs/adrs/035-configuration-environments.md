@@ -533,3 +533,23 @@ An environment either runs the previous release or the new one, never a mixture.
 - **Auto-deploy defaults for bare `zitadel deploy` (per #449).** Whether bare `deploy` should auto-target a designated non-prod environment (Vercel-style: implicit for preview, explicit for prod) depends on env-metadata this ADR treats as out of scope (which envs are production-class). Follow-up once env-classes are defined.
 - **Environment lifecycle, values, and data isolation.** Environment creation, retirement, per-env value shape (base URLs, custom domains, template values referenced from releases), template resolution semantics on deployment, and cross-env data isolation (including the exception that users carry their own user-schema revision) are covered by a follow-up ADR.
 - **Inner-loop semantics.** Whether every local save creates a release (Vercel-shaped local dev) or only explicit `zitadel deploy` does (Terraform-shaped) is a follow-up decision affecting local-dev ergonomics.
+
+## Amendment (2026-09-02): pointer kind vocabulary
+
+The [Releases](#releases) table above writes the flow kind as `flow`. The wire
+enum on `POST /releases` spells it **`flow_definition`** instead.
+
+`flow` is ambiguous in the API it ships into: `/flow` is the runtime flow
+orchestration resource (tag *Flows*), while the revisions a release pins come
+from `/flow_definitions` (tag *Flow Definitions*), carry `flowdef_` ids, and are
+gated by `flow_definition.read` / `flow_definition.write`. A pointer reading
+`kind: flow` invites the reading that a release pins a runtime flow.
+
+The kinds accepted at the contract are therefore `schema`, `flow_definition`
+and `branding`. Branding is included from the outset: its revisions are already
+immutable, and because a project has exactly one branding there is no field to
+derive a handle from, so its handle is the constant `default` — as the table
+above already shows. Handle resolution is per kind, not a shared column read.
+
+The illustrative table is otherwise unchanged; this fixes the name the wire
+uses, not the model.

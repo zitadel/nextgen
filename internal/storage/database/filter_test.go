@@ -115,3 +115,19 @@ func TestArrayContainsFilter(t *testing.T) {
 	assert.True(t, filter.Restricts(col))
 	assert.False(t, filter.Restricts(database.Col(domain.FlowDefinitionFieldID)))
 }
+
+func TestCorrelatedEqualFilter(t *testing.T) {
+	t.Parallel()
+
+	col := database.Col(domain.SessionFieldLifecycleOwnerTeamID)
+	filter := database.CorrelatedEqual(col, "team_01H")
+	assert.Equal(t, col, filter.Column)
+	assert.Equal(t, "team_01H", filter.Value)
+	assert.True(t, filter.Restricts(col))
+	assert.False(t, filter.Restricts(database.Col(domain.SessionFieldUserID)))
+
+	// It must compose like any other filter, so a wrapping And reports the
+	// restriction through it.
+	combined := database.And(database.Equal(database.Col(domain.SessionFieldProjectID), "proj_01H"), filter)
+	assert.True(t, combined.Restricts(col))
+}
