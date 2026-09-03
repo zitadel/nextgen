@@ -2,7 +2,7 @@
 # Zitadel Management Project — shared CI/CD and registry resources
 #
 # Run once locally: tofu apply -var-file=mgmt.tfvars
-# ──���──────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 
 # ─── APIs ────────────────────────────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ resource "google_project_iam_member" "infra_apply_ar_reader" {
   member  = "serviceAccount:${google_service_account.infra_apply.email}"
 }
 
-# ─── Service Account: github-deploy (app deploy CI) ���────────────────────────
+# ─── Service Account: github-deploy (app deploy CI) ──────────────────────────
 
 resource "google_service_account" "github_deploy" {
   account_id   = "github-deploy"

@@ -50,6 +50,10 @@ jobs:
         id: plan
         working-directory: ${{ env.WORKING_DIR }}
         run: |
+          # tee makes the pipeline's exit status tee's, not tofu's; without
+          # pipefail a failed plan would pass the step and post a misleading
+          # comment. The mgmt plan below already guards this way.
+          set -o pipefail
           tofu plan \
             -var-file="environments/${{ env.ENVIRONMENT }}.tfvars" \
             -no-color \
@@ -131,6 +135,10 @@ jobs:
       - name: Plan
         working-directory: ${{ env.WORKING_DIR }}
         run: |
+          # tee makes the pipeline's exit status tee's, not tofu's; without
+          # pipefail a failed plan would pass the step and post a misleading
+          # comment. The mgmt plan below already guards this way.
+          set -o pipefail
           tofu plan \
             -var-file="environments/${{ env.ENVIRONMENT }}.tfvars" \
             -no-color \
