@@ -16,7 +16,7 @@ Validation runs in two layers:
 
 | Field | Required | Notes |
 |---|:-:|---|
-| `name` | ✓ | Unique within `(project_id, schema_version)`. Used as the slug for direct resolution. |
+| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name, and resolution by name picks the newest active one. |
 | `schema_version` | ✓ | Monotonic per `(project_id, name)`. The repository picks the highest active version. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
 | `user_schema` | ✓ | URL of the user schema this flow's `fields` resolve against. Captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
@@ -65,7 +65,6 @@ Transition values:
 
 ### Definition
 
-- `name` unique within `(project_id, schema_version)`. **DDL.**
 - Every key in `purposes` is a supported `FlowDefinitionPurpose`.
 - Every value in `purposes` matches a step `name`.
 - `user_schema` URL resolves to a user-type schema. May be deferred until promotion to runtime use.
@@ -101,6 +100,5 @@ Transition values:
 ## Open questions
 
 - **When to resolve `user_schema`.** On write, only at runtime use, or somewhere in between? Tied to the still-undecided definition lifecycle.
-- **Uniqueness key.** `(project_id, name)` or `(project_id, name, schema_version)`? The latter lets revisions coexist; recommended.
 - **Cross-project pivots.** Out of scope — pivots and switches resolve within the same `project_id` when implemented.
-- **Built-in default flow.** Should the project-wide default ship embedded (`go:embed`) and be exempt from the uniqueness check on `name`?
+- **Built-in default flow.** Should the project-wide default ship embedded (`go:embed`)?
