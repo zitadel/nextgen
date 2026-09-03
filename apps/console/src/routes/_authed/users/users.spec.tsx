@@ -38,6 +38,19 @@ async function renderUsers() {
   return router;
 }
 
+/** Records every `POST /users/query` body, so the expansion sent can be asserted. */
+function recordQueries(response: (body: Record<string, unknown>) => Response) {
+  const bodies: Record<string, unknown>[] = [];
+  server.use(
+    http.post(USERS_QUERY_URL, async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      bodies.push(body);
+      return response(body);
+    }),
+  );
+  return bodies;
+}
+
 describe("users screen", () => {
   it("renders the page heading and a user row", async () => {
     server.use(
@@ -381,5 +394,108 @@ describe("users screen", () => {
     // The in-flight page is discarded rather than appended to the new list.
     expect(screen.queryByText("stale@x.com")).not.toBeInTheDocument();
     expect(screen.getByText("page1-2@x.com")).toBeInTheDocument();
+  });
+
+  it("asks for the memberships and lists every team a user is on", async () => {
+    // One request, not a roster read per row: `expand: ["teams"]` embeds the
+    // memberships on the list response (ADR 059), and each entry carries the
+    // team's name so the cell renders without resolving ids. D1 makes the column
+    // plural — a user can belong to several teams.
+    const bodies = recordQueries(() =>
+      HttpResponse.json({
+        users: [
+          {
+            id: "user_1",
+            attributes: { email: "maya@acme.com" },
+            teams: [
+              { id: "team_1", name: "Acme Web", membership_status: "active" },
+              { id: "team_2", name: "Platform", membership_status: "pending" },
+            ],
+          },
+          {
+            id: "user_2",
+            attributes: { email: "solo@acme.com" },
+            // Stamped, so the only em dash in this row is the Team cell.
+            metadata: { status: "active" },
+            teams: [],
+          },
+        ],
+      }),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("Team")).toBeInTheDocument();
+    expect(bodies.at(-1)).toMatchObject({ expand: ["teams"] });
+
+    // Every membership the endpoint returns, `pending` included: it omits the
+    // ones the user was removed from, so what arrives is the roster. Each is its
+    // own link to the team, as the Teams directory's rows are — the embedded
+    // entry carries the id, so this costs no extra read.
+    expect(table.getByRole("link", { name: "Acme Web" })).toHaveAttribute(
+      "href",
+      "/teams/team_1",
+    );
+    expect(table.getByRole("link", { name: "Platform" })).toHaveAttribute(
+      "href",
+      "/teams/team_2",
+    );
+    // `[]` is "on no team", which the table draws as an empty cell rather than
+    // leaving the row a column short.
+    const soloRow = screen.getByRole("link", { name: "solo@acme.com" }).closest("tr");
+    expect(soloRow).not.toBeNull();
+    expect(within(soloRow as HTMLElement).getByText("—")).toBeInTheDocument();
+  });
+
+  it("says when a user is on more teams than the row carries", async () => {
+    // The embedded list is capped and cannot be paged, so the cap must not read
+    // as the whole roster.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              attributes: { email: "maya@acme.com" },
+              teams: [{ id: "team_1", name: "Acme Web", membership_status: "active" }],
+              teams_truncated: true,
+            },
+          ],
+        }),
+      ),
+    );
+    await renderUsers();
+
+    // Asserted as two nodes, which is the point: the marker sits outside the
+    // truncating span so CSS cannot clip it off the end of a long roster.
+    const row = (await screen.findByRole("link", { name: "maya@acme.com" })).closest("tr");
+    expect(row).not.toBeNull();
+    const cell = within(row as HTMLElement);
+    expect(cell.getByRole("link", { name: "Acme Web" })).toBeInTheDocument();
+    // Not a link: the response carries the capped list and a boolean, not the
+    // names past the cap, and the user detail screen does not list teams yet.
+    const marker = cell.getByText("+more");
+    expect(marker.closest("a")).toBeNull();
+    expect(marker).toHaveClass("shrink-0");
+    expect(marker.className).not.toMatch(/truncate/);
+  });
+
+  it("drops the Team column when the credential may not read memberships", async () => {
+    // `expand: ["teams"]` needs `team_membership.read` on top of `user.read`,
+    // and the refusal covers the whole request. Losing the column is the honest
+    // outcome; losing the users is not.
+    const bodies = recordQueries((body) =>
+      body.expand
+        ? HttpResponse.json({ message: "not permitted" }, { status: 403 })
+        : HttpResponse.json({ users: [{ id: "user_1", attributes: { email: "maya@acme.com" } }] }),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("maya@acme.com")).toBeInTheDocument();
+    expect(table.queryByText("Team")).not.toBeInTheDocument();
+    // The retry drops the expansion rather than the request.
+    expect(bodies).toHaveLength(2);
+    expect(bodies.at(-1)).not.toHaveProperty("expand");
   });
 });
