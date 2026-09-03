@@ -231,14 +231,18 @@ POST /flow/{id}/submit          # submit the current step
 Flow definition management:
 
 ```http
-POST   /flow_definitions
-GET    /flow_definitions
-GET    /flow_definitions/{id}
-PUT    /flow_definitions/{id}
-DELETE /flow_definitions/{id}
+POST /flow_definitions          # publish a new revision
+GET  /flow_definitions?project_id=…&name=…
+GET  /flow_definitions/{id}
 # planned: POST /flow_definitions/{id}/validate
 # planned: POST /flow_definitions/{id}/simulate
 ```
+
+A flow definition is an immutable revision ([ADR 035](../../adrs/035-configuration-environments.md)):
+every `POST` assigns a new id, a repeated `name` is a new revision of that
+flow, and the `name` filter lists one flow's revisions newest first. There
+is no update or delete; retirement waits for releases
+([#536](https://github.com/zitadel/nextgen/issues/536)).
 
 ---
 
