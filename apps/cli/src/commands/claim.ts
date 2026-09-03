@@ -308,10 +308,14 @@ function expiredError(message: string): ZitadelError {
   });
 }
 
-/** Loopback check on the URL's hostname; `[::1]` is how WHATWG URLs spell IPv6 loopback. */
+/**
+ * Loopback check on the URL's hostname: `localhost`, the whole `127.0.0.0/8`
+ * block, or `[::1]` (how WHATWG URLs spell IPv6 loopback).
+ */
 function isLoopbackUrl(value: string): boolean {
   try {
-    return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(value).hostname);
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
   } catch {
     return false;
   }

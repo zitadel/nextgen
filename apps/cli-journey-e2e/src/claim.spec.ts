@@ -31,6 +31,7 @@ test("zitadel claim completes against the local server's own console", async ({ 
     outputDir: string;
     preset: string | null;
     registryUrl: string;
+    runtime: string;
   };
   test.skip(metadata.framework !== "next", "claim is framework-independent; next lane only");
   test.skip(
@@ -40,6 +41,10 @@ test("zitadel claim completes against the local server's own console", async ({ 
   test.skip(
     process.env.JOURNEY_PREEXISTING_APP === "1",
     "the fresh-app lane already proves claim; keep the preexisting lane lean",
+  );
+  test.skip(
+    metadata.runtime === "docker",
+    "the harness bootstrap env does not reach the docker container, so claim completion 401s there",
   );
   if (!metadata.localRuntimeUrl) throw new Error("metadata.json has no localRuntimeUrl");
   const serverOrigin = new URL(metadata.localRuntimeUrl).origin;
@@ -103,8 +108,11 @@ test("zitadel claim completes against the local server's own console", async ({ 
     // place, and the page completes the claim on its own.
     await expect(page.getByText("Project claimed")).toBeVisible({ timeout: 60_000 });
 
-    // CLI leg: the poll sees the completion and exits cleanly.
-    const [exitCode] = (await once(cli, "exit")) as [number | null];
+    // CLI leg: the poll sees the completion and exits cleanly. The child may
+    // have exited while the browser leg ran, so read the buffered exit code
+    // before subscribing — a late `once` would wait forever.
+    const exitCode =
+      cli.exitCode ?? ((await once(cli, "exit")) as [number | null])[0];
     expect(exitCode, `CLI output was:\n${output}`).toBe(0);
   } finally {
     if (cli.exitCode === null) cli.kill("SIGTERM");
