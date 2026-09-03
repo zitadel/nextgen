@@ -31,14 +31,15 @@ One `jobs` table. Columns (logical; DDL is dialect-owned):
 | `name` | handler to run. Not unique. Many queued rows share one `name`. |
 | `payload` | opaque bytes; empty for sweeps. |
 | `unique_key` | uniqueness constraint, nullable. `UNIQUE` where not null (multiple nulls allowed). Periodic: required, equal to `name`. Queued: optional (set for idempotent enqueue). |
-| `run_at` | due instant (database clock). |
+| `run_at` | do not start before (database clock). |
+| `not_after` | do not start after (database clock). Nullable. Same type as `run_at`. Periodic: always null. Queued: optional; copy the payload’s useful life (verification-code expiry, magic-link TTL). |
 | `period` | set on unique periodic rows; null on queued rows. |
 | `claimed_until`, `claimed_by` | lease. |
 | `attempt`, `last_error` | retry bookkeeping. |
 | `status` | `pending`, `claimed`, `done`, `dead`. |
 | `completed_at` | set when moving to `done` or `dead`. |
 
-`Claim` selects `pending` (or lease expired) with `run_at <= now()`, ordered by `run_at`, and ignores `done`/`dead`.
+`Claim` selects `pending` (or lease expired) with `run_at <= now()` and `(not_after IS NULL OR not_after > now())`, ordered by `run_at`, and ignores `done`/`dead`.
 
 ### 1. Two row kinds, one `ORDER BY run_at`
 
@@ -85,7 +86,11 @@ Complete:
 - Queued success → `done` + `completed_at`.
 - Periodic success → same unique row, lease cleared, `run_at = now() + period` (skip missed beats, not `run_at + period`). No history row.
 
-Fail: backoff then `dead`. A unique periodic row must not stay leased forever (otherwise that sweep never runs again).
+Fail: backoff then `dead`. A unique periodic row must not stay leased forever (otherwise that sweep never runs again). Retry that would next run at or after `not_after` goes `dead` instead of rescheduling.
+
+Past-`not_after` rows are not Performed. Mark them `dead` (with `completed_at`) rather than leaving them pending. A reclaimed lease after the deadline must not Perform.
+
+`not_after` is an engine filter, not domain truth. Perform still no-ops if the live entity is gone, used, or rotated.
 
 An expired lease makes the row claimable again. Delivery is at-least-once. Handlers must be idempotent: a crash after a side effect and before Complete retries the same row.
 
@@ -97,7 +102,7 @@ The Go API is `time.Duration`. Column types follow sessions: Postgres `INTERVAL`
 
 ### 5. Periodic jobs are one unique row
 
-Uniqueness is the `unique_key` column, not `name`. Periodic registration sets `unique_key = name` (for example both `jobs.gc`) and a non-null `period`. Boot upserts on that key. Config (viper) remains the knob; replicas overwrite `period` from config. The row is the shared cursor, not a second config store.
+Uniqueness is the `unique_key` column, not `name`. Periodic registration sets `unique_key = name` (for example both `jobs.gc`), a non-null `period`, and `not_after` null. Missed beats already skip via `run_at = now() + period`. Boot upserts on that key. Config (viper) remains the knob; replicas overwrite `period` from config. The row is the shared cursor, not a second config store.
 
 `period` lives on the row so Complete can reschedule in SQL without the completing replica’s in-memory catalog.
 
@@ -109,13 +114,15 @@ A service calls `Enqueue` on the statements of the transaction that wrote the en
 
 Queued rows share `name` (`email.send`) and usually leave `unique_key` null — each Enqueue inserts. If `unique_key` is set (for example `email.send:{user_id}:welcome`), Enqueue is idempotent: a conflict keeps the existing row.
 
+Enqueue may set `not_after` from the entity TTL in the same transaction (do not send a verification mail after the code is dead).
+
 ### 7. Retain, then `jobs.gc`; metrics instead of a dead-letter table
 
-`done` and `dead` linger until unique periodic `jobs.gc` deletes them by `completed_at` older than a retain window (time-only, same idea as [ADR 049](049-events-api-retention-export.md)).
+`done` and `dead` linger until unique periodic `jobs.gc` deletes them by `completed_at` older than a retain window (time-only, same idea as [ADR 049](049-events-api-retention-export.md)). `jobs.gc` also drops leftover `pending` rows with `not_after < now()` if Claim did not mark them `dead`.
 
 No dead-letter table. `dead` stays queryable until GC.
 
-The engine emits at least: claimed, completed, failed, dead, perform duration, claim lag (`now() - run_at` at claim).
+The engine emits at least: claimed, completed, failed, dead, perform duration, claim lag (`now() - run_at` at claim), `jobs_expired_unrun` (skipped because `not_after` had passed).
 
 ### 8. Every replica runs the loop; the lease is the lock
 
@@ -175,7 +182,7 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 
 ### Testing
 
-- [`stmttest`](../../internal/storage/stmttest/) owns Claim, unique keys, lease expiry, enqueue-in-tx, and periodic reschedule across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)).
+- [`stmttest`](../../internal/storage/stmttest/) owns Claim, unique keys, lease expiry, enqueue-in-tx, periodic reschedule, Claim skipping `not_after <= now()`, and Fail-to-dead when retry would miss `not_after`, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)).
 - The engine loop is tested against a fake `JobStatements` (or sqlite only), not a second backend × three-dialect matrix.
 
 ## Alternatives considered
