@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 	"time"
@@ -464,7 +466,7 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	if err := v.Unmarshal(&cfg, viper.DecodeHook(textUnmarshalerDecodeHook)); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
 	// Create the data dir configuration actually selected, not the default
@@ -480,6 +482,62 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, cfg.Validate()
+}
+
+// textUnmarshalerDecodeHook enables mapstructure to use types that implement
+// encoding.TextUnmarshaler, allowing viper to accept string values for enums
+// and other custom types that support text unmarshalling. This enables config
+// files and environment variables to use string names (e.g., "debug", "json")
+// instead of just integers.
+func textUnmarshalerDecodeHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String {
+		return data, nil
+	}
+
+	str, ok := data.(string)
+	if !ok {
+		return data, nil
+	}
+
+	// Check if the target type or its pointer implements TextUnmarshaler
+	textUnmarshalerType := reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+
+	// For non-pointer types, check if pointer to type implements TextUnmarshaler
+	var ptrType reflect.Type
+	if t.Kind() == reflect.Ptr {
+		ptrType = t
+	} else {
+		ptrType = reflect.PointerTo(t)
+	}
+
+	if !ptrType.Implements(textUnmarshalerType) {
+		return data, nil
+	}
+
+	// Create a pointer instance and call UnmarshalText
+	var instance reflect.Value
+	if t.Kind() == reflect.Ptr {
+		instance = reflect.New(t.Elem())
+	} else {
+		instance = reflect.New(t)
+	}
+
+	// Call UnmarshalText on the instance
+	method := instance.MethodByName("UnmarshalText")
+	if !method.IsValid() {
+		return data, nil
+	}
+
+	results := method.Call([]reflect.Value{reflect.ValueOf([]byte(str))})
+	if len(results) > 0 && !results[len(results)-1].IsNil() {
+		return data, results[len(results)-1].Interface().(error)
+	}
+
+	// Return the unmarshalled value
+	if t.Kind() == reflect.Ptr {
+		return instance.Interface(), nil
+	}
+	return instance.Elem().Interface(), nil
 }
 
 // mustBindEnv panics on viper's documented "this can't fail in
