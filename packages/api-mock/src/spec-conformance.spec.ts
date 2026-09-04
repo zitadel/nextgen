@@ -890,7 +890,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(() => new URL(secondBody.details.dashboard_url as string)).not.toThrow();
   });
 
-  test("a completed challenge still returns 410 from status once expired", async () => {
+  // Mirrors the server: the grant is the claim source of truth, so a claim
+  // that landed stays reported as completed even after its challenge's TTL.
+  test("a completed claim stays completed on status past challenge expiry", async () => {
     const project = await createProject("claim-completed-expired");
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
@@ -904,8 +906,36 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
     expireClaimChallenge(challenge_id);
     const status = await claimStatus(project.id, challenge_id, project.projectSecret);
-    expect(status.status).toBe(410);
+    expect(status.status).toBe(200);
     const statusBody = (await status.json()) as Record<string, unknown>;
-    expect(statusBody.code).toBe("proj.claim_expired");
+    expect(statusBody.status).toBe("completed");
+    expect(typeof statusBody.team_id).toBe("string");
+  });
+
+  // The grant, not the polled challenge, is the truth: a poll on a pending
+  // challenge whose project was claimed through ANOTHER challenge reports
+  // completed with the owning team, even once the claim window has closed —
+  // never a false "can no longer be claimed" verdict.
+  test("a pending challenge on a project claimed elsewhere reports completed", async () => {
+    const project = await createProject("claim-cross-challenge-status");
+    const first = await initClaim(project.id, project.projectSecret);
+    const { challenge_id: polled } = (await first.json()) as { challenge_id: string };
+    const second = await initClaim(project.id, project.projectSecret);
+    const { challenge_id: winner } = (await second.json()) as { challenge_id: string };
+
+    const cookie = await platformSessionCookie();
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id: winner }),
+    });
+    expect(complete.status).toBe(200);
+    expireClaimWindow(project.id);
+
+    const status = await claimStatus(project.id, polled, project.projectSecret);
+    expect(status.status).toBe(200);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.status).toBe("completed");
+    expect(typeof statusBody.team_id).toBe("string");
   });
 });
