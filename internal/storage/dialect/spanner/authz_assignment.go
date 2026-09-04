@@ -147,7 +147,7 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 		return nil, wrapError(err)
 	}
 	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
 		return nil, err
 	}
 	var assignments []*domain.AuthzAssignment
@@ -162,7 +162,7 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 	nextCursor := pagination.MarshalNext(
 		filter.Pagination.OrderBy,
 		assignments,
-		authzAssignmentSchema,
+		authz.AuthzAssignmentSchema,
 		filter.Pagination.Limit,
 	)
 	return &database.ListResult[*domain.AuthzAssignment]{
@@ -170,6 +170,7 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 		NextCursor: nextCursor,
 	}, nil
 }
+
 func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	stmt := buildStatement(revokeAuthzAssignmentStmt, projectID, id).statement()
 	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
@@ -268,44 +269,5 @@ func owningTeamKey(a *domain.AuthzAssignment) *string {
 	key := a.ProjectID
 	return &key
 }
-
-var authzAssignmentSchema = database.NewSchema(map[domain.AuthzAssignmentField]database.FieldBinding[domain.AuthzAssignment]{
-	domain.AuthzAssignmentFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(a *domain.AuthzAssignment) any { return a.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.AuthzAssignmentFieldID: {
-		SQLName:  "id",
-		Accessor: func(a *domain.AuthzAssignment) any { return a.ID },
-		Coerce:   database.CoerceString,
-	},
-	domain.AuthzAssignmentFieldPrincipalType: {
-		SQLName:  "principal_type",
-		Accessor: func(a *domain.AuthzAssignment) any { return a.PrincipalType.String() },
-		Coerce:   database.CoerceString,
-	},
-	domain.AuthzAssignmentFieldPrincipalID: {
-		SQLName:  "principal_id",
-		Accessor: func(a *domain.AuthzAssignment) any { return a.PrincipalID },
-		Coerce:   database.CoerceString,
-	},
-	domain.AuthzAssignmentFieldRelation: {
-		SQLName:  "relation",
-		Accessor: func(a *domain.AuthzAssignment) any { return a.Relation },
-		Coerce:   database.CoerceString,
-	},
-	domain.AuthzAssignmentFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(a *domain.AuthzAssignment) any { return a.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.AuthzAssignmentFieldExpiresAt: {
-		SQLName:  "expires_at",
-		Accessor: func(a *domain.AuthzAssignment) any { return database.NullableValue(a.ExpiresAt) },
-		Coerce:   database.CoerceTime,
-		Nullable: true,
-	},
-})
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
