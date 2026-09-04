@@ -48,8 +48,9 @@ export class ClaimCheck implements SanityCheck {
 
     if (state.kind === "detached") {
       // The window classification travels in `details` so the doctor
-      // envelope's advisory can stop advertising `zitadel claim` once the
-      // server is guaranteed to refuse it.
+      // envelope's advisory can switch to the same reconciliation wording;
+      // the claim command itself stays suggested either way, since the local
+      // record may be stale and the server answers authoritatively.
       const message = state.claimable
         ? "This project is temporary until you attach it to a team, and claiming is only " +
           `possible within ${CLAIM_WINDOW_DAYS} days of creation. Run \`zitadel claim\` ` +

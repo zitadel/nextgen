@@ -230,8 +230,10 @@ function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion:
   // Additive to the journey staging rather than a stage of its own: attaching a
   // team is orthogonal to whether login works yet, so it appends to whichever
   // stage the user is in instead of displacing it. A closed window flips the
-  // nudge to the no-retry wording: advertising `claim` there would suggest a
-  // command the server is guaranteed to refuse.
+  // nudge to reconciliation wording, which still tells the user to run
+  // `claim`: the local record may be stale (claimed from another machine
+  // reads detached), and the server resolves the grant before the window,
+  // so the command is the authoritative check, never a guaranteed failure.
   const claim =
     project.claim?.kind === "detached"
       ? project.claim.claimable
