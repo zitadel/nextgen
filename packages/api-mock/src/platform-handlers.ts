@@ -177,6 +177,7 @@ type FlowDefinitionRecord = {
   status: string;
   createdAt: string;
   updatedAt: string;
+  seq: number;
   body: Record<string, unknown>;
 };
 
@@ -191,6 +192,7 @@ type SchemaRecord = {
   projectId: string;
   objectType?: string;
   createdAt: string;
+  seq: number;
   body: GetSchemaById200Schema;
 };
 
@@ -224,6 +226,11 @@ type Store = {
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   claimChallenges: Map<string, ClaimChallengeRecord>;
   claims: Map<string, ClaimRecord>;
+  // Publication order. `nowIso()` is millisecond-resolution and ids are
+  // random, so two records minted back to back would tie with nothing to say
+  // which came first. Only some server dialects mint time-ordered ids, so
+  // this stands in for the id tiebreak rather than reproducing it.
+  lastSeq: number;
 };
 
 function makeStore(): Store {
@@ -233,6 +240,7 @@ function makeStore(): Store {
     flowDefinitions: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
+    lastSeq: 0,
   };
 }
 
@@ -279,15 +287,17 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     projectId: projectID,
     objectType: schemaObjectType(body),
     createdAt,
+    seq: ++store.lastSeq,
     body,
   });
-  const id = `flow_${shortId()}`;
+  const id = `flowdef_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
     projectId: projectID,
     status: "active",
     createdAt,
     updatedAt: createdAt,
+    seq: ++store.lastSeq,
     body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
   });
 }
@@ -303,19 +313,17 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
 }
 
 /**
- * `created_at DESC, id DESC`, the order the server lists in. The comparator has
- * to be a total order: `createdAt` is millisecond-resolution here, so two
- * schemas can share one, and a tie that resolved arbitrarily would let
- * `revisions=latest` pick a different revision from one call to the next.
+ * `created_at DESC, id DESC`, the order the server lists in. `seq` stands in
+ * for the id tiebreak.
  */
-function compareSchemasNewestFirst(a: SchemaRecord, b: SchemaRecord): number {
+function compareNewestFirst(
+  a: { createdAt: string; seq: number },
+  b: { createdAt: string; seq: number },
+): number {
   if (a.createdAt !== b.createdAt) {
     return a.createdAt < b.createdAt ? 1 : -1;
   }
-  if (a.id === b.id) {
-    return 0;
-  }
-  return a.id < b.id ? 1 : -1;
+  return b.seq - a.seq;
 }
 
 /**
@@ -711,6 +719,7 @@ export function setupPlatformHandlers() {
         projectId: query.data.project_id,
         objectType: schemaObjectType(schemaBody),
         createdAt: nowIso(),
+        seq: ++store.lastSeq,
         body: schemaBody,
       });
       const responseBody: CreateSchema201 = { id };
@@ -730,7 +739,7 @@ export function setupPlatformHandlers() {
       const matching = [...store.schemas.values()]
         .filter((r) => r.projectId === query.data.project_id)
         .filter((r) => !query.data.object_type || r.objectType === query.data.object_type)
-        .sort(compareSchemasNewestFirst);
+        .sort(compareNewestFirst);
       // The server's anti-join repeats none of the caller's filters, and only
       // object_type can correlate a suppressing row — so narrowing by
       // object_type before selecting the latest is equivalent, while narrowing
@@ -820,7 +829,7 @@ export function setupPlatformHandlers() {
         return invalid;
       }
 
-      const id = `flow_${shortId()}`;
+      const id = `flowdef_${shortId()}`;
       const now = nowIso();
       const record: FlowDefinitionRecord = {
         id,
@@ -828,6 +837,7 @@ export function setupPlatformHandlers() {
         status: "active",
         createdAt: now,
         updatedAt: now,
+        seq: ++store.lastSeq,
         body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
@@ -845,9 +855,13 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
+      // Newest by creation first, matching the server's
+      // `created_at DESC, id DESC`.
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()]
           .filter((record) => record.projectId === query.data.project_id)
+          .filter((record) => !query.data.name || record.body.name === query.data.name)
+          .sort(compareNewestFirst)
           .map(flowResponse),
         next_page_token: null,
       };
