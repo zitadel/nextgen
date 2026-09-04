@@ -3,7 +3,9 @@
 package stmttest
 
 import (
+	"cmp"
 	"context"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -16,6 +18,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
 func sampleFlowDefinition(projectID, id, name string) *domain.FlowDefinition {
@@ -66,6 +69,8 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
+		t.Run("environments", func(t *testing.T) { battleEnvironments(t, d) })
+		t.Run("releases", func(t *testing.T) { battleReleases(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -264,6 +269,52 @@ func battleBrandings(t *testing.T, d dialect) {
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListBrandings(unfilteredListCtx(t), opts)
 		}, func(b *domain.Branding) string { return b.ID })
+		assertDrainMatch(t, want, got)
+	})
+}
+
+func battleEnvironments(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureEnvironmentProject(t, d.stmts)
+	// Five names, not the three seeded ones: drainIncarnation needs more rows
+	// than the emission limit so the last page is short. Created out of order
+	// and collected in name order, because that is the order the list returns.
+	names := []string{"staging", "dev", "sandbox", "prod", "preview"}
+	byName := make(map[string]string, len(names))
+	for _, name := range names {
+		byName[name] = createEnvironment(t, d.stmts, projectID, name).ID
+	}
+	want := make([]string, 0, len(names))
+	for _, name := range slices.Sorted(maps.Keys(byName)) {
+		want = append(want, byName[name])
+	}
+	filter := database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID)
+	orderAsc := database.OrderBy[domain.EnvironmentField]{
+		Columns:   []database.Column[domain.EnvironmentField]{database.Col(domain.EnvironmentFieldName)},
+		Direction: database.OrderAsc,
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error) {
+		return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(e *domain.Environment) string { return e.ID }, 2)
+
+	t.Run("name_order_helper", func(t *testing.T) {
+		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Environment], error) {
+			return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
+				Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
+				Pagination: database.Page[domain.EnvironmentField]{
+					Limit:  2,
+					Cursor: cursor,
+					OrderBy: database.OrderBy[domain.EnvironmentField]{
+						Columns: []database.Column[domain.EnvironmentField]{
+							database.Col(domain.EnvironmentFieldName),
+						},
+						Direction: database.OrderAsc,
+					},
+				},
+			})
+		}, func(e *domain.Environment) string { return e.ID })
 		assertDrainMatch(t, want, got)
 	})
 }
@@ -496,4 +547,48 @@ func battleUserTeams(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(ut *domain.UserTeam) string { return ut.TeamID }, 2)
+}
+
+func battleReleases(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureReleaseProject(t, d.stmts)
+	// Five distinct pinned sets, not five copies of one: the content hash is
+	// unique per project, so repeating a set would be rejected by the index
+	// rather than giving the drain another row to page over.
+	created := make([]*domain.Release, 0, 5)
+	for i := range 5 {
+		created = append(created, createRelease(t, d.stmts, projectID, string(rune('a'+i)), domain.ReleaseMetadata{}))
+	}
+	// drainIncarnation compares the paged ids against this slice in order, so
+	// it has to be the order the query produces rather than the order the rows
+	// were written. Two releases can land on the same created_at, and the id
+	// that breaks that tie is a UUID on Spanner — unrelated to insertion
+	// order. Sort by the same key the index does.
+	slices.SortFunc(created, func(a, b *domain.Release) int {
+		return cmp.Or(
+			a.CreatedAt.Compare(b.CreatedAt),
+			cmp.Compare(a.ID, b.ID),
+		)
+	})
+	want := make([]string, 0, len(created))
+	for _, entity := range created {
+		want = append(want, entity.ID)
+	}
+	filter := database.Equal(database.Col(domain.ReleaseFieldProjectID), projectID)
+	orderAsc := release.NewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
+		return d.stmts.ListReleases(unfilteredListCtx(t), &database.ListOptions[domain.ReleaseField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(r *domain.Release) string { return r.ID }, 2)
+
+	t.Run("newest_first_helper", func(t *testing.T) {
+		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Release], error) {
+			opts := release.ListOptions(projectID, 2)
+			opts.Pagination.Cursor = cursor
+			return d.stmts.ListReleases(unfilteredListCtx(t), opts)
+		}, func(r *domain.Release) string { return r.ID })
+		assertDrainMatch(t, want, got)
+	})
 }

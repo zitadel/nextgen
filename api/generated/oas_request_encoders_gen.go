@@ -94,8 +94,36 @@ func encodeCreateFlowDefinitionRequest(
 	return nil
 }
 
+func encodeCreateGrantRequest(
+	req *CreateGrantRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateProjectRequest(
 	req *CreateProjectRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateReleaseRequest(
+	req *CreateReleaseRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -250,6 +278,20 @@ func encodeQuerySessionsRequest(
 
 func encodeQueryTeamsRequest(
 	req *QueryTeamsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryUsersRequest(
+	req *QueryUsersRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

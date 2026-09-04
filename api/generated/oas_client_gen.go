@@ -94,6 +94,17 @@ type Invoker interface {
 	//
 	// POST /flow_definitions
 	CreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
+	// CreateGrant invokes createGrant operation.
+	//
+	// Bind a user or team to `project.viewer`, `project.editor`, or
+	// `project.admin` on the project identified by the `project-id` header.
+	// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
+	// created here — claim owns that path. An unrevoked grant with the same
+	// principal and relation occupies the unique key even after `expires_at`;
+	// DELETE it before re-creating.
+	//
+	// POST /grants
+	CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
 	// CreateHandoff invokes createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -113,6 +124,23 @@ type Invoker interface {
 	//
 	// POST /projects
 	CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error)
+	// CreateRelease invokes createRelease operation.
+	//
+	// Bundles a release from revisions that already exist, supplied as
+	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
+	// per-kind create endpoints for that, then pin the ids here.
+	// Every referenced `revision_id` must exist in the project. Each one's handle
+	// is read from the revision itself and recorded on the release, so a resource
+	// is always pinned under the identity it declares.
+	// Creating a release does not deploy it. A release is environment-agnostic
+	// and the same release can later be deployed to any number of environments
+	// unchanged.
+	// Idempotent on the pinned set: metadata is excluded from the comparison, so
+	// re-submitting the same revisions with a different `message` returns the
+	// release that already pins them rather than creating a second one.
+	//
+	// POST /releases
+	CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
 	// CreateSchema invokes createSchema operation.
 	//
 	// Create a new schema. The optional `$id` field is the JSON Schema document
@@ -169,6 +197,15 @@ type Invoker interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteGrant invokes deleteGrant operation.
+	//
+	// Soft-revokes a grant this API manages and emits `authz.revoked`.
+	// Already-revoked, missing, project-secret setup, and owning-team grants
+	// return 404. The row is not un-revoked. Expired grants can still be
+	// revoked so the unique binding can be reused.
+	//
+	// DELETE /grants/{id}
+	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
 	// DeleteTeam invokes deleteTeam operation.
 	//
 	// Deactivates the team.
@@ -241,6 +278,14 @@ type Invoker interface {
 	//
 	// GET /projects/{project_id}/claim/status
 	GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (GetClaimStatusRes, error)
+	// GetEnvironmentByName invokes getEnvironmentByName operation.
+	//
+	// Reads one environment of the project by its name.
+	// The lookup is scoped to the project in `project_id`: a name that exists in
+	// another project answers `env.not_found` exactly as an unused name does.
+	//
+	// GET /environments/{name}
+	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
 	// GetEvent invokes getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -263,6 +308,19 @@ type Invoker interface {
 	//
 	// GET /flow/{id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
+	// GetGrant invokes getGrant operation.
+	//
+	// Loads a grant by `(project_id, id)` that this API manages (user or team
+	// bound to viewer, editor, or admin) and that has not been revoked.
+	// "Active" here means not revoked: expired grants stay visible so the
+	// client can DELETE before re-granting the same binding. Authorization
+	// still ignores expired grants. Grants are not registered in
+	// `resource_scope_index`; project scope is required on the query (same as
+	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
+	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	//
+	// GET /grants/{id}
+	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
 	// GetHealth invokes getHealth operation.
 	//
 	// Check whether the server is healthy.
@@ -303,6 +361,19 @@ type Invoker interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetReleaseById invokes getReleaseById operation.
+	//
+	// Reads one release: its metadata and the `(kind, handle, revision_id)`
+	// tuples it pins.
+	// Does not embed resource content. Resolve each `revision_id` through the
+	// per-kind read endpoints when the bytes are needed.
+	// The lookup is scoped to the project in `project_id`: a release id belonging
+	// to another project answers not found exactly as an unknown id does, so the
+	// endpoint cannot be used to probe for releases in projects the caller cannot
+	// read.
+	//
+	// GET /releases/{release_id}
+	GetReleaseById(ctx context.Context, params GetReleaseByIdParams) (GetReleaseByIdRes, error)
 	// GetSchemaById invokes getSchemaById operation.
 	//
 	// Get a schema by its ID. A schema ID identifies one immutable revision, so
@@ -363,6 +434,12 @@ type Invoker interface {
 	//
 	// GET /branding
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
+	// ListEnvironments invokes listEnvironments operation.
+	//
+	// Lists the project's environments ordered by name.
+	//
+	// GET /environments
+	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
 	// ListEvents invokes listEvents operation.
 	//
 	// Returns project-scoped audit events, newest-first by keyset on
@@ -384,6 +461,14 @@ type Invoker interface {
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListReleases invokes listReleases operation.
+	//
+	// Lists the project's releases, newest first.
+	// Entries carry metadata only — the pinned set is omitted. Read one release
+	// with `GET /releases/{release_id}` to get its pointers.
+	//
+	// GET /releases
+	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
 	// ListSchemas invokes listSchemas operation.
 	//
 	// Retrieve a list of all schemas available in the system. This endpoint
@@ -408,12 +493,6 @@ type Invoker interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
-	// ListUsers invokes listUsers operation.
-	//
-	// List users.
-	//
-	// GET /users
-	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// PatchProject invokes patchProject operation.
 	//
 	// Updates the state of a project.
@@ -440,6 +519,15 @@ type Invoker interface {
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
+	// QueryUsers invokes queryUsers operation.
+	//
+	// Returns the users of a project, paginated with a cursor.
+	// The project comes from the credential, not from a parameter: the operation
+	// is bound to the token's own project by construction. This is why it takes
+	// no `project_id`, unlike the other query endpoints.
+	//
+	// POST /users/query
+	QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -1339,6 +1427,151 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 	return result, nil
 }
 
+// CreateGrant invokes createGrant operation.
+//
+// Bind a user or team to `project.viewer`, `project.editor`, or
+// `project.admin` on the project identified by the `project-id` header.
+// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
+// created here — claim owns that path. An unrevoked grant with the same
+// principal and relation occupies the unique key even after `expires_at`;
+// DELETE it before re-creating.
+//
+// POST /grants
+func (c *Client) CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error) {
+	res, err := c.sendCreateGrant(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (res CreateGrantRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createGrant"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/grants"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateGrantOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/grants"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateGrantRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CreateGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateGrantResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // CreateHandoff invokes createHandoff operation.
 //
 // Completes the authentication attempt and mints a `handoff_token`.
@@ -1562,6 +1795,157 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateProjectResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// CreateRelease invokes createRelease operation.
+//
+// Bundles a release from revisions that already exist, supplied as
+// `(kind, revision_id)` pairs. No new revisions are allocated — use the
+// per-kind create endpoints for that, then pin the ids here.
+// Every referenced `revision_id` must exist in the project. Each one's handle
+// is read from the revision itself and recorded on the release, so a resource
+// is always pinned under the identity it declares.
+// Creating a release does not deploy it. A release is environment-agnostic
+// and the same release can later be deployed to any number of environments
+// unchanged.
+// Idempotent on the pinned set: metadata is excluded from the comparison, so
+// re-submitting the same revisions with a different `message` returns the
+// release that already pins them rather than creating a second one.
+//
+// POST /releases
+func (c *Client) CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
+	res, err := c.sendCreateRelease(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendCreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (res CreateReleaseRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/releases"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/releases"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateReleaseRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CreateReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateReleaseResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -2292,6 +2676,155 @@ func (c *Client) sendDeleteFlowDefinition(ctx context.Context, params DeleteFlow
 
 	stage = "DecodeResponse"
 	result, err := decodeDeleteFlowDefinitionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// DeleteGrant invokes deleteGrant operation.
+//
+// Soft-revokes a grant this API manages and emits `authz.revoked`.
+// Already-revoked, missing, project-secret setup, and owning-team grants
+// return 404. The row is not un-revoked. Expired grants can still be
+// revoked so the unique binding can be reused.
+//
+// DELETE /grants/{id}
+func (c *Client) DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error) {
+	res, err := c.sendDeleteGrant(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) (res DeleteGrantRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("deleteGrant"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.URLTemplateKey.String("/grants/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, DeleteGrantOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/grants/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "DELETE", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, DeleteGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeDeleteGrantResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -3286,6 +3819,157 @@ func (c *Client) sendGetClaimStatus(ctx context.Context, params GetClaimStatusPa
 	return result, nil
 }
 
+// GetEnvironmentByName invokes getEnvironmentByName operation.
+//
+// Reads one environment of the project by its name.
+// The lookup is scoped to the project in `project_id`: a name that exists in
+// another project answers `env.not_found` exactly as an unused name does.
+//
+// GET /environments/{name}
+func (c *Client) GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error) {
+	res, err := c.sendGetEnvironmentByName(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (res GetEnvironmentByNameRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getEnvironmentByName"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/environments/{name}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetEnvironmentByNameOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/environments/"
+	{
+		// Encode "name" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "name",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.Name); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetEnvironmentByNameOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetEnvironmentByNameResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // GetEvent invokes getEvent operation.
 //
 // Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -3662,6 +4346,159 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 
 	stage = "DecodeResponse"
 	result, err := decodeGetFlowStepResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetGrant invokes getGrant operation.
+//
+// Loads a grant by `(project_id, id)` that this API manages (user or team
+// bound to viewer, editor, or admin) and that has not been revoked.
+// "Active" here means not revoked: expired grants stay visible so the
+// client can DELETE before re-granting the same binding. Authorization
+// still ignores expired grants. Grants are not registered in
+// `resource_scope_index`; project scope is required on the query (same as
+// events). Misses, revoked rows, project-secret setup (`sk_proj`),
+// owning-team (`relation=team`) rows, and cross-project ids return 404.
+//
+// GET /grants/{id}
+func (c *Client) GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error) {
+	res, err := c.sendGetGrant(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res GetGrantRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getGrant"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/grants/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetGrantOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/grants/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetGrantResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -4230,6 +5067,162 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 	stage = "DecodeResponse"
 	result, err := decodeGetReadyResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetReleaseById invokes getReleaseById operation.
+//
+// Reads one release: its metadata and the `(kind, handle, revision_id)`
+// tuples it pins.
+// Does not embed resource content. Resolve each `revision_id` through the
+// per-kind read endpoints when the bytes are needed.
+// The lookup is scoped to the project in `project_id`: a release id belonging
+// to another project answers not found exactly as an unknown id does, so the
+// endpoint cannot be used to probe for releases in projects the caller cannot
+// read.
+//
+// GET /releases/{release_id}
+func (c *Client) GetReleaseById(ctx context.Context, params GetReleaseByIdParams) (GetReleaseByIdRes, error) {
+	res, err := c.sendGetReleaseById(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetReleaseById(ctx context.Context, params GetReleaseByIdParams) (res GetReleaseByIdRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getReleaseById"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/releases/{release_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetReleaseByIdOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/releases/"
+	{
+		// Encode "release_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "release_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ReleaseID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetReleaseByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetReleaseByIdResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -5210,6 +6203,174 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 	return result, nil
 }
 
+// ListEnvironments invokes listEnvironments operation.
+//
+// Lists the project's environments ordered by name.
+//
+// GET /environments
+func (c *Client) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error) {
+	res, err := c.sendListEnvironments(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListEnvironments(ctx context.Context, params ListEnvironmentsParams) (res ListEnvironmentsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listEnvironments"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/environments"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListEnvironmentsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/environments"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListEnvironmentsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListEnvironmentsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // ListEvents invokes listEvents operation.
 //
 // Returns project-scoped audit events, newest-first by keyset on
@@ -5770,6 +6931,32 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "expand" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Expand != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Expand {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -5821,6 +7008,176 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 
 	stage = "DecodeResponse"
 	result, err := decodeListFlowDefinitionsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListReleases invokes listReleases operation.
+//
+// Lists the project's releases, newest first.
+// Entries carry metadata only — the pinned set is omitted. Read one release
+// with `GET /releases/{release_id}` to get its pointers.
+//
+// GET /releases
+func (c *Client) ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error) {
+	res, err := c.sendListReleases(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams) (res ListReleasesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listReleases"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/releases"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListReleasesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/releases"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListReleasesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListReleasesResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -6399,157 +7756,6 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 	return result, nil
 }
 
-// ListUsers invokes listUsers operation.
-//
-// List users.
-//
-// GET /users
-func (c *Client) ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error) {
-	res, err := c.sendListUsers(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res ListUsersRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listUsers"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/users"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, ListUsersOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [1]string
-	pathParts[0] = "/users"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "limit" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "limit",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
-				}
-				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "page_token" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "page_token",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.PageToken.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, ListUsersOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeListUsersResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
 // PatchProject invokes patchProject operation.
 //
 // Updates the state of a project.
@@ -7075,6 +8281,128 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryTeamsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// QueryUsers invokes queryUsers operation.
+//
+// Returns the users of a project, paginated with a cursor.
+// The project comes from the credential, not from a parameter: the operation
+// is bound to the token's own project by construction. This is why it takes
+// no `project_id`, unlike the other query endpoints.
+//
+// POST /users/query
+func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error) {
+	res, err := c.sendQueryUsers(ctx, request)
+	return res, err
+}
+
+func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest) (res QueryUsersRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("queryUsers"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/users/query"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, QueryUsersOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/users/query"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeQueryUsersRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, QueryUsersOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeQueryUsersResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

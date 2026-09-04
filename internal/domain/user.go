@@ -62,6 +62,28 @@ type User struct {
 
 	// Attributes are populated by user read statements.
 	Attributes Attributes
+
+	// Ref is the derived identity of ADR 058 §3a, resolved live from the
+	// schema's x-identifier/x-display designations. Populated by service
+	// reads that resolve it; nil on plain statement-level reads.
+	Ref *UserRef
+
+	// Teams is the user's team memberships, populated only when the read asked
+	// for it. Nil means it was not asked for; empty means the user has none.
+	Teams []UserTeam
+	// TeamsTruncated reports that the user is on more teams than the read's
+	// cap carries. The whole list is served by ListUserTeams.
+	TeamsTruncated bool
+
+	// LifecycleOwnerTeam is the team named by LifecycleOwnerTeamID, populated
+	// only when the read asked for it. Nil alone is ambiguous — a self-owned
+	// user has no owner to load — so LifecycleOwnerTeamLoaded is what says the
+	// read looked.
+	LifecycleOwnerTeam *Team
+	// LifecycleOwnerTeamLoaded reports that the read resolved the owner team.
+	// It is the to-one counterpart of Teams being non-nil: it separates "not
+	// asked for" from "asked for, and the user is self-owned".
+	LifecycleOwnerTeamLoaded bool
 }
 
 type UserMetadata struct {
@@ -84,63 +106,12 @@ func (u *User) OwningTeamID() (string, bool) {
 	return *u.LifecycleOwnerTeamID, true
 }
 
-// IdentityAttributeKeys are the conventional user-schema property names the
-// platform reads to render a user's identity (e.g. `name` and `email` on
-// `GET /sessions/me`). The shipped presets spell the name parts camelCase
-// (`givenName`/`familyName` — see packages/config/defaults/*.json); the
-// snake_case spellings stay accepted for schemas authored that way. Schemas
-// remain free-form: one that names these properties differently simply
-// yields no display name or email, and callers fall back to the user ID.
-var IdentityAttributeKeys = []string{
-	"email",
-	"familyName",
-	"family_name",
-	"givenName",
-	"given_name",
-	"name",
-}
-
 // StringAttribute returns the value of the attribute with the given key when
 // it is a non-empty string, and "" otherwise (absent key or non-string value).
 func (u *User) StringAttribute(key AttributeKey) string {
 	value, _ := u.Attributes.Get(key)
 	s, _ := value.(string)
 	return s
-}
-
-// DisplayName resolves the user's human-readable name from the conventional
-// identity attributes: `name` when present, otherwise the given and family
-// name parts joined — camelCase spelling first (the shipped presets'
-// convention), snake_case as fallback. Returns "" when the loaded
-// attributes carry none of them.
-func (u *User) DisplayName() string {
-	if name := u.StringAttribute("name"); name != "" {
-		return name
-	}
-	name := u.firstStringAttribute("givenName", "given_name")
-	if familyName := u.firstStringAttribute("familyName", "family_name"); familyName != "" {
-		if name != "" {
-			name += " "
-		}
-		name += familyName
-	}
-	return name
-}
-
-// firstStringAttribute returns the first key's non-empty string value.
-func (u *User) firstStringAttribute(keys ...AttributeKey) string {
-	for _, key := range keys {
-		if value := u.StringAttribute(key); value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-// Email returns the conventional `email` identity attribute, or "" when the
-// loaded attributes do not carry one.
-func (u *User) Email() string {
-	return u.StringAttribute("email")
 }
 
 type CreateUser struct {
@@ -151,11 +122,11 @@ type CreateUser struct {
 	// nil => self-owned: the user survives team deletion and owns their own deprovisioning.
 	// set => team-owned: deleting/deactivating that team can deactivate this user per policy.
 	LifecycleOwnerTeamID *string
-	// InitialMembershipTeamID is optional roster context at create time — not lifecycle ownership.
+	// InitialMembershipTeamID is optional membership context at create time — not lifecycle ownership.
 	// When set, Create also inserts an active team_memberships row for this team and uses it as the
 	// team-scoped EAV uniqueness scope for attributes. A self-owned signup user can still set this
 	// to their default workspace team; an enterprise provisioned user may set both fields to the
-	// same tenant team, but lifecycle ownership and roster membership remain separate concerns.
+	// same tenant team, but lifecycle ownership and team membership remain separate concerns.
 	InitialMembershipTeamID *string
 	Attributes              CreateAttributes
 }
@@ -176,8 +147,8 @@ func (c *CreateUser) AttributeTeamScope() string {
 // them would type-check and write a schema url as the row's primary key.
 type CreateUserParams struct {
 	ProjectID string
-	// TeamID is optional roster context, not lifecycle ownership — it becomes
-	// [CreateUser.InitialMembershipTeamID].
+	// TeamID is optional membership context, not lifecycle ownership — it
+	// becomes [CreateUser.InitialMembershipTeamID].
 	TeamID *string
 	// ID is empty for a server-minted id; non-empty is for ceremony only.
 	ID string

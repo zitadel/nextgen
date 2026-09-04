@@ -15,6 +15,7 @@ flows:
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
       team.delete: Permission to delete teams
+      team_membership.read: Permission to read team memberships
       flow_definition.read: Permission to read flow definitions
       flow_definition.write: Permission to create and manage flow definitions
       flow_definition.delete: Permission to delete flow definitions
@@ -22,6 +23,9 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      release.read: Permission to read project configuration releases
+      release.write: Permission to create project configuration releases
+      environment.read: Permission to read project environments
       events.read: Permission to list and get project audit events
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
@@ -54,6 +58,7 @@ flows:
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
       team.delete: Permission to delete teams
+      team_membership.read: Permission to read team memberships
       flow_definition.read: Permission to read flow definitions
       flow_definition.write: Permission to create and manage flow definitions
       flow_definition.delete: Permission to delete flow definitions
@@ -61,6 +66,9 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      release.read: Permission to read project configuration releases
+      release.write: Permission to create project configuration releases
+      environment.read: Permission to read project environments
       events.read: Permission to list and get project audit events
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)

@@ -1,12 +1,12 @@
 type: object
-description: Paginated list of users.
+description: The project's releases, newest first.
 required:
-  - users
+  - releases
 properties:
-  users:
+  releases:
     type: array
     items:
-      $ref: user.yaml
+      $ref: release-summary.yaml
   next_page_token:
     description: |
       Token to pass as `page_token` in the next request to fetch the following page.

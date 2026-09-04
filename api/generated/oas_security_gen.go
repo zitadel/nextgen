@@ -80,8 +80,14 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateFlowDefinitionOperation: []string{
 		"flow_definition.write",
 	},
+	CreateGrantOperation: []string{
+		"project.write",
+	},
 	CreateHandoffOperation: []string{
 		"auth_attempt.write",
+	},
+	CreateReleaseOperation: []string{
+		"release.write",
 	},
 	CreateSchemaOperation: []string{
 		"schema.write",
@@ -97,6 +103,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	DeleteFlowDefinitionOperation: []string{
 		"flow_definition.delete",
+	},
+	DeleteGrantOperation: []string{
+		"project.write",
 	},
 	DeleteTeamOperation: []string{
 		"team.delete",
@@ -119,14 +128,23 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetClaimStatusOperation: []string{
 		"project.write",
 	},
+	GetEnvironmentByNameOperation: []string{
+		"environment.read",
+	},
 	GetEventOperation: []string{
 		"events.read",
 	},
 	GetFlowDefinitionOperation: []string{
 		"flow_definition.read",
 	},
+	GetGrantOperation: []string{
+		"project.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
+	},
+	GetReleaseByIdOperation: []string{
+		"release.read",
 	},
 	GetSchemaByIdOperation: []string{
 		"schema.read",
@@ -149,11 +167,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListBrandingOperation: []string{
 		"branding.read",
 	},
+	ListEnvironmentsOperation: []string{
+		"environment.read",
+	},
 	ListEventsOperation: []string{
 		"events.read",
 	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definition.read",
+	},
+	ListReleasesOperation: []string{
+		"release.read",
 	},
 	ListSchemasOperation: []string{
 		"schema.read",
@@ -163,10 +187,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListUserTeamsOperation: []string{
 		"user.read",
-		"team.read",
-	},
-	ListUsersOperation: []string{
-		"user.read",
+		"team_membership.read",
 	},
 	PatchProjectOperation: []string{
 		"project.write",
@@ -179,6 +200,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	QueryTeamsOperation: []string{
 		"team.read",
+	},
+	QueryUsersOperation: []string{
+		"user.read",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",

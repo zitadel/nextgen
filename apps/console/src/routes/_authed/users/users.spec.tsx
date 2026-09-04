@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
 const server = setupServer();
 
@@ -37,17 +38,33 @@ async function renderUsers() {
   return router;
 }
 
+/** Records every `POST /users/query` body, so the expansion sent can be asserted. */
+function recordQueries(response: (body: Record<string, unknown>) => Response) {
+  const bodies: Record<string, unknown>[] = [];
+  server.use(
+    http.post(USERS_QUERY_URL, async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      bodies.push(body);
+      return response(body);
+    }),
+  );
+  return bodies;
+}
+
 describe("users screen", () => {
   it("renders the page heading and a user row", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
-            // The shipped `consumer`/`business` presets spell the name parts
-            // camelCase; `listUsers` returns the schema's attribute tree verbatim.
+            // The envelope carries the server-resolved identity (ADR 058
+            // §3a); `attributes` stays the schema's verbatim tree.
             {
               id: "user_1",
               schema: "sch_business",
+              identifier: "maya.patel@acme.com",
+              identifier_property: "email",
+              display: "Maya Patel",
               attributes: {
                 givenName: "Maya",
                 familyName: "Patel",
@@ -60,17 +77,21 @@ describe("users screen", () => {
     );
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
-    // Columns are the schema's properties (design `277:288291`, decisions log
-    // D4), so there is no combined "Name" column — the first property carries
-    // the link to the detail screen.
-    expect(await screen.findByRole("link", { name: "maya.patel@acme.com" })).toBeInTheDocument();
+    // The User column leads with the resolved display and carries the link;
+    // the identifier has its own column (asserted below). Schema-driven
+    // attribute columns follow (design `277:288291`, decisions log D4).
+    expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
+    // The designated identifier is its own platform-derived column (like
+    // Status and ID), role-named so mixed-schema lists read down one column.
+    expect(screen.getByRole("columnheader", { name: "Identifier" })).toBeInTheDocument();
+    expect(screen.getAllByText("maya.patel@acme.com").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Maya")).toBeInTheDocument();
     expect(screen.getByText("Patel")).toBeInTheDocument();
   });
 
   it("builds the columns from the schema the users reference", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             {
@@ -111,7 +132,7 @@ describe("users screen", () => {
     // Columns union across schemas (D4), so a minimal user sits in a table that
     // also has business columns. The cell must read as empty, not as missing.
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             {
@@ -138,64 +159,64 @@ describe("users screen", () => {
     );
     await renderUsers();
 
-    // `schemaFields` orders properties by key, so `companyName` is the first
-    // column and therefore the linked one. The user without a company falls back
-    // to its id rather than rendering an empty link.
-    expect(await screen.findByRole("link", { name: "Acme" })).toBeInTheDocument();
+    // The link lives on the User identity column now. Neither fixture
+    // carries envelope identity, so both rows degrade to their id — the
+    // schema-driven cells render values and placeholders unchanged.
+    expect(await screen.findByRole("link", { name: "user_1" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "user_2" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("Acme")).toBeInTheDocument();
     expect(within(screen.getByRole("table")).getByText("min@acme.com")).toBeInTheDocument();
   });
 
-  it("derives the display name the way the platform does", async () => {
-    // Mirrors `User.DisplayName` (internal/domain/user.go): explicit `name`
-    // wins, else the given/family parts joined, with snake_case accepted for
-    // schemas authored that way. A partial name must not render a stray space.
+  it("renders the server-resolved identity chain, never deriving from attributes", async () => {
+    // ADR 058: the envelope's display → identifier → id, resolved by the
+    // server from the schema's own designations. The console carries zero
+    // derivation logic — attributes that *look* like identity (name,
+    // givenName, username) are never read.
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             {
               id: "user_1",
-              attributes: {
-                name: "Ada L.",
-                givenName: "Ada",
-                familyName: "Lovelace",
-                email: "a@x.com",
-              },
+              identifier: "a@x.com",
+              identifier_property: "email",
+              display: "Ada L.",
+              attributes: { name: "WRONG name attr", givenName: "Ada", email: "a@x.com" },
             },
-            { id: "user_2", attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" } },
-            { id: "user_3", attributes: { givenName: "Radia", email: "r@x.com" } },
+            {
+              id: "user_2",
+              identifier: "g@x.com",
+              identifier_property: "email",
+              attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
+            },
+            { id: "user_3", attributes: { username: "nope", givenName: "Radia", email: "r@x.com" } },
           ],
         }),
       ),
     );
     await renderUsers();
-    // The derived name is no longer a column; it names the row's actions and
-    // titles the delete dialog, which is where a wrong derivation would show.
+    // Display when designated; identifier when not; the id when the schema
+    // designates nothing. The identity also names the row's actions, which
+    // titles the delete dialog.
     expect(await screen.findByRole("button", { name: "Actions for Ada L." })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Actions for Grace Hopper" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Actions for Radia" })).toBeInTheDocument();
-  });
-
-  it("ignores non-identity attributes when deriving the name", async () => {
-    // Regression: the screen used to read a `username` property that no shipped
-    // schema defines, so every row silently fell back to the email. Reading an
-    // unrelated attribute as the name is worse than having none.
-    server.use(
-      http.get(USERS_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", attributes: { username: "nope", email: "kenji@acme.com" } }] }),
-      ),
-    );
-    await renderUsers();
-    expect(
-      await screen.findByRole("button", { name: "Actions for kenji@acme.com" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for g@x.com" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for user_3" })).toBeInTheDocument();
+    // The `name` attribute still renders as a schema-driven column value —
+    // the assertions above prove it is never *promoted* to the identity.
   });
 
   it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
-      http.get(USERS_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", attributes: { email: "kenji@acme.com", status: "Blocked" } }] }),
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [{
+            id: "user_1",
+            identifier: "kenji@acme.com",
+            identifier_property: "email",
+            attributes: { email: "kenji@acme.com", status: "Blocked" },
+          }],
+        }),
       ),
     );
     await renderUsers();
@@ -217,7 +238,7 @@ describe("users screen", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
       server.use(
-        http.get(USERS_URL, () =>
+        http.post(USERS_QUERY_URL, () =>
           HttpResponse.json(
             {
               code: "auth.unauthorized",
@@ -239,7 +260,7 @@ describe("users screen", () => {
 
   it("filters live users across every rendered column, and by id", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             { id: "user_1", attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" } },
@@ -267,7 +288,7 @@ describe("users screen", () => {
 
   it("shows the status the server stamped, and an em dash without one", async () => {
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
             { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
@@ -291,7 +312,7 @@ describe("users screen", () => {
     // `metadata` is the server's own key. Without excluding it the fallback
     // column set would render it as an attribute of the user's schema.
     server.use(
-      http.get(USERS_URL, () =>
+      http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [{ id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } }],
         }),
@@ -307,8 +328,8 @@ describe("users screen", () => {
   it("loads the next page on demand and stops offering when there is none", async () => {
     let asked: string | null = null;
     server.use(
-      http.get(USERS_URL, ({ request }) => {
-        const token = new URL(request.url).searchParams.get("page_token");
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const { page_token: token = null } = (await request.json()) as { page_token?: string };
         asked = token;
         return token
           ? HttpResponse.json({ users: [{ id: "user_2", attributes: { email: "second@x.com" } }] })
@@ -343,8 +364,8 @@ describe("users screen", () => {
     let firstPageCalls = 0;
 
     server.use(
-      http.get(USERS_URL, async ({ request }) => {
-        const token = new URL(request.url).searchParams.get("page_token");
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const { page_token: token } = (await request.json()) as { page_token?: string };
         if (token) {
           await secondPageSent;
           return HttpResponse.json({ users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }] });
@@ -380,5 +401,158 @@ describe("users screen", () => {
     // The in-flight page is discarded rather than appended to the new list.
     expect(screen.queryByText("stale@x.com")).not.toBeInTheDocument();
     expect(screen.getByText("page1-2@x.com")).toBeInTheDocument();
+  });
+
+  it("asks for the memberships and lists every team a user is on", async () => {
+    // One request, not a roster read per row: `expand: ["teams"]` embeds the
+    // memberships on the list response (ADR 059), and each entry carries the
+    // team's name so the cell renders without resolving ids. D1 makes the column
+    // plural — a user can belong to several teams.
+    const bodies = recordQueries(() =>
+      HttpResponse.json({
+        users: [
+          {
+            id: "user_1",
+            identifier: "maya@acme.com",
+            identifier_property: "email",
+            attributes: { email: "maya@acme.com" },
+            teams: [
+              { id: "team_1", name: "Acme Web", membership_status: "active" },
+              { id: "team_2", name: "Platform", membership_status: "pending" },
+            ],
+          },
+          {
+            id: "user_2",
+            identifier: "solo@acme.com",
+            identifier_property: "email",
+            attributes: { email: "solo@acme.com" },
+            // Stamped, so the only em dash in this row is the Team cell.
+            metadata: { status: "active" },
+            teams: [],
+          },
+        ],
+      }),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("Team")).toBeInTheDocument();
+    expect(bodies.at(-1)).toMatchObject({ expand: ["teams"] });
+
+    // Every membership the endpoint returns, `pending` included: it omits the
+    // ones the user was removed from, so what arrives is the roster. Each is its
+    // own link to the team, as the Teams directory's rows are — the embedded
+    // entry carries the id, so this costs no extra read.
+    expect(table.getByRole("link", { name: "Acme Web" })).toHaveAttribute(
+      "href",
+      "/teams/team_1",
+    );
+    expect(table.getByRole("link", { name: "Platform" })).toHaveAttribute(
+      "href",
+      "/teams/team_2",
+    );
+    // `[]` is "on no team", which the table draws as an empty cell rather than
+    // leaving the row a column short.
+    const soloRow = screen.getByRole("link", { name: "solo@acme.com" }).closest("tr");
+    expect(soloRow).not.toBeNull();
+    expect(within(soloRow as HTMLElement).getByText("—")).toBeInTheDocument();
+  });
+
+  it("says when a user is on more teams than the row carries", async () => {
+    // The embedded list is capped and cannot be paged, so the cap must not read
+    // as the whole roster.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              identifier: "maya@acme.com",
+              identifier_property: "email",
+              attributes: { email: "maya@acme.com" },
+              teams: [{ id: "team_1", name: "Acme Web", membership_status: "active" }],
+              teams_truncated: true,
+            },
+          ],
+        }),
+      ),
+    );
+    await renderUsers();
+
+    // Asserted as two nodes, which is the point: the marker sits outside the
+    // truncating span so CSS cannot clip it off the end of a long roster.
+    const row = (await screen.findByRole("link", { name: "maya@acme.com" })).closest("tr");
+    expect(row).not.toBeNull();
+    const cell = within(row as HTMLElement);
+    expect(cell.getByRole("link", { name: "Acme Web" })).toBeInTheDocument();
+    // Not a link: the response carries the capped list and a boolean, not the
+    // names past the cap, and the user detail screen does not list teams yet.
+    const marker = cell.getByText("+more");
+    expect(marker.closest("a")).toBeNull();
+    expect(marker).toHaveClass("shrink-0");
+    expect(marker.className).not.toMatch(/truncate/);
+  });
+
+  it("stops searching team names once the column is dropped mid-list", async () => {
+    // The first page is expanded and its rows keep their memberships; the
+    // second is refused, which drops the column. Searching a team name would
+    // otherwise filter the table on something no longer on screen.
+    server.use(
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        if (body.page_token) {
+          return body.expand
+            ? HttpResponse.json({ message: "not permitted" }, { status: 403 })
+            : HttpResponse.json({
+                users: [{ id: "user_2", attributes: { email: "second@x.com" } }],
+              });
+        }
+        return HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              attributes: { email: "first@x.com" },
+              teams: [{ id: "team_1", name: "Acme Web", membership_status: "active" }],
+            },
+          ],
+          next_page_token: "tok_2",
+        });
+      }),
+    );
+    await renderUsers();
+
+    // While the column is on screen, its names are searchable.
+    await userEvent.type(await screen.findByLabelText("Search users"), "Acme Web");
+    expect(await screen.findByText("first@x.com")).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("Search users"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await screen.findByText("second@x.com");
+    const table = within(screen.getByRole("table"));
+    expect(table.queryByText("Team")).not.toBeInTheDocument();
+
+    // The column is gone, so the team name no longer matches anything.
+    await userEvent.type(screen.getByLabelText("Search users"), "Acme Web");
+    await waitFor(() => expect(screen.queryByText("first@x.com")).not.toBeInTheDocument());
+    expect(screen.getByText("No users match the current filters.")).toBeInTheDocument();
+  });
+
+  it("drops the Team column when the credential may not read memberships", async () => {
+    // `expand: ["teams"]` needs `team_membership.read` on top of `user.read`,
+    // and the refusal covers the whole request. Losing the column is the honest
+    // outcome; losing the users is not.
+    const bodies = recordQueries((body) =>
+      body.expand
+        ? HttpResponse.json({ message: "not permitted" }, { status: 403 })
+        : HttpResponse.json({ users: [{ id: "user_1", attributes: { email: "maya@acme.com" } }] }),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("maya@acme.com")).toBeInTheDocument();
+    expect(table.queryByText("Team")).not.toBeInTheDocument();
+    // The retry drops the expansion rather than the request.
+    expect(bodies).toHaveLength(2);
+    expect(bodies.at(-1)).not.toHaveProperty("expand");
   });
 });

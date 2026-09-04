@@ -17,7 +17,7 @@ import { api } from "../../../api/zitadel";
 import { formatDate } from "../../../lib/date";
 import { displayValue, field } from "../../../lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
-import { userAttributes, userDisplayName } from "../../../lib/user";
+import { userAttributes, userIdentity, userIdentitySecondary } from "../../../lib/user";
 
 /**
  * User detail (Figma `467:44362`, `Filled` and `Authentication` variants).
@@ -83,16 +83,21 @@ function UserDetail() {
   const { userId } = Route.useParams();
   const router = useRouter();
   const attributes = userAttributes(user);
-  const name = userDisplayName(attributes) ?? field(attributes, "email") ?? userId;
+  // The server-resolved identity chain (ADR 058): display → identifier → id.
+  const name = userIdentity(user) ?? userId;
+  const secondary = userIdentitySecondary(user);
   const fields = schema ? schemaFields(schema) : [];
   const metadata = userMetadata(user);
 
   return (
     <div className={PAGE}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className={HEADING}>{name}</h1>
-          {metadata.status && <StatusBadge status={metadata.status} />}
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className={HEADING}>{name}</h1>
+            {metadata.status && <StatusBadge status={metadata.status} />}
+          </div>
+          {secondary && <p className="text-muted-foreground text-sm">{secondary}</p>}
         </div>
         <Card className="gap-0 rounded-xl py-0">
           {/* Stacked below `sm`, in a row above it — the mobile frame

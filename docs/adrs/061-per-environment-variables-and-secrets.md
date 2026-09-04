@@ -1,4 +1,4 @@
-# ADR 059: Per-Environment Variables and Secrets
+# ADR 061: Per-Environment Variables and Secrets
 
 > **Status:** Proposed
 > **Date:** 2026-09-04
@@ -223,18 +223,32 @@ not need them:
   a target environment before it goes live belongs with deployments (ADR 035),
   not here.
 
-## Environments are not a resource yet
+## The environment level is a name, and the name is not enforced
 
-`environment_name` is free text with nothing to reference. ADR 035 defines
-environments as runtime slots but explicitly defers their internals (naming,
-count, lifecycle), and no environments table exists. A typo therefore scopes a
-variable into invisibility, and nothing enumerates the environments a project
-has.
+Environments landed as a resource while this was being written (#532): a project
+holds environments of `(project_id, id, name)`, the name is unique per project,
+addresses the resource on the wire (`GET /environments/{name}`), and is validated
+as a lowercase DNS-style label of at most 63 characters.
 
-This is recorded as a TODO on `VariableOwner.EnvironmentName` and in the three
-dialect migrations. When environments land, the column should get the treatment
-`project_id` already has: a reference, with the lifecycle question (what a
-rename or a deletion does to the variables scoped to it) answered there.
+A variable scopes to that **name** rather than to the environment id, which
+matches how an environment is addressed everywhere else, keeps a variable
+readable by a request that knows only which environment it is serving, and keeps
+the owner tuple a tuple of strings.
+
+The name is currently **not checked** on the way in. Two things follow, and
+neither is decided here:
+
+- **A foreign key is not available while an unset level is `""`.** The natural
+  key needs every owner column non-null, so "not scoped to an environment" is
+  the empty string, and no environment row carries that name. Enforcing the
+  reference therefore means validating on write (the
+  `GetEnvironmentByName` statement already exists) rather than in the schema.
+  Until that lands, a typo scopes a variable into invisibility rather than
+  failing.
+- **Renaming or deleting an environment does not touch its variables.** They
+  keep pointing at a name nothing answers to. Whichever way that is settled
+  (cascade on the name, forbid the rename, or leave the variables orphaned by
+  design), it belongs with the environment lifecycle rather than here.
 
 ## Alternatives considered
 

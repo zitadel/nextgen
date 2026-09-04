@@ -14,9 +14,10 @@ CREATE TABLE zitadel_nextgen.variables (
     name             TEXT NOT NULL CHECK (name <> '')
     , project_id     TEXT NOT NULL CHECK (project_id <> '')
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
-    -- TODO: environments are not a resource yet (ADR 035 defers their
-    -- internals), so this is free text with nothing to reference. Give it the
-    -- same treatment as project_id once they exist.
+    -- Scoped by environment name, not id, the way an environment is addressed
+    -- everywhere else. It cannot carry a foreign key: the empty string means
+    -- "not scoped to an environment", and no environment row answers to it.
+    -- TODO: check the environment exists on the write path instead.
     , environment_name TEXT NOT NULL DEFAULT ''
     , team_id        TEXT NOT NULL DEFAULT ''
     , user_schema_id TEXT NOT NULL DEFAULT ''

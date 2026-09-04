@@ -29,6 +29,8 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
+	EnvironmentStatements
+	ReleaseStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -116,6 +118,36 @@ type JSONSchemaStatements interface {
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type EnvironmentPool interface {
+// 	Statementer[EnvironmentStatements]
+// 	Transactioner[EnvironmentStatements]
+// }
+
+type EnvironmentStatements interface {
+	Statements
+	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
+	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
+	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type ReleasePool interface {
+// 	Statementer[ReleaseStatements]
+// 	Transactioner[ReleaseStatements]
+// }
+
+type ReleaseStatements interface {
+	Statements
+	CreateRelease(ctx context.Context, entity *domain.Release) error
+	GetReleaseByID(ctx context.Context, projectID, id string) (*domain.Release, error)
+	// GetReleaseByContentHash is the read half of the idempotency contract:
+	// assembling a release resolves an identical pinned set to the release that
+	// already holds it rather than writing a second one.
+	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
+	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type TeamPool interface {
 // 	Statementer[TeamStatements]
 // 	Transactioner[TeamStatements]
@@ -125,6 +157,7 @@ type TeamStatements interface {
 	Statements
 	CreateTeam(ctx context.Context, entity *domain.Team) error
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error)
 	UpdateTeam(ctx context.Context, entity *domain.Team) error
 	ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle
@@ -227,7 +260,26 @@ type UserQueryOptions struct {
 	UniqueAttributesOnly bool
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
+	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded
+	// by a batched second query keyed on the page's ids, never by joining it
+	// into the user query: a join multiplies rows, which would make LIMIT
+	// count memberships instead of users and corrupt the keyset cursor.
+	IncludeTeams bool
+	// TeamsLimit caps how many membership entries each user carries when
+	// IncludeTeams is set. Zero means [DefaultUserTeamsLimit].
+	TeamsLimit int
+	// IncludeLifecycleOwnerTeam hydrates the team that owns each user's
+	// lifecycle (ADR 059). Like IncludeTeams it is a batched second query,
+	// keyed on the distinct owner ids the page returned; self-owned users
+	// contribute no id and stay nil.
+	IncludeLifecycleOwnerTeam bool
 }
+
+// DefaultUserTeamsLimit caps an embedded membership list. Embedded collections are not
+// paginated, so without a cap one user on thousands of teams would dominate a
+// page whose limit promised twenty users. Past the cap the user is flagged
+// truncated and the full list is read from ListUserTeams.
+const DefaultUserTeamsLimit = 10
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type UserPool interface {
@@ -411,10 +463,10 @@ type AuthzAssignmentStatements interface {
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
-// The resolver reads these edges, not team_memberships (roster/lifecycle stays separate).
+// The resolver reads these edges, not team_memberships (membership/lifecycle stays separate).
 //
 // Use cases:
-//   - Upsert: low-level row ops. Prefer [SyncUserTeamMembershipEdge] for roster status changes.
+//   - Upsert: low-level row ops. Prefer [SyncUserTeamMembershipEdge] for membership status changes.
 //   - DeleteAuthzMembershipEdges: column-shaped deletes via Filter (single edge, by member, by set).
 //   - DeleteAuthzMembershipEdgesForTeamDeactivate: team deactivate (team set + lifecycle-owned users).
 //   - Get/ListByMember: resolver / dual-write test reads.

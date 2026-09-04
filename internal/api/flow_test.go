@@ -118,7 +118,7 @@ func newTestServer(t *testing.T) *testServer {
 	keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
 
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil, tokenService, keyService, nil, nil, "")
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, tokenService, keyService, nil, nil, nil, "")
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),
@@ -304,6 +304,25 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 	}
 	if got, ok := fr.HandoffTokenExpiresAt.Get(); !ok || !got.Equal(expiresAt) {
 		t.Errorf("handoff_token_expires_at = %v (set=%t), want %v", got, ok, expiresAt)
+	}
+}
+
+// TestSubmitFlowStep_UnknownPropertiesReturnError covers #1103: a submit body
+// keying its values under an unrecognised top-level property (e.g. "data"
+// instead of "fields") used to be silently accepted with the fields ignored,
+// so the resulting empty submission came back as a 200 with a misleading
+// "value missing" step error instead of a request error.
+func TestSubmitFlowStep_UnknownPropertiesReturnError(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+		"data":   map[string]any{"identifier": "alice@example.com"},
+	}, cookieVal)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (body = %s)", resp.StatusCode, http.StatusBadRequest, body)
 	}
 }
 

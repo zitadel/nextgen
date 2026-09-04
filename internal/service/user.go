@@ -3,12 +3,22 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+const (
+	userFieldCreatedAt            = "created_at"
+	userFieldID                   = "id"
+	userFieldSchema               = "schema"
+	userFieldStatus               = "status"
+	userFieldTeamID               = "team_id"
+	userFieldLifecycleOwnerTeamID = "lifecycle_owner_team_id"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -45,6 +55,13 @@ type ListUsersInput struct {
 	ProjectID string
 	PageToken string
 	Limit     int
+	Sorting   *Sorting // optional; defaults to createdAt desc
+	Filters   []Filter
+	// IncludeTeams embeds each user's team memberships (ADR 059).
+	IncludeTeams bool
+	// IncludeLifecycleOwnerTeam embeds the team that owns each user's
+	// lifecycle (ADR 059).
+	IncludeLifecycleOwnerTeam bool
 }
 
 type ListPasskeysInput struct {
@@ -102,6 +119,7 @@ type userService struct {
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
 	hasher      crypto.Hasher
+	refs        UserRefResolver
 }
 
 // NewUserService returns the interface rather than *userService, deliberately
@@ -114,11 +132,13 @@ func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
 	hasher crypto.Hasher,
+	refs UserRefResolver,
 ) UserService {
 	return &userService{
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
 		hasher:      hasher,
+		refs:        refs,
 	}
 }
 
@@ -182,8 +202,32 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 			WithMessage("The user was created but could not be read back. Fetch it by id rather than retrying the create.").
 			WithDetails(domain.CreatedUserDetails{UserID: action.CreateUser.ID})
 	}
+	// The identity ref is derived decoration and the create has already
+	// committed: a resolution failure must not fail the create — the caller
+	// would retry and hit the unique constraints — so the response simply
+	// carries no ref fields and clients fall back to the id (ADR 058).
+	if refs, err := s.refs.ResolveRefsForUsers(ctx, input.ProjectID, []*domain.User{user}); err == nil {
+		if ref, ok := refs[user.ID]; ok {
+			user.Ref = &ref
+		}
+	}
 
 	return user, nil
+}
+
+// attachUserRefs resolves the derived identity (ADR 058 §3a) onto each
+// user's Ref — one batch per page, per §4.
+func (s *userService) attachUserRefs(ctx context.Context, projectID string, users ...*domain.User) error {
+	refs, err := s.refs.ResolveRefsForUsers(ctx, projectID, users)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to resolve user identities")
+	}
+	for _, user := range users {
+		if ref, ok := refs[user.ID]; ok {
+			user.Ref = &ref
+		}
+	}
+	return nil
 }
 
 func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
@@ -192,28 +236,168 @@ func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) err
 }
 
 func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
+	columnFilters, queryOpts, err := splitUserFilters(input.Filters)
+	if err != nil {
+		return nil, err
+	}
+	queryOpts.IncludeTeams = input.IncludeTeams
+	queryOpts.IncludeLifecycleOwnerTeam = input.IncludeLifecycleOwnerTeam
+
+	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
+	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
+	for _, f := range columnFilters {
+		filter, err := userFilter(f)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, filter)
+	}
+
+	// Newest-first by default, unlike the ascending default the other list
+	// services use: the users list is read as "who signed up recently".
+	orderBy, err := listOrderBy(input.Sorting, domain.UserFieldCreatedAt, database.OrderDesc, userField, domain.UserFieldID)
+	if err != nil {
+		return nil, err
+	}
+
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
-		Filter: database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		Filter: database.And(filters...),
 		Pagination: database.Page[domain.UserField]{
-			Limit:  uint32(normalizeLimit(input.Limit)),
-			Cursor: []byte(input.PageToken),
-			OrderBy: database.OrderBy[domain.UserField]{
-				Columns: []database.Column[domain.UserField]{
-					database.Col(domain.UserFieldCreatedAt),
-					database.Col(domain.UserFieldID),
-				},
-				Direction: database.OrderDesc,
-			},
+			Limit:   uint32(normalizeLimit(input.Limit)),
+			Cursor:  []byte(input.PageToken),
+			OrderBy: orderBy,
 		},
-	}, UserQueryOptions{})
+	}, queryOpts)
 	if err != nil {
 		return nil, mapListError(err, "failed to list users from database")
+	}
+	if err := s.attachUserRefs(ctx, input.ProjectID, result.Items...); err != nil {
+		return nil, err
 	}
 
 	return &ListUsersOutput{
 		Items:         result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+// splitUserFilters separates the predicates that compile to a filter on the
+// users row from the one that does not. Team membership lives in another
+// table and reaches the query as [UserQueryOptions.MembershipTeamID], which
+// the dialects compile to an EXISTS clause — the same shape
+// [UserQueryOptions.Attributes] already uses for the EAV match.
+func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
+	var (
+		columns []Filter
+		opts    UserQueryOptions
+	)
+	for _, f := range filters {
+		if f.Field != userFieldTeamID {
+			columns = append(columns, f)
+			continue
+		}
+		// The storage option holds one team and ADR 031 ANDs filters, so a
+		// second value would silently win over the first. Refuse instead.
+		if opts.MembershipTeamID != nil {
+			return nil, UserQueryOptions{}, domain.ErrRequestInvalid().
+				WithDetails(fmt.Sprintf("%s may only be given once", userFieldTeamID))
+		}
+		if f.Operation != filterOpEquals {
+			return nil, UserQueryOptions{}, domain.ErrRequestInvalid().
+				WithDetails(fmt.Sprintf("operation %q is not valid for %s", f.Operation, userFieldTeamID))
+		}
+		teamID, err := stringFilterValue(f)
+		if err != nil {
+			return nil, UserQueryOptions{}, err
+		}
+		opts.MembershipTeamID = &teamID
+	}
+	return columns, opts, nil
+}
+
+// userFilter maps an API filter predicate to a storage filter. Operations the
+// v2 filter layer cannot express return [domain.ErrNotImplemented];
+// invalid field/operation/value combinations return [domain.ErrRequestInvalid].
+// [splitUserFilters] has already taken team_id out.
+func userFilter(f Filter) (database.Filter[domain.UserField], error) {
+	switch f.Field {
+	case userFieldCreatedAt:
+		return createdAtFilter(f.Operation, database.Col(domain.UserFieldCreatedAt), f.Value)
+	case userFieldID:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldID), value)
+	case userFieldSchema:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
+	case userFieldStatus:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return userStatusFilter(f.Operation, value)
+	case userFieldLifecycleOwnerTeamID:
+		// The column is null for self-owned users. `= NULL` matches nothing in
+		// SQL, so a null value would quietly return an empty page; reject it
+		// instead. Selecting self-owned users needs an is-null filter the
+		// storage layer does not have yet.
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldLifecycleOwnerTeamID), value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
+	}
+}
+
+// userStatusFilter filters on the user's lifecycle status.
+func userStatusFilter(op, status string) (database.Filter[domain.UserField], error) {
+	switch op {
+	case filterOpEquals:
+	case filterOpNotEquals:
+		// todo: update when the operation is supported
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains, filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
+	}
+
+	switch domain.UserStatus(status) {
+	case domain.UserStatusActive, domain.UserStatusSuspended, domain.UserStatusDeactivated, domain.UserStatusPendingPurge:
+		return database.Equal(database.Col(domain.UserFieldStatus), status), nil
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown status %q", status))
+	}
+}
+
+// userField maps an API field name to its [domain.UserField] for sorting.
+func userField(field string) (domain.UserField, error) {
+	switch field {
+	case userFieldCreatedAt:
+		return domain.UserFieldCreatedAt, nil
+	case userFieldID:
+		return domain.UserFieldID, nil
+	case userFieldSchema:
+		return domain.UserFieldSchemaURL, nil
+	case userFieldStatus:
+		return domain.UserFieldStatus, nil
+	case userFieldLifecycleOwnerTeamID:
+		return domain.UserFieldLifecycleOwnerTeamID, nil
+	case userFieldTeamID:
+		// Not a column on the user: the keyset cursor is built from the last
+		// row's sort values, and there is no membership value on that row.
+		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().
+			WithDetails(fmt.Sprintf("%s can be filtered but not sorted", userFieldTeamID))
+	default:
+		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
+	}
 }
 
 func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
@@ -314,6 +498,9 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
+	if err := s.attachUserRefs(ctx, input.ProjectID, user); err != nil {
+		return nil, err
+	}
 
 	return user, nil
 }
@@ -341,6 +528,9 @@ func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*dom
 			return nil, domain.ErrUserNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+	if err := s.attachUserRefs(ctx, sessionToken.ProjectID, user); err != nil {
+		return nil, err
 	}
 
 	return user, nil
@@ -524,16 +714,4 @@ func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID str
 		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		UserQueryOptions{Attributes: attrs, UniqueAttributesOnly: true},
 	)
-}
-
-// UserStatementsIdentityReader adapts [UserStatements] to [UserIdentityReader].
-type UserStatementsIdentityReader struct {
-	Pool StatementPool
-}
-
-func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	return r.Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
-		database.Equal(database.Col(domain.UserFieldID), userID),
-	), UserQueryOptions{AttributeKeys: attributeKeys})
 }

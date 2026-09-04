@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -57,30 +58,42 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 	return &api.DeleteUserByIDNoContent{}, nil
 }
 
-// ListUsers scopes to the bearer's project: the operation carries no
-// project parameter, so the oauth2 principal (the project secret the
-// CLI's status probe sends) is the only authority. It serves the project's
-// users newest-first, windowed by the cursor pagination the service applies.
-func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (api.ListUsersRes, error) {
+// QueryUsers is the users list (ADR 031). It carries no project parameter: the
+// oauth2 principal (the project secret the CLI's status probe sends) is the
+// only authority for which project's users are served, so the scope check is
+// what keeps a browser-plane preview secret out. Results are newest-first
+// unless the request sorts otherwise.
+func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	// No project parameter: the operation is bound to the token's own project
-	// by construction, so only the scope check is live — it keeps the
-	// browser-plane preview secret from listing the project's users.
 	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err
 	}
 
-	users, err := h.userService.ListUsers(ctx, service.ListUsersInput{
-		ProjectID: scopeCtx.ProjectID,
-		PageToken: string(params.PageToken.Value),
-		Limit:     int(params.Limit.Value),
-	})
+	input := mapQueryUsersToService(scopeCtx.ProjectID, req)
+	// Expanding answers 403 rather than a silently missing property: a caller
+	// could not tell that from "this user has no teams". Filtering on team_id
+	// reads the same memberships by a different route — it answers "who is in
+	// this team", one page at a time — so it takes the same gate.
+	if input.IncludeTeams || filtersOnTeamID(req.Filter) {
+		if err := requireMembershipRead(ctx); err != nil {
+			return nil, err
+		}
+	}
+	// The owner team is a different resource under a different permission, so
+	// it is gated on its own rather than folded into the membership check.
+	if input.IncludeLifecycleOwnerTeam {
+		if err := requireTeamRead(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	users, err := h.userService.ListUsers(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &api.ListUsersResponse{
+	resp := &api.QueryUsersResponse{
 		Users: make([]api.User, 0, len(users.Items)),
 	}
 	if users.NextPageToken != "" {
@@ -95,6 +108,42 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	}
 
 	return resp, nil
+}
+
+func mapQueryUsersToService(projectID string, req *api.QueryUsersRequest) service.ListUsersInput {
+	input := service.ListUsersInput{
+		ProjectID: projectID,
+		// The decoder fills this with the schema's default (20) when the body
+		// omits it, and the schema floors it at 1; the service still normalizes,
+		// which is what bounds callers that reach it without going through HTTP.
+		Limit:     int(req.Limit.Or(0)),
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		input.Sorting = sortingToService(sorting.Field, sorting.Direction)
+	}
+	for _, filter := range req.Filter {
+		input.Filters = append(input.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
+	}
+	for _, expand := range req.Expand {
+		switch expand {
+		case api.UserExpandTeams:
+			input.IncludeTeams = true
+		case api.UserExpandLifecycleOwnerTeam:
+			input.IncludeLifecycleOwnerTeam = true
+		}
+	}
+	return input
+}
+
+// filtersOnTeamID reports whether the request selects users by team membership.
+// The service turns that filter into a storage option rather than a column
+// predicate, so it is read off the request here rather than off the mapped
+// input.
+func filtersOnTeamID(filters []api.QueryUsersRequestFilterItem) bool {
+	return slices.ContainsFunc(filters, func(f api.QueryUsersRequestFilterItem) bool {
+		return f.Field == api.UserFilterFieldTeamID
+	})
 }
 
 func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPasskeysParams) (api.ListUserPasskeysRes, error) {
@@ -140,6 +189,10 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
+	// Same permission as the embedded read, or this becomes the way around it.
+	if err := requireMembershipRead(ctx); err != nil {
+		return nil, err
+	}
 
 	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
 		ProjectID: projectID,
@@ -158,13 +211,7 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
 	}
 	for _, team := range teams.Items {
-		res.Teams = append(res.Teams, api.UserTeam{
-			ID:               team.TeamID,
-			Name:             team.TeamName,
-			MembershipStatus: api.UserTeamMembershipStatus(team.Status),
-			CreatedAt:        team.CreatedAt,
-			UpdatedAt:        team.UpdatedAt,
-		})
+		res.Teams = append(res.Teams, apiUserTeam(*team))
 	}
 
 	return res, nil
@@ -229,6 +276,22 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 
 // ------------------ Mappers ---------------
 
+// userRefToAPI maps the resolved reference (ADR 058 §3): identifier and
+// identifier_property travel together, display independently; empty means
+// absent on the wire. Lives with the user mapping because every
+// user-linked resource embeds the same reference.
+func userRefToAPI(ref domain.UserRef) api.UserRef {
+	out := api.UserRef{UserID: api.UserID(ref.UserID)}
+	if ref.Identifier != "" {
+		out.Identifier = api.NewOptString(ref.Identifier)
+		out.IdentifierProperty = api.NewOptString(ref.IdentifierProperty)
+	}
+	if ref.Display != "" {
+		out.Display = api.NewOptString(ref.Display)
+	}
+	return out
+}
+
 func domainUserToApiUser(user *domain.User) (*api.User, error) {
 	userData, err := user.Attributes.ToMap()
 	if err != nil {
@@ -247,7 +310,7 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 		lifecycleOwnerTeamID.SetToNull()
 	}
 
-	return &api.User{
+	out := &api.User{
 		ID:         api.UserID(user.ID),
 		Schema:     user.SchemaURL,
 		Attributes: *attributes,
@@ -257,7 +320,56 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 			Status:               api.UserMetadataStatus(user.Metadata.Status),
 			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
 		},
-	}, nil
+	}
+
+	// The derived identity of ADR 058 §3a: identifier and identifier_property
+	// travel together, display independently; empty means absent on the wire
+	// (the userRefToAPI pairing rule).
+	if user.Ref != nil {
+		if user.Ref.Identifier != "" {
+			out.Identifier = api.NewOptString(user.Ref.Identifier)
+			out.IdentifierProperty = api.NewOptString(user.Ref.IdentifierProperty)
+		}
+		if user.Ref.Display != "" {
+			out.Display = api.NewOptString(user.Ref.Display)
+		}
+	}
+
+	// Nil means the read was not asked for memberships, so the property stays
+	// off the wire entirely; an empty non-nil slice means it was asked for and
+	// the user has none, which serializes as []. Every other caller of
+	// this mapper leaves Teams nil and is unaffected.
+	if user.Teams != nil {
+		out.Teams = make([]api.UserTeam, 0, len(user.Teams))
+		for _, team := range user.Teams {
+			out.Teams = append(out.Teams, apiUserTeam(team))
+		}
+		out.TeamsTruncated = api.NewOptBool(user.TeamsTruncated)
+	}
+
+	// Same absent-versus-empty rule for the to-one: not asked for stays off the
+	// wire, asked for on a self-owned user serializes as null.
+	// teamResponse is the same mapper getTeam and queryTeams answer with, so the
+	// embedded team cannot drift from the sub-resource's representation.
+	if user.LifecycleOwnerTeamLoaded {
+		if team := user.LifecycleOwnerTeam; team != nil {
+			out.Metadata.LifecycleOwnerTeam.SetTo(*teamResponse(team))
+		} else {
+			out.Metadata.LifecycleOwnerTeam.SetToNull()
+		}
+	}
+
+	return out, nil
+}
+
+func apiUserTeam(team domain.UserTeam) api.UserTeam {
+	return api.UserTeam{
+		ID:               team.TeamID,
+		Name:             team.TeamName,
+		MembershipStatus: api.UserTeamMembershipStatus(team.Status),
+		CreatedAt:        team.CreatedAt,
+		UpdatedAt:        team.UpdatedAt,
+	}
 }
 
 // ------------------ Errors ---------------

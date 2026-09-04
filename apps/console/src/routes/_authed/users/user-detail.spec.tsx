@@ -16,6 +16,7 @@ vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_console");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
 const USER_ID = "user_1";
 const server = setupServer();
@@ -40,6 +41,10 @@ function stub({
   user = {
     id: USER_ID,
     schema: "sch_business",
+    // The heading renders the envelope's resolved identity (ADR 058):
+    // this schema designates email and no display properties.
+    identifier: "maya@acme.com",
+    identifier_property: "email",
     attributes: { email: "maya@acme.com", companyName: "Acme" },
     metadata: { status: "active", created_at: "2026-07-12T09:00:00Z", updated_at: "2026-07-12T09:00:00Z" },
   },
@@ -100,6 +105,8 @@ describe("user detail", () => {
         HttpResponse.json({
           id: USER_ID,
           schema: "sch_business",
+          identifier: "maya@acme.com",
+          identifier_property: "email",
           attributes: { email: "maya@acme.com", headcount: 42, verified: false },
         }),
       ),
@@ -155,11 +162,33 @@ describe("user detail", () => {
     expect(screen.getByText(expected)).toBeInTheDocument();
   });
 
+  it("leads with the display and subtitles the identifier when both resolve", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        identifier: "maya@acme.com",
+        identifier_property: "email",
+        display: "Maya Patel",
+        attributes: { email: "maya@acme.com" },
+      },
+    });
+    await renderDetail();
+    expect(await screen.findByRole("heading", { name: "Maya Patel" })).toBeInTheDocument();
+    expect(screen.getAllByText("maya@acme.com").length).toBeGreaterThanOrEqual(1);
+  });
+
   it("omits status and created on a record the server has not stamped", async () => {
     // `metadata` sits on an otherwise open record, so a user written before it
     // existed simply has none. Nothing is invented for it.
     stub({
-      user: { id: USER_ID, schema: "sch_business", attributes: { email: "maya@acme.com" } },
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        identifier: "maya@acme.com",
+        identifier_property: "email",
+        attributes: { email: "maya@acme.com" },
+      },
     });
     await renderDetail();
     await screen.findByRole("heading", { name: "maya@acme.com" });
@@ -210,11 +239,11 @@ describe("user detail", () => {
         deleted = true;
         return new HttpResponse(null, { status: 204 });
       }),
-      // The shape `list-users-response.yaml` requires — `users` is a required
+      // The shape `query-users-response.yaml` requires — `users` is a required
       // property, not an optional one. A bare array sent the list loader into
       // the error boundary on the redirect below, which the assertions could
       // not see because the boundary swallowed it.
-      http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     );
     const router = await renderDetail();
 

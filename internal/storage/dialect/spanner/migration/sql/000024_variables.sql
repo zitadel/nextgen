@@ -7,9 +7,9 @@
 CREATE TABLE variables (
     name             STRING(MAX) NOT NULL,
     project_id       STRING(MAX) NOT NULL,
-    -- TODO: environments are not a resource yet (ADR 035 defers their
-    -- internals), so this is free text with nothing to reference. Give it the
-    -- same treatment as project_id once they exist.
+    -- Scoped by environment name, not id; it cannot carry a foreign key,
+    -- because the empty string means "not scoped to an environment" and no
+    -- environment row answers to it. See the postgres migration.
     environment_name STRING(MAX) NOT NULL DEFAULT (''),
     team_id          STRING(MAX) NOT NULL DEFAULT (''),
     user_schema_id   STRING(MAX) NOT NULL DEFAULT (''),

@@ -1,5 +1,213 @@
 # @zitadel/server
 
+## 1.0.0-alpha.21
+
+### Minor Changes
+
+- [#1124](https://github.com/zitadel/nextgen/pull/1124) [`6b59d5a`](https://github.com/zitadel/nextgen/commit/6b59d5a37d731abad0ef05b2699da2a0d860ed89) Thanks [@bastionstack](https://github.com/bastionstack)! - Show each user's teams in the console users list. The memberships ride along on
+  `POST /users/query` with `expand: ["teams"]`, so the column costs no request per
+  row, and a user on more teams than the embedded list carries says so rather than
+  presenting the cap as the whole roster. A credential that may not read
+  memberships keeps the list and loses the column.
+
+- [#1085](https://github.com/zitadel/nextgen/pull/1085) [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b) Thanks [@livio-a](https://github.com/livio-a)! - Session responses identify their user through a resolved **user ref** derived
+  from the user schema's own `x-identifier`/`x-display` designations (ADR 058),
+  replacing the convention-resolved flat `name`/`email` fields this supersedes
+  (see the earlier `GET /sessions/me` identity changeset). Rendering follows one
+  chain everywhere: `display`, falling back to `identifier`, then `user_id`.
+  - `@zitadel/server`: `GET /sessions/me`, session get, and query sessions embed
+    `user` (`{user_id, identifier, identifier_property, display}`), the list
+    path hydrated with one batch resolution per page — listed sessions now carry
+    user identity at all. The conventional attribute-name resolver
+    (`name`/`givenName`+`familyName`/`email`) is removed.
+  - `@zitadel/api`: the regenerated client types the new `user` ref component.
+  - `@zitadel/components`: `<zitadel-session>`/`<zitadel-logout>` render from
+    the ref; the `zitadel-signout` detail is now `{display, identifier}`;
+    logout templates substitute `{{display}}`/`{{identifier}}` (the old
+    `{{name}}`/`{{email}}` tokens keep filling as aliases).
+  - `@zitadel/sdk-core` (and every SPA SDK via the shared contract):
+    `NextgenSession`/`ClientSession` become `{userId, identifier,
+identifierProperty, display}`; JWT-claim identities map `name` → `display`
+    and `email` → `identifier`.
+  - `@zitadel/sdk-next` / `@zitadel/sdk-nuxt`: server and client session reads
+    return the new shape.
+  - `@zitadel/cli`: scaffolded Nuxt auth plugins emit the new fields.
+
+  **Breaking:** the flat `name`/`email` session fields and the old SDK session
+  shape are gone. An unknown property is dropped rather than rejected, so a
+  client left on the old fields reads silently empty values instead of failing
+  loudly — update server, SDKs, and app chrome together.
+
+- [#1092](https://github.com/zitadel/nextgen/pull/1092) [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060) Thanks [@livio-a](https://github.com/livio-a)! - User responses carry the derived identity of ADR 058 §3a: the envelope
+  gains read-only `identifier`, `identifier_property`, and `display`,
+  resolved live from each user's own schema designations
+  (`x-identifier`/`x-display`) on every read path — query users (one batch
+  resolution per page), get by id, `users/me`, and the create read-back.
+  Clients render `display`, falling back to `identifier`, then `id`, with
+  zero designation logic of their own. The embedded console (shipped inside
+  `@zitadel/server`) renders them: the users list gains a leading **User**
+  identity column on exactly that chain plus a dedicated role-named
+  **Identifier** column (platform-derived, outside the schema-driven column
+  set), the user detail heads with the identity, and the console's
+  convention-based display-name guesser is removed.
+
+### Patch Changes
+
+- [#1126](https://github.com/zitadel/nextgen/pull/1126) [`21beee0`](https://github.com/zitadel/nextgen/commit/21beee0fe6d6b7df07a05f2bf9b8570bc72d4127) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The server now mints claim and dashboard URLs from a dedicated `server.public_base` setting (env `NEXTGEN_SERVER_PUBLIC_BASE`, default `https://nextgen.zitadel.cloud`) instead of deriving them from the schema identity namespace. Deployments reachable at another origin — a local server most of all — set the new key and `zitadel claim` opens the right console instead of a dead `nextgen.com` address. A misconfigured base (query, fragment, userinfo, or a non-http(s) scheme) now fails at startup instead of leaking into every minted URL.
+
+- [#1090](https://github.com/zitadel/nextgen/pull/1090) [`941645e`](https://github.com/zitadel/nextgen/commit/941645e194c9d2b0d1f0aa484f0c0d518bddafc8) Thanks [@livio-a](https://github.com/livio-a)! - Internal plumbing for ADR 058 §3/§4: the `user-ref` resolution primitives
+  (designation readers, `domain.ResolveUserRef`, and the batched
+  `(project_id, user_ids) → refs` resolution port) and the inert `user-ref`
+  wire component. No endpoint behavior changes yet — session adoption ships
+  separately.
+
+## 1.0.0-alpha.20
+
+### Major Changes
+
+- [#982](https://github.com/zitadel/nextgen/pull/982) [`c1ee831`](https://github.com/zitadel/nextgen/commit/c1ee83117f22e50885bf551740ba5719832c0bc9) Thanks [@vitorbari](https://github.com/vitorbari)! - Remove `GET /users`. `POST /users/query` replaces it, matching projects and
+  teams, which have no `GET` collection either. Callers move from
+  `listUsers({ limit, page_token })` to `queryUsers({ limit, page_token })`,
+  which additionally accepts `filter` and `sorting`.
+
+### Minor Changes
+
+- [#981](https://github.com/zitadel/nextgen/pull/981) [`c8dfb1f`](https://github.com/zitadel/nextgen/commit/c8dfb1f3d64d10c9535184994a6221a5a159d103) Thanks [@vitorbari](https://github.com/vitorbari)! - Add `POST /users/query`, the structured-filter user list. Filter and sort by
+  `created_at`, `id`, `schema`, `status`, or `lifecycle_owner_team_id`, paginated
+  with the same cursor contract as the other query endpoints. Unlike them it
+  takes no `project_id` — the users list is bound to the token's own project.
+
+- [#1070](https://github.com/zitadel/nextgen/pull/1070) [`cb6894d`](https://github.com/zitadel/nextgen/commit/cb6894dc8763758a785c775d5fa7c6fa80d1181d) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `POST /projects/{project_id}/claim/complete` now distinguishes two reasons for its 403. `claim.no_personal_team` still means the user holds no team membership at all, which clears itself because the next sign-in provisions one. The new `claim.personal_team_not_active` means the membership exists but is not active, so provisioning will not clear it, and `details.details.membership_status` says which state it is in: `removed` (withdrawn by deactivating the team or the user, so someone has to restore the user's access — the team itself may still be active), `inactive` (suspended), or `pending` (an unaccepted invitation). Clients can branch on the code to stop offering one message for both, and on the status to say what would actually clear it. The 403 response is now a `oneOf` over the two codes discriminated on `code`, so generated clients get a variant per code instead of typing every 403 as the old one.
+
+- [#1078](https://github.com/zitadel/nextgen/pull/1078) [`bb8b010`](https://github.com/zitadel/nextgen/commit/bb8b0102145ee9ed75fc3e334185478a656ed4f1) Thanks [@peintnermax](https://github.com/peintnermax)! - The console serves the project claim page at `/claim`: a developer opening a claim link authenticates through the platform login widget and the project is attached to their personal team, with explicit outcomes for an expired, already-claimed, or unauthorized challenge instead of a redirect loop.
+
+- [#1075](https://github.com/zitadel/nextgen/pull/1075) [`309ae57`](https://github.com/zitadel/nextgen/commit/309ae57e20145b6417d77726624e7ceb6c1a288b) Thanks [@wim07101993](https://github.com/wim07101993)! - Projects now carry **environments** — the runtime slots a release is deployed onto (ADR 035). Two read endpoints ship: `GET /environments` lists a project's environments by name, and `GET /environments/{name}` reads one by its project-unique name, which is the handle a deploy target is already known by.
+
+  Environments are identity only for now: `{ id, project_id, name, created_at }`, with no link to a release yet. Because there is no create endpoint, every project — new or created through the CLI — is seeded with `dev`, `staging` and `prod` at creation, and the set cannot be changed until environment lifecycle lands. Existing projects are not backfilled.
+
+  Seeding emits one `environment.created` audit event per environment.
+
+- [#1071](https://github.com/zitadel/nextgen/pull/1071) [`b1a4899`](https://github.com/zitadel/nextgen/commit/b1a489967af31962f4eba834f64f9825f4e525e3) Thanks [@vitorbari](https://github.com/vitorbari)! - `POST /users/query` accepts `expand: ["lifecycle_owner_team"]`, which resolves
+  each user's `metadata.lifecycle_owner_team_id` into the team itself at
+  `metadata.lifecycle_owner_team`. It is the same body `GET /teams/{team_id}`
+  serves, so a list of users renders its owning teams without a request per user.
+
+  The property is absent when not requested and `null` when the user is
+  self-owned. Expanding it requires `team.read` in addition to `user.read`; the
+  id alone stays unconditional.
+
+- [#984](https://github.com/zitadel/nextgen/pull/984) [`b2a74e4`](https://github.com/zitadel/nextgen/commit/b2a74e49eb44448c4c2203ce5642698c45ef8863) Thanks [@vitorbari](https://github.com/vitorbari)! - Embed a user's team memberships on `POST /users/query` with
+  `expand: ["teams"]`, saving a request per user. The property is omitted when
+  not requested and `[]` when the user has none. Embedded lists are capped at 10
+  with `teams_truncated`; the whole list stays at `GET /users/{user_id}/teams`.
+
+- [#983](https://github.com/zitadel/nextgen/pull/983) [`25c1802`](https://github.com/zitadel/nextgen/commit/25c1802a9df257d7eca1a2469cb4caf389118a25) Thanks [@vitorbari](https://github.com/vitorbari)! - Filter users by team: `POST /users/query` accepts a `team_id` filter field,
+  restricting the result to users holding an active membership in that team.
+  `equals` only, and it may be given once. It is filterable but not sortable.
+
+  As everywhere on the user endpoints, `team_id` is membership, not lifecycle
+  ownership — `lifecycle_owner_team_id` is a separate filter field answering a
+  different question: which team may deprovision the user.
+
+- [#1079](https://github.com/zitadel/nextgen/pull/1079) [`7910305`](https://github.com/zitadel/nextgen/commit/79103051d4fa05897fa63f4e4a87dcdfd0b0b37f) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `GET /flow-definitions` accepts `expand=user_schema` and embeds each flow definition's user schema on the entry, the same object `GET /schemas/{id}` returns, so a directory shows schema names from one request instead of one schema request per flow. The property is omitted when not requested and `null` when the referenced schema cannot be resolved or read; an unknown expand value is rejected with a 400. Expansion changes neither ordering nor page tokens.
+
+- [#986](https://github.com/zitadel/nextgen/pull/986) [`b1bcc37`](https://github.com/zitadel/nextgen/commit/b1bcc3740fe780297761baaf69f9df403927efcc) Thanks [@grvijayan](https://github.com/grvijayan)! - `GET /flow_definitions` now returns each row as the same `{id, project_id, flow_definition, created_at, updated_at}` representation that `GET /flow_definitions/{id}` returns, so a list row carries the flow's name, status, user schema, purposes and steps. The flat summary it returned before is gone, and with it the `schema_uri` field, which the response declared but the server never populated. Clients that read `name` or `status` from the top level of a list row must read them from `flow_definition`.
+
+  `POST /flow_definitions` and `PUT /flow_definitions/{id}` now return the `created_at` and `updated_at` the database wrote. Both answered with zero timestamps before.
+
+- [#988](https://github.com/zitadel/nextgen/pull/988) [`0a9a5af`](https://github.com/zitadel/nextgen/commit/0a9a5afd0336382ca8ebef9c646f09acde2d7ada) Thanks [@livio-a](https://github.com/livio-a)! - Login flows resolve the identifier from the schema's designation: a flow field carries the identifier challenge only when it names the schema-root `x-identifier` property. Other unique properties keep their uniqueness for storage but are no longer treated as login identifiers.
+
+- [#1004](https://github.com/zitadel/nextgen/pull/1004) [`b94e797`](https://github.com/zitadel/nextgen/commit/b94e79767e84e1898f6ffe0f97e9c629a3788f86) Thanks [@vitorbari](https://github.com/vitorbari)! - Reading a user's team memberships now requires `team_membership.read` on top of
+  `user.read`, on every surface that serves them: `GET /users/{user_id}/teams`,
+  and `POST /users/query` when `expand` asks for `teams` or a filter selects on
+  `team_id`. Requesting any of them without it answers `403` rather than quietly
+  omitting the data or serving the filtered page.
+
+  Granular scopes are not minted yet, so an operator project secret satisfies the
+  requirement for now; browser-plane preview secrets do not.
+
+- [#1026](https://github.com/zitadel/nextgen/pull/1026) [`3474d05`](https://github.com/zitadel/nextgen/commit/3474d05856a796cd1bb8b9b20ac1d49312b5c149) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Add grant create, get, and revoke APIs for project viewer/editor/admin bindings.
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - feat: the sign-in and sign-up surface is rebuilt on the shadcn design language. The card, fields, buttons, alert and trustmark are re-cut to the shadcn geometry and re-keyed onto the shadcn token roles, so every colour now comes from a semantic `--zl-*` role and light mode falls out of the token layer. Form-level alerts move below the fields, forgot-password moves onto the password field's label row, and headings and labels are set in the display face. Tenant branding, the `part`/`exportparts` hooks and `suppress-header` are unchanged.
+
+- [#951](https://github.com/zitadel/nextgen/pull/951) [`0fa2e45`](https://github.com/zitadel/nextgen/commit/0fa2e45fe265e0f90c68c664c3c460cbc85781ea) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Passkeys can now be registered through the management API: `POST
+/users/{user_id}/passkeys` (scope `user.write`) starts a WebAuthn ceremony and
+  returns the creation options, and `POST
+/users/{user_id}/passkeys/{registration_id}` verifies the attestation and
+  stores the credential with an optional display name. Combined with `POST
+/users` and `PUT /users/{user_id}/password`, backends can provision users with
+  either credential type without going through the hosted login flow.
+
+- [#979](https://github.com/zitadel/nextgen/pull/979) [`3017d95`](https://github.com/zitadel/nextgen/commit/3017d95238f8d7bf05b4f0426c57c83b33872e7a) Thanks [@peintnermax](https://github.com/peintnermax)! - Deployments that opt into the platform plane via `platform.bootstrap_project` provision their users a personal team: every session exchange ensures the team and its membership, so a freshly registered developer can complete a project claim without manual seeding, and users created before this change converge on their next sign-in. Provisioning is best-effort and never fails the sign-in, so a session can briefly exist before its team does; `claim/complete` answers `claim.no_personal_team` until the next exchange, which retries. Standalone deployments that merely pin `platform.project_id` are unaffected.
+
+  `platform.bootstrap_project` now seeds a usable project rather than a bare row: encryption and signing keys, the default user schema, and the default login flow definitions are created with it, so a bootstrapped platform project can serve the registration and sign-in the platform plane exists for.
+
+  **Upgrade note for existing `platform.bootstrap_project` deployments.** The previous bootstrap created the platform project as a bare row with none of that, and there is no way to seed one in place yet. The server therefore refuses to start when it finds a platform project without an active token encryption key, rather than booting into a project that cannot serve a registration. If you hit this, unset `platform.bootstrap_project` **and** set `platform.project_id` to `proj_platform`, which starts with the pre-upgrade behaviour; track in-place seeding under [#527](https://github.com/zitadel/nextgen/issues/527). Set both, not just the flag: with neither set, the default project falls back to the earliest-created one, which silently repoints console and claim routing away from the platform project unless it happened to be created first. Do not delete the platform project to force a reseed: deletion cascades to its users, teams, schemas, sessions, and grants.
+
+- [#1088](https://github.com/zitadel/nextgen/pull/1088) [`79ea448`](https://github.com/zitadel/nextgen/commit/79ea4487b59f293f6306528c9199a6c57837f5cc) Thanks [@vitorbari](https://github.com/vitorbari)! - The API contract gains **releases** — immutable, project-scoped configuration snapshots. A release pins one revision of each resource it includes and records who assembled it, from what commit, and why; it carries pointers and metadata, never resource content.
+
+  Three endpoints are described: `POST /releases` bundles a release from revision ids that already exist, `GET /releases` lists a project's releases newest first with the pinned set omitted, and `GET /releases/{release_id}` reads one release with its pointers.
+
+  `POST /releases` is idempotent on the pinned set — metadata is excluded from the comparison, so re-submitting the same revisions with a different message answers `200` with the release that already pins them instead of `201` and a duplicate.
+
+  This ships the contract and the generated clients only. The endpoints answer `501` until the implementation lands.
+
+- [#964](https://github.com/zitadel/nextgen/pull/964) [`d7aefb3`](https://github.com/zitadel/nextgen/commit/d7aefb3020cf7fb32cfc89229fb379c320ad5898) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Record observed requestor IP, User-Agent, and Origin on Path A `request.api` event metadata so SIEM pipelines can join mutations via `request_id`.
+
+- [#987](https://github.com/zitadel/nextgen/pull/987) [`4a8d546`](https://github.com/zitadel/nextgen/commit/4a8d546d8abd6902f2e19c50e8b980f91451bbfd) Thanks [@livio-a](https://github.com/livio-a)! - User schemas can now declare their identity: the schema-root `x-identifier` keyword names the leaf property whose value identifies a user, and `x-display` lists the property paths that render the display name. Inline schema uploads validate the designations — every designated property must exist and declare a scalar type, the identifier must additionally be unique within the project, and a schema that enables password authentication must designate an identifier, since password verification is unreachable without one. The shipped default human-user schema designates `email`.
+
+- [#932](https://github.com/zitadel/nextgen/pull/932) [`2bd640d`](https://github.com/zitadel/nextgen/commit/2bd640d920f4c30eb711a101640da9563e6cef6f) Thanks [@vitorbari](https://github.com/vitorbari)! - `GET /schemas` accepts a `kind` query parameter, so you can list only the user schemas in a project instead of every schema document it has stored. The console's User schemas screen now uses it.
+
+  The `schema.created` audit event carries the schema's kind and object type, where it previously carried an empty payload.
+
+- [#930](https://github.com/zitadel/nextgen/pull/930) [`1ef3c32`](https://github.com/zitadel/nextgen/commit/1ef3c32fd6fa7091f2300fa9e210f43040dbd143) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `GET /schemas` and `GET /schemas/{id}` now return each schema as an `{id, schema, metadata}` envelope carrying the full customer-authored document, and `GET /schemas` wraps its rows in a `{schemas: [...]}` object. The two read endpoints share one representation; the resource `id` and `metadata.created_at` are server-owned and can no longer collide with keys in the document. Clients that read the bare document from `GET /schemas/{id}` or the bare `{id, created_at}` array from `GET /schemas` must unwrap the envelope.
+
+- [#946](https://github.com/zitadel/nextgen/pull/946) [`78915e0`](https://github.com/zitadel/nextgen/commit/78915e0595901fd134ec92f7074ca37cb6a7ddbe) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `GET /schemas` now pages by cursor: it takes `limit` (default 20, max 100) and `page_token`, returns `next_page_token`, rejects malformed or mismatched page tokens with `req.invalid`, and drops the never-implemented `offset` parameter.
+
+- [#957](https://github.com/zitadel/nextgen/pull/957) [`14cc4df`](https://github.com/zitadel/nextgen/commit/14cc4dff9424e0ec8024f1821786b0967930505b) Thanks [@vitorbari](https://github.com/vitorbari)! - `GET /schemas` takes a `revisions` parameter: `all` (the default) keeps returning every revision, and `latest` returns the newest revision of each `objectType` — one row per schema. Schemas stored without an `objectType` are returned by both. A `page_token` is bound to the mode it was issued in and is rejected by the other, and the console's user-schema directory and add-user picker now show one row per schema rather than one per edit.
+
+- [#947](https://github.com/zitadel/nextgen/pull/947) [`19fc783`](https://github.com/zitadel/nextgen/commit/19fc7835e23d04da9c458bda2fda39c4aa9dbc00) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The console's schema directory now pages through `GET /schemas` with a `Load more` button, and `zitadel schemas list` walks every page so the printed revision history stays complete.
+
+- [#976](https://github.com/zitadel/nextgen/pull/976) [`b8b5b97`](https://github.com/zitadel/nextgen/commit/b8b5b970c6cf99d2e60b55737fce860876b16577) Thanks [@muhlemmer](https://github.com/muhlemmer)! - Filter sessions by team on `POST /sessions/query`. The new `lifecycle_owner_team_id` filter field returns the sessions of the users whose lifecycle that team owns — the same users it can deactivate and whose sessions it can revoke. Roster membership does not match: a collaborator on the team's roster whose lifecycle another team (or the user themselves) owns is not returned. A session stays project-scoped and carries no team, so the link is read from the user at query time; a session of a self-owned user, and a session with no user, match no team.
+
+  The change also ships an index-only schema migration: `sessions` gains `(project_id, created_at, id)` and `(project_id, user_id)`, and on SQLite `users` gains the lifecycle-owner index the other dialects already had. It adds no column or table, but it does close a pre-existing gap — before it, every page of `POST /sessions/query` scanned and sorted a project's whole session table (127 ms for an unfiltered first page at 2M sessions, against 0.44 ms after). On PostgreSQL the indexes are built `CONCURRENTLY`, so upgrading does not block session creation or exchange.
+
+- [#950](https://github.com/zitadel/nextgen/pull/950) [`2a0623b`](https://github.com/zitadel/nextgen/commit/2a0623bfc5f045905de8930fe45aeadf3de10f78) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Sessions created by sign-up now record how the user authenticated: registering
+  with a passkey yields a session with a verified passkey factor, and registering
+  with a password yields one with a verified password factor. Passkey sign-up
+  also became atomic — if the chosen identifier is already taken, the flow now
+  routes to `user_already_exists` (matching the password path) instead of
+  silently attaching the credential, and no partial user is left behind. The
+  `pkreg.not_found` error code disappeared from `POST /flow/{id}/submit`; an
+  expired or unknown registration ceremony now surfaces as `att.stale_challenge`.
+
+### Patch Changes
+
+- [#912](https://github.com/zitadel/nextgen/pull/912) [`67b3c5a`](https://github.com/zitadel/nextgen/commit/67b3c5a354c49fa066c96d1ce93421e6efadd9df) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Wire the claim init/status/complete endpoints to the claim service (ADR 046): challenge tokens now use the contract's `ch_` wire prefix, the 409 already-claimed response carries flat `details.{team_id, dashboard_url}`, and the API handler resolves the platform-project pin in bootstrap mode so claim/complete accepts platform sessions.
+
+- [#945](https://github.com/zitadel/nextgen/pull/945) [`2f1b2f4`](https://github.com/zitadel/nextgen/commit/2f1b2f4dce2ca5c1c9582e9737ca143d1bc97177) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Completing a project claim as a user without an active personal team now returns a clear 403 with code `claim.no_personal_team` instead of a 500, and owning-team grants can no longer be created with an expiry: project ownership ends only by explicit transfer or revocation, never by lapse.
+
+- [#912](https://github.com/zitadel/nextgen/pull/912) [`67b3c5a`](https://github.com/zitadel/nextgen/commit/67b3c5a354c49fa066c96d1ce93421e6efadd9df) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Derive claim state from the active owning-team grant instead of a denormalized resource-scope team marker (ADR 054): claim/complete writes only the authz_assignments grant, claim status and events visibility read it, and a per-dialect uniqueness guarantee (partial unique index on Postgres/SQLite, NULL_FILTERED owning_team_key index on Spanner) keeps at most one active owning team per project, closing the double-claim race.
+
+- [#931](https://github.com/zitadel/nextgen/pull/931) [`d997952`](https://github.com/zitadel/nextgen/commit/d997952eb28ebb1ea81b3291ef8b632a828f0eb4) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The console renders the schema directory and the add-user schema picker from the single `GET /schemas` response instead of fetching every schema's document individually.
+
+- [#980](https://github.com/zitadel/nextgen/pull/980) [`c8288b5`](https://github.com/zitadel/nextgen/commit/c8288b58d8370fb1e60ad366e394e6c575d9ed49) Thanks [@vitorbari](https://github.com/vitorbari)! - Document what `team_id` does on the user endpoints. On `POST /users` it adds
+  the new user to that team and scopes team-unique attributes; on
+  `GET /users/{user_id}` it serves the user only when they hold an active
+  membership there. Both are membership, not lifecycle ownership — which is
+  reported as `metadata.lifecycle_owner_team_id` and cannot be set through the
+  API. No request or response shape changed.
+
+- [#1086](https://github.com/zitadel/nextgen/pull/1086) [`3f3dd43`](https://github.com/zitadel/nextgen/commit/3f3dd4312b52b90e3cb96d01826b488f55a1dcab) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Fix embedded default-login-flow seeding dropping each transition's `purpose`
+  field, which left the login flow's Sign Up link unable to switch the flow
+  into registration mode.
+
+- [#1036](https://github.com/zitadel/nextgen/pull/1036) [`7d27c9c`](https://github.com/zitadel/nextgen/commit/7d27c9cdf26230f02e34b10169df98f958c4dae1) Thanks [@wim07101993](https://github.com/wim07101993)! - `GET /flow_definitions` now bounds its result set. A request that omits `limit` returned every flow definition in the project; it now returns the same default page of 20 as the other list endpoints, capped at 100, and hands back a `next_page_token` to walk the rest.
+
+- [#960](https://github.com/zitadel/nextgen/pull/960) [`ad19e29`](https://github.com/zitadel/nextgen/commit/ad19e29957bd8d4caf146ae87d6e3775e582cd87) Thanks [@livio-a](https://github.com/livio-a)! - Login identifier lookups now match only uniquely-registered attribute values. Previously, an equal value stored under the same key as a non-unique attribute of another user (for example a notification email address) made the lookup ambiguous and rejected the legitimate user's sign-in.
+
+- [#970](https://github.com/zitadel/nextgen/pull/970) [`6098080`](https://github.com/zitadel/nextgen/commit/609808008e5be1159f7eadf3d904de52c9ea3b70) Thanks [@livio-a](https://github.com/livio-a)! - Unique attribute values are now compared case-insensitively (Unicode case folding): `Alice@Example.com` and `alice@example.com` register as one unique value and resolve to the same user at sign-in regardless of typed casing. Stored attribute values keep their original casing.
+
 ## 0.1.0-alpha.19
 
 ### Minor Changes

@@ -97,6 +97,20 @@ func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *Creat
 	return r, ht.ErrNotImplemented
 }
 
+// CreateGrant implements createGrant operation.
+//
+// Bind a user or team to `project.viewer`, `project.editor`, or
+// `project.admin` on the project identified by the `project-id` header.
+// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
+// created here — claim owns that path. An unrevoked grant with the same
+// principal and relation occupies the unique key even after `expires_at`;
+// DELETE it before re-creating.
+//
+// POST /grants
+func (UnimplementedHandler) CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (r CreateGrantRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateHandoff implements createHandoff operation.
 //
 // Completes the authentication attempt and mints a `handoff_token`.
@@ -119,6 +133,26 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 //
 // POST /projects
 func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (r CreateProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateRelease implements createRelease operation.
+//
+// Bundles a release from revisions that already exist, supplied as
+// `(kind, revision_id)` pairs. No new revisions are allocated — use the
+// per-kind create endpoints for that, then pin the ids here.
+// Every referenced `revision_id` must exist in the project. Each one's handle
+// is read from the revision itself and recorded on the release, so a resource
+// is always pinned under the identity it declares.
+// Creating a release does not deploy it. A release is environment-agnostic
+// and the same release can later be deployed to any number of environments
+// unchanged.
+// Idempotent on the pinned set: metadata is excluded from the comparison, so
+// re-submitting the same revisions with a different `message` returns the
+// release that already pins them rather than creating a second one.
+//
+// POST /releases
+func (UnimplementedHandler) CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -190,6 +224,18 @@ func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserReque
 //
 // DELETE /flow_definitions/{id}
 func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteGrant implements deleteGrant operation.
+//
+// Soft-revokes a grant this API manages and emits `authz.revoked`.
+// Already-revoked, missing, project-secret setup, and owning-team grants
+// return 404. The row is not un-revoked. Expired grants can still be
+// revoked so the unique binding can be reused.
+//
+// DELETE /grants/{id}
+func (UnimplementedHandler) DeleteGrant(ctx context.Context, params DeleteGrantParams) (r DeleteGrantRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -286,6 +332,17 @@ func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimS
 	return r, ht.ErrNotImplemented
 }
 
+// GetEnvironmentByName implements getEnvironmentByName operation.
+//
+// Reads one environment of the project by its name.
+// The lookup is scoped to the project in `project_id`: a name that exists in
+// another project answers `env.not_found` exactly as an unused name does.
+//
+// GET /environments/{name}
+func (UnimplementedHandler) GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (r GetEnvironmentByNameRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetEvent implements getEvent operation.
 //
 // Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -314,6 +371,22 @@ func (UnimplementedHandler) GetFlowDefinition(ctx context.Context, params GetFlo
 //
 // GET /flow/{id}
 func (UnimplementedHandler) GetFlowStep(ctx context.Context, params GetFlowStepParams) (r GetFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetGrant implements getGrant operation.
+//
+// Loads a grant by `(project_id, id)` that this API manages (user or team
+// bound to viewer, editor, or admin) and that has not been revoked.
+// "Active" here means not revoked: expired grants stay visible so the
+// client can DELETE before re-granting the same binding. Authorization
+// still ignores expired grants. Grants are not registered in
+// `resource_scope_index`; project scope is required on the query (same as
+// events). Misses, revoked rows, project-secret setup (`sk_proj`),
+// owning-team (`relation=team`) rows, and cross-project ids return 404.
+//
+// GET /grants/{id}
+func (UnimplementedHandler) GetGrant(ctx context.Context, params GetGrantParams) (r GetGrantRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -372,6 +445,22 @@ func (UnimplementedHandler) GetProject(ctx context.Context, params GetProjectPar
 //
 // GET /readyz
 func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetReleaseById implements getReleaseById operation.
+//
+// Reads one release: its metadata and the `(kind, handle, revision_id)`
+// tuples it pins.
+// Does not embed resource content. Resolve each `revision_id` through the
+// per-kind read endpoints when the bytes are needed.
+// The lookup is scoped to the project in `project_id`: a release id belonging
+// to another project answers not found exactly as an unknown id does, so the
+// endpoint cannot be used to probe for releases in projects the caller cannot
+// read.
+//
+// GET /releases/{release_id}
+func (UnimplementedHandler) GetReleaseById(ctx context.Context, params GetReleaseByIdParams) (r GetReleaseByIdRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -456,6 +545,15 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 	return r, ht.ErrNotImplemented
 }
 
+// ListEnvironments implements listEnvironments operation.
+//
+// Lists the project's environments ordered by name.
+//
+// GET /environments
+func (UnimplementedHandler) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (r ListEnvironmentsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListEvents implements listEvents operation.
 //
 // Returns project-scoped audit events, newest-first by keyset on
@@ -480,6 +578,17 @@ func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsPar
 //
 // GET /flow_definitions
 func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (r ListFlowDefinitionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListReleases implements listReleases operation.
+//
+// Lists the project's releases, newest first.
+// Entries carry metadata only — the pinned set is omitted. Read one release
+// with `GET /releases/{release_id}` to get its pointers.
+//
+// GET /releases
+func (UnimplementedHandler) ListReleases(ctx context.Context, params ListReleasesParams) (r ListReleasesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -513,15 +622,6 @@ func (UnimplementedHandler) ListUserPasskeys(ctx context.Context, params ListUse
 //
 // GET /users/{user_id}/teams
 func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTeamsParams) (r ListUserTeamsRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// ListUsers implements listUsers operation.
-//
-// List users.
-//
-// GET /users
-func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -560,6 +660,18 @@ func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySession
 //
 // POST /teams/query
 func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryUsers implements queryUsers operation.
+//
+// Returns the users of a project, paginated with a cursor.
+// The project comes from the credential, not from a parameter: the operation
+// is bound to the token's own project by construction. This is why it takes
+// no `project_id`, unlike the other query endpoints.
+//
+// POST /users/query
+func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest) (r QueryUsersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

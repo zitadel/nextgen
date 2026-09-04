@@ -54,10 +54,10 @@ export function ContextSwitcher() {
 
             - **no current team.** Neither `GET /sessions/me` nor the runtime
               document carries one, so there is nothing to show as selected.
-            - **nothing is team-scoped.** `GET /users` takes no `team_id`, and the
-              users and schemas lists are scoped by project, so choosing a team
-              would change nothing on screen. `team_id` exists only as an optional
-              param on create and get-by-id calls.
+            - **nothing is team-scoped yet.** `POST /users/query` now accepts a
+              `team_id` filter, but the console does not send one, and the
+              schemas list is still project-scoped — so choosing a team would
+              change nothing on screen until the users list passes it through.
 
           Restore this when a current team is resolvable and the list reads accept
           it. The plan badge has since been dropped from the design; if it returns,

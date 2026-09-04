@@ -123,14 +123,14 @@ func (v *Variable) GetDecryptedValue(decrypter crypto.Decrypter) (any, error) {
 type VariableOwner struct {
 	ProjectID string
 	// EnvironmentName names the environment of the project the variable belongs
-	// to.
+	// to, by name rather than by id: that is how an environment is addressed
+	// everywhere else, and it is what a request serving an environment knows.
 	//
-	// TODO: environments are not a resource yet (ADR 035 defines them as
-	// runtime slots but defers their internals), so this is unvalidated free
-	// text with nothing to point at: a typo scopes a variable into
-	// invisibility, and nothing enumerates the environments a project has. Once
-	// environments exist, key on them here and let the table carry the
-	// reference, the way project_id does.
+	// TODO: nothing checks that the environment exists. The empty string means
+	// "not scoped to an environment", so no environment row can ever match it
+	// and the table cannot carry the reference the way project_id does; the
+	// check belongs on the write path, against GetEnvironmentByName. Until
+	// then a typo scopes a variable into invisibility rather than failing.
 	EnvironmentName string
 	TeamID          string
 	UserSchemaID    string

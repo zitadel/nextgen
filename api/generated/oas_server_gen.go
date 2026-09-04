@@ -74,6 +74,17 @@ type Handler interface {
 	//
 	// POST /flow_definitions
 	CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
+	// CreateGrant implements createGrant operation.
+	//
+	// Bind a user or team to `project.viewer`, `project.editor`, or
+	// `project.admin` on the project identified by the `project-id` header.
+	// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
+	// created here — claim owns that path. An unrevoked grant with the same
+	// principal and relation occupies the unique key even after `expires_at`;
+	// DELETE it before re-creating.
+	//
+	// POST /grants
+	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -93,6 +104,23 @@ type Handler interface {
 	//
 	// POST /projects
 	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
+	// CreateRelease implements createRelease operation.
+	//
+	// Bundles a release from revisions that already exist, supplied as
+	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
+	// per-kind create endpoints for that, then pin the ids here.
+	// Every referenced `revision_id` must exist in the project. Each one's handle
+	// is read from the revision itself and recorded on the release, so a resource
+	// is always pinned under the identity it declares.
+	// Creating a release does not deploy it. A release is environment-agnostic
+	// and the same release can later be deployed to any number of environments
+	// unchanged.
+	// Idempotent on the pinned set: metadata is excluded from the comparison, so
+	// re-submitting the same revisions with a different `message` returns the
+	// release that already pins them rather than creating a second one.
+	//
+	// POST /releases
+	CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The optional `$id` field is the JSON Schema document
@@ -149,6 +177,15 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteGrant implements deleteGrant operation.
+	//
+	// Soft-revokes a grant this API manages and emits `authz.revoked`.
+	// Already-revoked, missing, project-secret setup, and owning-team grants
+	// return 404. The row is not un-revoked. Expired grants can still be
+	// revoked so the unique binding can be reused.
+	//
+	// DELETE /grants/{id}
+	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
 	// DeleteTeam implements deleteTeam operation.
 	//
 	// Deactivates the team.
@@ -221,6 +258,14 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/claim/status
 	GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (GetClaimStatusRes, error)
+	// GetEnvironmentByName implements getEnvironmentByName operation.
+	//
+	// Reads one environment of the project by its name.
+	// The lookup is scoped to the project in `project_id`: a name that exists in
+	// another project answers `env.not_found` exactly as an unused name does.
+	//
+	// GET /environments/{name}
+	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
 	// GetEvent implements getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -243,6 +288,19 @@ type Handler interface {
 	//
 	// GET /flow/{id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
+	// GetGrant implements getGrant operation.
+	//
+	// Loads a grant by `(project_id, id)` that this API manages (user or team
+	// bound to viewer, editor, or admin) and that has not been revoked.
+	// "Active" here means not revoked: expired grants stay visible so the
+	// client can DELETE before re-granting the same binding. Authorization
+	// still ignores expired grants. Grants are not registered in
+	// `resource_scope_index`; project scope is required on the query (same as
+	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
+	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	//
+	// GET /grants/{id}
+	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
 	// GetHealth implements getHealth operation.
 	//
 	// Check whether the server is healthy.
@@ -283,6 +341,19 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetReleaseById implements getReleaseById operation.
+	//
+	// Reads one release: its metadata and the `(kind, handle, revision_id)`
+	// tuples it pins.
+	// Does not embed resource content. Resolve each `revision_id` through the
+	// per-kind read endpoints when the bytes are needed.
+	// The lookup is scoped to the project in `project_id`: a release id belonging
+	// to another project answers not found exactly as an unknown id does, so the
+	// endpoint cannot be used to probe for releases in projects the caller cannot
+	// read.
+	//
+	// GET /releases/{release_id}
+	GetReleaseById(ctx context.Context, params GetReleaseByIdParams) (GetReleaseByIdRes, error)
 	// GetSchemaById implements getSchemaById operation.
 	//
 	// Get a schema by its ID. A schema ID identifies one immutable revision, so
@@ -343,6 +414,12 @@ type Handler interface {
 	//
 	// GET /branding
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
+	// ListEnvironments implements listEnvironments operation.
+	//
+	// Lists the project's environments ordered by name.
+	//
+	// GET /environments
+	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
 	// ListEvents implements listEvents operation.
 	//
 	// Returns project-scoped audit events, newest-first by keyset on
@@ -364,6 +441,14 @@ type Handler interface {
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListReleases implements listReleases operation.
+	//
+	// Lists the project's releases, newest first.
+	// Entries carry metadata only — the pinned set is omitted. Read one release
+	// with `GET /releases/{release_id}` to get its pointers.
+	//
+	// GET /releases
+	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
 	// ListSchemas implements listSchemas operation.
 	//
 	// Retrieve a list of all schemas available in the system. This endpoint
@@ -388,12 +473,6 @@ type Handler interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
-	// ListUsers implements listUsers operation.
-	//
-	// List users.
-	//
-	// GET /users
-	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// PatchProject implements patchProject operation.
 	//
 	// Updates the state of a project.
@@ -420,6 +499,15 @@ type Handler interface {
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
+	// QueryUsers implements queryUsers operation.
+	//
+	// Returns the users of a project, paginated with a cursor.
+	// The project comes from the credential, not from a parameter: the operation
+	// is bound to the token's own project by construction. This is why it takes
+	// no `project_id`, unlike the other query endpoints.
+	//
+	// POST /users/query
+	QueryUsers(ctx context.Context, req *QueryUsersRequest) (QueryUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.

@@ -104,8 +104,9 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 		return nil, err
 	}
 	input := service.GetSessionInput{
-		ProjectID: projectID,
-		SessionID: string(params.SessionID),
+		ProjectID:        projectID,
+		SessionID:        string(params.SessionID),
+		WithUserIdentity: true,
 	}
 
 	session, err := h.sessionService.Get(ctx, input)
@@ -298,12 +299,7 @@ func sessionToAPI(session *domain.Session) *api.SessionResponse {
 		resp.UserID = api.NewOptNilUserID(api.UserID(*session.UserID))
 	}
 	if session.User != nil {
-		if name := session.User.DisplayName(); name != "" {
-			resp.Name = api.NewOptString(name)
-		}
-		if email := session.User.Email(); email != "" {
-			resp.Email = api.NewOptString(email)
-		}
+		resp.User = api.NewOptUserRef(userRefToAPI(*session.User))
 	}
 	return resp
 }

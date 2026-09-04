@@ -27,6 +27,14 @@ func (s *CreateProjectRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *CreateReleaseRequest) setDefaults() {
+	{
+		val := bool(false)
+		s.GitDirty.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *Field) setDefaults() {
 	{
 		val := bool(false)
@@ -55,6 +63,22 @@ func (s *QueryTeamsRequest) setDefaults() {
 	{
 		val := int(20)
 		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QueryUsersRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *ReleaseMetadata) setDefaults() {
+	{
+		val := bool(false)
+		s.GitDirty = val
 	}
 }
 

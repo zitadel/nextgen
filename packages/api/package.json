@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/api",
-  "version": "0.1.0-alpha.19",
+  "version": "1.0.0-alpha.21",
   "description": "Generated TypeScript API client for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/api#readme",
   "bugs": {
