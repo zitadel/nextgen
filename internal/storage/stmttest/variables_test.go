@@ -297,6 +297,29 @@ func TestVariablesOwnerWithoutProjectRejected(t *testing.T) {
 	})
 }
 
+// TestVariablesProjectForeignKey covers the other half of the project being
+// mandatory: it is a real reference, so a variable cannot name a project that
+// does not exist and does not outlive the one it belongs to.
+func TestVariablesProjectForeignKey(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newVariableFixture(t, d.stmts)
+
+		err := d.stmts.SetVariable(t.Context(), &domain.Variable{
+			Name:  f.name,
+			Owner: domain.VariableOwner{ProjectID: f.requester.ProjectID + "-missing"},
+			Value: "orphan",
+		})
+		require.Error(t, err, "a variable cannot belong to a project that is not there")
+
+		f.set(t, d.stmts, f.ownerAt(levelProject), "project", false)
+		require.Len(t, f.get(t, d.stmts, f.requester), 1)
+
+		_, err = d.stmts.DeleteProjectByID(t.Context(), f.requester.ProjectID)
+		require.NoError(t, err)
+		assert.Empty(t, f.get(t, d.stmts, f.requester), "deleting the project takes its variables with it")
+	})
+}
+
 func errorsAsNoRowFound(err error) (*database.NoRowFoundError, bool) {
 	var target *database.NoRowFoundError
 	if errors.As(err, &target) {

@@ -6,11 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.uber.org/mock/gomock"
 
-	"github.com/zitadel/nextgen/internal/crypto"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -37,6 +38,15 @@ var (
 	}
 	variablesProjectOwner = domain.VariableOwner{ProjectID: variablesRequester.ProjectID}
 )
+
+// testCrypter is a real AES256GCM crypter, not a stand-in: it writes the key id
+// into the JWE header of everything it encrypts, which is what the read path
+// resolves the key by.
+func testCrypter(keyID string) op.Crypto {
+	var key [32]byte
+	copy(key[:], keyID)
+	return op.NewAES256GCMCrypto(key, keyID)
+}
 
 func testVariable(t *testing.T, name string, owner domain.VariableOwner, value any) *domain.Variable {
 	t.Helper()
@@ -243,20 +253,75 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 	t.Run("decrypts a secret into the document", func(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
-		crypter := &crypto.InverseCrypter{}
+		crypter := testCrypter("key-1")
 		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", crypter)
 		require.NoError(t, err)
 		require.NotEqual(t, "s3cret", secret.Value)
 
-		// The key is fetched because a secret is in scope.
-		keys.EXPECT().
-			GetProjectCrypter(gomock.Any(), variablesRequester.ProjectID, domain.EncryptionKeyPurposeSecret).
-			Return(crypter, nil)
+		// The key is fetched by the id the stored value names, not by project.
+		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(crypter, nil)
 		statements.EXPECT().GetVariables(gomock.Any(), variablesRequester, anyNames).Return([]*domain.Variable{secret}, nil)
 
 		got, err := svc.ReplaceVariables(t.Context(), variablesRequester, map[string]any{"token": "${{ token }}"})
 		require.NoError(t, err)
 		assert.Equal(t, "s3cret", got["token"])
+	})
+
+	// A variable outlives the key that was active when it was written, unlike a
+	// cookie or a token. Reaching for the active key would make every stored
+	// secret unreadable the first time the project's secret key is rotated.
+	t.Run("decrypts with the key that wrote the secret, not the active one", func(t *testing.T) {
+		svc, statements, keys := newMockedVariableService(t)
+
+		retired := testCrypter("key-1")
+		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", retired)
+		require.NoError(t, err)
+
+		// No GetProjectCrypter EXPECT: asking for the project's active key
+		// would hand back key-2 here, which cannot read what key-1 wrote.
+		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(retired, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesRequester, anyNames).Return([]*domain.Variable{secret}, nil)
+
+		got, err := svc.ReplaceVariables(t.Context(), variablesRequester, map[string]any{"token": "${{ token }}"})
+		require.NoError(t, err)
+		assert.Equal(t, "s3cret", got["token"])
+	})
+
+	// One key lookup however many secrets one document holds under it.
+	t.Run("resolves each key once per document", func(t *testing.T) {
+		svc, statements, keys := newMockedVariableService(t)
+
+		crypter := testCrypter("key-1")
+		first, err := domain.NewSecretVariable("first", variablesProjectOwner, "one", crypter)
+		require.NoError(t, err)
+		second, err := domain.NewSecretVariable("second", variablesProjectOwner, "two", crypter)
+		require.NoError(t, err)
+
+		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(crypter, nil).Times(1)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesRequester, anyNames).
+			Return([]*domain.Variable{first, second}, nil)
+
+		got, err := svc.ReplaceVariables(t.Context(), variablesRequester, map[string]any{
+			"first":  "${{ first }}",
+			"second": "${{ second }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "one", got["first"])
+		assert.Equal(t, "two", got["second"])
+	})
+
+	t.Run("renders a reference embedded in text", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		statements.EXPECT().GetVariables(gomock.Any(), variablesRequester, anyNames).Return([]*domain.Variable{
+			testVariable(t, "host", variablesProjectOwner, "example.test"),
+		}, nil)
+
+		got, err := svc.ReplaceVariables(t.Context(), variablesRequester, map[string]any{
+			"callback": "https://${{ host }}/callback",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.test/callback", got["callback"])
 	})
 
 	t.Run("leaves a reference the requester holds nothing for", func(t *testing.T) {
@@ -288,18 +353,35 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 	t.Run("reports a key lookup failure", func(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
-		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", &crypto.InverseCrypter{})
+		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", testCrypter("key-1"))
 		require.NoError(t, err)
 
-		sentinel := errors.New("no secret key for project")
-		keys.EXPECT().
-			GetProjectCrypter(gomock.Any(), variablesRequester.ProjectID, domain.EncryptionKeyPurposeSecret).
-			Return(nil, sentinel)
+		sentinel := errors.New("no key with that id")
+		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(nil, sentinel)
 		statements.EXPECT().GetVariables(gomock.Any(), variablesRequester, anyNames).Return([]*domain.Variable{secret}, nil)
 
 		_, err = svc.ReplaceVariables(t.Context(), variablesRequester, map[string]any{"token": "${{ token }}"})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
+	})
+
+	// A value flagged secret that is not something a crypter produced cannot
+	// name a key, and must fail rather than reach the document as it stands.
+	t.Run("reports a secret that carries no key id", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		broken := &domain.Variable{
+			Name:     "token",
+			Owner:    variablesProjectOwner,
+			Value:    "not-ciphertext",
+			IsSecret: true,
+		}
+		// No key service EXPECT: there is no key id to look up.
+		statements.EXPECT().GetVariables(gomock.Any(), variablesRequester, anyNames).Return([]*domain.Variable{broken}, nil)
+
+		got, err := svc.ReplaceVariables(t.Context(), variablesRequester, map[string]any{"token": "${{ token }}"})
+		require.Error(t, err)
+		assert.Nil(t, got)
 	})
 
 	t.Run("reports a storage failure", func(t *testing.T) {

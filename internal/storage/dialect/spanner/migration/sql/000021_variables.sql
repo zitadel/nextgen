@@ -1,11 +1,15 @@
 -- +goose NO TRANSACTION
 -- +goose Up
--- One row per variable. Owner ids are NOT NULL with an empty-string default;
--- see the postgres migration for why empty rather than NULL.
+-- One row per variable. The owner ids below the project are NOT NULL with an
+-- empty-string default; the project is required and references projects. See the
+-- postgres migration for why empty rather than NULL.
 -- +goose StatementBegin
 CREATE TABLE variables (
     name             STRING(MAX) NOT NULL,
-    project_id       STRING(MAX) NOT NULL DEFAULT (''),
+    project_id       STRING(MAX) NOT NULL,
+    -- TODO: environments are not a resource yet (ADR 035 defers their
+    -- internals), so this is free text with nothing to reference. Give it the
+    -- same treatment as project_id once they exist.
     environment_name STRING(MAX) NOT NULL DEFAULT (''),
     team_id          STRING(MAX) NOT NULL DEFAULT (''),
     user_schema_id   STRING(MAX) NOT NULL DEFAULT (''),
@@ -15,14 +19,14 @@ CREATE TABLE variables (
     created_at       TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     modified_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT variables_name_not_empty CHECK (name != ''),
-    -- Owner levels below the project are independent; only the project is
-    -- required, because an empty owner id reads as a wildcard on read and an
-    -- owner such as (team_id set, project_id '') would otherwise be readable
-    -- from any project. See the postgres migration.
-    CONSTRAINT variables_owner_needs_project CHECK (
-        project_id != ''
-        OR (environment_name = '' AND team_id = '' AND user_schema_id = '' AND user_id = '')
-    )
+    -- Owner levels below the project are independent of one another, so any
+    -- combination of them is storable. The project is required, because an
+    -- empty owner id reads as a wildcard on read. See the postgres migration.
+    CONSTRAINT variables_project_not_empty CHECK (project_id != ''),
+    CONSTRAINT fk_variables_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects (id)
+        ON DELETE CASCADE
 ) PRIMARY KEY (name, project_id, environment_name, team_id, user_schema_id, user_id)
 -- +goose StatementEnd
 

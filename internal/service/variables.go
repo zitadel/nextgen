@@ -97,26 +97,26 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 }
 
 func (s *variableService) ReplaceVariables(ctx context.Context, requester domain.VariableOwner, doc map[string]any) (map[string]any, error) {
-	toReplace, err := domain.ScanDocumentForVariables(doc)
+	placeholders, err := domain.ScanDocumentForVariables(doc)
 	if err != nil {
 		return nil, err
 	}
-	if len(toReplace) == 0 {
+	if len(placeholders) == 0 {
 		return doc, nil
 	}
 
-	// One name per query term, however many addresses reference it.
-	placeholders := make([]string, 0, len(toReplace))
-	seen := make(map[string]bool, len(toReplace))
-	for _, v := range toReplace {
-		if seen[v.Placeholder] {
+	// One name per query term, however many placeholders reference it.
+	variableNames := make([]string, 0, len(placeholders))
+	seen := make(map[string]bool, len(placeholders))
+	for _, placeholder := range placeholders {
+		if seen[placeholder.VariableName] {
 			continue
 		}
-		seen[v.Placeholder] = true
-		placeholders = append(placeholders, v.Placeholder)
+		seen[placeholder.VariableName] = true
+		variableNames = append(variableNames, placeholder.VariableName)
 	}
 
-	varList, err := s.v2Pool.Statements().GetVariables(ctx, requester, placeholders...)
+	varList, err := s.v2Pool.Statements().GetVariables(ctx, requester, variableNames...)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}
@@ -130,22 +130,37 @@ func (s *variableService) ReplaceVariables(ctx context.Context, requester domain
 		}
 	}
 
-	var decrypter crypto.Decrypter
 	if containsSecrets {
-		decrypter, err = s.keys.GetProjectCrypter(ctx, requester.ProjectID, domain.EncryptionKeyPurposeSecret)
-		if err != nil {
-			return nil, err
-		}
-
-		varMap, err = domain.Variables(varMap).DecryptAll(decrypter)
+		varMap, err = domain.Variables(varMap).DecryptAll(s.decrypterOfWritingKey(ctx))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if err := domain.ReplaceVariablesInDocument(doc, toReplace, varMap); err != nil {
+	if err := domain.ReplaceVariables(placeholders, varMap); err != nil {
 		return nil, err
 	}
 
 	return doc, nil
+}
+
+func (s *variableService) decrypterOfWritingKey(ctx context.Context) crypto.Decrypter {
+	crypters := make(map[string]crypto.Decrypter)
+
+	return crypto.DecrypterFn(func(encrypted string) (string, error) {
+		header, err := domain.DecodeJWEHeader(encrypted)
+		if err != nil {
+			return "", domain.ErrInternal(err).WithMessage("failed to decode the header of an encrypted variable")
+		}
+
+		crypter, ok := crypters[header.KeyID]
+		if !ok {
+			crypter, err = s.keys.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
+			if err != nil {
+				return "", err
+			}
+			crypters[header.KeyID] = crypter
+		}
+		return crypter.Decrypt(encrypted)
+	})
 }

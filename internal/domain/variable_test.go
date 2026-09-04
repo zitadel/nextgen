@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,13 +57,37 @@ func TestNewVariable(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects a value that is not a scalar", func(t *testing.T) {
+	t.Run("keeps every JSON scalar", func(t *testing.T) {
+		t.Parallel()
+
+		for name, value := range map[string]any{
+			"string": "dark",
+			"bool":   true,
+			"int":    8080,
+			"uint":   uint64(8080),
+			"byte":   byte('a'),
+			"rune":   'a',
+			"float":  1.5,
+		} {
+			t.Run(name, func(t *testing.T) {
+				v, err := domain.NewVariable("v", variableOwner, value)
+				require.NoError(t, err)
+				assert.Equal(t, value, v.Value)
+			})
+		}
+	})
+
+	t.Run("rejects a value JSON has no scalar for", func(t *testing.T) {
 		t.Parallel()
 
 		for name, value := range map[string]any{
 			"map":   map[string]any{"a": 1},
 			"slice": []any{1, 2},
 			"nil":   nil,
+			// A timestamp would come back as the string it serialized to, so a
+			// caller that wants one stores the string it wants back.
+			"time":     time.Now(),
+			"timeCopy": &time.Time{},
 		} {
 			t.Run(name, func(t *testing.T) {
 				_, err := domain.NewVariable("v", variableOwner, value)
@@ -162,6 +187,26 @@ func TestVariableGetDecryptedValue(t *testing.T) {
 		got, err := v.GetDecryptedValue(crypter)
 		require.NoError(t, err)
 		assert.Equal(t, "s3cret", got, "the type survives the round trip")
+	})
+
+	// The value goes through JSON in both directions, so the type on the way out
+	// is JSON's, not the one the caller wrote. Storage does the same to a plain
+	// value, which is why a number is documented as coming back a float64.
+	t.Run("returns a number as a float64", func(t *testing.T) {
+		t.Parallel()
+		crypter := cryptomock.NewMockCrypter(gomock.NewController(t))
+
+		crypter.EXPECT().Encrypt(gomock.Any()).DoAndReturn(func(plaintext string) (string, error) {
+			crypter.EXPECT().Decrypt("ciphertext").Return(plaintext, nil)
+			return "ciphertext", nil
+		})
+
+		v, err := domain.NewSecretVariable("port", variableOwner, 8080, crypter)
+		require.NoError(t, err)
+
+		got, err := v.GetDecryptedValue(crypter)
+		require.NoError(t, err)
+		assert.Equal(t, float64(8080), got, "there is no int on the other side of the storage")
 	})
 
 	t.Run("reports a secret whose stored value is not a string", func(t *testing.T) {

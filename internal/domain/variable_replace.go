@@ -4,20 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"slices"
+	"strings"
 )
 
-var variablePlaceholderRegex = regexp.MustCompile(`^\$\{\{ *(?P<placeholder>\w+) *}}$`)
+var variablePlaceholderRegex = regexp.MustCompile(`(?P<placeholder>\$\{\{ *(?P<variableName>\w+) *}})`)
 
-// maxExpansionBytes bounds the total the substituted values add to one
-// document, measured as the bytes they serialize to. A variable is capped at
-// [MaxVariableStringLength], but nothing caps how many addresses name it, so
-// without this a small document could still render a very large response.
 const maxExpansionBytes = 1 << 20 // 1Mb
-
-// maxDocumentDepth bounds how deep the scan will walk. A document that arrived
-// as JSON is far shallower; the guard is for one built in memory, where a map
-// that contains itself would otherwise recurse until the stack runs out.
 const maxDocumentDepth = 20
 
 func ErrVariableExpansionTooLarge() Error {
@@ -28,13 +20,15 @@ func ErrVariableDocumentTooDeep() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("document_too_deep"), "variable: document nests too deeply", nil, nil)
 }
 
-func ScanDocumentForVariables(doc map[string]any) (toReplace []VariableToReplace, err error) {
-	err = scanNodeForVariables(doc, nil, &toReplace)
-	return toReplace, err
+func ScanDocumentForVariables(doc map[string]any) (placeholders []VariablePlaceholder, err error) {
+	// The document itself is a map, never a string, so the root needs no
+	// container: nothing replaces the document as a whole.
+	err = scanNodeForVariables(doc, nil, &placeholders, 0)
+	return placeholders, err
 }
 
-func scanNodeForVariables(node any, address []any, toReplace *[]VariableToReplace) error {
-	if len(address) > maxDocumentDepth {
+func scanNodeForVariables(node any, address ReaderWriter, placeholders *[]VariablePlaceholder, depth int) error {
+	if depth > maxDocumentDepth {
 		return ErrVariableDocumentTooDeep()
 	}
 
@@ -42,171 +36,139 @@ func scanNodeForVariables(node any, address []any, toReplace *[]VariableToReplac
 	case map[string]any:
 		nestedMap := typed
 		for key, value := range nestedMap {
-			if err := scanNodeForVariables(value, append(address, key), toReplace); err != nil {
+			err := scanNodeForVariables(value, &mapReaderWriter{storage: nestedMap, key: key}, placeholders, depth+1)
+			if err != nil {
 				return err
 			}
 		}
 	case []any:
 		nestedSlice := typed
 		for i, value := range nestedSlice {
-			if err := scanNodeForVariables(value, append(address, i), toReplace); err != nil {
+			err := scanNodeForVariables(value, &sliceReaderWriter{storage: nestedSlice, index: i}, placeholders, depth+1)
+			if err != nil {
 				return err
 			}
 		}
 	case string:
 		value := typed
-		match := variablePlaceholderRegex.FindStringSubmatch(value)
-		if match == nil {
-			// if there is no variable with the placeholder name, we assume it is deliberate.
-			return nil
+		matches := variablePlaceholderRegex.FindAllStringSubmatch(value, -1)
+		for _, match := range matches {
+			*placeholders = append(*placeholders, VariablePlaceholder{
+				VariableName: match[variablePlaceholderRegex.SubexpIndex("variableName")],
+				Value:        match[variablePlaceholderRegex.SubexpIndex("placeholder")],
+				Storage:      address,
+			})
 		}
-		*toReplace = append(*toReplace, VariableToReplace{
-			Address:     slices.Clone(address),
-			Placeholder: match[variablePlaceholderRegex.SubexpIndex("placeholder")],
-		})
 	}
 
 	return nil
 }
 
-func ReplaceVariablesInDocument(
-	doc map[string]any,
-	toReplace []VariableToReplace,
-	vars map[string]*Variable,
-) error {
+func ReplaceVariables(placeholders []VariablePlaceholder, vars map[string]*Variable) error {
 	budget := maxExpansionBytes
 
-	type resolvedVariable struct {
-		value any
-		size  int
-	}
-	resolved := make(map[string]resolvedVariable, len(vars))
-
-	for _, v := range toReplace {
-		variable, ok := vars[v.Placeholder]
+	for _, placeholder := range placeholders {
+		variable, ok := vars[placeholder.VariableName]
 		if !ok {
 			continue
 		}
 
-		current, ok := resolved[v.Placeholder]
-		if !ok {
-			current = resolvedVariable{value: variable.Value, size: renderedSize(variable.Value)}
-			resolved[v.Placeholder] = current
-		}
-
-		if current.size > budget {
-			return ErrVariableExpansionTooLarge().WithDetails(map[string]any{
-				"placeholder": v.Placeholder,
-				"address":     v.Address,
-			})
-		}
-		budget -= current.size
-
-		if err := setNestedVariable(doc, v.Address, current.value); err != nil {
+		size, err := placeholder.ReplaceWith(variable, budget)
+		if err != nil {
 			return err
 		}
+		budget -= size
 	}
 	return nil
 }
 
-// renderedSize is what value costs when the document is serialized. Variable
-// values are scalars, so this is exact and cheap; an unencodable value is
-// charged the budget in full rather than being treated as free.
-func renderedSize(value any) int {
+type VariablePlaceholder struct {
+	// VariableName is the name of the variable with which the placeholder needs
+	// to be replaced.
+	VariableName string
+	// Value is the complete placeholder, "${{ name }}" spacing and all, which
+	// is what gets replaced inside the string holding it.
+	Value string
+	// Storage is the location from which the original value can be read and
+	// overwritten. This is needed because it is not possible to create a
+	// pointer to a value in a map.
+	Storage ReaderWriter
+}
+
+func (p VariablePlaceholder) ReplaceWith(variable *Variable, maxSize int) (replacedBytes int, err error) {
+	if p.Storage == nil {
+		return 0, ErrInternal(nil).WithMessage("cannot replace a variable without storage")
+	}
+	if variable == nil {
+		return 0, nil
+	}
+
+	container, ok := p.Storage.Read().(string)
+	if !ok {
+		return 0, ErrInternal(nil).WithMessage("cannot replace placeholder in non-string container")
+	}
+
+	// One string can hold the same placeholder more than once, and the
+	// replacement below takes every occurrence at once. So the occurrences
+	// are counted here, and the placeholders the earlier pass already resolved
+	// find nothing left to do and cost nothing.
+	occurrences := strings.Count(container, p.Value)
+	if occurrences == 0 {
+		return 0, nil
+	}
+
+	strValue := renderVariableValue(variable.Value)
+	replacedBytes = occurrences * len(strValue)
+	if replacedBytes > maxSize {
+		return 0, ErrVariableExpansionTooLarge().WithDetails(map[string]any{"variableName": p.VariableName})
+	}
+	// if the placeholder takes up the entire value, just replace it so that type
+	// is maintained. E.g. "${{ RETRY_COUNT }}" becomes 10 instead of "10"
+	if p.Value == container {
+		p.Storage.Write(variable.Value)
+	} else {
+		p.Storage.Write(strings.ReplaceAll(container, p.Value, strValue))
+	}
+
+	return replacedBytes, nil
+}
+
+func renderVariableValue(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
 	encoded, err := json.Marshal(value)
 	if err != nil {
-		return maxExpansionBytes + 1
+		return fmt.Sprintf("%v", value)
 	}
-	return len(encoded)
+	return string(encoded)
 }
 
-func setNestedVariable(m map[string]any, address []any, value any) error {
-	if len(address) == 0 {
-		return ErrInternal(nil).WithMessage("variable address is empty")
-	}
-
-	var node any = m
-	for _, step := range address[:len(address)-1] {
-		child, err := nestedChild(node, step)
-		if err != nil {
-			return err
-		}
-		node = child
-	}
-	return assignNested(node, address[len(address)-1], value)
+type ReaderWriter interface {
+	Write(v any)
+	Read() any
 }
 
-func nestedChild(node any, step any) (any, error) {
-	switch key := step.(type) {
-	case string:
-		nestedMap, ok := node.(map[string]any)
-		if !ok {
-			return nil, errVariableAddressMismatch(step, "map", node)
-		}
-		child, ok := nestedMap[key]
-		if !ok {
-			return nil, ErrInternal(nil).WithMessage("variable address names a key that is no longer present").
-				WithDetails(map[string]any{"key": key})
-		}
-		return child, nil
-	case int:
-		nestedSlice, ok := node.([]any)
-		if !ok {
-			return nil, errVariableAddressMismatch(step, "slice", node)
-		}
-		if key < 0 || key >= len(nestedSlice) {
-			return nil, ErrInternal(nil).WithMessage("variable address indexes outside the slice").
-				WithDetails(map[string]any{"index": key, "length": len(nestedSlice)})
-		}
-		return nestedSlice[key], nil
-	default:
-		return nil, errVariableAddressStep(step)
-	}
+type mapReaderWriter struct {
+	storage map[string]any
+	key     string
 }
 
-func assignNested(node any, step any, value any) error {
-	switch key := step.(type) {
-	case string:
-		nestedMap, ok := node.(map[string]any)
-		if !ok {
-			return errVariableAddressMismatch(step, "map", node)
-		}
-		nestedMap[key] = value
-		return nil
-	case int:
-		nestedSlice, ok := node.([]any)
-		if !ok {
-			return errVariableAddressMismatch(step, "slice", node)
-		}
-		if key < 0 || key >= len(nestedSlice) {
-			return ErrInternal(nil).WithMessage("variable address indexes outside the slice").
-				WithDetails(map[string]any{"index": key, "length": len(nestedSlice)})
-		}
-		// The slice header is a copy, but it points at the same backing array,
-		// so this reaches the document.
-		nestedSlice[key] = value
-		return nil
-	default:
-		return errVariableAddressStep(step)
-	}
+func (a *mapReaderWriter) Write(v any) {
+	a.storage[a.key] = v
+}
+func (a *mapReaderWriter) Read() any {
+	return a.storage[a.key]
 }
 
-func errVariableAddressMismatch(step any, want string, got any) Error {
-	return ErrInternal(nil).WithMessage("variable address does not match the document").
-		WithDetails(map[string]any{"step": fmt.Sprint(step), "expected": want, "got": fmt.Sprintf("%T", got)})
+type sliceReaderWriter struct {
+	storage []any
+	index   int
 }
 
-func errVariableAddressStep(step any) Error {
-	return ErrInternal(nil).WithMessage("variable address step is neither a map key nor a slice index").
-		WithDetails(map[string]any{"type": fmt.Sprintf("%T", step)})
+func (a *sliceReaderWriter) Write(v any) {
+	a.storage[a.index] = v
 }
-
-type VariableToReplace struct {
-	// Address is the chain of field names which leads to this variable in the
-	// doc. Keys can be either of type `string` for a nested key in a map or
-	// `int` for the index in a list.
-	Address []any
-	// Placeholder is the string which needs to be replaced with the actual
-	// value of the configured variable
-	Placeholder string
+func (a *sliceReaderWriter) Read() any {
+	return a.storage[a.index]
 }

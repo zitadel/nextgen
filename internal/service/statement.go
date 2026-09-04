@@ -329,8 +329,9 @@ type VariableStatements interface {
 	GetVariables(ctx context.Context, requester domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	// SetVariable writes variable under its own name and owner, replacing the
 	// value and IsSecret flag of an existing variable with the same name and
-	// owner. An owner whose ancestors are unset (a team with no project, say) is
-	// rejected by the owner-chain constraint.
+	// owner. The owner levels below the project are independent, so any
+	// combination of them is storable; the project is not optional, and one
+	// that is missing or names no existing project is rejected by the table.
 	SetVariable(ctx context.Context, variable *domain.Variable) error
 	// DeleteVariable removes the variable owner entered under name. Removing one
 	// that is not there returns NoRowFoundError; it never deletes a variable

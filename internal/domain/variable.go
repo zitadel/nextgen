@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 )
@@ -87,10 +86,10 @@ func NewSecretVariable(name string, owner VariableOwner, value any, encrypter cr
 
 func validateVariableValue(value any) error {
 	switch v := value.(type) {
-	case bool, byte,
+	case bool,
 		int, int8, int16, int32, int64,
-		float32, float64,
-		time.Time, *time.Time:
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
 		return nil
 	case string:
 		if len(v) > MaxVariableStringLength {
@@ -98,7 +97,7 @@ func validateVariableValue(value any) error {
 		}
 		return nil
 	default:
-		return ErrInvalidVariableValue().WithDetails(map[string]string{"reason": "the value can only be a bool, byte, int, float, rune, string or timestamp"})
+		return ErrInvalidVariableValue().WithDetails(map[string]string{"reason": "the value can only be a bool, number or string"})
 	}
 }
 
@@ -122,7 +121,16 @@ func (v *Variable) GetDecryptedValue(decrypter crypto.Decrypter) (any, error) {
 }
 
 type VariableOwner struct {
-	ProjectID       string
+	ProjectID string
+	// EnvironmentName names the environment of the project the variable belongs
+	// to.
+	//
+	// TODO: environments are not a resource yet (ADR 035 defines them as
+	// runtime slots but defers their internals), so this is unvalidated free
+	// text with nothing to point at: a typo scopes a variable into
+	// invisibility, and nothing enumerates the environments a project has. Once
+	// environments exist, key on them here and let the table carry the
+	// reference, the way project_id does.
 	EnvironmentName string
 	TeamID          string
 	UserSchemaID    string

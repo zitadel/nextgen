@@ -30,7 +30,7 @@ func plainVar(t *testing.T, name string, value any) *Variable {
 func TestScanDocumentForVariables(t *testing.T) {
 	t.Parallel()
 
-	t.Run("records an address per placeholder through maps and slices", func(t *testing.T) {
+	t.Run("binds a placeholder to the value it was found in, through maps and slices", func(t *testing.T) {
 		t.Parallel()
 
 		doc := decodeDoc(t, `{
@@ -41,23 +41,30 @@ func TestScanDocumentForVariables(t *testing.T) {
 
 		found, err := ScanDocumentForVariables(doc)
 		require.NoError(t, err)
+		require.Len(t, found, 4)
 
-		byPlaceholder := make(map[string][]any, len(found))
 		for _, f := range found {
-			byPlaceholder[f.Placeholder] = f.Address
+			assert.Equal(t, "${{ "+f.VariableName+" }}", f.Value, "the placeholder carries its own text")
+			require.NotNil(t, f.Storage)
+			assert.Equal(t, f.Value, f.Storage.Read(), "storage reads back the value the placeholder sits in")
+
+			// Writing through the placeholder is what has to reach the
+			// document, whether it sits in a map or in a slice.
+			f.Storage.Write(f.VariableName)
 		}
 
-		assert.Equal(t, []any{"a"}, byPlaceholder["one"])
-		assert.Equal(t, []any{"nested", "b"}, byPlaceholder["two"])
-		assert.Equal(t, []any{"list", 0}, byPlaceholder["three"])
-		assert.Equal(t, []any{"list", 2, "c"}, byPlaceholder["four"])
+		assert.Equal(t, "one", doc["a"])
+		assert.Equal(t, "two", doc["nested"].(map[string]any)["b"])
+		list := doc["list"].([]any)
+		assert.Equal(t, "three", list[0])
+		assert.Equal(t, "literal", list[1], "a value holding no placeholder is left alone")
+		assert.Equal(t, "four", list[2].(map[string]any)["c"])
 	})
 
-	// Each level builds its children's addresses with append, and append reuses
-	// the backing array once a slice has spare capacity. Without a copy, every
-	// sibling below that point is recorded at the same address -- so one field
-	// gets written repeatedly and the rest silently keep their placeholder.
-	t.Run("gives siblings distinct addresses deep in the document", func(t *testing.T) {
+	// Siblings share every level of the document above them, so a scan that
+	// hands them one shared location writes one field repeatedly and leaves the
+	// rest holding their placeholder.
+	t.Run("gives siblings their own storage deep in the document", func(t *testing.T) {
 		t.Parallel()
 
 		doc := decodeDoc(t, `{"a":{"b":{"c":{"k1":"${{ v }}","k2":"${{ v }}","k3":"${{ v }}"}}}}`)
@@ -66,31 +73,48 @@ func TestScanDocumentForVariables(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, found, 3)
 
-		leaves := make(map[string]bool, len(found))
-		for _, f := range found {
-			assert.Equal(t, []any{"a", "b", "c"}, f.Address[:3], "the shared prefix is intact")
-			leaves[f.Address[3].(string)] = true
-		}
-		assert.Equal(t, map[string]bool{"k1": true, "k2": true, "k3": true}, leaves,
-			"each sibling needs its own address")
+		require.NoError(t, ReplaceVariables(found, VariableListToMap([]*Variable{plainVar(t, "v", "value")})))
+
+		leaves := doc["a"].(map[string]any)["b"].(map[string]any)["c"].(map[string]any)
+		assert.Equal(t, map[string]any{"k1": "value", "k2": "value", "k3": "value"}, leaves,
+			"each sibling needs its own storage")
 	})
 
-	t.Run("ignores text that is not exactly one placeholder", func(t *testing.T) {
+	t.Run("ignores text that holds no placeholder", func(t *testing.T) {
 		t.Parallel()
 
 		doc := decodeDoc(t, `{
-			"embedded": "prefix ${{ v }} suffix",
-			"plain":    "no placeholder",
-			"dollars":  "$5.00",
-			"jsonref":  "#/$defs/user",
-			"single":   "${ v }",
-			"empty":    "${{ }}",
-			"dotted":   "${{ a.b }}"
+			"plain":   "no placeholder",
+			"dollars": "$5.00",
+			"jsonref": "#/$defs/user",
+			"single":  "${ v }",
+			"empty":   "${{ }}",
+			"dotted":  "${{ a.b }}"
 		}`)
 
 		found, err := ScanDocumentForVariables(doc)
 		require.NoError(t, err)
-		assert.Empty(t, found, "only a whole-value ${{ name }} is a reference")
+		assert.Empty(t, found, "a placeholder is ${{ name }} and nothing looser")
+	})
+
+	// A value that is one placeholder can keep the variable's type; a value
+	// that wraps text around its placeholders cannot, so the two have to be
+	// told apart -- and one value can hold several placeholders, which is a
+	// record each.
+	t.Run("records every placeholder a value embeds", func(t *testing.T) {
+		t.Parallel()
+
+		doc := decodeDoc(t, `{"callback":"${{ scheme }}://${{ host }}/callback"}`)
+
+		found, err := ScanDocumentForVariables(doc)
+		require.NoError(t, err)
+		require.Len(t, found, 2)
+
+		for _, f := range found {
+			assert.Equal(t, doc["callback"], f.Storage.Read(), "both sit in the same value")
+		}
+		assert.Equal(t, []string{"scheme", "host"}, []string{found[0].VariableName, found[1].VariableName},
+			"the placeholders come back in the order the value holds them")
 	})
 
 	t.Run("accepts optional inner spacing", func(t *testing.T) {
@@ -140,7 +164,7 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		return ReplaceVariablesInDocument(doc, found, decrypted)
+		return ReplaceVariables(found, decrypted)
 	}
 
 	t.Run("writes values at every address, keeping their type", func(t *testing.T) {
@@ -170,6 +194,62 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		assert.Equal(t, 8080, list[1].(map[string]any)["again"])
 	})
 
+	// A value that wraps text around its placeholder cannot keep the variable's
+	// type -- the text around it has to survive -- so the variable is rendered
+	// into the string instead. Callback and issuer URLs are why this exists.
+	t.Run("renders placeholders embedded in text", func(t *testing.T) {
+		t.Parallel()
+
+		doc := decodeDoc(t, `{
+			"callback": "https://${{ host }}/callback",
+			"both":     "${{ scheme }}://${{ host }}:${{ port }}",
+			"repeated": "${{ host }} and ${{ host }}",
+			"list":     ["https://${{ host }}/one"]
+		}`)
+
+		require.NoError(t, replace(t, doc,
+			plainVar(t, "host", "example.test"),
+			plainVar(t, "scheme", "https"),
+			plainVar(t, "port", 8080),
+		))
+
+		assert.Equal(t, "https://example.test/callback", doc["callback"])
+		// A number rendered into text reads the way the document would have
+		// spelled it, without the quotes a JSON string would carry.
+		assert.Equal(t, "https://example.test:8080", doc["both"])
+		assert.Equal(t, "example.test and example.test", doc["repeated"],
+			"a placeholder held twice in one value is replaced at both spots")
+		assert.Equal(t, "https://example.test/one", doc["list"].([]any)[0],
+			"a slice element is written in place too")
+	})
+
+	// Storage hands every number back as a float64, and fmt would write a large
+	// one in scientific notation.
+	t.Run("renders a large number the way the document would spell it", func(t *testing.T) {
+		t.Parallel()
+
+		doc := decodeDoc(t, `{"budget":"up to ${{ big }} bytes"}`)
+
+		require.NoError(t, replace(t, doc, plainVar(t, "big", float64(1000000))))
+		assert.Equal(t, "up to 1000000 bytes", doc["budget"])
+	})
+
+	t.Run("leaves the text around a placeholder nothing was entered for", func(t *testing.T) {
+		t.Parallel()
+
+		doc := decodeDoc(t, `{
+			"partly": "https://${{ host }}/${{ nope }}",
+			"none":   "https://${{ nope }}/callback"
+		}`)
+
+		require.NoError(t, replace(t, doc, plainVar(t, "host", "example.test")))
+
+		assert.Equal(t, "https://example.test/${{ nope }}", doc["partly"],
+			"what resolved is written, what did not stays as it is")
+		assert.Equal(t, "https://${{ nope }}/callback", doc["none"],
+			"a value nothing resolved in is left untouched")
+	})
+
 	t.Run("leaves a placeholder whose variable is not held", func(t *testing.T) {
 		t.Parallel()
 
@@ -196,7 +276,7 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		vars := VariableListToMap([]*Variable{secret})
 		decrypted, err := Variables(vars).DecryptAll(crypter)
 		require.NoError(t, err)
-		require.NoError(t, ReplaceVariablesInDocument(doc, found, decrypted))
+		require.NoError(t, ReplaceVariables(found, decrypted))
 		assert.Equal(t, "s3cret", doc["token"])
 	})
 
@@ -243,9 +323,37 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		found, err := ScanDocumentForVariables(fields)
 		require.NoError(t, err)
 
-		err = ReplaceVariablesInDocument(fields, found, VariableListToMap([]*Variable{big}))
+		err = ReplaceVariables(found, VariableListToMap([]*Variable{big}))
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrVariableExpansionTooLarge())
+	})
+
+	t.Run("charges an embedded placeholder to the same budget", func(t *testing.T) {
+		t.Parallel()
+
+		big := plainVar(t, "big", strings.Repeat("A", MaxVariableStringLength))
+
+		fields := make(map[string]any, 200)
+		for i := range 200 {
+			fields[string(rune('a'+i%26))+string(rune('a'+i/26))] = "prefix ${{ big }} suffix"
+		}
+
+		found, err := ScanDocumentForVariables(fields)
+		require.NoError(t, err)
+
+		err = ReplaceVariables(found, VariableListToMap([]*Variable{big}))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrVariableExpansionTooLarge())
+	})
+
+	// A placeholder that comes from anywhere but the scan has no document to
+	// write back to, and must say so rather than quietly doing nothing.
+	t.Run("reports a placeholder that is not bound to a document", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := VariablePlaceholder{VariableName: "v", Value: "${{ v }}"}.
+			ReplaceWith(plainVar(t, "v", "value"), maxExpansionBytes)
+		require.Error(t, err)
 	})
 
 	t.Run("allows a document that stays inside the budget", func(t *testing.T) {
