@@ -1160,25 +1160,29 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 	pc.state.CurrentPurpose = prev.Purpose
 	pc.state.ClearPendingChallenge()
 
+	// One resolution serves both the identifier check and the render below:
+	// it is the same step either way, and resolving twice would double the
+	// schema load and the chance of a transient failure on one back click.
+	resolved, err := r.resolveStepFields(pc.ctx, pc.state, prevStep)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+
 	// The identifier is re-offered, so the user may submit a different one —
 	// and even an unchanged one re-runs the user challenge. Both need an
 	// attempt without a user factor on it; keeping the resolved user would
 	// also scope the next passkey ceremony's allowCredentials to whoever the
 	// abandoned leg resolved.
-	collectsIdentifier, err := r.stepCollectsIdentifier(pc.ctx, pc.state, prevStep)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	if collectsIdentifier {
+	if collectsIdentifier(resolved) {
 		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
 			return FlowStepResult{}, err
 		}
 	}
 
-	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
+	// Prefill and build after the drop, so the step reflects the state the
+	// user is actually returning to.
+	prefillFromCollected(&resolved, pc.state.CollectedData.UserData)
+	step := r.buildStep(pc.state, prevStep, resolved, nil, nil, nil)
 	pc.state.IssuedAt = r.now()
 	return FlowStepResult{State: pc.state, Step: step}, nil
 }
@@ -1242,19 +1246,15 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	return r.buildStep(state, step, resolved, nil, nil, nil), nil
 }
 
-// stepCollectsIdentifier reports whether the step declares a field carrying
-// the identifier challenge.
-func (r *FlowStateMachineRuntime) stepCollectsIdentifier(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (bool, error) {
-	resolved, err := r.resolveStepFields(ctx, state, step)
-	if err != nil {
-		return false, err
-	}
+// collectsIdentifier reports whether a resolved field set carries the
+// identifier challenge.
+func collectsIdentifier(resolved FlowResolvedFields) bool {
 	for _, field := range resolved.Fields {
 		if field.Challenge == FlowFieldChallengeIdentifier {
-			return true, nil
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
