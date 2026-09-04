@@ -353,7 +353,7 @@ function claimWindowExpiredError(): ZitadelError {
     "E_VALIDATION",
     `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
     {
-      hint: "The project itself keeps working. To get a claimable project, create a fresh one with `zitadel setup` and claim it within the window.",
+      hint: "The project itself keeps working. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
     },
   );
 }

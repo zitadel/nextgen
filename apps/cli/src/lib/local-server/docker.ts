@@ -40,6 +40,12 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
     // published above, not the cloud default the server config falls back to.
     "--env",
     `NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:${spec.port}`,
+    // The local claim journey needs the platform project (claim/complete is
+    // authenticated against it), so a CLI-managed runtime seeds it by
+    // default — otherwise the claim URL this server advertises leads to a
+    // flow that cannot complete. An explicit env still wins.
+    "--env",
+    `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true"}`,
   ];
 
   if (spec.identity) {
