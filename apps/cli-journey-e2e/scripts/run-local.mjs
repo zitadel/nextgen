@@ -245,6 +245,10 @@ async function runFrameworkJourney(context) {
         // personal teams provisioned at session exchange. Framework lane
         // only — the testkit lane's contract is a scrubbed, unconfigured
         // binary. Reaches the server through prepare-app's `start` step env.
+        // Deliberately NOT a `zitadel start` default: platform.bootstrap_project
+        // pins the deployment's console/hosted-login default project to
+        // proj_platform, which would break the standalone semantics the
+        // embedded-surface suite proves.
         NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
         ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },

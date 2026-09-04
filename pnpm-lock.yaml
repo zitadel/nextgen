@@ -464,6 +464,9 @@ importers:
       undici:
         specifier: ^7.24.7
         version: 7.24.7
+      wrap-ansi:
+        specifier: ^7.0.0
+        version: 7.0.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -474,6 +477,9 @@ importers:
       '@types/semver':
         specifier: 'catalog:'
         version: 7.8.0
+      '@types/wrap-ansi':
+        specifier: ^3.0.0
+        version: 3.0.0
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../../packages/api-mock
@@ -24426,7 +24432,7 @@ snapshots:
   cli-truncate@5.2.0:
     dependencies:
       slice-ansi: 8.0.0
-      string-width: 8.2.1
+      string-width: 8.2.2
 
   cli-width@4.1.0: {}
 
@@ -33460,7 +33466,7 @@ snapshots:
   wrap-ansi@10.0.0:
     dependencies:
       ansi-styles: 6.2.3
-      string-width: 8.2.1
+      string-width: 8.2.2
       strip-ansi: 7.2.0
 
   wrap-ansi@6.2.0:

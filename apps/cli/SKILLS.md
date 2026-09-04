@@ -210,21 +210,37 @@ the CLI's help layer, not the envelope.
   safely. The link is always printed before any browser opens, so a headless
   machine, an SSH session, or `--no-open` needs no special handling — copy it
   and open it anywhere. Links last 10 minutes; once one lapses the command
-  exits `E_VALIDATION` and points at a fresh run. `--dry-run` stops before
+  exits `E_VALIDATION` and points at a fresh run. Claiming itself is only
+  possible within 14 days of project creation: past that the platform answers
+  `410 proj.claim_window_expired`, the command exits `E_VALIDATION`, and a
+  fresh link does **not** help — only a fresh `setup` yields a claimable
+  project (the old one keeps working, it just can't be attached anymore).
+  `--dry-run` stops before
   anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
   there is nothing to preview, because a claim is decided in a browser.
   Flags: `--no-open` (print the link instead of launching a browser),
   `--timeout <seconds>` (stop waiting sooner than the link's own expiry).
   `setup`, `status`, and `doctor` report whether a team is attached, reading
   `claimed_at`/`team_id` from `.zitadel/secret` (no platform call). `status`
-  carries `data.project.claim` as `{"kind": "detached"}` or
+  carries `data.project.claim` as
+  `{"kind": "detached", "claimable": true, "deadline": "2026-09-18T09:00:00.000Z"}`
+  (`claimable` flips to `false` once the locally recorded creation time says
+  the 14-day window has passed; the guidance then switches to reconciliation
+  wording but the claim command stays in `next_commands`, because the local
+  record can be stale and running `claim` answers authoritatively — an
+  attached project skips cleanly. `deadline` is omitted when the creation
+  time is unknown) or
   `{"kind": "attached", "team_id": "team_01H…", "claimed_at": "2026-08-01T09:00:00.000Z"}`,
   and `doctor` reports a
   `claim` check. A project with no team is only ever a **warning**, never a
   failure — it works exactly like one with a team, so `doctor` still exits 0
   and `--fix` deliberately does nothing (a claim needs a human in a browser).
-  All three stay silent about teams when the project's `server` in
-  `zitadel.json` is local or self-hosted, where there is nothing to attach.
+  `status` and `doctor` stay silent about teams off the cloud: they answer
+  offline and cannot know whether a local or self-hosted server hosts a
+  platform to claim into. `setup` is online anyway, so against a local server
+  it probes the runtime document and nudges only when the server hosts the
+  platform plane (`platform.bootstrap_project`), where the claim can actually
+  complete.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.

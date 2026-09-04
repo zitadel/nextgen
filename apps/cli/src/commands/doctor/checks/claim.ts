@@ -1,4 +1,4 @@
-import { claimState, type ClaimState } from "../../../lib/claim-state";
+import { CLAIM_WINDOW_DAYS, claimState, type ClaimState } from "../../../lib/claim-state";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "../../../lib/project";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -47,12 +47,24 @@ export class ClaimCheck implements SanityCheck {
     }
 
     if (state.kind === "detached") {
+      // The window classification travels in `details` so the doctor
+      // envelope's advisory can switch to the same reconciliation wording;
+      // the claim command itself stays suggested either way, since the local
+      // record may be stale and the server answers authoritatively.
+      const message = state.claimable
+        ? "This project is temporary until you attach it to a team, and claiming is only " +
+          `possible within ${CLAIM_WINDOW_DAYS} days of creation. Run \`zitadel claim\` ` +
+          "to make it permanent; nothing about the project changes."
+        : `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
+          "closed. Run `zitadel claim` to reconcile: a project attached from another " +
+          "machine reports its team, one never attached can no longer be claimed. Either " +
+          "way it keeps working; `zitadel setup` in a fresh directory gets you a new " +
+          "project you can attach.";
       return {
         name: this.name,
         status: "warn",
-        message:
-          "This project is temporary until you attach it to a team. Run `zitadel claim` " +
-          "to make it permanent; nothing about the project changes.",
+        message,
+        details: { claimable: state.claimable },
         path: this.path,
       };
     }

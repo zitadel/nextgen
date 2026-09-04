@@ -71,12 +71,14 @@
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
     "undici": "^7.24.7",
+    "wrap-ansi": "^7.0.0",
     "zod": "catalog:",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/semver": "catalog:",
+    "@types/wrap-ansi": "^3.0.0",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "msw": "catalog:",

@@ -10,6 +10,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { localServerHostsPlatform } from "../../../src/commands/setup";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const tempDirs: string[] = [];
@@ -203,6 +204,56 @@ describe("setup command", () => {
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
     expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+  });
+
+  // A bootstrapped local server hosts its own platform project and claim
+  // page. A real run probes the server's runtime document before nudging
+  // (localServerHostsPlatform, covered below); dry run contacts no platform,
+  // so its preview shows the nudge optimistically.
+  it("nudges claim when setting up against the local server (dry run previews it)", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "http://localhost:8080",
+      "--dry-run",
+      "--framework",
+      "next",
+    ]);
+
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+  });
+
+  // The probe behind the real-run local nudge: only a runtime document
+  // naming the well-known platform project counts, and every failure mode
+  // (wrong project, missing document, dead server) fails closed so setup
+  // never nudges into a claim that would 401 at complete.
+  it("detects the platform plane from the local runtime document, failing closed", async () => {
+    server.use(
+      http.get("http://localhost:9931/console/runtime.json", () =>
+        HttpResponse.json({ mode: "standalone", console_project_id: "proj_platform" }),
+      ),
+      http.get("http://localhost:9932/console/runtime.json", () =>
+        HttpResponse.json({ mode: "standalone", console_project_id: "proj_someone" }),
+      ),
+      http.get("http://localhost:9933/console/runtime.json", () =>
+        HttpResponse.json({ error: "nope" }, { status: 404 }),
+      ),
+      http.get("http://localhost:9934/console/runtime.json", () => HttpResponse.error()),
+    );
+
+    await expect(localServerHostsPlatform("http://localhost:9931")).resolves.toBe(true);
+    await expect(localServerHostsPlatform("http://localhost:9932")).resolves.toBe(false);
+    await expect(localServerHostsPlatform("http://localhost:9933")).resolves.toBe(false);
+    await expect(localServerHostsPlatform("http://localhost:9934")).resolves.toBe(false);
   });
 
   it("says nothing about teams when setting up against a self-hosted server", async () => {
