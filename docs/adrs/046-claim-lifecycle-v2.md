@@ -36,6 +36,13 @@
 > bounds *automatic provisioning* to one team per user; it does not change
 > §Context's rule that a user may belong to many teams.
 >
+> **Proposed amendment — [ADR 061](061-background-jobs.md):**
+> if ADR 061 is accepted, the [§Non-goals](#non-goals) statement that there is
+> no scheduled-task infrastructure (all TTLs are read-time filtering) no longer
+> holds for instance scheduling. Automated expiry and deletion of unclaimed
+> projects remains a non-goal of this claim contract. Do not implement a
+> sweeper from this ADR alone.
+>
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
 > Withdrawn [ADR 003](003-create-first-claim-later.md), which removed the
