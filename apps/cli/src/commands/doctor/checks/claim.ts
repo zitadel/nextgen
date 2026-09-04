@@ -54,9 +54,11 @@ export class ClaimCheck implements SanityCheck {
         ? "This project is temporary until you attach it to a team, and claiming is only " +
           `possible within ${CLAIM_WINDOW_DAYS} days of creation. Run \`zitadel claim\` ` +
           "to make it permanent; nothing about the project changes."
-        : `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days of ` +
-          "creation, so it can no longer be claimed. It keeps working as it is; run " +
-          "`zitadel setup` in a fresh directory to get a project you can attach.";
+        : `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
+          "closed. Run `zitadel claim` to reconcile: a project attached from another " +
+          "machine reports its team, one never attached can no longer be claimed. Either " +
+          "way it keeps working; `zitadel setup` in a fresh directory gets you a new " +
+          "project you can attach.";
       return {
         name: this.name,
         status: "warn",

@@ -225,8 +225,11 @@ the CLI's help layer, not the envelope.
   carries `data.project.claim` as
   `{"kind": "detached", "claimable": true, "deadline": "2026-09-18T09:00:00.000Z"}`
   (`claimable` flips to `false` once the locally recorded creation time says
-  the 14-day window has passed, and the claim command then leaves
-  `next_commands`; `deadline` is omitted when the creation time is unknown) or
+  the 14-day window has passed; the guidance then switches to reconciliation
+  wording but the claim command stays in `next_commands`, because the local
+  record can be stale and running `claim` answers authoritatively — an
+  attached project skips cleanly. `deadline` is omitted when the creation
+  time is unknown) or
   `{"kind": "attached", "team_id": "team_01H…", "claimed_at": "2026-08-01T09:00:00.000Z"}`,
   and `doctor` reports a
   `claim` check. A project with no team is only ever a **warning**, never a

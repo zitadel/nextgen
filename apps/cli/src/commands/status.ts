@@ -271,7 +271,11 @@ function nextCommandsFor(
     );
   } else {
     commands.push(publicCliCommand("doctor", cliVersion));
-    if (project.claim?.kind === "detached" && project.claim.claimable) {
+    // Suggested even when the local record says the window has closed: the
+    // record can be stale (claimed from another machine reads detached), and
+    // `claim` is the safe reconciliation — the server checks the grant
+    // before the window, so an attached project answers with a clean skip.
+    if (project.claim?.kind === "detached") {
       commands.push(claimCommand(cliVersion));
     }
     if (users === "none") {

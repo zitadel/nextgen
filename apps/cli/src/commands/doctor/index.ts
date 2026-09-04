@@ -262,15 +262,16 @@ function advisoryForWarnings(
 
   const claimWarning = warnings.find((check) => check.name === "claim");
   if (claimWarning) {
-    // The check classified the window (details.claimable); once it is closed
-    // the claim command is guaranteed to be refused, so the advisory switches
-    // to the fresh-setup wording and stops suggesting the command.
-    if (claimWindowClosed(claimWarning)) {
-      nextActions.push(claimWindowClosedAction(cliVersion));
-    } else {
-      nextActions.push(claimAction(cliVersion));
-      nextCommands.push(claimCommand(cliVersion));
-    }
+    // The check classified the window (details.claimable). Once it looks
+    // closed the advisory switches to reconciliation wording, but the claim
+    // command stays suggested either way: the local record can be stale
+    // (claimed from another machine reads detached), and the server checks
+    // the grant before the window, so running claim is safe and answers
+    // authoritatively.
+    nextActions.push(
+      claimWindowClosed(claimWarning) ? claimWindowClosedAction(cliVersion) : claimAction(cliVersion),
+    );
+    nextCommands.push(claimCommand(cliVersion));
   }
 
   const managedRuntimeWarning = warnings.find((check) => check.name === "managed-runtime-processes");

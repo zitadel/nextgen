@@ -572,13 +572,20 @@ async function resolveScaffoldFramework(
  * started against it can actually complete. `platform.bootstrap_project`
  * pins the deployment's default project to the well-known proj_platform, and
  * the console runtime document publishes that resolution, so one public GET
- * answers the question. Fail closed: an unreadable or absent document means
- * no nudge, never a nudge into a flow that would 401 at claim/complete.
+ * answers the question. Fail closed: an unreadable, absent, or hanging
+ * document means no nudge, never a nudge into a flow that would 401 at
+ * claim/complete — the timeout mirrors checkLocalServerHealth so a socket
+ * that accepts and stalls cannot hang setup after the real work is done.
  * Exported so the fail-closed behavior is testable without a live server.
  */
-export async function localServerHostsPlatform(server: string): Promise<boolean> {
+export async function localServerHostsPlatform(
+  server: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
   try {
-    const res = await fetch(new URL("/console/runtime.json", server));
+    const res = await fetch(new URL("/console/runtime.json", server), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     if (!res.ok) {
       return false;
     }

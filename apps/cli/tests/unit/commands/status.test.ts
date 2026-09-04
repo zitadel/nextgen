@@ -110,9 +110,11 @@ describe("status command", () => {
   });
 
   // Once the locally recorded creation time says the 14-day window has
-  // passed, the server is guaranteed to refuse the claim, so the nudge and
-  // the command suggestion must both flip to fresh-setup guidance.
-  it("switches to fresh-setup guidance once the claim window has closed", async () => {
+  // passed, the nudge flips to reconciliation wording. The claim command
+  // stays suggested: the local record can be stale (claimed from another
+  // machine reads detached) and the server resolves the grant before the
+  // window, so running claim is the safe authoritative check.
+  it("switches to reconciliation guidance once the claim window has closed", async () => {
     const cwd = await configuredProject();
     await writeFile(
       join(cwd, ".zitadel/secret"),
@@ -130,9 +132,10 @@ describe("status command", () => {
     };
     expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: false });
     const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain("claim window has closed");
     expect(actions).toContain("no longer be claimed");
     expect(actions).not.toContain("temporary until you attach");
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
   it("reports the owning team once claimed, and stops nudging", async () => {
