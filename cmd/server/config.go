@@ -127,6 +127,17 @@ type ServerConfig struct {
 	// files exist in the master key directory, the newest file is used for
 	// encryption.
 	MasterKeys map[string]*MasterKeyConfig `mapstructure:"master_keys"`
+	// GenerateMasterKey allows the server to mint a master key when it starts
+	// with none configured and none in the master key directory. It defaults to
+	// true, which is what makes a first local start work with no configuration
+	// at all.
+	//
+	// Turn it off wherever a generated key would be the wrong answer rather
+	// than a convenience: on ephemeral storage every instance would mint its
+	// own key, and project KEKs wrapped by one of them cannot be unwrapped by
+	// the next. With it off, a missing key fails the start instead, which is
+	// the failure that can still be recovered from.
+	GenerateMasterKey bool `mapstructure:"generate_master_key"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`

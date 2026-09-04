@@ -6,8 +6,12 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -65,49 +69,26 @@ func ensureServerMasterKey(cfg *ServerConfig) error {
 		return fmt.Errorf("failed to get master key directory: %w", err)
 	}
 
-	files, err := os.ReadDir(masterKeyDir)
+	keysFromFileSystem, err := loadMasterKeysFromFileSystem(masterKeyDir, len(cfg.MasterKeys) == 0)
 	if err != nil {
-		return fmt.Errorf("failed to list master key directory: %w", err)
-	}
-
-	var newestFile string
-	var newestFileModTime time.Time
-	keysFromDir := make(map[string]*MasterKeyConfig, len(files))
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		info, err := file.Info()
-		if err != nil {
-			return fmt.Errorf("failed to get info of file %s: %w", file.Name(), err)
-		}
-		keyPath := filepath.Join(masterKeyDir, file.Name())
-		if info.ModTime().After(newestFileModTime) {
-			newestFile = keyPath
-			newestFileModTime = info.ModTime()
-		}
-
-		keysFromDir[file.Name()] = &MasterKeyConfig{
-			File: keyPath,
-		}
+		return err
 	}
 
 	if len(cfg.MasterKeys) > 0 {
-		for id, key := range keysFromDir {
-			cfg.MasterKeys[id] = key
-		}
+		maps.Copy(cfg.MasterKeys, keysFromFileSystem)
 	} else {
-		for id, key := range keysFromDir {
-			if key.File == newestFile {
-				keysFromDir[id].UseForEncryption = true
-				break
-			}
-		}
-		cfg.MasterKeys = keysFromDir
+		cfg.MasterKeys = keysFromFileSystem
 	}
 
 	if len(cfg.MasterKeys) == 0 {
+		if !cfg.GenerateMasterKey {
+			return fmt.Errorf(
+				"no master key: server.master_keys is unset and %s holds no key file, "+
+					"while master key generation is off (--%s / server.generate_master_key: false). "+
+					"Configure server.master_keys, or place a key file in that directory",
+				masterKeyDir, flagDisableMasterKeyGeneration)
+		}
+
 		filePath, err := createMasterKey(masterKeyDir)
 		if err != nil {
 			return err
@@ -118,11 +99,83 @@ func ensureServerMasterKey(cfg *ServerConfig) error {
 				UseForEncryption: true,
 			},
 		}
-		// TODO: add a flag which allows to disable the auto generation of a master key (https://github.com/zitadel/nextgen/issues/655)
-		fmt.Fprintf(os.Stderr, "created server master key file at %s (generated for local/dev only; configure server.master_keys for production)\n", filePath)
+		// A warning rather than a bare stderr line: on ephemeral storage this
+		// is the moment a deployment starts losing data, and it has to survive
+		// aggregated logs. Logging is not configured yet -- loadConfig runs
+		// before setUpLogging -- so this goes through the default handler.
+		slog.Warn("created server master key file (generated for local/dev only; configure server.master_keys for production)",
+			slog.String("path", filePath),
+			slog.String("disable_with", "--"+flagDisableMasterKeyGeneration))
 	}
 
 	return nil
+}
+
+func loadMasterKeysFromFileSystem(dir string, containsActiveKey bool) (map[string]*MasterKeyConfig, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list master key directory: %w", err)
+	}
+
+	var newestKey *MasterKeyConfig
+	var newestFileModTime time.Time
+	keysFromDir := make(map[string]*MasterKeyConfig, len(files))
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		info, err := file.Info()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get info of file %s: %w", file.Name(), err)
+		}
+		keyPath := filepath.Join(dir, file.Name())
+		key := &MasterKeyConfig{
+			File: keyPath,
+		}
+		if info.ModTime().After(newestFileModTime) {
+			newestKey = key
+			newestFileModTime = info.ModTime()
+		}
+
+		keysFromDir[file.Name()] = key
+	}
+
+	if containsActiveKey && newestKey != nil {
+		newestKey.UseForEncryption = true
+	}
+	return keysFromDir, nil
+}
+
+// masterKeyEnvPrefix is the environment prefix that cannot work.
+// server.master_keys is a map keyed by key id, and viper's AutomaticEnv has no
+// way to discover map keys, so every NEXTGEN_SERVER_MASTER_KEYS_* variable is
+// dropped in silence -- and dropping it is what leaves the server with no
+// configured key, which is what makes it generate one.
+const masterKeyEnvPrefix = "NEXTGEN_SERVER_MASTER_KEYS_"
+
+// warnIgnoredMasterKeyEnv reports master key environment variables that cannot
+// reach the configuration, so an operator who set them learns it here rather
+// than from unwrappable data later.
+func warnIgnoredMasterKeyEnv(environ []string) {
+	ignored := ignoredMasterKeyEnv(environ)
+	if len(ignored) == 0 {
+		return
+	}
+	slog.Warn("ignoring master key environment variables: server.master_keys is keyed by key id and cannot be set from the environment; configure it in the config file, or place the key file in the master key directory",
+		slog.Any("variables", ignored))
+}
+
+func ignoredMasterKeyEnv(environ []string) []string {
+	var ignored []string
+	for _, entry := range environ {
+		name, _, ok := strings.Cut(entry, "=")
+		if ok && strings.HasPrefix(name, masterKeyEnvPrefix) {
+			ignored = append(ignored, name)
+		}
+	}
+	slices.Sort(ignored)
+	return ignored
 }
 
 func createMasterKey(dir string) (string, error) {
