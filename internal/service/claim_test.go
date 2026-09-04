@@ -363,8 +363,21 @@ func TestClaimService_Complete(t *testing.T) {
 			name: "challenge expired",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrProjectClaimExpired(),
+		},
+		{
+			// Both expired: the final refusal must win, matching Status —
+			// a fresh claim init recovers only from an expired challenge.
+			name: "claim window closed wins over challenge expiry",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
 		},
 		{
 			name: "claim window closed",
