@@ -3804,11 +3804,87 @@ func TestFlowStateMachine_Back_WithoutResolvedUserMintsNoAttempt(t *testing.T) {
 
 // TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck pins
 // the passkey action as a non-submission of the password step's field.
-// Browsers post the whole form, so the password field rides along with the
-// action; dispatching it as a password check failed the leg with
-// error.invalid_credentials before the WebAuthn prompt ever appeared — which
-// is what pushes users onto the back-navigation path above.
+// Browsers post the whole form, so the field rides along with the action, and
+// both the value it carries and the value it lacks used to sink the leg
+// before the WebAuthn prompt ever appeared: an empty box failed the
+// required-field check, and a filled one was verified as a password. Neither
+// is a password submission.
 func TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck(t *testing.T) {
+	t.Parallel()
+	const email = "alice@example.com"
+	const challengeID = "ch-1"
+	const rpid = "example.com"
+
+	// The password field is required with min_length 8, so an empty value
+	// trips "required" and a short one trips the length rule. Both are the
+	// browser's form state, not something the user submitted.
+	passwordFields := map[string]string{
+		"empty box":                  "",
+		"below the length minimum":   "short",
+		"the identifier left behind": email,
+	}
+
+	for name, password := range passwordFields {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := purposeNavDefinition()
+
+			w.schemaResolver.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+				AnyTimes()
+			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+			w.authAttemptService.EXPECT().
+				SubmitIdentifier(gomock.Any(), gomock.Any()).
+				Return("user_alice", nil).
+				Times(1)
+			w.authAttemptService.EXPECT().
+				SubmitPassword(gomock.Any(), gomock.Any()).
+				Times(0)
+			w.authAttemptService.EXPECT().
+				IssuePasskeyChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyChallengeInput) bool {
+					return in.RPID == rpid
+				})).
+				Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil).
+				Times(1)
+
+			start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+				Definition:    def,
+				Purpose:       domain.FlowDefinitionPurposeLogin,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+
+			afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+				Action: domain.FlowActionSubmit,
+				Fields: map[string]any{"email": email},
+			})
+			require.NoError(t, err)
+			require.Equal(t, "password", afterIdentify.State.CurrentStep)
+
+			issued, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
+				Action:    domain.FlowActionPasskey,
+				Fields:    map[string]any{"x-auth-methods#password": password},
+				PasskeyRP: &domain.FlowPasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
+			})
+			require.NoError(t, err)
+			assert.Nil(t, issued.Step.Error, "the passkey action must not fail on the password field")
+			require.NotNil(t, issued.Step.Challenge)
+			assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
+			assert.Equal(t, domain.FlowChallengeMethodPasskey, issued.Step.Challenge.Method)
+			assert.Equal(t, "password", issued.State.CurrentStep, "the issue leg halts on the same step")
+			assert.Empty(t, issued.State.CollectedData.AuthMethods.Password,
+				"a field the leg does not submit must not be collected either")
+		})
+	}
+}
+
+// TestFlowStateMachine_Process_PasskeyStillIdentifies keeps the other half:
+// the identifier is the one field a passkey login leg does consume, so it
+// still reaches SubmitIdentifier and still answers to its own rules.
+func TestFlowStateMachine_Process_PasskeyStillIdentifies(t *testing.T) {
 	t.Parallel()
 	const email = "alice@example.com"
 	const challengeID = "ch-1"
@@ -3822,16 +3898,13 @@ func TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck(t *tes
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			return in.AttributeName == "email" && in.Value == email
+		})).
 		Return("user_alice", nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Any()).
-		Times(0)
-	w.authAttemptService.EXPECT().
-		IssuePasskeyChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyChallengeInput) bool {
-			return in.RPID == rpid
-		})).
+		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
 		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil).
 		Times(1)
 
@@ -3843,24 +3916,15 @@ func TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck(t *tes
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": email},
-	})
-	require.NoError(t, err)
-	require.Equal(t, "password", afterIdentify.State.CurrentStep)
-
-	issued, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
-		Fields:    map[string]any{"x-auth-methods#password": "whatever-the-form-still-held"},
+		Fields:    map[string]any{"email": email},
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
-	assert.Nil(t, issued.Step.Error, "the passkey action must not fail on the password field")
 	require.NotNil(t, issued.Step.Challenge)
-	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
-	assert.Equal(t, domain.FlowChallengeMethodPasskey, issued.Step.Challenge.Method)
-	assert.Equal(t, "password", issued.State.CurrentStep, "the issue leg halts on the same step")
+	assert.Equal(t, "user_alice", issued.State.CollectedData.UserID,
+		"the identifier a passkey leg carries still resolves the user")
 }
 
 // Purpose-entry toggling is a zero-input loop; without coalescing, every

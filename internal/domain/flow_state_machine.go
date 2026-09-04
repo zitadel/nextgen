@@ -355,6 +355,9 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	if err != nil {
 		return FlowStepResult{}, err
 	}
+	if actionKind == FlowActionKindPasskey {
+		pc.in.Fields = identifierFieldsOnly(resolved, pc.in.Fields)
+	}
 	halt, err := r.validateAndMerge(pc, resolved, actionKind)
 	if err != nil {
 		return FlowStepResult{}, err
@@ -397,16 +400,11 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 // them into CollectedData. Returns a rendered halt step on validation
 // failure.
 //
-// Every action validates the values it sent; field-collecting actions
-// (see [collectsStepFields]) additionally require declared required fields
-// to be present.
-//
-// TODO: Validate rejects an empty required field the client did submit,
-// on every action. So "sign in with passkey" on a step with a required
-// password fails, because the client sends password="" with it. The check
-// should depend on the action — but an empty identifier on a passkey leg
-// can be a valid rejection, so we can't just skip it everywhere.
-// Pre-existing; add a password-step test when fixed.
+// Every action validates the values it sent — which is why a leg that
+// consumes a subset is narrowed to that subset before it gets here (see
+// [identifierFieldsOnly]); field-collecting actions (see
+// [collectsStepFields]) additionally require declared required fields to be
+// present.
 func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields, actionKind FlowActionKind) (*FlowStepResult, error) {
 	var errs FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
@@ -557,7 +555,7 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 // processSubmit handles kind=submit: dispatch challenges, run
 // on_success (if declared), and route the resulting outcome.
 func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
-	dispatch, err := r.dispatchChallenges(pc, resolved, challengeDispatchOrder)
+	dispatch, err := r.dispatchChallenges(pc, resolved)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -591,14 +589,14 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
 }
 
-// processPasskeyLogin handles kind=passkey. The issue leg runs
-// identifier dispatch — and only that, see [identifierDispatchOnly] — so
-// IssuePasskeyChallenge can populate allowCredentials; the verify leg
-// validates the assertion. Ceremony abandonment falls through to the
-// standard pipeline.
+// processPasskeyLogin handles kind=passkey. The issue leg runs the
+// identifier dispatch so IssuePasskeyChallenge can populate
+// allowCredentials — and only that, because the leg reaches here holding
+// nothing else (see [identifierFieldsOnly]); the verify leg validates the
+// assertion. Ceremony abandonment falls through to the standard pipeline.
 func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
 	if pc.in.ChallengeResponse == nil {
-		dispatch, err := r.dispatchChallenges(pc, resolved, identifierDispatchOnly)
+		dispatch, err := r.dispatchChallenges(pc, resolved)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -681,14 +679,29 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 	FlowFieldChallengePassword,
 }
 
-// identifierDispatchOnly is the dispatch order for the passkey login issue
-// leg: resolve the user so IssuePasskeyChallenge can scope allowCredentials,
-// and stop there. Choosing "sign in with a passkey" is not a password
-// submission — but the client keeps posting the password step's field
-// alongside the action, and dispatching it would fail the leg with
-// error.invalid_credentials before the browser is ever prompted.
-var identifierDispatchOnly = []FlowFieldChallenge{
-	FlowFieldChallengeIdentifier,
+// identifierFieldsOnly keeps just the identifier-challenge entries of a
+// submission. A passkey login leg consumes exactly one value — the identifier
+// that scopes allowCredentials — but browsers post the whole form, so the
+// step's other fields ride along with the action. Choosing "sign in with a
+// passkey" is not a submission of those fields: validating them fails the leg
+// on an empty required password, and dispatching them verifies that password
+// as a credential — both before the WebAuthn prompt ever appears. Dropping
+// them here keeps validation, dispatch, and collection agreeing on what the
+// leg was given.
+//
+// The identifier itself stays in, empty or not, so the rules that decide
+// whether a blank identifier is usable keep applying to it.
+func identifierFieldsOnly(resolved FlowResolvedFields, values map[string]any) map[string]any {
+	kept := make(map[string]any)
+	for _, field := range resolved.Fields {
+		if field.Challenge != FlowFieldChallengeIdentifier {
+			continue
+		}
+		if value, submitted := values[field.Name]; submitted {
+			kept[field.Name] = value
+		}
+	}
+	return kept
 }
 
 // applyOutcomeFlip flips CurrentPurpose on identifier outcomes:
@@ -703,13 +716,13 @@ func applyOutcomeFlip(state *FlowState, outcome string) {
 	}
 }
 
-// dispatchChallenges submits the field-shaped challenges named by order —
-// [challengeDispatchOrder] for a plain submit, [identifierDispatchOnly] for
-// the passkey login issue leg. CurrentPurpose + visited on_success decide
-// verify-vs-skip.
-func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields, order []FlowFieldChallenge) (flowDispatchResult, error) {
+// dispatchChallenges submits field-shaped challenges in
+// [challengeDispatchOrder]. CurrentPurpose + visited on_success decide
+// verify-vs-skip. What reaches it is what the action submitted, so a leg
+// that consumes a subset (see [identifierFieldsOnly]) dispatches a subset.
+func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields) (flowDispatchResult, error) {
 	ctx, def, state, step, fields := pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields
-	for _, challenge := range order {
+	for _, challenge := range challengeDispatchOrder {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
 			continue
