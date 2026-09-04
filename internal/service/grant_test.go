@@ -491,7 +491,7 @@ func TestGrantService_List(t *testing.T) {
 
 	t.Run("empty page", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{}, nil)
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{}, nil)
 		})
 		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"})
 		require.NoError(t, err)
@@ -509,7 +509,7 @@ func TestGrantService_List(t *testing.T) {
 			},
 		}}
 		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, refs, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
 				Items:      []*domain.AuthzAssignment{userAsgn, teamAsgn},
 				NextCursor: []byte("next"),
 			}, nil)
@@ -536,7 +536,7 @@ func TestGrantService_List(t *testing.T) {
 	t.Run("default path resolves refs by id", func(t *testing.T) {
 		refs := &grantRefStub{byID: map[string]domain.UserRef{userID: {UserID: userID}}}
 		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, refs, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
 				Items: []*domain.AuthzAssignment{userAsgn},
 			}, nil)
 		})
@@ -559,7 +559,7 @@ func TestGrantService_List(t *testing.T) {
 			},
 		}}
 		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, refs, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
 				Items: []*domain.AuthzAssignment{userAsgn, teamAsgn},
 			}, nil)
 			s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
@@ -597,7 +597,7 @@ func TestGrantService_List(t *testing.T) {
 
 	t.Run("expand missing principal is requested but empty", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
 				Items: []*domain.AuthzAssignment{expiredAsgn},
 			}, nil)
 			s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.User]{}, nil)
@@ -614,7 +614,7 @@ func TestGrantService_List(t *testing.T) {
 
 	t.Run("missing principal degrades to id-only", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
 				Items: []*domain.AuthzAssignment{expiredAsgn},
 			}, nil)
 		})
@@ -640,7 +640,7 @@ func TestGrantService_List(t *testing.T) {
 
 	t.Run("maps invalid page token", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).Return(nil, database.ErrInvalidCursor())
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.ErrInvalidCursor())
 		})
 		_, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", PageToken: "nope"})
 		require.Error(t, err)
@@ -649,8 +649,9 @@ func TestGrantService_List(t *testing.T) {
 
 	t.Run("filters by principal_type", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+					require.Equal(t, "proj_customer", projectID)
 					require.NotNil(t, opts.Filter)
 					return &database.ListResult[*domain.AuthzAssignment]{Items: []*domain.AuthzAssignment{userAsgn}}, nil
 				})
@@ -666,8 +667,9 @@ func TestGrantService_List(t *testing.T) {
 
 	t.Run("filters by relation", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+					require.Equal(t, "proj_customer", projectID)
 					require.NotNil(t, opts.Filter)
 					return &database.ListResult[*domain.AuthzAssignment]{Items: []*domain.AuthzAssignment{teamAsgn}}, nil
 				})

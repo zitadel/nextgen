@@ -119,8 +119,7 @@ func TestAuthzAssignmentStatements_ListManagedGrants(t *testing.T) {
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewSKProjProjectSetupAssignment(projectID)))
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(projectID, teamID)))
 
-		listed, err := d.stmts.ListManagedGrants(t.Context(), &database.ListOptions[domain.AuthzAssignmentField]{
-			Filter: database.Equal(database.Col(domain.AuthzAssignmentFieldProjectID), projectID),
+		listed, err := d.stmts.ListManagedGrants(t.Context(), projectID, &database.ListOptions[domain.AuthzAssignmentField]{
 			Pagination: database.Page[domain.AuthzAssignmentField]{
 				Limit: 20,
 				OrderBy: database.OrderBy[domain.AuthzAssignmentField]{
@@ -140,6 +139,30 @@ func TestAuthzAssignmentStatements_ListManagedGrants(t *testing.T) {
 		assert.Contains(t, got, expiredGrant.ID)
 		assert.NotContains(t, got, revokedGrant.ID)
 		assert.Len(t, listed.Items, 3)
+
+		otherProject := ensureProject(t, d.stmts)
+		otherGrant := newTestAssignment(otherProject, "", domain.AuthzPrincipalTypeUser, "user_other_"+uniqueSuffix(t), "project", "viewer", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), otherGrant))
+
+		scoped, err := d.stmts.ListManagedGrants(t.Context(), projectID, &database.ListOptions[domain.AuthzAssignmentField]{
+			Pagination: database.Page[domain.AuthzAssignmentField]{
+				Limit: 20,
+				OrderBy: database.OrderBy[domain.AuthzAssignmentField]{
+					Columns:   []database.Column[domain.AuthzAssignmentField]{database.Col(domain.AuthzAssignmentFieldID)},
+					Direction: database.OrderAsc,
+				},
+			},
+		})
+		require.NoError(t, err)
+		for _, a := range scoped.Items {
+			assert.NotEqual(t, otherGrant.ID, a.ID)
+			assert.Equal(t, projectID, a.ProjectID)
+		}
+
+		_, err = d.stmts.ListManagedGrants(t.Context(), "", &database.ListOptions[domain.AuthzAssignmentField]{
+			Pagination: database.Page[domain.AuthzAssignmentField]{Limit: 1},
+		})
+		require.Error(t, err)
 	})
 }
 

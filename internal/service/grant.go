@@ -310,8 +310,7 @@ func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (*ListGr
 		return nil, domain.ErrGrantInvalid().WithDetails("project_id is required")
 	}
 
-	filters := make([]database.Filter[domain.AuthzAssignmentField], 0, len(req.Filters)+1)
-	filters = append(filters, database.Equal(database.Col(domain.AuthzAssignmentFieldProjectID), req.ProjectID))
+	filters := make([]database.Filter[domain.AuthzAssignmentField], 0, len(req.Filters))
 	for _, f := range req.Filters {
 		filter, err := grantFilter(f)
 		if err != nil {
@@ -330,8 +329,12 @@ func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (*ListGr
 		cursor = []byte(req.PageToken)
 	}
 
-	result, err := s.v2Pool.Statements().ListManagedGrants(ctx, &database.ListOptions[domain.AuthzAssignmentField]{
-		Filter: database.And(filters...),
+	var filter database.Filter[domain.AuthzAssignmentField]
+	if len(filters) > 0 {
+		filter = database.And(filters...)
+	}
+	result, err := s.v2Pool.Statements().ListManagedGrants(ctx, req.ProjectID, &database.ListOptions[domain.AuthzAssignmentField]{
+		Filter: filter,
 		Pagination: database.Page[domain.AuthzAssignmentField]{
 			Limit:   uint32(normalizeLimit(req.Limit)),
 			OrderBy: orderBy,

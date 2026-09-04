@@ -144,15 +144,14 @@ func battleGrants(t *testing.T, d dialect) {
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
 		want = append(want, a.ID)
 	}
-	filter := database.Equal(database.Col(domain.AuthzAssignmentFieldProjectID), projectID)
 	orderAsc := database.OrderBy[domain.AuthzAssignmentField]{
 		Columns:   []database.Column[domain.AuthzAssignmentField]{database.Col(domain.AuthzAssignmentFieldID)},
 		Direction: database.OrderAsc,
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
-		return d.stmts.ListManagedGrants(t.Context(), &database.ListOptions[domain.AuthzAssignmentField]{
-			Filter: filter, Pagination: page,
+		return d.stmts.ListManagedGrants(t.Context(), projectID, &database.ListOptions[domain.AuthzAssignmentField]{
+			Pagination: page,
 		})
 	}, func(a *domain.AuthzAssignment) string { return a.ID }, 2)
 }

@@ -141,13 +141,17 @@ func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, pro
 }
 
 // ListManagedGrants implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, filter *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projectID string, filter *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+	filter, err := authz.ScopeManagedGrantList(projectID, filter)
+	if err != nil {
+		return nil, wrapError(err)
+	}
 	var compiler statementCompiler
 	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
 		return nil, err
 	}
 	var assignments []*domain.AuthzAssignment
-	err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+	err = s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
 		assignments, qErr = collectRows(iter, scanAuthzAssignment)
 		return qErr

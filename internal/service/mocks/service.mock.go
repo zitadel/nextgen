@@ -3755,18 +3755,18 @@ func (c *MockAllStatementsListJSONSchemasCall) DoAndReturn(f func(context.Contex
 }
 
 // ListManagedGrants mocks base method.
-func (m *MockAllStatements) ListManagedGrants(ctx context.Context, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+func (m *MockAllStatements) ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListManagedGrants", ctx, opts)
+	ret := m.ctrl.Call(m, "ListManagedGrants", ctx, projectID, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.AuthzAssignment])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListManagedGrants indicates an expected call of ListManagedGrants.
-func (mr *MockAllStatementsMockRecorder) ListManagedGrants(ctx, opts any) *MockAllStatementsListManagedGrantsCall {
+func (mr *MockAllStatementsMockRecorder) ListManagedGrants(ctx, projectID, opts any) *MockAllStatementsListManagedGrantsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedGrants", reflect.TypeOf((*MockAllStatements)(nil).ListManagedGrants), ctx, opts)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedGrants", reflect.TypeOf((*MockAllStatements)(nil).ListManagedGrants), ctx, projectID, opts)
 	return &MockAllStatementsListManagedGrantsCall{Call: call}
 }
 
@@ -3782,13 +3782,13 @@ func (c *MockAllStatementsListManagedGrantsCall) Return(arg0 *database.ListResul
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListManagedGrantsCall) Do(f func(context.Context, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAllStatementsListManagedGrantsCall {
+func (c *MockAllStatementsListManagedGrantsCall) Do(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAllStatementsListManagedGrantsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListManagedGrantsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAllStatementsListManagedGrantsCall {
+func (c *MockAllStatementsListManagedGrantsCall) DoAndReturn(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAllStatementsListManagedGrantsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -9843,18 +9843,18 @@ func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) DoAndReturn(f f
 }
 
 // ListManagedGrants mocks base method.
-func (m *MockAuthzAssignmentStatements) ListManagedGrants(ctx context.Context, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+func (m *MockAuthzAssignmentStatements) ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListManagedGrants", ctx, opts)
+	ret := m.ctrl.Call(m, "ListManagedGrants", ctx, projectID, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.AuthzAssignment])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListManagedGrants indicates an expected call of ListManagedGrants.
-func (mr *MockAuthzAssignmentStatementsMockRecorder) ListManagedGrants(ctx, opts any) *MockAuthzAssignmentStatementsListManagedGrantsCall {
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListManagedGrants(ctx, projectID, opts any) *MockAuthzAssignmentStatementsListManagedGrantsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedGrants", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListManagedGrants), ctx, opts)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedGrants", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListManagedGrants), ctx, projectID, opts)
 	return &MockAuthzAssignmentStatementsListManagedGrantsCall{Call: call}
 }
 
@@ -9870,13 +9870,13 @@ func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) Return(arg0 *databa
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) Do(f func(context.Context, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAuthzAssignmentStatementsListManagedGrantsCall {
+func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) Do(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAuthzAssignmentStatementsListManagedGrantsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAuthzAssignmentStatementsListManagedGrantsCall {
+func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) DoAndReturn(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAuthzAssignmentStatementsListManagedGrantsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
