@@ -6073,10 +6073,8 @@ func (s *AuthMethods) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.SSO.Set {
-			e.FieldStart("sso")
-			s.SSO.Encode(e)
-		}
+		e.FieldStart("sso")
+		s.SSO.Encode(e)
 	}
 	{
 		if s.Otp.Set {
@@ -6136,7 +6134,6 @@ func (s *AuthMethods) Decode(d *jx.Decoder) error {
 			}
 		case "sso":
 			if err := func() error {
-				s.SSO.Reset()
 				if err := s.SSO.Decode(d); err != nil {
 					return err
 				}
@@ -60281,6 +60278,48 @@ func (s *RevokeSessionUnauthorized) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *RevokeSessionUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes SSOAuthMethod as json.
+func (s SSOAuthMethod) Encode(e *jx.Encoder) {
+	unwrapped := jx.Raw(s)
+
+	if len(unwrapped) != 0 {
+		e.Raw(unwrapped)
+	}
+}
+
+// Decode decodes SSOAuthMethod from json.
+func (s *SSOAuthMethod) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SSOAuthMethod to nil")
+	}
+	var unwrapped jx.Raw
+	if err := func() error {
+		v, err := d.RawAppend(nil)
+		unwrapped = jx.Raw(v)
+		if err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = SSOAuthMethod(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SSOAuthMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SSOAuthMethod) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

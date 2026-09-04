@@ -40,10 +40,10 @@ example:
         salt: xyz789
         max_number: 100000
   sso_providers:
-    - id: google-1
+    - id: google
       name: Google
       template: google
-    - id: entra-1
+    - id: entra
       name: Microsoft
       template: entraid
 properties:

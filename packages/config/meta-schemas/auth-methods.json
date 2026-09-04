@@ -15,7 +15,7 @@
       "$ref": "auth-method.json"
     },
     "sso": {
-      "$ref": "auth-method.json"
+      "$ref": "sso-auth-method.json"
     },
     "otp": {
       "$ref": "auth-method.json"

@@ -5,7 +5,7 @@ properties:
   id:
     type: string
     description: Provider instance identifier.
-    example: google-1
+    example: google
   name:
     type: string
     description: Display name for the provider.

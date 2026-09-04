@@ -21,7 +21,13 @@ import brandingMetaSchema from "../meta-schemas/branding.json" with {
 import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with {
   type: "json",
 };
+import idpConnectionMetaSchema from "../meta-schemas/idp-connection.json" with {
+  type: "json",
+};
 import propertyNameMetaSchema from "../meta-schemas/property-name.json" with {
+  type: "json",
+};
+import ssoAuthMethodMetaSchema from "../meta-schemas/sso-auth-method.json" with {
   type: "json",
 };
 import userPropertyMetaSchema from "../meta-schemas/user-property.json" with {
@@ -49,9 +55,10 @@ export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
 export type MetaSchemaFile = { name: string; body: object };
 
 /**
- * The dialect files to materialize, in write order. `auth-methods.json` and
- * `auth-method.json` are pulled in by `user-schema.json`'s relative `$ref`s —
- * without them the copied dialect cannot resolve offline.
+ * The dialect files to materialize, in write order. `auth-methods.json`,
+ * `auth-method.json`, and `sso-auth-method.json` are pulled in by
+ * `user-schema.json`'s relative `$ref`s — without them the copied dialect
+ * cannot resolve offline.
  */
 export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
   return [
@@ -61,6 +68,8 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "property-name.json", body: propertyNameMetaSchema as object },
     { name: "auth-methods.json", body: authMethodsMetaSchema as object },
     { name: "auth-method.json", body: authMethodMetaSchema as object },
+    { name: "sso-auth-method.json", body: ssoAuthMethodMetaSchema as object },
+    { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
   ];
 }

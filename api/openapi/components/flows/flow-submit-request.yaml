@@ -51,4 +51,4 @@ properties:
     description: |
       ID of the selected SSO provider (from `sso_providers[].id`).
       Required when `action` is "sso".
-    example: google-1
+    example: google
