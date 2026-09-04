@@ -36,11 +36,12 @@
 > bounds *automatic provisioning* to one team per user; it does not change
 > §Context's rule that a user may belong to many teams.
 >
-> **Amendment (2026-09-03):** [§Non-goals](#non-goals) said there was no
-> scheduled-task infrastructure and that all TTLs were read-time filtering.
-> Instance scheduling is specified in [ADR 061](061-background-jobs.md).
-> Automated expiry and deletion of **unclaimed projects** remains a non-goal
-> of this claim contract.
+> **Proposed amendment — [ADR 061](061-background-jobs.md):**
+> if ADR 061 is accepted, the [§Non-goals](#non-goals) statement that there is
+> no scheduled-task infrastructure (all TTLs are read-time filtering) no longer
+> holds for instance scheduling. Automated expiry and deletion of unclaimed
+> projects remains a non-goal of this claim contract. Do not implement a
+> sweeper from this ADR alone.
 >
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
@@ -242,10 +243,10 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   `projects.project_secret`, so changing the stored value would not invalidate
   the old secret). **Accepted trade-off:** the pre-claim secret stays valid after
   claim, so anyone who held it pre-claim retains API access until rotation ships.
-- **Automated expiry and deletion of unclaimed projects.** Unclaimed projects
-  still persist unenforced. [ADR 061](061-background-jobs.md) adds instance
-  scheduling; it does not add an unclaimed-project sweeper. CLI messaging frames
-  them as temporary without promising deletion; an expired-unclaimed project stays
+- **Automated expiry and deletion of unclaimed projects.** There is no
+  scheduled-task infrastructure in the server (all TTLs are read-time filtering),
+  so unclaimed projects persist unenforced. CLI messaging frames them as
+  temporary without promising deletion; an expired-unclaimed project stays
   cheaply derivable (created long ago with no claim grant). **Accepted
   trade-off:** unclaimed projects accumulate until an expiry mechanism exists.
 - **Claim metrics and telemetry.** Claim volumes are answerable with ad-hoc
