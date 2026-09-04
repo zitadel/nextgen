@@ -172,7 +172,6 @@ func TestRequireExpandScope(t *testing.T) {
 		code  string
 	}{
 		{"membership", requireMembershipRead, "team_membership.read", domain.ErrUserPermissionDenied().Code},
-		{"user.read", requireUserRead, "user.read", domain.ErrUserPermissionDenied().Code},
 		{"team.read users expand", requireTeamRead, "team.read", domain.ErrUserPermissionDenied().Code},
 		{"team.read grant principal", func(ctx context.Context) error {
 			return requireExpandScope(ctx, "team.read", domain.ErrTeamPermissionDenied, "expanding a grant principal requires team.read")
@@ -221,8 +220,16 @@ func TestRequireExpandScope(t *testing.T) {
 		}
 	})
 	t.Run("team read does not grant user read", func(t *testing.T) {
-		if err := requireUserRead(withScopes("team.read")); err == nil {
+		err := requireExpandScope(withScopes("team.read"), "user.read", domain.ErrUserPermissionDenied, "expanding a grant principal requires user.read")
+		if err == nil {
 			t.Fatal("expected error")
+		}
+		var de domain.Error
+		if !errors.As(err, &de) {
+			t.Fatalf("error is not a domain.Error: %v", err)
+		}
+		if de.Code != domain.ErrUserPermissionDenied().Code {
+			t.Fatalf("code %q, want %q", de.Code, domain.ErrUserPermissionDenied().Code)
 		}
 	})
 	t.Run("user read does not grant team read", func(t *testing.T) {

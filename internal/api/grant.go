@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"slices"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -92,12 +93,7 @@ func mapQueryGrantsToService(projectID string, req *api.QueryGrantsRequest) serv
 	for _, filter := range req.Filter {
 		svcReq.Filters = append(svcReq.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
 	}
-	for _, expand := range req.Expand {
-		switch expand {
-		case api.GrantExpandPrincipal:
-			svcReq.IncludePrincipal = true
-		}
-	}
+	svcReq.IncludePrincipal = slices.Contains(req.Expand, api.GrantExpandPrincipal)
 	return svcReq
 }
 

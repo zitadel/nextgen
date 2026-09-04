@@ -354,11 +354,6 @@ func requireMembershipRead(ctx context.Context) error {
 		"reading a user's team memberships requires team_membership.read")
 }
 
-func requireUserRead(ctx context.Context) error {
-	return requireExpandScope(ctx, "user.read", domain.ErrUserPermissionDenied,
-		"expanding a grant principal requires user.read")
-}
-
 func requireTeamRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "team.read", domain.ErrUserPermissionDenied,
 		"expanding a user's lifecycle owner team requires team.read")
