@@ -236,12 +236,20 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   `projects.project_secret`, so changing the stored value would not invalidate
   the old secret). **Accepted trade-off:** the pre-claim secret stays valid after
   claim, so anyone who held it pre-claim retains API access until rotation ships.
-- **Automated expiry and deletion of unclaimed projects.** There is no
-  scheduled-task infrastructure in the server (all TTLs are read-time filtering),
-  so unclaimed projects persist unenforced. CLI messaging frames them as
-  temporary without promising deletion; an expired-unclaimed project stays
-  cheaply derivable (created long ago with no claim grant). **Accepted
-  trade-off:** unclaimed projects accumulate until an expiry mechanism exists.
+- **Automated deletion of unclaimed projects.** The claim *window* itself is
+  enforced, but only at claim time: `claim/init` and `claim/complete` refuse a
+  project older than `domain.ClaimWindow` (14 days from `projects.created_at`)
+  with `proj.claim_window_expired` (410), ordered after the already-claimed
+  check so a claimed project keeps answering 409. That lets CLI messaging state
+  the deadline honestly. Deleting the project when the window closes stays out
+  of scope: there is no general scheduled-task infrastructure in the server
+  (the audit retention loop is audit-specific), and the proposed ADR 061
+  ([#1119](https://github.com/zitadel/nextgen/pull/1119)), which designs one,
+  explicitly excludes this sweeper. An expired-unclaimed project stays cheaply
+  derivable (created
+  long ago with no claim grant). **Accepted trade-off:** expired unclaimed
+  projects accumulate, unclaimable, until a reaper ships on the ADR 061
+  runtime.
 - **Claim metrics and telemetry.** Claim volumes are answerable with ad-hoc
   queries over the grant data until a metrics surface is added.
 - **Claim attributes on `GET /projects/{id}`.** `claimed_at` and `team_id` are

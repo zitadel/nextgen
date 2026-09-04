@@ -238,6 +238,18 @@ function makeStore(): Store {
 
 const CLAIM_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
+// Mirrors domain.ClaimWindow (internal/domain/claim.go): an unclaimed project
+// can only be claimed within 14 days of creation; init and complete both 410
+// with proj.claim_window_expired after that, and the already-claimed 409 wins
+// over the closed window, matching the server's check order.
+const CLAIM_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const CLAIM_WINDOW_EXPIRED_MESSAGE =
+  "the project was not claimed within 14 days of creation and can no longer be claimed";
+
+function claimWindowClosed(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() > CLAIM_WINDOW_MS;
+}
+
 /** Extract a bearer token from the Authorization header, or "" when absent. */
 function bearerToken(request: Request): string {
   return (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -398,6 +410,14 @@ export function expireClaimChallenge(challengeId: string): void {
   }
 }
 
+/** Backdates the project past the claim window, for window-expiry tests. */
+export function expireClaimWindow(projectId: string): void {
+  const project = store.projects.get(projectId);
+  if (project) {
+    project.createdAt = new Date(Date.now() - CLAIM_WINDOW_MS - 1000).toISOString();
+  }
+}
+
 export function completeClaimChallenge(
   challengeId: string,
   projectId: string,
@@ -426,6 +446,13 @@ export function completeClaimChallenge(
         team_id: existing.teamId,
         dashboard_url: existing.dashboardUrl,
       }),
+    };
+  }
+  const project = store.projects.get(projectId);
+  if (project && claimWindowClosed(project.createdAt)) {
+    return {
+      status: 410,
+      body: errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
     };
   }
 
@@ -581,6 +608,13 @@ export function setupPlatformHandlers() {
             dashboard_url: claim.dashboardUrl,
           }),
           { status: 409 },
+        );
+      }
+
+      if (claimWindowClosed(project.createdAt)) {
+        return HttpResponse.json(
+          errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+          { status: 410 },
         );
       }
 

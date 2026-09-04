@@ -46,7 +46,11 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
-import { expireClaimChallenge, snapshotPlatformStore } from "./platform-handlers.js";
+import {
+  expireClaimChallenge,
+  expireClaimWindow,
+  snapshotPlatformStore,
+} from "./platform-handlers.js";
 import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
 
 const PORT = 4456;
@@ -716,6 +720,30 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(complete.status).toBe(410);
     const completeBody = (await complete.json()) as Record<string, unknown>;
     expect(completeBody.code).toBe("proj.claim_expired");
+  });
+
+  test("a closed claim window makes init and complete return 410 claim_window_expired", async () => {
+    const project = await createProject("claim-window-expired");
+    // Mint the challenge while the window is open, then close it: complete
+    // must refuse even a live challenge once the project is too old.
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    expireClaimWindow(project.id);
+
+    const reinit = await initClaim(project.id, project.projectSecret);
+    expect(reinit.status).toBe(410);
+    const reinitBody = (await reinit.json()) as Record<string, unknown>;
+    expect(reinitBody.code).toBe("proj.claim_window_expired");
+
+    const cookie = await platformSessionCookie();
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(complete.status).toBe(410);
+    const completeBody = (await complete.json()) as Record<string, unknown>;
+    expect(completeBody.code).toBe("proj.claim_window_expired");
   });
 
   test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {

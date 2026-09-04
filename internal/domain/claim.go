@@ -16,6 +16,13 @@ const (
 // ClaimChallengeTTL is the challenge lifetime (ADR 046 §3).
 const ClaimChallengeTTL = 10 * time.Minute
 
+// ClaimWindow is how long after creation an unclaimed project can still be
+// claimed (the epic's 14-day lifetime, enforced at claim time; ADR 046
+// §Non-goals records that nothing deletes the project when it closes).
+// Keep in sync with CLAIM_WINDOW_DAYS in apps/cli/src/lib/claim-state.ts,
+// which prints the deadline this constant enforces.
+const ClaimWindow = 14 * 24 * time.Hour
+
 // NewClaimChallengeToken mints the plaintext challenge token and the stored
 // challenge id (handoff-token pattern, ADR 046 §3): 128 bits of crypto/rand,
 // prefixed and base64url-encoded. Only the id — the SHA-256 of the plaintext —
