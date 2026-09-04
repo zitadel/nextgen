@@ -397,6 +397,70 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			wantErr:           domain.ErrFlowDefinitionInvalid(`step "step_1": transition "next" targets unknown or inactive flow "external-flow"`, nil),
 		},
 		{
+			name: "failed to create flow definition - pivot target lookup fails",
+			fields: fields{
+				schemaResolver: &mockSchemaGetter{
+					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
+						return userSchema, nil
+					},
+				},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{
+					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
+						return &jsonschema.Schema{}, nil
+					},
+					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
+						return "https://example.com/schemas/flow-definition.json", nil
+					},
+				},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return []domain.PivotingTarget{
+						{
+							Name:       "external-flow",
+							Step:       "step_1",
+							Transition: "next",
+						},
+					}, nil
+				},
+				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
+					stmts := servicemocks.NewMockAllStatements(ctrl)
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(nil, assert.AnError).Times(1)
+					return stmts
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				req: service.FlowDefinitionRequest{
+					ProjectID:     "project1",
+					Name:          "some-flow",
+					Status:        "active",
+					SchemaVersion: "1.0.0",
+					FlowSchemaURI: "",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[string]string{"login": "step_1"},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []domain.Field{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "done"},
+								"next":   {Target: "external-flow", Action: new(domain.Switch)},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: new(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
+			wantErr:           assert.AnError,
+		},
+		{
 			name: "failed to create flow definition - validation failed",
 			fields: fields{
 				schemaResolver: &mockSchemaGetter{

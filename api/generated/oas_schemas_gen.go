@@ -15499,7 +15499,7 @@ func (s *FlowDefinitionExpand) UnmarshalText(data []byte) error {
 	}
 }
 
-// List of flow definitions, newest first.
+// List of flow definitions, newest by creation time first.
 // Ref: #
 type FlowDefinitionListResponse struct {
 	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
