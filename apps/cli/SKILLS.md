@@ -236,7 +236,10 @@ the CLI's help layer, not the envelope.
   under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
   under `.zitadel/local/nextgen-data/`. The local runtime provisions the
   built-in platform project, so the console's own sign-in and `zitadel claim`
-  work against it the same way they do on Zitadel Cloud. Runtime metadata
+  work against it the same way they do on Zitadel Cloud. A healthy runtime is
+  reused only when it was launched by a CLI that hands the server the same
+  environment; one started by an older CLI is restarted on the next `start`,
+  keeping its data. Runtime metadata
   reports the published server package version; the repository contributor
   wrapper reports the `dev+<short-commit>` source build it launched. That
   label names the revision the binary was built from, which after a Moon cache

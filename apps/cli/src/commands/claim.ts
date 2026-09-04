@@ -165,7 +165,7 @@ export default class Claim extends BaseCommand {
     // so only a loopback API paired with a non-loopback claim page warns.
     if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
       const warning =
-        `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
+        `The server at ${this.meta.source} advertised a claim page on ${originOf(challenge.claim_url)}. ` +
         "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).";
       if (json) {
         process.stderr.write(`Warning: ${warning}\n`);
@@ -302,14 +302,35 @@ export default class Claim extends BaseCommand {
  * Plain text rather than a JSON line on purpose — stdout is the single
  * envelope, and a second machine format on stderr would only invite parsing
  * what is meant to be read.
+ *
+ * The expiry is only narrated when it parses, and then in the same ISO form
+ * the poll deadline is derived from: {@link claimDeadline} falls back to the
+ * documented TTL for an unparseable `expires_at`, so echoing the raw value
+ * would promise a time the CLI itself does not honour.
  */
 export function claimLinkNarration(challenge: { claim_url: string; expires_at?: string }): string {
-  const expiry =
-    typeof challenge.expires_at === "string" ? ` The link expires at ${challenge.expires_at}.` : "";
+  const parsed = typeof challenge.expires_at === "string" ? Date.parse(challenge.expires_at) : NaN;
+  const expiry = Number.isNaN(parsed)
+    ? ""
+    : ` The link expires at ${new Date(parsed).toISOString()}.`;
   return (
     `Finish in your browser: ${challenge.claim_url}\n` +
     `Sign in there to attach this project to your team.${expiry}\n`
   );
+}
+
+/**
+ * The origin of a URL for the wrong-origin warning, or the value itself when
+ * it does not parse: the warning exists to show where a link points, and a
+ * malformed link is still worth naming rather than a reason to crash a
+ * command that could otherwise print it and carry on.
+ */
+export function originOf(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value;
+  }
 }
 
 /**

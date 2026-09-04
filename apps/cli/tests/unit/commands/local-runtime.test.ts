@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   CONTAINER_DATA_DIR,
+  LAUNCH_CONTRACT,
   defaultLocalServerImageForCliVersion,
   localContainerName,
   localRuntimePaths,
@@ -377,6 +378,116 @@ describe("local runtime commands", () => {
 
     const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
     expect(stop.exitCode).toBe(0);
+  });
+
+  // A runtime launched by an older CLI keeps answering /healthz while missing
+  // the environment this CLI hands the server, and a running process cannot
+  // pick that up. `start` must restart it rather than report it as running —
+  // otherwise upgrading the CLI leaves the platform-project fix unreachable
+  // until someone stops the server by hand.
+  it("start restarts a healthy binary runtime recorded under an older launch contract", async () => {
+    const cwd = await tempProject("zitadel-start-contract-");
+    const fake = await fakeServerBinary();
+    const port = await freePort();
+    const env = { ZITADEL_SERVER_BINARY: fake.binPath };
+    const args = ["start", "--cwd", cwd, "--json", "--port", String(port)];
+
+    const first = await runCliForTest(args, env);
+    expect(first.exitCode).toBe(0);
+    const firstPid = runtimePidOf(first.stdout);
+    binaryPids.push(firstPid);
+    expect((await readRuntimeMetadata(cwd))?.launch_contract).toBe(LAUNCH_CONTRACT);
+
+    // Same contract: the healthy runtime is reused, not restarted.
+    const again = await runCliForTest(args, env);
+    expect(again.exitCode).toBe(0);
+    expect(parseJson(again.stdout)).toMatchObject({
+      data: { title: "Local Zitadel server is already running.", runtime: { pid: firstPid } },
+    });
+
+    // The record an older CLI would have written: healthy, same port, no
+    // contract marker.
+    const recorded = await readRuntimeMetadata(cwd);
+    if (!recorded) {
+      throw new Error("runtime metadata missing after start");
+    }
+    const { launch_contract: _contract, ...legacy } = recorded;
+    await writeRuntimeMetadata(cwd, legacy);
+
+    const restarted = await runCliForTest(args, env);
+    expect(restarted.exitCode).toBe(0);
+    const envelope = parseJson(restarted.stdout) as {
+      data: { title: string; runtime: { pid: number } };
+    };
+    expect(envelope.data.title).toBe("Local Zitadel server is ready.");
+    expect(envelope.data.runtime.pid).not.toBe(firstPid);
+    binaryPids.push(envelope.data.runtime.pid);
+    expect(() => process.kill(firstPid, 0)).toThrow();
+    expect((await readRuntimeMetadata(cwd))?.launch_contract).toBe(LAUNCH_CONTRACT);
+
+    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+    expect(stop.exitCode).toBe(0);
+  });
+
+  it("start recreates a matching container whose record predates the launch contract", async () => {
+    const cwd = await tempProject("zitadel-start-container-contract-");
+    const image = await expectedDefaultImage();
+    const fake = await fakeDocker({ existingContainerImage: image });
+    const port = await freePort();
+    const serverUrl = `http://localhost:${String(port)}`;
+    const containerName = localContainerName(cwd);
+    // `runtimeFor` writes the record shape an older CLI produced: no marker.
+    await writeRuntimeMetadata(cwd, { ...runtimeFor(cwd, serverUrl), image });
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(parseJson(result.stdout)).toMatchObject({
+      data: { title: "Local Zitadel server is ready." },
+    });
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls).toContainEqual(["stop", containerName]);
+    expect(dockerCalls).toContainEqual(["rm", containerName]);
+    expect(dockerCalls.find((args) => args[0] === "run")).toContain(
+      "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
+    );
+    expect((await readRuntimeMetadata(cwd))?.launch_contract).toBe(LAUNCH_CONTRACT);
+  });
+
+  it("start reuses a healthy matching container recorded under the current launch contract", async () => {
+    const cwd = await tempProject("zitadel-start-container-reuse-");
+    const image = await expectedDefaultImage();
+    const fake = await fakeDocker({ existingContainerImage: image });
+    // The "container" answering /healthz on the port the record names.
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+    await writeRuntimeMetadata(cwd, {
+      ...runtimeFor(cwd, serverUrl),
+      image,
+      launch_contract: LAUNCH_CONTRACT,
+    });
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(parseJson(result.stdout)).toMatchObject({
+      data: { title: "Local Zitadel server is already running." },
+    });
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.some((args) => args[0] === "run")).toBe(false);
+    expect(dockerCalls.some((args) => args[0] === "rm")).toBe(false);
   });
 
   it("start fails with E_PORT_IN_USE when a foreign listener owns the requested port", async () => {

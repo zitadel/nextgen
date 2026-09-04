@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { ZitadelError } from "../errors";
 import {
   type BinaryRuntimeMetadata,
+  LAUNCH_CONTRACT,
   type RuntimeMetadata,
   checkLocalServerHealth,
 } from "./runtime";
@@ -64,10 +65,16 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
+    // The platform config below is the CLI's to own for its managed runtime:
+    // an ambient project pin (`platform.project_id`) combined with the forced
+    // bootstrap would fail the server's config validation for any id other
+    // than the built-in one, and there is no reason to pin anything on a
+    // data dir only this CLI provisions.
+    const { NEXTGEN_PLATFORM_PROJECT_ID: _inheritedProjectPin, ...inheritedEnv } = process.env;
     const child = spawn(command.command, command.args, {
       detached: true,
       env: {
-        ...process.env,
+        ...inheritedEnv,
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
         // Browser-facing URLs (claim, dashboard) must point at this local
@@ -89,6 +96,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
     }
     return {
       schema_version: 1,
+      launch_contract: LAUNCH_CONTRACT,
       backend: "binary",
       pid: child.pid,
       command: [command.command, ...command.args].join(" "),

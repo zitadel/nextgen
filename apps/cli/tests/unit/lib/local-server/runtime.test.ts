@@ -79,6 +79,30 @@ describe("local server runtime metadata", () => {
     await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
   });
 
+  // The marker is what lets `start` tell a runtime it may reuse from one it
+  // must restart, so it has to survive the write/read cycle unchanged.
+  it("round-trips the launch contract", async () => {
+    const metadata: RuntimeMetadata = { ...runtimeFor(cwd), launch_contract: 1 };
+
+    await writeRuntimeMetadata(cwd, metadata);
+
+    await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
+  });
+
+  // A record from an older CLI carries no marker, and a corrupt one must read
+  // the same way: "no contract", which `start` treats as a restart.
+  it("drops a launch contract that is not a positive integer", async () => {
+    const paths = await ensureLocalState(cwd);
+    const metadata = runtimeFor(cwd);
+    for (const junk of ["1", 0, -1, 1.5, null]) {
+      await writeFile(
+        paths.runtimeFile,
+        `${JSON.stringify({ ...metadata, launch_contract: junk }, null, 2)}\n`,
+      );
+      await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
+    }
+  });
+
   it("treats legacy runtime metadata without backend as Docker metadata", async () => {
     const paths = await ensureLocalState(cwd);
     const metadata = runtimeFor(cwd);

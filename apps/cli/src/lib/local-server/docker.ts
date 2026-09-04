@@ -5,6 +5,7 @@ import {
   CONTAINER_DATA_DIR,
   CONTAINER_HTTP_PORT,
   type ContainerIdentity,
+  LAUNCH_CONTRACT,
   type RuntimeMetadata,
 } from "./runtime";
 
@@ -214,6 +215,7 @@ export function metadataFromStart(input: {
 }): RuntimeMetadata {
   return {
     schema_version: 1,
+    launch_contract: LAUNCH_CONTRACT,
     backend: "docker",
     container_name: input.containerName,
     container_id: input.containerId,
