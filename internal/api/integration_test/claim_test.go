@@ -300,7 +300,12 @@ func TestClaimExpiredChallenge(t *testing.T) {
 		ChallengeID: api.ChallengeID(plain),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.ProjClaimExpired{}, statusResp, helpers.MustMarshal(t, statusResp))
+	// The 410 is a discriminated union since the claim window landed; a lapsed
+	// challenge must decode as the retryable proj.claim_expired variant, not
+	// the final closed-window refusal.
+	statusGone, ok := statusResp.(*api.GetClaimStatusGone)
+	require.True(t, ok, helpers.MustMarshal(t, statusResp))
+	assert.True(t, statusGone.IsProjClaimExpired(), helpers.MustMarshal(t, statusResp))
 
 	userID := harness.CreateUserWithTeam(t, harness.EnsurePlatformProject(t).ID)
 	client.SetSessionToken(platformSessionCookie(t, userID).Value)
@@ -308,7 +313,9 @@ func TestClaimExpiredChallenge(t *testing.T) {
 		&api.CompleteClaimRequest{ChallengeID: api.ChallengeID(plain)},
 		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	require.IsType(t, &api.ProjClaimExpired{}, completeResp, helpers.MustMarshal(t, completeResp))
+	completeGone, ok := completeResp.(*api.CompleteClaimGone)
+	require.True(t, ok, helpers.MustMarshal(t, completeResp))
+	assert.True(t, completeGone.IsProjClaimExpired(), helpers.MustMarshal(t, completeResp))
 }
 
 // TestCompleteClaimNoPersonalTeam: the session user is authenticated but has
@@ -493,7 +500,7 @@ func TestCompleteClaimConcurrent(t *testing.T) {
 		switch results[i].(type) {
 		case *api.CompleteClaimResponse:
 			winners++
-		case *api.ProjClaimExpired, *api.AlreadyClaimedResponse:
+		case *api.CompleteClaimGone, *api.AlreadyClaimedResponse:
 			losers++
 		default:
 			t.Fatalf("unexpected complete result: %T %s", results[i], helpers.MustMarshal(t, results[i]))

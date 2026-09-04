@@ -184,6 +184,21 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 	if challenge.Status == domain.ClaimChallengeStatusCompleted {
 		return s.completedStatus(ctx, stmts, projectID)
 	}
+	// The closed window outranks challenge expiry: both answer 410, but a
+	// fresh claim init recovers only from an expired challenge, so a polling
+	// CLI must learn the final refusal, not the retryable one. Reachable when
+	// the window closes between init and poll, since Init refuses to mint
+	// once it is already closed.
+	project, err := stmts.GetProjectByID(ctx, projectID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrProjectNotFound()
+		}
+		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to load project for claim")
+	}
+	if err := checkClaimWindow(project); err != nil {
+		return nil, err
+	}
 	if time.Now().After(challenge.ExpiresAt) {
 		return nil, domain.ErrProjectClaimExpired()
 	}
@@ -300,11 +315,12 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 	return result, nil
 }
 
-// claimedProjectState resolves the claim state all three legs branch on: a
-// missing project is ErrProjectNotFound, an unclaimed project (no active
-// owning-team grant) is (project, nil, nil), a claimed project returns its
-// owning team id. The loaded project rides along so callers can enforce the
-// claim window without a second read.
+// claimedProjectState resolves the claim state the claim writes branch on
+// (Init, Complete, and Complete's lost-race re-read; Status loads the project
+// directly): a missing project is ErrProjectNotFound, an unclaimed project
+// (no active owning-team grant) is (project, nil, nil), a claimed project
+// returns its owning team id. The loaded project rides along so callers can
+// enforce the claim window without a second read.
 // projectIsClaimed (event_claim.go) is deliberately not reused: events
 // visibility treats a missing project as unclaimed, while claim needs the 404
 // and the team id for the 409 details.
