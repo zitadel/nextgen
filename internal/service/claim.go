@@ -233,13 +233,11 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 			}
 			return err
 		}
-		if challenge.Status == domain.ClaimChallengeStatusPending && time.Now().After(challenge.ExpiresAt) {
-			return domain.ErrProjectClaimExpired()
-		}
-		// The claimed-check also answers a re-spent completed challenge:
-		// completion wrote the grant in this same transaction shape, so a
-		// completed challenge always reports 409 with the owning team rather
-		// than 410 (matching the OpenAPI contract and the api-mock).
+		// The claimed-check runs before both expiry checks and also answers a
+		// re-spent completed challenge: completion wrote the grant in this
+		// same transaction shape, so a completed challenge always reports 409
+		// with the owning team rather than 410 (matching the OpenAPI contract
+		// and the api-mock).
 		//
 		// Two different pending challenges racing on one project cannot
 		// double-write the grant: authz_assignments_one_owning_team keeps at
@@ -253,8 +251,14 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		if teamID != nil {
 			return s.alreadyClaimedErr(projectID, *teamID)
 		}
+		// The closed window outranks challenge expiry, matching Status: both
+		// answer 410, but a fresh claim init recovers only from an expired
+		// challenge, so a both-expired complete must report the final refusal.
 		if err := checkClaimWindow(project); err != nil {
 			return err
+		}
+		if challenge.Status == domain.ClaimChallengeStatusPending && time.Now().After(challenge.ExpiresAt) {
+			return domain.ErrProjectClaimExpired()
 		}
 		team, err := stmts.GetPersonalTeamForUser(ctx, s.platformProjectID, userID)
 		if err != nil {

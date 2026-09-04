@@ -240,8 +240,10 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   enforced, but only at claim time: `claim/init` and `claim/complete` refuse a
   project older than `domain.ClaimWindow` (14 days from `projects.created_at`)
   with `proj.claim_window_expired` (410), ordered after the already-claimed
-  check so a claimed project keeps answering 409. That lets CLI messaging state
-  the deadline honestly. Deleting the project when the window closes stays out
+  check so a claimed project keeps answering 409, and `claim/status` reports
+  the same final 410 for a pending challenge, taking precedence over challenge
+  expiry so a polling client learns the refusal no new challenge can fix. That
+  lets CLI messaging state the deadline honestly. Deleting the project when the window closes stays out
   of scope: there is no general scheduled-task infrastructure in the server
   (the audit retention loop is audit-specific), and the proposed ADR 061
   ([#1119](https://github.com/zitadel/nextgen/pull/1119)), which designs one,
