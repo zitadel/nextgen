@@ -1,5 +1,12 @@
 # @zitadel/components
 
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/config@1.0.0-alpha.22
+
 ## 1.0.0-alpha.21
 
 ### Minor Changes

@@ -1,5 +1,30 @@
 # @zitadel/server
 
+## 1.0.0-alpha.22
+
+### Minor Changes
+
+- [#1093](https://github.com/zitadel/nextgen/pull/1093) [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definitions are revisioned: `POST /flow_definitions` publishes a new
+  revision on every call, so a repeated `name` no longer returns 409, and
+  `GET /flow_definitions` accepts a `name` filter that lists one flow's
+  revisions newest first.
+
+- [#1155](https://github.com/zitadel/nextgen/pull/1155) [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab) Thanks [@vitorbari](https://github.com/vitorbari)! - The events API defines the `release.created` event type and its payload.
+
+  The payload carries the release's `content_hash`, its audit metadata (`message`, `git_sha`, `git_dirty`) and the `(kind, handle, revision_id)` tuples the release pins, so an audit stream answers what a release changed without reading the releases table. Nothing emits the event until `POST /releases` is implemented.
+
+- [#1115](https://github.com/zitadel/nextgen/pull/1115) [`472a182`](https://github.com/zitadel/nextgen/commit/472a18216b472cdcd76620b1f11f37ce997fcdcb) Thanks [@vitorbari](https://github.com/vitorbari)! - Adds persistence support for **releases** — immutable, project-scoped configuration snapshots that pin one revision of each resource they include.
+
+  Release records store their pinned revisions and assembly metadata. A project-scoped content-hash index prevents duplicate snapshots and provides the storage contract needed for idempotent release orchestration in a follow-up.
+
+### Patch Changes
+
+- [#1134](https://github.com/zitadel/nextgen/pull/1134) [`c0bef04`](https://github.com/zitadel/nextgen/commit/c0bef048c305cd4fdac5d44bd1219a3fc08e550a) Thanks [@muhlemmer](https://github.com/muhlemmer)! - createProject response now includes the project name field.
+
+- [#1136](https://github.com/zitadel/nextgen/pull/1136) [`1f5e7b9`](https://github.com/zitadel/nextgen/commit/1f5e7b9d8ccd1282a81f8541f359376ddd0947bc) Thanks [@muhlemmer](https://github.com/muhlemmer)! - Flow submit endpoint now rejects requests with unrecognized top-level properties instead of silently ignoring them.
+
+- [#1135](https://github.com/zitadel/nextgen/pull/1135) [`4a637a3`](https://github.com/zitadel/nextgen/commit/4a637a3fed02f969cae61a427d293ca226bd6a4a) Thanks [@muhlemmer](https://github.com/muhlemmer)! - instrumentation.log.level, instrumentation.log.format, and instrumentation.log.streams now accept string names (e.g. debug, json, request) in addition to numeric values.
+
 ## 1.0.0-alpha.21
 
 ### Minor Changes
