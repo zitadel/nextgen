@@ -134,12 +134,12 @@ func NewClaimService(v2Pool *DB, consoleBaseURL, platformProjectID string) Claim
 
 func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (*ClaimInitResult, error) {
 	var stmts claimStatements = s.v2Pool.Statements()
-	project, teamID, err := claimedProjectState(ctx, stmts, projectID)
+	project, grant, err := claimedProjectState(ctx, stmts, projectID)
 	if err != nil {
 		return nil, err
 	}
-	if teamID != nil {
-		return nil, s.alreadyClaimedErr(projectID, *teamID)
+	if grant != nil {
+		return nil, s.alreadyClaimedErr(projectID, grant.PrincipalID)
 	}
 	if err := checkClaimWindow(project); err != nil {
 		return nil, err
@@ -181,21 +181,33 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 	if subtle.ConstantTimeCompare([]byte(challenge.InitiatingSecretHash), []byte(secretHash)) == 0 {
 		return nil, domain.ErrProjectPermissionDenied()
 	}
+	// The grant, not the polled challenge, is the claim source of truth
+	// (ADR 046 §1): a project claimed through another challenge reports
+	// completed with its owning team — the poller's goal state is reached
+	// either way — rather than a false expiry or closed-window verdict once
+	// this challenge lapses or day 14 passes.
+	project, grant, err := claimedProjectState(ctx, stmts, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if grant != nil {
+		return &ClaimStatusResult{
+			Status:       domain.ClaimChallengeStatusCompleted,
+			TeamID:       grant.PrincipalID,
+			ClaimedAt:    grant.CreatedAt,
+			DashboardURL: s.dashboardURL(projectID),
+		}, nil
+	}
+	// A completed challenge wrote the grant in the same transaction, so a
+	// completed challenge without one is corrupt state.
 	if challenge.Status == domain.ClaimChallengeStatusCompleted {
-		return s.completedStatus(ctx, stmts, projectID)
+		return nil, domain.ErrInternal(nil).WithMessage("completed claim challenge without a project-team grant")
 	}
 	// The closed window outranks challenge expiry: both answer 410, but a
 	// fresh claim init recovers only from an expired challenge, so a polling
 	// CLI must learn the final refusal, not the retryable one. Reachable when
 	// the window closes between init and poll, since Init refuses to mint
 	// once it is already closed.
-	project, err := stmts.GetProjectByID(ctx, projectID)
-	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrProjectNotFound()
-		}
-		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to load project for claim")
-	}
 	if err := checkClaimWindow(project); err != nil {
 		return nil, err
 	}
@@ -203,22 +215,6 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 		return nil, domain.ErrProjectClaimExpired()
 	}
 	return &ClaimStatusResult{Status: domain.ClaimChallengeStatusPending}, nil
-}
-
-// completedStatus reconstructs team and claim time from the grant written at
-// complete. A missing grant on a completed challenge is corrupt state: it is
-// written in the same transaction that marks completion.
-func (s *claimService) completedStatus(ctx context.Context, stmts claimStatements, projectID string) (*ClaimStatusResult, error) {
-	grant, err := stmts.GetActiveOwningTeamGrant(ctx, projectID)
-	if err != nil {
-		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("completed claim challenge without a project-team grant")
-	}
-	return &ClaimStatusResult{
-		Status:       domain.ClaimChallengeStatusCompleted,
-		TeamID:       grant.PrincipalID,
-		ClaimedAt:    grant.CreatedAt,
-		DashboardURL: s.dashboardURL(projectID),
-	}, nil
 }
 
 func (s *claimService) Complete(ctx context.Context, projectID, challengeID, userID string) (*ClaimCompleteResult, error) {
@@ -244,12 +240,12 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		// most one active owning-team row per project (ADR 054 §2), so the
 		// losing insert conflicts and Complete's caller-side handler below
 		// turns it into the same 409.
-		project, teamID, err := claimedProjectState(ctx, stmts, projectID)
+		project, grant, err := claimedProjectState(ctx, stmts, projectID)
 		if err != nil {
 			return err
 		}
-		if teamID != nil {
-			return s.alreadyClaimedErr(projectID, *teamID)
+		if grant != nil {
+			return s.alreadyClaimedErr(projectID, grant.PrincipalID)
 		}
 		// The closed window outranks challenge expiry, matching Status: both
 		// answer 410, but a fresh claim init recovers only from an expired
@@ -307,8 +303,8 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		// claim race (authz_assignments_one_owning_team): the winner's grant
 		// committed first. Re-read it for the 409's owning-team details.
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			if _, teamID, terr := claimedProjectState(ctx, s.v2Pool.Statements(), projectID); terr == nil && teamID != nil {
-				return nil, s.alreadyClaimedErr(projectID, *teamID)
+			if _, grant, terr := claimedProjectState(ctx, s.v2Pool.Statements(), projectID); terr == nil && grant != nil {
+				return nil, s.alreadyClaimedErr(projectID, grant.PrincipalID)
 			}
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -319,16 +315,16 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 	return result, nil
 }
 
-// claimedProjectState resolves the claim state the claim writes branch on
-// (Init, Complete, and Complete's lost-race re-read; Status loads the project
-// directly): a missing project is ErrProjectNotFound, an unclaimed project
-// (no active owning-team grant) is (project, nil, nil), a claimed project
-// returns its owning team id. The loaded project rides along so callers can
-// enforce the claim window without a second read.
+// claimedProjectState resolves the claim state every leg branches on: a
+// missing project is ErrProjectNotFound, an unclaimed project (no active
+// owning-team grant) is (project, nil, nil), a claimed project returns its
+// active owning-team grant. The loaded project rides along so callers can
+// enforce the claim window, and the full grant so Status can report the
+// owning team and claim time without a second read.
 // projectIsClaimed (event_claim.go) is deliberately not reused: events
 // visibility treats a missing project as unclaimed, while claim needs the 404
 // and the team id for the 409 details.
-func claimedProjectState(ctx context.Context, stmts claimedProjectStatements, projectID string) (*domain.Project, *string, error) {
+func claimedProjectState(ctx context.Context, stmts claimedProjectStatements, projectID string) (*domain.Project, *domain.AuthzAssignment, error) {
 	project, err := stmts.GetProjectByID(ctx, projectID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -343,7 +339,7 @@ func claimedProjectState(ctx context.Context, stmts claimedProjectStatements, pr
 		}
 		return nil, nil, domain.ErrInternal(err).WithMessage("failed to load claim grant for project")
 	}
-	return project, &grant.PrincipalID, nil
+	return project, grant, nil
 }
 
 // checkClaimWindow enforces the claim window at claim time: a project older
