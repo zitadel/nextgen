@@ -150,7 +150,6 @@ func FlowdefPayloadSnapshot(fd *FlowDefinition) FlowdefPayload {
 	}
 }
 
-// FlowdefPayloadDelta is the allowlisted update delta (new values only).
 func flowdefPurposesWire(in map[FlowDefinitionPurpose]string) map[string]string {
 	if len(in) == 0 {
 		return nil

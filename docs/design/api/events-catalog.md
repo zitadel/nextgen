@@ -138,7 +138,9 @@ writers exist.
 
 Types with no live producer today. They stay in `domain.EventType` and the
 events API so stored rows keep decoding. A type moves back to Path B when a
-producer appears again.
+producer appears again. A retired type is removed once its rows have aged out
+of retention ([ADR 049](../../adrs/049-events-api-retention-export.md)) on
+every supported deployment; that removal is its own breaking change.
 
 | `event_type` | Retired by | Return |
 |--------------|------------|--------|

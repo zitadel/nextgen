@@ -1,6 +1,6 @@
 ---
-"@zitadel/server": minor
-"@zitadel/api": minor
+"@zitadel/server": major
+"@zitadel/api": major
 ---
 
 Remove `PUT /flow_definitions/{id}` and `DELETE /flow_definitions/{id}`. A
