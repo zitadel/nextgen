@@ -704,7 +704,9 @@ func TestProjectService_DefaultProject(t *testing.T) {
 		statements.EXPECT().
 			ListProjects(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-				assert.EqualValues(t, 1, opts.Pagination.Limit)
+				// Two candidates, because the earliest row may be the platform
+				// project the heuristic must skip.
+				assert.EqualValues(t, 2, opts.Pagination.Limit)
 				assert.Equal(t, []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldCreatedAt)}, opts.Pagination.OrderBy.Columns)
 				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
 				return &database.ListResult[*domain.Project]{Items: []*domain.Project{first}}, nil
@@ -714,6 +716,63 @@ func TestProjectService_DefaultProject(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, first, got)
+	})
+
+	// A bootstrapped deployment (CLI-managed local servers seed the platform
+	// project at startup, before any user project exists) must still resolve
+	// the user's own project: the platform row is infrastructure, not the
+	// deployment's product.
+	t.Run("skips the platform project even when it is the oldest row", func(t *testing.T) {
+		t.Parallel()
+
+		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
+		real := &domain.Project{ID: "proj_real", PreviewOrigins: []string{}}
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().
+			ListProjects(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Project]{Items: []*domain.Project{platform, real}}, nil)
+
+		got, err := svc.DefaultProject(context.Background(), "")
+
+		assert.NoError(t, err)
+		assert.Equal(t, real, got)
+	})
+
+	t.Run("returns nil when only the platform project exists", func(t *testing.T) {
+		t.Parallel()
+
+		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().
+			ListProjects(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Project]{Items: []*domain.Project{platform}}, nil)
+
+		got, err := svc.DefaultProject(context.Background(), "")
+
+		assert.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	// Explicit configuration wins unchanged, including pointing at the
+	// platform project itself.
+	t.Run("a configured platform project id is honored", func(t *testing.T) {
+		t.Parallel()
+
+		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().GetProjectByID(gomock.Any(), domain.PlatformProjectID).Return(platform, nil)
+		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
+
+		got, err := svc.DefaultProject(context.Background(), domain.PlatformProjectID)
+
+		assert.NoError(t, err)
+		assert.Equal(t, platform, got)
 	})
 
 	t.Run("returns nil while no project exists yet — the server never creates one", func(t *testing.T) {
