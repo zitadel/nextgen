@@ -198,7 +198,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return err
 	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
-	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	environmentService := service.NewEnvironmentService(serviceDBPool)
