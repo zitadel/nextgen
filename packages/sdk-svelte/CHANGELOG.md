@@ -1,5 +1,14 @@
 # @zitadel/sdk-svelte
 
+## 1.0.0-alpha.21
+
+### Patch Changes
+
+- Updated dependencies [[`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b), [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060)]:
+  - @zitadel/api@1.0.0-alpha.21
+  - @zitadel/components@1.0.0-alpha.21
+  - @zitadel/sdk-core@1.0.0-alpha.21
+
 ## 1.0.0-alpha.20
 
 ### Patch Changes

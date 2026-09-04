@@ -37,7 +37,7 @@ func TestGrantResponse_Principal(t *testing.T) {
 		ObjectType:    "project",
 		Relation:      "viewer",
 	}
-	userRef := &service.UserRef{UserID: "user_1"}
+	userRef := &domain.UserRef{UserID: "user_1"}
 
 	t.Run("omit when Principal is nil", func(t *testing.T) {
 		resp, err := grantResponse(&service.Grant{Assignment: asgn, User: userRef})

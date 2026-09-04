@@ -129,15 +129,7 @@ func grantResponse(g *service.Grant) (*api.Grant, error) {
 		resp.ExpiresAt = api.NewOptNilDateTime(*asgn.ExpiresAt)
 	}
 	if g.User != nil {
-		ref := api.UserRef{UserID: api.UserID(g.User.UserID)}
-		if g.User.Identifier != "" {
-			ref.Identifier = api.NewOptString(g.User.Identifier)
-			ref.IdentifierProperty = api.NewOptString(g.User.IdentifierProperty)
-		}
-		if g.User.Display != "" {
-			ref.Display = api.NewOptString(g.User.Display)
-		}
-		resp.User = api.NewOptUserRef(ref)
+		resp.User = api.NewOptUserRef(userRefToAPI(*g.User))
 	}
 	if g.Team != nil {
 		ref := api.TeamRef{TeamID: g.Team.TeamID}

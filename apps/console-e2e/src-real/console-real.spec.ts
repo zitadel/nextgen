@@ -101,3 +101,36 @@ test("shows the status the API stamped on a seeded user", async ({ page, seed })
   const row = page.getByRole("row").filter({ hasText: user.email });
   await expect(row.getByText("active", { exact: true })).toBeVisible();
 });
+
+test("embeds the team memberships on the list read rather than degrading", async ({
+  page,
+  seed,
+}) => {
+  // `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and
+  // the console falls back to an unexpanded read when it is refused — which is
+  // silent by design. Asserted against a real instance because the fallback
+  // would otherwise hide a genuinely rejected expansion behind a list that
+  // still renders: what a stub cannot tell you is whether the *server* accepts
+  // the parameter.
+  //
+  // The column's contents are not asserted. No endpoint writes a membership
+  // (`EnsurePersonalTeam` is a no-op outside the platform project, and the API
+  // exposes only `GET /users/{user_id}/teams`), so on this instance every user
+  // is on no team and every cell is honestly empty. Add the content assertion
+  // with the endpoint that can seed one.
+  const user = await seed.user();
+  await signIn(page, user);
+
+  const query = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/users/query" && response.ok(),
+  );
+  await page.goto("/users");
+  expect(JSON.parse((await (await query).request().postData()) ?? "{}")).toMatchObject({
+    expand: ["teams"],
+  });
+
+  // The header is the console's own signal that the expansion was served: it is
+  // dropped on a 403, so its presence means no fallback happened.
+  await expect(page.getByRole("columnheader", { name: "Team", exact: true })).toBeVisible();
+  await expectNoErrorBoundary(page);
+});

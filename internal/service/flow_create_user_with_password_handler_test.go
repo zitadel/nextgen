@@ -13,6 +13,7 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const passwordHandlerTestSchema = `{
@@ -48,7 +49,10 @@ func newPasswordHandlerFixture(t *testing.T) *passwordHandlerFixture {
 	hasher := cryptomock.NewMockHasher(ctrl)
 
 	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	userService := service.NewUserService(service.NewPool(v2Pool), schemaStore, hasher)
+	svcPool := service.NewPool(v2Pool)
+	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
+	userService := service.NewUserService(svcPool, schemaStore, hasher, service.StatementsUserRefResolver{Pool: svcPool})
 	handler := service.NewFlowCreateUserHandler(hasher, userService, schemaStore, v2Pool)
 
 	return &passwordHandlerFixture{

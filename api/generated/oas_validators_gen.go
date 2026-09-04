@@ -7513,6 +7513,24 @@ func (s *SessionResponse) Validate() error {
 		})
 	}
 	if err := func() error {
+		if value, ok := s.User.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "user",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Factors == nil {
 			return errors.New("nil is invalid value")
 		}

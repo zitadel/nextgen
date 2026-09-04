@@ -38,12 +38,14 @@ func isManagedGrant(a *domain.AuthzAssignment) bool {
 
 type GrantService struct {
 	v2Pool            *DB
+	refs              UserRefResolver
 	platformProjectID string
 }
 
-func NewGrantService(v2Pool *DB, platformProjectID string) *GrantService {
+func NewGrantService(v2Pool *DB, refs UserRefResolver, platformProjectID string) *GrantService {
 	return &GrantService{
 		v2Pool:            v2Pool,
+		refs:              refs,
 		platformProjectID: platformProjectID,
 	}
 }
@@ -248,20 +250,23 @@ type GrantPrincipal struct {
 // User and Team nil is the ADR 059 missing-principal case (wire null).
 type Grant struct {
 	Assignment *domain.AuthzAssignment
-	User       *UserRef
+	User       *domain.UserRef
 	Team       *TeamRef
 	Principal  *GrantPrincipal
 }
 
-func (g *Grant) attachUser(user *domain.User) {
-	if user != nil {
-		g.User = userRefFrom(user)
-		if g.Principal != nil {
-			g.Principal.User = user
+func (g *Grant) attachUser(user *domain.User, ref domain.UserRef, found bool) {
+	if found {
+		g.User = &ref
+		if user != nil {
+			user.Ref = &ref
 		}
-		return
+	} else {
+		g.User = &domain.UserRef{UserID: g.Assignment.PrincipalID}
 	}
-	g.User = &UserRef{UserID: g.Assignment.PrincipalID}
+	if g.Principal != nil {
+		g.Principal.User = user
+	}
 }
 
 func (g *Grant) attachTeam(team *domain.Team) {
@@ -273,16 +278,6 @@ func (g *Grant) attachTeam(team *domain.Team) {
 		return
 	}
 	g.Team = &TeamRef{TeamID: g.Assignment.PrincipalID}
-}
-
-// UserRef is the ADR 058 label for a user principal. Identifier/display are
-// empty when the user cannot be loaded or carries no conventional identity
-// attributes. #1090's designation resolver replaces this mapping when it lands.
-type UserRef struct {
-	UserID             string
-	Identifier         string
-	IdentifierProperty string
-	Display            string
 }
 
 // TeamRef is the label for a team principal. Name is empty when the team
@@ -384,16 +379,19 @@ func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns
 		home = asgns[0].ProjectID
 	}
 
-	ctx = WithAuthzListUnrestricted(ctx)
-	attrKeys := domain.IdentityAttributeKeys
+	var users map[string]*domain.User
 	if includePrincipal {
-		attrKeys = nil
+		var err error
+		users, err = s.loadUsers(WithAuthzListUnrestricted(ctx), home, userIDs, nil)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant user refs")
+		}
 	}
-	users, err := s.loadUsers(ctx, home, userIDs, attrKeys)
+	userRefs, err := s.resolveGrantUserRefs(ctx, home, userIDs, users)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant user refs")
 	}
-	teams, err := s.loadTeams(ctx, home, teamIDs)
+	teams, err := s.loadTeams(WithAuthzListUnrestricted(ctx), home, teamIDs)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant team refs")
 	}
@@ -401,12 +399,27 @@ func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns
 	for _, g := range out {
 		switch g.Assignment.PrincipalType {
 		case domain.AuthzPrincipalTypeUser:
-			g.attachUser(users[g.Assignment.PrincipalID])
+			ref, ok := userRefs[g.Assignment.PrincipalID]
+			g.attachUser(users[g.Assignment.PrincipalID], ref, ok)
 		case domain.AuthzPrincipalTypeTeam:
 			g.attachTeam(teams[g.Assignment.PrincipalID])
 		}
 	}
 	return out, nil
+}
+
+func (s *GrantService) resolveGrantUserRefs(ctx context.Context, projectID string, userIDs []string, users map[string]*domain.User) (map[string]domain.UserRef, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+	if users != nil {
+		loaded := make([]*domain.User, 0, len(users))
+		for _, user := range users {
+			loaded = append(loaded, user)
+		}
+		return s.refs.ResolveRefsForUsers(ctx, projectID, loaded)
+	}
+	return s.refs.ResolveUserRefs(ctx, projectID, userIDs)
 }
 
 func principalIDs(asgns []*domain.AuthzAssignment) (userIDs, teamIDs []string) {
@@ -452,15 +465,6 @@ func (s *GrantService) loadUsers(ctx context.Context, projectID string, userIDs 
 		return nil, err
 	}
 	return indexByID(listed.Items, func(u *domain.User) string { return u.ID }), nil
-}
-
-func userRefFrom(user *domain.User) *UserRef {
-	ref := &UserRef{UserID: user.ID, Display: user.DisplayName()}
-	if email := user.Email(); email != "" {
-		ref.Identifier = email
-		ref.IdentifierProperty = "email"
-	}
-	return ref
 }
 
 func (s *GrantService) loadTeams(ctx context.Context, projectID string, teamIDs []string) (map[string]*domain.Team, error) {

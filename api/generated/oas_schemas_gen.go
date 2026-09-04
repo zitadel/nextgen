@@ -41769,21 +41769,13 @@ type SessionResponse struct {
 	// The authenticated user. Null for anonymous sessions and until the `user`
 	// factor has been verified through an `auth_attempt`.
 	UserID OptNilUserID `json:"user_id"`
-	// Human-readable name of the authenticated user, resolved from the
-	// conventional user-schema properties: `name` when defined, otherwise
-	// the given and family name parts joined — `givenName`/`familyName`
-	// (the shipped presets' spelling) or `given_name`/`family_name`. Only
-	// present on reads that hydrate the user's identity
-	// (`GET /sessions/me`) and only when the session has an authenticated
-	// user whose schema carries those properties; clients fall back to
-	// `email`, then `user_id`.
-	Name OptString `json:"name"`
-	// Email address of the authenticated user, resolved from the
-	// conventional `email` user-schema property. Only present on reads
-	// that hydrate the user's identity (`GET /sessions/me`) and only when
-	// the session has an authenticated user whose schema carries that
-	// property.
-	Email OptString `json:"email"`
+	// The authenticated user's resolved reference, derived live from the
+	// user schema's `x-identifier`/`x-display` designations (ADR 058).
+	// Present on identity-hydrating reads (`GET /sessions/me`, session get
+	// and query) whenever the session has an authenticated user; absent
+	// for anonymous sessions. Clients render `display`, falling back to
+	// `identifier`, then `user_id`.
+	User OptUserRef `json:"user"`
 	// Verified authentication factors accumulated by this session.
 	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
 	// Each value is a factor event object with at least `verified_at` and
@@ -41825,14 +41817,9 @@ func (s *SessionResponse) GetUserID() OptNilUserID {
 	return s.UserID
 }
 
-// GetName returns the value of Name.
-func (s *SessionResponse) GetName() OptString {
-	return s.Name
-}
-
-// GetEmail returns the value of Email.
-func (s *SessionResponse) GetEmail() OptString {
-	return s.Email
+// GetUser returns the value of User.
+func (s *SessionResponse) GetUser() OptUserRef {
+	return s.User
 }
 
 // GetFactors returns the value of Factors.
@@ -41885,14 +41872,9 @@ func (s *SessionResponse) SetUserID(val OptNilUserID) {
 	s.UserID = val
 }
 
-// SetName sets the value of Name.
-func (s *SessionResponse) SetName(val OptString) {
-	s.Name = val
-}
-
-// SetEmail sets the value of Email.
-func (s *SessionResponse) SetEmail(val OptString) {
-	s.Email = val
+// SetUser sets the value of User.
+func (s *SessionResponse) SetUser(val OptUserRef) {
+	s.User = val
 }
 
 // SetFactors sets the value of Factors.
@@ -45650,6 +45632,21 @@ type User struct {
 	// names and types are determined entirely by that schema.
 	Attributes UserAttributes `json:"attributes"`
 	Metadata   UserMetadata   `json:"metadata"`
+	// The current value of the user schema's designated identifier
+	// (`x-identifier`), resolved live at read time. Absent when the schema
+	// designates no identifier or the user carries no value for it.
+	Identifier OptString `json:"identifier"`
+	// The schema property `identifier` came from, so clients can reach the
+	// property's schema for semantics (a mailto link, a field label)
+	// instead of guessing from the value. Present exactly when
+	// `identifier` is.
+	IdentifierProperty OptString `json:"identifier_property"`
+	// The `x-display` rendering — the designated properties' values joined
+	// in list order, resolved live at read time. Purely presentational.
+	// Absent when the schema designates no display properties or the user
+	// carries no values for them. Clients render `display`, falling back
+	// to `identifier`, then `id`.
+	Display OptString `json:"display"`
 	// The user's team memberships, present only when the request asked for them with
 	// `expand: ["teams"]` (ADR 059). Absent means it was not requested; `[]`
 	// means the user has none.
@@ -45683,6 +45680,21 @@ func (s *User) GetMetadata() UserMetadata {
 	return s.Metadata
 }
 
+// GetIdentifier returns the value of Identifier.
+func (s *User) GetIdentifier() OptString {
+	return s.Identifier
+}
+
+// GetIdentifierProperty returns the value of IdentifierProperty.
+func (s *User) GetIdentifierProperty() OptString {
+	return s.IdentifierProperty
+}
+
+// GetDisplay returns the value of Display.
+func (s *User) GetDisplay() OptString {
+	return s.Display
+}
+
 // GetTeams returns the value of Teams.
 func (s *User) GetTeams() []UserTeam {
 	return s.Teams
@@ -45711,6 +45723,21 @@ func (s *User) SetAttributes(val UserAttributes) {
 // SetMetadata sets the value of Metadata.
 func (s *User) SetMetadata(val UserMetadata) {
 	s.Metadata = val
+}
+
+// SetIdentifier sets the value of Identifier.
+func (s *User) SetIdentifier(val OptString) {
+	s.Identifier = val
+}
+
+// SetIdentifierProperty sets the value of IdentifierProperty.
+func (s *User) SetIdentifierProperty(val OptString) {
+	s.IdentifierProperty = val
+}
+
+// SetDisplay sets the value of Display.
+func (s *User) SetDisplay(val OptString) {
+	s.Display = val
 }
 
 // SetTeams sets the value of Teams.
@@ -47792,8 +47819,10 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 	}
 }
 
-// A resolved reference to a user (ADR 058). Fields are role-named, not
+// A resolved reference to a user (ADR 058 §3). Fields are role-named, not
 // property-named, so responses can mix users from different schemas.
+// `identifier` and `display` are resolved independently from the user
+// schema's `x-identifier` and `x-display` designations, live at read time.
 // Clients render `display`, falling back to `identifier`, then `user_id`.
 // Missing or deleted users degrade to `user_id` only.
 // Ref: #
@@ -47802,15 +47831,17 @@ type UserRef struct {
 	UserID UserID `json:"user_id"`
 	// The current value of the schema's designated identifier
 	// (`x-identifier`). Absent when the schema designates no identifier or
-	// the user carries no value for it. Until designation plumbing ships,
-	// this is the conventional `email` attribute when present.
+	// the user carries no value for it.
 	Identifier OptString `json:"identifier"`
-	// The schema property `identifier` came from. Present exactly when
+	// The schema property `identifier` came from, so clients can reach the
+	// property's schema for semantics (a mailto link, a field label)
+	// instead of guessing from the value. Present exactly when
 	// `identifier` is.
 	IdentifierProperty OptString `json:"identifier_property"`
-	// The friendly display name. Absent when the user carries no display
-	// properties. Until designation plumbing ships, this is the conventional
-	// `name` / given+family attributes when present.
+	// The `x-display` rendering — the designated properties' values joined
+	// in list order. Purely presentational, with no source attribution.
+	// Absent when the schema designates no display properties or the user
+	// carries no values for them.
 	Display OptString `json:"display"`
 }
 
