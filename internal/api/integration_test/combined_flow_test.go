@@ -292,6 +292,14 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 		"x-auth-methods#password": jx.Raw(`"` + password + `"`),
 	})
 	require.Equal(t, "done", done.Response.Step.Name)
+
+	// Reaching this terminal through user_already_exists is still a sign-in,
+	// so it has to carry a token to exchange for a session. terminate gates
+	// the handoff on a resolved user, so the flow must have recorded the user
+	// the identifier lookup pinned on the attempt.
+	handoffToken, hasToken := done.Response.HandoffToken.Get()
+	require.True(t, hasToken, "sign-in via user_already_exists must issue a handoff token")
+	require.NotEmpty(t, handoffToken)
 }
 
 // TestBackToIdentifierRotatesAuthAttempt drives the back action through the

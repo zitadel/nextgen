@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -698,8 +699,12 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 // them here keeps validation, dispatch, and collection agreeing on what the
 // leg was given.
 //
-// The identifier itself stays in, empty or not, so the rules that decide
-// whether a blank identifier is usable keep applying to it.
+// What survives is whatever the *current step* declares as an identifier
+// field — so an identifier step keeps its value, empty or not, and the rules
+// deciding whether a blank identifier is usable keep applying to it, while a
+// step that declares no identifier (the password step) submits nothing at
+// all. That is the discoverable ceremony: the assertion carries the user
+// handle instead.
 func identifierFieldsOnly(resolved FlowResolvedFields, values map[string]any) map[string]any {
 	kept := make(map[string]any)
 	for _, field := range resolved.Fields {
@@ -754,10 +759,17 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 			if err != nil {
 				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
 			}
+			// A successful lookup pins the user on the attempt whichever
+			// purpose asked for it, so the flow records it either way.
+			// user_already_exists then flips to login and routes to
+			// verification, where the flow is verifying exactly this user — so
+			// recording is honest, and it keeps CollectedData.UserID a truthful
+			// signal of what the attempt carries. Left blank, the two fall out
+			// of step: back skips its rotation and terminate skips the handoff.
+			recordResolvedUser(state, userID)
 			if state.CurrentPurpose == FlowDefinitionPurposeRegister {
 				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
 			}
-			recordResolvedUser(state, userID)
 		case FlowFieldChallengePassword:
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
@@ -1149,12 +1161,16 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 	state.IssuedAt = r.now()
 }
 
-// processBack pops the previous BackStack entry and re-renders that
-// step, restoring the snapshotted purpose. CollectedData is preserved
-// (previous form prefills); PendingChallenge is dropped; History is
-// left intact. Landing back on a step that collects the identifier drops
-// the resolved user, since that is the user going back to change who they
-// are signing in as.
+// processBack pops the previous BackStack entry and re-renders that step,
+// restoring the snapshotted purpose. PendingChallenge is dropped; History is
+// left intact.
+//
+// CollectedData.UserData survives, so the previous form prefills. The rest of
+// CollectedData depends on where back lands: a step that collects the
+// identifier is the user going back to change who they are signing in as, so
+// the resolved user and the password collected for them go too, and the auth
+// attempt rotates with them (see [dropResolvedUser]). Landing anywhere else
+// leaves all of it in place.
 func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
 	prev, ok := pc.state.PeekBackStack()
 	if !ok {
@@ -1182,7 +1198,10 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 	// attempt without a user factor on it; keeping the resolved user would
 	// also scope the next passkey ceremony's allowCredentials to whoever the
 	// abandoned leg resolved.
-	if collectsIdentifier(resolved) {
+	collectsIdentifier := slices.ContainsFunc(resolved.Fields, func(f FlowField) bool {
+		return f.Challenge == FlowFieldChallengeIdentifier
+	})
+	if collectsIdentifier {
 		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
 			return FlowStepResult{}, err
 		}
@@ -1240,8 +1259,9 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 }
 
 // renderStep renders the step currently pinned by state.CurrentStep.
-// Callers advance state (or pop for back) before invoking so
-// state.CurrentStep already points at the step they want rendered.
+// Callers advance state before invoking so state.CurrentStep already points
+// at the step they want rendered. Back does not come through here: it
+// resolves its target once and builds from that set.
 func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefinition, state *FlowState) (*FlowStep, error) {
 	step, ok := def.FindStep(state.CurrentStep)
 	if !ok {
@@ -1253,17 +1273,6 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
 	return r.buildStep(state, step, resolved, nil, nil, nil), nil
-}
-
-// collectsIdentifier reports whether a resolved field set carries the
-// identifier challenge.
-func collectsIdentifier(resolved FlowResolvedFields) bool {
-	for _, field := range resolved.Fields {
-		if field.Challenge == FlowFieldChallengeIdentifier {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
@@ -1325,9 +1334,10 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 	return resolved, nil
 }
 
-// buildStep assembles a FlowStep from the raw pieces. Callers without a
-// processCtx (Start, renderStep) supply state + step directly; callers
-// mid-pipeline pass pc.state + pc.currentStep.
+// buildStep assembles a FlowStep from the raw pieces. The step it renders is
+// always the caller's to name: Start and renderStep supply state + step
+// directly, mid-pipeline callers pass pc.state + pc.currentStep, and
+// processBack passes pc.state with the back-stack step it just popped to.
 func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
