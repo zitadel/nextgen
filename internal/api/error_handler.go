@@ -197,9 +197,8 @@ func isSecurityError(err error) bool {
 }
 
 // securityErrorDetails maps an ogen security failure to the auth.unauthorized
-// wire contract. Session-only ops use sessionUnauthorizedMessage because ogen
-// reports an absent cookie without naming the scheme (ADR 030, Decision 4).
-// Dual-scheme ops stay on the default unauthorized message.
+// wire contract. Session-only ops use sessionUnauthorizedMessage; dual-scheme
+// ops stay on the default unauthorized message (ADR 030, Decision 4).
 func securityErrorDetails(err error) api.ErrorDetails {
 	unauthorized := domain.ErrAuthUnauthorized(err)
 	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {

@@ -113,7 +113,6 @@ func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
 func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 	t.Parallel()
 
-	// Dual-scheme grant ops must not inherit the session-only 401 copy.
 	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
 
 	t.Run("missing credentials", func(t *testing.T) {

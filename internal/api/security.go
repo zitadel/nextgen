@@ -85,11 +85,8 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
-// sessionCookieOperations is the session-only 401-copy allowlist.
-// OgenErrorHandler rewrites those ops to sessionUnauthorizedMessage because
-// ogen reports an absent cookie without naming the scheme. Dual-scheme
-// routes (oauth2 OR nextgenSession) must stay off this map so a bad Bearer
-// is not rewritten as a missing session cookie.
+// sessionCookieOperations is the session-only 401 rewrite allowlist.
+// Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
 var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionOperation:    true,
 	api.RevokeMySessionOperation: true,
@@ -204,8 +201,7 @@ type ScopeContext struct {
 	ProjectID string
 	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
 	// project secrets hold project.write + project.read, preview secrets hold
-	// project.read only. Session tokens mint an empty Scope — the authz gate
-	// does not use a project.write ceiling for user principals.
+	// project.read only. Session tokens mint an empty Scope.
 	Scope []string
 	// PrincipalType / PrincipalID identify the authz principal for resolver.Check.
 	// OAuth2 project secrets are sk_proj with PrincipalID == ProjectID.
