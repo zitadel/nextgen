@@ -100,13 +100,17 @@ func TestVariablesRoundTrip(t *testing.T) {
 		f := newVariableFixture(t, d.stmts)
 		owner := f.ownerAt(levelProject)
 
-		f.set(t, d.stmts, owner, map[string]any{"theme": "dark"}, true)
+		// A secret holds what the domain's secret constructor produces: the
+		// JWE the project's key encrypted the value to, which is a string and
+		// never a structure.
+		const ciphertext = "eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiJrZXktMSJ9.encrypted.value"
+		f.set(t, d.stmts, owner, ciphertext, true)
 
 		got := f.get(t, d.stmts, f.requester)
 		require.Len(t, got, 1)
 		assert.Equal(t, f.name, got[0].Name)
 		assert.Equal(t, owner, got[0].Owner)
-		assert.Equal(t, map[string]any{"theme": "dark"}, got[0].Value)
+		assert.Equal(t, ciphertext, got[0].Value)
 		assert.True(t, got[0].IsSecret)
 
 		// The primary key is name plus owner, so a second write at the same one

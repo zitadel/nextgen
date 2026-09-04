@@ -13,7 +13,7 @@ CREATE TABLE variables (
     team_id          TEXT    NOT NULL DEFAULT '',
     user_schema_id   TEXT    NOT NULL DEFAULT '',
     user_id          TEXT    NOT NULL DEFAULT '',
-    value            TEXT    NOT NULL DEFAULT '{}',
+    value            TEXT    NOT NULL,
     is_secret        INTEGER NOT NULL DEFAULT 0,
     created_at       INTEGER NOT NULL,
     modified_at      INTEGER NOT NULL,
