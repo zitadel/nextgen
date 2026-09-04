@@ -78,13 +78,16 @@ export function isAttached(
  * stay fast and work offline. `zitadel claim` reaches the same conclusion the
  * same way before it decides to skip.
  *
- * **Why cloud and local, but not self-hosted.** Claiming attaches a project
- * to a team on the platform that hosts it. The cloud has one, and so does a
- * CLI-launched local server: it hosts its own platform project and claim page
- * and advertises its own claim URL, so the local dev loop is a real claim
- * journey. A self-hosted server may or may not have a platform project, and
- * the CLI cannot tell from here, so nudging there could advertise an
- * impossible action for the entire life of the project.
+ * **Why cloud only.** Claiming attaches a project to a team on the platform
+ * that hosts it. The cloud always has one. A local or self-hosted server has
+ * one only when it opted into `platform.bootstrap_project`, and that flag
+ * also pins the deployment's console and hosted-login default project to
+ * proj_platform, so it is deliberately NOT a `zitadel start` default — which
+ * means this offline classifier cannot know whether a local claim could
+ * complete. `setup` is online anyway and probes the local server's runtime
+ * document to decide the nudge there; the offline surfaces (`status`,
+ * `doctor`) stay cloud-gated rather than advertise a possibly impossible
+ * action.
  *
  * The local record can be stale in one direction: a project claimed from
  * another machine, or a `.zitadel/secret` restored from a backup, reads as
@@ -96,8 +99,7 @@ export function claimState(input: {
   secret: Pick<ZitadelSecret, "claimed_at" | "team_id"> & { created_at?: string };
   server: string;
 }): ClaimState {
-  const kind = serverKind.value(input.server);
-  if (kind !== "cloud" && kind !== "local") {
+  if (serverKind.value(input.server) !== "cloud") {
     return { kind: "not-applicable" };
   }
   if (isAttached(input.secret)) {

@@ -73,12 +73,6 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
         // Browser-facing URLs (claim, dashboard) must point at this local
         // server, not the cloud default the server config falls back to.
         NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
-        // The local claim journey needs the platform project (claim/complete
-        // is authenticated against it), so a CLI-managed runtime seeds it by
-        // default — otherwise the claim URL this server advertises leads to a
-        // flow that cannot complete. An explicit env still wins.
-        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT:
-          process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true",
       },
       stdio: ["ignore", log.fd, log.fd],
     });

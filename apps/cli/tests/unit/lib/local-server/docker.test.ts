@@ -49,8 +49,6 @@ describe("local server Docker helpers", () => {
       `NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`,
       "--env",
       "NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:8090",
-      "--env",
-      "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
       "--volume",
       "/tmp/app/.zitadel/local/container-passwd:/etc/passwd:ro",
       "--volume",
