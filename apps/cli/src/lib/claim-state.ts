@@ -23,10 +23,20 @@ export function claimWindowDeadline(createdAt: string | undefined, now = Date.no
 }
 
 function deadlinePhrase(deadline?: Date): string {
+  // Time and zone included, not just the date: the server closes the window
+  // at an exact timestamp (created_at + 14 x 24h), and a bare "before Sep 18"
+  // misleads in both directions at the boundary day.
   const when =
     deadline === undefined
       ? `within ${CLAIM_WINDOW_DAYS} days of creation`
-      : `before ${deadline.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}`;
+      : `before ${deadline.toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZoneName: "short",
+        })}`;
   return `attach it ${when}, after that it can no longer be claimed`;
 }
 
