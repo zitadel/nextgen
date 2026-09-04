@@ -137,6 +137,12 @@ func (s *releaseService) getByContentHash(ctx context.Context, projectID, conten
 //
 // Ordering, the empty set and duplicate handles are the domain constructor's
 // to reject; this only resolves.
+//
+// TODO(#1154): the pinned set is not checked for closure. A flow pinned here
+// may reference a user schema this release does not pin, and nothing objects.
+// The check belongs in this loop, which already holds every resolved handle and
+// has read each revision — but it is not expressible while a flow references
+// its schema by revision id instead of by handle (#1144).
 func (s *releaseService) resolvePointers(ctx context.Context, projectID string, requested []CreateReleasePointer) ([]domain.ReleasePointer, error) {
 	pointers := make([]domain.ReleasePointer, 0, len(requested))
 	for _, pointer := range requested {
