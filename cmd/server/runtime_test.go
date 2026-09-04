@@ -219,6 +219,31 @@ server:
 	assert.Contains(t, err.Error(), "no master key")
 }
 
+// The other half of the newest-file rule: a directory key is decrypt-only when
+// the config already carries keys, since the config is what names the key to
+// encrypt with. loadMasterKeysFromFileSystem decides that from one boolean, so
+// both of its answers need a test.
+func TestEnsureServerMasterKeyLeavesDirectoryKeysDecryptOnlyWhenKeysAreConfigured(t *testing.T) {
+	dataDir := t.TempDir()
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	require.NoError(t, os.MkdirAll(masterKeyDir, 0o700))
+	fromDir := writeMasterKeyFile(t, masterKeyDir, "rotated-out.pem", time.Now())
+
+	cfg := &ServerConfig{
+		DataDir: dataDir,
+		MasterKeys: map[string]*MasterKeyConfig{
+			"configured": {PrivateKey: "configured-private-key", UseForEncryption: true},
+		},
+	}
+	require.NoError(t, ensureServerMasterKey(cfg))
+
+	require.Len(t, cfg.MasterKeys, 2)
+	assert.Equal(t, &MasterKeyConfig{File: fromDir}, cfg.MasterKeys["rotated-out.pem"],
+		"a directory key must not take over encryption from the configured one")
+	assert.Equal(t, &MasterKeyConfig{PrivateKey: "configured-private-key", UseForEncryption: true},
+		cfg.MasterKeys["configured"])
+}
+
 func TestDefaultSQLitePathUsesDataDir(t *testing.T) {
 	dataDir := t.TempDir()
 	assert.Equal(t, filepath.Join(dataDir, "zitadel.db"), defaultSQLitePath(dataDir))
