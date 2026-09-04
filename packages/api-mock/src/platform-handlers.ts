@@ -246,6 +246,18 @@ function makeStore(): Store {
 
 const CLAIM_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
+// Mirrors domain.ClaimWindow (internal/domain/claim.go): an unclaimed project
+// can only be claimed within 14 days of creation; init and complete both 410
+// with proj.claim_window_expired after that, and the already-claimed 409 wins
+// over the closed window, matching the server's check order.
+const CLAIM_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const CLAIM_WINDOW_EXPIRED_MESSAGE =
+  "the project was not claimed within 14 days of creation and can no longer be claimed";
+
+function claimWindowClosed(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() > CLAIM_WINDOW_MS;
+}
+
 /** Extract a bearer token from the Authorization header, or "" when absent. */
 function bearerToken(request: Request): string {
   return (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -406,6 +418,14 @@ export function expireClaimChallenge(challengeId: string): void {
   }
 }
 
+/** Backdates the project past the claim window, for window-expiry tests. */
+export function expireClaimWindow(projectId: string): void {
+  const project = store.projects.get(projectId);
+  if (project) {
+    project.createdAt = new Date(Date.now() - CLAIM_WINDOW_MS - 1000).toISOString();
+  }
+}
+
 export function completeClaimChallenge(
   challengeId: string,
   projectId: string,
@@ -414,18 +434,19 @@ export function completeClaimChallenge(
   if (!challenge || challenge.projectId !== projectId) {
     return { status: 404, body: errorBody("not_found", "claim challenge not found") };
   }
-  // The TTL is enforced regardless of status: an expired challenge is gone even
-  // if it was already spent, so a completed-but-expired challenge still 410s.
-  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
-    return {
-      status: 410,
-      body: errorBody("proj.claim_expired", "the claim challenge has expired"),
-    };
+  // Fail closed on a challenge without its project, mirroring the server's
+  // proj.not_found: a claim must never be minted from an inconsistent store,
+  // and letting it through would also bypass the window check below.
+  const project = store.projects.get(projectId);
+  if (!project) {
+    return { status: 404, body: errorBody("proj.not_found", "project not found") };
   }
-  // First-claim-wins and single-use: once the project has a grant — whether
-  // from this challenge on an earlier call or from another challenge entirely —
-  // completion reports it as already claimed instead of minting a second grant
-  // or silently succeeding again.
+  // First-claim-wins and single-use, checked before both expiry answers
+  // (server order): once the project has a grant — whether from this challenge
+  // on an earlier call or from another challenge entirely — completion reports
+  // it as already claimed instead of minting a second grant or silently
+  // succeeding again. A completed challenge always has the grant, so it lands
+  // here, never on the expiry answers below.
   const existing = store.claims.get(projectId);
   if (existing) {
     return {
@@ -434,6 +455,21 @@ export function completeClaimChallenge(
         team_id: existing.teamId,
         dashboard_url: existing.dashboardUrl,
       }),
+    };
+  }
+  // The closed window outranks challenge expiry (server order): both are 410,
+  // but only challenge expiry recovers with a fresh init, so a both-expired
+  // complete must report the final refusal.
+  if (claimWindowClosed(project.createdAt)) {
+    return {
+      status: 410,
+      body: errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+    };
+  }
+  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
+    return {
+      status: 410,
+      body: errorBody("proj.claim_expired", "the claim challenge has expired"),
     };
   }
 
@@ -592,6 +628,13 @@ export function setupPlatformHandlers() {
         );
       }
 
+      if (claimWindowClosed(project.createdAt)) {
+        return HttpResponse.json(
+          errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+          { status: 410 },
+        );
+      }
+
       const id = challengeId();
       const expiresAt = new Date(Date.now() + CLAIM_CHALLENGE_TTL_MS).toISOString();
       store.claimChallenges.set(id, {
@@ -646,9 +689,36 @@ export function setupPlatformHandlers() {
           { status: 403 },
         );
       }
-      // The TTL is enforced regardless of status: an ephemeral challenge is
-      // gone once expired, so status stops being readable even after it
-      // completed. The durable grant lives in `store.claims`, not here.
+      // The grant, not the polled challenge, is the claim source of truth
+      // (server order): a project claimed through any challenge reports
+      // completed with its owning team, surviving challenge expiry and the
+      // closed window alike. `authed` initiated this challenge (403 above),
+      // so it is the challenge's own project.
+      const claim = store.claims.get(challenge.projectId);
+      let responseBody: GetClaimStatus200;
+      if (claim) {
+        responseBody = {
+          status: "completed",
+          team_id: claim.teamId,
+          claimed_at: claim.claimedAt,
+          dashboard_url: claim.dashboardUrl,
+        };
+        const completedOut = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+        if (!completedOut.ok) {
+          return completedOut.response;
+        }
+        return HttpResponse.json(completedOut.data);
+      }
+      // The closed claim window outranks challenge expiry for a pending
+      // challenge: both are 410, but only challenge expiry recovers with a
+      // fresh init, so the poller must learn the final refusal (mirrors the
+      // server's check order).
+      if (claimWindowClosed(authed.createdAt)) {
+        return HttpResponse.json(
+          errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+          { status: 410 },
+        );
+      }
       if (new Date(challenge.expiresAt).getTime() < Date.now()) {
         return HttpResponse.json(
           errorBody("proj.claim_expired", "the claim challenge has expired"),
@@ -656,18 +726,7 @@ export function setupPlatformHandlers() {
         );
       }
 
-      let responseBody: GetClaimStatus200;
-      if (challenge.status === "completed") {
-        const claim = store.claims.get(challenge.projectId)!;
-        responseBody = {
-          status: "completed",
-          team_id: claim.teamId,
-          claimed_at: claim.claimedAt,
-          dashboard_url: claim.dashboardUrl,
-        };
-      } else {
-        responseBody = { status: "pending" };
-      }
+      responseBody = { status: "pending" };
       const out = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;

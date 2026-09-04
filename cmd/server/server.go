@@ -441,10 +441,11 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
-	// Empty means "the deployment's first-created project is the default"
-	// (Console ADR 0004 §2); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
-	// existing project instead. The server never creates a project itself,
-	// unless platform.bootstrap_project explicitly opts in (#605).
+	// Empty means "the deployment's first-created non-platform project is the
+	// default" (Console ADR 0004 §2; the built-in platform row is skipped by
+	// the heuristic); set NEXTGEN_PLATFORM_PROJECT_ID to pin an existing
+	// project instead. The server never creates a project itself, unless
+	// platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
 	v.SetDefault("platform.bootstrap_project", false)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)

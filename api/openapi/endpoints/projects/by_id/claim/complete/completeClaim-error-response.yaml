@@ -13,6 +13,7 @@ content:
         - $ref: '../../../../../components/schemas/errors/claim-personal_team_not_active.yaml'
         - $ref: '../../../../../components/schemas/errors/proj-already_claimed.yaml'
         - $ref: '../../../../../components/schemas/errors/proj-claim_expired.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-claim_window_expired.yaml'
         - $ref: '../../../../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/sess-not_found.yaml'
@@ -29,6 +30,7 @@ content:
           claim.personal_team_not_active: '../../../../../components/schemas/errors/claim-personal_team_not_active.yaml'
           proj.already_claimed: '../../../../../components/schemas/errors/proj-already_claimed.yaml'
           proj.claim_expired: '../../../../../components/schemas/errors/proj-claim_expired.yaml'
+          proj.claim_window_expired: '../../../../../components/schemas/errors/proj-claim_window_expired.yaml'
           proj.not_found: '../../../../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../../../../components/schemas/errors/req-invalid.yaml'
           sess.not_found: '../../../../../components/schemas/errors/sess-not_found.yaml'
@@ -79,6 +81,11 @@ content:
         value:
           code: proj.claim_expired
           message: 'the claim challenge has expired'
+      proj.claim_window_expired:
+        summary: proj.claim_window_expired
+        value:
+          code: proj.claim_window_expired
+          message: 'the project was not claimed within 14 days of creation and can no longer be claimed'
       proj.not_found:
         summary: proj.not_found
         value:

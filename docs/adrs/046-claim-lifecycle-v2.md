@@ -156,8 +156,13 @@ dance):
    key**, not a credential. The poll is authorized by the project secret, which
    must be the same one that initiated (its hash is stored at init, otherwise
    `403`). It returns `pending`, or `completed` with `team_id` / `claimed_at` /
-   `dashboard_url`. It is a plain completion signal with no secret handover;
-   `410` once expired.
+   `dashboard_url`. The claim grant, not the polled challenge, is the source
+   of truth: once the project is claimed — through this challenge or another
+   concurrent one — the poll keeps answering `completed`, surviving challenge
+   expiry and the claim window alike. It is a plain completion signal with no
+   secret handover; `410` only while the project is unclaimed, for a lapsed
+   challenge (`proj.claim_expired`) or a closed claim window
+   (`proj.claim_window_expired`, which takes precedence).
 3. **`POST /claim/complete`** (browser) treats it as **effectively a credential**.
    The browser never holds the project secret
    ([ADR 005](005-public-runtime-private-credentials.md)), so the `challenge_id`
@@ -236,12 +241,22 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   `projects.project_secret`, so changing the stored value would not invalidate
   the old secret). **Accepted trade-off:** the pre-claim secret stays valid after
   claim, so anyone who held it pre-claim retains API access until rotation ships.
-- **Automated expiry and deletion of unclaimed projects.** There is no
-  scheduled-task infrastructure in the server (all TTLs are read-time filtering),
-  so unclaimed projects persist unenforced. CLI messaging frames them as
-  temporary without promising deletion; an expired-unclaimed project stays
-  cheaply derivable (created long ago with no claim grant). **Accepted
-  trade-off:** unclaimed projects accumulate until an expiry mechanism exists.
+- **Automated deletion of unclaimed projects.** The claim *window* itself is
+  enforced, but only at claim time: `claim/init` and `claim/complete` refuse a
+  project older than `domain.ClaimWindow` (14 days from `projects.created_at`)
+  with `proj.claim_window_expired` (410), ordered after the already-claimed
+  check so a claimed project keeps answering 409, and `claim/status` reports
+  the same final 410 for a pending challenge, taking precedence over challenge
+  expiry so a polling client learns the refusal no new challenge can fix. That
+  lets CLI messaging state the deadline honestly. Deleting the project when the window closes stays out
+  of scope: there is no general scheduled-task infrastructure in the server
+  (the audit retention loop is audit-specific), and the proposed ADR 061
+  ([#1119](https://github.com/zitadel/nextgen/pull/1119)), which designs one,
+  explicitly excludes this sweeper. An expired-unclaimed project stays cheaply
+  derivable (created
+  long ago with no claim grant). **Accepted trade-off:** expired unclaimed
+  projects accumulate, unclaimable, until a reaper ships on the ADR 061
+  runtime.
 - **Claim metrics and telemetry.** Claim volumes are answerable with ad-hoc
   queries over the grant data until a metrics surface is added.
 - **Claim attributes on `GET /projects/{id}`.** `claimed_at` and `team_id` are

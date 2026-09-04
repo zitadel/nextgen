@@ -7246,6 +7246,76 @@ func NewClaimPersonalTeamNotActiveCompleteClaimForbidden(v ClaimPersonalTeamNotA
 
 func (*CompleteClaimForbidden) completeClaimRes() {}
 
+// CompleteClaimGone represents sum type.
+type CompleteClaimGone struct {
+	Type                   CompleteClaimGoneType // switch on this field
+	ProjClaimExpired       ProjClaimExpired
+	ProjClaimWindowExpired ProjClaimWindowExpired
+}
+
+// CompleteClaimGoneType is oneOf type of CompleteClaimGone.
+type CompleteClaimGoneType string
+
+// Possible values for CompleteClaimGoneType.
+const (
+	ProjClaimExpiredCompleteClaimGone       CompleteClaimGoneType = "proj.claim_expired"
+	ProjClaimWindowExpiredCompleteClaimGone CompleteClaimGoneType = "proj.claim_window_expired"
+)
+
+// IsProjClaimExpired reports whether CompleteClaimGone is ProjClaimExpired.
+func (s CompleteClaimGone) IsProjClaimExpired() bool {
+	return s.Type == ProjClaimExpiredCompleteClaimGone
+}
+
+// IsProjClaimWindowExpired reports whether CompleteClaimGone is ProjClaimWindowExpired.
+func (s CompleteClaimGone) IsProjClaimWindowExpired() bool {
+	return s.Type == ProjClaimWindowExpiredCompleteClaimGone
+}
+
+// SetProjClaimExpired sets CompleteClaimGone to ProjClaimExpired.
+func (s *CompleteClaimGone) SetProjClaimExpired(v ProjClaimExpired) {
+	s.Type = ProjClaimExpiredCompleteClaimGone
+	s.ProjClaimExpired = v
+}
+
+// GetProjClaimExpired returns ProjClaimExpired and true boolean if CompleteClaimGone is ProjClaimExpired.
+func (s CompleteClaimGone) GetProjClaimExpired() (v ProjClaimExpired, ok bool) {
+	if !s.IsProjClaimExpired() {
+		return v, false
+	}
+	return s.ProjClaimExpired, true
+}
+
+// NewProjClaimExpiredCompleteClaimGone returns new CompleteClaimGone from ProjClaimExpired.
+func NewProjClaimExpiredCompleteClaimGone(v ProjClaimExpired) CompleteClaimGone {
+	var s CompleteClaimGone
+	s.SetProjClaimExpired(v)
+	return s
+}
+
+// SetProjClaimWindowExpired sets CompleteClaimGone to ProjClaimWindowExpired.
+func (s *CompleteClaimGone) SetProjClaimWindowExpired(v ProjClaimWindowExpired) {
+	s.Type = ProjClaimWindowExpiredCompleteClaimGone
+	s.ProjClaimWindowExpired = v
+}
+
+// GetProjClaimWindowExpired returns ProjClaimWindowExpired and true boolean if CompleteClaimGone is ProjClaimWindowExpired.
+func (s CompleteClaimGone) GetProjClaimWindowExpired() (v ProjClaimWindowExpired, ok bool) {
+	if !s.IsProjClaimWindowExpired() {
+		return v, false
+	}
+	return s.ProjClaimWindowExpired, true
+}
+
+// NewProjClaimWindowExpiredCompleteClaimGone returns new CompleteClaimGone from ProjClaimWindowExpired.
+func NewProjClaimWindowExpiredCompleteClaimGone(v ProjClaimWindowExpired) CompleteClaimGone {
+	var s CompleteClaimGone
+	s.SetProjClaimWindowExpired(v)
+	return s
+}
+
+func (*CompleteClaimGone) completeClaimRes() {}
+
 type CompleteClaimNotFound ErrorDetails
 
 func (*CompleteClaimNotFound) completeClaimRes() {}
@@ -19162,6 +19232,76 @@ func (s *GetAuthAttemptErrorResponseStatusCode) SetResponse(val GetAuthAttemptEr
 }
 
 func (*GetAuthAttemptErrorResponseStatusCode) getAuthAttemptRes() {}
+
+// GetClaimStatusGone represents sum type.
+type GetClaimStatusGone struct {
+	Type                   GetClaimStatusGoneType // switch on this field
+	ProjClaimExpired       ProjClaimExpired
+	ProjClaimWindowExpired ProjClaimWindowExpired
+}
+
+// GetClaimStatusGoneType is oneOf type of GetClaimStatusGone.
+type GetClaimStatusGoneType string
+
+// Possible values for GetClaimStatusGoneType.
+const (
+	ProjClaimExpiredGetClaimStatusGone       GetClaimStatusGoneType = "proj.claim_expired"
+	ProjClaimWindowExpiredGetClaimStatusGone GetClaimStatusGoneType = "proj.claim_window_expired"
+)
+
+// IsProjClaimExpired reports whether GetClaimStatusGone is ProjClaimExpired.
+func (s GetClaimStatusGone) IsProjClaimExpired() bool {
+	return s.Type == ProjClaimExpiredGetClaimStatusGone
+}
+
+// IsProjClaimWindowExpired reports whether GetClaimStatusGone is ProjClaimWindowExpired.
+func (s GetClaimStatusGone) IsProjClaimWindowExpired() bool {
+	return s.Type == ProjClaimWindowExpiredGetClaimStatusGone
+}
+
+// SetProjClaimExpired sets GetClaimStatusGone to ProjClaimExpired.
+func (s *GetClaimStatusGone) SetProjClaimExpired(v ProjClaimExpired) {
+	s.Type = ProjClaimExpiredGetClaimStatusGone
+	s.ProjClaimExpired = v
+}
+
+// GetProjClaimExpired returns ProjClaimExpired and true boolean if GetClaimStatusGone is ProjClaimExpired.
+func (s GetClaimStatusGone) GetProjClaimExpired() (v ProjClaimExpired, ok bool) {
+	if !s.IsProjClaimExpired() {
+		return v, false
+	}
+	return s.ProjClaimExpired, true
+}
+
+// NewProjClaimExpiredGetClaimStatusGone returns new GetClaimStatusGone from ProjClaimExpired.
+func NewProjClaimExpiredGetClaimStatusGone(v ProjClaimExpired) GetClaimStatusGone {
+	var s GetClaimStatusGone
+	s.SetProjClaimExpired(v)
+	return s
+}
+
+// SetProjClaimWindowExpired sets GetClaimStatusGone to ProjClaimWindowExpired.
+func (s *GetClaimStatusGone) SetProjClaimWindowExpired(v ProjClaimWindowExpired) {
+	s.Type = ProjClaimWindowExpiredGetClaimStatusGone
+	s.ProjClaimWindowExpired = v
+}
+
+// GetProjClaimWindowExpired returns ProjClaimWindowExpired and true boolean if GetClaimStatusGone is ProjClaimWindowExpired.
+func (s GetClaimStatusGone) GetProjClaimWindowExpired() (v ProjClaimWindowExpired, ok bool) {
+	if !s.IsProjClaimWindowExpired() {
+		return v, false
+	}
+	return s.ProjClaimWindowExpired, true
+}
+
+// NewProjClaimWindowExpiredGetClaimStatusGone returns new GetClaimStatusGone from ProjClaimWindowExpired.
+func NewProjClaimWindowExpiredGetClaimStatusGone(v ProjClaimWindowExpired) GetClaimStatusGone {
+	var s GetClaimStatusGone
+	s.SetProjClaimWindowExpired(v)
+	return s
+}
+
+func (*GetClaimStatusGone) getClaimStatusRes() {}
 
 type GetClaimStatusNotFound ErrorDetails
 
@@ -31228,6 +31368,52 @@ func (o OptProjClaimExpiredDetails) Or(d ProjClaimExpiredDetails) ProjClaimExpir
 	return d
 }
 
+// NewOptProjClaimWindowExpiredDetails returns new OptProjClaimWindowExpiredDetails with value set to v.
+func NewOptProjClaimWindowExpiredDetails(v ProjClaimWindowExpiredDetails) OptProjClaimWindowExpiredDetails {
+	return OptProjClaimWindowExpiredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjClaimWindowExpiredDetails is optional ProjClaimWindowExpiredDetails.
+type OptProjClaimWindowExpiredDetails struct {
+	Value ProjClaimWindowExpiredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjClaimWindowExpiredDetails was set.
+func (o OptProjClaimWindowExpiredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjClaimWindowExpiredDetails) Reset() {
+	var v ProjClaimWindowExpiredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjClaimWindowExpiredDetails) SetTo(v ProjClaimWindowExpiredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjClaimWindowExpiredDetails) Get() (v ProjClaimWindowExpiredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) ProjClaimWindowExpiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjMissingIDDetails returns new OptProjMissingIDDetails with value set to v.
 func NewOptProjMissingIDDetails(v ProjMissingIDDetails) OptProjMissingIDDetails {
 	return OptProjMissingIDDetails{
@@ -34174,13 +34360,65 @@ func (s *ProjClaimExpired) SetDetails(val OptProjClaimExpiredDetails) {
 	s.Details = val
 }
 
-func (*ProjClaimExpired) completeClaimRes()  {}
-func (*ProjClaimExpired) getClaimStatusRes() {}
-
 // Additional error-specific context.
 type ProjClaimExpiredDetails map[string]jx.Raw
 
 func (s *ProjClaimExpiredDetails) init() ProjClaimExpiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjClaimWindowExpired struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjClaimWindowExpiredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjClaimWindowExpired) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjClaimWindowExpired) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjClaimWindowExpired) GetDetails() OptProjClaimWindowExpiredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjClaimWindowExpired) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjClaimWindowExpired) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjClaimWindowExpired) SetDetails(val OptProjClaimWindowExpiredDetails) {
+	s.Details = val
+}
+
+func (*ProjClaimWindowExpired) initClaimRes() {}
+
+// Additional error-specific context.
+type ProjClaimWindowExpiredDetails map[string]jx.Raw
+
+func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

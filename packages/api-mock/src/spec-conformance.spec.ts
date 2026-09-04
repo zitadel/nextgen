@@ -46,7 +46,11 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
-import { expireClaimChallenge, snapshotPlatformStore } from "./platform-handlers.js";
+import {
+  expireClaimChallenge,
+  expireClaimWindow,
+  snapshotPlatformStore,
+} from "./platform-handlers.js";
 import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
 
 const PORT = 4456;
@@ -751,6 +755,55 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(completeBody.code).toBe("proj.claim_expired");
   });
 
+  test("a closed claim window makes init and complete return 410 claim_window_expired", async () => {
+    const project = await createProject("claim-window-expired");
+    // Mint the challenge while the window is open, then close it: complete
+    // must refuse even a live challenge once the project is too old.
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    expireClaimWindow(project.id);
+
+    const reinit = await initClaim(project.id, project.projectSecret);
+    expect(reinit.status).toBe(410);
+    const reinitBody = (await reinit.json()) as Record<string, unknown>;
+    expect(reinitBody.code).toBe("proj.claim_window_expired");
+
+    // The poll must learn the same final refusal, not the retryable
+    // challenge expiry, so a CLI mid-poll stops suggesting a fresh claim.
+    const status = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(status.status).toBe(410);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.code).toBe("proj.claim_window_expired");
+
+    const cookie = await platformSessionCookie();
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(complete.status).toBe(410);
+    const completeBody = (await complete.json()) as Record<string, unknown>;
+    expect(completeBody.code).toBe("proj.claim_window_expired");
+
+    // Both expired at once: the final window refusal must win over the
+    // retryable challenge expiry, on status and complete alike.
+    expireClaimChallenge(challenge_id);
+    const bothStatus = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(bothStatus.status).toBe(410);
+    expect(((await bothStatus.json()) as Record<string, unknown>).code).toBe(
+      "proj.claim_window_expired",
+    );
+    const bothComplete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(bothComplete.status).toBe(410);
+    expect(((await bothComplete.json()) as Record<string, unknown>).code).toBe(
+      "proj.claim_window_expired",
+    );
+  });
+
   test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {
     const project = await createProject("claim-complete-no-cookie");
     const init = await initClaim(project.id, project.projectSecret);
@@ -870,7 +923,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(() => new URL(secondBody.details.dashboard_url as string)).not.toThrow();
   });
 
-  test("a completed challenge still returns 410 from status once expired", async () => {
+  // Mirrors the server: the grant is the claim source of truth, so a claim
+  // that landed stays reported as completed even after its challenge's TTL.
+  test("a completed claim stays completed on status past challenge expiry", async () => {
     const project = await createProject("claim-completed-expired");
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
@@ -884,8 +939,36 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
     expireClaimChallenge(challenge_id);
     const status = await claimStatus(project.id, challenge_id, project.projectSecret);
-    expect(status.status).toBe(410);
+    expect(status.status).toBe(200);
     const statusBody = (await status.json()) as Record<string, unknown>;
-    expect(statusBody.code).toBe("proj.claim_expired");
+    expect(statusBody.status).toBe("completed");
+    expect(typeof statusBody.team_id).toBe("string");
+  });
+
+  // The grant, not the polled challenge, is the truth: a poll on a pending
+  // challenge whose project was claimed through ANOTHER challenge reports
+  // completed with the owning team, even once the claim window has closed —
+  // never a false "can no longer be claimed" verdict.
+  test("a pending challenge on a project claimed elsewhere reports completed", async () => {
+    const project = await createProject("claim-cross-challenge-status");
+    const first = await initClaim(project.id, project.projectSecret);
+    const { challenge_id: polled } = (await first.json()) as { challenge_id: string };
+    const second = await initClaim(project.id, project.projectSecret);
+    const { challenge_id: winner } = (await second.json()) as { challenge_id: string };
+
+    const cookie = await platformSessionCookie();
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id: winner }),
+    });
+    expect(complete.status).toBe(200);
+    expireClaimWindow(project.id);
+
+    const status = await claimStatus(project.id, polled, project.projectSecret);
+    expect(status.status).toBe(200);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.status).toBe("completed");
+    expect(typeof statusBody.team_id).toBe("string");
   });
 });

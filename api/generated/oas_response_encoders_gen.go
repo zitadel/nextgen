@@ -221,7 +221,7 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 
 		return nil
 
-	case *ProjClaimExpired:
+	case *CompleteClaimGone:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
 		span.SetStatus(codes.Error, http.StatusText(410))
@@ -1936,7 +1936,7 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 
 		return nil
 
-	case *ProjClaimExpired:
+	case *GetClaimStatusGone:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
 		span.SetStatus(codes.Error, http.StatusText(410))
@@ -3231,6 +3231,19 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 		span.SetStatus(codes.Error, http.StatusText(409))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *ProjClaimWindowExpired:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(410)
+		span.SetStatus(codes.Error, http.StatusText(410))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
