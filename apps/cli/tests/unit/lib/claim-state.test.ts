@@ -65,11 +65,28 @@ describe("claim state", () => {
     ).toEqual({ kind: "detached", claimable: true });
   });
 
-  it("is not applicable off the cloud, attached or not", () => {
-    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
-      expect(claimState({ secret: DETACHED, server })).toEqual({ kind: "not-applicable" });
-      expect(claimState({ secret: ATTACHED, server })).toEqual({ kind: "not-applicable" });
-    }
+  // Self-hosted only: a CLI-launched local server hosts its own platform
+  // project and claim page (it advertises its own claim URL), so the local
+  // dev loop is a real claim journey and gets the same nudges as the cloud.
+  it("is not applicable on a self-hosted server, attached or not", () => {
+    expect(
+      claimState({ secret: DETACHED, server: "https://zitadel.example.com" }),
+    ).toEqual({ kind: "not-applicable" });
+    expect(
+      claimState({ secret: ATTACHED, server: "https://zitadel.example.com" }),
+    ).toEqual({ kind: "not-applicable" });
+  });
+
+  it("applies to a local server the same as the cloud", () => {
+    expect(claimState({ secret: DETACHED, server: "http://localhost:8080" })).toEqual({
+      kind: "detached",
+      claimable: true,
+    });
+    expect(claimState({ secret: ATTACHED, server: "http://localhost:8080" })).toEqual({
+      kind: "attached",
+      team_id: "team-001",
+      claimed_at: ATTACHED.claimed_at,
+    });
   });
 
   it("recognises cloud subdomains", () => {

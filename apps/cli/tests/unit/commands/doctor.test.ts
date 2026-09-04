@@ -233,13 +233,14 @@ describe("doctor command", () => {
     expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(before);
   });
 
-  // A local project has no platform team to attach to, so the nudge must not
-  // follow `zitadel setup --server local` around forever.
-  it("passes the claim check without a nudge for a local project", async () => {
-    const cwd = await makeHealthyProject();
-    await writeDetachedSecret(cwd);
+  // A CLI-launched local server hosts its own platform project and claim
+  // page, so the local dev loop nudges like the cloud; only a self-hosted
+  // server, where the CLI cannot know a platform exists, stays silent.
+  it("nudges a local project but passes the claim check for a self-hosted one", async () => {
+    const local = await makeHealthyProject();
+    await writeDetachedSecret(local);
     await writeFile(
-      join(cwd, "zitadel.json"),
+      join(local, "zitadel.json"),
       JSON.stringify({
         project: "proj-001",
         server: "http://localhost:8080",
@@ -248,14 +249,33 @@ describe("doctor command", () => {
       }),
     );
 
-    const res = await doctor(cwd);
-
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as {
+    const localRes = await doctor(local);
+    expect(localRes.exitCode).toBe(0);
+    const localJson = parseJson(localRes.stdout) as {
       data: { checks: Check[]; next_commands?: string[] };
     };
-    expect(json.data.checks.find((check) => check.name === "claim")?.status).toBe("pass");
-    expect(json.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim"));
+    expect(localJson.data.checks.find((check) => check.name === "claim")?.status).toBe("warn");
+    expect(localJson.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim"));
+
+    const selfHosted = await makeHealthyProject();
+    await writeDetachedSecret(selfHosted);
+    await writeFile(
+      join(selfHosted, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "https://zitadel.example.com",
+        framework: { id: "next" },
+        environments: { development: { issuer: "http://localhost:3000" } },
+      }),
+    );
+
+    const selfHostedRes = await doctor(selfHosted);
+    expect(selfHostedRes.exitCode).toBe(0);
+    const selfHostedJson = parseJson(selfHostedRes.stdout) as {
+      data: { checks: Check[]; next_commands?: string[] };
+    };
+    expect(selfHostedJson.data.checks.find((check) => check.name === "claim")?.status).toBe("pass");
+    expect(selfHostedJson.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim"));
   });
 
   // The skew stays advisory (the app keeps working on its pinned train), and

@@ -78,10 +78,13 @@ export function isAttached(
  * stay fast and work offline. `zitadel claim` reaches the same conclusion the
  * same way before it decides to skip.
  *
- * **Why cloud only.** Claiming attaches a project to a team on the platform.
- * A local or self-hosted server has no such platform, and `--server local` is
- * the documented dev loop, so an ungated nudge would advertise an impossible
- * action for the entire life of a local project.
+ * **Why cloud and local, but not self-hosted.** Claiming attaches a project
+ * to a team on the platform that hosts it. The cloud has one, and so does a
+ * CLI-launched local server: it hosts its own platform project and claim page
+ * and advertises its own claim URL, so the local dev loop is a real claim
+ * journey. A self-hosted server may or may not have a platform project, and
+ * the CLI cannot tell from here, so nudging there could advertise an
+ * impossible action for the entire life of the project.
  *
  * The local record can be stale in one direction: a project claimed from
  * another machine, or a `.zitadel/secret` restored from a backup, reads as
@@ -93,7 +96,8 @@ export function claimState(input: {
   secret: Pick<ZitadelSecret, "claimed_at" | "team_id"> & { created_at?: string };
   server: string;
 }): ClaimState {
-  if (serverKind.value(input.server) !== "cloud") {
+  const kind = serverKind.value(input.server);
+  if (kind !== "cloud" && kind !== "local") {
     return { kind: "not-applicable" };
   }
   if (isAttached(input.secret)) {
@@ -140,8 +144,8 @@ export function claimBoxAction(cliVersion: string, deadline?: Date): BoxAction {
   return {
     text:
       `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
-      "Make it permanent now; nothing about the project changes, so users, passkeys, " +
-      "and the issuer keep working:",
+      "Claiming is independent of the steps above, so you can do it right away; " +
+      "nothing about the project changes, and users, passkeys, and the issuer keep working:",
     command: publicCliCommand("claim", cliVersion),
   };
 }

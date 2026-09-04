@@ -233,7 +233,9 @@ the CLI's help layer, not the envelope.
   failure — it works exactly like one with a team, so `doctor` still exits 0
   and `--fix` deliberately does nothing (a claim needs a human in a browser).
   All three stay silent about teams when the project's `server` in
-  `zitadel.json` is local or self-hosted, where there is nothing to attach.
+  `zitadel.json` is self-hosted, where the CLI cannot know a platform exists.
+  A CLI-launched local server hosts its own platform project and claim page,
+  so local projects get the same nudges as cloud ones.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
