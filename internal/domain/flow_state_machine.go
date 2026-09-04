@@ -480,29 +480,10 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	// without proving a factor.
 	repurposeUndo := false
 	if transition.Purpose != nil {
-		hadResolvedUser := pc.state.CollectedData.UserID != ""
-		clearUserBoundState(pc.state)
-		pc.state.CollectedData.AuthMethods.Password = ""
-		if hadResolvedUser {
-			// The persisted attempt carries the resolved user as a factor,
-			// and PrepareUserChallenge refuses a second user challenge on a
-			// session-linked attempt. The flow-state reset must rotate the
-			// attempt in lockstep or the next identifier submission dies on
-			// "The user was already authenticated". The abandoned attempt
-			// ages out like any abandoned flow. No resolved user → nothing
-			// on the attempt to escape → no rotation (idle purpose toggles
-			// must not mint attempt rows).
-			attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID}
-			if pc.state.SessionID != "" {
-				sid := pc.state.SessionID
-				attemptInput.SessionID = &sid
-			}
-			attemptID, err := r.authAttempts.Start(pc.ctx, attemptInput)
-			if err != nil {
-				return FlowStepResult{}, fmt.Errorf("flow state machine: rotate auth attempt on re-purpose: %w", err)
-			}
-			pc.state.AuthAttemptID = attemptID
+		if err := r.dropResolvedUser(pc, "re-purpose"); err != nil {
+			return FlowStepResult{}, err
 		}
+		pc.state.CollectedData.AuthMethods.Password = ""
 		pc.state.CurrentPurpose = *transition.Purpose
 
 		// Purpose entries link to each other, forming a zero-input loop.
@@ -542,10 +523,41 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	return FlowStepResult{State: pc.state, Step: step}, nil
 }
 
+// dropResolvedUser clears the resolved user from the flow state and, when
+// one was resolved, rotates the auth attempt in lockstep.
+//
+// The persisted attempt carries the resolved user as a factor, and
+// PrepareUserChallenge refuses a second user challenge on a session-linked
+// attempt — which every flow is, since the flow service links the attempt to
+// the session it runs against. Clearing the flow state without rotating
+// leaves the attempt one step ahead of the flow, and the next identifier
+// submission dies on "The user was already authenticated". The abandoned
+// attempt ages out like any abandoned flow. No resolved user → nothing on the
+// attempt to escape → no rotation (idle navigation must not mint attempt
+// rows). reason names the caller for the wrapped error.
+func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string) error {
+	hadResolvedUser := pc.state.CollectedData.UserID != ""
+	clearUserBoundState(pc.state)
+	if !hadResolvedUser {
+		return nil
+	}
+	attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID}
+	if pc.state.SessionID != "" {
+		sid := pc.state.SessionID
+		attemptInput.SessionID = &sid
+	}
+	attemptID, err := r.authAttempts.Start(pc.ctx, attemptInput)
+	if err != nil {
+		return fmt.Errorf("flow state machine: rotate auth attempt on %s: %w", reason, err)
+	}
+	pc.state.AuthAttemptID = attemptID
+	return nil
+}
+
 // processSubmit handles kind=submit: dispatch challenges, run
 // on_success (if declared), and route the resulting outcome.
 func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
-	dispatch, err := r.dispatchChallenges(pc, resolved)
+	dispatch, err := r.dispatchChallenges(pc, resolved, challengeDispatchOrder)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -580,12 +592,13 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs
-// identifier dispatch first so IssuePasskeyChallenge can populate
-// allowCredentials; the verify leg validates the assertion. Ceremony
-// abandonment falls through to the standard pipeline.
+// identifier dispatch — and only that, see [identifierDispatchOnly] — so
+// IssuePasskeyChallenge can populate allowCredentials; the verify leg
+// validates the assertion. Ceremony abandonment falls through to the
+// standard pipeline.
 func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
 	if pc.in.ChallengeResponse == nil {
-		dispatch, err := r.dispatchChallenges(pc, resolved)
+		dispatch, err := r.dispatchChallenges(pc, resolved, identifierDispatchOnly)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -668,6 +681,16 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 	FlowFieldChallengePassword,
 }
 
+// identifierDispatchOnly is the dispatch order for the passkey login issue
+// leg: resolve the user so IssuePasskeyChallenge can scope allowCredentials,
+// and stop there. Choosing "sign in with a passkey" is not a password
+// submission — but the client keeps posting the password step's field
+// alongside the action, and dispatching it would fail the leg with
+// error.invalid_credentials before the browser is ever prompted.
+var identifierDispatchOnly = []FlowFieldChallenge{
+	FlowFieldChallengeIdentifier,
+}
+
 // applyOutcomeFlip flips CurrentPurpose on identifier outcomes:
 // login + user_not_found → register; register + user_already_exists → login.
 // Recovery never flips.
@@ -680,12 +703,13 @@ func applyOutcomeFlip(state *FlowState, outcome string) {
 	}
 }
 
-// dispatchChallenges submits field-shaped challenges in
-// [challengeDispatchOrder]. CurrentPurpose + visited on_success decide
+// dispatchChallenges submits the field-shaped challenges named by order —
+// [challengeDispatchOrder] for a plain submit, [identifierDispatchOnly] for
+// the passkey login issue leg. CurrentPurpose + visited on_success decide
 // verify-vs-skip.
-func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields) (flowDispatchResult, error) {
+func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields, order []FlowFieldChallenge) (flowDispatchResult, error) {
 	ctx, def, state, step, fields := pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields
-	for _, challenge := range challengeDispatchOrder {
+	for _, challenge := range order {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
 			continue
@@ -1106,19 +1130,37 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 // processBack pops the previous BackStack entry and re-renders that
 // step, restoring the snapshotted purpose. CollectedData is preserved
 // (previous form prefills); PendingChallenge is dropped; History is
-// left intact.
+// left intact. Landing back on a step that collects the identifier drops
+// the resolved user, since that is the user going back to change who they
+// are signing in as.
 func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
 	prev, ok := pc.state.PeekBackStack()
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", ErrFlowInvalidAction(), pc.state.CurrentStep)
 	}
-	if _, ok := pc.def.FindStep(prev.StepName); !ok {
+	prevStep, ok := pc.def.FindStep(prev.StepName)
+	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", ErrFlowIntegrity(), prev.StepName)
 	}
 	pc.state.PopBackStack()
 	pc.state.CurrentStep = prev.StepName
 	pc.state.CurrentPurpose = prev.Purpose
 	pc.state.ClearPendingChallenge()
+
+	// The identifier is re-offered, so the user may submit a different one —
+	// and even an unchanged one re-runs the user challenge. Both need an
+	// attempt without a user factor on it; keeping the resolved user would
+	// also scope the next passkey ceremony's allowCredentials to whoever the
+	// abandoned leg resolved.
+	collectsIdentifier, err := r.stepCollectsIdentifier(pc.ctx, pc.state, prevStep)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	if collectsIdentifier {
+		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
+			return FlowStepResult{}, err
+		}
+	}
 
 	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
@@ -1185,6 +1227,21 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
 	return r.buildStep(state, step, resolved, nil, nil, nil), nil
+}
+
+// stepCollectsIdentifier reports whether the step declares a field carrying
+// the identifier challenge.
+func (r *FlowStateMachineRuntime) stepCollectsIdentifier(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (bool, error) {
+	resolved, err := r.resolveStepFields(ctx, state, step)
+	if err != nil {
+		return false, err
+	}
+	for _, field := range resolved.Fields {
+		if field.Challenge == FlowFieldChallengeIdentifier {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {

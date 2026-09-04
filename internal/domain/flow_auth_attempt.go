@@ -48,8 +48,10 @@ type FlowAuthAttemptService interface {
 }
 
 // FlowCreateAttemptInput is the bootstrap input to
-// [FlowAuthAttemptService.Start]. SessionID is set only for step-up
-// auth; RequiredChecks overrides the project default when pinned.
+// [FlowAuthAttemptService.Start]. SessionID carries the session the flow runs
+// against — the anonymous one minted at start, or an existing one for step-up
+// — so exchange can upgrade it in place; RequiredChecks overrides the project
+// default when pinned.
 type FlowCreateAttemptInput struct {
 	ProjectID      string
 	SessionID      *string

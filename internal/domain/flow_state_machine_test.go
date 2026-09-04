@@ -3252,13 +3252,18 @@ func purposeNavDefinition() *domain.FlowDefinition {
 				},
 			},
 			{
+				// The password step offers passkey too, as
+				// default-login.json does: "sign in with a passkey" stays
+				// reachable for a user who cannot recall their password.
 				Name:   "password",
 				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					domain.FlowActionSubmit: {Target: "done"},
+					domain.FlowActionSubmit:  {Target: "done"},
+					domain.FlowActionPasskey: {Target: "done"},
 				},
 			},
 			{
@@ -3565,6 +3570,297 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	assert.Equal(t, "password", guarded.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, guarded.State.CurrentPurpose,
 		"user_already_exists must flip back to login for verification")
+}
+
+// TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt replays the
+// browser trace behind a "The user was already authenticated" report:
+// identify, fail the password, go back, identify again. The first
+// identification pins the user as a factor on the attempt, and
+// PrepareUserChallenge refuses a second user challenge on a session-linked
+// attempt — which every flow is, since the flow service links the attempt to
+// the session it runs against. Back onto a step that re-collects the
+// identifier must rotate the attempt in lockstep with dropping the resolved
+// user, or the second identification dies.
+func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
+	t.Parallel()
+	const email = "alice@example.com"
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	gomock.InOrder(
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil),
+		w.authAttemptService.EXPECT().
+			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+				return in.AttemptID == "attempt-1"
+			})).
+			Return("user_alice", nil),
+		w.authAttemptService.EXPECT().
+			SubmitPassword(gomock.Any(), gomock.Any()).
+			Return(domain.ErrAuthAttemptProofRejected(nil)),
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-2", nil),
+		w.authAttemptService.EXPECT().
+			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+				return in.AttemptID == "attempt-2"
+			})).
+			Return("user_alice", nil),
+	)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", afterIdentify.State.CurrentStep)
+	require.Equal(t, "user_alice", afterIdentify.State.CollectedData.UserID)
+
+	// A rejected password holds the user on the step — this is what sends
+	// them looking for the back action in the first place.
+	afterWrongPassword, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"x-auth-methods#password": "not-the-password"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", afterWrongPassword.State.CurrentStep)
+	require.NotNil(t, afterWrongPassword.Step.Error)
+	require.Equal(t, domain.FlowStepErrorInvalidCredentials, *afterWrongPassword.Step.Error)
+
+	back, err := w.sm.Process(t.Context(), def, afterWrongPassword.State, domain.FlowSubmitInput{
+		Action: "back",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "identifier", back.State.CurrentStep)
+	assert.Equal(t, "attempt-2", back.State.AuthAttemptID,
+		"back onto the identifier must rotate the auth attempt")
+	assert.Empty(t, back.State.CollectedData.UserID,
+		"the resolved user must not survive back onto the identifier")
+	assert.Equal(t, email, back.State.CollectedData.UserData["email"],
+		"the identifier itself survives so the form prefills")
+
+	// The whole point: re-identifying now lands on the rotated attempt
+	// instead of dying on "The user was already authenticated".
+	reIdentified, err := w.sm.Process(t.Context(), def, back.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "password", reIdentified.State.CurrentStep)
+	assert.Equal(t, "user_alice", reIdentified.State.CollectedData.UserID)
+}
+
+// verificationChainDefinition puts a step behind the password so back can
+// land somewhere that does not re-collect the identifier: identifier →
+// password → confirm.
+func verificationChainDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-verification-chain",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "identifier",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "password"},
+				},
+			},
+			{
+				Name:   "password",
+				Fields: []domain.Field{"x-auth-methods#password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "confirm"},
+				},
+			},
+			{
+				Name: "confirm",
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// TestFlowStateMachine_Back_WithinVerificationKeepsAuthAttempt is the other
+// half of the rule: back onto a step that does not re-collect the identifier
+// leaves the resolved user — and so the attempt — alone. Rotating there would
+// throw away verified factors the flow still needs.
+func TestFlowStateMachine_Back_WithinVerificationKeepsAuthAttempt(t *testing.T) {
+	t.Parallel()
+	const email = "alice@example.com"
+	w := newFlowTestWorld(t)
+	def := verificationChainDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil).Times(1)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("user_alice", nil).
+		Times(1)
+	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", afterIdentify.State.CurrentStep)
+
+	afterPassword, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"x-auth-methods#password": "very-good-password-1"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "confirm", afterPassword.State.CurrentStep)
+	require.Equal(t, "user_alice", afterPassword.State.CollectedData.UserID)
+
+	back, err := w.sm.Process(t.Context(), def, afterPassword.State, domain.FlowSubmitInput{
+		Action: "back",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", back.State.CurrentStep)
+	assert.Equal(t, "attempt-1", back.State.AuthAttemptID,
+		"back within verification must not rotate the auth attempt")
+	assert.Equal(t, "user_alice", back.State.CollectedData.UserID)
+}
+
+// TestFlowStateMachine_Back_WithoutResolvedUserMintsNoAttempt keeps idle
+// navigation free: back onto the identifier when nothing was resolved has
+// nothing to rotate away from, and must not mint an attempt row per click.
+func TestFlowStateMachine_Back_WithoutResolvedUserMintsNoAttempt(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil).Times(1)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// user_not_found routes on to register with nothing resolved.
+	flipped, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "ghost@example.com"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "register", flipped.State.CurrentStep)
+
+	back, err := w.sm.Process(t.Context(), def, flipped.State, domain.FlowSubmitInput{
+		Action: "back",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "identifier", back.State.CurrentStep)
+	assert.Equal(t, "attempt-1", back.State.AuthAttemptID)
+}
+
+// TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck pins
+// the passkey action as a non-submission of the password step's field.
+// Browsers post the whole form, so the password field rides along with the
+// action; dispatching it as a password check failed the leg with
+// error.invalid_credentials before the WebAuthn prompt ever appeared — which
+// is what pushes users onto the back-navigation path above.
+func TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck(t *testing.T) {
+	t.Parallel()
+	const email = "alice@example.com"
+	const challengeID = "ch-1"
+	const rpid = "example.com"
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("user_alice", nil).
+		Times(1)
+	w.authAttemptService.EXPECT().
+		SubmitPassword(gomock.Any(), gomock.Any()).
+		Times(0)
+	w.authAttemptService.EXPECT().
+		IssuePasskeyChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyChallengeInput) bool {
+			return in.RPID == rpid
+		})).
+		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", afterIdentify.State.CurrentStep)
+
+	issued, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"x-auth-methods#password": "whatever-the-form-still-held"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	assert.Nil(t, issued.Step.Error, "the passkey action must not fail on the password field")
+	require.NotNil(t, issued.Step.Challenge)
+	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
+	assert.Equal(t, domain.FlowChallengeMethodPasskey, issued.Step.Challenge.Method)
+	assert.Equal(t, "password", issued.State.CurrentStep, "the issue leg halts on the same step")
 }
 
 // Purpose-entry toggling is a zero-input loop; without coalescing, every
