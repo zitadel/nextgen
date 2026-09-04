@@ -735,6 +735,13 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const reinitBody = (await reinit.json()) as Record<string, unknown>;
     expect(reinitBody.code).toBe("proj.claim_window_expired");
 
+    // The poll must learn the same final refusal, not the retryable
+    // challenge expiry, so a CLI mid-poll stops suggesting a fresh claim.
+    const status = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(status.status).toBe(410);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.code).toBe("proj.claim_window_expired");
+
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",

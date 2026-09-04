@@ -434,6 +434,13 @@ export function completeClaimChallenge(
       body: errorBody("proj.claim_expired", "the claim challenge has expired"),
     };
   }
+  // Fail closed on a challenge without its project, mirroring the server's
+  // proj.not_found: a claim must never be minted from an inconsistent store,
+  // and letting it through would also bypass the window check below.
+  const project = store.projects.get(projectId);
+  if (!project) {
+    return { status: 404, body: errorBody("proj.not_found", "project not found") };
+  }
   // First-claim-wins and single-use: once the project has a grant — whether
   // from this challenge on an earlier call or from another challenge entirely —
   // completion reports it as already claimed instead of minting a second grant
@@ -448,8 +455,7 @@ export function completeClaimChallenge(
       }),
     };
   }
-  const project = store.projects.get(projectId);
-  if (project && claimWindowClosed(project.createdAt)) {
+  if (claimWindowClosed(project.createdAt)) {
     return {
       status: 410,
       body: errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
@@ -670,6 +676,17 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(
           errorBody("proj.permission_denied", "the presented project secret did not initiate this challenge"),
           { status: 403 },
+        );
+      }
+      // The closed claim window outranks challenge expiry for a pending
+      // challenge: both are 410, but only challenge expiry recovers with a
+      // fresh init, so the poller must learn the final refusal (mirrors the
+      // server's check order). `authed` initiated this challenge (403 above),
+      // so it is the challenge's own project.
+      if (challenge.status !== "completed" && claimWindowClosed(authed.createdAt)) {
+        return HttpResponse.json(
+          errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+          { status: 410 },
         );
       }
       // The TTL is enforced regardless of status: an ephemeral challenge is
