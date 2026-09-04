@@ -156,8 +156,13 @@ dance):
    key**, not a credential. The poll is authorized by the project secret, which
    must be the same one that initiated (its hash is stored at init, otherwise
    `403`). It returns `pending`, or `completed` with `team_id` / `claimed_at` /
-   `dashboard_url`. It is a plain completion signal with no secret handover;
-   `410` once expired.
+   `dashboard_url`. The claim grant, not the polled challenge, is the source
+   of truth: once the project is claimed — through this challenge or another
+   concurrent one — the poll keeps answering `completed`, surviving challenge
+   expiry and the claim window alike. It is a plain completion signal with no
+   secret handover; `410` only while the project is unclaimed, for a lapsed
+   challenge (`proj.claim_expired`) or a closed claim window
+   (`proj.claim_window_expired`, which takes precedence).
 3. **`POST /claim/complete`** (browser) treats it as **effectively a credential**.
    The browser never holds the project secret
    ([ADR 005](005-public-runtime-private-credentials.md)), so the `challenge_id`

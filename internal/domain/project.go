@@ -14,8 +14,10 @@ const (
 
 // PlatformProjectID is the well-known id of the deployment's platform project.
 // The server owns it: bootstrap (platform.bootstrap_project) creates this row
-// and default-project resolution pins to it. Readable body per ADR 047 §3.3;
-// operators never author it.
+// and pins default-project resolution to it while the flag is set. Without
+// that pin (or an explicit platform.project_id) the resolution heuristic
+// skips this row — it is infrastructure, never the deployment's own product
+// project. Readable body per ADR 047 §3.3; operators never author it.
 var PlatformProjectID = PrefixProject.IDPrefix("platform") // "proj_platform"
 
 func ErrProjectNameInvalid() Error {
