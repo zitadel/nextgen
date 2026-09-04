@@ -121,8 +121,6 @@ tracked below.
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
-| Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | delta of allowlisted fields that changed |
-| Flow definition delete | `flowdef.deleted` | `admin` | `flow_definition` | _(empty)_ |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | Project create seed `CreateEnvironment` (one per default environment) | `environment.created` | `admin` | `environment` | `name` |
@@ -135,6 +133,19 @@ tracked below.
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist.
+
+## Retired
+
+Types with no live producer today. They stay in `domain.EventType` and the
+events API so stored rows keep decoding. A type moves back to Path B when a
+producer appears again. A retired type is removed once its rows have aged out
+of retention ([ADR 049](../../adrs/049-events-api-retention-export.md)) on
+every supported deployment; that removal is its own breaking change.
+
+| `event_type` | Retired by | Return |
+|--------------|------------|--------|
+| `flowdef.updated` | [#530](https://github.com/zitadel/nextgen/issues/530): a flow definition is an immutable revision, a change publishes a new one | none planned |
+| `flowdef.deleted` | [#530](https://github.com/zitadel/nextgen/issues/530): no delete endpoint | with retirement under releases ([#536](https://github.com/zitadel/nextgen/issues/536)) |
 
 ## Deferred
 

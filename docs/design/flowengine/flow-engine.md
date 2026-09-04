@@ -65,16 +65,21 @@ definition matches; resolution returns `flow_definition.not_found`.
 A flow definition is a directed graph of steps, managed as an API resource. Each definition references a **user schema** via `user_schema` — step fields are property names from that schema, and the engine resolves field metadata (type, validation, implicit outcomes) from schema annotations at runtime.
 
 ```
-POST   /flow_definitions             Create
-GET    /flow_definitions             List
-GET    /flow_definitions/{id}        Get
-PUT    /flow_definitions/{id}        Update (full replacement)
-DELETE /flow_definitions/{id}        Delete
+POST   /flow_definitions             Publish a new revision
+GET    /flow_definitions             List, newest first; `name=` narrows to one flow's revisions
+GET    /flow_definitions/{id}        Get one revision
 
 # planned (not in the shipped spec):
 POST   /flow_definitions/{id}/validate    Check for dead ends, missing transitions
 POST   /flow_definitions/{id}/simulate    Dry-run with mock input
 ```
+
+A definition is an immutable revision: every `POST` assigns a new id, and a
+repeated `name` is a new revision of that flow, not a conflict. There is no
+update or delete. Resolution by `name` picks the newest active revision of
+that name. Audience resolution (steps 1-4 above) ranks every active
+definition regardless of name, so a new revision of an unscoped flow becomes
+the project default the same way a new flow does.
 
 ## Schema-Driven Steps
 

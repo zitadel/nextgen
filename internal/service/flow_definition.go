@@ -1,13 +1,10 @@
 package service
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -17,10 +14,8 @@ import (
 
 type FlowDefinitionService interface {
 	Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
-	Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
 	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
 	List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error)
-	Delete(ctx context.Context, projectID string, id string) error
 }
 
 type SchemaGetter interface {
@@ -35,16 +30,15 @@ type BuiltinSchemaProvider interface {
 type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
 
 type FlowDefinitionRequest struct {
-	FlowDefinitionID string
-	ProjectID        string
-	Name             string
-	Status           string
-	SchemaVersion    string // todo (grvijayan): currently empty as the request does not contain schema version
-	FlowSchemaURI    string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
-	UserSchema       string
-	Purposes         map[string]string
-	Audience         domain.FlowDefinitionAudience
-	Steps            []domain.FlowDefinitionStep
+	ProjectID     string
+	Name          string
+	Status        string
+	SchemaVersion string // todo (grvijayan): currently empty as the request does not contain schema version
+	FlowSchemaURI string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
+	UserSchema    string
+	Purposes      map[string]string
+	Audience      domain.FlowDefinitionAudience
+	Steps         []domain.FlowDefinitionStep
 }
 
 type flowDefinitionService struct {
@@ -116,119 +110,6 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 		return nil, err
 	}
 	return flowDefinition, nil
-}
-
-func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	retrievedFlowDef, err := fd.Get(ctx, req.ProjectID, req.FlowDefinitionID)
-	if err != nil {
-		return nil, err
-	}
-	status, err := domain.FlowDefinitionStatusString(req.Status)
-	if err != nil {
-		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
-	}
-	reqPurposes, err := mapPurposesToDomain(req.Purposes)
-	if err != nil {
-		return nil, err
-	}
-	err = fd.isUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes, reqPurposes)
-	if err != nil {
-		return nil, err
-	}
-	flowDefinition, err := domain.NewFlowDefinition(
-		req.FlowDefinitionID,
-		req.ProjectID,
-		req.Name,
-		req.SchemaVersion,
-		req.UserSchema,
-		reqPurposes,
-		req.Audience,
-		req.Steps,
-		status,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = fd.Validate(ctx, flowDefinition)
-	if err != nil {
-		return nil, err
-	}
-	err = fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().UpdateFlowDefinition(ctx, flowDefinition); err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return domain.ErrFlowDefinitionNotFound()
-			}
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeFlowdefUpdated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  flowDefinition.ProjectID,
-			EntityType: "flow_definition",
-			EntityID:   flowDefinition.ID,
-			Payload:    domain.FlowdefPayloadDelta(retrievedFlowDef, flowDefinition),
-		})
-	})
-	if err != nil {
-		return nil, err
-	}
-	return flowDefinition, nil
-}
-
-func (fd *flowDefinitionService) isUpdateAllowed(
-	ctx context.Context,
-	projectID string,
-	currentStatus, reqStatus domain.FlowDefinitionStatus,
-	currentPurposes, reqPurposes map[domain.FlowDefinitionPurpose]string) error {
-	if currentStatus != domain.FlowDefinitionStatusActive {
-		return nil
-	}
-
-	if currentStatus == reqStatus && maps.Equal(currentPurposes, reqPurposes) {
-		return nil
-	}
-
-	purposesToCheck := make([]domain.FlowDefinitionPurpose, 0, len(currentPurposes))
-	if reqStatus != domain.FlowDefinitionStatusActive {
-		for p := range currentPurposes {
-			purposesToCheck = append(purposesToCheck, p)
-		}
-	} else {
-		for p := range currentPurposes {
-			if _, ok := reqPurposes[p]; !ok {
-				purposesToCheck = append(purposesToCheck, p)
-			}
-		}
-	}
-	if len(purposesToCheck) == 0 {
-		return nil
-	}
-	slices.SortFunc(purposesToCheck, func(a, b domain.FlowDefinitionPurpose) int {
-		return cmp.Compare(a.String(), b.String())
-	})
-
-	fds, err := fd.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-		),
-	})
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to list active flow definitions for update conflict check")
-	}
-	for _, purpose := range purposesToCheck {
-		count := 0
-		for _, item := range fds.Items {
-			if _, ok := item.Purposes[purpose]; ok {
-				count++
-			}
-		}
-		if count <= 1 {
-			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
-		}
-	}
-	return nil
 }
 
 func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) error {
@@ -357,25 +238,4 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 		Items:         result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
-}
-
-func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id string) error {
-	if projectID == "" {
-		return domain.ErrMissingProjectID()
-	}
-	if id == "" {
-		return domain.ErrMissingFlowDefinitionID()
-	}
-	return fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().DeleteFlowDefinitionByID(ctx, projectID, id); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeFlowdefDeleted,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  projectID,
-			EntityType: "flow_definition",
-			EntityID:   id,
-		})
-	})
 }

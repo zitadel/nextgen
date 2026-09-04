@@ -18,10 +18,6 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = ? AND id = ?`
 
-	updateFlowDefinitionStmt = `UPDATE flow_definitions SET
-name = ?, schema_version = ?, status = ?, purposes = ?, definition = ?, updated_at = ?
-WHERE project_id = ? AND id = ? RETURNING created_at, updated_at`
-
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at
 FROM flow_definitions`
 )
@@ -83,27 +79,6 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, pro
 		return nil, wrapError(err)
 	}
 	return def, nil
-}
-
-// UpdateFlowDefinition implements [service.FlowDefinitionStatements].
-func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	content, err := flowdefinition.Marshal(entity)
-	if err != nil {
-		return err
-	}
-	var defStr sql.NullString
-	if len(content) > 0 {
-		defStr = sql.NullString{String: string(content), Valid: true}
-	}
-	purposes, err := encodeJSON(flowdefinition.PurposeStrings(entity))
-	if err != nil {
-		return wrapError(err)
-	}
-	now := nowUnixNano()
-	return scanFlowDefinitionTimestamps(entity, f.client.QueryRow(ctx, updateFlowDefinitionStmt,
-		entity.Name, entity.SchemaVersion, entity.Status.String(), purposes, defStr, now,
-		entity.ProjectID, entity.ID,
-	))
 }
 
 func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition, row *sql.Row) error {

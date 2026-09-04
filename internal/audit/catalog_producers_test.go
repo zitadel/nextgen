@@ -36,8 +36,6 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeAuthCheckFailed:           "internal/service",
 	domain.EventTypeAuthCheckSucceeded:        "internal/service",
 	domain.EventTypeFlowdefCreated:            "internal/service",
-	domain.EventTypeFlowdefUpdated:            "internal/service",
-	domain.EventTypeFlowdefDeleted:            "internal/service",
 	domain.EventTypeSchemaCreated:             "internal/service",
 	domain.EventTypeBrandingCreated:           "internal/service",
 	domain.EventTypeEnvironmentCreated:        "internal/service",
@@ -58,7 +56,9 @@ func TestCatalogPathBTypesHaveProducers(t *testing.T) {
 	require.NoError(t, err)
 
 	active := string(raw)
-	if i := strings.Index(active, "## Deferred"); i >= 0 {
+	// Retired types keep their domain constant for stored rows but have no
+	// producer; Deferred types have neither yet.
+	if i := strings.Index(active, "## Retired"); i >= 0 {
 		active = active[:i]
 	}
 	// Backtick-quoted dotted names in active Path A/B sections (event_type values).

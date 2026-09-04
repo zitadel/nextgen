@@ -8,13 +8,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// Create and Update read the timestamps the database wrote back into the
-// entity, so the API can answer with them instead of zero values.
-func TestFlowDefinitionStatements_CreateUpdate_ReturnTimestamps(t *testing.T) {
+// Create reads the timestamps the database wrote back into the entity, so
+// the API can answer with them instead of zero values.
+func TestFlowDefinitionStatements_Create_ReturnTimestamps(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		def := sampleFlowDefinition(projectID, "flowdef_"+uniqueSuffix(t), "Default Login")
@@ -28,26 +26,5 @@ func TestFlowDefinitionStatements_CreateUpdate_ReturnTimestamps(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, stored.CreatedAt, def.CreatedAt)
 		assert.Equal(t, stored.UpdatedAt, def.UpdatedAt)
-
-		createdAt := def.CreatedAt
-		def.Name = "Updated Login"
-		def.CreatedAt, def.UpdatedAt = createdAt.AddDate(1, 0, 0), createdAt.AddDate(1, 0, 0)
-		require.NoError(t, d.stmts.UpdateFlowDefinition(t.Context(), def))
-
-		assert.Equal(t, createdAt, def.CreatedAt, "created_at is set by the database, not the caller")
-		assert.True(t, def.UpdatedAt.After(createdAt))
-
-		stored, err = d.stmts.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
-		require.NoError(t, err)
-		assert.Equal(t, stored.UpdatedAt, def.UpdatedAt)
-	})
-}
-
-func TestFlowDefinitionStatements_Update_NotFound(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureProject(t, d.stmts)
-		def := sampleFlowDefinition(projectID, "flowdef_"+uniqueSuffix(t), "Missing")
-		err := d.stmts.UpdateFlowDefinition(t.Context(), def)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
