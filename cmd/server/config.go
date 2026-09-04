@@ -38,11 +38,13 @@ type EventsConfig struct {
 type PlatformConfig struct {
 	// ProjectID pins a standalone deployment's default project to an existing
 	// project (an id of the form "proj_<...>"). When empty (the default), the
-	// deployment tracks its first-created project — the one the customer's
-	// `zitadel setup` creates. The server never creates that project itself; a
-	// configured id that does not exist is a startup error. Leave empty when
-	// BootstrapProject is set — the platform project's id is server-owned
-	// (domain.PlatformProjectID), not operator-authored. (#605)
+	// deployment tracks its first-created project other than the built-in
+	// platform row — the one the customer's `zitadel setup` creates; the
+	// platform project is infrastructure and only becomes the default through
+	// this pin or BootstrapProject. The server never creates that project
+	// itself; a configured id that does not exist is a startup error. Leave
+	// empty when BootstrapProject is set — the platform project's id is
+	// server-owned (domain.PlatformProjectID), not operator-authored. (#605)
 	ProjectID string `mapstructure:"project_id"`
 
 	// BootstrapProject, when true, ensures the well-known platform project
