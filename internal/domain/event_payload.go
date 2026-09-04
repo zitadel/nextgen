@@ -233,6 +233,51 @@ type EnvironmentPayload struct {
 
 type EnvironmentCreatedPayload = EnvironmentPayload
 
+// ReleasePayload records what a release pinned, so the audit stream answers
+// "what changed" without a join back to the releases table. ContentHash
+// identifies the pinned set; Pointers spell it out.
+type ReleasePayload struct {
+	ContentHash string                  `json:"content_hash,omitempty"`
+	Message     string                  `json:"message,omitempty"`
+	GitSHA      string                  `json:"git_sha,omitempty"`
+	GitDirty    bool                    `json:"git_dirty,omitempty"`
+	Pointers    []ReleasePointerPayload `json:"pointers,omitempty"`
+}
+
+type ReleasePointerPayload struct {
+	Kind       string `json:"kind,omitempty"`
+	Handle     string `json:"handle,omitempty"`
+	RevisionID string `json:"revision_id,omitempty"`
+}
+
+type ReleaseCreatedPayload = ReleasePayload
+
+// ReleasePayloadSnapshot is the allowlisted create snapshot for release events.
+func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
+	if rel == nil {
+		return ReleasePayload{}
+	}
+	payload := ReleasePayload{
+		ContentHash: rel.ContentHash,
+		GitDirty:    rel.Metadata.GitDirty,
+		Pointers:    make([]ReleasePointerPayload, 0, len(rel.Pointers)),
+	}
+	if rel.Metadata.Message != nil {
+		payload.Message = *rel.Metadata.Message
+	}
+	if rel.Metadata.GitSHA != nil {
+		payload.GitSHA = *rel.Metadata.GitSHA
+	}
+	for _, pointer := range rel.Pointers {
+		payload.Pointers = append(payload.Pointers, ReleasePointerPayload{
+			Kind:       pointer.Kind.String(),
+			Handle:     pointer.Handle,
+			RevisionID: pointer.RevisionID,
+		})
+	}
+	return payload
+}
+
 type AuthzGrantedPayload struct {
 	PrincipalType string `json:"principal_type,omitempty"`
 	PrincipalID   string `json:"principal_id,omitempty"`
