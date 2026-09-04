@@ -36,10 +36,11 @@ func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixtu
 	return variableFixture{
 		name: "login.appearance." + suffix,
 		requester: domain.VariableOwner{
-			ProjectID:    projectID,
-			TeamID:       "team-var-" + suffix,
-			UserSchemaID: "usch-var-" + suffix,
-			UserID:       "user-var-" + suffix,
+			ProjectID:       projectID,
+			EnvironmentName: "env-var-" + suffix,
+			TeamID:          "team-var-" + suffix,
+			UserSchemaID:    "usch-var-" + suffix,
+			UserID:          "user-var-" + suffix,
 		},
 	}
 }
@@ -53,21 +54,26 @@ func (f variableFixture) set(t *testing.T, stmts service.AllStatements, owner do
 	return v
 }
 
-// ownerLevel is how deep into the owner chain a variable is entered. The chain
-// is a prefix, so a level names every id above it too.
+// ownerLevel is how narrow an owner the fixture builds. The levels are
+// independent in the table, but nesting them is the case worth exercising: each
+// level here names every id above it too.
 type ownerLevel int
 
 const (
 	levelProject ownerLevel = iota + 1
+	levelEnvironment
 	levelTeam
 	levelUserSchema
 	levelUser
 )
 
 // ownerAt truncates the requester to the given level, which is how a variable
-// entered further up the hierarchy is addressed.
+// entered further up is addressed.
 func (f variableFixture) ownerAt(level ownerLevel) domain.VariableOwner {
 	owner := domain.VariableOwner{ProjectID: f.requester.ProjectID}
+	if level >= levelEnvironment {
+		owner.EnvironmentName = f.requester.EnvironmentName
+	}
 	if level >= levelTeam {
 		owner.TeamID = f.requester.TeamID
 	}
@@ -122,6 +128,7 @@ func TestVariablesDoNotOverride(t *testing.T) {
 		f := newVariableFixture(t, d.stmts)
 		levels := []ownerLevel{
 			levelProject,
+			levelEnvironment,
 			levelTeam,
 			levelUserSchema,
 			levelUser,
@@ -138,6 +145,47 @@ func TestVariablesDoNotOverride(t *testing.T) {
 		for i, level := range levels {
 			assert.Equal(t, f.ownerAt(level), got[i].Owner)
 		}
+	})
+}
+
+// TestVariablesOwnerSkippingLevels covers what the owner levels being
+// independent buys: an owner may name a user in a team without naming an
+// environment or a user schema. Such a row has to be storable, readable and
+// addressable on its own, since only the project is required.
+func TestVariablesOwnerSkippingLevels(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newVariableFixture(t, d.stmts)
+
+		userInTeam := domain.VariableOwner{
+			ProjectID: f.requester.ProjectID,
+			TeamID:    f.requester.TeamID,
+			UserID:    f.requester.UserID,
+		}
+		f.set(t, d.stmts, f.ownerAt(levelEnvironment), "environment", false)
+		f.set(t, d.stmts, userInTeam, "user-in-team", false)
+
+		got := f.get(t, d.stmts, f.requester)
+		require.Len(t, got, 2, "an owner that skips levels is still on the requester's branch")
+
+		// NameThenOwner sorts on environment_name before team_id, and an
+		// unnamed level is the empty string, so the owner that skips the
+		// environment sorts ahead of the one that names it.
+		assert.Equal(t, userInTeam, got[0].Owner, "the owner must survive the round trip unfilled")
+		assert.Equal(t, f.ownerAt(levelEnvironment), got[1].Owner)
+
+		// A neighbour holding the same team but a different user cannot see it,
+		// which is what the unnamed environment and user schema must not undo.
+		neighbour := f.requester
+		neighbour.UserID += "-neighbour"
+		got = f.get(t, d.stmts, neighbour)
+		require.Len(t, got, 1)
+		assert.Equal(t, "environment", got[0].Value)
+
+		// Deleting addresses the owner as entered, levels left unnamed included.
+		require.NoError(t, d.stmts.DeleteVariable(t.Context(), userInTeam, f.name))
+		got = f.get(t, d.stmts, f.requester)
+		require.Len(t, got, 1)
+		assert.Equal(t, "environment", got[0].Value)
 	})
 }
 
@@ -231,10 +279,11 @@ func TestVariablesDelete(t *testing.T) {
 	})
 }
 
-// TestVariablesOwnerChainRejected guards the constraint that keeps an empty
-// owner id from reading as a wildcard: an owner whose ancestors are unset must
-// not be storable at all.
-func TestVariablesOwnerChainRejected(t *testing.T) {
+// TestVariablesOwnerWithoutProjectRejected guards the constraint that keeps an
+// empty project id from reading as a wildcard. The levels below the project are
+// independent of one another and any combination of them is storable, but an
+// owner that names one of them without naming a project is not.
+func TestVariablesOwnerWithoutProjectRejected(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
 

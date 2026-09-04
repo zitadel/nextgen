@@ -2,10 +2,12 @@
 // domain mapping for the variables table.
 //
 // A variable row is one [domain.Variable]: a value entered by one owner under
-// one name. The owner hierarchy is encoded positionally, not as a level column
-// -- an owner id that is unset is stored as the empty string, so a
+// one name. The owner is a set of independent levels encoded positionally, not
+// a level column -- a level that is unset is stored as the empty string, so a
 // project-level variable carries project_id and leaves team_id, user_schema_id
-// and user_id empty.
+// and user_id empty, and a variable naming a user in a team may leave
+// environment_name and user_schema_id empty. Only the project is required; see
+// the postgres migration for why.
 //
 // Unlike the settings table this replaces, variables do not override one
 // another: there is no ladder and no final flag, so storage never collapses

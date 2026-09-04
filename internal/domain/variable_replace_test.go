@@ -297,6 +297,56 @@ func TestVariableListToMap(t *testing.T) {
 		assert.False(t, user.IsMoreSpecificThan(user), "an equal owner is not more specific")
 	})
 
+	// The levels are not a chain: an owner may name a user in a team of a
+	// project and name neither an environment nor a user schema, so ranking by
+	// how deep an owner reaches is not enough.
+	t.Run("ranks owners that skip levels", func(t *testing.T) {
+		t.Parallel()
+
+		teamNoEnv := VariableOwner{ProjectID: "p", TeamID: "t"}
+		userInTeam := VariableOwner{ProjectID: "p", TeamID: "t", UserID: "u"}
+
+		assert.True(t, teamNoEnv.IsMoreSpecificThan(project))
+		assert.True(t, userInTeam.IsMoreSpecificThan(teamNoEnv))
+		assert.False(t, teamNoEnv.IsMoreSpecificThan(userInTeam))
+
+		// Setting a level nobody else set narrows the owner, whichever level
+		// it is.
+		assert.True(t, team.IsMoreSpecificThan(teamNoEnv), "the environment is one more level named")
+		assert.True(t, userInTeam.IsMoreSpecificThan(VariableOwner{ProjectID: "p", UserID: "u"}))
+	})
+
+	// Between owners neither of which contains the other, the narrowest level
+	// either one names decides: a value entered for one user beats one entered
+	// for a whole team, however many broader levels the team-level owner also
+	// names.
+	t.Run("ranks the narrowest level ahead of a broader owner naming more levels", func(t *testing.T) {
+		t.Parallel()
+
+		userOnly := VariableOwner{ProjectID: "p", UserID: "u"}
+
+		assert.True(t, userOnly.IsMoreSpecificThan(schema), "a user beats a whole user schema")
+		assert.True(t, userOnly.IsMoreSpecificThan(team), "a user beats a whole team")
+		assert.False(t, schema.IsMoreSpecificThan(userOnly))
+
+		schemaOnly := VariableOwner{ProjectID: "p", UserSchemaID: "s"}
+		assert.True(t, schemaOnly.IsMoreSpecificThan(team), "a user schema beats a whole team")
+		assert.True(t, user.IsMoreSpecificThan(userOnly), "an owner naming every level stays the narrowest")
+	})
+
+	t.Run("collapses owners that skip levels", func(t *testing.T) {
+		t.Parallel()
+
+		userInTeam := VariableOwner{ProjectID: "p", TeamID: "t", UserID: "u"}
+
+		got := VariableListToMap([]*Variable{
+			{Name: "v", Owner: team, Value: "team"},
+			{Name: "v", Owner: userInTeam, Value: "user-in-team"},
+			{Name: "v", Owner: project, Value: "project"},
+		})
+		assert.Equal(t, "user-in-team", got["v"].Value)
+	})
+
 	t.Run("keeps distinct names apart", func(t *testing.T) {
 		t.Parallel()
 

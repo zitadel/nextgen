@@ -26,14 +26,16 @@ CREATE TABLE zitadel_nextgen.variables (
     -- upsert conflict target and the only way to address a row.
     , PRIMARY KEY (name, project_id, environment_name, team_id, user_schema_id, user_id)
 
-    -- A variable cannot be owned at a level whose ancestors are unset; without
-    -- this an owner such as (team_id set, project_id '') would be readable by
-    -- any project, since the empty project_id reads as a wildcard.
-    , CONSTRAINT variables_owner_chain CHECK (
-        (project_id <> '' OR (environment_name = '' AND team_id = '' AND user_schema_id = '' AND user_id = ''))
-        AND (environment_name <> '' OR (team_id = '' AND user_schema_id = '' AND user_id = ''))
-        AND (team_id <> '' OR (user_schema_id = '' AND user_id = ''))
-        AND (user_schema_id <> '' OR user_id = '')
+    -- The owner levels below the project are independent of one another: a
+    -- variable may name a user in a team without naming an environment or a
+    -- user schema, so no level requires the one above it. The project is the
+    -- exception, because an empty owner id reads as a wildcard on read -- an
+    -- owner such as (team_id set, project_id '') would be visible from every
+    -- project. Every variable is entered under a project, so requiring one
+    -- here costs nothing and closes that hole.
+    , CONSTRAINT variables_owner_needs_project CHECK (
+        project_id <> ''
+        OR (environment_name = '' AND team_id = '' AND user_schema_id = '' AND user_id = '')
     )
 );
 

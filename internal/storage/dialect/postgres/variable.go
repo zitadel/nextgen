@@ -13,20 +13,20 @@ import (
 )
 
 const (
-	variablesQuery = `SELECT name, project_id, team_id, user_schema_id, user_id, value, is_secret, created_at, modified_at
+	variablesQuery = `SELECT name, project_id, environment_name, team_id, user_schema_id, user_id, value, is_secret, created_at, modified_at
 FROM zitadel_nextgen.variables`
 
 	// The conflict target is the natural key, so a rewrite at the same owner and
 	// name replaces the value instead of adding a second variable there.
-	setVariableStmt = `INSERT INTO zitadel_nextgen.variables (name, project_id, team_id, user_schema_id, user_id, value, is_secret)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (name, project_id, team_id, user_schema_id, user_id)
+	setVariableStmt = `INSERT INTO zitadel_nextgen.variables (name, project_id, environment_name, team_id, user_schema_id, user_id, value, is_secret)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (name, project_id, environment_name, team_id, user_schema_id, user_id)
 DO UPDATE SET value = EXCLUDED.value, is_secret = EXCLUDED.is_secret, modified_at = NOW()`
 
 	// Every owner column is matched exactly, so this can only remove the
 	// variable the caller owns -- never one it merely inherits.
 	deleteVariableStmt = `DELETE FROM zitadel_nextgen.variables
-WHERE name = $1 AND project_id = $2 AND team_id = $3 AND user_schema_id = $4 AND user_id = $5`
+WHERE name = $1 AND project_id = $2 AND environment_name = $3 AND team_id = $4 AND user_schema_id = $5 AND user_id = $6`
 )
 
 type variableStatements struct{ statement }
@@ -60,7 +60,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 		return err
 	}
 	if _, err := s.client.Exec(ctx, setVariableStmt,
-		v.Name, v.Owner.ProjectID, v.Owner.TeamID, v.Owner.UserSchemaID, v.Owner.UserID,
+		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentName, v.Owner.TeamID, v.Owner.UserSchemaID, v.Owner.UserID,
 		encoded, v.IsSecret,
 	); err != nil {
 		return wrapError(err)
@@ -71,7 +71,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 // DeleteVariable implements [service.VariableStatements].
 func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
 	tag, err := s.client.Exec(ctx, deleteVariableStmt,
-		name, owner.ProjectID, owner.TeamID, owner.UserSchemaID, owner.UserID,
+		name, owner.ProjectID, owner.EnvironmentName, owner.TeamID, owner.UserSchemaID, owner.UserID,
 	)
 	if err != nil {
 		return wrapError(err)
@@ -88,7 +88,7 @@ func scanVariable(row pgx.CollectableRow) (*variable.VariableStorage, error) {
 		encoded []byte
 	)
 	if err := row.Scan(
-		&stored.Name, &stored.ProjectID, &stored.TeamID, &stored.UserSchemaID, &stored.UserID,
+		&stored.Name, &stored.ProjectID, &stored.EnvironmentName, &stored.TeamID, &stored.UserSchemaID, &stored.UserID,
 		&encoded, &stored.IsSecret, &stored.CreatedAt, &stored.ModifiedAt,
 	); err != nil {
 		return nil, err

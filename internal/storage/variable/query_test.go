@@ -21,33 +21,40 @@ func TestVisibleTo_AgreesWithHasAccessTo(t *testing.T) {
 
 	ids := []string{"", "match", "other"}
 	requester := domain.VariableOwner{
-		ProjectID:    "match",
-		TeamID:       "match",
-		UserSchemaID: "match",
-		UserID:       "match",
+		ProjectID:       "match",
+		EnvironmentName: "match",
+		TeamID:          "match",
+		UserSchemaID:    "match",
+		UserID:          "match",
 	}
 
 	for _, project := range ids {
-		for _, team := range ids {
-			for _, schema := range ids {
-				for _, user := range ids {
-					v := &domain.Variable{Owner: domain.VariableOwner{
-						ProjectID:    project,
-						TeamID:       team,
-						UserSchemaID: schema,
-						UserID:       user,
-					}}
+		for _, environment := range ids {
+			for _, team := range ids {
+				for _, schema := range ids {
+					for _, user := range ids {
+						v := &domain.Variable{Owner: domain.VariableOwner{
+							ProjectID:       project,
+							EnvironmentName: environment,
+							TeamID:          team,
+							UserSchemaID:    schema,
+							UserID:          user,
+						}}
 
-					// The SQL filter admits a row when every column is either
-					// unset or equal to the requester's, which is the predicate
-					// ownerScope compiles per column.
-					admitted := (project == "" || project == requester.ProjectID) &&
-						(team == "" || team == requester.TeamID) &&
-						(schema == "" || schema == requester.UserSchemaID) &&
-						(user == "" || user == requester.UserID)
+						// The SQL filter admits a row when every column is
+						// either unset or equal to the requester's, which is
+						// the predicate ownerScope compiles per column. The
+						// columns are independent, so every combination has to
+						// agree, not just the nested ones.
+						admitted := (project == "" || project == requester.ProjectID) &&
+							(environment == "" || environment == requester.EnvironmentName) &&
+							(team == "" || team == requester.TeamID) &&
+							(schema == "" || schema == requester.UserSchemaID) &&
+							(user == "" || user == requester.UserID)
 
-					assert.Equal(t, admitted, requester.HasAccessTo(v),
-						"project=%q team=%q user_schema=%q user=%q", project, team, schema, user)
+						assert.Equal(t, admitted, requester.HasAccessTo(v),
+							"project=%q environment=%q team=%q user_schema=%q user=%q", project, environment, team, schema, user)
+					}
 				}
 			}
 		}

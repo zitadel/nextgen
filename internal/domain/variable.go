@@ -139,31 +139,48 @@ func (owner *VariableOwner) HasAccessTo(variable *Variable) bool {
 
 // IsMoreSpecificThan reports whether owner sits closer to a requester than
 // other does, which is what decides between two variables of the same name.
-//
-// An owner is a prefix chain -- the owner-chain constraint forbids setting a
-// level whose ancestors are unset -- so the deepest level carrying an id names
-// the whole owner, and comparing those depths is the whole comparison.
 func (owner *VariableOwner) IsMoreSpecificThan(other VariableOwner) bool {
 	return owner.specificity() > other.specificity()
 }
 
-// specificity is how deep the owner chain reaches: 0 for an owner scoped to
-// nothing, up to 5 for one naming a single user.
-func (owner *VariableOwner) specificity() int {
-	switch {
-	case owner.UserID != "":
-		return 5
-	case owner.UserSchemaID != "":
-		return 4
-	case owner.TeamID != "":
-		return 3
-	case owner.EnvironmentName != "":
-		return 2
-	case owner.ProjectID != "":
-		return 1
-	default:
-		return 0
+// Owner levels, narrowest first. A level is worth more than every level below
+// it combined, so summing the levels an owner sets orders owners the way a
+// lexicographic comparison from the narrowest level down would: an owner naming
+// a user outranks one naming a whole team, however many broader levels that one
+// also names.
+const (
+	variableOwnerLevelProject = 1 << iota
+	variableOwnerLevelEnvironment
+	variableOwnerLevelTeam
+	variableOwnerLevelUserSchema
+	variableOwnerLevelUser
+)
+
+// specificity ranks an owner against its siblings. The levels are independent
+// -- a variable can belong to a user in a team of a project without naming an
+// environment or a user schema -- so the levels an owner sets are a set, not a
+// depth, and the rank has to account for each of them.
+//
+// It runs from 0 for an owner scoped to nothing up to 31 for one naming every
+// level. Only the ordering of the numbers means anything; the values themselves
+// are not a level count and must not be read as one.
+func (owner *VariableOwner) specificity() (rank int) {
+	if owner.ProjectID != "" {
+		rank += variableOwnerLevelProject
 	}
+	if owner.EnvironmentName != "" {
+		rank += variableOwnerLevelEnvironment
+	}
+	if owner.TeamID != "" {
+		rank += variableOwnerLevelTeam
+	}
+	if owner.UserSchemaID != "" {
+		rank += variableOwnerLevelUserSchema
+	}
+	if owner.UserID != "" {
+		rank += variableOwnerLevelUser
+	}
+	return rank
 }
 
 func VariableListToMap(variables []*Variable) (vars map[string]*Variable) {

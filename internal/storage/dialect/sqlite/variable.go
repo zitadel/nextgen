@@ -12,20 +12,20 @@ import (
 )
 
 const (
-	variablesQuery = `SELECT name, project_id, team_id, user_schema_id, user_id, value, is_secret, created_at, modified_at
+	variablesQuery = `SELECT name, project_id, environment_name, team_id, user_schema_id, user_id, value, is_secret, created_at, modified_at
 FROM variables`
 
 	// The conflict target is the natural key, so a rewrite at the same owner and
 	// name replaces the value instead of adding a second variable there.
-	setVariableStmt = `INSERT INTO variables (name, project_id, team_id, user_schema_id, user_id, value, is_secret, created_at, modified_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT (name, project_id, team_id, user_schema_id, user_id)
+	setVariableStmt = `INSERT INTO variables (name, project_id, environment_name, team_id, user_schema_id, user_id, value, is_secret, created_at, modified_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (name, project_id, environment_name, team_id, user_schema_id, user_id)
 DO UPDATE SET value = excluded.value, is_secret = excluded.is_secret, modified_at = excluded.modified_at`
 
 	// Every owner column is matched exactly, so this can only remove the
 	// variable the caller owns -- never one it merely inherits.
 	deleteVariableStmt = `DELETE FROM variables
-WHERE name = ? AND project_id = ? AND team_id = ? AND user_schema_id = ? AND user_id = ?`
+WHERE name = ? AND project_id = ? AND environment_name = ? AND team_id = ? AND user_schema_id = ? AND user_id = ?`
 )
 
 type variableStatements struct{ statement }
@@ -60,7 +60,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 	}
 	now := nowUnixNano()
 	_, err = execAffected(ctx, s.client, setVariableStmt,
-		v.Name, v.Owner.ProjectID, v.Owner.TeamID, v.Owner.UserSchemaID, v.Owner.UserID,
+		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentName, v.Owner.TeamID, v.Owner.UserSchemaID, v.Owner.UserID,
 		string(encoded), v.IsSecret, now, now,
 	)
 	return err
@@ -69,7 +69,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 // DeleteVariable implements [service.VariableStatements].
 func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
 	n, err := execAffected(ctx, s.client, deleteVariableStmt,
-		name, owner.ProjectID, owner.TeamID, owner.UserSchemaID, owner.UserID,
+		name, owner.ProjectID, owner.EnvironmentName, owner.TeamID, owner.UserSchemaID, owner.UserID,
 	)
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func scanVariable(rows *sql.Rows) (*variable.VariableStorage, error) {
 		modifiedNano int64
 	)
 	if err := rows.Scan(
-		&row.Name, &row.ProjectID, &row.TeamID, &row.UserSchemaID, &row.UserID,
+		&row.Name, &row.ProjectID, &row.EnvironmentName, &row.TeamID, &row.UserSchemaID, &row.UserID,
 		&encoded, &row.IsSecret, &createdNano, &modifiedNano,
 	); err != nil {
 		return nil, err

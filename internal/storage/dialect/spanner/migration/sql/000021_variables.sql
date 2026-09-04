@@ -15,14 +15,13 @@ CREATE TABLE variables (
     created_at       TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     modified_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT variables_name_not_empty CHECK (name != ''),
-    -- A variable cannot be owned at a level whose ancestors are unset: an owner
-    -- such as (team_id set, project_id '') would otherwise be readable from any
-    -- project, because an empty owner id reads as a wildcard.
-    CONSTRAINT variables_owner_chain CHECK (
-        (project_id != '' OR (environment_name = '' AND team_id = '' AND user_schema_id = '' AND user_id = ''))
-        AND (environment_name != '' OR (team_id = '' AND user_schema_id = '' AND user_id = ''))
-        AND (team_id != '' OR (user_schema_id = '' AND user_id = ''))
-        AND (user_schema_id != '' OR user_id = '')
+    -- Owner levels below the project are independent; only the project is
+    -- required, because an empty owner id reads as a wildcard on read and an
+    -- owner such as (team_id set, project_id '') would otherwise be readable
+    -- from any project. See the postgres migration.
+    CONSTRAINT variables_owner_needs_project CHECK (
+        project_id != ''
+        OR (environment_name = '' AND team_id = '' AND user_schema_id = '' AND user_id = '')
     )
 ) PRIMARY KEY (name, project_id, environment_name, team_id, user_schema_id, user_id)
 -- +goose StatementEnd
