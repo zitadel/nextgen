@@ -13,15 +13,16 @@ export default defineNuxtPlugin(() => {
   // Strip the raw JWT before seeding useState. The bearer token must not be
   // serialised into the Nuxt SSR payload (__NUXT__) where it would be exposed
   // to client-side JavaScript and third-party scripts. Vue components only
-  // need userId / email / name — use getAuth(event) server-side when the
+  // need userId / identifier / display — use getAuth(event) server-side when the
   // token itself is required (e.g. to forward it to an upstream API).
   const clientAuth: ClientAuthResult = auth.isAuthenticated
     ? {
         isAuthenticated: true,
         session: {
           userId: auth.session.userId,
-          email: auth.session.email,
-          name: auth.session.name,
+          identifier: auth.session.identifier,
+          identifierProperty: auth.session.identifierProperty,
+          display: auth.session.display,
         },
       }
     : { isAuthenticated: false, session: null };

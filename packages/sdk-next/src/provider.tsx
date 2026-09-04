@@ -19,7 +19,12 @@ const signedOut: UnauthState = { isAuthenticated: false, session: null };
  * server-only field) must not survive the conversion to the client shape.
  */
 function toClientSession(session: ClientSession | NextgenSession): ClientSession {
-  return { userId: session.userId, email: session.email, name: session.name };
+  return {
+    userId: session.userId,
+    identifier: session.identifier,
+    identifierProperty: session.identifierProperty,
+    display: session.display,
+  };
 }
 
 /**

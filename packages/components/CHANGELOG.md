@@ -1,5 +1,57 @@
 # @zitadel/components
 
+## 1.0.0-alpha.21
+
+### Minor Changes
+
+- [#1085](https://github.com/zitadel/nextgen/pull/1085) [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b) Thanks [@livio-a](https://github.com/livio-a)! - Session responses identify their user through a resolved **user ref** derived
+  from the user schema's own `x-identifier`/`x-display` designations (ADR 058),
+  replacing the convention-resolved flat `name`/`email` fields this supersedes
+  (see the earlier `GET /sessions/me` identity changeset). Rendering follows one
+  chain everywhere: `display`, falling back to `identifier`, then `user_id`.
+  - `@zitadel/server`: `GET /sessions/me`, session get, and query sessions embed
+    `user` (`{user_id, identifier, identifier_property, display}`), the list
+    path hydrated with one batch resolution per page — listed sessions now carry
+    user identity at all. The conventional attribute-name resolver
+    (`name`/`givenName`+`familyName`/`email`) is removed.
+  - `@zitadel/api`: the regenerated client types the new `user` ref component.
+  - `@zitadel/components`: `<zitadel-session>`/`<zitadel-logout>` render from
+    the ref; the `zitadel-signout` detail is now `{display, identifier}`;
+    logout templates substitute `{{display}}`/`{{identifier}}` (the old
+    `{{name}}`/`{{email}}` tokens keep filling as aliases).
+  - `@zitadel/sdk-core` (and every SPA SDK via the shared contract):
+    `NextgenSession`/`ClientSession` become `{userId, identifier,
+identifierProperty, display}`; JWT-claim identities map `name` → `display`
+    and `email` → `identifier`.
+  - `@zitadel/sdk-next` / `@zitadel/sdk-nuxt`: server and client session reads
+    return the new shape.
+  - `@zitadel/cli`: scaffolded Nuxt auth plugins emit the new fields.
+
+  **Breaking:** the flat `name`/`email` session fields and the old SDK session
+  shape are gone. An unknown property is dropped rather than rejected, so a
+  client left on the old fields reads silently empty values instead of failing
+  loudly — update server, SDKs, and app chrome together.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/config@1.0.0-alpha.21
+
+## 1.0.0-alpha.20
+
+### Minor Changes
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - The login surface is Lit-only, and the console composes shadcn/ui (ADR 055). `@zitadel/ui-react` and `@zitadel/shared-component-styles` are removed: each atom's CSS now lives beside it as `packages/components/src/atoms/zl-<atom>.css`, with the shadow-host rules merged into the same file, and `@zitadel/components` gains `IconSize`, `IconTone`, `ZITADEL_ATTRIBUTION_LOGOTYPE_SVG` and `zitadelTrustmarkInnerHtml` on its public surface. The `--zl-*` variables from `@zitadel/design-tokens` remain the only contract the two surfaces share, so nothing about theming, tenant branding, or the `part`/`exportparts` styling hooks changes. Consumers importing `@zitadel/ui-react` should compose shadcn/ui, or embed `<zitadel-login>` or the atom itself as a custom element.
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - feat: the sign-in and sign-up surface is rebuilt on the shadcn design language. The card, fields, buttons, alert and trustmark are re-cut to the shadcn geometry and re-keyed onto the shadcn token roles, so every colour now comes from a semantic `--zl-*` role and light mode falls out of the token layer. Form-level alerts move below the fields, forgot-password moves onto the password field's label row, and headings and labels are set in the display face. Tenant branding, the `part`/`exportparts` hooks and `suppress-header` are unchanged.
+
+### Patch Changes
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - fix: the `split`, `split-right` and `hero` designs keep "Secured with Zitadel" 24px below the card, as the centred design does. It hung off the page-shell footer, which spans both panes, so the brand pane's height decided the distance — over 100px on a tall pane. Those templates now carry a `data-zl-attribution-anchor` in their form column; a template without one still uses the footer slot. The split brand pane is also smaller: `--zl-spacing-8` block padding, and an 18rem placeholder with `--zl-split-hero-max-height` tracking it at 22.5rem.
+
+- Updated dependencies [[`0a9a5af`](https://github.com/zitadel/nextgen/commit/0a9a5afd0336382ca8ebef9c646f09acde2d7ada), [`4a8d546`](https://github.com/zitadel/nextgen/commit/4a8d546d8abd6902f2e19c50e8b980f91451bbfd), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b)]:
+  - @zitadel/config@1.0.0-alpha.20
+
 ## 0.1.0-alpha.19
 
 ### Minor Changes

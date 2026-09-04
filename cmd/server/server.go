@@ -10,10 +10,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
@@ -146,7 +148,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
-	userIdentity := service.UserStatementsIdentityReader{Pool: serviceDBPool}
+	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
 	keyService := service.NewKeyService(serviceDBPool, *masterKey)
@@ -157,7 +159,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userLookup,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(serviceDBPool, userIdentity, service.SessionConfig{
+	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -190,12 +192,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
-	// The claim and dashboard URLs hang off the console. builtin_public_base is
-	// the only public-origin config today and carries the /api/schemas path, so
-	// strip it down to the origin before appending the console path; a
-	// dedicated server public-base setting should replace this when cloud
-	// deployment configuration lands.
-	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
+	// The claim and dashboard URLs hang off the console, reached at the
+	// deployment's public base (not at schema.builtin_public_base, which is an
+	// identifier namespace and must not follow the deployment address).
+	consoleBase, err := consoleBaseURL(cfg.Server.PublicBase, cfg.Server.ConsolePath)
+	if err != nil {
+		return err
+	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
@@ -205,6 +208,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		serviceDBPool,
 		schemaStore,
 		passwordHasher,
+		service.StatementsUserRefResolver{Pool: serviceDBPool},
 	)
 
 	// The platform project's registration side effect (#527): every flow-created
@@ -364,6 +368,29 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 }
 
+// consoleBaseURL joins the deployment's public base with the console mount
+// path. The public base may carry a path prefix (a proxy mounting the server
+// under a subpath) but nothing else: query, fragment, or userinfo would leak
+// into every minted claim and dashboard URL, so misconfiguration fails at
+// startup instead. The result never ends in a slash — callers append paths.
+func consoleBaseURL(publicBase, consolePath string) (string, error) {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server public base: %w", err)
+	}
+	if (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" {
+		return "", fmt.Errorf("server public base %q must be an absolute http(s) URL", publicBase)
+	}
+	if base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return "", fmt.Errorf("server public base %q must carry only an origin and an optional path prefix", publicBase)
+	}
+	if consolePath != "" && !strings.HasPrefix(consolePath, "/") {
+		return "", fmt.Errorf("server console path %q must start with a slash", consolePath)
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + strings.TrimRight(consolePath, "/")
+	return base.String(), nil
+}
+
 // ----------------------------- CONFIG --------------------------------------
 
 func loadConfig(configPath string) (Config, error) {
@@ -380,6 +407,7 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.data_dir", dataDir)
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
+	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
 	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
@@ -463,7 +491,21 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		// viper's own defaults (see viper.DecodeHook's doc comment) — lost if
+		// not restated here, since DecodeHook overrides rather than extends them.
+		// stringToWeakSliceHookFunc mirrors viper's own unexported hook of the
+		// same name: mapstructure.StringToSliceHookFunc only fires for a
+		// []string target, which would silently stop comma-separated env vars
+		// (e.g. NEXTGEN_INSTRUMENTATION_LOG_STREAMS=request,service) from
+		// reaching non-string slice fields such as []zlog.Stream.
+		mapstructure.StringToTimeDurationHookFunc(),
+		stringToWeakSliceHookFunc(","),
+		// Lets enum types generated by enumer (zlog.Level, zlog.Stream,
+		// instrumentation.LogFormat, ...) decode from their documented string
+		// names via the encoding.TextUnmarshaler they already implement.
+		mapstructure.TextUnmarshallerHookFunc(),
+	))); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
 	// Create the data dir configuration actually selected, not the default
@@ -479,6 +521,24 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, cfg.Validate()
+}
+
+// stringToWeakSliceHookFunc splits a string into a slice on sep, without
+// requiring the target slice's element type to be string — matching
+// viper's own unexported hook of the same name (spf13/viper's
+// stringToWeakSliceHookFunc in viper.go), which viper.DecodeHook drops
+// unless it's restated alongside any custom hooks.
+func stringToWeakSliceHookFunc(sep string) mapstructure.DecodeHookFunc {
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String || t.Kind() != reflect.Slice {
+			return data, nil
+		}
+		raw := data.(string)
+		if raw == "" {
+			return []string{}, nil
+		}
+		return strings.Split(raw, sep), nil
+	}
 }
 
 // mustBindEnv panics on viper's documented "this can't fail in

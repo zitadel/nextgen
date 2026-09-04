@@ -18,7 +18,7 @@ func newSessionServiceForIntegration(t *testing.T) (service.SessionService, serv
 	t.Helper()
 	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
 	pool := integrationPoolOrFail(t)
-	return service.NewSessionService(pool, service.UserStatementsIdentityReader{Pool: pool}, cfg), cfg
+	return service.NewSessionService(pool, service.StatementsUserRefResolver{Pool: pool}, cfg), cfg
 }
 
 func TestSessionService_Exchange_integration(t *testing.T) {

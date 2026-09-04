@@ -4448,7 +4448,8 @@ type ListFlowDefinitionsParams struct {
 	// Filter flow definitions by purpose (e.g., registration, login).
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
 	// The flow name to filter by. Every revision of a flow shares its
-	// `name`, so the result is that flow's revisions, newest first.
+	// `name`, so the result is that flow's revisions, newest by creation
+	// time first.
 	Name OptString `json:",omitempty,omitzero"`
 	// Related entities to embed on each returned flow definition.
 	Expand []FlowDefinitionExpand `json:",omitempty"`

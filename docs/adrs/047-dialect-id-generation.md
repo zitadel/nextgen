@@ -50,6 +50,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | user | `user` |
 | branding | `brnd` |
 | environment | `env` |
+| release | `rel` |
 | flow definition | `flowdef` |
 | flow handle (in-memory) | `flow` |
 | JSON schema (when server-assigned) | `sch` |

@@ -30,6 +30,7 @@ type AllStatements interface {
 	CryptoKeyStatements
 	JSONSchemaStatements
 	EnvironmentStatements
+	ReleaseStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -125,6 +126,23 @@ type EnvironmentStatements interface {
 	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
 	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
 	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type ReleasePool interface {
+// 	Statementer[ReleaseStatements]
+// 	Transactioner[ReleaseStatements]
+// }
+
+type ReleaseStatements interface {
+	Statements
+	CreateRelease(ctx context.Context, entity *domain.Release) error
+	GetReleaseByID(ctx context.Context, projectID, id string) (*domain.Release, error)
+	// GetReleaseByContentHash is the read half of the idempotency contract:
+	// assembling a release resolves an identical pinned set to the release that
+	// already holds it rather than writing a second one.
+	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
+	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

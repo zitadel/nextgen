@@ -1,5 +1,27 @@
 # @zitadel/config
 
+## 1.0.0-alpha.21
+
+### Patch Changes
+
+- Updated dependencies [[`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b), [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060)]:
+  - @zitadel/api@1.0.0-alpha.21
+
+## 1.0.0-alpha.20
+
+### Minor Changes
+
+- [#988](https://github.com/zitadel/nextgen/pull/988) [`0a9a5af`](https://github.com/zitadel/nextgen/commit/0a9a5afd0336382ca8ebef9c646f09acde2d7ada) Thanks [@livio-a](https://github.com/livio-a)! - Login flows resolve the identifier from the schema's designation: a flow field carries the identifier challenge only when it names the schema-root `x-identifier` property. Other unique properties keep their uniqueness for storage but are no longer treated as login identifiers.
+
+- [#987](https://github.com/zitadel/nextgen/pull/987) [`4a8d546`](https://github.com/zitadel/nextgen/commit/4a8d546d8abd6902f2e19c50e8b980f91451bbfd) Thanks [@livio-a](https://github.com/livio-a)! - User schemas can now declare their identity: the schema-root `x-identifier` keyword names the leaf property whose value identifies a user, and `x-display` lists the property paths that render the display name. Inline schema uploads validate the designations — every designated property must exist and declare a scalar type, the identifier must additionally be unique within the project, and a schema that enables password authentication must designate an identifier, since password verification is unreachable without one. The shipped default human-user schema designates `email`.
+
+### Patch Changes
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - fix: the `split`, `split-right` and `hero` designs keep "Secured with Zitadel" 24px below the card, as the centred design does. It hung off the page-shell footer, which spans both panes, so the brand pane's height decided the distance — over 100px on a tall pane. Those templates now carry a `data-zl-attribution-anchor` in their form column; a template without one still uses the footer slot. The split brand pane is also smaller: `--zl-spacing-8` block padding, and an 18rem placeholder with `--zl-split-hero-max-height` tracking it at 22.5rem.
+
+- Updated dependencies []:
+  - @zitadel/api@1.0.0-alpha.20
+
 ## 0.1.0-alpha.19
 
 ### Minor Changes

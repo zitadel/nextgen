@@ -81,15 +81,6 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-// Publication order. `nowIso()` is millisecond-resolution and ids are random,
-// so two records minted back to back would otherwise tie with no way to say
-// which came first; the server never ties because its ids are time-ordered.
-let lastSeq = 0;
-function nextSeq(): number {
-  lastSeq += 1;
-  return lastSeq;
-}
-
 /**
  * Spec-defined error envelope. Matches `api/openapi/components/error-details.yaml`
  * and the structural shape of every per-endpoint `*Default`/`*4xx` error type
@@ -230,6 +221,11 @@ type Store = {
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   claimChallenges: Map<string, ClaimChallengeRecord>;
   claims: Map<string, ClaimRecord>;
+  // Publication order. `nowIso()` is millisecond-resolution and ids are
+  // random, so two records minted back to back would tie with nothing to say
+  // which came first. Only some server dialects mint time-ordered ids, so
+  // this stands in for the id tiebreak rather than reproducing it.
+  lastSeq: number;
 };
 
 function makeStore(): Store {
@@ -239,6 +235,7 @@ function makeStore(): Store {
     flowDefinitions: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
+    lastSeq: 0,
   };
 }
 
@@ -285,7 +282,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     projectId: projectID,
     objectType: schemaObjectType(body),
     createdAt,
-    seq: nextSeq(),
+    seq: ++store.lastSeq,
     body,
   });
   const id = `flowdef_${shortId()}`;
@@ -295,7 +292,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     status: "active",
     createdAt,
     updatedAt: createdAt,
-    seq: nextSeq(),
+    seq: ++store.lastSeq,
     body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
   });
 }
@@ -312,7 +309,7 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
 
 /**
  * `created_at DESC, id DESC`, the order the server lists in. `seq` stands in
- * for the id tiebreak, since the mock's ids carry no time.
+ * for the id tiebreak.
  */
 function compareNewestFirst(
   a: { createdAt: string; seq: number },
@@ -717,7 +714,7 @@ export function setupPlatformHandlers() {
         projectId: query.data.project_id,
         objectType: schemaObjectType(schemaBody),
         createdAt: nowIso(),
-        seq: nextSeq(),
+        seq: ++store.lastSeq,
         body: schemaBody,
       });
       const responseBody: CreateSchema201 = { id };
@@ -835,7 +832,7 @@ export function setupPlatformHandlers() {
         status: "active",
         createdAt: now,
         updatedAt: now,
-        seq: nextSeq(),
+        seq: ++store.lastSeq,
         body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
@@ -853,8 +850,8 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      // Newest first: under a name filter the first entry is the flow's
-      // current revision, which callers rely on.
+      // Newest by creation first, matching the server's
+      // `created_at DESC, id DESC`.
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()]
           .filter((record) => record.projectId === query.data.project_id)
