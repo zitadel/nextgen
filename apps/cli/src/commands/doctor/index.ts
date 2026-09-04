@@ -510,9 +510,11 @@ function remedyCommandOf(check: CheckOutcome | undefined): string | undefined {
 }
 
 /**
- * Reads the claim check's window classification out of its details. Absent or
- * malformed details mean "not closed": the server enforces the window, the
- * advisory only avoids suggesting a command guaranteed to be refused.
+ * Reads the claim check's window classification out of its details. Absent
+ * or malformed details mean "not closed". The classification only selects
+ * the advisory wording (deadline nudge vs reconciliation); the claim
+ * command stays suggested either way, because the local record may be stale
+ * and running claim lets the server answer authoritatively.
  */
 function claimWindowClosed(check: CheckOutcome): boolean {
   const details = check.details;
