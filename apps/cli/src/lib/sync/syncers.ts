@@ -6,8 +6,6 @@ import type {
   CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
   GetBrandingById200,
-  UpdateFlowDefinition200,
-  UpdateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
@@ -156,11 +154,16 @@ class SchemaSyncer implements ResourceSyncer {
   }
 }
 
+/**
+ * Flow definitions are revisioned like schemas: every edit publishes a new
+ * immutable revision via `POST /flow_definitions`, no update or delete. The
+ * revisions of one flow share its `name`; the runtime serves the newest.
+ */
 class FlowDefinitionSyncer implements ResourceSyncer {
   readonly kind = "flow";
   readonly directory = FLOWS_DIR;
-  readonly mutable = true;
-  readonly revisioned = false;
+  readonly mutable = false;
+  readonly revisioned = true;
   readonly normalize = normalizeFlowBody;
   // For flows the comparison form doubles as the file form: everything it
   // strips (envelope keys, the empty `audience` echo) is transport noise.
@@ -187,7 +190,8 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   /**
-   * Wraps the bare on-disk flow body in the spec's create-envelope
+   * `POST /flow_definitions` publishes a new immutable revision and returns
+   * its id. Wraps the bare on-disk flow body in the spec's create-envelope
    * (`api/openapi/components/flows/flow-definition-create-request.yaml`)
    * before sending. The file on disk stays bare so it is human-editable;
    * only the wire request carries `project_id` and the surrounding
@@ -202,22 +206,18 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     return { id: result.id, canonical: result.flow_definition as object };
   }
 
-  /**
-   * PUT completely replaces the flow definition. The wire request wraps the
-   * bare on-disk flow in the `{ flow_definition }` update envelope
-   * (`api/openapi/components/flows/flow-definition-update-request.yaml`); the
-   * file on disk stays bare so it is human-editable. Flat-by-id: no
-   * `project_id` query — authz resolves the project from RSI.
-   */
-  async update(id: string, data: object): Promise<{ canonical?: object }> {
-    const result = (await this.client.updateFlowDefinition(id, {
-      flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition,
-    })) as UpdateFlowDefinition200;
-    return { canonical: result.flow_definition as object };
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "flows are revisioned — edit publishes a new revision, not an update",
+    );
   }
 
   async delete(id: string): Promise<void> {
-    await this.client.deleteFlowDefinition(id);
+    // Flow revisions are immutable on the platform; removing the local file
+    // does not retire them. The newest revision of the name keeps being
+    // served — publish a new revision to change what users see.
+    throw new ZitadelError("E_NOT_IMPLEMENTED", `flow delete is not supported (${id})`);
   }
 
   /**
