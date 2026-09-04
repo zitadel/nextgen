@@ -35,8 +35,10 @@ export function wrapForBox(message: string, columns = process.stdout.columns): s
  * a command to run, that command pulled out of the sentence. The JSON
  * envelope keeps its own plain `next_actions`/`next_commands` strings; this
  * shape exists only so {@link renderBoxActions} can put the command alone on
- * an indented styled line, where it stands out and a triple-click copies it
- * without surrounding prose.
+ * an indented styled line, where it stands out and a drag-select copies it
+ * without surrounding prose. (Line selection such as triple-click still
+ * includes the box border and padding — commands that must copy as a whole
+ * physical line belong outside a frame, like the claim URL.)
  */
 export type BoxAction = { text: string; command?: string };
 
