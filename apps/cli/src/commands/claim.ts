@@ -143,17 +143,8 @@ export default class Claim extends BaseCommand {
         return this.alreadyClaimed({ project_id: secret.project_id, ...claimed });
       }
       if (isClaimWindowExpired(error)) {
-        // Deliberately not the retryable "start a new link" shape: a new
-        // challenge cannot fix a closed window, so suggesting `claim` again
-        // would send the user in a circle.
         this.recordTelemetry({ claim_outcome: "window_expired" });
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
-          {
-            hint: "The project itself keeps working. To get a claimable project, create a fresh one with `zitadel setup` and claim it within the window.",
-          },
-        );
+        throw claimWindowExpiredError();
       }
       throw error;
     }
@@ -252,6 +243,13 @@ export default class Claim extends BaseCommand {
           return status;
         }
       } catch (error) {
+        // The window can close between init and poll (a challenge minted in
+        // the window's last minutes); the status route reports that as its
+        // own 410 code, and it must not read as the retryable link expiry.
+        if (isClaimWindowExpired(error)) {
+          this.recordTelemetry({ claim_outcome: "window_expired", poll_count: polls });
+          throw claimWindowExpiredError();
+        }
         if (error instanceof ApiError && error.status === 410) {
           this.recordTelemetry({ claim_outcome: "expired", poll_count: polls });
           throw expiredError("The link expired before the browser step finished.");
@@ -343,6 +341,21 @@ function expiredError(message: string): ZitadelError {
     hint: "Links are valid for 10 minutes. Start a new one.",
     nextCommands: ["zitadel claim"],
   });
+}
+
+/**
+ * Deliberately not the retryable "start a new link" shape: a new challenge
+ * cannot fix a closed window, so suggesting `claim` again would send the
+ * user in a circle.
+ */
+function claimWindowExpiredError(): ZitadelError {
+  return new ZitadelError(
+    "E_VALIDATION",
+    `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+    {
+      hint: "The project itself keeps working. To get a claimable project, create a fresh one with `zitadel setup` and claim it within the window.",
+    },
+  );
 }
 
 /**
