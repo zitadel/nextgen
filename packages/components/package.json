@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "1.0.0-alpha.20",
+  "version": "1.0.0-alpha.21",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {

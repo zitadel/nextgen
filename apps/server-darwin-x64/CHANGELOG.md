@@ -1,5 +1,7 @@
 # @zitadel/server-darwin-x64
 
+## 1.0.0-alpha.21
+
 ## 1.0.0-alpha.20
 
 ## 0.1.0-alpha.19

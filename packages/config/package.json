@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "1.0.0-alpha.20",
+  "version": "1.0.0-alpha.21",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
