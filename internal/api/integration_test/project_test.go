@@ -126,6 +126,7 @@ func TestCreateProject(t *testing.T) {
 			require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
 			got := resp.(*api.CreateProjectResponse)
 			assert.NotEmpty(t, got.ID)
+			assert.Equal(t, tc.req.Name, got.Name)
 			assert.NotEmpty(t, got.ProjectSecret)
 			assert.NotEmpty(t, got.PreviewSecret)
 			assert.Equal(t, tc.req.PreviewOrigins, got.PreviewOrigins)
