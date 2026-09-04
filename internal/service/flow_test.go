@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -120,8 +122,6 @@ func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose
 	return ok
 }
 
-func ptr[T any](v T) *T { return &v }
-
 func newDef(name, version string, audience domain.FlowDefinitionAudience, purposes ...domain.FlowDefinitionPurpose) *domain.FlowDefinition {
 	entries := make(map[domain.FlowDefinitionPurpose]string, len(purposes))
 	for _, p := range purposes {
@@ -146,15 +146,11 @@ func TestResolve_ResolveByName_ExactVersion(t *testing.T) {
 	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Name:          ptr("login"),
-		SchemaVersion: ptr("1.2.3"),
+		Name:          new("login"),
+		SchemaVersion: new("1.2.3"),
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != want {
-		t.Fatalf("Resolve = %v, want %v", got, want)
-	}
+	require.NoError(t, err)
+	assert.Same(t, want, got)
 }
 
 func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
@@ -165,22 +161,13 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
-			if opts == nil || opts.Filter == nil {
-				t.Fatal("expected filter")
-			}
-			if !filterMatches(def, opts.Filter) {
-				t.Errorf("filter did not match expected definition attributes")
-			}
+			require.NotNil(t, opts)
+			require.NotNil(t, opts.Filter, "expected filter")
+			assert.True(t, filterMatches(def, opts.Filter), "filter did not match expected definition attributes")
 			// assert required fields are restricted
-			if !opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldName)) {
-				t.Error("expected Name filter")
-			}
-			if !opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldStatus)) {
-				t.Error("expected Status filter")
-			}
-			if !opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldSchemaVersion)) {
-				t.Error("expected SchemaVersion filter")
-			}
+			assert.True(t, opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldName)), "expected Name filter")
+			assert.True(t, opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldStatus)), "expected Status filter")
+			assert.True(t, opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldSchemaVersion)), "expected SchemaVersion filter")
 			return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{def}}, nil
 		},
 	)
@@ -190,12 +177,10 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Name:          ptr("login"),
-		SchemaVersion: ptr("1.2.3"),
+		Name:          new("login"),
+		SchemaVersion: new("1.2.3"),
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestResolve_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
@@ -207,14 +192,10 @@ func TestResolve_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
 	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Name:      ptr("login"),
+		Name:      new("login"),
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != v2 {
-		t.Fatalf("Resolve = %v, want %v (latest version)", got, v2)
-	}
+	require.NoError(t, err)
+	assert.Same(t, v2, got, "want the latest version")
 }
 
 // Revisions of one name share a schema version, so the pick must not
@@ -232,14 +213,10 @@ func TestResolve_ResolveByName_SameVersionPicksNewest(t *testing.T) {
 		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
-			Name:      ptr("login"),
+			Name:      new("login"),
 		})
-		if err != nil {
-			t.Fatalf("Resolve returned error: %v", err)
-		}
-		if got != newer {
-			t.Fatalf("Resolve = %v, want the newest revision", got.ID)
-		}
+		require.NoError(t, err)
+		assert.Same(t, newer, got, "want the newest revision")
 	}
 }
 
@@ -259,14 +236,10 @@ func TestResolve_ResolveByName_TimestampCollisionBreaksOnID(t *testing.T) {
 		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
-			Name:      ptr("login"),
+			Name:      new("login"),
 		})
-		if err != nil {
-			t.Fatalf("Resolve returned error: %v", err)
-		}
-		if got != b {
-			t.Fatalf("Resolve = %v, want the revision with the higher id", got.ID)
-		}
+		require.NoError(t, err)
+		assert.Same(t, b, got, "want the revision with the higher id")
 	}
 }
 
@@ -276,11 +249,9 @@ func TestResolve_ResolveByName_NotFound(t *testing.T) {
 	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Name:      ptr("missing"),
+		Name:      new("missing"),
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
-		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
-	}
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
 }
 
 func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
@@ -290,11 +261,9 @@ func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
-		Name:      ptr("login"),
+		Name:      new("login"),
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch()) {
-		t.Fatalf("Resolve err = %v, want ErrPurposeMismatch", err)
-	}
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionPurposeMismatch())
 }
 
 func TestResolve_ResolveByAudience_ReturnsFirstMatchingPurpose(t *testing.T) {
@@ -306,12 +275,8 @@ func TestResolve_ResolveByAudience_ReturnsFirstMatchingPurpose(t *testing.T) {
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != first {
-		t.Fatalf("Resolve = %v, want first definition", got)
-	}
+	require.NoError(t, err)
+	assert.Same(t, first, got, "want first definition")
 }
 
 func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
@@ -322,9 +287,7 @@ func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
-		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
-	}
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
 }
 
 func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
@@ -335,14 +298,10 @@ func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
 	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		SchemaVersion: ptr("1.0.0"),
+		SchemaVersion: new("1.0.0"),
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != v1 {
-		t.Fatalf("Resolve = %v, want v1 (exact match)", got)
-	}
+	require.NoError(t, err)
+	assert.Same(t, v1, got, "want v1 (exact match)")
 }
 
 func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
@@ -358,9 +317,7 @@ func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("Resolve err = %v, want boom", err)
-	}
+	assert.ErrorIs(t, err, sentinel)
 }
 
 func TestResolve_ResolveByAudience_AppHintOutranksTeamAndDefault(t *testing.T) {
@@ -372,14 +329,10 @@ func TestResolve_ResolveByAudience_AppHintOutranksTeamAndDefault(t *testing.T) {
 	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{AppID: ptr("app-1"), TeamID: ptr("team-1")},
+		Hint:      service.ResolveFlowHint{AppID: new("app-1"), TeamID: new("team-1")},
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != byApp {
-		t.Fatalf("Resolve = %v, want the app-scoped definition", got.Name)
-	}
+	require.NoError(t, err)
+	assert.Same(t, byApp, got, "want the app-scoped definition")
 }
 
 func TestResolve_ResolveByAudience_TeamHintOutranksDefault(t *testing.T) {
@@ -390,14 +343,10 @@ func TestResolve_ResolveByAudience_TeamHintOutranksDefault(t *testing.T) {
 	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{TeamID: ptr("team-1")},
+		Hint:      service.ResolveFlowHint{TeamID: new("team-1")},
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != byTeam {
-		t.Fatalf("Resolve = %v, want the team-scoped definition", got.Name)
-	}
+	require.NoError(t, err)
+	assert.Same(t, byTeam, got, "want the team-scoped definition")
 }
 
 // A definition scoped to an app must not capture unhinted requests just by
@@ -413,12 +362,8 @@ func TestResolve_ResolveByAudience_ScopedFlowDoesNotCaptureDefault(t *testing.T)
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != fallback {
-		t.Fatalf("Resolve = %v, want the unscoped default", got.Name)
-	}
+	require.NoError(t, err)
+	assert.Same(t, fallback, got, "want the unscoped default")
 }
 
 // Hints are routing suggestions, not a security boundary: when only scoped
@@ -431,14 +376,10 @@ func TestResolve_ResolveByAudience_UnmatchedHintFallsBackToScoped(t *testing.T) 
 	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{AppID: ptr("app-2")},
+		Hint:      service.ResolveFlowHint{AppID: new("app-2")},
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != scoped {
-		t.Fatalf("Resolve = %v, want the only remaining definition", got.Name)
-	}
+	require.NoError(t, err)
+	assert.Same(t, scoped, got, "want the only remaining definition")
 }
 
 func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
@@ -454,23 +395,17 @@ func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
 	got, err := svc.Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{UserSchemaID: ptr("https://tenant.com/schemas/machine.json")},
+		Hint:      service.ResolveFlowHint{UserSchemaID: new("https://tenant.com/schemas/machine.json")},
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != machine {
-		t.Fatalf("Resolve = %v, want the machine-schema definition despite being older", got.Name)
-	}
+	require.NoError(t, err)
+	assert.Same(t, machine, got, "want the machine-schema definition despite being older")
 
 	_, err = svc.Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{UserSchemaID: ptr("https://tenant.com/schemas/unknown.json")},
+		Hint:      service.ResolveFlowHint{UserSchemaID: new("https://tenant.com/schemas/unknown.json")},
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
-		t.Fatalf("Resolve err = %v, want ErrFlowDefinitionNotFound for unmatched schema hint", err)
-	}
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound(), "unmatched schema hint")
 }
 
 func TestResolve_ResolveByAudience_NoHintPicksNewestDeterministically(t *testing.T) {
@@ -486,12 +421,8 @@ func TestResolve_ResolveByAudience_NoHintPicksNewestDeterministically(t *testing
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
 		})
-		if err != nil {
-			t.Fatalf("Resolve returned error: %v", err)
-		}
-		if got != newer {
-			t.Fatalf("Resolve = %v, want the newest definition", got.Name)
-		}
+		require.NoError(t, err)
+		assert.Same(t, newer, got, "want the newest definition")
 	}
 }
 
@@ -510,12 +441,8 @@ func TestResolve_ResolveByAudience_TimestampCollisionBreaksOnID(t *testing.T) {
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
 		})
-		if err != nil {
-			t.Fatalf("Resolve returned error: %v", err)
-		}
-		if got != b {
-			t.Fatalf("Resolve = %v, want the definition with the higher id", got.Name)
-		}
+		require.NoError(t, err)
+		assert.Same(t, b, got, "want the definition with the higher id")
 	}
 }
 
@@ -593,18 +520,11 @@ func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 		Definition: def,
 		Purpose:    domain.FlowDefinitionPurposeLogin,
 	})
-	if err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	if res.State == nil || res.State.ID == "" {
-		t.Fatal("flow id was not minted")
-	}
-	if sm.gotStartInput.Session.ID == "" {
-		t.Fatal("session id was not minted")
-	}
-	if sm.gotStartInput.UserSchemaURL != def.UserSchema {
-		t.Errorf("UserSchemaURL = %q, want %q", sm.gotStartInput.UserSchemaURL, def.UserSchema)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, res.State)
+	assert.NotEmpty(t, res.State.ID, "flow id was not minted")
+	assert.NotEmpty(t, sm.gotStartInput.Session.ID, "session id was not minted")
+	assert.Equal(t, def.UserSchema, sm.gotStartInput.UserSchemaURL)
 }
 
 // Path B auth.attempt.created runs inside stateMachine.Start. The flow id
@@ -620,26 +540,16 @@ func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
 		Definition: def,
 		Purpose:    domain.FlowDefinitionPurposeLogin,
 	})
-	if err != nil {
-		t.Fatalf("Start: %v", err)
-	}
+	require.NoError(t, err)
 
 	slot, ok := audit.ActorSlotFromContext(sm.gotStartCtx)
-	if !ok || slot == nil {
-		t.Fatal("state machine Start ctx has no actor slot")
-	}
-	if slot.FlowID == nil || *slot.FlowID == "" {
-		t.Fatal("flow_id was not stamped before stateMachine.Start (auth.attempt.created would miss it)")
-	}
-	if res.State == nil || *slot.FlowID != res.State.ID {
-		t.Errorf("stamped flow_id = %v, want %q", slot.FlowID, res.State.ID)
-	}
-	if slot.SessionID == nil || *slot.SessionID == "" {
-		t.Fatal("session_id was not stamped before stateMachine.Start")
-	}
-	if sm.gotStartInput.Session.ID != *slot.SessionID {
-		t.Errorf("stamped session_id = %q, want %q", *slot.SessionID, sm.gotStartInput.Session.ID)
-	}
+	require.True(t, ok, "state machine Start ctx has no actor slot")
+	require.NotNil(t, slot)
+	require.NotEmpty(t, slot.FlowID, "flow_id was not stamped before stateMachine.Start (auth.attempt.created would miss it)")
+	require.NotNil(t, res.State)
+	assert.Equal(t, res.State.ID, *slot.FlowID, "stamped flow_id")
+	require.NotEmpty(t, slot.SessionID, "session_id was not stamped before stateMachine.Start")
+	assert.Equal(t, *slot.SessionID, sm.gotStartInput.Session.ID, "stamped session_id")
 }
 
 func TestFlowService_Start_PassesRedirectURIThrough(t *testing.T) {
@@ -650,16 +560,13 @@ func TestFlowService_Start_PassesRedirectURIThrough(t *testing.T) {
 	svc := service.NewFlowService(stubDB(t), sm)
 
 	redirect := "https://rp.example.com/cb"
-	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
+	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition:  def,
 		Purpose:     domain.FlowDefinitionPurposeLogin,
 		RedirectURI: &redirect,
-	}); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	if sm.gotStartInput.RedirectURI == nil || *sm.gotStartInput.RedirectURI != redirect {
-		t.Errorf("RedirectURI = %v, want %q", sm.gotStartInput.RedirectURI, redirect)
-	}
+	})
+	require.NoError(t, err)
+	assert.Equal(t, &redirect, sm.gotStartInput.RedirectURI)
 }
 
 func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
@@ -679,17 +586,14 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	svc := service.NewFlowService(service.NewPool(pool), sm)
 
 	sessionID := "sess_explicit"
-	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
+	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
 		Purpose:    domain.FlowDefinitionPurposeReauth,
 		SessionID:  &sessionID,
 		UserAgent:  &domain.UserAgent{IP: "203.0.113.9"}, // must not trigger a create
-	}); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	if sm.gotStartInput.Session.ID != sessionID {
-		t.Errorf("Session.ID = %q, want %q", sm.gotStartInput.Session.ID, sessionID)
-	}
+	})
+	require.NoError(t, err)
+	assert.Equal(t, sessionID, sm.gotStartInput.Session.ID)
 }
 
 func TestFlowService_Start_PersistsSession(t *testing.T) {
@@ -705,9 +609,7 @@ func TestFlowService_Start_PersistsSession(t *testing.T) {
 		// With no supplied session, Start persists one for the flow's project.
 		// The anonymous/building nature of a new session is domain.NewSession's
 		// contract, covered by the domain and stmttest suites.
-		if sess.ProjectID != def.ProjectID {
-			t.Errorf("session ProjectID = %q, want %q", sess.ProjectID, def.ProjectID)
-		}
+		assert.Equal(t, def.ProjectID, sess.ProjectID)
 		sess.ID = "sess_created"
 		return nil
 	}).Times(1)
@@ -715,15 +617,12 @@ func TestFlowService_Start_PersistsSession(t *testing.T) {
 
 	svc := service.NewFlowService(service.NewPool(pool), sm)
 
-	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
+	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
 		Purpose:    domain.FlowDefinitionPurposeLogin,
-	}); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	if sm.gotStartInput.Session.ID != "sess_created" {
-		t.Errorf("Session.ID = %q, want the persisted session id", sm.gotStartInput.Session.ID)
-	}
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "sess_created", sm.gotStartInput.Session.ID, "want the persisted session id")
 }
 
 func TestFlowService_Start_RecordsUserAgent(t *testing.T) {
@@ -737,9 +636,8 @@ func TestFlowService_Start_RecordsUserAgent(t *testing.T) {
 	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
 	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
 		// The request's user agent is recorded on the session the flow creates.
-		if sess.UserAgent == nil || sess.UserAgent.IP != "203.0.113.9" {
-			t.Errorf("session user agent = %+v, want IP 203.0.113.9", sess.UserAgent)
-		}
+		require.NotNil(t, sess.UserAgent)
+		assert.Equal(t, "203.0.113.9", sess.UserAgent.IP)
 		sess.ID = "sess_created"
 		return nil
 	}).Times(1)
@@ -747,13 +645,12 @@ func TestFlowService_Start_RecordsUserAgent(t *testing.T) {
 
 	svc := service.NewFlowService(service.NewPool(pool), sm)
 
-	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
+	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
 		Purpose:    domain.FlowDefinitionPurposeLogin,
 		UserAgent:  &domain.UserAgent{IP: "203.0.113.9", Info: map[string]any{"user_agent": "agent/1"}},
-	}); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
+	})
+	require.NoError(t, err)
 }
 
 func TestFlowService_Start_RejectsEmptySessionID(t *testing.T) {
@@ -768,9 +665,7 @@ func TestFlowService_Start_RejectsEmptySessionID(t *testing.T) {
 		Purpose:    domain.FlowDefinitionPurposeLogin,
 		SessionID:  &empty,
 	})
-	if !errors.Is(err, domain.ErrRequestInvalid()) {
-		t.Fatalf("Start err = %v, want ErrRequestInvalid", err)
-	}
+	assert.ErrorIs(t, err, domain.ErrRequestInvalid())
 }
 
 func TestFlowService_Start_PropagatesStateMachineError(t *testing.T) {
@@ -783,9 +678,7 @@ func TestFlowService_Start_PropagatesStateMachineError(t *testing.T) {
 		Definition: def,
 		Purpose:    domain.FlowDefinitionPurposeLogin,
 	})
-	if err == nil || err.Error() != "boom" {
-		t.Fatalf("Start err = %v, want boom", err)
-	}
+	assert.EqualError(t, err, "boom")
 }
 
 func TestFlowService_Submit_RefetchesDefinitionAndCallsProcess(t *testing.T) {
@@ -801,18 +694,14 @@ func TestFlowService_Submit_RefetchesDefinitionAndCallsProcess(t *testing.T) {
 		ProjectID:    def.ProjectID,
 		FlowProgress: domain.FlowProgress{DefinitionID: def.ID},
 	}
-	if _, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
+	_, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
 		State:  state,
 		Action: "submit",
-	}); err != nil {
-		t.Fatalf("Submit: %v", err)
-	}
-	if sm.gotProcessDef == nil || sm.gotProcessDef.ID != def.ID {
-		t.Fatalf("Process was not called with refetched definition")
-	}
-	if sm.gotSubmitInput.Action != "submit" {
-		t.Errorf("Action = %q, want submit", sm.gotSubmitInput.Action)
-	}
+	})
+	require.NoError(t, err)
+	require.NotNil(t, sm.gotProcessDef, "Process was not called with refetched definition")
+	assert.Equal(t, def.ID, sm.gotProcessDef.ID, "Process was not called with refetched definition")
+	assert.Equal(t, "submit", sm.gotSubmitInput.Action)
 }
 
 func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
@@ -836,15 +725,9 @@ func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
 		},
 		Action: "submit",
 	})
-	if err != nil {
-		t.Fatalf("Submit: %v", err)
-	}
-	if res.HandoffToken != "ht_abc" {
-		t.Errorf("HandoffToken = %q, want ht_abc", res.HandoffToken)
-	}
-	if !res.HandoffTokenExpiresAt.Equal(expiresAt) {
-		t.Errorf("HandoffTokenExpiresAt = %v, want %v", res.HandoffTokenExpiresAt, expiresAt)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "ht_abc", res.HandoffToken)
+	assert.True(t, res.HandoffTokenExpiresAt.Equal(expiresAt), "HandoffTokenExpiresAt = %v, want %v", res.HandoffTokenExpiresAt, expiresAt)
 }
 
 func TestFlowService_GetStep_CallsRender(t *testing.T) {
@@ -860,13 +743,8 @@ func TestFlowService_GetStep_CallsRender(t *testing.T) {
 	svc := service.NewFlowService(repo, sm)
 
 	res, err := svc.GetStep(t.Context(), service.GetFlowStepRequest{State: state})
-	if err != nil {
-		t.Fatalf("GetStep: %v", err)
-	}
-	if sm.gotRenderState != state {
-		t.Errorf("Render was called with %p, want %p", sm.gotRenderState, state)
-	}
-	if res.Step == nil || res.Step.Name != "identify" {
-		t.Errorf("Step = %+v, want name identify", res.Step)
-	}
+	require.NoError(t, err)
+	assert.Same(t, state, sm.gotRenderState, "Render was called with the wrong state")
+	require.NotNil(t, res.Step)
+	assert.Equal(t, "identify", res.Step.Name)
 }

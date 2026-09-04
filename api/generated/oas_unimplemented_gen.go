@@ -94,7 +94,7 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 // Every call allocates a new opaque id. Revisions of one flow share its
 // `name`; posting a definition under an existing `name` publishes a new
 // revision of that flow, it is not a conflict. List with `name` to see a
-// flow's revisions, newest first.
+// flow's revisions, newest by creation time first.
 //
 // POST /flow_definitions
 func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (r CreateFlowDefinitionRes, _ error) {
@@ -577,7 +577,7 @@ func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsPar
 
 // ListFlowDefinitions implements listFlowDefinitions operation.
 //
-// Retrieves a list of all flow definitions, newest first.
+// Retrieves a list of all flow definitions, newest by creation time first.
 // This endpoint can be used to view existing flow definitions and their configurations.
 // Filter by `name` to list the revisions of one flow.
 //

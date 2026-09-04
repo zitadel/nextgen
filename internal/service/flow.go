@@ -309,9 +309,12 @@ func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinition
 // pickNewestFlowRevision prefers the highest schema version (a lexicographic
 // compare, sufficient while versions stay zero-padded MAJOR.MINOR.PATCH) and,
 // among revisions of one version, the newest created. Revisions of a name
-// share a version, so the pick must not depend on list order. Caller ensures
-// defs non-empty.
+// share a version, so the pick must not depend on list order. This differs
+// from GET /flow_definitions, which orders by creation time alone.
 func pickNewestFlowRevision(defs []*domain.FlowDefinition) *domain.FlowDefinition {
+	if len(defs) == 0 {
+		return nil
+	}
 	winner := defs[0]
 	for _, def := range defs[1:] {
 		if def.SchemaVersion > winner.SchemaVersion ||

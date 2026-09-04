@@ -22,6 +22,7 @@ func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaStore(t),
 			h.EnsureHasher(t),
+			service.StatementsUserRefResolver{Pool: h.EnsureServiceDB(t)},
 		)
 	}
 	return h.userService.value

@@ -30,8 +30,9 @@ import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
  * ## Template-slot mode
  *
  * When the consumer projects a `<template>` child the element renders the
- * template's clone into its light DOM with `{{name}}`, `{{email}}`, and
- * `{{initial}}` substituted. Any element with `data-action="logout"` inside
+ * template's clone into its light DOM with `{{display}}`, `{{identifier}}`,
+ * and `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy
+ * aliases of the first two). Any element with `data-action="logout"` inside
  * the cloned template triggers the sign-out flow. This mirrors the
  * placeholder `<nextgen-logout>`'s contract so existing markup keeps working.
  *
@@ -221,11 +222,11 @@ export class ZitadelLogout extends LitElement {
    */
   @property({ type: String }) accessor theme: "" | ThemeMode = "";
 
-  @state() private accessor displayName = "";
+  @state() private accessor userDisplay = "";
 
-  @state() private accessor displayEmail = "";
+  @state() private accessor userIdentifier = "";
 
-  @state() private accessor displayUserId = "";
+  @state() private accessor userId = "";
 
   @state() private accessor open = false;
 
@@ -324,9 +325,9 @@ export class ZitadelLogout extends LitElement {
   private async loadIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
     try {
       const session = await getSession(api);
-      this.displayName = session.name ?? "";
-      this.displayEmail = session.email ?? "";
-      this.displayUserId = session.user_id ?? "";
+      this.userDisplay = session.user?.display ?? "";
+      this.userIdentifier = session.user?.identifier ?? "";
+      this.userId = session.user_id ?? "";
     } catch {
       // No active session — render the control without identity.
     } finally {
@@ -336,13 +337,14 @@ export class ZitadelLogout extends LitElement {
   }
 
   private get initial(): string {
-    const source = this.displayName || this.displayEmail || this.displayUserId;
+    const source = this.userDisplay || this.userIdentifier || this.userId;
     return source ? source.charAt(0).toUpperCase() : "?";
   }
 
   /**
    * Clones the consumer-supplied `<template>` into the light DOM, fills the
-   * `{{name}}`, `{{email}}`, and `{{initial}}` tokens via a TreeWalker, and
+   * `{{display}}`, `{{identifier}}`, and `{{initial}}` tokens (plus the
+   * legacy `{{name}}`/`{{email}}` aliases) via a TreeWalker, and
    * wires every element with `data-action="logout"` to trigger sign-out.
    * Light-DOM mounting is deliberate so the consumer's existing CSS applies.
    *
@@ -354,7 +356,7 @@ export class ZitadelLogout extends LitElement {
     if (!this.templateMode || !this.pendingTemplate) return;
 
     const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
-    fillTemplateTokens(clone, this.displayName, this.displayEmail, this.initial);
+    fillTemplateTokens(clone, this.userDisplay, this.userIdentifier, this.initial);
 
     const container = document.createElement("span");
     container.appendChild(clone);
@@ -412,7 +414,7 @@ export class ZitadelLogout extends LitElement {
     this.open = false;
     this.loading = false;
 
-    emit(this, "zitadel-signout", { name: this.displayName, email: this.displayEmail });
+    emit(this, "zitadel-signout", { display: this.userDisplay, identifier: this.userIdentifier });
 
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
@@ -451,10 +453,10 @@ export class ZitadelLogout extends LitElement {
                 <div class="preview-avatar" aria-hidden="true">${this.initial}</div>
                 <div class="preview-info">
                   <div class="preview-name">
-                    ${this.displayName || this.displayEmail || this.displayUserId}
+                    ${this.userDisplay || this.userIdentifier || this.userId}
                   </div>
-                  ${this.displayName && this.displayEmail
-                    ? html`<div class="preview-email">${this.displayEmail}</div>`
+                  ${this.userDisplay && this.userIdentifier
+                    ? html`<div class="preview-email">${this.userIdentifier}</div>`
                     : nothing}
                 </div>
               </div>
@@ -500,24 +502,36 @@ export class ZitadelLogout extends LitElement {
 }
 
 /**
- * Substitutes `{{name}}`, `{{email}}`, and `{{initial}}` placeholders inside
- * a fragment's text nodes. Walking text nodes (rather than running a regex
- * over `outerHTML`) keeps attributes and structural markup untouched.
+ * Substitutes `{{display}}`, `{{identifier}}`, and `{{initial}}` placeholders
+ * inside a fragment's text nodes; `{{name}}` and `{{email}}` fill as legacy
+ * aliases of display and identifier so pre-ref templates keep rendering.
+ * Walking text nodes (rather than running a regex over `outerHTML`) keeps
+ * attributes and structural markup untouched.
  */
 function fillTemplateTokens(
   fragment: DocumentFragment,
-  name: string,
-  email: string,
+  display: string,
+  identifier: string,
   initial: string,
 ): void {
+  // Single pass with a callback: substituted values are never rescanned, so
+  // an identity value containing a token-like substring (or a `$&`-style
+  // replacement pattern) renders literally instead of being re-substituted.
+  const values: Record<string, string> = {
+    display,
+    identifier,
+    name: display,
+    email: identifier,
+    initial,
+  };
   const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode() as Text | null;
   while (node) {
     if (node.textContent) {
-      node.textContent = node.textContent
-        .replace(/\{\{name\}\}/g, name)
-        .replace(/\{\{email\}\}/g, email)
-        .replace(/\{\{initial\}\}/g, initial);
+      node.textContent = node.textContent.replace(
+        /\{\{(display|identifier|name|email|initial)\}\}/g,
+        (_, token: string) => values[token] ?? "",
+      );
     }
     node = walker.nextNode() as Text | null;
   }

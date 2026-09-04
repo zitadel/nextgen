@@ -36,6 +36,38 @@ properties:
   metadata:
     readOnly: true
     $ref: user-metadata.yaml
+  # The derived identity fields of ADR 058 §3a: the same resolution that
+  # produces the `user-ref` component (components/schemas/user-ref.yaml),
+  # inlined on the envelope — `user_id` is omitted since the envelope has
+  # `id`. Refs and derived label fields ride the resource's own read
+  # permission (ADR 059 rule 8), so they carry no expand gate.
+  identifier:
+    readOnly: true
+    type: string
+    description: |
+      The current value of the user schema's designated identifier
+      (`x-identifier`), resolved live at read time. Absent when the schema
+      designates no identifier or the user carries no value for it.
+    example: ada@example.com
+  identifier_property:
+    readOnly: true
+    type: string
+    description: |
+      The schema property `identifier` came from, so clients can reach the
+      property's schema for semantics (a mailto link, a field label)
+      instead of guessing from the value. Present exactly when
+      `identifier` is.
+    example: email
+  display:
+    readOnly: true
+    type: string
+    description: |
+      The `x-display` rendering — the designated properties' values joined
+      in list order, resolved live at read time. Purely presentational.
+      Absent when the schema designates no display properties or the user
+      carries no values for them. Clients render `display`, falling back
+      to `identifier`, then `id`.
+    example: Ada Lovelace
   teams:
     readOnly: true
     type: array
