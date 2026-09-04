@@ -518,7 +518,7 @@ func decodeCompleteClaimResponse(resp *http.Response) (res CompleteClaimRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ProjClaimExpired
+			var response CompleteClaimGone
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -4093,7 +4093,7 @@ func decodeGetClaimStatusResponse(resp *http.Response) (res GetClaimStatusRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ProjClaimExpired
+			var response GetClaimStatusGone
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6801,6 +6801,41 @@ func decodeInitClaimResponse(resp *http.Response) (res InitClaimRes, _ error) {
 				return nil
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
+			}
+			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	case 410:
+		// Code 410.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response ProjClaimWindowExpired
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
 			}
 			return &response, nil
 		default:

@@ -219,6 +219,7 @@ func TestClaimService_Status(t *testing.T) {
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 			},
 			want: &service.ClaimStatusResult{Status: domain.ClaimChallengeStatusPending},
 		},
@@ -227,8 +228,31 @@ func TestClaimService_Status(t *testing.T) {
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 			},
 			wantErr: domain.ErrProjectClaimExpired(),
+		},
+		{
+			// Reachable when the window closes between init and poll: Init
+			// refuses to mint once it is already closed.
+			name:       "claim window closed",
+			secretHash: "secret_hash_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
+		},
+		{
+			// Both are 410, but only challenge expiry recovers with a fresh
+			// init, so the final refusal must win.
+			name:       "claim window closed wins over challenge expiry",
+			secretHash: "secret_hash_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
 		},
 		{
 			name:       "completed",
