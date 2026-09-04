@@ -90,3 +90,21 @@ session:
 	assert.Equal(t, 30*time.Minute, cfg.Session.DefaultTTL)
 	assert.Equal(t, 48*time.Hour, cfg.Session.MaxTTL)
 }
+
+// TestLoadConfigAcceptsStreamsFromEnv pins a narrower regression than the
+// duration/slice check above: mapstructure.StringToSliceHookFunc (unlike
+// viper's own unexported stringToWeakSliceHookFunc it would otherwise
+// replace) only splits a string into a slice when the target element type
+// is string, so a naive substitution silently stops a comma-separated
+// NEXTGEN_INSTRUMENTATION_LOG_STREAMS env var from reaching []zlog.Stream.
+func TestLoadConfigAcceptsStreamsFromEnv(t *testing.T) {
+	t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_STREAMS", "request,service")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, []zlog.Stream{zlog.StreamRequest, zlog.StreamService}, cfg.Instrumentation.Log.Streams)
+}

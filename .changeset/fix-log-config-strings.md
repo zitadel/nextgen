@@ -2,4 +2,4 @@
 "@zitadel/server": patch
 ---
 
-instrumentation.log.level and instrumentation.log.format now accept string names (debug, json, gcp) in addition to numeric values.
+instrumentation.log.level, instrumentation.log.format, and instrumentation.log.streams now accept string names (e.g. debug, json, request) in addition to numeric values.

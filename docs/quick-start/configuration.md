@@ -67,6 +67,33 @@ does not cover IAM setup.
 
 Migrations run automatically when the server starts.
 
+## Logging
+
+| YAML key                      | Environment                           | Default                                        | Description                    |
+|--------------------------------|-----------------------------------------|---------------------------------------------------|-----------------------------------|
+| `instrumentation.log.level`   | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`   | `info`                                         | Minimum log level              |
+| `instrumentation.log.format`  | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`  | `text`                                         | Log output encoding            |
+| `instrumentation.log.streams` | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS` | `[runtime, ready, request, service, storage]`  | Which log streams are enabled  |
+
+`level`, `format`, and each entry of `streams` accept either their documented
+string name (below) or the underlying numeric value; string values are
+resolved case-insensitively via each type's `encoding.TextUnmarshaler`.
+
+- `level`: `debug`, `info`, `warn`, `error` (`zlog.Level` is `slog.Level`
+  under the hood, so an offset suffix like `warn+4` is also accepted; the
+  GCP-only severities — notice, critical, alert, emergency — have no string
+  form and must be set by their numeric value).
+- `format`: `disabled`, `text`, `json`, `gcp`, `gcp_error_reporting`.
+- `streams`: `runtime`, `ready`, `request`, `service`, `storage`.
+
+```yaml
+instrumentation:
+  log:
+    level: debug
+    format: json
+    streams: [request, service]
+```
+
 ## Config file search paths
 
 When `-c` is not passed, the server looks for `nextgen.yaml` in:
