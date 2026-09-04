@@ -18,6 +18,7 @@ import (
 func VisibleTo(requester domain.VariableOwner, names ...string) *database.ListOptions[VariableStorageField] {
 	filters := []database.Filter[VariableStorageField]{
 		ownerScope(VariableStorageFieldProjectID, requester.ProjectID),
+		ownerScope(VariableStorageFieldEnvironmentName, requester.EnvironmentName),
 		ownerScope(VariableStorageFieldTeamID, requester.TeamID),
 		ownerScope(VariableStorageFieldUserSchemaID, requester.UserSchemaID),
 		ownerScope(VariableStorageFieldUserID, requester.UserID),
@@ -42,6 +43,7 @@ func NameThenOwner() database.OrderBy[VariableStorageField] {
 		Columns: []database.Column[VariableStorageField]{
 			database.Col(VariableStorageFieldName),
 			database.Col(VariableStorageFieldProjectID),
+			database.Col(VariableStorageFieldEnvironmentName),
 			database.Col(VariableStorageFieldTeamID),
 			database.Col(VariableStorageFieldUserSchemaID),
 			database.Col(VariableStorageFieldUserID),
@@ -86,10 +88,11 @@ func RowToDomain(row *VariableStorage) *domain.Variable {
 	return &domain.Variable{
 		Name: row.Name,
 		Owner: domain.VariableOwner{
-			ProjectID:    row.ProjectID,
-			TeamID:       row.TeamID,
-			UserSchemaID: row.UserSchemaID,
-			UserID:       row.UserID,
+			ProjectID:       row.ProjectID,
+			EnvironmentName: row.EnvironmentName,
+			TeamID:          row.TeamID,
+			UserSchemaID:    row.UserSchemaID,
+			UserID:          row.UserID,
 		},
 		Value:    row.Value,
 		IsSecret: row.IsSecret,

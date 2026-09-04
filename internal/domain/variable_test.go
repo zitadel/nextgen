@@ -15,10 +15,11 @@ import (
 )
 
 var variableOwner = domain.VariableOwner{
-	ProjectID:    "project-1",
-	TeamID:       "team-1",
-	UserSchemaID: "user-schema-1",
-	UserID:       "user-1",
+	ProjectID:       "project-1",
+	EnvironmentName: "env-1",
+	TeamID:          "team-1",
+	UserSchemaID:    "user-schema-1",
+	UserID:          "user-1",
 }
 
 func TestNewVariable(t *testing.T) {

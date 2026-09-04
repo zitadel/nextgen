@@ -262,9 +262,10 @@ func TestVariableListToMap(t *testing.T) {
 	t.Parallel()
 
 	project := VariableOwner{ProjectID: "p"}
-	team := VariableOwner{ProjectID: "p", TeamID: "t"}
-	schema := VariableOwner{ProjectID: "p", TeamID: "t", UserSchemaID: "s"}
-	user := VariableOwner{ProjectID: "p", TeamID: "t", UserSchemaID: "s", UserID: "u"}
+	env := VariableOwner{ProjectID: "p", EnvironmentName: "e"}
+	team := VariableOwner{ProjectID: "p", EnvironmentName: "e", TeamID: "t"}
+	schema := VariableOwner{ProjectID: "p", EnvironmentName: "e", TeamID: "t", UserSchemaID: "s"}
+	user := VariableOwner{ProjectID: "p", EnvironmentName: "e", TeamID: "t", UserSchemaID: "s", UserID: "u"}
 
 	// Storage returns the whole ladder because variables do not override each
 	// other; collapsing it is what picks the value a document actually gets.
@@ -274,7 +275,7 @@ func TestVariableListToMap(t *testing.T) {
 		for _, order := range [][]*Variable{
 			{{Name: "v", Owner: project, Value: "project"}, {Name: "v", Owner: user, Value: "user"}},
 			{{Name: "v", Owner: user, Value: "user"}, {Name: "v", Owner: project, Value: "project"}},
-			{{Name: "v", Owner: team, Value: "team"}, {Name: "v", Owner: user, Value: "user"}, {Name: "v", Owner: project, Value: "project"}},
+			{{Name: "v", Owner: env, Value: "env"}, {Name: "v", Owner: team, Value: "team"}, {Name: "v", Owner: user, Value: "user"}, {Name: "v", Owner: project, Value: "project"}},
 		} {
 			got := VariableListToMap(order)
 			assert.Equal(t, "user", got["v"].Value)
@@ -285,11 +286,13 @@ func TestVariableListToMap(t *testing.T) {
 		t.Parallel()
 
 		assert.True(t, project.IsMoreSpecificThan(VariableOwner{}))
-		assert.True(t, team.IsMoreSpecificThan(project))
+		assert.True(t, env.IsMoreSpecificThan(project))
+		assert.True(t, team.IsMoreSpecificThan(env))
 		assert.True(t, schema.IsMoreSpecificThan(team))
 		assert.True(t, user.IsMoreSpecificThan(schema))
 
-		assert.False(t, project.IsMoreSpecificThan(team))
+		assert.False(t, project.IsMoreSpecificThan(env))
+		assert.False(t, env.IsMoreSpecificThan(team))
 		assert.False(t, team.IsMoreSpecificThan(user))
 		assert.False(t, user.IsMoreSpecificThan(user), "an equal owner is not more specific")
 	})

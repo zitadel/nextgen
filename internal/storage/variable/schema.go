@@ -23,15 +23,16 @@ import (
 // owner tuple flattened onto the row and the two row timestamps added, neither
 // of which the domain type carries.
 type VariableStorage struct {
-	Name         string
-	ProjectID    string
-	TeamID       string
-	UserSchemaID string
-	UserID       string
-	Value        any
-	IsSecret     bool
-	CreatedAt    time.Time
-	ModifiedAt   time.Time
+	Name            string
+	ProjectID       string
+	EnvironmentName string
+	TeamID          string
+	UserSchemaID    string
+	UserID          string
+	Value           any
+	IsSecret        bool
+	CreatedAt       time.Time
+	ModifiedAt      time.Time
 }
 
 // Schema binds variable filter/order fields. Every owner column is NOT NULL
@@ -45,6 +46,11 @@ var Schema = database.NewSchema(map[VariableStorageField]database.FieldBinding[V
 	VariableStorageFieldProjectID: {
 		SQLName:  "project_id",
 		Accessor: func(v *VariableStorage) any { return v.ProjectID },
+		Coerce:   database.CoerceString,
+	},
+	VariableStorageFieldEnvironmentName: {
+		SQLName:  "environment_name",
+		Accessor: func(v *VariableStorage) any { return v.EnvironmentName },
 		Coerce:   database.CoerceString,
 	},
 	VariableStorageFieldTeamID: {
@@ -89,6 +95,7 @@ type VariableStorageField uint8
 const (
 	VariableStorageFieldName VariableStorageField = iota
 	VariableStorageFieldProjectID
+	VariableStorageFieldEnvironmentName
 	VariableStorageFieldTeamID
 	VariableStorageFieldUserSchemaID
 	VariableStorageFieldUserID

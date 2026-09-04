@@ -122,14 +122,16 @@ func (v *Variable) GetDecryptedValue(decrypter crypto.Decrypter) (any, error) {
 }
 
 type VariableOwner struct {
-	ProjectID    string
-	TeamID       string
-	UserSchemaID string
-	UserID       string
+	ProjectID       string
+	EnvironmentName string
+	TeamID          string
+	UserSchemaID    string
+	UserID          string
 }
 
 func (owner *VariableOwner) HasAccessTo(variable *Variable) bool {
 	return (variable.Owner.ProjectID == "" || variable.Owner.ProjectID == owner.ProjectID) &&
+		(variable.Owner.EnvironmentName == "" || variable.Owner.EnvironmentName == owner.EnvironmentName) &&
 		(variable.Owner.TeamID == "" || variable.Owner.TeamID == owner.TeamID) &&
 		(variable.Owner.UserSchemaID == "" || variable.Owner.UserSchemaID == owner.UserSchemaID) &&
 		(variable.Owner.UserID == "" || variable.Owner.UserID == owner.UserID)
@@ -146,14 +148,16 @@ func (owner *VariableOwner) IsMoreSpecificThan(other VariableOwner) bool {
 }
 
 // specificity is how deep the owner chain reaches: 0 for an owner scoped to
-// nothing, up to 4 for one naming a single user.
+// nothing, up to 5 for one naming a single user.
 func (owner *VariableOwner) specificity() int {
 	switch {
 	case owner.UserID != "":
-		return 4
+		return 5
 	case owner.UserSchemaID != "":
-		return 3
+		return 4
 	case owner.TeamID != "":
+		return 3
+	case owner.EnvironmentName != "":
 		return 2
 	case owner.ProjectID != "":
 		return 1
