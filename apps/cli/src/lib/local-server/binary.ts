@@ -64,7 +64,8 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
-    const child = spawn(command.command, withMigrateFlag(command.args), {
+    const args = withMigrateFlag(command.args);
+    const child = spawn(command.command, args, {
       detached: true,
       env: {
         ...process.env,
@@ -84,7 +85,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       schema_version: 1,
       backend: "binary",
       pid: child.pid,
-      command: [command.command, ...command.args].join(" "),
+      command: [command.command, ...args].join(" "),
       log_path: spec.logPath,
       server_package: command.serverPackage,
       server_version: command.serverVersion,

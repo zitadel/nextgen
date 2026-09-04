@@ -27,7 +27,7 @@ describe("local server binary helpers", () => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
     const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
-    await startBinaryRuntime({
+    const runtime = await startBinaryRuntime({
       cliVersion: "0.0.0-test",
       dataDir: join(dir, "data"),
       logPath: join(dir, "logs", "server.log"),
@@ -42,6 +42,7 @@ describe("local server binary helpers", () => {
     ];
     expect(command).toBe("/tmp/fake-nextgen-server");
     expect(args).toEqual(["--migrate"]);
+    expect(runtime.command).toBe("/tmp/fake-nextgen-server --migrate");
     expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
     expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
   });
