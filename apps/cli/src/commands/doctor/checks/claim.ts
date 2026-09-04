@@ -1,4 +1,4 @@
-import { claimState, type ClaimState } from "../../../lib/claim-state";
+import { CLAIM_WINDOW_DAYS, claimState, type ClaimState } from "../../../lib/claim-state";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "../../../lib/project";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -51,7 +51,8 @@ export class ClaimCheck implements SanityCheck {
         name: this.name,
         status: "warn",
         message:
-          "This project is temporary until you attach it to a team. Run `zitadel claim` " +
+          "This project is temporary until you attach it to a team, and claiming is only " +
+          `possible within ${CLAIM_WINDOW_DAYS} days of creation. Run \`zitadel claim\` ` +
           "to make it permanent; nothing about the project changes.",
         path: this.path,
       };

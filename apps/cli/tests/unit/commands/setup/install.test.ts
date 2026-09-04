@@ -81,18 +81,24 @@ describe("setup dependency installation", () => {
 
     // The box ends on one breadcrumb instead of the customize/publish pair —
     // those steps only make sense after the first successful login.
-    expect(result.boxActions.at(-1)).toBe(
-      "Once login works: npx @zitadel/cli@latest status shows your next steps; " +
-        "customizing is covered in your README's Zitadel section.",
-    );
-    expect(result.boxActions.join("\n")).toContain("register a user");
-    expect(result.boxActions.join("\n")).not.toContain(".zitadel/schemas/");
-    expect(result.boxActions.join("\n")).not.toContain(planCommand);
-    // Every box line except the breadcrumb is also in the envelope, which
-    // additionally carries the customize/publish pair for agents.
-    for (const action of result.boxActions.slice(0, -1)) {
-      expect(result.nextActions).toContain(action);
-    }
+    expect(result.boxActions.at(-1)).toEqual({
+      text:
+        "Once login works, this shows your next steps (customizing is covered in " +
+        "your README's Zitadel section):",
+      command: "npx @zitadel/cli@latest status",
+    });
+    const boxText = result.boxActions
+      .map((action) => [action.text, action.command].filter(Boolean).join(" "))
+      .join("\n");
+    expect(boxText).toContain("register a user");
+    expect(boxText).not.toContain(".zitadel/schemas/");
+    expect(boxText).not.toContain(planCommand);
+    // The box carries the same journey as the envelope, structured for
+    // rendering: every boxed command appears in the envelope prose, and the
+    // verify mission is quoted verbatim in both. The envelope additionally
+    // carries the customize/publish pair for agents.
+    expect(result.nextActions.join("\n")).toContain("npm run dev");
+    expect(result.nextActions).toContain(result.boxActions.find((action) => !action.command)?.text);
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
   });
 
@@ -102,7 +108,7 @@ describe("setup dependency installation", () => {
 
     const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
 
-    expect(result.boxActions[0]).toBe("Install dependencies: npm install");
+    expect(result.boxActions[0]).toEqual({ text: "Install dependencies:", command: "npm install" });
     expect(result.nextActions[0]).toBe("Install dependencies: npm install");
   });
 

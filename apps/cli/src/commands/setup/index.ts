@@ -18,7 +18,14 @@ import {
 import { consola } from "consola";
 
 import { brandingDesignLabel } from "../../lib/branding/designs";
-import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
+import { renderBoxActions, wrapForBox } from "../../lib/box";
+import {
+  claimAction,
+  claimBoxAction,
+  claimCommand,
+  claimState,
+  claimWindowDeadline,
+} from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
@@ -412,13 +419,20 @@ export default class Setup extends BaseCommand {
     // way of deferring it.
     //
     // Empty off the cloud, where nothing can be attached.
+    // The deadline is concrete because the server enforces the claim window
+    // at claim time and the project was created moments ago, so created_at
+    // computes the same date the platform will hold the user to. A dry run
+    // gets the generic wording: its stand-in project has a fixed past
+    // created_at, and no real window started anyway.
+    const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const claimNudge =
       claimState({ secret: {}, server: answers.server }).kind === "detached"
         ? {
-            actions: [claimAction(this.meta.cliVersion)],
+            actions: [claimAction(this.meta.cliVersion, deadline)],
+            boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
             commands: [claimCommand(this.meta.cliVersion)],
           }
-        : { actions: [], commands: [] };
+        : { actions: [], boxActions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -444,13 +458,18 @@ export default class Setup extends BaseCommand {
       // status panel separate from the per-step narration above it.
       // `box` accepts ANSI-styled text in the message body, so our
       // pre-coloured rows (path/url/id helpers) survive intact.
+      // `wrapForBox` caps the content at the terminal width: consola sizes
+      // the frame to the longest line, so an unwrapped sentence wider than
+      // the window would break the right border.
       consola.box({
         title: "Zitadel is ready",
-        message: [
-          renderSummary(sections),
-          "",
-          [...installOutcome.boxActions, ...claimNudge.actions].join("\n"),
-        ].join("\n"),
+        message: wrapForBox(
+          [
+            renderSummary(sections),
+            "",
+            renderBoxActions([...installOutcome.boxActions, ...claimNudge.boxActions]),
+          ].join("\n"),
+        ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
       // The envelope's `warnings` never render in non-JSON mode (setup

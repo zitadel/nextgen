@@ -5,8 +5,9 @@ import { createZitadelClient } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
+import { wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
-import { isAttached } from "../lib/claim-state";
+import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
@@ -141,6 +142,19 @@ export default class Claim extends BaseCommand {
       if (claimed) {
         return this.alreadyClaimed({ project_id: secret.project_id, ...claimed });
       }
+      if (isClaimWindowExpired(error)) {
+        // Deliberately not the retryable "start a new link" shape: a new
+        // challenge cannot fix a closed window, so suggesting `claim` again
+        // would send the user in a circle.
+        this.recordTelemetry({ claim_outcome: "window_expired" });
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+          {
+            hint: "The project itself keeps working. To get a claimable project, create a fresh one with `zitadel setup` and claim it within the window.",
+          },
+        );
+      }
       throw error;
     }
 
@@ -164,11 +178,19 @@ export default class Claim extends BaseCommand {
     // Always show the link first, before attempting anything: it is the whole
     // instruction on its own, so a launch that never happens (headless box,
     // no `xdg-open`, `--no-open`, an agent) needs no separate path.
+    //
+    // The URL prints as a bare line under the frame rather than inside it:
+    // it must never be split (clickability, and the journey e2e scrape reads
+    // it out of the narration), and consola pads every box line to the
+    // longest one, so a ~110-character URL inside the box would re-break the
+    // frame on any terminal narrower than the URL itself. `wrapForBox` keeps
+    // the frame's own content inside the terminal width.
     consola.box({
       title: "Finish in your browser",
-      message: `${challenge.claim_url}\n\nSign in there to attach this project to your team.`,
+      message: wrapForBox("Sign in at the link below to attach this project to your team."),
       style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
     });
+    consola.log(challenge.claim_url);
 
     const skipLaunch = flags["no-open"] || nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
@@ -299,6 +321,21 @@ function alreadyClaimedDetails(
     team_id: details.team_id,
     dashboard_url: typeof details.dashboard_url === "string" ? details.dashboard_url : undefined,
   };
+}
+
+/**
+ * A `410 proj.claim_window_expired` from `claim/init`: the project outlived
+ * domain.ClaimWindow before anyone claimed it. Distinct from the plain 410 the
+ * poll maps to "the link expired", which a new link fixes; this one nothing
+ * fixes.
+ */
+function isClaimWindowExpired(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 410 &&
+    isObject(error.body) &&
+    error.body.code === "proj.claim_window_expired"
+  );
 }
 
 function expiredError(message: string): ZitadelError {
