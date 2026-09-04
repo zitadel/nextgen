@@ -21,6 +21,7 @@ oneOf:
   - $ref: types/project-created-event.yaml
   - $ref: types/project-deleted-event.yaml
   - $ref: types/project-updated-event.yaml
+  - $ref: types/release-created-event.yaml
   - $ref: types/request-api-event.yaml
   - $ref: types/schema-created-event.yaml
   - $ref: types/session-deleted-event.yaml
@@ -52,6 +53,7 @@ discriminator:
     project.created: types/project-created-event.yaml
     project.deleted: types/project-deleted-event.yaml
     project.updated: types/project-updated-event.yaml
+    release.created: types/release-created-event.yaml
     request.api: types/request-api-event.yaml
     schema.created: types/schema-created-event.yaml
     session.deleted: types/session-deleted-event.yaml
