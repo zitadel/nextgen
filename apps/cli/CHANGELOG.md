@@ -1,5 +1,14 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- Updated dependencies [[`c0bef04`](https://github.com/zitadel/nextgen/commit/c0bef048c305cd4fdac5d44bd1219a3fc08e550a), [`1f5e7b9`](https://github.com/zitadel/nextgen/commit/1f5e7b9d8ccd1282a81f8541f359376ddd0947bc), [`4a637a3`](https://github.com/zitadel/nextgen/commit/4a637a3fed02f969cae61a427d293ca226bd6a4a), [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea), [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab), [`472a182`](https://github.com/zitadel/nextgen/commit/472a18216b472cdcd76620b1f11f37ce997fcdcb)]:
+  - @zitadel/server@1.0.0-alpha.22
+  - @zitadel/api@1.0.0-alpha.22
+  - @zitadel/config@1.0.0-alpha.22
+
 ## 1.0.0-alpha.21
 
 ### Patch Changes

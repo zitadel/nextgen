@@ -1,5 +1,7 @@
 # @zitadel/server-win32-x64
 
+## 1.0.0-alpha.22
+
 ## 1.0.0-alpha.21
 
 ## 1.0.0-alpha.20
