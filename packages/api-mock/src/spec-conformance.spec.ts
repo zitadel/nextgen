@@ -751,6 +751,24 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(complete.status).toBe(410);
     const completeBody = (await complete.json()) as Record<string, unknown>;
     expect(completeBody.code).toBe("proj.claim_window_expired");
+
+    // Both expired at once: the final window refusal must win over the
+    // retryable challenge expiry, on status and complete alike.
+    expireClaimChallenge(challenge_id);
+    const bothStatus = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(bothStatus.status).toBe(410);
+    expect(((await bothStatus.json()) as Record<string, unknown>).code).toBe(
+      "proj.claim_window_expired",
+    );
+    const bothComplete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(bothComplete.status).toBe(410);
+    expect(((await bothComplete.json()) as Record<string, unknown>).code).toBe(
+      "proj.claim_window_expired",
+    );
   });
 
   test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {

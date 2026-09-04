@@ -19,8 +19,8 @@ const ClaimChallengeTTL = 10 * time.Minute
 // ClaimWindow is how long after creation an unclaimed project can still be
 // claimed (the epic's 14-day lifetime, enforced at claim time; ADR 046
 // §Non-goals records that nothing deletes the project when it closes).
-// Keep in sync with CLAIM_WINDOW_DAYS in apps/cli/src/lib/claim-state.ts,
-// which prints the deadline this constant enforces.
+// The CLI prints the deadline this constant enforces; keep its copy in
+// apps/cli/src/lib/claim-state.ts in sync.
 const ClaimWindow = 14 * 24 * time.Hour
 
 // NewClaimChallengeToken mints the plaintext challenge token and the stored

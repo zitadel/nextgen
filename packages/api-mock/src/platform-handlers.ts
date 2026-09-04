@@ -426,14 +426,6 @@ export function completeClaimChallenge(
   if (!challenge || challenge.projectId !== projectId) {
     return { status: 404, body: errorBody("not_found", "claim challenge not found") };
   }
-  // The TTL is enforced regardless of status: an expired challenge is gone even
-  // if it was already spent, so a completed-but-expired challenge still 410s.
-  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
-    return {
-      status: 410,
-      body: errorBody("proj.claim_expired", "the claim challenge has expired"),
-    };
-  }
   // Fail closed on a challenge without its project, mirroring the server's
   // proj.not_found: a claim must never be minted from an inconsistent store,
   // and letting it through would also bypass the window check below.
@@ -441,10 +433,12 @@ export function completeClaimChallenge(
   if (!project) {
     return { status: 404, body: errorBody("proj.not_found", "project not found") };
   }
-  // First-claim-wins and single-use: once the project has a grant — whether
-  // from this challenge on an earlier call or from another challenge entirely —
-  // completion reports it as already claimed instead of minting a second grant
-  // or silently succeeding again.
+  // First-claim-wins and single-use, checked before both expiry answers
+  // (server order): once the project has a grant — whether from this challenge
+  // on an earlier call or from another challenge entirely — completion reports
+  // it as already claimed instead of minting a second grant or silently
+  // succeeding again. A completed challenge always has the grant, so it lands
+  // here, never on the expiry answers below.
   const existing = store.claims.get(projectId);
   if (existing) {
     return {
@@ -455,10 +449,19 @@ export function completeClaimChallenge(
       }),
     };
   }
+  // The closed window outranks challenge expiry (server order): both are 410,
+  // but only challenge expiry recovers with a fresh init, so a both-expired
+  // complete must report the final refusal.
   if (claimWindowClosed(project.createdAt)) {
     return {
       status: 410,
       body: errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+    };
+  }
+  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
+    return {
+      status: 410,
+      body: errorBody("proj.claim_expired", "the claim challenge has expired"),
     };
   }
 
