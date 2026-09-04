@@ -1,6 +1,34 @@
+import type { BoxAction } from "./box";
 import { serverKind } from "./oclif/server-kind";
 import type { ZitadelSecret } from "./project";
 import { publicCliCommand } from "./public-cli";
+
+/**
+ * Mirrors domain.ClaimWindow (internal/domain/claim.go): the server refuses
+ * `claim/init` and `claim/complete` with `proj.claim_window_expired` once the
+ * project is more than this many days old. Keep the two in sync — drift here
+ * shows as a wrong printed deadline, the enforcement stays server-side.
+ */
+export const CLAIM_WINDOW_DAYS = 14;
+
+/**
+ * The date after which the platform refuses to claim, from the project's
+ * creation time. Falls back to `now` when creation time is unknown, which is
+ * exact at setup time (the project was just created) and the only caller
+ * without a recorded creation time.
+ */
+export function claimWindowDeadline(createdAt: string | undefined, now = Date.now()): Date {
+  const base = createdAt === undefined ? now : Date.parse(createdAt);
+  return new Date((Number.isNaN(base) ? now : base) + CLAIM_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+}
+
+function deadlinePhrase(deadline?: Date): string {
+  const when =
+    deadline === undefined
+      ? `within ${CLAIM_WINDOW_DAYS} days of creation`
+      : `before ${deadline.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}`;
+  return `attach it ${when}, after that it can no longer be claimed`;
+}
 
 /**
  * Whether this project is attached to a team, as the CLI can tell locally.
@@ -74,16 +102,31 @@ export function claimState(input: {
  * The nudge for `next_actions`, quoting the command the way `journey-guidance`
  * does.
  *
- * Deliberately says nothing about deletion: unattached projects are framed as
- * temporary, but the epic's 14-day lifetime is not enforced anywhere yet, so
- * promising it would be a lie the product cannot keep.
+ * Names the claim window because the server now enforces it at claim time
+ * (`proj.claim_window_expired`); before that enforcement existed this copy
+ * deliberately promised nothing. It still says nothing about deletion, because
+ * nothing deletes the project when the window closes — it only stops being
+ * claimable (ADR 046 §Non-goals).
  */
-export function claimAction(cliVersion: string): string {
+export function claimAction(cliVersion: string, deadline?: Date): string {
   return (
-    "This project is temporary until you attach it to a team: run " +
-    `${publicCliCommand("claim", cliVersion)} to make it permanent. ` +
+    `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
+    `Run ${publicCliCommand("claim", cliVersion)} to make it permanent. ` +
     "Nothing about the project changes, so users, passkeys, and the issuer keep working."
   );
+}
+
+/**
+ * The same nudge for the human box, with the command on its own styled line.
+ */
+export function claimBoxAction(cliVersion: string, deadline?: Date): BoxAction {
+  return {
+    text:
+      `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
+      "Make it permanent now; nothing about the project changes, so users, passkeys, " +
+      "and the issuer keep working:",
+    command: publicCliCommand("claim", cliVersion),
+  };
 }
 
 /** The command for `next_commands`. */
