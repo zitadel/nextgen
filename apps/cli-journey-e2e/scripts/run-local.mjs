@@ -242,10 +242,10 @@ async function runFrameworkJourney(context) {
         NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
         // The claim spec completes in the embedded console, which needs a
         // platform project (claim/complete 401s without one) and the
-        // personal teams provisioned at session exchange. Framework lane
-        // only — the testkit lane's contract is a scrubbed, unconfigured
-        // binary. Reaches the server through prepare-app's `start` step env.
-        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
+        // personal teams provisioned at session exchange. Deliberately NOT
+        // exported here anymore: the CLI's own `start` launchers seed
+        // NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true by default, and this lane
+        // running env-free is the zero-config proof of that path.
         ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },
     });

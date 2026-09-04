@@ -164,6 +164,7 @@ export function claimWindowClosedAction(cliVersion: string): string {
   return (
     `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days ` +
     "of creation, so it can no longer be claimed. It keeps working as it is; " +
-    `to get a project you can attach, create a fresh one with ${publicCliCommand("setup", cliVersion)}.`
+    `to get a project you can attach, run ${publicCliCommand("setup", cliVersion)} ` +
+    "in a fresh directory (in this one it would just skip as already initialized)."
   );
 }
