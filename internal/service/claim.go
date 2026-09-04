@@ -134,12 +134,15 @@ func NewClaimService(v2Pool *DB, consoleBaseURL, platformProjectID string) Claim
 
 func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (*ClaimInitResult, error) {
 	var stmts claimStatements = s.v2Pool.Statements()
-	teamID, err := claimedTeamID(ctx, stmts, projectID)
+	project, teamID, err := claimedProjectState(ctx, stmts, projectID)
 	if err != nil {
 		return nil, err
 	}
 	if teamID != nil {
 		return nil, s.alreadyClaimedErr(projectID, *teamID)
+	}
+	if err := checkClaimWindow(project); err != nil {
+		return nil, err
 	}
 
 	plain, id, err := domain.NewClaimChallengeToken()
@@ -228,12 +231,15 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		// most one active owning-team row per project (ADR 054 §2), so the
 		// losing insert conflicts and Complete's caller-side handler below
 		// turns it into the same 409.
-		teamID, err := claimedTeamID(ctx, stmts, projectID)
+		project, teamID, err := claimedProjectState(ctx, stmts, projectID)
 		if err != nil {
 			return err
 		}
 		if teamID != nil {
 			return s.alreadyClaimedErr(projectID, *teamID)
+		}
+		if err := checkClaimWindow(project); err != nil {
+			return err
 		}
 		team, err := stmts.GetPersonalTeamForUser(ctx, s.platformProjectID, userID)
 		if err != nil {
@@ -282,7 +288,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		// claim race (authz_assignments_one_owning_team): the winner's grant
 		// committed first. Re-read it for the 409's owning-team details.
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			if teamID, terr := claimedTeamID(ctx, s.v2Pool.Statements(), projectID); terr == nil && teamID != nil {
+			if _, teamID, terr := claimedProjectState(ctx, s.v2Pool.Statements(), projectID); terr == nil && teamID != nil {
 				return nil, s.alreadyClaimedErr(projectID, *teamID)
 			}
 		}
@@ -294,27 +300,41 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 	return result, nil
 }
 
-// claimedTeamID resolves the claim state all three legs branch on: a missing
-// project is ErrProjectNotFound, an unclaimed project (no active owning-team
-// grant) is (nil, nil), a claimed project returns its owning team id.
+// claimedProjectState resolves the claim state all three legs branch on: a
+// missing project is ErrProjectNotFound, an unclaimed project (no active
+// owning-team grant) is (project, nil, nil), a claimed project returns its
+// owning team id. The loaded project rides along so callers can enforce the
+// claim window without a second read.
 // projectIsClaimed (event_claim.go) is deliberately not reused: events
 // visibility treats a missing project as unclaimed, while claim needs the 404
 // and the team id for the 409 details.
-func claimedTeamID(ctx context.Context, stmts claimedProjectStatements, projectID string) (*string, error) {
-	if _, err := stmts.GetProjectByID(ctx, projectID); err != nil {
+func claimedProjectState(ctx context.Context, stmts claimedProjectStatements, projectID string) (*domain.Project, *string, error) {
+	project, err := stmts.GetProjectByID(ctx, projectID)
+	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrProjectNotFound()
+			return nil, nil, domain.ErrProjectNotFound()
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to load project for claim")
+		return nil, nil, domain.ErrInternal(err).WithMessage("failed to load project for claim")
 	}
 	grant, err := stmts.GetActiveOwningTeamGrant(ctx, projectID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, nil
+			return project, nil, nil
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to load claim grant for project")
+		return nil, nil, domain.ErrInternal(err).WithMessage("failed to load claim grant for project")
 	}
-	return &grant.PrincipalID, nil
+	return project, &grant.PrincipalID, nil
+}
+
+// checkClaimWindow enforces the claim window at claim time: a project older
+// than domain.ClaimWindow can no longer be claimed (nothing is deleted when
+// the window closes, ADR 046 §Non-goals). Callers order it after the
+// already-claimed check so a claimed project keeps answering 409, not 410.
+func checkClaimWindow(project *domain.Project) error {
+	if time.Now().After(project.CreatedAt.Add(domain.ClaimWindow)) {
+		return domain.ErrProjectClaimWindowExpired()
+	}
+	return nil
 }
 
 func (s *claimService) alreadyClaimedErr(projectID, teamID string) error {
