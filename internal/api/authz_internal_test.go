@@ -416,6 +416,24 @@ func TestCredentialCeiling(t *testing.T) {
 		}
 	})
 
+	t.Run("empty home fails closed", func(t *testing.T) {
+		err := credentialCeiling(ScopeContext{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		}, "proj_customer")
+		if !errors.Is(err, errAuthzNoScope) {
+			t.Fatalf("got %v, want no scope", err)
+		}
+		err = credentialCeiling(ScopeContext{
+			Scope:         []string{"project.write", "project.read"},
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		}, "proj_a")
+		if !errors.Is(err, errAuthzNoScope) {
+			t.Fatalf("got %v, want no scope", err)
+		}
+	})
+
 	t.Run("project secret still needs write on own project", func(t *testing.T) {
 		err := credentialCeiling(ScopeContext{
 			ProjectID:     "proj_a",

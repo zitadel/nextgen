@@ -319,24 +319,22 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 }
 
 // credentialCeiling is the pre-resolver gate on the credential plane.
-// Project secrets still need project.write (preview stays denied). User
-// principals skip that ceiling; resolver.Check decides Allow / Forbidden /
-// NotFound (ADR 053 §5).
+// Empty home fails closed. Users skip the secret write ceiling; secrets
+// still need project.write (ADR 053 §5).
 func credentialCeiling(scope ScopeContext, targetProjectID string) error {
+	if scope.ProjectID == "" {
+		return errAuthzNoScope
+	}
 	if scope.PrincipalType == domain.AuthzPrincipalTypeUser {
-		if scope.ProjectID == "" {
-			return errAuthzNoScope
-		}
 		return nil
 	}
-	if !hasOperatorProjectWrite(scope.Scope) {
-		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
-		if scope.ProjectID == "" || scope.ProjectID != targetProjectID {
-			return errAuthzNoScope
-		}
-		return errAuthzPreviewDenied
+	if hasOperatorProjectWrite(scope.Scope) {
+		return nil
 	}
-	return nil
+	if scope.ProjectID != targetProjectID {
+		return errAuthzNoScope
+	}
+	return errAuthzPreviewDenied
 }
 
 // hasOperatorProjectWrite is the credential-plane ceiling: only the full
