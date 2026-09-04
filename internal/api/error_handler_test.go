@@ -110,6 +110,42 @@ func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
 	)
 }
 
+func TestSessionCookieOperationsExcludeDualSchemeGrants(t *testing.T) {
+	t.Parallel()
+	for _, op := range []api.OperationName{
+		api.CreateGrantOperation,
+		api.GetGrantOperation,
+		api.DeleteGrantOperation,
+	} {
+		if sessionCookieOperations[op] {
+			t.Fatalf("%s must stay off the session-only 401 rewrite allowlist", op)
+		}
+	}
+}
+
+func TestGrantErrorResponseShapes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		err    domain.Error
+		status int
+	}{
+		{"invalid", domain.ErrGrantInvalid(), http.StatusBadRequest},
+		{"not found", domain.ErrGrantNotFound(), http.StatusNotFound},
+		{"principal not found", domain.ErrGrantPrincipalNotFound(), http.StatusNotFound},
+		{"already exists", domain.ErrGrantAlreadyExists(), http.StatusConflict},
+		{"permission denied", domain.ErrGrantPermissionDenied(), http.StatusForbidden},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := grantErrorResponse(tc.err)
+			require.Equal(t, tc.status, got.StatusCode)
+			require.Equal(t, api.ErrorCode(tc.err.Code), got.Response.Code)
+		})
+	}
+}
+
 func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 	t.Parallel()
 

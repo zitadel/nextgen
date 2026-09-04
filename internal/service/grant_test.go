@@ -22,6 +22,7 @@ func TestGrantService_Create(t *testing.T) {
 	t.Parallel()
 
 	future := time.Now().Add(time.Hour)
+	past := time.Now().Add(-time.Minute)
 	userID := "user_grant01"
 	teamID := "team_grant01"
 
@@ -165,6 +166,70 @@ func TestGrantService_Create(t *testing.T) {
 				Relation:      "viewer",
 			},
 			wantErr: domain.ErrGrantInvalid(),
+		},
+		{
+			name: "expires_at in the past",
+			input: service.CreateGrantInput{
+				ProjectID:     "proj_customer",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   userID,
+				Relation:      "viewer",
+				ExpiresAt:     &past,
+			},
+			wantErr: domain.ErrGrantInvalid(),
+		},
+		{
+			name: "principal kind mismatch",
+			input: service.CreateGrantInput{
+				ProjectID:     "proj_customer",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   userID,
+				Relation:      "viewer",
+			},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
+					ResourceID:   userID,
+					ResourceKind: domain.ResourceKindTeam,
+					ProjectID:    grantPlatformProjID,
+				}, nil)
+			},
+			wantErr: domain.ErrGrantPrincipalNotFound(),
+		},
+		{
+			name: "principal home is not the platform project",
+			input: service.CreateGrantInput{
+				ProjectID:     "proj_customer",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   userID,
+				Relation:      "viewer",
+			},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
+					ResourceID:   userID,
+					ResourceKind: domain.ResourceKindUser,
+					ProjectID:    "proj_other",
+				}, nil)
+			},
+			wantErr: domain.ErrGrantPrincipalNotFound(),
+		},
+		{
+			name: "inactive team",
+			input: service.CreateGrantInput{
+				ProjectID:     "proj_customer",
+				PrincipalType: domain.AuthzPrincipalTypeTeam,
+				PrincipalID:   teamID,
+				Relation:      "editor",
+			},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetResourceScope(gomock.Any(), teamID).Return(&domain.ResourceScope{
+					ResourceID:   teamID,
+					ResourceKind: domain.ResourceKindTeam,
+					ProjectID:    grantPlatformProjID,
+				}, nil)
+				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
+					Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrGrantPrincipalNotFound(),
 		},
 	}
 
@@ -330,6 +395,38 @@ func TestGrantService_Get(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
+}
+
+func TestGrantService_Revoke_EventUsesAssignmentProject(t *testing.T) {
+	t.Parallel()
+
+	homeTeam := "team_home"
+	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
+		ProjectID: "proj_platform",
+		TeamID:    &homeTeam,
+	})
+	var got *domain.Event
+	svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+		s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(&domain.AuthzAssignment{
+			ID:            "asgn_1",
+			ProjectID:     "proj_customer",
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_grant01",
+			ObjectType:    "project",
+			Relation:      "viewer",
+		}, nil)
+		s.EXPECT().RevokeAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(nil)
+		s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, ev *domain.Event) error {
+				got = ev
+				return nil
+			})
+	})
+	require.NoError(t, svc.Revoke(ctx, "proj_customer", "asgn_1"))
+	require.NotNil(t, got)
+	assert.Equal(t, domain.EventTypeAuthzRevoked, got.EventType)
+	assert.Equal(t, "proj_customer", got.ProjectID)
+	assert.Nil(t, got.TeamID)
 }
 
 func TestGrantService_Revoke(t *testing.T) {
