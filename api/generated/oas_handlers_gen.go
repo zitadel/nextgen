@@ -997,11 +997,15 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 
 // handleCreateFlowDefinitionRequest handles createFlowDefinition operation.
 //
-// Creates a new flow definition.
+// Publishes a new flow definition revision.
 // Flow definitions are templates that define the sequence of steps (capabilities)
 // for a particular user journey (e.g., registration, login, password reset).
 // Flow definitions are created based on the flow definition schema, which includes the flow's
 // purpose, audience, and the steps involved.
+// Every call allocates a new opaque id. Revisions of one flow share its
+// `name`; posting a definition under an existing `name` publishes a new
+// revision of that flow, it is not a conflict. List with `name` to see a
+// flow's revisions, newest by creation time first.
 //
 // POST /flow_definitions
 func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -8367,8 +8371,9 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 
 // handleListFlowDefinitionsRequest handles listFlowDefinitions operation.
 //
-// Retrieves a list of all flow definitions.
+// Retrieves a list of all flow definitions, newest by creation time first.
 // This endpoint can be used to view existing flow definitions and their configurations.
+// Filter by `name` to list the revisions of one flow.
 //
 // GET /flow_definitions
 func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -8525,6 +8530,10 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 					Name: "purpose",
 					In:   "query",
 				}: params.Purpose,
+				{
+					Name: "name",
+					In:   "query",
+				}: params.Name,
 				{
 					Name: "expand",
 					In:   "query",
