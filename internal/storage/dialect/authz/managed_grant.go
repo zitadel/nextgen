@@ -8,9 +8,10 @@ import (
 )
 
 // ManagedGrantListConjunct is ANDed into the managed-grants list SELECT so
-// setup (sk_proj) and owning-team (relation=team) rows cannot leak into a
-// page. Literals are portable across postgres, sqlite, and spanner.
-const ManagedGrantListConjunct = `revoked_at IS NULL AND object_type = 'project' AND principal_type IN ('user', 'team') AND relation IN ('viewer', 'editor', 'admin')`
+// setup (sk_proj), owning-team (relation=team), app-group catalog, and
+// team/resource-scoped system rows cannot leak into a page. Literals are
+// portable across postgres, sqlite, and spanner.
+const ManagedGrantListConjunct = `revoked_at IS NULL AND object_type = 'project' AND principal_type IN ('user', 'team') AND relation IN ('viewer', 'editor', 'admin') AND catalog_id = '` + domain.SystemCatalogID + `' AND scope_kind = 'project'`
 
 // ScopeManagedGrantList ANDs project_id into opts so ListManagedGrants cannot
 // list across projects even if a caller omits that filter.

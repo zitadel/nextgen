@@ -3,6 +3,7 @@
 package stmttest
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/authz/compiler"
+	"github.com/zitadel/nextgen/internal/authz/openfga"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -119,6 +122,25 @@ func TestAuthzAssignmentStatements_ListManagedGrants(t *testing.T) {
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewSKProjProjectSetupAssignment(projectID)))
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(projectID, teamID)))
 
+		teamScoped := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_ts_"+uniqueSuffix(t), "project", "viewer", domain.NewTeamAssignmentScope(teamID))
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), teamScoped))
+
+		model, err := openfga.ParseDSL(sampleCatalogOpenFGAModel)
+		require.NoError(t, err)
+		output, err := compiler.Compile(model)
+		require.NoError(t, err)
+		appCatalogID := fmt.Sprintf("cat_app_%s", uniqueSuffix(t))
+		require.NoError(t, d.stmts.PersistCatalogVersion(t.Context(), domain.AuthzCatalogVersion{
+			ID: appCatalogID, CatalogKind: domain.AuthzCatalogKindAppGroup, OwnerID: "owner_" + uniqueSuffix(t), Version: 1,
+		}, output.Catalog))
+		appGrant := &domain.AuthzAssignment{
+			ProjectID: projectID, CatalogID: appCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "user_app_" + uniqueSuffix(t),
+			ObjectType: "project", Relation: "viewer",
+		}
+		appGrant.ApplyScope(domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), appGrant))
+
 		listed, err := d.stmts.ListManagedGrants(t.Context(), projectID, &database.ListOptions[domain.AuthzAssignmentField]{
 			Pagination: database.Page[domain.AuthzAssignmentField]{
 				Limit: 20,
@@ -138,6 +160,8 @@ func TestAuthzAssignmentStatements_ListManagedGrants(t *testing.T) {
 		assert.Contains(t, got, teamGrant.ID)
 		assert.Contains(t, got, expiredGrant.ID)
 		assert.NotContains(t, got, revokedGrant.ID)
+		assert.NotContains(t, got, teamScoped.ID)
+		assert.NotContains(t, got, appGrant.ID)
 		assert.Len(t, listed.Items, 3)
 
 		otherProject := ensureProject(t, d.stmts)
