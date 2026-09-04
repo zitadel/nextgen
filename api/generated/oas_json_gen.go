@@ -37865,6 +37865,38 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundGetReleaseByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelPermissionDeniedGetReleaseByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.permission_denied")
+		{
+			s := s.RelPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetReleaseByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -37913,6 +37945,12 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetReleaseByIdErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundGetReleaseByIdErrorResponse
+					found = true
+				case "rel.permission_denied":
+					s.Type = RelPermissionDeniedGetReleaseByIdErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetReleaseByIdErrorResponse
 					found = true
@@ -37936,6 +37974,14 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalGetReleaseByIdErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundGetReleaseByIdErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelPermissionDeniedGetReleaseByIdErrorResponse:
+		if err := s.RelPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetReleaseByIdErrorResponse:
@@ -42155,6 +42201,38 @@ func (s ListReleasesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundListReleasesErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelPermissionDeniedListReleasesErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.permission_denied")
+		{
+			s := s.RelPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListReleasesErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -42203,6 +42281,12 @@ func (s *ListReleasesErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListReleasesErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundListReleasesErrorResponse
+					found = true
+				case "rel.permission_denied":
+					s.Type = RelPermissionDeniedListReleasesErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListReleasesErrorResponse
 					found = true
@@ -42226,6 +42310,14 @@ func (s *ListReleasesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalListReleasesErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundListReleasesErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelPermissionDeniedListReleasesErrorResponse:
+		if err := s.RelPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidListReleasesErrorResponse:
