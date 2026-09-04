@@ -161,16 +161,14 @@ describe("status command", () => {
   });
 
   // The project lives wherever `zitadel.json` says, not wherever this
-  // invocation is pointed: the `--server` flag retargets the health probe
-  // only. Self-hosted is the no-teams case; a local project nudges like a
-  // cloud one because the local server hosts its own claim page.
-  it("omits claim state for a self-hosted project, whatever --server says", async () => {
+  // invocation is pointed: `--server local` retargets the health probe only.
+  it("omits claim state for a local project, whatever --server says", async () => {
     const cwd = await makeProject();
     await writeFile(
       join(cwd, "zitadel.json"),
       JSON.stringify({
         project: "proj-001",
-        server: "https://zitadel.example.com",
+        server: "http://localhost:8080",
         environments: { development: { issuer: "http://localhost:3000" } },
       }),
     );

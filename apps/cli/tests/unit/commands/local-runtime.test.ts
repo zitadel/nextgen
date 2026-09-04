@@ -374,11 +374,6 @@ describe("local runtime commands", () => {
         logs: expect.stringContaining("fake zitadel server listening"),
       },
     });
-    // Zero-config claim journey: the launcher itself must seed the platform
-    // project, without the caller exporting any NEXTGEN_* env.
-    expect((parseJson(logs.stdout) as { data: { logs: string } }).data.logs).toContain(
-      "platform bootstrap=true",
-    );
 
     const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
     expect(stop.exitCode).toBe(0);
@@ -460,9 +455,6 @@ describe("local runtime commands", () => {
     expect(runCall).toBeDefined();
     expect(runCall?.join(" ")).toContain(`${localRuntimePaths(cwd).dataDir}:${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).toContain(`NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
-    // Zero-config claim journey: the launcher itself must seed the platform
-    // project, without the caller exporting any NEXTGEN_* env.
-    expect(runCall?.join(" ")).toContain("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true");
     expect(runCall?.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
     expect(runCall?.at(-1)).toBe(await expectedDefaultImage());
   });
@@ -842,10 +834,7 @@ const server = http.createServer((req, res) => {
   res.writeHead(404).end();
 });
 server.listen(port, "localhost", () => {
-  console.log(
-    "fake zitadel server listening " + port +
-    " platform bootstrap=" + (process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT || "unset"),
-  );
+  console.log("fake zitadel server listening " + port);
 });
 process.on("SIGTERM", () => {
   server.close(() => process.exit(0));

@@ -232,10 +232,12 @@ the CLI's help layer, not the envelope.
   `claim` check. A project with no team is only ever a **warning**, never a
   failure — it works exactly like one with a team, so `doctor` still exits 0
   and `--fix` deliberately does nothing (a claim needs a human in a browser).
-  All three stay silent about teams when the project's `server` in
-  `zitadel.json` is self-hosted, where the CLI cannot know a platform exists.
-  A CLI-launched local server hosts its own platform project and claim page,
-  so local projects get the same nudges as cloud ones.
+  `status` and `doctor` stay silent about teams off the cloud: they answer
+  offline and cannot know whether a local or self-hosted server hosts a
+  platform to claim into. `setup` is online anyway, so against a local server
+  it probes the runtime document and nudges only when the server hosts the
+  platform plane (`platform.bootstrap_project`), where the claim can actually
+  complete.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.

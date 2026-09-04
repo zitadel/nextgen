@@ -1057,22 +1057,14 @@ describe("ClaimCheck", () => {
 
   // Local and self-hosted servers have no platform team, so there is nothing to
   // nudge toward and a warning would be permanent noise.
-  it("passes without a nudge on a self-hosted server", async () => {
-    const cwd = await makeProject();
-    await writeServer(cwd, "https://zitadel.example.com");
-    const outcome = await new ClaimCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("pass");
-    expect(outcome.message).not.toContain("temporary");
-  });
-
-  // The local server hosts its own platform project and claim page, so the
-  // local dev loop warns exactly like the cloud.
-  it("warns for a local project with no owning team", async () => {
-    const cwd = await makeProject();
-    await writeServer(cwd, "http://localhost:8080");
-    const outcome = await new ClaimCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("temporary until you attach it to a team");
+  it("passes without a nudge off the cloud", async () => {
+    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
+      const cwd = await makeProject();
+      await writeServer(cwd, server);
+      const outcome = await new ClaimCheck().run(ctxFor(cwd));
+      expect(outcome.status).toBe("pass");
+      expect(outcome.message).not.toContain("temporary");
+    }
   });
 
   // Nothing wraps a throw from this check (it implements SanityCheck directly),
