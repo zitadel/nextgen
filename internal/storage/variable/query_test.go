@@ -81,9 +81,9 @@ func TestToDomain_MapsRowsInOrder(t *testing.T) {
 	t.Parallel()
 
 	rows := []*variable.VariableStorage{
-		{Name: "a.variable", ProjectID: "project-1", Value: "a-project"},
-		{Name: "a.variable", ProjectID: "project-1", TeamID: "team-1", Value: "a-team", IsSecret: true},
-		{Name: "b.variable", ProjectID: "project-1", Value: "b-project"},
+		{Name: "a_variable", ProjectID: "project-1", Value: "a-project"},
+		{Name: "a_variable", ProjectID: "project-1", TeamID: "team-1", Value: "a-team", IsSecret: true},
+		{Name: "b_variable", ProjectID: "project-1", Value: "b-project"},
 	}
 
 	got := variable.ToDomain(rows)
@@ -93,7 +93,7 @@ func TestToDomain_MapsRowsInOrder(t *testing.T) {
 	assert.Equal(t, []any{"a-project", "a-team", "b-project"},
 		[]any{got[0].Value, got[1].Value, got[2].Value})
 
-	assert.Equal(t, "a.variable", got[1].Name)
+	assert.Equal(t, "a_variable", got[1].Name)
 	assert.Equal(t, domain.VariableOwner{ProjectID: "project-1", TeamID: "team-1"}, got[1].Owner)
 	assert.Equal(t, "a-team", got[1].Value)
 	assert.True(t, got[1].IsSecret)

@@ -5,6 +5,7 @@ package stmttest
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,14 +28,19 @@ func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixtu
 	suffix := uniqueSuffix(t)
 	projectID := "proj-var-" + suffix
 
-	// The variables table carries no foreign key to projects (a root-level
-	// variable stores '' rather than a project id), but a real project keeps the
-	// fixture honest about what an owner id looks like.
+	// project_id is a real foreign key, so the project has to exist before a
+	// variable can name it. A real one also keeps the fixture honest about what
+	// an owner id looks like.
 	require.NoError(t, stmts.CreateProject(t.Context(), newTestProject(projectID)))
 	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
+	// A name is what a document references, so it has to be one the placeholder
+	// syntax can address: \w only, which the suffix's separator is not.
+	name := "login_appearance_" + strings.ReplaceAll(suffix, "-", "_")
+	require.Regexp(t, domain.NameRegex, name, "the fixture must use a referenceable name")
+
 	return variableFixture{
-		name: "login.appearance." + suffix,
+		name: name,
 		requester: domain.VariableOwner{
 			ProjectID:       projectID,
 			EnvironmentName: "env-var-" + suffix,
@@ -242,7 +248,7 @@ func TestVariablesNameFilter(t *testing.T) {
 		owner := f.ownerAt(levelProject)
 		f.set(t, d.stmts, owner, "wanted", false)
 
-		other := variableFixture{name: f.name + ".other", requester: f.requester}
+		other := variableFixture{name: f.name + "_other", requester: f.requester}
 		other.set(t, d.stmts, owner, "unwanted", false)
 
 		byName, err := d.stmts.GetVariables(t.Context(), f.requester, f.name)

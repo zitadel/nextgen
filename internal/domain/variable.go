@@ -15,8 +15,13 @@ func ErrVariableNotFound() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("not_found"), "variable: not found", nil, nil)
 }
 
+// The message stays a literal: gen_error_schemas reads it straight off the AST
+// and skips any error whose message it cannot, which leaves the code in the
+// catalog with no schema file for the generated $ref to resolve. The pattern
+// travels in the details instead.
 func ErrInvalidVariableName() Error {
-	return newError(PrefixVariable.ErrorCodePrefix("invalid_name"), fmt.Sprintf("variable name is not valid (%s)", NameRegex), nil, nil)
+	return newError(PrefixVariable.ErrorCodePrefix("invalid_name"), "the name of the variable is invalid",
+		map[string]string{"pattern": NameRegex.String()}, nil)
 }
 
 func ErrInvalidVariableValue() Error {
