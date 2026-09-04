@@ -48,26 +48,46 @@ import (
 func NewCommand() *cobra.Command {
 	var configPath string
 	var userFiles []string
+	var applyMigrations bool
 
-	cmd := &cobra.Command{
-		Use:   "server",
-		Short: "Run the server",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(configPath)
-			if err != nil {
-				return err
-			}
-			return run(cmd.Context(), cfg, userFiles)
-		},
+	runServer := func(cmd *cobra.Command, _ []string) error {
+		cfg, err := loadConfig(configPath)
+		if err != nil {
+			return err
+		}
+		return run(cmd.Context(), cfg, userFiles, applyMigrations)
 	}
 
-	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
-	cmd.Flags().StringArrayVar(&userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
+	root := &cobra.Command{
+		Use:           "nextgen",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	root.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
+	addServerFlags(root, &applyMigrations, &userFiles)
 
-	return cmd
+	serverCmd := &cobra.Command{
+		Use:           "server",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	addServerFlags(serverCmd, &applyMigrations, &userFiles)
+
+	root.AddCommand(serverCmd)
+	root.AddCommand(newMigrateCommand(&configPath))
+	return root
 }
 
-func run(ctx context.Context, cfg Config, userFiles []string) error {
+func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]string) {
+	cmd.Flags().BoolVar(applyMigrations, "migrate", false, "Apply database migrations before serving")
+	cmd.Flags().StringArrayVar(userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
+}
+
+func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) error {
 	var err error
 	sfs := &ShutdownFuncs{}
 	defer func() {
@@ -99,7 +119,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
 
-	pool, err := startDatabase(ctx, cfg)
+	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
 		return err
 	}
@@ -605,16 +625,24 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 
 // ----------------------------- STORAGE --------------------------------------
 
-func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
+func connectDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
 	dialect, err := buildDatabaseDialect(cfg)
 	if err != nil {
 		return nil, err
 	}
-	pool, err := database.Connect(ctx, dialect)
+	return database.Connect(ctx, dialect)
+}
+
+func startDatabase(ctx context.Context, cfg Config, applyMigrations bool) (database.Pool, error) {
+	pool, err := connectDatabase(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	if !applyMigrations {
+		return pool, nil
+	}
 	if err := pool.Migrate(ctx); err != nil {
+		_ = pool.Close(ctx)
 		return nil, err
 	}
 	return pool, nil

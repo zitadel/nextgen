@@ -6,7 +6,7 @@ import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
 import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const args = forwardedArgs();
+const args = withServerMigrateArgs(forwardedArgs());
 const out = "dist/server/nextgen-debug";
 
 // -gcflags "all=-N -l": disable compiler optimisations (-N) and inlining (-l) so the
@@ -25,7 +25,9 @@ try {
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
-    await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
+    if (args[0] !== "migrate" && args[0] !== "completion") {
+      await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
+    }
     await run("go", buildArgs, { cwd: repoRoot });
     await runBinary(`./${out}`, args, repoRoot);
   }
@@ -84,6 +86,16 @@ async function runBinary(command, binaryArgs, cwd) {
 
 function isHelp(a) {
   return a.includes("--help") || a.includes("-h") || a[0] === "help";
+}
+
+function withServerMigrateArgs(args) {
+  if (isHelp(args) || args.includes("--migrate")) {
+    return args;
+  }
+  if (args[0] === "migrate" || args[0] === "completion") {
+    return args;
+  }
+  return [...args, "--migrate"];
 }
 
 function helpArgs(a) {

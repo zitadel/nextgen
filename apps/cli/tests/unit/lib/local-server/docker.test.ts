@@ -18,6 +18,10 @@ describe("local server Docker helpers", () => {
     expect(dockerfile).toContain(`ENV NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
     // The declared USER is what makes the default location unwritable.
     expect(dockerfile).toContain("USER 65532:65532");
+    // Bare `docker run` must still migrate; the image CMD is how smoke-container
+    // and `zitadel start --runtime docker` keep applying schema after --migrate
+    // defaulted off on the binary.
+    expect(dockerfile).toContain('CMD ["--migrate"]');
   });
 
   it("builds the single-container run command without an explicit encryption key", () => {
