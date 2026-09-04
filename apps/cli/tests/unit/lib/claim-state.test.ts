@@ -119,14 +119,16 @@ describe("claim copy", () => {
     expect(box.text).not.toContain("npx");
   });
 
-  // The closed-window counterpart must not quote the claim command anywhere:
-  // the server is guaranteed to refuse it, so the only honest pointer is a
-  // fresh setup.
-  it("drops the claim command once the window has closed", () => {
+  // The closed-window counterpart stays reconciliatory: the local record can
+  // be stale (claimed from another machine reads detached), so it keeps
+  // quoting the claim command as the safe authoritative check alongside the
+  // fresh-setup pointer.
+  it("frames a closed window as reconciliation, not a verdict", () => {
     const closed = claimWindowClosedAction("0.1.0");
+    expect(closed).toContain("claim window has closed");
+    expect(closed).toContain("npx @zitadel/cli@latest claim");
     expect(closed).toContain("no longer be claimed");
     expect(closed).toContain("npx @zitadel/cli@latest setup");
-    expect(closed).not.toContain("claim ");
     expect(closed).not.toMatch(/delete|removed|expire/i);
   });
 

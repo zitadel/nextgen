@@ -41,11 +41,14 @@ export type ClaimState =
   | { kind: "attached"; team_id: string; claimed_at: string }
   /**
    * `claimable` classifies the claim window from the locally recorded
-   * creation time: once it has passed, the server refuses the claim, so
-   * nudges must stop advertising `zitadel claim`. Lenient on an unknown or
-   * unparsable creation time (claimable, no deadline) because the server is
-   * the enforcer and the CLI only advises. `deadline` is the ISO date the
-   * window closes, when the creation time is known.
+   * creation time: once it has passed, nudges switch to reconciliation
+   * wording (claimWindowClosedAction). Never proof of anything: the local
+   * record can be stale (a project claimed from another machine still reads
+   * detached), so the claim command stays advertised as the safe check —
+   * the server resolves the grant before the window. Lenient on an unknown
+   * or unparsable creation time (claimable, no deadline) because the server
+   * is the enforcer and the CLI only advises. `deadline` is the ISO date
+   * the window closes, when the creation time is known.
    */
   | { kind: "detached"; claimable: boolean; deadline?: string }
   | { kind: "not-applicable" };
@@ -158,15 +161,22 @@ export function claimCommand(cliVersion: string): string {
 }
 
 /**
- * The nudge's counterpart for a closed claim window: the server refuses the
- * claim now, so this deliberately quotes no claim command anywhere; callers
- * must also keep `zitadel claim` out of `next_commands` alongside it.
+ * The nudge's counterpart for a closed claim window. Deliberately framed as
+ * reconciliation, not a verdict: the local record can be stale in one
+ * direction (a project claimed from another machine still reads detached
+ * here), so "window closed" from local data alone must not send the user off
+ * to duplicate a project that is already attached and working. Running
+ * `zitadel claim` is safe either way — the server checks the grant before
+ * the window, so an attached project answers with a clean already-claimed
+ * skip, and only a genuinely unattached one gets the final refusal.
  */
 export function claimWindowClosedAction(cliVersion: string): string {
   return (
-    `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days ` +
-    "of creation, so it can no longer be claimed. It keeps working as it is; " +
-    `to get a project you can attach, run ${publicCliCommand("setup", cliVersion)} ` +
-    "in a fresh directory (in this one it would just skip as already initialized)."
+    `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
+    `closed. Run ${publicCliCommand("claim", cliVersion)} to reconcile: if the project ` +
+    "was attached to a team from another machine it confirms that, and if it was never " +
+    "attached it can no longer be claimed. Either way the project keeps working; " +
+    `${publicCliCommand("setup", cliVersion)} in a fresh directory gets you a new ` +
+    "project you can attach."
   );
 }

@@ -197,10 +197,11 @@ describe("doctor command", () => {
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
-  // Same advisory posture, opposite guidance: past the 14-day window the
-  // server refuses the claim, so suggesting the command would be a guaranteed
-  // failure.
-  it("stops advertising claim once the window has closed", async () => {
+  // Same advisory posture, reconciliation wording: past the 14-day window
+  // the warning explains both outcomes, and the claim command stays
+  // suggested because the local record can be stale (claimed from another
+  // machine reads detached) and running claim answers authoritatively.
+  it("switches to reconciliation wording once the window has closed", async () => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
 
@@ -213,9 +214,9 @@ describe("doctor command", () => {
     expect(json.data.ok).toBe(true);
     const claim = json.data.checks.find((check) => check.name === "claim");
     expect(claim?.status).toBe("warn");
-    expect(claim?.message).toContain("no longer be claimed");
-    expect((json.data.next_actions ?? []).join("\n")).toContain("no longer be claimed");
-    expect(json.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim"));
+    expect(claim?.message).toContain("claim window has closed");
+    expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
+    expect(json.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim"));
   });
 
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The

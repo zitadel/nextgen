@@ -1034,16 +1034,19 @@ describe("ClaimCheck", () => {
     expect(outcome.details).toEqual({ claimable: true });
   });
 
-  // Past the window the server refuses the claim, so the warning must stop
-  // pointing at `zitadel claim` and flag the closed window in its details for
-  // the doctor advisory.
-  it("switches to fresh-setup wording once the claim window has closed", async () => {
+  // Past the window the warning flips to reconciliation wording but keeps
+  // pointing at `zitadel claim`: the local record can be stale (claimed from
+  // another machine reads detached) and the server resolves the grant before
+  // the window, so the command is the safe authoritative check. The closed
+  // window still travels in details for the doctor advisory.
+  it("switches to reconciliation wording once the claim window has closed", async () => {
     const cwd = await makeProject();
     await writeSecret(cwd, { created_at: "2026-01-01T00:00:00.000Z" });
     const outcome = await new ClaimCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("claim window has closed");
+    expect(outcome.message).toContain("zitadel claim");
     expect(outcome.message).toContain("no longer be claimed");
-    expect(outcome.message).not.toContain("zitadel claim");
     expect(outcome.details).toEqual({ claimable: false });
   });
 
