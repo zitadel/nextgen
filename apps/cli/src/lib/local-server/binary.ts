@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { ZitadelError } from "../errors";
 import {
   type BinaryRuntimeMetadata,
+  LAUNCH_CONTRACT,
   type RuntimeMetadata,
   checkLocalServerHealth,
 } from "./runtime";
@@ -64,15 +65,28 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
+    // The platform config below is the CLI's to own for its managed runtime:
+    // an ambient project pin (`platform.project_id`) combined with the forced
+    // bootstrap would fail the server's config validation for any id other
+    // than the built-in one, and there is no reason to pin anything on a
+    // data dir only this CLI provisions.
+    const { NEXTGEN_PLATFORM_PROJECT_ID: _inheritedProjectPin, ...inheritedEnv } = process.env;
     const child = spawn(command.command, command.args, {
       detached: true,
       env: {
-        ...process.env,
+        ...inheritedEnv,
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
         // Browser-facing URLs (claim, dashboard) must point at this local
         // server, not the cloud default the server config falls back to.
         NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
+        // The platform project hosts the console's own sign-in and the
+        // personal teams a claim attaches to. Without it the console falls
+        // back to the app's own project: the claim page's sign-in is then
+        // rejected on origin and `claim/complete` refuses every session, while
+        // the CLI waits out the link. A CLI-owned data dir is the one place
+        // enabling it is safe — nothing else provisions projects there.
+        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
       },
       stdio: ["ignore", log.fd, log.fd],
     });
@@ -82,6 +96,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
     }
     return {
       schema_version: 1,
+      launch_contract: LAUNCH_CONTRACT,
       backend: "binary",
       pid: child.pid,
       command: [command.command, ...command.args].join(" "),

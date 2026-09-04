@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { claimDeadline } from "../../../src/commands/claim";
+import { claimDeadline, claimLinkNarration, originOf } from "../../../src/commands/claim";
 
 const NOW = Date.parse("2026-08-04T12:00:00.000Z");
 const TEN_MINUTES = 10 * 60 * 1000;
@@ -50,5 +50,41 @@ describe("claimDeadline", () => {
     for (const input of cases) {
       expect(Number.isFinite(claimDeadline(input))).toBe(true);
     }
+  });
+});
+
+describe("claim link narration", () => {
+  const claimUrl = "https://console.example/claim?challenge_id=ch_1&project_id=proj_1";
+
+  it("carries the link and a parsed expiry", () => {
+    const text = claimLinkNarration({ claim_url: claimUrl, expires_at: "2026-09-03T22:54:42Z" });
+    expect(text).toContain(`Finish in your browser: ${claimUrl}`);
+    expect(text).toContain("The link expires at 2026-09-03T22:54:42.000Z.");
+  });
+
+  // `claimDeadline` falls back to the documented TTL for an unparseable
+  // `expires_at`; echoing the raw value would promise a time the poll does
+  // not honour, so the narration drops it instead.
+  it("omits an expiry the poll would not honour", () => {
+    for (const expiresAt of ["soon", "", undefined]) {
+      const text = claimLinkNarration({ claim_url: claimUrl, expires_at: expiresAt });
+      expect(text).toContain(claimUrl);
+      expect(text).not.toContain("expires at");
+    }
+  });
+});
+
+describe("origin of a claim link", () => {
+  it("names the origin of a well-formed link", () => {
+    expect(originOf("https://nextgen.zitadel.cloud/ui/console/claim?x=1")).toBe(
+      "https://nextgen.zitadel.cloud",
+    );
+  });
+
+  // The wrong-origin warning must never be the reason a claim run crashes:
+  // a link that does not parse is named as-is and the command carries on.
+  it("falls back to the raw value when the link does not parse", () => {
+    expect(originOf("/claim?challenge_id=ch_1")).toBe("/claim?challenge_id=ch_1");
+    expect(originOf("not a url")).toBe("not a url");
   });
 });

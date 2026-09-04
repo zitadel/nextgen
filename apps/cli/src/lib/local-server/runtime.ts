@@ -21,6 +21,22 @@ export const CONTAINER_HTTP_PORT = 8080;
 
 export type RuntimeBackend = "binary" | "docker";
 
+/**
+ * The launch contract: the environment the CLI hands the server when it
+ * starts a runtime, versioned so `start` can tell a runtime that is merely
+ * healthy from one that is healthy *and* launched the way the current CLI
+ * launches it. A running process cannot pick up a new variable, so a change
+ * to that environment is invisible to the health probe alone — the runtime
+ * keeps answering `/healthz` while the feature that needed the variable stays
+ * broken. Bump this whenever the launch environment changes in a way an
+ * already-running runtime must be restarted to receive; `start` then restarts
+ * runtimes recorded under an older (or no) contract, keeping their data dir.
+ *
+ * 1 — `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true`: the platform project the
+ *     console's sign-in and `zitadel claim` need.
+ */
+export const LAUNCH_CONTRACT = 1;
+
 type RuntimeMetadataBase = {
   schema_version: 1;
   backend: RuntimeBackend;
@@ -29,6 +45,12 @@ type RuntimeMetadataBase = {
   data_dir: string;
   created_at: string;
   cli_version: string;
+  /**
+   * The {@link LAUNCH_CONTRACT} the runtime was started under. Absent on
+   * records written by CLIs that predate the marker, which is exactly what
+   * makes those runtimes restart on the next `start`.
+   */
+  launch_contract?: number;
 };
 
 export type BinaryRuntimeMetadata = RuntimeMetadataBase & {
@@ -280,6 +302,13 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     data_dir: input.data_dir,
     created_at: input.created_at,
     cli_version: input.cli_version,
+    // Optional so records from older CLIs still parse; anything that is not
+    // a positive integer reads as "no contract", i.e. restart on `start`.
+    ...(typeof input.launch_contract === "number" &&
+    Number.isInteger(input.launch_contract) &&
+    input.launch_contract > 0
+      ? { launch_contract: input.launch_contract }
+      : {}),
   };
 
   if (backend === "binary") {
@@ -390,6 +419,17 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
 
 export function isRuntimeObject(value: unknown): value is RuntimeMetadata {
   return isObject(value) && value.schema_version === 1;
+}
+
+/**
+ * Whether a recorded runtime was launched under the current
+ * {@link LAUNCH_CONTRACT}, and so may be reused by `start` rather than
+ * restarted. A record without the marker was written by a CLI that predates
+ * it; a higher value comes from a newer CLI and is treated the same way, since
+ * this CLI cannot know what that launch environment contained.
+ */
+export function hasCurrentLaunchContract(metadata: RuntimeMetadata | undefined): boolean {
+  return metadata?.launch_contract === LAUNCH_CONTRACT;
 }
 
 function isValidPort(value: number): boolean {

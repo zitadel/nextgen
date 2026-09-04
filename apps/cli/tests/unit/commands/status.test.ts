@@ -53,13 +53,13 @@ afterEach(async () => {
   }
 });
 
-async function configuredProject(): Promise<string> {
+async function configuredProject(server = "https://api.zitadel.cloud"): Promise<string> {
   const cwd = await makeProject();
   await writeFile(
     join(cwd, "zitadel.json"),
     JSON.stringify({
       project: "proj-001",
-      server: "https://api.zitadel.cloud",
+      server,
       environments: { development: { issuer: "http://localhost:3000" } },
     }),
   );
@@ -130,6 +130,29 @@ describe("status command", () => {
     });
     expect(json.data.next_actions.join("\n")).not.toContain("temporary until you attach");
     expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // The local runtime carries the platform project and can take a claim. The
+  // team `zitadel claim` recorded is a fact wherever the project lives; only
+  // the nudge for a missing team is cloud-only.
+  it("reports the owning team on a local server too", async () => {
+    const cwd = await configuredProject("http://localhost:8080");
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({ ...SECRET, claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" }),
+    );
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: { project: { claim?: { kind: string; team_id?: string } }; next_actions: string[] };
+    };
+    expect(json.data.project.claim).toEqual({
+      kind: "attached",
+      team_id: "team-001",
+      claimed_at: "2026-01-02T00:00:00.000Z",
+    });
+    expect(json.data.next_actions.join("\n")).not.toContain("temporary until you attach");
   });
 
   // The project lives wherever `zitadel.json` says, not wherever this

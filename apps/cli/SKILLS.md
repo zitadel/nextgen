@@ -209,7 +209,10 @@ the CLI's help layer, not the envelope.
   `status: "skipped"` with `reason: "already-claimed"`, so agents can retry
   safely. The link is always printed before any browser opens, so a headless
   machine, an SSH session, or `--no-open` needs no special handling — copy it
-  and open it anywhere. Links last 10 minutes; once one lapses the command
+  and open it anywhere. Under `--json` the link and its expiry go to **stderr**
+  (stdout stays the single envelope), so capture stderr and hand the link to a
+  human; the command keeps blocking until they finish or the link lapses.
+  Links last 10 minutes; once one lapses the command
   exits `E_VALIDATION` and points at a fresh run. `--dry-run` stops before
   anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
   there is nothing to preview, because a claim is decided in a browser.
@@ -223,19 +226,25 @@ the CLI's help layer, not the envelope.
   `claim` check. A project with no team is only ever a **warning**, never a
   failure — it works exactly like one with a team, so `doctor` still exits 0
   and `--fix` deliberately does nothing (a claim needs a human in a browser).
-  All three stay silent about teams when the project's `server` in
-  `zitadel.json` is local or self-hosted, where there is nothing to attach.
+  A recorded team is reported wherever the project lives; the nudge for a
+  missing one is only raised when the project's `server` in `zitadel.json` is
+  Zitadel Cloud, since a local or self-hosted project is not temporary.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
 - `start` — start the managed local Zitadel server and persist runtime metadata
   under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
-  under `.zitadel/local/nextgen-data/`. Runtime metadata reports the published
-  server package version; the repository contributor wrapper reports the
-  `dev+<short-commit>` source build it launched. That label names the revision
-  the binary was built from, which after a Moon cache hit can be an earlier
-  commit whose server sources are byte-identical. Use `--runtime docker` or
-  `--image` for the Docker backend.
+  under `.zitadel/local/nextgen-data/`. The local runtime provisions the
+  built-in platform project, so the console's own sign-in and `zitadel claim`
+  work against it the same way they do on Zitadel Cloud. A healthy runtime is
+  reused only when it was launched by a CLI that hands the server the same
+  environment; one started by an older CLI is restarted on the next `start`,
+  keeping its data. Runtime metadata
+  reports the published server package version; the repository contributor
+  wrapper reports the `dev+<short-commit>` source build it launched. That
+  label names the revision the binary was built from, which after a Moon cache
+  hit can be an earlier commit whose server sources are byte-identical. Use
+  `--runtime docker` or `--image` for the Docker backend.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes

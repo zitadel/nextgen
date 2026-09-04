@@ -138,8 +138,9 @@ type ProjectStatus =
       issuer?: string;
       /**
        * Whether the project is attached to a team, from the local
-       * `.zitadel/secret`. Omitted entirely off the cloud, where there is
-       * nothing to attach and the field would only invite agents to act on it.
+       * `.zitadel/secret`. A recorded team is reported on any server; a
+       * missing one is omitted entirely off the cloud, where the nudge does
+       * not apply and the field would only invite agents to act on it.
        */
       claim?: ClaimState;
     };

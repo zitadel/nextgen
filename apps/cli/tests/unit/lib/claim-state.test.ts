@@ -35,10 +35,22 @@ describe("claim state", () => {
     ).toEqual({ kind: "detached" });
   });
 
-  it("is not applicable off the cloud, attached or not", () => {
+  it("is not applicable off the cloud while nothing is attached", () => {
     for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
       expect(claimState({ secret: DETACHED, server })).toEqual({ kind: "not-applicable" });
-      expect(claimState({ secret: ATTACHED, server })).toEqual({ kind: "not-applicable" });
+    }
+  });
+
+  // The local runtime carries the platform project and can take a claim, and
+  // `zitadel claim` writes this record when it does. Only the nudge is
+  // cloud-only; the record is reported wherever the project lives.
+  it("reports an attached project on any server", () => {
+    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
+      expect(claimState({ secret: ATTACHED, server })).toEqual({
+        kind: "attached",
+        team_id: "team-001",
+        claimed_at: "2026-08-01T10:00:00.000Z",
+      });
     }
   });
 

@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { CONTAINER_DATA_DIR } from "../../../../src/lib/local-server/runtime";
-import { dockerRunArgs } from "../../../../src/lib/local-server/docker";
+import { dockerRunArgs, metadataFromStart } from "../../../../src/lib/local-server/docker";
+import { CONTAINER_DATA_DIR, LAUNCH_CONTRACT } from "../../../../src/lib/local-server/runtime";
 
 describe("local server Docker helpers", () => {
   // The server derives its default data dir next to the entrypoint, which lives
@@ -49,6 +49,8 @@ describe("local server Docker helpers", () => {
       `NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`,
       "--env",
       "NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:8090",
+      "--env",
+      "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
       "--volume",
       "/tmp/app/.zitadel/local/container-passwd:/etc/passwd:ro",
       "--volume",
@@ -58,5 +60,20 @@ describe("local server Docker helpers", () => {
       "ghcr.io/zitadel/nextgen:test",
     ]);
     expect(args.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
+  });
+
+  // The record must say which launch contract the container got, or a later
+  // `start` cannot tell it from a container created by an older CLI.
+  it("records the current launch contract for a started container", () => {
+    const metadata = metadataFromStart({
+      cwdDataDir: "/tmp/app/.zitadel/local/nextgen-data",
+      cliVersion: "0.0.0-test",
+      containerName: "zitadel-server-test",
+      containerId: "container-test-id",
+      image: "ghcr.io/zitadel/nextgen:test",
+      port: 8090,
+      serverUrl: "http://localhost:8090",
+    });
+    expect(metadata.launch_contract).toBe(LAUNCH_CONTRACT);
   });
 });

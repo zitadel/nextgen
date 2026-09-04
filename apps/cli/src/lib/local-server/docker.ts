@@ -5,6 +5,7 @@ import {
   CONTAINER_DATA_DIR,
   CONTAINER_HTTP_PORT,
   type ContainerIdentity,
+  LAUNCH_CONTRACT,
   type RuntimeMetadata,
 } from "./runtime";
 
@@ -40,6 +41,11 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
     // published above, not the cloud default the server config falls back to.
     "--env",
     `NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:${spec.port}`,
+    // The platform project hosts the console's own sign-in and the personal
+    // teams a claim attaches to; the binary launcher explains why the
+    // CLI-owned runtime is the one place to enable it.
+    "--env",
+    "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
   ];
 
   if (spec.identity) {
@@ -209,6 +215,7 @@ export function metadataFromStart(input: {
 }): RuntimeMetadata {
   return {
     schema_version: 1,
+    launch_contract: LAUNCH_CONTRACT,
     backend: "docker",
     container_name: input.containerName,
     container_id: input.containerId,

@@ -29,6 +29,7 @@ import {
   defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
   ensureLocalState,
+  hasCurrentLaunchContract,
   localContainerName,
   localServerUrl,
   readRuntimeMetadata,
@@ -101,9 +102,14 @@ export default class Start extends BaseCommand {
     const existingRuntime = await readRuntimeMetadata(this.meta.cwd);
 
     if (runtimeBackend === "binary") {
+      // Healthy is not enough to reuse: a runtime launched by an older CLI
+      // answers /healthz just fine while missing the environment this CLI
+      // hands the server (the launch contract), and a running process cannot
+      // pick that up. Such a runtime is restarted below, keeping its data dir.
       if (
         existingRuntime?.backend === "binary" &&
         existingRuntime.port === port &&
+        hasCurrentLaunchContract(existingRuntime) &&
         isProcessRunning(existingRuntime.pid) &&
         (await checkLocalServerHealth(serverUrl))
       ) {
@@ -155,10 +161,17 @@ export default class Start extends BaseCommand {
       await stopBinaryRuntime(existingRuntime.pid);
     }
     const existing = await inspectContainer(containerName);
+    // Same rule as the binary runtime: a container that matches the image is
+    // reused only when its runtime record shows it was created under the
+    // current launch contract. A record from an older CLI, or none at all,
+    // means the container's environment is unknown, so it is recreated on the
+    // same data volume.
     if (
       existing.exists &&
       existing.running &&
       existing.image === image &&
+      existingRuntime?.backend === "docker" &&
+      hasCurrentLaunchContract(existingRuntime) &&
       (await checkLocalServerHealth(serverUrl))
     ) {
       const metadata = metadataFromStart({
