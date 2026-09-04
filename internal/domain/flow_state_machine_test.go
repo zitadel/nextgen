@@ -3635,6 +3635,9 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 	require.Equal(t, "password", afterWrongPassword.State.CurrentStep)
 	require.NotNil(t, afterWrongPassword.Step.Error)
 	require.Equal(t, domain.FlowStepErrorInvalidCredentials, *afterWrongPassword.Step.Error)
+	// mergeCollected banks the password before the proof is checked, so the
+	// rejected one is sitting in state at this point.
+	require.Equal(t, "not-the-password", afterWrongPassword.State.CollectedData.AuthMethods.Password)
 
 	back, err := w.sm.Process(t.Context(), def, afterWrongPassword.State, domain.FlowSubmitInput{
 		Action: "back",
@@ -3645,6 +3648,8 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 		"back onto the identifier must rotate the auth attempt")
 	assert.Empty(t, back.State.CollectedData.UserID,
 		"the resolved user must not survive back onto the identifier")
+	assert.Empty(t, back.State.CollectedData.AuthMethods.Password,
+		"credential material collected for the dropped identity must go with it")
 	assert.Equal(t, email, back.State.CollectedData.UserData["email"],
 		"the identifier itself survives so the form prefills")
 
