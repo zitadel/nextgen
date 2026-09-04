@@ -35,11 +35,13 @@ describe("local server binary helpers", () => {
       serverUrl: "http://localhost:8091",
     });
 
-    const [, , options] = vi.mocked(spawn).mock.calls[0] as unknown as [
+    const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
       string,
       string[],
       { env: NodeJS.ProcessEnv },
     ];
+    expect(command).toBe("/tmp/fake-nextgen-server");
+    expect(args).toEqual(["--migrate"]);
     expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
     expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
   });
