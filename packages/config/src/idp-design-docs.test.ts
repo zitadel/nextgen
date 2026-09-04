@@ -6,13 +6,13 @@ import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
 // Verification receipt for the IdP design docs (docs/design/idp/): loads the
-// draft connection schema, its example files, the sso-auth-method schema, and
-// the scaffolded flow from docs/design/idp/schemas/ and runs the accept/reject
-// matrix the docs claim was "mechanically verified". Nothing here ships, the
-// schema is a design draft, but the docs lean on these results for
-// security-relevant rules (verified_claims value classes, protocol arms,
-// scope requirements), so the receipt must be checkable from the repo.
-// When the schema lands as a real meta-schema file, point this test at it.
+// shipped connection and sso-auth-method schemas from
+// packages/config/meta-schemas/, the example connection files and the
+// scaffolded flow from docs/design/idp/schemas/, and runs the accept/reject
+// matrix the docs claim was "mechanically verified". The docs lean on these
+// results for security-relevant rules (verified_claims value classes,
+// protocol arms, scope requirements), so the receipt must be checkable from
+// the repo.
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const readme = readFileSync(
@@ -37,15 +37,13 @@ const socialLoginFlow = readFileSync(
 );
 
 const schemasDir = join(repoRoot, "docs/design/idp/schemas");
-const loadJson = (name: string) =>
-  JSON.parse(readFileSync(join(schemasDir, name), "utf8")) as Record<
-    string,
-    unknown
-  >;
-const connectionSchema = loadJson("idp-connection.json");
-const googleExample = loadJson("google.json");
-const githubExample = loadJson("github.json");
-const ssoAuthMethodSchema = loadJson("sso-auth-method.json");
+const metaSchemaDir = join(repoRoot, "packages/config/meta-schemas");
+const loadJson = (dir: string, name: string) =>
+  JSON.parse(readFileSync(join(dir, name), "utf8")) as Record<string, unknown>;
+const connectionSchema = loadJson(metaSchemaDir, "idp-connection.json");
+const googleExample = loadJson(schemasDir, "google.json");
+const githubExample = loadJson(schemasDir, "github.json");
+const ssoAuthMethodSchema = loadJson(metaSchemaDir, "sso-auth-method.json");
 
 const ajv = () => new Ajv2020({ strict: false, validateFormats: false });
 const validateConnection = ajv().compile(connectionSchema);
@@ -214,16 +212,12 @@ describe("sso-auth-method schema (docs/design/idp/2-auth-method-selection.md)", 
 });
 
 describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () => {
-  // The two most copy-able snippets in the doc, validated against the exact
-  // proposed meta-schema change: shipped auth-methods.json with only the sso
-  // slot repointed at the doc's sso-auth-method schema.
-  const metaSchemaDir = join(repoRoot, "packages/config/meta-schemas");
-  const shippedAuthMethod = JSON.parse(
-    readFileSync(join(metaSchemaDir, "auth-method.json"), "utf8"),
-  ) as object;
-  const shippedAuthMethods = JSON.parse(
-    readFileSync(join(metaSchemaDir, "auth-methods.json"), "utf8"),
-  ) as { properties: Record<string, { $ref: string }> };
+  // The two most copy-able snippets in the doc, validated against the
+  // shipped auth-methods.json, whose sso slot points at sso-auth-method.json.
+  const shippedAuthMethod = loadJson(metaSchemaDir, "auth-method.json") as object;
+  const shippedAuthMethods = loadJson(metaSchemaDir, "auth-methods.json") as {
+    properties: Record<string, { $ref: string }>;
+  };
 
   const snippets = [...authMethodSelection.matchAll(/"x-auth-methods": (\{[\s\S]*?\n\})/g)].map(
     (m) => JSON.parse(`{"x-auth-methods": ${m[1]!}}`) as Record<string, unknown>,
@@ -233,23 +227,18 @@ describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () 
     expect(snippets).toHaveLength(2);
   });
 
-  it("both validate against the proposed composite (sso slot repointed)", () => {
-    const proposed = JSON.parse(JSON.stringify(shippedAuthMethods)) as typeof shippedAuthMethods;
-    proposed.properties["sso"] = { $ref: "sso-auth-method.json" };
+  it("the sso slot is the sso-auth-method schema", () => {
+    expect(shippedAuthMethods.properties["sso"]).toEqual({ $ref: "sso-auth-method.json" });
+  });
+
+  it("both validate against the shipped composite", () => {
     const composite = ajv()
       .addSchema(shippedAuthMethod, "auth-method.json")
       .addSchema(ssoAuthMethodSchema as object, "sso-auth-method.json")
-      .compile(proposed);
+      .compile(shippedAuthMethods);
     for (const snippet of snippets) {
       expect(composite(snippet["x-auth-methods"])).toBe(true);
     }
-  });
-
-  it("today's shipped auth-methods.json rejects sso.providers — the change is required", () => {
-    const shipped = ajv()
-      .addSchema(shippedAuthMethod, "auth-method.json")
-      .compile(shippedAuthMethods);
-    expect(shipped(snippets[0]!["x-auth-methods"])).toBe(false);
   });
 });
 
@@ -262,40 +251,19 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     sso_providers?: string[];
     transitions?: Record<string, { target: string; action?: string; purpose?: string }>;
   };
-  const flow = loadJson("default-login.scaffold.json") as unknown as {
+  const flow = loadJson(schemasDir, "default-login.scaffold.json") as unknown as {
     purposes: Record<string, string>;
     steps: ScaffoldStep[];
   };
-  const flowMeta = () =>
-    JSON.parse(
-      readFileSync(join(repoRoot, "packages/config/meta-schemas/flow-definition.json"), "utf8"),
-    ) as {
-      $defs: {
-        Step: {
-          properties: { on_success: { enum: string[] }; sso_providers: { items: object } };
-        };
-      };
-    };
+  const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("fails against the shipped meta-schema only on the two documented deltas", () => {
-    // The on_success enum gains create_user_with_sso, and sso_providers
-    // becomes a slug list (area 2, Rendering from the Connection).
+  it("validates against the shipped meta-schema", () => {
+    // on_success carries create_user_with_sso and sso_providers is a slug
+    // list (area 2, Rendering from the Connection).
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
-      flowMeta(),
+      flowMeta,
     );
-    expect(validate(flow)).toBe(false);
-    for (const err of validate.errors!) {
-      const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
-      const slugList = err.keyword === "type" && err.instancePath.includes("/sso_providers/");
-      expect(onSuccess || slugList, `${err.instancePath} ${err.keyword}`).toBe(true);
-    }
-  });
-
-  it("validates once both deltas land in the meta-schema", () => {
-    const patched = flowMeta();
-    patched.$defs.Step.properties.on_success.enum.push("create_user_with_sso");
-    patched.$defs.Step.properties.sso_providers.items = { type: "string", minLength: 1 };
-    expect(ajv().compile(patched)(flow)).toBe(true);
+    expect(validate(flow), JSON.stringify(validate.errors)).toBe(true);
   });
 
   it("every step carrying sso_providers routes all three outcomes", () => {
@@ -511,7 +479,7 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
 describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", () => {
   // catalog.json restates the vendor facts of the example connections; this
   // pins the two files together so an edit to one fails until the other moves.
-  const catalog = loadJson("catalog.json") as Record<
+  const catalog = loadJson(schemasDir, "catalog.json") as Record<
     string,
     {
       display_name: string;

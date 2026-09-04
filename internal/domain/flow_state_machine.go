@@ -668,12 +668,13 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 	FlowFieldChallengePassword,
 }
 
-// applyOutcomeFlip flips CurrentPurpose on identifier outcomes:
-// login + user_not_found → register; register + user_already_exists → login.
-// Recovery never flips.
+// applyOutcomeFlip flips CurrentPurpose on resolution outcomes:
+// login + user_not_found → register; login + identity_unknown → register;
+// register + user_already_exists → login. Recovery never flips.
 func applyOutcomeFlip(state *FlowState, outcome string) {
 	switch {
-	case state.CurrentPurpose == FlowDefinitionPurposeLogin && outcome == FlowImplicitOutcomeUserNotFound:
+	case state.CurrentPurpose == FlowDefinitionPurposeLogin &&
+		(outcome == FlowImplicitOutcomeUserNotFound || outcome == FlowImplicitOutcomeIdentityUnknown):
 		state.CurrentPurpose = FlowDefinitionPurposeRegister
 	case state.CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:
 		state.CurrentPurpose = FlowDefinitionPurposeLogin

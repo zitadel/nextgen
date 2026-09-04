@@ -1,0 +1,394 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IdentityProviderConnection",
+  "type": "object",
+  "required": [
+    "slug",
+    "protocol",
+    "display_name"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Editor affordance: path or URL of this schema so editors validate and autocomplete the file (scaffolded connection files point at `.zitadel/meta/idp-connection.json`). Ignored by the platform."
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "maxLength": 64,
+      "description": "Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps (sso_providers). Unique within the Project.",
+      "examples": [
+        "google",
+        "github",
+        "corp_idp"
+      ]
+    },
+    "protocol": {
+      "type": "string",
+      "enum": [
+        "oidc",
+        "oauth2"
+      ],
+      "description": "Selects which protocol block is required and which engine handles the connection. Closed: every value has a server implementation."
+    },
+    "template": {
+      "type": "string",
+      "examples": [
+        "google",
+        "github",
+        "okta"
+      ],
+      "description": "Names the catalog entry this file was scaffolded from. Keys vendor knowledge only: glyphs and button branding, the setup scan/match, and catalog claim tables. Carries no protocol behavior: conduct comes only from the protocol blocks."
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Shown to the user on the sign-in button."
+    },
+    "subject_claim": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Claim carrying the provider's stable subject identifier. Optional for OIDC (the engine uses `sub` per spec; override where `sub` is pairwise, e.g. Entra `oid`). Required for OAuth2 \u2014 no `sub` guarantee."
+    },
+    "claim_mapping": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[^$]"
+      },
+      "description": "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. May name properties only some schemas define; unmatched entries are ignored per schema."
+    },
+    "verified_claims": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "const": true
+          },
+          {
+            "const": "$supplementary_fetch"
+          },
+          {
+            "type": "string",
+            "pattern": "^[^$]"
+          }
+        ]
+      },
+      "description": "Maps a verifiable user-schema property to its verification source: a claim name (read the claim), the literal `true` (trust this provider unconditionally), or the `$`-pointer `\"$supplementary_fetch\"` (verified by the selected supplementary_fetch strategy per its contract - e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries values, not verification state.",
+      "examples": [
+        {
+          "email": "email_verified"
+        },
+        {
+          "email": true
+        },
+        {
+          "email": "$supplementary_fetch"
+        }
+      ]
+    },
+    "provisioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How far this provider's data is trusted. `creation` names what happens to a subject that has no account yet. With `disabled`, the provider never creates a user. With `auto`, the user is created without a collection step when the mapped claims fill every required property of the schema. A required property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a required property is missing or such a property is unverified, the collection step is shown instead, prefilled with the claims that did arrive. Gating on other properties will be added when `x-verify` returns to the dialect. The following are deferred and will be added as additive changes. The `auto_only` value, which creates the user from complete claims or fails without collecting. The linking policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey. `is_auto_update`, together with per-property verification state.",
+      "properties": {
+        "creation": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "auto"
+          ],
+          "default": "auto"
+        }
+      }
+    },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or to serve a provider that exposes no .well-known document.",
+      "required": [
+        "issuer",
+        "client_id",
+        "client_secret_env",
+        "scopes"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Discovery base. Endpoints are resolved from its .well-known document unless overridden below."
+        },
+        "jwks_uri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Overrides the JWKS endpoint from discovery. Required in practice when the provider exposes no .well-known document, since ID tokens cannot otherwise be validated."
+        },
+        "id_token_mapping": {
+          "type": "boolean",
+          "default": false,
+          "description": "Read user claims from the id_token instead of the userinfo endpoint, for providers that populate only the former."
+        },
+        "authorization_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Overrides discovery."
+        },
+        "token_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Overrides discovery."
+        },
+        "userinfo_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Overrides discovery."
+        },
+        "client_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "client_secret_env": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "Name of the environment variable holding the client secret. The value itself never appears in configuration."
+        },
+        "token_endpoint_auth_method": {
+          "type": "string",
+          "enum": [
+            "client_secret_basic",
+            "client_secret_post"
+          ],
+          "default": "client_secret_basic",
+          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "contains": {
+            "const": "openid"
+          },
+          "default": [
+            "openid",
+            "profile",
+            "email"
+          ],
+          "description": "Must contain `openid` - without it the provider returns no id_token and the connection is not OIDC. Enforced by `required` + `contains`; the `default` is a UI-prefill hint only - validators never inject it, so an omitted `scopes` is rejected regardless."
+        },
+        "pkce_enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship."
+        },
+        "static_authorize_parameters": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1,
+            "not": {
+              "enum": [
+                "client_id",
+                "redirect_uri",
+                "response_type",
+                "scope",
+                "state",
+                "nonce",
+                "code_challenge",
+                "code_challenge_method",
+                "response_mode",
+                "request",
+                "request_uri",
+                "client_secret",
+                "client_assertion"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected by the same guard: values here are committed to git and appended to the public authorize URL, so a credential pasted one level too deep leaks twice."
+        }
+      }
+    },
+    "oauth2": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OAuth 2.0 connection details. No discovery exists, so all three endpoints are stated explicitly.",
+      "required": [
+        "authorization_endpoint",
+        "token_endpoint",
+        "userinfo_endpoint",
+        "client_id",
+        "client_secret_env"
+      ],
+      "properties": {
+        "authorization_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Where the user is sent to authorize."
+        },
+        "token_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Where the authorization code is exchanged."
+        },
+        "userinfo_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "description": "Where the authenticated user's profile is fetched."
+        },
+        "client_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "client_secret_env": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "Name of the environment variable holding the client secret. The value itself never appears in configuration."
+        },
+        "token_endpoint_auth_method": {
+          "type": "string",
+          "enum": [
+            "client_secret_basic",
+            "client_secret_post"
+          ],
+          "default": "client_secret_basic",
+          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Provider-specific; OAuth 2.0 defines no universal scope."
+        },
+        "pkce_enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship."
+        },
+        "static_authorize_parameters": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1,
+            "not": {
+              "enum": [
+                "client_id",
+                "redirect_uri",
+                "response_type",
+                "scope",
+                "state",
+                "nonce",
+                "code_challenge",
+                "code_challenge_method",
+                "response_mode",
+                "request",
+                "request_uri",
+                "client_secret",
+                "client_assertion"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected by the same guard: values here are committed to git and appended to the public authorize URL, so a credential pasted one level too deep leaks twice."
+        },
+        "supplementary_fetch": {
+          "type": "string",
+          "enum": [
+            "github_primary_email"
+          ],
+          "description": "Provider-specific follow-up call after userinfo, implemented in the engine. Closed: every value is implemented behaviour. New values are non-breaking."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "supplementary_fetch": {
+                "const": "github_primary_email"
+              }
+            },
+            "required": [
+              "supplementary_fetch"
+            ]
+          },
+          "then": {
+            "required": [
+              "scopes"
+            ],
+            "properties": {
+              "scopes": {
+                "contains": {
+                  "const": "user:email"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "protocol": {
+            "const": "oidc"
+          }
+        },
+        "required": [
+          "protocol"
+        ]
+      },
+      "then": {
+        "required": [
+          "oidc"
+        ],
+        "properties": {
+          "oauth2": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "protocol": {
+            "const": "oauth2"
+          }
+        },
+        "required": [
+          "protocol"
+        ]
+      },
+      "then": {
+        "required": [
+          "oauth2",
+          "subject_claim"
+        ],
+        "properties": {
+          "oidc": false
+        }
+      }
+    }
+  ]
+}

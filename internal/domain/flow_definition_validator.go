@@ -10,6 +10,7 @@ import (
 var reservedOutcomes = map[string]struct{}{
 	"user_not_found":      {},
 	"user_already_exists": {},
+	"identity_unknown":    {},
 	"callback":            {},
 }
 
@@ -296,7 +297,7 @@ func validateSteps(steps []FlowDefinitionStep) error {
 			_, isReserved := reservedOutcomes[transitionKey]
 			if !isAction && !isReserved {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, callback)", step.Name, transitionKey), nil)
+					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)", step.Name, transitionKey), nil)
 			}
 		}
 
@@ -520,8 +521,11 @@ func validateFlipTableCoverage(def FlowDefinition) error {
 	return nil
 }
 
-// purposeFlipTargets mirrors the engine's flip table. Kept separate so
-// the validator stays pure.
+// purposeFlipTargets mirrors the identifier half of the engine's flip
+// table. Kept separate so the validator stays pure. identity_unknown also
+// flips login → register but fires only from SSO resolution, so its
+// coverage is a rule on steps carrying sso_providers (#1014), not on
+// every combined entry step.
 var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
 	FlowDefinitionPurposeLogin: {
 		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,

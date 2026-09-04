@@ -3496,7 +3496,7 @@ type AuthMethods struct {
 	Password  OptAuthMethod `json:"password"`
 	Passkey   OptAuthMethod `json:"passkey"`
 	MagicLink OptAuthMethod `json:"magic_link"`
-	SSO       OptAuthMethod `json:"sso"`
+	SSO       SSOAuthMethod `json:"sso"`
 	Otp       OptAuthMethod `json:"otp"`
 }
 
@@ -3516,7 +3516,7 @@ func (s *AuthMethods) GetMagicLink() OptAuthMethod {
 }
 
 // GetSSO returns the value of SSO.
-func (s *AuthMethods) GetSSO() OptAuthMethod {
+func (s *AuthMethods) GetSSO() SSOAuthMethod {
 	return s.SSO
 }
 
@@ -3541,7 +3541,7 @@ func (s *AuthMethods) SetMagicLink(val OptAuthMethod) {
 }
 
 // SetSSO sets the value of SSO.
-func (s *AuthMethods) SetSSO(val OptAuthMethod) {
+func (s *AuthMethods) SetSSO(val SSOAuthMethod) {
 	s.SSO = val
 }
 
@@ -38589,6 +38589,8 @@ func (*RevokeSessionNoContent) revokeSessionRes() {}
 type RevokeSessionUnauthorized ErrorDetails
 
 func (*RevokeSessionUnauthorized) revokeSessionRes() {}
+
+type SSOAuthMethod jx.Raw
 
 // An available SSO identity provider.
 // Ref: #

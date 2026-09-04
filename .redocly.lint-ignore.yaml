@@ -8,3 +8,10 @@ api/openapi/endpoints/schemas/user-schema.yaml:
     # a data-format migration.
     - '#/properties/objectType'
     - '#/properties/metaSchema'
+api/openapi/endpoints/schemas/sso-auth-method.json:
+  no-required-schema-properties-undefined:
+    # `providers` is defined at the schema root; the if/then/else arms only
+    # require or forbid it depending on `enabled`, which is what gives editors
+    # a precise error instead of an "all arms failed" oneOf.
+    - '#/allOf/0/then/required/0'
+    - '#/allOf/0/else/not/required/0'

@@ -298,5 +298,15 @@ wire; the manifest gains `create_user_with_sso` and `link_sso`; the `purposes`
 enum gains `link_account` (with `user_not_found` flipping it to `register`).
 The two mechanisms decided above accommodate this without change.
 
+**Amendment (#851, social login).** Ceremony resolution does not reuse
+`user_not_found` for an unknown subject. A shared entry step hosts both the
+typed identifier and the provider buttons, and one transition key has one
+target, so `user_not_found` keeps its typed-identifier route and a new
+outcome, `identity_unknown`, routes the unknown SSO subject to the collection
+step. It flips `CurrentPurpose` from `login` to `register` exactly as
+`user_not_found` does. `user_link_required` is not added: account linking is
+out of scope for #851, and the outcome returns with the linking journey. See
+[Resolution Branches](../design/idp/3-social-login-flow.md#resolution-branches).
+
 [dispatch]: ../../internal/domain/flow_state_machine.go
 [validator]: ../../internal/domain/flow_definition_validator.go

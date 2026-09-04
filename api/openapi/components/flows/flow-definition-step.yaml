@@ -69,7 +69,7 @@ properties:
       $ref: sso-provider.yaml
     default: []
     example:
-      - id: google-1
+      - id: google
         name: Google
         template: google
 

@@ -61,7 +61,12 @@ export const FLOW_VALIDATION_RULES = {
 export type FlowValidationRuleId = keyof typeof FLOW_VALIDATION_RULES;
 
 /** Mirrors `reservedOutcomes` in flow_definition_validator.go. */
-export const RESERVED_OUTCOMES = ["user_not_found", "user_already_exists", "callback"] as const;
+export const RESERVED_OUTCOMES = [
+  "user_not_found",
+  "user_already_exists",
+  "identity_unknown",
+  "callback",
+] as const;
 
 /** Mirrors the `FlowDefinitionPurpose` enum (snake transform) in flow_definition.go. */
 export const FLOW_PURPOSES = [
@@ -73,7 +78,11 @@ export const FLOW_PURPOSES = [
   "link_account",
 ] as const;
 
-/** Mirrors `purposeFlipTargets` in flow_definition_validator.go. */
+/**
+ * Mirrors `purposeFlipTargets` in flow_definition_validator.go: the
+ * identifier outcomes only. `identity_unknown` fires from SSO resolution
+ * and is covered by the sso_providers routing rule (#1044).
+ */
 export const PURPOSE_FLIP_TARGETS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   login: { user_not_found: "register" },
   register: { user_already_exists: "login" },
@@ -363,7 +372,7 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
       issues.push(
         error(
           "steps",
-          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, callback)`,
+          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)`,
           name,
         ),
       );

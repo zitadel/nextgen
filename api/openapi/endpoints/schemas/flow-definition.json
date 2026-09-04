@@ -169,17 +169,30 @@
         },
         "sso_providers": {
           "type": "array",
+          "uniqueItems": true,
           "items": {
-            "$ref": "#/$defs/SSOProvider"
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "maxLength": 64
           },
-          "description": "Identity providers available on this step. When non-empty, the step must define a `transitions.callback` entry — the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
+          "examples": [
+            [
+              "google"
+            ],
+            [
+              "google",
+              "github"
+            ]
+          ],
+          "description": "Slugs of the identity provider connections offered on this step. Each entry must match the `slug` of a connection in the project; the connection supplies the display name and template at render time. When non-empty, the step must define a `transitions.callback` entry — the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
         },
         "on_success": {
           "type": "string",
           "enum": [
-            "create_user"
+            "create_user",
+            "create_user_with_sso"
           ],
-          "description": "Server-side mutation to run after the step's fields validate and before the transition fires. - create_user: materialize the user from collected schema   fields. Used by register flows."
+          "description": "Server-side mutation to run after the step's fields validate and before the transition fires. - create_user: materialize the user from collected schema   fields. Used by register flows. - create_user_with_sso: materialize the user from the resolved external identity plus the collected fields. Used by the collection step an `identity_unknown` outcome routes to."
         },
         "complete": {
           "type": "string",
@@ -194,7 +207,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/Transition"
           },
-          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces: - `user_not_found` - emitted when a unique field (`x-unique`) does not match an existing user. - `user_already_exists` - emitted when registration matches an existing user. - `callback` - emitted when an external system returns control to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into."
+          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces: - `user_not_found` - emitted when a unique field (`x-unique`) does not match an existing user. - `user_already_exists` - emitted when registration matches an existing user. - `identity_unknown` - emitted when SSO resolution finds no user for the provider's subject; flips a login flow to register. - `callback` - emitted when an external system returns control to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into."
         }
       }
     },
@@ -274,42 +287,6 @@
             }
           ],
           "description": "Provider-specific configuration consumed by the implementation when issuing the per-render challenge. Opaque to the engine."
-        }
-      }
-    },
-    "SSOProvider": {
-      "type": "object",
-      "required": [
-        "id",
-        "name",
-        "template"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "type": "string",
-          "examples": [
-            "google",
-            "corp_idp"
-          ],
-          "description": "Provider instance identifier. Echoed back by the client when the user picks a provider; routed to the corresponding configured IdP at the engine."
-        },
-        "name": {
-          "type": "string",
-          "examples": [
-            "Google",
-            "Acme SSO"
-          ],
-          "description": "Display name surfaced to the user. Localized client-side if a matching text key exists in the locale dictionary."
-        },
-        "template": {
-          "type": "string",
-          "examples": [
-            "google",
-            "entraid",
-            "github"
-          ],
-          "description": "Hint for rendering (logo, brand colors) — e.g. `google`, `entraid`, `github`. Consumed by the runtime template, not by the engine."
         }
       }
     },

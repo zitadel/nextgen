@@ -238,7 +238,7 @@ describe("steps", () => {
     const def = flow();
     step(def, "identifier").transitions.jump = { target: "done" };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, callback)',
+      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)',
     );
   });
 
