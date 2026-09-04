@@ -223,7 +223,7 @@ describe("Next setup integration", () => {
     // Pre-existing app ⇒ widget posture, recorded for doctor --fix (ADR 044).
     expect(scaffold.posture).toBe("widget");
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
-      id: expect.stringMatching(/^flow_/),
+      id: expect.stringMatching(/^flowdef_/),
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
       name: "default-login",
       status: "active",
@@ -481,7 +481,7 @@ describe("Next setup integration", () => {
       resources: Record<string, { id?: string }>;
     };
     expect(state.resources[".zitadel/schemas/default-human-user.json"]?.id).toMatch(/^sch_/);
-    expect(state.resources[".zitadel/flows/default-login.json"]?.id).toMatch(/^flow_/);
+    expect(state.resources[".zitadel/flows/default-login.json"]?.id).toMatch(/^flowdef_/);
   });
 
   it("fails apply clearly for missing env refs", async () => {

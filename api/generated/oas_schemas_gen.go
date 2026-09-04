@@ -7676,20 +7676,11 @@ func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
 
-type CreateFlowDefinitionBadRequest ErrorDetails
-
-func (*CreateFlowDefinitionBadRequest) createFlowDefinitionRes() {}
-
-type CreateFlowDefinitionConflict ErrorDetails
-
-func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
-
 // CreateFlowDefinitionErrorResponse represents sum type.
 type CreateFlowDefinitionErrorResponse struct {
 	Type                     CreateFlowDefinitionErrorResponseType // switch on this field
 	AuthUnauthorized         AuthUnauthorized
 	EvtInvalid               EvtInvalid
-	FlowdefAlreadyExists     FlowdefAlreadyExists
 	FlowdefInvalid           FlowdefInvalid
 	FlowdefNotFound          FlowdefNotFound
 	FlowdefPermissionDenied  FlowdefPermissionDenied
@@ -7706,7 +7697,6 @@ type CreateFlowDefinitionErrorResponseType string
 const (
 	AuthUnauthorizedCreateFlowDefinitionErrorResponse         CreateFlowDefinitionErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateFlowDefinitionErrorResponse               CreateFlowDefinitionErrorResponseType = "evt.invalid"
-	FlowdefAlreadyExistsCreateFlowDefinitionErrorResponse     CreateFlowDefinitionErrorResponseType = "flowdef.already_exists"
 	FlowdefInvalidCreateFlowDefinitionErrorResponse           CreateFlowDefinitionErrorResponseType = "flowdef.invalid"
 	FlowdefNotFoundCreateFlowDefinitionErrorResponse          CreateFlowDefinitionErrorResponseType = "flowdef.not_found"
 	FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse  CreateFlowDefinitionErrorResponseType = "flowdef.permission_denied"
@@ -7724,11 +7714,6 @@ func (s CreateFlowDefinitionErrorResponse) IsAuthUnauthorized() bool {
 // IsEvtInvalid reports whether CreateFlowDefinitionErrorResponse is EvtInvalid.
 func (s CreateFlowDefinitionErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidCreateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefAlreadyExists reports whether CreateFlowDefinitionErrorResponse is FlowdefAlreadyExists.
-func (s CreateFlowDefinitionErrorResponse) IsFlowdefAlreadyExists() bool {
-	return s.Type == FlowdefAlreadyExistsCreateFlowDefinitionErrorResponse
 }
 
 // IsFlowdefInvalid reports whether CreateFlowDefinitionErrorResponse is FlowdefInvalid.
@@ -7805,27 +7790,6 @@ func (s CreateFlowDefinitionErrorResponse) GetEvtInvalid() (v EvtInvalid, ok boo
 func NewEvtInvalidCreateFlowDefinitionErrorResponse(v EvtInvalid) CreateFlowDefinitionErrorResponse {
 	var s CreateFlowDefinitionErrorResponse
 	s.SetEvtInvalid(v)
-	return s
-}
-
-// SetFlowdefAlreadyExists sets CreateFlowDefinitionErrorResponse to FlowdefAlreadyExists.
-func (s *CreateFlowDefinitionErrorResponse) SetFlowdefAlreadyExists(v FlowdefAlreadyExists) {
-	s.Type = FlowdefAlreadyExistsCreateFlowDefinitionErrorResponse
-	s.FlowdefAlreadyExists = v
-}
-
-// GetFlowdefAlreadyExists returns FlowdefAlreadyExists and true boolean if CreateFlowDefinitionErrorResponse is FlowdefAlreadyExists.
-func (s CreateFlowDefinitionErrorResponse) GetFlowdefAlreadyExists() (v FlowdefAlreadyExists, ok bool) {
-	if !s.IsFlowdefAlreadyExists() {
-		return v, false
-	}
-	return s.FlowdefAlreadyExists, true
-}
-
-// NewFlowdefAlreadyExistsCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from FlowdefAlreadyExists.
-func NewFlowdefAlreadyExistsCreateFlowDefinitionErrorResponse(v FlowdefAlreadyExists) CreateFlowDefinitionErrorResponse {
-	var s CreateFlowDefinitionErrorResponse
-	s.SetFlowdefAlreadyExists(v)
 	return s
 }
 
@@ -12607,6 +12571,7 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 }
 
 func (*ErrorDetails) createBrandingRes()       {}
+func (*ErrorDetails) createFlowDefinitionRes() {}
 func (*ErrorDetails) createFlowRes()           {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
@@ -15408,9 +15373,11 @@ func (s *FlowCookieInvalidDetails) init() FlowCookieInvalidDetails {
 // Ref: #
 type FlowDefinition struct {
 	// Stable identifier for this flow, used as the target of cross-flow
-	// `switch` and `pivot` transitions. Renaming is not supported — the
-	// `name` is part of the public contract another definition may
-	// reference. Acts as the human display label as well; no separate slug.
+	// `switch` and `pivot` transitions. Every revision of a flow shares its
+	// `name`; publishing a definition under an existing `name` adds a
+	// revision to that flow. Renaming is not supported — the `name` is part
+	// of the public contract another definition may reference. Acts as the
+	// human display label as well; no separate slug.
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
 	// Server-assigned identifier of the user schema this flow operates on,
@@ -15532,6 +15499,7 @@ func (s *FlowDefinitionExpand) UnmarshalText(data []byte) error {
 	}
 }
 
+// List of flow definitions, newest by creation time first.
 // Ref: #
 type FlowDefinitionListResponse struct {
 	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
@@ -17055,59 +17023,6 @@ func (s *FlowUnsupported) SetDetails(val OptFlowUnsupportedDetails) {
 type FlowUnsupportedDetails map[string]jx.Raw
 
 func (s *FlowUnsupportedDetails) init() FlowUnsupportedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type FlowdefAlreadyExists struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptFlowdefAlreadyExistsDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *FlowdefAlreadyExists) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *FlowdefAlreadyExists) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *FlowdefAlreadyExists) GetDetails() OptFlowdefAlreadyExistsDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *FlowdefAlreadyExists) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *FlowdefAlreadyExists) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *FlowdefAlreadyExists) SetDetails(val OptFlowdefAlreadyExistsDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type FlowdefAlreadyExistsDetails map[string]jx.Raw
-
-func (s *FlowdefAlreadyExistsDetails) init() FlowdefAlreadyExistsDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -27404,52 +27319,6 @@ func (o OptFlowUnsupportedDetails) Get() (v FlowUnsupportedDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowUnsupportedDetails) Or(d FlowUnsupportedDetails) FlowUnsupportedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowdefAlreadyExistsDetails returns new OptFlowdefAlreadyExistsDetails with value set to v.
-func NewOptFlowdefAlreadyExistsDetails(v FlowdefAlreadyExistsDetails) OptFlowdefAlreadyExistsDetails {
-	return OptFlowdefAlreadyExistsDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowdefAlreadyExistsDetails is optional FlowdefAlreadyExistsDetails.
-type OptFlowdefAlreadyExistsDetails struct {
-	Value FlowdefAlreadyExistsDetails
-	Set   bool
-}
-
-// IsSet returns true if OptFlowdefAlreadyExistsDetails was set.
-func (o OptFlowdefAlreadyExistsDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowdefAlreadyExistsDetails) Reset() {
-	var v FlowdefAlreadyExistsDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowdefAlreadyExistsDetails) SetTo(v FlowdefAlreadyExistsDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowdefAlreadyExistsDetails) Get() (v FlowdefAlreadyExistsDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowdefAlreadyExistsDetails) Or(d FlowdefAlreadyExistsDetails) FlowdefAlreadyExistsDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
