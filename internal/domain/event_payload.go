@@ -236,11 +236,16 @@ type EnvironmentCreatedPayload = EnvironmentPayload
 // ReleasePayload records what a release pinned, so the audit stream answers
 // "what changed" without a join back to the releases table. ContentHash
 // identifies the pinned set; Pointers spell it out.
+//
+// GitDirty is always encoded. For the string fields an empty value and an
+// absent one mean the same thing — the caller supplied nothing — but false is
+// an assertion the audit record has to carry: it says the working tree was
+// clean, so git_sha describes this release exactly.
 type ReleasePayload struct {
 	ContentHash string                  `json:"content_hash,omitempty"`
 	Message     string                  `json:"message,omitempty"`
 	GitSHA      string                  `json:"git_sha,omitempty"`
-	GitDirty    bool                    `json:"git_dirty,omitempty"`
+	GitDirty    bool                    `json:"git_dirty"`
 	Pointers    []ReleasePointerPayload `json:"pointers,omitempty"`
 }
 
