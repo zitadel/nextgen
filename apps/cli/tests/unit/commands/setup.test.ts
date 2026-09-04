@@ -205,6 +205,30 @@ describe("setup command", () => {
     expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
   });
 
+  // The local server hosts its own platform project and claim page, so a
+  // local setup gets the same temporary-project nudge as a cloud one.
+  it("nudges claim when setting up against the local server", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "http://localhost:8080",
+      "--dry-run",
+      "--framework",
+      "next",
+    ]);
+
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+  });
+
   it("says nothing about teams when setting up against a self-hosted server", async () => {
     const cwd = await makeNextProject();
 
