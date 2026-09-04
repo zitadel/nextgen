@@ -7,26 +7,26 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 
 ## Server
 
-| YAML key                 | Environment                      | Default                                               | Description                                                                                             |
-|--------------------------|----------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `server.address`         | `NEXTGEN_SERVER_ADDRESS`         | `:8080`                                               | Listen address                                                                                          |
-| `server.data_dir`        | `NEXTGEN_SERVER_DATA_DIR`        | `nextgen-data` next to the binary                     | Local runtime data root                                                                                 |
+| YAML key                 | Environment                      | Default                                                             | Description                                                                                            |
+| ------------------------ | -------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `server.address`         | `NEXTGEN_SERVER_ADDRESS`         | `:8080`                                                             | Listen address                                                                                         |
+| `server.data_dir`        | `NEXTGEN_SERVER_DATA_DIR`        | `nextgen-data` next to the binary                                   | Local runtime data root                                                                                |
 | `server.master_keys`     | — (YAML only)                    | auto-generated RSA master key under `<server.data_dir>/master-keys` | Master keys that wrap each project's key encryption key (KEK); see [Encryption keys](#encryption-keys) |
-| `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                | Serve embedded management console                                                                       |
-| `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                         | Console URL prefix                                                                                      |
-| `server.login_enabled`   | `NEXTGEN_SERVER_LOGIN_ENABLED`   | `true`                                                | Serve embedded login shell                                                                              |
-| `server.login_path`      | `NEXTGEN_SERVER_LOGIN_PATH`      | `/ui/login`                                           | Login URL prefix                                                                                        |
+| `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                              | Serve embedded management console                                                                      |
+| `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                                       | Console URL prefix                                                                                     |
+| `server.login_enabled`   | `NEXTGEN_SERVER_LOGIN_ENABLED`   | `true`                                                              | Serve embedded login shell                                                                             |
+| `server.login_path`      | `NEXTGEN_SERVER_LOGIN_PATH`      | `/ui/login`                                                         | Login URL prefix                                                                                       |
 
 ## Database
 
 Configure exactly one dialect under `database:`, or omit it for the local
 default.
 
-| Backend | When to use | Config key / env |
-| ------- | ----------- | ---------------- |
-| **SQLite** | Local development, CLI binary runtime, small single-node / homelab | `database.sqlite` / `NEXTGEN_DATABASE_SQLITE` |
-| **PostgreSQL** | Production and Docker Compose | `database.postgres` / `NEXTGEN_DATABASE_POSTGRES` |
-| **Spanner** | Production on Google Cloud Spanner | `database.spanner` / `NEXTGEN_DATABASE_SPANNER` |
+| Backend        | When to use                                                        | Config key / env                                  |
+| -------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
+| **SQLite**     | Local development, CLI binary runtime, small single-node / homelab | `database.sqlite` / `NEXTGEN_DATABASE_SQLITE`     |
+| **PostgreSQL** | Production and Docker Compose                                      | `database.postgres` / `NEXTGEN_DATABASE_POSTGRES` |
+| **Spanner**    | Production on Google Cloud Spanner                                 | `database.spanner` / `NEXTGEN_DATABASE_SPANNER`   |
 
 When `database:` is omitted, the server uses **SQLite** at
 `<server.data_dir>/zitadel.db` (local / homelab default).
@@ -66,6 +66,33 @@ Spanner authentication uses Application Default Credentials (ADC); this guide
 does not cover IAM setup.
 
 Migrations run automatically when the server starts.
+
+## Logging
+
+| YAML key                      | Environment                           | Default                                       | Description                   |
+| ----------------------------- | ------------------------------------- | --------------------------------------------- | ----------------------------- |
+| `instrumentation.log.level`   | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`   | `info`                                        | Minimum log level             |
+| `instrumentation.log.format`  | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`  | `text`                                        | Log output encoding           |
+| `instrumentation.log.streams` | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS` | `[runtime, ready, request, service, storage]` | Which log streams are enabled |
+
+`level`, `format`, and each entry of `streams` accept either their documented
+string name (below) or the underlying numeric value; string values are
+resolved case-insensitively via each type's `encoding.TextUnmarshaler`.
+
+- `level`: `debug`, `info`, `warn`, `error` (`zlog.Level` is `slog.Level`
+  under the hood, so an offset suffix like `warn+4` is also accepted; the
+  GCP-only severities — notice, critical, alert, emergency — have no string
+  form and must be set by their numeric value).
+- `format`: `disabled`, `text`, `json`, `gcp`, `gcp_error_reporting`.
+- `streams`: `runtime`, `ready`, `request`, `service`, `storage`.
+
+```yaml
+instrumentation:
+  log:
+    level: debug
+    format: json
+    streams: [request, service]
+```
 
 ## Config file search paths
 
