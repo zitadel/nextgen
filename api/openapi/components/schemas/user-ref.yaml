@@ -6,6 +6,7 @@ description: |
   `identifier` and `display` are resolved independently from the user
   schema's `x-identifier` and `x-display` designations, live at read time.
   Clients render `display`, falling back to `identifier`, then `user_id`.
+  Missing or deleted users degrade to `user_id` only.
 required:
   - user_id
 properties:
