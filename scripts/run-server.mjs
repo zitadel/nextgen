@@ -7,7 +7,7 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = withServerMigrateArgs(forwardedArgs());
 
 try {
-  if (!isHelp(args) && args[0] !== "migrate") {
+  if (!isHelp(args) && args[0] !== "migrate" && args[0] !== "completion") {
     await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
   }
   await run("go", ["run", ".", ...args], { cwd: repoRoot });

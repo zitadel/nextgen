@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -22,9 +21,20 @@ func TestCommandHelpListsMigrate(t *testing.T) {
 	cmd.SetArgs([]string{"--help"})
 	require.NoError(t, cmd.Execute())
 
-	got := out.String()
-	assert.Contains(t, got, "migrate")
-	assert.Contains(t, got, "Apply database migrations and exit")
+	var migrateCmd, serverCmd bool
+	for _, c := range cmd.Commands() {
+		switch c.Name() {
+		case "migrate":
+			migrateCmd = true
+			assert.Equal(t, "Apply database migrations and exit", c.Short)
+		case "server":
+			serverCmd = true
+			require.NotNil(t, c.Flags().Lookup("migrate"), "expected --migrate on server")
+		}
+	}
+	assert.True(t, migrateCmd, "expected a command named migrate")
+	assert.True(t, serverCmd, "expected a command named server")
+	require.NotNil(t, cmd.Flags().Lookup("migrate"), "expected --migrate on root")
 }
 
 func TestMigrateCommandAppliesSchemaIdempotently(t *testing.T) {
@@ -33,7 +43,9 @@ func TestMigrateCommandAppliesSchemaIdempotently(t *testing.T) {
 	for range 2 {
 		cmd := NewCommand()
 		cmd.SetArgs([]string{"migrate", "--config", configPath})
-		require.NoError(t, cmd.Execute())
+		executed, err := cmd.ExecuteC()
+		require.NoError(t, err)
+		assert.Equal(t, "migrate", executed.Name())
 	}
 
 	assert.True(t, sqliteHasGooseTable(t, defaultSQLitePath(dataDir)))
@@ -44,7 +56,7 @@ func TestStartDatabaseSkipsMigrationsUnlessRequested(t *testing.T) {
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	skipped, err := startDatabase(ctx, cfg, false)
 	require.NoError(t, err)
 	require.NoError(t, skipped.Close(ctx))

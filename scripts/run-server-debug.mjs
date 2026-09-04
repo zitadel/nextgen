@@ -25,7 +25,7 @@ try {
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
-    if (args[0] !== "migrate") {
+    if (args[0] !== "migrate" && args[0] !== "completion") {
       await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
     }
     await run("go", buildArgs, { cwd: repoRoot });

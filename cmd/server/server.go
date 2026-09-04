@@ -59,19 +59,21 @@ func NewCommand() *cobra.Command {
 	}
 
 	root := &cobra.Command{
-		Use:          "nextgen",
-		Short:        "Run the server",
-		SilenceUsage: true,
-		RunE:         runServer,
+		Use:           "nextgen",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
 	}
 	root.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
 	addServerFlags(root, &applyMigrations, &userFiles)
 
 	serverCmd := &cobra.Command{
-		Use:          "server",
-		Short:        "Run the server",
-		SilenceUsage: true,
-		RunE:         runServer,
+		Use:           "server",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
 	}
 	addServerFlags(serverCmd, &applyMigrations, &userFiles)
 
