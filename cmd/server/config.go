@@ -132,6 +132,11 @@ type ServerConfig struct {
 	ConsolePath    string `mapstructure:"console_path"`
 	LoginEnabled   bool   `mapstructure:"login_enabled"`
 	LoginPath      string `mapstructure:"login_path"`
+	// PublicBase is the origin this deployment is reachable at from a browser.
+	// It only feeds user-facing URLs (claim and dashboard); schema identity
+	// stays on schema.builtin_public_base, which is an identifier namespace,
+	// not an address.
+	PublicBase string `mapstructure:"public_base"`
 }
 
 type SchemaConfig struct {
