@@ -39,7 +39,15 @@ function deadlinePhrase(deadline?: Date): string {
  */
 export type ClaimState =
   | { kind: "attached"; team_id: string; claimed_at: string }
-  | { kind: "detached" }
+  /**
+   * `claimable` classifies the claim window from the locally recorded
+   * creation time: once it has passed, the server refuses the claim, so
+   * nudges must stop advertising `zitadel claim`. Lenient on an unknown or
+   * unparsable creation time (claimable, no deadline) because the server is
+   * the enforcer and the CLI only advises. `deadline` is the ISO date the
+   * window closes, when the creation time is known.
+   */
+  | { kind: "detached"; claimable: boolean; deadline?: string }
   | { kind: "not-applicable" };
 
 /**
@@ -82,7 +90,7 @@ export function isAttached(
  * skip rather than an error.
  */
 export function claimState(input: {
-  secret: Pick<ZitadelSecret, "claimed_at" | "team_id">;
+  secret: Pick<ZitadelSecret, "claimed_at" | "team_id"> & { created_at?: string };
   server: string;
 }): ClaimState {
   if (serverKind.value(input.server) !== "cloud") {
@@ -95,7 +103,16 @@ export function claimState(input: {
       claimed_at: input.secret.claimed_at,
     };
   }
-  return { kind: "detached" };
+  const createdAt = Date.parse(input.secret.created_at ?? "");
+  if (Number.isNaN(createdAt)) {
+    return { kind: "detached", claimable: true };
+  }
+  const deadline = claimWindowDeadline(input.secret.created_at);
+  return {
+    kind: "detached",
+    claimable: deadline.getTime() > Date.now(),
+    deadline: deadline.toISOString(),
+  };
 }
 
 /**
@@ -132,4 +149,17 @@ export function claimBoxAction(cliVersion: string, deadline?: Date): BoxAction {
 /** The command for `next_commands`. */
 export function claimCommand(cliVersion: string): string {
   return publicCliCommand("claim", cliVersion);
+}
+
+/**
+ * The nudge's counterpart for a closed claim window: the server refuses the
+ * claim now, so this deliberately quotes no claim command anywhere; callers
+ * must also keep `zitadel claim` out of `next_commands` alongside it.
+ */
+export function claimWindowClosedAction(cliVersion: string): string {
+  return (
+    `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days ` +
+    "of creation, so it can no longer be claimed. It keeps working as it is; " +
+    `to get a project you can attach, create a fresh one with ${publicCliCommand("setup", cliVersion)}.`
+  );
 }

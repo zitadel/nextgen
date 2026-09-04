@@ -42,7 +42,9 @@ const SECRET = {
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
   preview_origins: [],
-  created_at: "2026-01-01T00:00:00.000Z",
+  // Recent, so the claim window reads as open; the closed-window test writes
+  // its own stale timestamp.
+  created_at: new Date(Date.now() - 60_000).toISOString(),
 };
 
 /** A fully healthy Next.js managed project: every check passes against it. */
@@ -1029,6 +1031,20 @@ describe("ClaimCheck", () => {
     const outcome = await new ClaimCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("warn");
     expect(outcome.message).toContain("temporary until you attach it to a team");
+    expect(outcome.details).toEqual({ claimable: true });
+  });
+
+  // Past the window the server refuses the claim, so the warning must stop
+  // pointing at `zitadel claim` and flag the closed window in its details for
+  // the doctor advisory.
+  it("switches to fresh-setup wording once the claim window has closed", async () => {
+    const cwd = await makeProject();
+    await writeSecret(cwd, { created_at: "2026-01-01T00:00:00.000Z" });
+    const outcome = await new ClaimCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("no longer be claimed");
+    expect(outcome.message).not.toContain("zitadel claim");
+    expect(outcome.details).toEqual({ claimable: false });
   });
 
   it("passes and names the team once attached", async () => {

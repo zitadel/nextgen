@@ -4,6 +4,7 @@ import {
   claimAction,
   claimBoxAction,
   claimState,
+  claimWindowClosedAction,
   claimWindowDeadline,
   isAttached,
 } from "../../../src/lib/claim-state";
@@ -20,9 +21,32 @@ describe("claim state", () => {
     });
   });
 
-  it("reads a project with neither field as detached", () => {
+  // Without a creation time the window cannot be classified, so the state is
+  // lenient (claimable, no deadline): the server enforces, the CLI advises.
+  it("reads a project with neither field as detached and claimable", () => {
     expect(claimState({ secret: DETACHED, server: "https://api.zitadel.cloud" })).toEqual({
       kind: "detached",
+      claimable: true,
+    });
+  });
+
+  it("classifies the claim window from the recorded creation time", () => {
+    const recent = new Date(Date.now() - 60_000).toISOString();
+    expect(
+      claimState({ secret: { created_at: recent }, server: "https://api.zitadel.cloud" }),
+    ).toEqual({
+      kind: "detached",
+      claimable: true,
+      deadline: claimWindowDeadline(recent).toISOString(),
+    });
+
+    const stale = "2026-01-01T00:00:00.000Z";
+    expect(
+      claimState({ secret: { created_at: stale }, server: "https://api.zitadel.cloud" }),
+    ).toEqual({
+      kind: "detached",
+      claimable: false,
+      deadline: claimWindowDeadline(stale).toISOString(),
     });
   });
 
@@ -32,13 +56,13 @@ describe("claim state", () => {
   it("treats a half-written record as detached", () => {
     expect(
       claimState({ secret: { team_id: "team-001" }, server: "https://api.zitadel.cloud" }),
-    ).toEqual({ kind: "detached" });
+    ).toEqual({ kind: "detached", claimable: true });
     expect(
       claimState({
         secret: { claimed_at: ATTACHED.claimed_at },
         server: "https://api.zitadel.cloud",
       }),
-    ).toEqual({ kind: "detached" });
+    ).toEqual({ kind: "detached", claimable: true });
   });
 
   it("is not applicable off the cloud, attached or not", () => {
@@ -51,6 +75,7 @@ describe("claim state", () => {
   it("recognises cloud subdomains", () => {
     expect(claimState({ secret: DETACHED, server: "https://eu-1.zitadel.cloud" })).toEqual({
       kind: "detached",
+      claimable: true,
     });
   });
 });
@@ -91,11 +116,23 @@ describe("claim copy", () => {
     expect(box.text).not.toContain("npx");
   });
 
+  // The closed-window counterpart must not quote the claim command anywhere:
+  // the server is guaranteed to refuse it, so the only honest pointer is a
+  // fresh setup.
+  it("drops the claim command once the window has closed", () => {
+    const closed = claimWindowClosedAction("0.1.0");
+    expect(closed).toContain("no longer be claimed");
+    expect(closed).toContain("npx @zitadel/cli@latest setup");
+    expect(closed).not.toContain("claim ");
+    expect(closed).not.toMatch(/delete|removed|expire/i);
+  });
+
   // `unclaimed` is banned from the public docs by the vocabulary gate; keeping
   // it out of the strings themselves is what makes that gate easy to keep.
   it("stays on the vocabulary the claim command established", () => {
     expect(claimAction("0.1.0")).not.toMatch(/\bunclaimed\b/i);
     expect(claimBoxAction("0.1.0").text).not.toMatch(/\bunclaimed\b/i);
+    expect(claimWindowClosedAction("0.1.0")).not.toMatch(/\bunclaimed\b/i);
   });
 });
 

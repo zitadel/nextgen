@@ -269,6 +269,35 @@ describe("claim", () => {
     expect(secret.team_id).toBeUndefined();
   });
 
+  // A challenge minted in the window's last minutes outlives it: the poll
+  // must then surface the same non-retryable refusal as init, not the
+  // "start a new link" advice a fresh challenge cannot honor.
+  it("maps a window that closes mid-poll to the non-retryable explanation", async () => {
+    const { cwd, project } = await makeProject();
+
+    const [res] = await Promise.all([
+      claim(cwd),
+      onChallengeMinted(() => expireClaimWindow(project.id)),
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      message: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("14 days");
+    expect(json.message).toContain("no longer be claimed");
+    expect((json.next_commands ?? []).some((command) => command.includes("claim"))).toBe(false);
+
+    const secret = await readSecret(cwd);
+    expect(secret.claimed_at).toBeUndefined();
+    expect(secret.team_id).toBeUndefined();
+  });
+
   it("stops waiting at --timeout and leaves the secret untouched", async () => {
     const { cwd } = await makeProject();
 

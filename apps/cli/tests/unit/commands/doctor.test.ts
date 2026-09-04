@@ -118,9 +118,13 @@ async function makeHealthyProject(): Promise<string> {
 
 /**
  * Rewrites the secret without `claimed_at`/`team_id`, i.e. a project that has
- * been set up but never claimed — the state every project starts in.
+ * been set up but never claimed — the state every project starts in. The
+ * creation time defaults to recent so the claim window reads as open.
  */
-async function writeDetachedSecret(cwd: string): Promise<void> {
+async function writeDetachedSecret(
+  cwd: string,
+  createdAt = new Date(Date.now() - 60_000).toISOString(),
+): Promise<void> {
   await writeFile(
     join(cwd, ".zitadel/secret"),
     JSON.stringify({
@@ -128,7 +132,7 @@ async function writeDetachedSecret(cwd: string): Promise<void> {
       project_secret: "sk_proj_test",
       preview_secret: "sk_proj_preview",
       preview_origins: [],
-      created_at: "2026-01-01T00:00:00.000Z",
+      created_at: createdAt,
     }),
   );
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
@@ -191,6 +195,27 @@ describe("doctor command", () => {
     expect(claim?.status).toBe("warn");
     expect(claim?.message).toContain("temporary until you attach it to a team");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // Same advisory posture, opposite guidance: past the 14-day window the
+  // server refuses the claim, so suggesting the command would be a guaranteed
+  // failure.
+  it("stops advertising claim once the window has closed", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { ok: boolean; checks: Check[]; next_actions?: string[]; next_commands?: string[] };
+    };
+    expect(json.data.ok).toBe(true);
+    const claim = json.data.checks.find((check) => check.name === "claim");
+    expect(claim?.status).toBe("warn");
+    expect(claim?.message).toContain("no longer be claimed");
+    expect((json.data.next_actions ?? []).join("\n")).toContain("no longer be claimed");
+    expect(json.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim"));
   });
 
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
