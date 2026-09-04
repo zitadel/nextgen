@@ -4347,7 +4347,11 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 // Polled by the CLI while a browser completes the claim. Authorized by the
 // project secret that initiated the challenge. Returns `pending`, or
 // `completed` with the owning team, the claim timestamp, and the dashboard
-// URL once the browser leg has finished.
+// URL once the project is claimed. The claim grant, not the polled
+// challenge, is the source of truth: a project claimed through another
+// concurrent challenge also reports `completed`, and a completed claim
+// keeps reporting `completed` past this challenge's expiry and past the
+// project's claim window.
 //
 // GET /projects/{project_id}/claim/status
 func (s *Server) handleGetClaimStatusRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
