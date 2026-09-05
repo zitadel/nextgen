@@ -72,6 +72,18 @@ resource "google_project_iam_member" "infra_apply_iam" {
   member   = "serviceAccount:${google_service_account.infra_apply.email}"
 }
 
+# Env projects: Spanner. Adopted rather than introduced — this binding is
+# already in state and applied, from work done on the mgmt tier after the
+# original infra branch was abandoned. It is declared here so the mgmt plan
+# reflects reality; without it the plan proposes destroying a live binding.
+# Whether a CI identity should hold spanner.admin at all is #1163.
+resource "google_project_iam_member" "infra_apply_spanner" {
+  for_each = var.env_project_ids
+  project  = each.value
+  role     = "roles/spanner.admin"
+  member   = "serviceAccount:${google_service_account.infra_apply.email}"
+}
+
 # Mgmt project: read Artifact Registry. Terraform needs this to update
 # Cloud Run services in env projects whose image lives in the mgmt AR repo —
 # Cloud Run validates cross-project image pull permission for the caller on
