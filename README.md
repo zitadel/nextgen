@@ -66,6 +66,44 @@ deletes it. In a fresh directory, `setup` walks through the scaffold choices
 directory. It installs dependencies with the detected package manager; pass
 `--skip-install` if you want to install them yourself.
 
+## Claim your project
+
+The project the quick start above creates is temporary until you attach it
+to a team on Zitadel Cloud. Point `setup` at a hosted server instead of
+`local` (so there's no runtime to `start`/`stop`), then claim it once the app
+is up:
+
+```sh
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha setup --server <your-zitadel-cloud-url>
+npm run dev
+```
+
+Register/log in through the app as above, then:
+
+```sh
+npx @zitadel/cli@alpha claim
+```
+
+This opens a browser so you can sign in with your own Zitadel account (not
+one of the app's end users) and attach the project to your team. The link
+prints before any browser opens, so it works over SSH or headless too
+(`--no-open`); nothing about the running project changes.
+
+> **Trying this before deploying to Zitadel Cloud:** claiming needs a server
+> with a platform project bootstrapped, which Zitadel Cloud has by default.
+> To exercise the same flow locally today, run the Docker deploy with the
+> platform project enabled and use `http://localhost:8080` in place of the
+> cloud URL above — see [docker-compose.md](docs/quick-start/docker-compose.md)
+> and [configuration.md § Platform](docs/quick-start/configuration.md#platform).
+> This box goes away once claiming against Zitadel Cloud is verified
+> end to end.
+
+Claiming is a strong signal for adoption, so once the cloud path above is
+verified end to end, this is proposed to become the primary customer quick
+start — author a project locally, connect it to an app, claim it on Zitadel
+Cloud — rather than a separate section.
+
 ## Manual Docker quick start
 
 Run the API and embedded UIs with Docker Compose when you want to inspect the
