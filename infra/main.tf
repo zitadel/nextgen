@@ -84,7 +84,13 @@ module "cloud_run" {
   vpc_network_id      = module.network.network_id
   vpc_subnet_id       = module.network.subnet_id
 
-  depends_on = [module.project]
+  master_key_secret_id        = module.secrets.master_key_secret_id
+  database_postgres_secret_id = module.secrets.database_postgres_secret_id
+
+  # Not just the secret containers: the revision cannot start until the runtime
+  # SA can actually read them, and those bindings live in the secrets module
+  # too. The variables above only create a dependency on the containers.
+  depends_on = [module.project, module.secrets]
 }
 
 module "load_balancer" {

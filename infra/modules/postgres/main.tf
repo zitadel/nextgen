@@ -44,6 +44,15 @@ resource "google_sql_database_instance" "zitadel" {
     }
   }
 
+  lifecycle {
+    # disk_autoresize grows the disk behind OpenTofu's back, which leaves
+    # var.disk_size_gb below the real size. The provider reads config-below-state
+    # as a shrink (ForceNewIfChange on settings.0.disk_size) and plans a
+    # destroy/recreate — and dev runs with deletion_protection = false, so the
+    # auto-apply job would carry it out. Own the floor, not the current size.
+    ignore_changes = [settings[0].disk_size]
+  }
+
   depends_on = [google_service_networking_connection.private_vpc_connection]
 }
 

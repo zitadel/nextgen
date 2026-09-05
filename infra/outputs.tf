@@ -44,17 +44,17 @@ output "dns_name_servers" {
 }
 
 output "certificate_map_name" {
-  description = "Certificate Manager map name (runtime infra.rs populates entries)"
+  description = "Certificate Manager map name (entries are added per tenant at onboarding)"
   value       = module.certificate_map.map_name
 }
 
 output "url_map_name" {
-  description = "GLB URL map name (runtime infra.rs adds host rules)"
+  description = "GLB URL map name (host rules are added per tenant at onboarding)"
   value       = module.load_balancer.url_map_name
 }
 
 output "backend_service_name" {
-  description = "GLB backend service name (referenced by cloud.gcp config)"
+  description = "GLB backend service name"
   value       = module.load_balancer.backend_service_name
 }
 

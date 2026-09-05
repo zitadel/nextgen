@@ -28,26 +28,13 @@ resource "google_project_iam_member" "run_metrics" {
   member  = "serviceAccount:${google_service_account.run.email}"
 }
 
-# Certificate Manager — runtime domain provisioning (infra.rs)
-resource "google_project_iam_member" "run_cert_manager" {
-  project = var.project_id
-  role    = "roles/certificatemanager.editor"
-  member  = "serviceAccount:${google_service_account.run.email}"
-}
-
-# Load Balancer — runtime host rule management (infra.rs)
-resource "google_project_iam_member" "run_lb_admin" {
-  project = var.project_id
-  role    = "roles/compute.loadBalancerAdmin"
-  member  = "serviceAccount:${google_service_account.run.email}"
-}
-
-# DNS — runtime DNS authorization records (infra.rs)
-resource "google_project_iam_member" "run_dns" {
-  project = var.project_id
-  role    = "roles/dns.admin"
-  member  = "serviceAccount:${google_service_account.run.email}"
-}
+# Deliberately absent: certificatemanager.editor, compute.loadBalancerAdmin and
+# dns.admin. They were granted for a runtime ("infra.rs") that provisions
+# customer certificates and host rules itself. No such runtime exists in this
+# repository — there is no Rust, and no Certificate Manager, Compute or DNS
+# client in go.mod — so on the identity that terminates internet traffic they
+# were blast radius and nothing else. Restore them, narrowed, when the component
+# that needs them actually lands.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Service Account: zitadel-migrator (Cloud Run Job for schema migrations)

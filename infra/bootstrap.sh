@@ -28,14 +28,19 @@ cat <<NEXT
    tofu init -backend-config=mgmt.tfbackend
    tofu apply -var-file=mgmt.tfvars
 
-3. Note the outputs and set GitHub repository variables:
+3. Note the outputs and set the GitHub repository variables:
 
-   GCP_MGMT_PROJECT_ID:       ${PROJECT_ID}
    GCP_INFRA_WIF_PROVIDER:    (from tofu output wif_provider)
    GCP_INFRA_SERVICE_ACCOUNT: (from tofu output infra_apply_sa_email)
    GCP_WIF_PROVIDER:          (from tofu output wif_provider)
    GCP_WIF_SERVICE_ACCOUNT:   (from tofu output github_deploy_sa_email)
-   AR_REGION:                 ${REGION}
+
+   And, on each environment rather than the repository:
+
+   GCP_PROJECT_ID:            (that environment's project, e.g. zitadel-dev-492704)
+   GCP_REGION:                ${REGION}
+
+   See infra/README.md for what reads each one.
 
 4. Apply the dev environment:
 
