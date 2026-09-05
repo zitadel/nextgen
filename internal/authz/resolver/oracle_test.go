@@ -132,8 +132,34 @@ func TestOracle_HandBuilt(t *testing.T) {
 				domain.NewUserTeamMembershipEdge("p1", "eng", "alice"),
 			},
 		}
-		assert.True(t, g.OracleFoothold("p1", domain.AuthzPrincipalTypeUser, "alice"))
-		assert.False(t, g.OracleFoothold("p1", domain.AuthzPrincipalTypeUser, "bob"))
+		assert.True(t, g.OracleFoothold("p1", "", domain.AuthzPrincipalTypeUser, "alice"))
+		assert.False(t, g.OracleFoothold("p1", "", domain.AuthzPrincipalTypeUser, "bob"))
+	})
+
+	t.Run("foreign team foothold uses home", func(t *testing.T) {
+		g := Graph{
+			Closure: closure,
+			Assignments: []*domain.AuthzAssignment{{
+				ProjectID: "customer", CatalogID: "c1",
+				PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "agency",
+				ObjectType: "project", Relation: "viewer",
+				ScopeKind: domain.AuthzScopeKindProject,
+			}},
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("platform", "agency", "alice"),
+			},
+		}
+		assert.True(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", "project", "viewer"))
+		assert.False(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", "team", "member"))
+		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
+		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "bob"))
+
+		noGrant := Graph{
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("platform", "agency", "alice"),
+			},
+		}
+		assert.False(t, noGrant.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
 	})
 
 	t.Run("sk_team constraint", func(t *testing.T) {

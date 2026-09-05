@@ -94,6 +94,13 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 	assert.Contains(t, w.args, "user_a")
 	assert.Contains(t, w.args, "proj_home")
 	assert.Contains(t, w.args, domain.AuthzPrincipalTypeUser.String())
+	homeBinds := 0
+	for _, arg := range w.args {
+		if arg == "proj_home" {
+			homeBinds++
+		}
+	}
+	assert.GreaterOrEqual(t, homeBinds, 2, "home must bind in both the allowed arm and the foothold arm")
 }
 
 func TestWriteActiveSystemCatalogID(t *testing.T) {
@@ -168,10 +175,29 @@ func TestWriteCheckAuthzConstraintTeam(t *testing.T) {
 func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
-	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", domain.AuthzPrincipalTypeUser, "user_a")
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", "", domain.AuthzPrincipalTypeUser, "user_a")
 	assert.Contains(t, w.b.String(), "NOW_SENTINEL")
 	assert.Contains(t, w.args, "proj_1")
 	assert.Contains(t, w.args, "user_a")
+}
+
+func TestWriteHasAuthzProjectFootholdDistinctHome(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_customer", "proj_platform", domain.AuthzPrincipalTypeUser, "user_a")
+	sql := w.b.String()
+	bind := func(fragment string) any {
+		t.Helper()
+		i := strings.Index(sql, fragment)
+		require.NotEqual(t, -1, i, "missing %q in:\n%s", fragment, sql)
+		n := strings.Count(sql[:i+len(fragment)], "?") - 1
+		require.GreaterOrEqual(t, n, 0)
+		require.Less(t, n, len(w.args))
+		return w.args[n]
+	}
+	assert.Equal(t, "proj_customer", bind("a.project_id = ?"), "assignment filter binds the protected project")
+	assert.Equal(t, "proj_platform", bind("e.project_id = ?\n          AND e.set_type = 'team'"), "team expand binds the home project")
+	assert.Equal(t, "proj_customer", bind("e.project_id = ?\n          AND e.member_type = 'user'"), "local membership shortcut stays on the protected project")
 }
 
 // Folding the constant arms back inside the correlated EXISTS changes only

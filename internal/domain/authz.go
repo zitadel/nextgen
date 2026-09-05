@@ -391,12 +391,17 @@ type AuthzCheckParams struct {
 	ResourceTeamID string
 }
 
+// AuthzHomeProjectID returns home when set, otherwise projectID.
+func AuthzHomeProjectID(home, projectID string) string {
+	if home != "" {
+		return home
+	}
+	return projectID
+}
+
 // HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.
 func (p AuthzCheckParams) HomeProjectID() string {
-	if p.PrincipalHomeProjectID != "" {
-		return p.PrincipalHomeProjectID
-	}
-	return p.ProjectID
+	return AuthzHomeProjectID(p.PrincipalHomeProjectID, p.ProjectID)
 }
 
 // AuthzListObjectsParams lists resource_scope_index ids the principal may see
