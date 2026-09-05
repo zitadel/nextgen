@@ -359,6 +359,22 @@ func TestRequireProjectAccess(t *testing.T) {
 		err := requireProjectAccess(operator, narrow, "proj_a", userAccess, opWrite)
 		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 	})
+
+	t.Run("foreign-home operator with foothold is forbidden not missed", func(t *testing.T) {
+		deny := false
+		foothold := true
+		narrow := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
+		foreignHome := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID:     "proj_platform",
+			Scope:         []string{"project.write", "project.read"},
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		})
+		err := requireProjectAccess(foreignHome, narrow, "proj_customer", userAccess, opWrite)
+		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+		err = requireProjectAccess(foreignHome, stubAuthzStmts{}, "proj_customer", userAccess, opWrite)
+		assertDomainCode(t, err, domain.ErrUserInvalid().Code)
+	})
 }
 
 func TestRequireProjectListAccess(t *testing.T) {
@@ -408,6 +424,27 @@ func TestRequireProjectListAccess(t *testing.T) {
 	}
 	if filter.PrincipalHomeProjectID != "proj_a" {
 		t.Fatalf("PrincipalHomeProjectID = %q, want credential home proj_a", filter.PrincipalHomeProjectID)
+	}
+
+	foreignHome := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		Scope:         []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+	ctx, err = requireProjectListAccess(foreignHome, narrow, "proj_customer", userAccess, domain.ResourceKindUser)
+	if err != nil {
+		t.Fatalf("foreign-home Forbidden with foothold should proceed for partial-view lists: %v", err)
+	}
+	filter, ok = service.AuthzListFilterFromContext(ctx)
+	if !ok {
+		t.Fatal("foreign-home Forbidden must attach the EXISTS list filter")
+	}
+	if filter.ProjectID != "proj_customer" {
+		t.Fatalf("filter ProjectID = %q, want proj_customer", filter.ProjectID)
+	}
+	if filter.PrincipalHomeProjectID != "proj_platform" {
+		t.Fatalf("PrincipalHomeProjectID = %q, want credential home proj_platform", filter.PrincipalHomeProjectID)
 	}
 
 	_, err = requireProjectListAccess(operator, stmts, "proj_b", userAccess, domain.ResourceKindUser)

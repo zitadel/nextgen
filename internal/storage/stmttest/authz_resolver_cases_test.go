@@ -736,5 +736,52 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			require.NoError(t, err)
 			assert.False(t, ok)
 		})
+
+		t.Run("foreign team grant empty home does not expand", func(t *testing.T) {
+			g := seedForeignTeamGrant(t, d.stmts, true)
+			params := g.checkParams("project", "viewer")
+			params.PrincipalHomeProjectID = ""
+			allowed, foothold := check(t, params)
+			assert.False(t, allowed)
+			assert.False(t, foothold)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), g.customer, "", domain.AuthzPrincipalTypeUser, g.userID)
+			require.NoError(t, err)
+			assert.False(t, ok)
+		})
+
+		t.Run("foreign team grant wrong home does not expand", func(t *testing.T) {
+			g := seedForeignTeamGrant(t, d.stmts, true)
+			params := g.checkParams("project", "viewer")
+			params.PrincipalHomeProjectID = g.customer
+			allowed, foothold := check(t, params)
+			assert.False(t, allowed)
+			assert.False(t, foothold)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), g.customer, g.customer, domain.AuthzPrincipalTypeUser, g.userID)
+			require.NoError(t, err)
+			assert.False(t, ok)
+		})
+
+		t.Run("local membership shortcut ignores distinct home", func(t *testing.T) {
+			g := seedForeignTeamGrant(t, d.stmts, false)
+			localTeam := "team_local_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(g.customer, localTeam)))
+			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(g.customer, localTeam, g.userID)))
+			allowed, foothold := check(t, g.checkParams("project", "viewer"))
+			assert.False(t, allowed)
+			assert.True(t, foothold)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), g.customer, g.platform, domain.AuthzPrincipalTypeUser, g.userID)
+			require.NoError(t, err)
+			assert.True(t, ok)
+		})
+
+		t.Run("foreign team grant lists customer resources", func(t *testing.T) {
+			g := seedForeignTeamGrant(t, d.stmts, true)
+			res := "usr_listed_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(g.customer, res)))
+			assert.Contains(t, listUsers(t, g.checkParams("project", "viewer")), res)
+			emptyHome := g.checkParams("project", "viewer")
+			emptyHome.PrincipalHomeProjectID = ""
+			assert.NotContains(t, listUsers(t, emptyHome), res)
+		})
 	})
 }
