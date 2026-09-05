@@ -221,8 +221,15 @@ func TestGrantService_Create_EventUsesAssignmentProject(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, got)
+	assert.Equal(t, domain.EventTypeAuthzGranted, got.EventType)
+	assert.Equal(t, domain.EventCategoryAdmin, got.Category)
 	assert.Equal(t, "proj_customer", got.ProjectID)
 	assert.Nil(t, got.TeamID)
+	require.NotNil(t, got.EntityType)
+	assert.Equal(t, "authz_assignment", *got.EntityType)
+	require.NotNil(t, got.EntityID)
+	assert.Equal(t, "asgn_test01", *got.EntityID)
+	assert.JSONEq(t, `{"principal_type":"user","principal_id":"user_grant01","relation":"viewer"}`, string(got.Payload))
 }
 
 func TestGrantService_Get(t *testing.T) {
@@ -337,7 +344,7 @@ func TestGrantService_Revoke(t *testing.T) {
 
 	t.Run("ok emits authz.revoked", func(t *testing.T) {
 		t.Parallel()
-		var emitted domain.EventType
+		var got *domain.Event
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(&domain.AuthzAssignment{
 				ID:            "asgn_1",
@@ -350,12 +357,19 @@ func TestGrantService_Revoke(t *testing.T) {
 			s.EXPECT().RevokeAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(nil)
 			s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(_ context.Context, e *domain.Event) error {
-					emitted = e.EventType
+					got = e
 					return nil
 				})
 		})
 		require.NoError(t, svc.Revoke(t.Context(), "proj_customer", "asgn_1"))
-		assert.Equal(t, domain.EventTypeAuthzRevoked, emitted)
+		require.NotNil(t, got)
+		assert.Equal(t, domain.EventTypeAuthzRevoked, got.EventType)
+		assert.Equal(t, "proj_customer", got.ProjectID)
+		require.NotNil(t, got.EntityType)
+		assert.Equal(t, "authz_assignment", *got.EntityType)
+		require.NotNil(t, got.EntityID)
+		assert.Equal(t, "asgn_1", *got.EntityID)
+		assert.JSONEq(t, `{"principal_type":"user","principal_id":"user_grant01","relation":"viewer"}`, string(got.Payload))
 	})
 
 	t.Run("already revoked is not found", func(t *testing.T) {

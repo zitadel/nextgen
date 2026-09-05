@@ -165,6 +165,47 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 		require.Equal(t, http.StatusUnauthorized, rec.Code)
 		require.JSONEq(t, want, rec.Body.String())
 	})
+
+	// Dual-scheme ops try nextgenSession when a cookie is present. A bad
+	// cookie must not rewrite to the session-only 401 copy.
+	t.Run("invalid session cookie", func(t *testing.T) {
+		t.Parallel()
+		tests := []struct {
+			name string
+			req  *http.Request
+		}{
+			{
+				name: "create",
+				req:  httptest.NewRequest(http.MethodPost, "/grants?project_id=proj_1", strings.NewReader(`{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`)),
+			},
+			{
+				name: "get",
+				req:  httptest.NewRequest(http.MethodGet, "/grants/asgn_1?project_id=proj_1", nil),
+			},
+			{
+				name: "delete",
+				req:  httptest.NewRequest(http.MethodDelete, "/grants/asgn_1?project_id=proj_1", nil),
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				mock := gomock.NewController(t)
+				tokenService := mocks.NewMockTokenService(mock)
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+				srv := newErrorHandlerTestServer(t, tokenService)
+
+				if tc.req.Method == http.MethodPost {
+					tc.req.Header.Set("Content-Type", "application/json")
+				}
+				tc.req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "garbage"})
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, tc.req)
+				require.Equal(t, http.StatusUnauthorized, rec.Code)
+				require.JSONEq(t, want, rec.Body.String())
+			})
+		}
+	})
 }
 
 func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
