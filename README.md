@@ -75,7 +75,7 @@ is up:
 
 ```sh
 npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha setup --server <your-zitadel-cloud-url>
+npx @zitadel/cli@alpha setup --server https://your-instance.zitadel.cloud
 npm run dev
 ```
 

@@ -23,7 +23,7 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | YAML key                     | Environment                          | Default | Description                                                                                                                                            |
 | ----------------------------- | ------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `platform.bootstrap_project` | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`  | `false` | Provisions the well-known platform project (encryption/signing keys, default user schema, default login flow) at startup. Needed for `zitadel claim` and self-registration to work on this deployment.   |
-| `platform.project_id`        | `NEXTGEN_PLATFORM_PROJECT_ID`         | (empty) | Pins an existing project as the platform project instead of bootstrapping one. Mutually exclusive with `bootstrap_project` unless set to its built-in id. Transitional (Console ADR 0004); expect it to be removed once bootstrap always provisions the platform project. |
+| `platform.project_id`        | `NEXTGEN_PLATFORM_PROJECT_ID`         | (empty) | Pins an existing project as the platform project instead of bootstrapping one. Mutually exclusive with `bootstrap_project` unless set to its built-in id. Transitional ([Console ADR 0004](../../apps/console/docs/adrs/0004-console-deployment-modes.md)); expect it to be removed once bootstrap always provisions the platform project. |
 
 To make claiming work against a local deployment, set both:
 
