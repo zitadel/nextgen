@@ -65,3 +65,17 @@ variable "data_dir" {
   type        = string
   default     = "/var/lib/zitadel/nextgen-data"
 }
+
+variable "runtime_secrets_ready" {
+  description = <<-DESC
+    Whether the runtime secrets hold at least one version each.
+
+    A Cloud Run revision cannot start against a secret with no versions, so
+    wiring the mount and the DSN before CI has seeded them would fail the very
+    apply that creates the containers. Ship a new environment with this false,
+    seed the secrets (deploy workflow, sync_secrets: true), then flip it — the
+    flip's plan shows the volume being added, which is the review gate for it.
+  DESC
+  type        = bool
+  default     = false
+}

@@ -38,13 +38,16 @@ resource "google_cloud_run_v2_service" "zitadel" {
     # `gcloud run services update --set-secrets` is declarative over volumes as
     # well as env, so a mount CI owned would be stripped by the next apply, and
     # the server would silently mint a throwaway key under the same ID.
-    volumes {
-      name = "master-key"
-      secret {
-        secret = var.master_key_secret_id
-        items {
-          path    = local.master_key_file_name
-          version = "latest"
+    dynamic "volumes" {
+      for_each = var.runtime_secrets_ready ? [1] : []
+      content {
+        name = "master-key"
+        secret {
+          secret = var.master_key_secret_id
+          items {
+            path    = local.master_key_file_name
+            version = "latest"
+          }
         }
       }
     }
@@ -63,20 +66,26 @@ resource "google_cloud_run_v2_service" "zitadel" {
         container_port = 8080
       }
 
-      volume_mounts {
-        name = "master-key"
-        # Mount the directory the server scans, not the file: Cloud Run mounts a
-        # secret volume as a directory, and the server picks keys up by file
-        # name from here.
-        mount_path = local.master_key_dir
+      dynamic "volume_mounts" {
+        for_each = var.runtime_secrets_ready ? [1] : []
+        content {
+          name = "master-key"
+          # Mount the directory the server scans, not the file: Cloud Run mounts
+          # a secret volume as a directory, and the server picks keys up by file
+          # name from here.
+          mount_path = local.master_key_dir
+        }
       }
 
-      env {
-        name = "NEXTGEN_DATABASE_POSTGRES"
-        value_source {
-          secret_key_ref {
-            secret  = var.database_postgres_secret_id
-            version = "latest"
+      dynamic "env" {
+        for_each = var.runtime_secrets_ready ? [1] : []
+        content {
+          name = "NEXTGEN_DATABASE_POSTGRES"
+          value_source {
+            secret_key_ref {
+              secret  = var.database_postgres_secret_id
+              version = "latest"
+            }
           }
         }
       }
