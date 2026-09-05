@@ -142,6 +142,25 @@ picked up with no config file and no secret in YAML.
 The `NEXTGEN_DATABASE_POSTGRES` DSN uses the `postgres_private_ip` and
 `postgres_database_name` outputs as inputs.
 
+## First deploy
+
+The runtime secrets are staged, because a Cloud Run revision cannot start
+against a secret that has no versions and OpenTofu creates the containers
+empty. Order matters exactly once, when an environment is new:
+
+1. **Apply the environment** with `runtime_secrets_ready = false` (the shipped
+   default). This creates the empty secret containers and their IAM bindings and
+   leaves the service alone.
+2. **Seed the secrets**: run the *Deploy / Cloud Run* workflow with
+   `sync_secrets: true`. It pushes the environment's GitHub secrets into the
+   containers as their first versions.
+3. **Flip `runtime_secrets_ready` to true** in that environment's tfvars. The
+   plan on that one-line change shows the master-key volume and the
+   `NEXTGEN_DATABASE_POSTGRES` reference being added — which is the thing worth
+   reviewing before it applies.
+
+After that the flag stays true and deploys are just the workflow.
+
 ## Migrations
 
 `zitadel-migrate-<environment>` exists but is **not wired**. The released binary

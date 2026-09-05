@@ -140,3 +140,9 @@ variable "deletion_protection" {
   type        = bool
   default     = true
 }
+
+variable "runtime_secrets_ready" {
+  description = "Set true once the runtime secrets have versions; see the cloud-run module for why this is staged."
+  type        = bool
+  default     = false
+}

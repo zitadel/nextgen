@@ -22,3 +22,8 @@ cloud_run_min_instances = 0
 cloud_run_max_instances = 5
 
 github_deploy_sa_email = "github-deploy@zitadel-ops.iam.gserviceaccount.com"
+
+# Flip to true once the secrets hold a version each — this apply creates the
+# empty containers, and a revision cannot start against an empty secret. See
+# "First deploy" in infra/README.md.
+runtime_secrets_ready = false

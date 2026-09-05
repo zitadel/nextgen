@@ -86,6 +86,7 @@ module "cloud_run" {
 
   master_key_secret_id        = module.secrets.master_key_secret_id
   database_postgres_secret_id = module.secrets.database_postgres_secret_id
+  runtime_secrets_ready       = var.runtime_secrets_ready
 
   # Not just the secret containers: the revision cannot start until the runtime
   # SA can actually read them, and those bindings live in the secrets module
