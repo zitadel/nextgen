@@ -1,3 +1,10 @@
+locals {
+  master_key_dir = "${var.data_dir}/master-keys"
+  # The file name doubles as the key ID the server reports, so it is stable on
+  # purpose: changing it would look like a new key rather than the same one.
+  master_key_file_name = "master-key.pem"
+}
+
 resource "google_cloud_run_v2_service" "zitadel" {
   name                = "zitadel-${var.environment}"
   location            = var.region
@@ -24,6 +31,24 @@ resource "google_cloud_run_v2_service" "zitadel" {
       max_instance_count = var.max_instances
     }
 
+    # The master key is a mounted file, not an env var: server.master_keys is a
+    # map keyed by key ID and Viper cannot fill map keys from the environment,
+    # but the server does discover keys in its master key directory by file
+    # name. OpenTofu owns the volume rather than the deploy workflow — a
+    # `gcloud run services update --set-secrets` is declarative over volumes as
+    # well as env, so a mount CI owned would be stripped by the next apply, and
+    # the server would silently mint a throwaway key under the same ID.
+    volumes {
+      name = "master-key"
+      secret {
+        secret = var.master_key_secret_id
+        items {
+          path    = local.master_key_file_name
+          version = "latest"
+        }
+      }
+    }
+
     containers {
       # `image` is required to create the service, but the deploy workflow —
       # not OpenTofu — owns which release runs here, so it is listed under
@@ -38,6 +63,24 @@ resource "google_cloud_run_v2_service" "zitadel" {
         container_port = 8080
       }
 
+      volume_mounts {
+        name = "master-key"
+        # Mount the directory the server scans, not the file: Cloud Run mounts a
+        # secret volume as a directory, and the server picks keys up by file
+        # name from here.
+        mount_path = local.master_key_dir
+      }
+
+      env {
+        name = "NEXTGEN_DATABASE_POSTGRES"
+        value_source {
+          secret_key_ref {
+            secret  = var.database_postgres_secret_id
+            version = "latest"
+          }
+        }
+      }
+
       resources {
         limits = {
           cpu    = var.cpu
@@ -49,13 +92,19 @@ resource "google_cloud_run_v2_service" "zitadel" {
 
   lifecycle {
     ignore_changes = [
-      # Deploy workflow owns release-specific fields via `gcloud run services update`.
+      # The deploy workflow owns the release itself and nothing else: it runs
+      # `gcloud run services update --image` and stops there. Configuration —
+      # env, secrets, volumes — is OpenTofu's, so that an apply cannot undo a
+      # deploy and a deploy cannot undo an apply.
       template[0].containers[0].image,
       template[0].containers[0].command,
       template[0].containers[0].args,
-      template[0].containers[0].env,
       template[0].containers[0].startup_probe,
       template[0].containers[0].liveness_probe,
+      # The live container is named `nextgen-1` from an earlier console deploy.
+      # The name has no effect on a single-container service, and adopting it
+      # would otherwise roll a revision purely to null the field.
+      template[0].containers[0].name,
       # gcloud stamps these metadata fields on every update; Terraform should
       # leave them alone so drift-clearing applies don't trigger a new
       # revision (and the cross-project image validation that comes with it).

@@ -174,11 +174,20 @@ jobs:
     env:
       WORKING_DIR: infra/mgmt
     steps:
+      # Full history: the detection below diffs two arbitrary SHAs, and on the
+      # default depth-1 checkout neither is present. `git diff` then dies with
+      # "fatal: bad object" and — inside an `if` condition, where `set -e` does
+      # not fire — the failure was read as "nothing changed". This job reported
+      # success without running a plan on every PR it has ever seen, including
+      # the one that added infra/mgmt/ in the first place.
       - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Detect mgmt changes
         id: changed
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             base="${{ github.event.pull_request.base.sha }}"
             head="${{ github.event.pull_request.head.sha }}"
@@ -189,12 +198,18 @@ jobs:
           # An all-zero "before" sha means the branch was created by this
           # push; compare against origin/main instead.
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            git fetch --depth=1 origin main || true
+            git fetch origin main
             base="$(git rev-parse origin/main^)"
           fi
-          if git diff --name-only "$base" "$head" -- infra/mgmt/ | grep -q .; then
+          # Run the diff on its own so a git failure fails the step, instead of
+          # being swallowed by the pipeline that reads it.
+          changes="$(git diff --name-only "$base" "$head" -- infra/mgmt/)"
+          if [ -n "$changes" ]; then
+            echo "mgmt files changed:"
+            echo "$changes"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
+            echo "no mgmt changes between $base and $head"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -218,9 +233,17 @@ jobs:
         if: steps.changed.outputs.changed == 'true'
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          set -o pipefail
+          # -detailed-exitcode returns 2 for "there are changes", which is the
+          # case this job exists to report. Under the runner's `bash -e` that
+          # non-zero status killed the step before PLAN_EXIT was written, so the
+          # comment and summary steps were skipped exactly when they mattered.
+          # Capture the code, then fail only on a real error (1).
+          set +e
           tofu plan -var-file=mgmt.tfvars -no-color -detailed-exitcode 2>&1 | tee /tmp/mgmt-plan.txt
-          echo "PLAN_EXIT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "PLAN_EXIT=$rc" >> "$GITHUB_ENV"
+          [ "$rc" != 1 ]
 
       - name: Publish plan to step summary
         if: steps.changed.outputs.changed == 'true'

@@ -50,16 +50,17 @@ infra/
 | Cloud Run image, command, env, probes | GitHub Actions deploy workflow | App releases    |
 | Secret containers + access bindings | `infra/` (OpenTofu, per env)   | Infra changes     |
 | Runtime secret *values*             | GitHub environment secrets     | Secret rotations  |
-| Customer certs + host rules         | Zitadel runtime (`infra.rs`)   | Tenant onboarding |
+| Customer certs + host rules         | Not yet implemented            | Tenant onboarding |
 
 ## Getting started
 
 ### 1. Bootstrap (one-time)
 
 ```bash
-# Create the GCS state bucket in the management project
-export PROJECT_ID=zitadel-ops
-./bootstrap.sh
+# Create the GCS state bucket in the management project.
+# bootstrap.sh lives in this directory, so run it from infra/.
+cd infra
+PROJECT_ID=zitadel-ops ./bootstrap.sh
 ```
 
 ### 2. Apply management config (one-time, locally)
@@ -67,17 +68,37 @@ export PROJECT_ID=zitadel-ops
 ```bash
 cd infra/mgmt
 # Edit mgmt.tfvars with your project IDs and GitHub repo
-tofu init -backend-config="bucket=zitadel-ops-tofu-state" -backend-config="prefix=mgmt"
+tofu init -backend-config=mgmt.tfbackend
 tofu apply -var-file=mgmt.tfvars
 ```
 
-Set GitHub repository variables from the outputs (see bootstrap.sh for the full list).
+### 3. Set the GitHub variables
 
-### 3. Apply environment (locally or via CI)
+Repository variables (Settings → Secrets and variables → Actions → Variables):
+
+| Variable                    | Value                          | Used by                        |
+| --------------------------- | ------------------------------ | ------------------------------ |
+| `GCP_INFRA_WIF_PROVIDER`    | `tofu output wif_provider`     | `infra.yml` — plan and apply   |
+| `GCP_INFRA_SERVICE_ACCOUNT` | `tofu output infra_apply_sa_email` | `infra.yml` — plan and apply |
+| `GCP_WIF_PROVIDER`          | `tofu output wif_provider`     | `deploy.yml`                   |
+| `GCP_WIF_SERVICE_ACCOUNT`   | `tofu output github_deploy_sa_email` | `deploy.yml`             |
+
+Environment variables, on the `dev` environment rather than the repository, so
+each environment names its own target:
+
+| Variable         | Value                | Used by      |
+| ---------------- | -------------------- | ------------ |
+| `GCP_PROJECT_ID` | `zitadel-dev-492704` | `deploy.yml` |
+| `GCP_REGION`     | `us-central1`        | `deploy.yml` |
+
+The `dev` environment also carries the two secrets listed under
+[Secrets](#secrets) below.
+
+### 4. Apply environment (locally or via CI)
 
 ```bash
 cd infra
-tofu init -backend-config="bucket=zitadel-ops-tofu-state" -backend-config="prefix=infra/dev"
+tofu init -backend-config=environments/dev.tfbackend
 tofu apply -var-file=environments/dev.tfvars
 ```
 

@@ -49,3 +49,19 @@ variable "vpc_subnet_id" {
   description = "Subnet ID for Direct VPC Egress"
   type        = string
 }
+
+variable "master_key_secret_id" {
+  description = "Secret Manager ID of the server master key, mounted as a file into the master key directory"
+  type        = string
+}
+
+variable "database_postgres_secret_id" {
+  description = "Secret Manager ID of the Postgres connection string, exposed as NEXTGEN_DATABASE_POSTGRES"
+  type        = string
+}
+
+variable "data_dir" {
+  description = "Server data dir; the master key directory is resolved beneath it. Must match NEXTGEN_SERVER_DATA_DIR in the image."
+  type        = string
+  default     = "/var/lib/zitadel/nextgen-data"
+}
