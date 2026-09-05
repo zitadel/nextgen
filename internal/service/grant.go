@@ -83,7 +83,11 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*dom
 		if err := tx.Statements().CreateAuthzAssignment(ctx, asgn); err != nil {
 			return err
 		}
-		if err := emitAuthzGranted(ctx, tx.Statements(), asgn); err != nil {
+		if err := emitManagedGrant(ctx, tx.Statements(), domain.EventTypeAuthzGranted, asgn, domain.AuthzGrantedPayload{
+			PrincipalType: asgn.PrincipalType.String(),
+			PrincipalID:   asgn.PrincipalID,
+			Relation:      asgn.Relation,
+		}); err != nil {
 			return err
 		}
 		created = asgn
@@ -136,7 +140,11 @@ func (s *GrantService) Revoke(ctx context.Context, projectID, id string) error {
 			}
 			return err
 		}
-		return emitAuthzRevoked(ctx, tx.Statements(), asgn)
+		return emitManagedGrant(ctx, tx.Statements(), domain.EventTypeAuthzRevoked, asgn, domain.AuthzRevokedPayload{
+			PrincipalType: asgn.PrincipalType.String(),
+			PrincipalID:   asgn.PrincipalID,
+			Relation:      asgn.Relation,
+		})
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -226,17 +234,15 @@ func (s *GrantService) loadPrincipal(ctx context.Context, stmts AllStatements, h
 	}
 }
 
-func emitAuthzRevoked(ctx context.Context, stmts EventStatements, a *domain.AuthzAssignment) error {
-	return audit.Emit(ctx, stmts, audit.EmitSpec{
-		Type:       domain.EventTypeAuthzRevoked,
-		Category:   domain.EventCategoryAdmin,
-		ProjectID:  a.ProjectID,
-		EntityType: "authz_assignment",
-		EntityID:   a.ID,
-		Payload: domain.AuthzRevokedPayload{
-			PrincipalType: a.PrincipalType.String(),
-			PrincipalID:   a.PrincipalID,
-			Relation:      a.Relation,
-		},
-	})
+// emitManagedGrant writes a grant-API event on the assignment's project.
+// Project-scoped grants have no team_id; actor home is not copied onto the row.
+func emitManagedGrant(ctx context.Context, stmts EventStatements, typ domain.EventType, a *domain.AuthzAssignment, payload any) error {
+	ev := audit.WithEntity(audit.FromContext(ctx, typ, domain.EventCategoryAdmin), "authz_assignment", a.ID)
+	ev.ProjectID = a.ProjectID
+	ev.TeamID = nil
+	ev, err := audit.WithPayload(ev, payload)
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
 }

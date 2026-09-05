@@ -39,7 +39,7 @@ content:
         summary: grant.permission_denied
         value:
           code: grant.permission_denied
-          message: 'the grant management API requires the project secret'
+          message: 'insufficient permissions to manage grants'
       internal:
         summary: internal
         value:

@@ -308,18 +308,33 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
 		return resolver.DecisionUnspecified, errAuthzNoScope
 	}
-	if !hasOperatorProjectWrite(scope.Scope) {
-		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
-		if scope.ProjectID == "" || scope.ProjectID != projectID {
-			return resolver.DecisionUnspecified, errAuthzNoScope
-		}
-		return resolver.DecisionUnspecified, errAuthzPreviewDenied
+	if err := credentialCeiling(scope, projectID); err != nil {
+		return resolver.DecisionUnspecified, err
 	}
 	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
 	if err != nil {
 		return resolver.DecisionUnspecified, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
 	return dec, nil
+}
+
+// credentialCeiling is the pre-resolver gate on the credential plane.
+// Empty home fails closed. Users skip the secret write ceiling; secrets
+// still need project.write (ADR 053 §5).
+func credentialCeiling(scope ScopeContext, targetProjectID string) error {
+	if scope.ProjectID == "" {
+		return errAuthzNoScope
+	}
+	if scope.PrincipalType == domain.AuthzPrincipalTypeUser {
+		return nil
+	}
+	if hasOperatorProjectWrite(scope.Scope) {
+		return nil
+	}
+	if scope.ProjectID != targetProjectID {
+		return errAuthzNoScope
+	}
+	return errAuthzPreviewDenied
 }
 
 // hasOperatorProjectWrite is the credential-plane ceiling: only the full

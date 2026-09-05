@@ -110,6 +110,63 @@ func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
 	)
 }
 
+func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
+	t.Parallel()
+
+	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+
+	t.Run("missing credentials", func(t *testing.T) {
+		t.Parallel()
+		srv := newErrorHandlerTestServer(t, nil)
+		tests := []struct {
+			name string
+			req  *http.Request
+		}{
+			{
+				name: "create",
+				req:  httptest.NewRequest(http.MethodPost, "/grants?project_id=proj_1", strings.NewReader(`{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`)),
+			},
+			{
+				name: "get",
+				req:  httptest.NewRequest(http.MethodGet, "/grants/asgn_1?project_id=proj_1", nil),
+			},
+			{
+				name: "delete",
+				req:  httptest.NewRequest(http.MethodDelete, "/grants/asgn_1?project_id=proj_1", nil),
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				if tc.req.Method == http.MethodPost {
+					tc.req.Header.Set("Content-Type", "application/json")
+				}
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, tc.req)
+				require.Equal(t, http.StatusUnauthorized, rec.Code)
+				require.JSONEq(t, want, rec.Body.String())
+			})
+		}
+	})
+
+	t.Run("invalid bearer", func(t *testing.T) {
+		t.Parallel()
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+		srv := newErrorHandlerTestServer(t, tokenService)
+
+		req := httptest.NewRequest(http.MethodPost, "/grants?project_id=proj_1", strings.NewReader(`{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer garbage")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.JSONEq(t, want, rec.Body.String())
+	})
+}
+
 func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	t.Parallel()
 

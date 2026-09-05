@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -185,6 +186,43 @@ func TestGrantService_Create(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGrantService_Create_EventUsesAssignmentProject(t *testing.T) {
+	t.Parallel()
+
+	userID := "user_grant01"
+	homeTeam := "team_home"
+	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
+		ProjectID: "proj_platform",
+		TeamID:    &homeTeam,
+	})
+	var got *domain.Event
+	svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+		expectActiveUserPrincipal(s, userID)
+		s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, a *domain.AuthzAssignment) error {
+				a.ID = "asgn_test01"
+				a.CreatedAt = time.Now()
+				a.UpdatedAt = a.CreatedAt
+				return nil
+			})
+		s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, ev *domain.Event) error {
+				got = ev
+				return nil
+			})
+	})
+	_, err := svc.Create(ctx, service.CreateGrantInput{
+		ProjectID:     "proj_customer",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   userID,
+		Relation:      "viewer",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "proj_customer", got.ProjectID)
+	assert.Nil(t, got.TeamID)
 }
 
 func TestGrantService_Get(t *testing.T) {
