@@ -99,10 +99,10 @@ prints before any browser opens, so it works over SSH or headless too
 > This box goes away once claiming against Zitadel Cloud is verified
 > end to end.
 
-Claiming is a strong signal for adoption, so once the cloud path above is
+<!-- Claiming is a strong signal for adoption, so once the cloud path above is
 verified end to end, this is proposed to become the primary customer quick
 start — author a project locally, connect it to an app, claim it on Zitadel
-Cloud — rather than a separate section.
+Cloud — rather than a separate section. -->
 
 ## Manual Docker quick start
 
