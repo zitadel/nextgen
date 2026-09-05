@@ -1,0 +1,170 @@
+name: Deploy / Cloud Run
+
+# Deploys a published release image to the Cloud Run service that infra/
+# provisions. This workflow owns the release and nothing else: it sets
+# `--image` and stops there. Configuration — env, secrets, volumes — belongs to
+# OpenTofu, because `gcloud run services update --set-secrets` is declarative
+# over volumes as well as env, so a deploy that touched them would strip the
+# master-key mount the infra module declares.
+#
+# Manual dispatch on purpose. A `release: published` trigger would not fire:
+# the release is created by release-publish.yml using GITHUB_TOKEN, and events
+# raised by that token do not start new workflow runs. Auto-deploying dev on
+# every release is a reasonable follow-up via `workflow_run`, but a shared
+# environment is worth a deliberate button for now.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Released version to deploy, e.g. 1.0.0-alpha.20 (no leading v)."
+        required: true
+        type: string
+      environment:
+        description: "Target environment."
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+      sync_secrets:
+        description: "Push this environment's GitHub secrets to Secret Manager as new versions. Required once, before the environment's runtime_secrets_ready flag is flipped."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.version }} to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      VERSION: ${{ inputs.version }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SOURCE_IMAGE: ghcr.io/zitadel/nextgen
+
+    steps:
+      - name: Check required variables
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for v in PROJECT_ID REGION WIF_PROVIDER WIF_SERVICE_ACCOUNT; do
+            [ -n "${!v:-}" ] || missing+=("$v")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing Actions variables: ${missing[*]}. GCP_PROJECT_ID and GCP_REGION are set on the '${ENVIRONMENT}' environment; the WIF pair is repository-wide. See infra/README.md."
+            exit 1
+          fi
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # ── Image ────────────────────────────────────────────────────────────
+      # Cloud Run imports public images from GitHub Container Registry
+      # directly, so nothing is mirrored into Artifact Registry. Public images
+      # are cached for up to an hour, which cannot serve a stale image here
+      # because release tags are immutable — but resolving the digest and
+      # deploying that removes the question entirely, and makes the revision
+      # record exactly what shipped.
+      - name: Resolve the release digest
+        run: |
+          set -euo pipefail
+          if ! docker manifest inspect "${SOURCE_IMAGE}:${VERSION}" >/dev/null 2>&1; then
+            echo "::error::${SOURCE_IMAGE}:${VERSION} does not exist. Check the version input against the published releases."
+            exit 1
+          fi
+          digest="$(docker buildx imagetools inspect "${SOURCE_IMAGE}:${VERSION}" --format '{{.Manifest.Digest}}')"
+          if [ -z "$digest" ]; then
+            echo "::error::Could not resolve a digest for ${SOURCE_IMAGE}:${VERSION}."
+            exit 1
+          fi
+          echo "IMAGE=${SOURCE_IMAGE}@${digest}" >> "$GITHUB_ENV"
+          echo "resolved ${SOURCE_IMAGE}:${VERSION} to ${digest}"
+
+      # ── Secrets ──────────────────────────────────────────────────────────
+      # GitHub environment secrets are the source of truth; Secret Manager is
+      # the delivery mechanism Cloud Run requires. The containers and their IAM
+      # bindings come from OpenTofu (infra/modules/secrets), so this only ever
+      # adds a version — the deploy identity holds secretVersionAdder and
+      # cannot read a value back.
+      #
+      # Rotation is NOT this: a new version under the same file name keeps the
+      # same key ID, so old `kid`s resolve to the new key and
+      # MigrateToLatestMasterKey has nothing to do. Rotating the master key
+      # needs a new ID alongside the old one — see
+      # docs/operations/encryption-keys.md.
+      - name: Sync secrets to Secret Manager
+        if: ${{ inputs.sync_secrets }}
+        env:
+          MASTER_KEY_PEM: ${{ secrets.MASTER_KEY_PEM }}
+          DATABASE_POSTGRES_DSN: ${{ secrets.DATABASE_POSTGRES_DSN }}
+        run: |
+          set -euo pipefail
+          for pair in \
+            "MASTER_KEY_PEM:zitadel-master-key-${ENVIRONMENT}" \
+            "DATABASE_POSTGRES_DSN:zitadel-database-postgres-${ENVIRONMENT}"; do
+            var="${pair%%:*}"
+            secret="${pair#*:}"
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Environment secret $var is not set on the '${ENVIRONMENT}' environment."
+              exit 1
+            fi
+            # printf into gcloud over a pipe: the value never becomes an argv
+            # entry and never lands in a temporary file.
+            printf '%s' "${!var}" |
+              gcloud secrets versions add "$secret" --project="$PROJECT_ID" --data-file=- >/dev/null
+            echo "added a new version of $secret"
+          done
+
+      # ── Deploy ───────────────────────────────────────────────────────────
+      # Only the image. The service account, port, env, secrets and the
+      # master-key volume are OpenTofu's, and `services update` preserves what
+      # it is not asked to change.
+      #
+      # Migrations run at server startup: the binary has no `migrate`
+      # subcommand (#1138), so zitadel-migrate-<env> is not invoked here.
+      - name: Deploy to Cloud Run
+        run: |
+          set -euo pipefail
+          gcloud run services update "zitadel-${ENVIRONMENT}" \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --image="$IMAGE"
+
+      # `services update` already fails when the revision does not become
+      # ready, so this reports which revision won rather than re-checking it.
+      - name: Report the serving revision
+        run: |
+          set -euo pipefail
+          revision="$(gcloud run services describe "zitadel-${ENVIRONMENT}" \
+            --project="$PROJECT_ID" --region="$REGION" \
+            --format='value(status.latestReadyRevisionName)')"
+          {
+            echo "### Deployed"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${VERSION}\` |"
+            echo "| Image | \`${IMAGE}\` |"
+            echo "| Service | \`zitadel-${ENVIRONMENT}\` |"
+            echo "| Revision | \`${revision}\` |"
+            echo
+            echo "Ingress is internal-load-balancer only, so reach it through the load balancer, not the \`run.app\` URL."
+          } >> "$GITHUB_STEP_SUMMARY"
