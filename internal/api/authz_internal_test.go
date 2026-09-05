@@ -392,6 +392,15 @@ func TestRequireProjectAccess_UserPrincipalCrossProject(t *testing.T) {
 		stmts := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
 		err := requireProjectAccess(human, stmts, "proj_customer", grantAccess, opDelete)
 		assertDomainCode(t, err, domain.ErrGrantPermissionDenied().Code)
+		var de domain.Error
+		if !errors.As(err, &de) {
+			t.Fatalf("error is not a domain.Error: %v", err)
+		}
+		if strings.Contains(strings.ToLower(de.Message), "session") ||
+			strings.Contains(strings.ToLower(de.Message), "cookie") ||
+			strings.Contains(strings.ToLower(de.Message), "bearer") {
+			t.Fatalf("grant denial must stay credential-neutral, got %q", de.Message)
+		}
 	})
 
 	t.Run("missing home project fails closed", func(t *testing.T) {
@@ -400,6 +409,16 @@ func TestRequireProjectAccess_UserPrincipalCrossProject(t *testing.T) {
 			PrincipalID:   "user_alice",
 		})
 		err := requireProjectAccess(orphan, stubAuthzStmts{}, "proj_customer", grantAccess, opWrite)
+		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
+	})
+
+	t.Run("write-bearing secret with empty home fails closed", func(t *testing.T) {
+		unbound := WithScopeContext(context.Background(), ScopeContext{
+			Scope:         []string{"project.write", "project.read"},
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		})
+		err := requireProjectAccess(unbound, stubAuthzStmts{}, "proj_a", grantAccess, opWrite)
 		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
 	})
 }
@@ -443,6 +462,33 @@ func TestCredentialCeiling(t *testing.T) {
 		}, "proj_a")
 		if !errors.Is(err, errAuthzPreviewDenied) {
 			t.Fatalf("got %v, want preview denied", err)
+		}
+	})
+
+	t.Run("write-bearing secret with home is allowed on own and foreign targets", func(t *testing.T) {
+		scope := ScopeContext{
+			ProjectID:     "proj_a",
+			Scope:         []string{"project.write", "project.read"},
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		}
+		if err := credentialCeiling(scope, "proj_a"); err != nil {
+			t.Fatalf("own project: %v", err)
+		}
+		if err := credentialCeiling(scope, "proj_b"); err != nil {
+			t.Fatalf("foreign project: %v", err)
+		}
+	})
+
+	t.Run("preview on a foreign project is anti-oracle", func(t *testing.T) {
+		err := credentialCeiling(ScopeContext{
+			ProjectID:     "proj_a",
+			Scope:         []string{"project.read"},
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_a",
+		}, "proj_b")
+		if !errors.Is(err, errAuthzNoScope) {
+			t.Fatalf("got %v, want no scope", err)
 		}
 	})
 }

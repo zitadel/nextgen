@@ -177,6 +177,35 @@ func TestHandleNextgenSession(t *testing.T) {
 		require.Equal(t, "project-1", scope.ProjectID)
 		require.Equal(t, domain.AuthzPrincipalTypeUser, scope.PrincipalType)
 		require.Equal(t, "user-1", scope.PrincipalID)
+		require.Empty(t, scope.Scope, "session tokens mint an empty Scope; the user skip must not depend on project.write")
+	})
+
+	t.Run("session write scopes still mint a user principal", func(t *testing.T) {
+		t.Parallel()
+
+		token := &domain.Token{
+			ProjectID: "project-1",
+			TokenID:   "token-1",
+			UserID:    "user-1",
+			Type:      domain.TokenTypeSessionToken,
+			Scope:     []string{"project.write", "project.read"},
+			SessionID: new("session-1"),
+		}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
+
+		handler := NewSecurityHandler(tokenService)
+		ctx, err := handler.HandleNextgenSession(t.Context(), api.CreateGrantOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		require.NoError(t, err)
+
+		scope, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, domain.AuthzPrincipalTypeUser, scope.PrincipalType)
+		require.Equal(t, "user-1", scope.PrincipalID)
+		require.Equal(t, token.Scope, scope.Scope)
+		require.NotEqual(t, domain.AuthzPrincipalTypeSKProj, scope.PrincipalType)
 	})
 
 	t.Run("invalid token is an unsatisfied requirement", func(t *testing.T) {
