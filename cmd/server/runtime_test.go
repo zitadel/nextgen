@@ -207,6 +207,9 @@ func TestEnsureServerMasterKeyLoadsAllKeysAndMarksNewestForEncryption(t *testing
 // that only skips directories adopts it as a key named "..data". Startup then
 // fails in buildMasterKey with "is a directory".
 func TestEnsureServerMasterKeyIgnoresProjectedVolumeMetadata(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows needs elevated privileges or Developer Mode to create the symlinks this layout is made of")
+	}
 	dataDir := t.TempDir()
 	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
 	timestampedDir := filepath.Join(masterKeyDir, "..2026_09_05_12_00_00.123456")
@@ -229,13 +232,28 @@ func TestEnsureServerMasterKeyIgnoresProjectedVolumeMetadata(t *testing.T) {
 		UseForEncryption: true,
 	}, cfg.MasterKeys[masterKeyFileName])
 
-	// The mounted key was adopted, so no throwaway key was generated beside it.
-	assert.NoFileExists(t, filepath.Join(timestampedDir, "master-key-generated.pem"))
+	// The mounted key was adopted rather than generated over: the directory
+	// still holds exactly what the projection put there, and master-key.pem is
+	// still the symlink, not a regular file createMasterKey wrote.
+	entries, err := os.ReadDir(masterKeyDir)
+	require.NoError(t, err)
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	assert.ElementsMatch(t, []string{"..2026_09_05_12_00_00.123456", "..data", masterKeyFileName}, names)
+
+	info, err := os.Lstat(filepath.Join(masterKeyDir, masterKeyFileName))
+	require.NoError(t, err)
+	assert.NotZero(t, info.Mode()&os.ModeSymlink, "the mounted key should still be the projection's symlink")
 }
 
 // A symlink to a directory is not a key even without a dot prefix: DirEntry
 // reports on the link, so only following it tells the two apart.
 func TestEnsureServerMasterKeyIgnoresSymlinkedDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows needs elevated privileges or Developer Mode to create the symlinks this layout is made of")
+	}
 	dataDir := t.TempDir()
 	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
 	realDir := filepath.Join(masterKeyDir, "nested")
