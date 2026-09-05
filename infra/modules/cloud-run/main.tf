@@ -152,9 +152,14 @@ resource "google_cloud_run_v2_job" "migrate" {
 
       containers {
         # Create-time bootstrap value, for the same reason as the service
-        # above. Note the job is not wired to anything yet: the binary has no
-        # `migrate` subcommand (#1138), so this placeholder is what the job
-        # still runs.
+        # above; `image` is ignored below, so what the job actually carries is
+        # whatever was last set on it out of band — today an old zitadel image,
+        # not this placeholder.
+        #
+        # Nothing invokes the job either way: the binary has no `migrate`
+        # subcommand (#1138), so migrations run at server startup and pointing
+        # this at a release would start a server that never exits and fail on
+        # the timeout below.
         image = "us-docker.pkg.dev/cloudrun/container/hello-job"
 
         resources {
