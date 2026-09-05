@@ -672,6 +672,20 @@ func TestRequireResourceAccessDeleteSharedURLElsewhere(t *testing.T) {
 	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
 }
 
+func TestGrantPermissionDeniedMessageOmitsCredentialHints(t *testing.T) {
+	msg := strings.ToLower(domain.ErrGrantPermissionDenied().Message)
+	for _, banned := range []string{
+		"project secret",
+		"session",
+		"cookie",
+		"bearer",
+	} {
+		if strings.Contains(msg, banned) {
+			t.Fatalf("grant permission_denied must stay credential-neutral, got %q", domain.ErrGrantPermissionDenied().Message)
+		}
+	}
+}
+
 func assertDomainCode(t *testing.T, err error, wantCode string) {
 	t.Helper()
 	if err == nil {
