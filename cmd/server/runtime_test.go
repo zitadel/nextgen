@@ -194,3 +194,79 @@ func TestEnsureServerMasterKeyLoadsAllKeysAndMarksNewestForEncryption(t *testing
 	require.Len(t, forEncryption, 1)
 	assert.Equal(t, newest, forEncryption[0].File)
 }
+
+// TestEnsureServerMasterKeyIgnoresProjectedVolumeMetadata reproduces the layout
+// a Kubernetes-style projected secret volume creates — the shape Cloud Run and
+// GKE both mount secrets with:
+//
+//	..2026_09_05_12_00_00.123456/master-key.pem   the real file
+//	..data -> ..2026_09_05_12_00_00.123456        symlink to the timestamped dir
+//	master-key.pem -> ..data/master-key.pem       symlink to the key
+//
+// `..data` is a symlink, so DirEntry.IsDir() reports false for it and a scan
+// that only skips directories adopts it as a key named "..data". Startup then
+// fails in buildMasterKey with "is a directory".
+func TestEnsureServerMasterKeyIgnoresProjectedVolumeMetadata(t *testing.T) {
+	dataDir := t.TempDir()
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	timestampedDir := filepath.Join(masterKeyDir, "..2026_09_05_12_00_00.123456")
+	require.NoError(t, os.MkdirAll(timestampedDir, 0o700))
+
+	require.NoError(t, os.WriteFile(filepath.Join(timestampedDir, masterKeyFileName), []byte("key-material"), 0o600))
+	require.NoError(t, os.Symlink("..2026_09_05_12_00_00.123456", filepath.Join(masterKeyDir, "..data")))
+	require.NoError(t, os.Symlink(filepath.Join("..data", masterKeyFileName), filepath.Join(masterKeyDir, masterKeyFileName)))
+
+	cfg := &ServerConfig{DataDir: dataDir}
+	require.NoError(t, ensureServerMasterKey(cfg))
+
+	// Only the key itself is picked up: the "..data" symlink and the
+	// timestamped directory behind it are both ignored.
+	require.Len(t, cfg.MasterKeys, 1)
+	require.Contains(t, cfg.MasterKeys, masterKeyFileName)
+	assert.NotContains(t, cfg.MasterKeys, "..data")
+	assert.Equal(t, &MasterKeyConfig{
+		File:             filepath.Join(masterKeyDir, masterKeyFileName),
+		UseForEncryption: true,
+	}, cfg.MasterKeys[masterKeyFileName])
+
+	// The mounted key was adopted, so no throwaway key was generated beside it.
+	assert.NoFileExists(t, filepath.Join(timestampedDir, "master-key-generated.pem"))
+}
+
+// A symlink to a directory is not a key even without a dot prefix: DirEntry
+// reports on the link, so only following it tells the two apart.
+func TestEnsureServerMasterKeyIgnoresSymlinkedDirectory(t *testing.T) {
+	dataDir := t.TempDir()
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	realDir := filepath.Join(masterKeyDir, "nested")
+	require.NoError(t, os.MkdirAll(realDir, 0o700))
+	require.NoError(t, os.Symlink("nested", filepath.Join(masterKeyDir, "linked-dir")))
+
+	key := writeMasterKeyFile(t, masterKeyDir, masterKeyFileName, time.Now())
+
+	cfg := &ServerConfig{DataDir: dataDir}
+	require.NoError(t, ensureServerMasterKey(cfg))
+
+	require.Len(t, cfg.MasterKeys, 1)
+	assert.NotContains(t, cfg.MasterKeys, "linked-dir")
+	assert.Equal(t, &MasterKeyConfig{File: key, UseForEncryption: true}, cfg.MasterKeys[masterKeyFileName])
+}
+
+// A stray dotfile — an editor swap file, .DS_Store — must not become a key, and
+// must not suppress generation when it is the only thing in the directory.
+func TestEnsureServerMasterKeyIgnoresStrayDotfile(t *testing.T) {
+	dataDir := t.TempDir()
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	require.NoError(t, os.MkdirAll(masterKeyDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(masterKeyDir, ".DS_Store"), []byte("not a key"), 0o600))
+
+	cfg := &ServerConfig{DataDir: dataDir}
+	require.NoError(t, ensureServerMasterKey(cfg))
+
+	// The dotfile is not a key, so the directory counts as empty and a key is
+	// generated — under the generated name, not the dotfile's.
+	require.Len(t, cfg.MasterKeys, 1)
+	require.Contains(t, cfg.MasterKeys, masterKeyFileName)
+	assert.NotContains(t, cfg.MasterKeys, ".DS_Store")
+	assert.FileExists(t, filepath.Join(masterKeyDir, masterKeyFileName))
+}

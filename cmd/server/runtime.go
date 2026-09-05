@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -74,15 +75,29 @@ func ensureServerMasterKey(cfg *ServerConfig) error {
 	var newestFileModTime time.Time
 	keysFromDir := make(map[string]*MasterKeyConfig, len(files))
 	for _, file := range files {
-		if file.IsDir() {
+		// Skip dot-prefixed entries. A key's file name doubles as its key ID, so
+		// no key an operator authored starts with a dot — but plenty of
+		// machinery does. Kubernetes-style projected secret volumes (which
+		// Cloud Run and GKE both use for mounted secrets) fill the directory
+		// with `..data -> ..<timestamp>/` alongside the key itself, and
+		// editors and macOS leave swap files and .DS_Store behind.
+		if strings.HasPrefix(file.Name(), ".") {
 			continue
 		}
 
-		info, err := file.Info()
+		keyPath := filepath.Join(masterKeyDir, file.Name())
+		// os.Stat rather than file.Info(): DirEntry reports on the link itself,
+		// so a symlinked directory looks like a regular file and would be
+		// adopted as a key. Following the link also means the mod time that
+		// picks the newest key is the key's, not the link's.
+		info, err := os.Stat(keyPath)
 		if err != nil {
 			return fmt.Errorf("failed to get info of file %s: %w", file.Name(), err)
 		}
-		keyPath := filepath.Join(masterKeyDir, file.Name())
+		if info.IsDir() {
+			continue
+		}
+
 		if info.ModTime().After(newestFileModTime) {
 			newestFile = keyPath
 			newestFileModTime = info.ModTime()
