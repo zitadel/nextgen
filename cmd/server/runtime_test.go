@@ -143,6 +143,107 @@ server:
 	assert.Empty(t, entries, "no key file should be generated when a key is configured")
 }
 
+// Generation off is the production posture: on ephemeral storage a generated
+// key is minted per instance, and project KEKs wrapped by one instance cannot be
+// unwrapped by the next. Failing the start is the recoverable failure.
+func TestLoadConfigFailsWhenMasterKeyGenerationIsDisabled(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("NEXTGEN_SERVER_GENERATE_MASTER_KEY", "false")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	_, err := loadConfig(configPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no master key")
+	assert.Contains(t, err.Error(), flagDisableMasterKeyGeneration, "the error has to name the way back")
+
+	entries, err := os.ReadDir(filepath.Join(dataDir, defaultMasterKeyDirName))
+	require.NoError(t, err)
+	assert.Empty(t, entries, "a refused start must not leave a key behind")
+}
+
+func TestLoadConfigUsesTheKeyDirectoryWhenGenerationIsDisabled(t *testing.T) {
+	dataDir := t.TempDir()
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	require.NoError(t, os.MkdirAll(masterKeyDir, 0o700))
+	keyPath := writeMasterKeyFile(t, masterKeyDir, "mounted-key.pem", time.Now())
+
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("NEXTGEN_SERVER_GENERATE_MASTER_KEY", "false")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err, "a key that is present is still discovered with generation off")
+
+	// This is how a container gets its key: mounted into the directory, which
+	// is discovered by file name, with generation off as the guard.
+	if assert.Contains(t, cfg.Server.MasterKeys, "mounted-key.pem") {
+		assert.Equal(t, &MasterKeyConfig{File: keyPath, UseForEncryption: true},
+			cfg.Server.MasterKeys["mounted-key.pem"])
+	}
+}
+
+// The flag is the operator's last word: it has to beat a config file that says
+// the opposite, which is what makes it usable as a deployment-wide guard.
+func TestDisableMasterKeyGenerationFlagOutranksTheConfigFile(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+server:
+  generate_master_key: true
+`), 0o600))
+
+	// Without the flag the config file wins and a key is generated.
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	require.Len(t, cfg.Server.MasterKeys, 1)
+
+	cmd := NewCommand()
+	require.NoError(t, cmd.Flags().Set(flagDisableMasterKeyGeneration, "true"))
+	overrides, err := flagOverrides(cmd.Flags())
+	require.NoError(t, err)
+	require.Len(t, overrides, 1)
+
+	// A fresh data dir, so the key generated above is not the one found.
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+
+	_, err = loadConfig(configPath, overrides...)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no master key")
+}
+
+// The other half of the newest-file rule: a directory key is decrypt-only when
+// the config already carries keys, since the config is what names the key to
+// encrypt with. loadMasterKeysFromFileSystem decides that from one boolean, so
+// both of its answers need a test.
+func TestEnsureServerMasterKeyLeavesDirectoryKeysDecryptOnlyWhenKeysAreConfigured(t *testing.T) {
+	dataDir := t.TempDir()
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	require.NoError(t, os.MkdirAll(masterKeyDir, 0o700))
+	fromDir := writeMasterKeyFile(t, masterKeyDir, "rotated-out.pem", time.Now())
+
+	cfg := &ServerConfig{
+		DataDir: dataDir,
+		MasterKeys: map[string]*MasterKeyConfig{
+			"configured": {PrivateKey: "configured-private-key", UseForEncryption: true},
+		},
+	}
+	require.NoError(t, ensureServerMasterKey(cfg))
+
+	require.Len(t, cfg.MasterKeys, 2)
+	assert.Equal(t, &MasterKeyConfig{File: fromDir}, cfg.MasterKeys["rotated-out.pem"],
+		"a directory key must not take over encryption from the configured one")
+	assert.Equal(t, &MasterKeyConfig{PrivateKey: "configured-private-key", UseForEncryption: true},
+		cfg.MasterKeys["configured"])
+}
+
 func TestDefaultSQLitePathUsesDataDir(t *testing.T) {
 	dataDir := t.TempDir()
 	assert.Equal(t, filepath.Join(dataDir, "zitadel.db"), defaultSQLitePath(dataDir))
@@ -193,4 +294,25 @@ func TestEnsureServerMasterKeyLoadsAllKeysAndMarksNewestForEncryption(t *testing
 	}
 	require.Len(t, forEncryption, 1)
 	assert.Equal(t, newest, forEncryption[0].File)
+}
+
+// The variables this reports are the ones viper drops in silence: master_keys
+// is a map keyed by key id, and AutomaticEnv cannot discover a map key.
+func TestIgnoredMasterKeyEnv(t *testing.T) {
+	got := ignoredMasterKeyEnv([]string{
+		"NEXTGEN_SERVER_MASTER_KEYS_PRIMARY_USE_FOR_ENCRYPTION=true",
+		"NEXTGEN_SERVER_DATA_DIR=/var/lib/nextgen",
+		"NEXTGEN_SERVER_MASTER_KEYS_PRIMARY_PRIVATE_KEY=secret",
+		"PATH=/usr/bin",
+		"NEXTGEN_SERVER_MASTER_KEYSNOTAKEY=x",
+	})
+
+	assert.Equal(t, []string{
+		"NEXTGEN_SERVER_MASTER_KEYS_PRIMARY_PRIVATE_KEY",
+		"NEXTGEN_SERVER_MASTER_KEYS_PRIMARY_USE_FOR_ENCRYPTION",
+	}, got, "only the master key variables, named without their values, in a stable order")
+}
+
+func TestIgnoredMasterKeyEnvReportsNothingWhenNoneAreSet(t *testing.T) {
+	assert.Empty(t, ignoredMasterKeyEnv([]string{"NEXTGEN_SERVER_DATA_DIR=/tmp", "HOME=/root"}))
 }

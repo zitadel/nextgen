@@ -12,6 +12,7 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.address`         | `NEXTGEN_SERVER_ADDRESS`         | `:8080`                                                             | Listen address                                                                                         |
 | `server.data_dir`        | `NEXTGEN_SERVER_DATA_DIR`        | `nextgen-data` next to the binary                                   | Local runtime data root                                                                                |
 | `server.master_keys`     | — (YAML only)                    | auto-generated RSA master key under `<server.data_dir>/master-keys` | Master keys that wrap each project's key encryption key (KEK); see [Encryption keys](#encryption-keys) |
+| `server.generate_master_key` | `NEXTGEN_SERVER_GENERATE_MASTER_KEY` | `true`                                                          | Mint a master key when none is configured and the master key directory is empty; `false` (or `--disable-master-key-generation`) fails the start instead |
 | `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                              | Serve embedded management console                                                                      |
 | `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                                       | Console URL prefix                                                                                     |
 | `server.login_enabled`   | `NEXTGEN_SERVER_LOGIN_ENABLED`   | `true`                                                              | Serve embedded login shell                                                                             |
@@ -127,6 +128,17 @@ Exactly one key must be marked `use_for_encryption: true`.
 For local development, leave `server.master_keys` unset and persist
 `server.data_dir`: the server generates an RSA master key at
 `<server.data_dir>/master-keys/master-key.pem` and reuses it on subsequent starts.
+
+For anything else, turn that generation off with `server.generate_master_key: false` (or
+`--disable-master-key-generation`, which outranks the file and the environment). A start with no key then fails with an
+error naming the directory it looked in, instead of minting a key. This matters most on ephemeral storage: without the
+guard every instance and every revision mints its own key, and a project KEK wrapped by one of them cannot be unwrapped
+by the next — a failure that surfaces later, as data that cannot be decrypted.
+
+`server.master_keys` cannot be set from the environment: it is a map keyed by key id, and environment variables cannot
+populate map keys. `NEXTGEN_SERVER_MASTER_KEYS_*` variables are ignored, and the server logs a warning naming them at
+startup. Use the config file, or mount the key file into `<server.data_dir>/master-keys/`, where it is picked up by
+file name.
 
 To rotate the master key, add a new key marked `use_for_encryption: true` and keep the previous key (s) (as extra
 entries or as files in the master key directory) for decryption; existing project KEKs are re-encrypted under the new

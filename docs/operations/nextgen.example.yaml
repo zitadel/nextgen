@@ -6,6 +6,12 @@ server:
   # project, keyed by key ID. If unset, the server generates and reuses an RSA
   # master key under <data_dir>/master-keys. Exactly one key must be marked
   # use_for_encryption.
+  #
+  # Set generate_master_key to false (or pass --disable-master-key-generation)
+  # to fail the start instead of minting a key. Recommended anywhere the data
+  # dir is not durable: a per-instance key leaves the previous instance's
+  # project KEKs unwrappable.
+  # generate_master_key: false
   # master_keys:
   #   master-key:
   #     use_for_encryption: true
