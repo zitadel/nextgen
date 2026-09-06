@@ -39,15 +39,14 @@ async function renderAt(path: string) {
  * console" all arrive, and `/settings` is where the account dropdown goes.
  */
 describe("landing routes", () => {
-  it("lands on Users from the console root", async () => {
+  it("lands on Teams from the console root", async () => {
     server.use(
-      http.post("http://localhost/api/users/query", () => HttpResponse.json({ users: [] })),
-      http.post("http://localhost/api/projects/query", () => HttpResponse.json({ projects: [] })),
+      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/users"));
-    expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+    expect(await screen.findByRole("heading", { name: "Teams" })).toBeInTheDocument();
   });
 
   it("lands on Admins from settings", async () => {

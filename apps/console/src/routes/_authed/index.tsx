@@ -3,7 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 /**
  * Home.
  *
- * **There is no Home screen, so `/` lands on Users.** The designed overview is a
+ * **There is no Home screen, so `/` lands on Teams.** The designed overview is a
  * set of figures nothing can compute: the stat cards need an aggregate or count
  * endpoint (`POST /users/query` and `POST /projects/query` return pages),
  * "Total Projects" and its trend need a multi-project list and a time series,
@@ -11,13 +11,15 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
  * page that explains this is worse than going somewhere useful, because `/` is
  * where sign-in, the logo and the claim flow's "Open the console" all land.
  *
- * Users is the target because it is the console's most complete screen. Point
- * this at the overview when the figures behind it exist, restoring the mock
- * parked below and replacing its dummy constants with loader data.
+ * Teams is the target because it is where a developer arriving through those
+ * paths belongs: the claim flow hands the project to a team, so "Open the
+ * console" should show the team that now owns it rather than a user list.
+ * Point this at the overview when the figures behind it exist, restoring the
+ * mock parked below and replacing its dummy constants with loader data.
  */
 export const Route = createFileRoute("/_authed/")({
   beforeLoad: () => {
-    throw redirect({ to: "/users" });
+    throw redirect({ to: "/teams" });
   },
 });
 
