@@ -18,7 +18,11 @@ import { describeError } from "../lib/api-error";
 import { getConsoleProjectId } from "../runtime/runtime";
 
 /**
- * The remove-admin confirmation (`Remove admin?` frame).
+ * The revoke confirmation (`Remove admin?` frame).
+ *
+ * The action names the relation the row holds rather than always saying
+ * "admin": this screen only creates `admin`, but the list shows whatever a
+ * grant carries.
  *
  * **The copy is literally true.** `DELETE /grants/{id}` revokes one binding on
  * one project. It does not touch the user record, and it does not touch any
@@ -32,13 +36,52 @@ import { getConsoleProjectId } from "../runtime/runtime";
 export function RemoveAdminDialog({
   grantId,
   name,
+  level,
   open,
   onOpenChange,
   onRemoved,
 }: {
   grantId: string;
   name: string;
+  /** The relation being revoked, title-cased, e.g. `Admin`. */
+  level: string;
   open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRemoved: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {/* 384px, per the frame. The important suffix is required: the
+          primitive's own `data-[size=default]:sm:max-w-lg` compiles to a
+          higher-specificity selector and would otherwise leave this 512px
+          (same trap as the delete-user dialog). */}
+      <AlertDialogContent className="sm:max-w-sm!">
+        {/* The body is a child of the content, which the primitive unmounts on
+            close, so its in-flight and error state starts clean every opening.
+            Holding that state out here instead would carry a failed attempt's
+            message into the next one. */}
+        <RemoveAdminBody
+          grantId={grantId}
+          name={name}
+          level={level}
+          onOpenChange={onOpenChange}
+          onRemoved={onRemoved}
+        />
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function RemoveAdminBody({
+  grantId,
+  name,
+  level,
+  onOpenChange,
+  onRemoved,
+}: {
+  grantId: string;
+  name: string;
+  level: string;
   onOpenChange: (open: boolean) => void;
   onRemoved: () => void;
 }) {
@@ -63,31 +106,27 @@ export function RemoveAdminDialog({
     }
   }
 
+  const action = `Remove ${level.toLowerCase()}`;
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      {/* 384px, per the frame. The important suffix is required: the
-          primitive's own `data-[size=default]:sm:max-w-lg` compiles to a
-          higher-specificity selector and would otherwise leave this 512px
-          (same trap as the delete-user dialog). */}
-      <AlertDialogContent className="sm:max-w-sm!">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Remove admin?</AlertDialogTitle>
-          <AlertDialogDescription>
-            They immediately lose access to this project. Their user account isn&apos;t deleted,
-            and their access to other projects isn&apos;t affected.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {/* The API owns this copy (ADR 030), so the message is rendered verbatim
-            rather than mapped to console-authored text. */}
-        {error && <p className="text-destructive text-sm">{error}</p>}
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-          <Button variant="destructive" disabled={submitting} onClick={() => void remove()}>
-            {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
-            Remove admin
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{action}?</AlertDialogTitle>
+        <AlertDialogDescription>
+          They immediately lose access to this project. Their user account isn&apos;t deleted, and
+          their access to other projects isn&apos;t affected.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      {/* The API owns this copy (ADR 030), so the message is rendered verbatim
+          rather than mapped to console-authored text. */}
+      {error && <p className="text-destructive text-sm">{error}</p>}
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+        <Button variant="destructive" disabled={submitting} onClick={() => void remove()}>
+          {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
+          {action}
+        </Button>
+      </AlertDialogFooter>
+    </>
   );
 }

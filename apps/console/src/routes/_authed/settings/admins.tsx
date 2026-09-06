@@ -188,15 +188,21 @@ function principalName(grant: Grant): string | undefined {
 }
 
 /**
- * The row menu carries only `Remove admin`.
+ * The row menu carries only the revoke.
+ *
+ * It names the relation the row actually holds. This screen only ever creates
+ * `admin`, but the list shows whatever a grant carries, and a row saying
+ * "Remove admin" over a `viewer` grant would misdescribe what the click
+ * revokes.
  *
  * The design's `Revoke invite` and `Resend invite` belong to an invite flow that
- * does not exist, and changing a grant's relation has no endpoint (#1021) —
+ * does not exist, and changing a grant's relation has no endpoint (#1021):
  * delete and re-create is the documented path. Each returns with the call that
  * makes it real.
  */
 function RowActions({ row, onRemoved }: { row: AdminRow; onRemoved: () => void }) {
   const [removeOpen, setRemoveOpen] = useState(false);
+  const action = `Remove ${row.level.toLowerCase()}`;
 
   return (
     <>
@@ -210,7 +216,7 @@ function RowActions({ row, onRemoved }: { row: AdminRow; onRemoved: () => void }
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
-            Remove admin
+            {action}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -218,6 +224,7 @@ function RowActions({ row, onRemoved }: { row: AdminRow; onRemoved: () => void }
       <RemoveAdminDialog
         grantId={row.id}
         name={row.name}
+        level={row.level}
         open={removeOpen}
         onOpenChange={setRemoveOpen}
         onRemoved={onRemoved}

@@ -190,11 +190,7 @@ function AddAdminForm({
           }))}
           selected={selected ? [selected.id] : []}
           searchPlaceholder="Search people"
-          emptyLabel={
-            people?.length === 0
-              ? "Everyone on this project is already an admin."
-              : "Nobody found. They need to sign up first."
-          }
+          emptyLabel={emptyLabel(people, error)}
           onSelect={(id) => setSelected((people ?? []).find((person) => person.id === id))}
           onClose={() => setPickerOpen(false)}
         />
@@ -213,6 +209,18 @@ function AddAdminForm({
       </DialogFooter>
     </>
   );
+}
+
+/**
+ * What the picker says when it has nothing to offer, which happens for three
+ * different reasons: the list could not be loaded, everyone already holds a
+ * grant, or the search matched nobody. Only the last of those is the operator's
+ * to act on by signing the colleague up.
+ */
+function emptyLabel(people: Person[] | undefined, error: string | undefined): string {
+  if (error && people?.length === 0) return "The people on this project could not be loaded.";
+  if (people?.length === 0) return "Everyone on this project is already an admin.";
+  return "Nobody found. They need to sign up first.";
 }
 
 /**

@@ -269,6 +269,68 @@ describe("admins screen", () => {
     ).toBeInTheDocument();
   });
 
+  it("names the relation the row holds, not always admin", async () => {
+    // The screen only creates `admin`, but the list shows whatever a grant
+    // carries, and "Remove admin" over a `viewer` row would misdescribe the
+    // click.
+    stubGrants(
+      grant({ relation: "viewer", principal: userPrincipal({ display: "Sasha Kim" }) }),
+    );
+    await renderAdmins();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for Sasha Kim" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove viewer" }));
+    const dialog = within(await screen.findByRole("alertdialog"));
+    expect(dialog.getByText("Remove viewer?")).toBeInTheDocument();
+  });
+
+  it("does not carry a failed removal into the next opening", async () => {
+    // The dialog content is mounted per opening, so the error from one attempt
+    // is not sitting there when the operator opens it again.
+    stubGrants(grant({ principal: userPrincipal({ display: "Maya Patel" }) }));
+    server.use(
+      http.delete(`${GRANTS_URL}/:id`, () =>
+        HttpResponse.json({ code: "grant.not_found", message: "no such grant" }, { status: 404 }),
+      ),
+    );
+    await renderAdmins();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
+    await userEvent.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove admin" }),
+    );
+    expect(await screen.findByText("no such grant")).toBeInTheDocument();
+
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Maya Patel" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
+
+    await screen.findByRole("alertdialog");
+    expect(screen.queryByText("no such grant")).not.toBeInTheDocument();
+  });
+
+  it("says the list could not be loaded rather than that everyone is an admin", async () => {
+    // Both cases leave the picker empty; only one of them is the operator's to
+    // act on.
+    stubGrants();
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    await renderAdmins();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
+
+    expect(
+      await screen.findByText("The people on this project could not be loaded."),
+    ).toBeInTheDocument();
+  });
+
   it("removes an admin after confirming", async () => {
     stubGrants(grant({ principal: userPrincipal({ display: "Maya Patel" }) }));
     let deleted: string | undefined;
