@@ -1,11 +1,47 @@
+import { spawn } from "node:child_process";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveServerCommand, stopBinaryRuntime } from "../../../../src/lib/local-server/binary";
+import {
+  resolveServerCommand,
+  startBinaryRuntime,
+  stopBinaryRuntime,
+} from "../../../../src/lib/local-server/binary";
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, spawn: vi.fn(() => ({ pid: 4242, unref: () => undefined })) };
+});
 
 describe("local server binary helpers", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("spawns the server with the address, data dir, and public base env", async () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    await startBinaryRuntime({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+      port: 8091,
+      serverUrl: "http://localhost:8091",
+    });
+
+    const [, , options] = vi.mocked(spawn).mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
+    expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
   });
 
   it("records an explicit source build version with a binary override", () => {

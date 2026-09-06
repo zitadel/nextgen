@@ -32,6 +32,7 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 
 	return &api.CreateProjectResponse{
 		ID:             project.ID,
+		Name:           project.Name,
 		ProjectSecret:  projectSecret,
 		PreviewSecret:  previewSecret,
 		PreviewOrigins: project.PreviewOrigins,
