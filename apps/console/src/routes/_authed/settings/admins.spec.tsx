@@ -194,6 +194,52 @@ describe("admins screen", () => {
     );
   });
 
+  it("does not offer people who are already admins", async () => {
+    // `POST /grants` refuses a second grant for the same principal and relation,
+    // so offering them would be offering a choice that cannot work.
+    stubGrants(grant({ principal_id: "user_9", principal: userPrincipal({ id: "user_9" }) }));
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            { id: "user_9", identifier: "already@acme.com" },
+            { id: "user_8", identifier: "free@acme.com" },
+          ],
+        }),
+      ),
+    );
+    await renderAdmins();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
+
+    expect(await screen.findByRole("option", { name: /free@acme.com/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /already@acme.com/ })).not.toBeInTheDocument();
+  });
+
+  it("still offers someone who only holds a lesser relation", async () => {
+    // A viewer can be made an admin: the refusal is per principal *and*
+    // relation, so filtering on the principal alone would hide a real choice.
+    stubGrants(
+      grant({
+        relation: "viewer",
+        principal_id: "user_9",
+        principal: userPrincipal({ id: "user_9" }),
+      }),
+    );
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({ users: [{ id: "user_9", identifier: "viewer@acme.com" }] }),
+      ),
+    );
+    await renderAdmins();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
+
+    expect(await screen.findByRole("option", { name: /viewer@acme.com/ })).toBeInTheDocument();
+  });
+
   it("surfaces the API's own message when the grant is refused", async () => {
     // ADR 030 makes the payload's `message` the human-facing string, so a
     // duplicate binding explains itself rather than getting console-authored copy.

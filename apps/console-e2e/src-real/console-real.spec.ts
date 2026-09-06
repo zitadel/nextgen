@@ -170,25 +170,32 @@ test("gives a colleague admin access to the project, and takes it away", async (
   await expectNoErrorBoundary(page);
 });
 
-test("refuses a second grant for the same person", async ({ page, seed }) => {
-  // The API owns this copy (ADR 030), so the console renders whatever it says
-  // rather than guessing at a duplicate from the status code.
+test("stops offering a colleague once they are already an admin", async ({ page, seed }) => {
+  // `POST /grants` refuses a second grant for the same principal and relation.
+  // Rather than let the operator pick someone and then read an error, the
+  // picker drops people who already hold one — asserted here because the list
+  // it filters against comes from the server, not from the form.
   const operator = await seed.user();
   const colleague = await seed.user();
   await signIn(page, operator);
 
   await page.goto("/settings/admins");
-  for (const attempt of [1, 2]) {
-    await page.getByRole("button", { name: "Add admin", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: "Add admin" });
-    await dialog.getByRole("combobox", { name: "Person" }).click();
-    await page.getByRole("option", { name: colleague.email }).click();
-    await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
-    if (attempt === 1) await expect(dialog).toBeHidden();
-  }
-  await expect(page.getByText(/already/i)).toBeVisible();
+  await page.getByRole("button", { name: "Add admin", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add admin" });
+  await dialog.getByRole("combobox", { name: "Person" }).click();
+  await page.getByRole("option", { name: colleague.email }).click();
+  await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toBeVisible();
+
+  // Second time round they are not on offer.
+  await page.getByRole("button", { name: "Add admin", exact: true }).click();
+  await page.getByRole("dialog", { name: "Add admin" }).getByRole("combobox", { name: "Person" }).click();
+  await expect(page.getByRole("option", { name: colleague.email })).toHaveCount(0);
+  // The operator, who holds no grant, is still offered.
+  await expect(page.getByRole("option", { name: operator.email })).toBeVisible();
 
   // Leave the instance as found.
+  await page.keyboard.press("Escape");
   await page.getByRole("dialog", { name: "Add admin" }).getByRole("button", { name: "Cancel" }).click();
   const row = page.getByRole("row").filter({ hasText: colleague.email });
   await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();

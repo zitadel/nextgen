@@ -94,13 +94,19 @@ function AdminsScreen() {
   const { grants } = Route.useLoaderData();
   const router = useRouter();
   const rows = grants.map(toAdminRow);
+  // Only `admin`: this screen creates that relation, and `POST /grants` refuses
+  // a duplicate per principal *and* relation, so somebody holding `viewer` can
+  // still be made an admin.
+  const alreadyAdmins = grants
+    .filter((grant) => grant.relation === "admin")
+    .map((grant) => grant.principal_id);
 
   return (
     <div className={`${RESOURCE_PAGE} pt-11`}>
       <div className={SETTINGS_COLUMN}>
       <div className="flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Admins</h1>
-        <AddAdminDialog onAdded={() => router.invalidate()}>
+        <AddAdminDialog alreadyAdmins={alreadyAdmins} onAdded={() => router.invalidate()}>
           <Button className="w-full gap-1.5 px-2.5 lg:w-auto">
             <Plus aria-hidden />
             Add admin

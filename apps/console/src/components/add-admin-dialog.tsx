@@ -37,18 +37,27 @@ import { getConsoleProjectId } from "../runtime/runtime";
  * access is given afterwards.
  *
  * **The picker filters on the client.** `POST /users/query` has no filter field
- * for an identifier — the enum is `created_at`, `id`, `schema`, `status`,
- * `team_id` and `lifecycle_owner_team_id` — so an email cannot be resolved
+ * for an identifier: the enum is `created_at`, `id`, `schema`, `status`,
+ * `team_id` and `lifecycle_owner_team_id`, so an email cannot be resolved
  * server-side. One page of users is loaded and the Combobox's own search
  * narrows it, which is honest for a project whose people fit in a page and
  * wants a server-side filter before it does not.
+ *
+ * **People who are already admins are not offered.** `POST /grants` refuses a
+ * second grant for the same principal and relation, so offering them is
+ * offering a choice that cannot work. The refusal is still handled: the list of
+ * existing admins is a snapshot, and somebody else can grant the same person
+ * while this dialog is open.
  */
 export function AddAdminDialog({
   children,
   onAdded,
+  alreadyAdmins,
 }: {
   children: ReactNode;
   onAdded: () => void;
+  /** Principal ids that already hold an `admin` grant on this project. */
+  alreadyAdmins: readonly string[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -69,6 +78,7 @@ export function AddAdminDialog({
             selection, its error or its people list behind. */}
         {open && (
           <AddAdminForm
+            alreadyAdmins={alreadyAdmins}
             onDone={() => {
               setOpen(false);
               onAdded();
@@ -90,7 +100,15 @@ interface Person {
   description?: string;
 }
 
-function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+function AddAdminForm({
+  alreadyAdmins,
+  onDone,
+  onCancel,
+}: {
+  alreadyAdmins: readonly string[];
+  onDone: () => void;
+  onCancel: () => void;
+}) {
   const [people, setPeople] = useState<Person[] | undefined>(undefined);
   const [selected, setSelected] = useState<Person | undefined>(undefined);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -103,7 +121,8 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
       try {
         const page = await api.queryUsers({ limit: PEOPLE_LIMIT });
         if (cancelled) return;
-        setPeople(page.users.map(toPerson));
+        const granted = new Set(alreadyAdmins);
+        setPeople(page.users.map(toPerson).filter((person) => !granted.has(person.id)));
       } catch (cause) {
         if (cancelled) return;
         setPeople([]);
@@ -113,6 +132,9 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
     return () => {
       cancelled = true;
     };
+    // The snapshot is taken once per opening: the dialog is remounted each time,
+    // so a person granted since the last open is already excluded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function submit() {
@@ -168,7 +190,11 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
           }))}
           selected={selected ? [selected.id] : []}
           searchPlaceholder="Search people"
-          emptyLabel="Nobody found. They need to sign up first."
+          emptyLabel={
+            people?.length === 0
+              ? "Everyone on this project is already an admin."
+              : "Nobody found. They need to sign up first."
+          }
           onSelect={(id) => setSelected((people ?? []).find((person) => person.id === id))}
           onClose={() => setPickerOpen(false)}
         />
