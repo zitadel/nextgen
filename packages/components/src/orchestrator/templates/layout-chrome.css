@@ -421,6 +421,17 @@ zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution > * {
 zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution > * {
   grid-column: 1;
 }
+/* Anything the host puts in `attribution-trailing` parks in the same column.
+   A slot is `display: contents`, so its projected nodes are the grid items and
+   `> *` above never reaches them — without this they would auto-place into the
+   brand column, on the far side of the seam from the mark they belong to. */
+zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution ::slotted(*) {
+  grid-column: 2;
+  justify-self: center;
+}
+zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) {
+  grid-column: 1;
+}
 /* Container query, not media query: keyed to the mount's inline size so a
    narrow embed on a wide viewport collapses exactly like a phone. */
 @container (max-width: 48rem) {
