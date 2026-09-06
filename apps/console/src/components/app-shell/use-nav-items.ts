@@ -1,7 +1,7 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 
-import { DESIGN_ONLY_NAV, type NavMeta } from "../../nav";
+import { DESIGN_ONLY_NAV, type NavMeta, type NavView } from "../../nav";
 
 export interface NavItem {
   /** Route path, or `undefined` for design-only entries that are not built yet. */
@@ -21,9 +21,12 @@ export interface SubNavItem extends NavItem {
 }
 
 /**
- * Builds the sidebar list: built routes come from `staticData.nav` on the route
- * tree (Console ADR 0001), merged with the design-only entries that appear in
- * the Figma mock but have no route yet. Each level is sorted by `nav.order` so
+ * Builds one sidebar's list: built routes come from `staticData.nav` on the
+ * route tree (Console ADR 0001), merged with the design-only entries that
+ * appear in the Figma mock but have no route yet.
+ *
+ * `view` selects which sidebar. The shell renders two from one route tree, so
+ * an entry belongs to exactly one of them. Each level is sorted by `nav.order` so
  * the sidebar matches the design regardless of route registration order.
  *
  * Entries carrying `nav.parent` are nested one level beneath the entry with
@@ -32,24 +35,26 @@ export interface SubNavItem extends NavItem {
  * disappearing: an orphan is a routing mistake, and hiding the screen entirely
  * is the worse failure.
  */
-export function useNavItems(): NavItem[] {
+export function useNavItems(view: NavView = "portal"): NavItem[] {
   const router = useRouter();
 
   const routed = (Object.values(router.routesById) as AnyRoute[])
     .map((route): NavItem | undefined => {
       const nav = route.options.staticData?.nav;
-      if (!nav) return undefined;
+      // `view` defaults to the portal list so the existing screens, none of
+      // which declare one, keep their place.
+      if (!nav || (nav.view ?? "portal") !== view) return undefined;
       const fullPath = route.fullPath;
       const to = fullPath === "/" ? "/" : fullPath.replace(/\/$/, "");
       return { to, nav, children: [] };
     })
     .filter((item): item is NavItem => item !== undefined);
 
-  const designOnly: NavItem[] = DESIGN_ONLY_NAV.map((nav) => ({
-    to: undefined,
-    nav,
-    children: [],
-  }));
+  // Design-only entries are portal rows; the Settings view has none.
+  const designOnly: NavItem[] =
+    view === "portal"
+      ? DESIGN_ONLY_NAV.map((nav) => ({ to: undefined, nav, children: [] }))
+      : [];
 
   const all: NavItem[] = [...routed, ...designOnly];
   const byPath = new Map<string, NavItem>();

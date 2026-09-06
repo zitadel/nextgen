@@ -1,0 +1,19 @@
+type: object
+title: TeamRef
+description: |
+  A resolved reference to a team. Carries the team's id and name so a grant
+  list is readable without embedding the full Team body. Id and display ride
+  `project.read` (ADR 059 rule 8): a reference field carrying only the
+  target's id and display strings needs no gate of its own. Missing or
+  deleted teams degrade to `team_id` only.
+required:
+  - team_id
+properties:
+  team_id:
+    type: string
+    description: The referenced team's id (`team_<opaque>`). Always present.
+    example: team_01KZZY8PX8K8ATNVDSMRCZY4N1
+  name:
+    type: string
+    description: The team's name. Absent when the team can no longer be loaded.
+    example: Platform admins

@@ -484,6 +484,21 @@ type Handler interface {
 	//
 	// PATCH /projects/{project_id}
 	PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (PatchProjectRes, error)
+	// QueryGrants implements queryGrants operation.
+	//
+	// Returns the collaboration grants of a project, paginated with a cursor.
+	// Only unrevoked grants this API manages are listed (user or team bound to
+	// viewer, editor, or admin), including expired grants so a client can
+	// DELETE before re-granting. Project-secret setup (`sk_proj`) and
+	// owning-team (`relation=team`) rows are not returned. Grants are not in
+	// `resource_scope_index`; project scope is required on the query (same as
+	// get). Requires `project.read`. `expand: ["principal"]` additionally
+	// requires `user.read` and `team.read` (documented on the expand enum;
+	// those scopes cannot be ANDed onto this security block because they are
+	// body-conditional).
+	//
+	// POST /grants/query
+	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
 	// QueryProjects implements queryProjects operation.
 	//
 	// Query projects.

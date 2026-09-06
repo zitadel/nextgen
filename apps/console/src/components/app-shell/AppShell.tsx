@@ -16,6 +16,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -30,6 +31,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
+import type { NavGroup } from "../../nav";
 import { type ThemePreference, useTheme } from "../../theme";
 import { ContextSwitcher } from "./ContextSwitcher";
 import { ZitadelLogo } from "./icons";
@@ -40,7 +42,9 @@ import { useNavItems } from "./use-nav-items";
  * frame, `j3qqriDab6WQfrlgLujf4Y`). `collapsible="icon"` gives the 256px →
  * icon-rail collapse with tooltips, ⌘/Ctrl+B, mobile off-canvas, and rail —
  * all from the component. The context bar (sidebar trigger + org/project
- * switchers + theme toggle) sits at the top of the content column. Colours come
+ * switchers + theme toggle) sits at the top of the content column in the portal
+ * view, and is absent from the Settings view, which the frames draw without one.
+ * Colours come
  * from `@zitadel/design-tokens` via the shadcn utility names; the sidebar
  * surface uses `background` per the design (see `ui/sidebar.tsx`).
  */
@@ -55,6 +59,9 @@ export function AppShell({
   /** Sign-out action for the footer user menu. */
   onSignOut?: () => void;
 }) {
+  const matchRoute = useMatchRoute();
+  const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
+
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
       <AppSidebar user={user} onSignOut={onSignOut} />
@@ -64,7 +71,11 @@ export function AppShell({
           stretches the whole page and the window scrolls sideways, rather than
           the table scrolling inside its own card. */}
       <SidebarInset className="min-w-0">
-        <ContextBar />
+        {/* No context bar in the Settings view: the settings frames draw none,
+            and the switcher it carries is a *project* control that says nothing
+            about an account screen. The sidebar's own header keeps a trigger, so
+            collapsing still works without it. */}
+        {!inSettings && <ContextBar />}
         {children}
       </SidebarInset>
     </SidebarProvider>
@@ -192,20 +203,59 @@ function SettingsHeader() {
 }
 
 /**
- * Settings nav — empty today, and that is the honest state.
+ * Settings nav: the design's grouped list, `ACCOUNT` over `WORKSPACE`.
  *
- * The design groups it as `PERSONAL` (Profile) and `WORKSPACE` (Teams,
- * Members). None of those screens exists: Profile needs a call that updates a
- * user (#693) and the two workspace rows need a team reference on the user read
- * responses (#735). A group heading with nothing under it advertises a section
- * that is not there, so the headings arrive with their first row.
+ * Rows attach the same way Portal's do, through `staticData.nav` on the route,
+ * and declare `view: "settings"` so they leave the primary list alone.
  *
- * When they land they attach the same way Portal's do — `staticData.nav` on the
- * route — plus whatever distinguishes the two views in `NavMeta`.
+ * A heading renders only when a route claims it. `ACCOUNT / Profile` needs a
+ * call that updates a user (#693) and is not built, so today the nav is
+ * `WORKSPACE` alone rather than an empty section above it.
  */
 function SettingsNav() {
-  return null;
+  const items = useNavItems("settings");
+  const matchRoute = useMatchRoute();
+
+  return (
+    <>
+      {SETTINGS_GROUPS.map((group) => {
+        const rows = items.filter((item) => item.nav.group === group);
+        if (rows.length === 0) return null;
+        return (
+          <SidebarGroup key={group} role="navigation" aria-label={group} className="py-0">
+            <SidebarGroupLabel>{group}</SidebarGroupLabel>
+            <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
+              {rows.map((item) => {
+                const Icon = item.nav.icon;
+                const label = item.nav.label;
+                // Every settings row is a built route: `useNavItems` merges the
+                // design-only entries into the portal list only.
+                if (!item.to) return null;
+                return (
+                  <SidebarMenuItem key={label}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={!!matchRoute({ to: item.to, fuzzy: true })}
+                      tooltip={label}
+                    >
+                      <Link to={item.to} title={label}>
+                        {Icon && <Icon aria-hidden />}
+                        <span>{label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        );
+      })}
+    </>
+  );
 }
+
+/** Heading order in the Settings nav, top to bottom, as the design draws it. */
+const SETTINGS_GROUPS: NavGroup[] = ["ACCOUNT", "WORKSPACE"];
 
 /** Portal nav: the flat list, with `User schemas` nested under `Users`. */
 function PortalNav() {
