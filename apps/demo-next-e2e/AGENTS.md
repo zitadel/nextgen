@@ -6,8 +6,10 @@ TCP server, specs under `src/`) and the **real lane** (`e2e-real`, specs under
 `src-real/` with `playwright.real.config.mts`), which boots a real server
 instance through `@zitadel/testing` (`ZITADEL_SERVER_BINARY`,
 `NEXTGEN_SERVER_{LOGIN,CONSOLE}_ENABLED=false`) and covers registration,
-password and passkey sign-in, and authenticated navigation against real
-storage. This project is the flagship Playwright consumer of the test kit —
+password sign-in, and authenticated navigation against real storage. It does
+not cover passkeys: the lane seeds the shipped `password-first` default flow,
+which offers no passkey action, and the real-server passkey round trip is
+covered by `cli-journey-e2e`'s `passkey-first` preset lane. This project is the flagship Playwright consumer of the test kit —
 see [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md). The
 real lane runs in CI through an explicit `full-pr` step even though its moon
 task carries `runInCI: false`. Defer to root
