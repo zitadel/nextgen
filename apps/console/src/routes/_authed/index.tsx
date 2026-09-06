@@ -19,7 +19,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
  */
 export const Route = createFileRoute("/_authed/")({
   beforeLoad: () => {
-    throw redirect({ to: "/teams" });
+    // Teams pins its tab in the URL, so the redirect has to name one.
+    throw redirect({ to: "/teams", search: { status: "active" } });
   },
 });
 
