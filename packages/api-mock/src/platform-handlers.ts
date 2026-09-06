@@ -27,7 +27,7 @@ import type {
   CreateFlowDefinition201,
   CreateProject201,
   CreateSchema201,
-  ClaimWindowResponse as ClaimWindow200,
+  GetClaimWindow200,
   GetClaimStatus200,
   GetFlowDefinition200,
   GetProject200,
@@ -45,12 +45,12 @@ import {
   CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteFlowDefinitionParams,
-  ClaimWindowResponse,
   GetClaimStatusParams,
   GetClaimStatusQueryParams,
   GetClaimStatusResponse,
   GetClaimWindowParams,
   GetClaimWindowQueryParams,
+  GetClaimWindowResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetProjectParams,
@@ -762,11 +762,11 @@ export function setupPlatformHandlers() {
       // lapsed challenge still reports it, because the page shows the
       // deadline beside the outcome it is explaining.
       const expiresAt = new Date(new Date(project.createdAt).getTime() + CLAIM_WINDOW_MS);
-      const responseBody: ClaimWindow200 = {
+      const responseBody: GetClaimWindow200 = {
         expires_at: expiresAt.toISOString(),
         expired: expiresAt.getTime() < Date.now(),
       };
-      const out = parse(ClaimWindowResponse, responseBody, "mock_response_invalid");
+      const out = parse(GetClaimWindowResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
