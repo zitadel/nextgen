@@ -81,7 +81,9 @@ users, sessions, tokens, events — is data: reached through the same
 contract, operated on rather than declared. The boundary is intent versus
 record. A bootstrap admin belongs in code; the users who register through
 your app are the record of its success, and no repository should try to
-hold them.
+hold them. The [developer experience principles](docs/design/developer-experience-principles.md)
+explain how this distinction should guide future product and engineering
+decisions.
 
 ### 3. Investigate — events answer questions
 
