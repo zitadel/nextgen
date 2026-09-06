@@ -56,8 +56,8 @@ tags:
   - name: Grants
     description: |
       Collaboration grants that bind a user or team to project.viewer,
-      project.editor, or project.admin. Create, get, and revoke; listing and
-      role-change PATCH are follow-ups.
+      project.editor, or project.admin. Create, get, query, and revoke;
+      role-change PATCH is a follow-up.
   - name: Events
     description: |
       Project-scoped audit event list and get (ADR 049). Unified surface for
@@ -156,6 +156,8 @@ paths:
     $ref: endpoints/releases/by_id/methods.yaml
   /grants:
     $ref: endpoints/grants/methods.yaml
+  /grants/query:
+    $ref: endpoints/grants/query/methods.yaml
   /grants/{id}:
     $ref: endpoints/grants/by_id/methods.yaml
   /events:

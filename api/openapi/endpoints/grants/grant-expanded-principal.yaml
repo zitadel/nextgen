@@ -1,0 +1,21 @@
+description: |
+  The principal bound by a grant: the User body when `principal_type` is
+  `user`, or the Team body when `principal_type` is `team`. Same
+  representation as `GET /users/{id}` and `GET /teams/{id}` respectively.
+  Clients discriminate with the grant's existing `principal_type`.
+oneOf:
+  - type: object
+    required:
+      - schema
+      - attributes
+      - metadata
+    allOf:
+      - $ref: ../users/user.yaml
+  - type: object
+    required:
+      - name
+      - status
+      - created_at
+      - updated_at
+    allOf:
+      - $ref: ../teams/team-response.yaml

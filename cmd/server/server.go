@@ -200,7 +200,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return err
 	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
-	grantService := service.NewGrantService(serviceDBPool, cfg.Platform.ResolvedProjectID())
+	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	environmentService := service.NewEnvironmentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
@@ -208,7 +208,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		serviceDBPool,
 		schemaStore,
 		passwordHasher,
-		service.StatementsUserRefResolver{Pool: serviceDBPool},
+		userRefs,
 	)
 
 	// The platform project's registration side effect (#527): every flow-created
