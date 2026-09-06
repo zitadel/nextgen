@@ -27,6 +27,10 @@ type ClaimService interface {
 	// personal team in one transaction. userID comes from the platform-session
 	// check (verifyClaimSession, C2).
 	Complete(ctx context.Context, projectID, challengeID, userID string) (*ClaimCompleteResult, error)
+	// Window reports when the project's claim window closes. Authorized by the
+	// challenge alone, so the claim page can show the deadline before the
+	// developer has signed in.
+	Window(ctx context.Context, projectID, challengeID string) (*ClaimWindowResult, error)
 }
 
 type ClaimInitResult struct {
@@ -52,6 +56,13 @@ type ClaimCompleteResult struct {
 	ProjectID string
 	TeamID    string
 	ClaimedAt time.Time
+}
+
+type ClaimWindowResult struct {
+	ExpiresAt time.Time
+	// Expired is the server's own verdict, so a browser with a skewed clock
+	// cannot decide the opposite of what the claim legs will enforce.
+	Expired bool
 }
 
 type claimService struct {
@@ -313,6 +324,37 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		return nil, domain.ErrInternal(err).WithMessage("failed to complete claim")
 	}
 	return result, nil
+}
+
+// Window is the browser-plane read behind the claim page's countdown. It is
+// deliberately the thinnest claim leg there is: no secret, no session, no
+// state written, and nothing returned but the deadline the other legs already
+// enforce through checkClaimWindow.
+//
+// The challenge is the authorization, exactly as it is for Complete — but
+// unlike Complete it is only matched, never spent, so reloading the page costs
+// nothing. Every failure to match one collapses into the same not-found, so a
+// caller guessing project ids cannot use this to discover which of them exist.
+// An expired or already-completed challenge still answers: the page shows the
+// window beside the outcome it is explaining, and the window is a property of
+// the project rather than of the challenge.
+func (s *claimService) Window(ctx context.Context, projectID, challengeID string) (*ClaimWindowResult, error) {
+	var stmts claimStatements = s.v2Pool.Statements()
+	if _, err := stmts.GetChallengeByID(ctx, projectID, domain.HashClaimChallengeToken(challengeID)); err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrClaimChallengeNotFound()
+		}
+		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to load claim challenge")
+	}
+	project, err := stmts.GetProjectByID(ctx, projectID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrClaimChallengeNotFound()
+		}
+		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to load project for claim window")
+	}
+	expiresAt := project.CreatedAt.Add(domain.ClaimWindow)
+	return &ClaimWindowResult{ExpiresAt: expiresAt, Expired: time.Now().After(expiresAt)}, nil
 }
 
 // claimedProjectState resolves the claim state every leg branches on: a

@@ -1,0 +1,21 @@
+type: object
+description: |
+  How long the project can still be claimed. Derived from the project's
+  creation time and the fixed 14-day claim window (ADR 046); it does not
+  depend on the challenge, which has its own much shorter expiry.
+required:
+  - expires_at
+  - expired
+properties:
+  expires_at:
+    type: string
+    format: date-time
+    description: The time when the project's claim window closes.
+    example: '2026-09-20T09:12:00Z'
+  expired:
+    type: boolean
+    description: |
+      Whether the window has already closed. Reported alongside `expires_at`
+      rather than left to the client so a skewed browser clock cannot show a
+      claimable project as expired, or the reverse.
+    example: false

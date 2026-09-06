@@ -577,3 +577,84 @@ func newMockedClaimService(t *testing.T, setupStmt func(*servicemocks.MockAllSta
 
 	return service.NewClaimService(service.NewPool(pool), claimConsoleBase, claimPlatformProjID)
 }
+
+func TestClaimService_Window(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		setupStmt func(s *servicemocks.MockAllStatements)
+		wantErr   error
+		// wantExpiresAt is the deadline the fixture's CreatedAt implies,
+		// compared with a tolerance because both fixtures build it from
+		// time.Now().
+		wantExpiresAt func() time.Time
+		wantExpired   bool
+	}{
+		{
+			name: "open window",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				p := claimableProject()
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(p, nil)
+			},
+			wantExpiresAt: func() time.Time { return time.Now().Add(domain.ClaimWindow) },
+		},
+		{
+			// The window belongs to the project, not the challenge: the page
+			// still shows the deadline next to the "link expired" message.
+			name: "expired challenge still reports the window",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+			},
+			wantExpiresAt: func() time.Time { return time.Now().Add(domain.ClaimWindow) },
+		},
+		{
+			name: "closed window",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+			},
+			// expiredWindowProject was created a full window plus an hour ago.
+			wantExpiresAt: func() time.Time { return time.Now().Add(-time.Hour) },
+			wantExpired:   true,
+		},
+		{
+			name: "unknown challenge",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrClaimChallengeNotFound(),
+		},
+		{
+			// A challenge without its project is corrupt state, but the caller
+			// gets the same not-found either way: this leg never confirms that
+			// a project id exists.
+			name: "missing project reports not found",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrClaimChallengeNotFound(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := newMockedClaimService(t, tc.setupStmt)
+
+			got, err := svc.Window(t.Context(), "proj_1", claimToken)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantExpired, got.Expired)
+			assert.WithinDuration(t, tc.wantExpiresAt(), got.ExpiresAt, time.Minute)
+		})
+	}
+}

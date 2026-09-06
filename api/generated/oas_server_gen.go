@@ -262,6 +262,17 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/claim/status
 	GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (GetClaimStatusRes, error)
+	// GetClaimWindow implements getClaimWindow operation.
+	//
+	// Read by the claim page in the browser to show how long is left to claim the
+	// project. Unauthenticated by design: the claim page runs this before the
+	// developer has signed in, and holding the `challenge_id` from the claim URL
+	// is the authorization — the same capability `claim/complete` accepts. It
+	// reveals only the window, never the project itself, and unlike
+	// `claim/complete` it spends nothing, so a reload is free.
+	//
+	// GET /projects/{project_id}/claim/window
+	GetClaimWindow(ctx context.Context, params GetClaimWindowParams) (GetClaimWindowRes, error)
 	// GetEnvironmentByName implements getEnvironmentByName operation.
 	//
 	// Reads one environment of the project by its name.

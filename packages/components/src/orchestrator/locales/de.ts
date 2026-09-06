@@ -111,7 +111,7 @@ export const de: Locale = {
 
   "register.title": "Konto erstellen",
   // Leer per Design — die Registrierungskarte hat keine Unterzeile (Figma 6593:141743).
-  "register.description": "",
+  "register.description": "Gib deine Daten ein, um loszulegen",
   "register.field.email": "E-Mail",
   "register.field.email.placeholder": "du@beispiel.de",
   "register.field.password": "Passwort",

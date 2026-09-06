@@ -27,6 +27,7 @@ import type {
   CreateFlowDefinition201,
   CreateProject201,
   CreateSchema201,
+  GetClaimWindow200,
   GetClaimStatus200,
   GetFlowDefinition200,
   GetProject200,
@@ -47,6 +48,9 @@ import {
   GetClaimStatusParams,
   GetClaimStatusQueryParams,
   GetClaimStatusResponse,
+  GetClaimWindowParams,
+  GetClaimWindowQueryParams,
+  GetClaimWindowResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetProjectParams,
@@ -720,6 +724,49 @@ export function setupPlatformHandlers() {
 
       responseBody = { status: "pending" };
       const out = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // GET /projects/:project_id/claim/window — the claim page's countdown
+    // read. Unauthenticated by contract: the browser runs it before the
+    // developer signs in, and the challenge from the claim URL is the
+    // capability. An unknown challenge is the only refusal, so a caller
+    // learns nothing about which project ids exist.
+    http.get("*/projects/:project_id/claim/window", ({ params, request }) => {
+      const path = parse(GetClaimWindowParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetClaimWindowQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const challenge = store.claimChallenges.get(query.data.challenge_id);
+      if (!challenge || challenge.projectId !== path.data.project_id) {
+        return HttpResponse.json(errorBody("not_found", "claim challenge not found"), {
+          status: 404,
+        });
+      }
+      const project = store.projects.get(challenge.projectId);
+      if (!project) {
+        return HttpResponse.json(errorBody("not_found", "claim challenge not found"), {
+          status: 404,
+        });
+      }
+
+      // The window belongs to the project, not the challenge: a spent or
+      // lapsed challenge still reports it, because the page shows the
+      // deadline beside the outcome it is explaining.
+      const expiresAt = new Date(new Date(project.createdAt).getTime() + CLAIM_WINDOW_MS);
+      const responseBody: GetClaimWindow200 = {
+        expires_at: expiresAt.toISOString(),
+        expired: expiresAt.getTime() < Date.now(),
+      };
+      const out = parse(GetClaimWindowResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }

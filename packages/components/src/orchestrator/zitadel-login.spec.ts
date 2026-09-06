@@ -327,6 +327,43 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
 
+  it("does not paint the terminal step when it is about to navigate away", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+      await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+
+      // The host's own signed-in screen is next; a "you are signed in" card
+      // here would be the second confirmation of one sign-in.
+      expect(element.shadowRoot?.querySelector("zl-card")).toBeNull();
+      expect(element.shadowRoot?.querySelector('slot[name="loader"]')).not.toBeNull();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
+  });
+
+  it("still shows the terminal step when the host handles the handoff itself", async () => {
+    // No post-sign-in-url: nothing navigates, so the terminal screen is the
+    // flow's last word and must render.
+    const element = await mount(host);
+    await advanceMockLoginFlow(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+    expect(element.shadowRoot?.querySelector("zl-card")).not.toBeNull();
+  });
+
   it("exchanges the handoff token and navigates when post-sign-in-url is set", async () => {
     const assign = vi.fn();
     const { location } = window;

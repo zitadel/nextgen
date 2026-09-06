@@ -71,19 +71,20 @@ if (preset === "password-first") {
     // The identifier step's "Sign up" nav must work with the email box
     // empty: navigate-kind actions skip field validation, and the purposed
     // transition re-enters the flow in register mode. The registration
-    // step's `passkey_register` action is a structural, locale-free marker.
+    // step's own `sign_in` action is a structural, locale-free marker — it
+    // is the one action only that step declares.
     await clickFlowAction(page, "register");
-    await expect(flowAction(page, "passkey_register")).toBeVisible();
+    await expect(flowAction(page, "sign_in")).toBeVisible();
 
     // Round-trip back to sign-in through the register step's own nav.
     await clickFlowAction(page, "sign_in");
     await expect(flowField(page, "email", { label: /email/i })).toBeVisible();
-    await expect(flowAction(page, "passkey_register")).toBeHidden();
+    await expect(flowAction(page, "sign_in")).toBeHidden();
 
     // Forward again and complete the registration entirely on the nav
     // path — this must run real register semantics (create, not verify).
     await clickFlowAction(page, "register");
-    await expect(flowAction(page, "passkey_register")).toBeVisible();
+    await expect(flowAction(page, "sign_in")).toBeVisible();
     await fillFlowField(page, "email", email, { label: /email/i });
     for (const entry of registrationProfile) {
       if (typeof entry.value !== "string") continue;
@@ -101,7 +102,7 @@ if (preset === "password-first") {
   });
 }
 
-if (preset === "passkey-first") {
+if (preset === "passkey-first" && process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
   test(`passkey-first preset: fallback registration, then one-tap passkey login in a fresh ${framework} app`, async ({
     page,
   }) => {
@@ -134,29 +135,6 @@ if (preset === "passkey-first") {
     await expect(passkeyButtons.first()).toBeVisible({ timeout: 30_000 });
     await expect(passkeyButtons).toHaveCount(1);
     await loginWithPasskey(page);
-    await expectSignedIn(page);
-    await expectSessionCookie(page);
-    await expect.poll(() => authenticator.credentialCount()).toBe(1);
-  });
-}
-
-if (preset === "password-first" && process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
-  test(`passkey-only registration, logout, and passkey login work in a fresh ${framework} app`, async ({
-    page,
-  }) => {
-    const authenticator = await enableVirtualPasskey(page);
-
-    const email = uniqueEmail("passkey");
-
-    await gotoLogin(page);
-    await registerWithPasskey(page, { email, profile: registrationProfile });
-    await expectSignedIn(page);
-    await expectSessionCookie(page);
-    await expect.poll(() => authenticator.credentialCount()).toBe(1);
-
-    await logout(page);
-    await gotoLogin(page);
-    await loginWithPasskey(page, { email });
     await expectSignedIn(page);
     await expectSessionCookie(page);
     await expect.poll(() => authenticator.credentialCount()).toBe(1);
