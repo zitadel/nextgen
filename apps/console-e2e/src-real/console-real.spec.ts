@@ -134,3 +134,65 @@ test("embeds the team memberships on the list read rather than degrading", async
   await expect(page.getByRole("columnheader", { name: "Team", exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
+
+test("gives a colleague admin access to the project, and takes it away", async ({ page, seed }) => {
+  // The whole journey of #769 against a live backend: the grant is created for
+  // somebody who already exists, shows up in the list with their resolved
+  // identity, and is revoked again. Asserted here rather than only over stubs
+  // because both writes and the `expand: ["principal"]` read are server
+  // behaviour, and the unit specs prove only what the console does with them.
+  const operator = await seed.user();
+  const colleague = await seed.user();
+  await signIn(page, operator);
+
+  await page.goto("/settings/admins");
+  await expect(page.getByRole("heading", { name: "Admins", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add admin", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add admin" });
+  await dialog.getByRole("combobox", { name: "Person" }).click();
+  await page.getByRole("option", { name: colleague.email }).click();
+  await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+
+  // The row is what proves the write landed: it comes back from the list read,
+  // not from the form's own state.
+  const row = page.getByRole("row").filter({ hasText: colleague.email });
+  await expect(row).toBeVisible();
+  await expect(row.getByText("Admin", { exact: true })).toBeVisible();
+
+  await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
+  await page.getByRole("menuitem", { name: "Remove admin" }).click();
+  const confirm = page.getByRole("alertdialog");
+  await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+
+  // Gone from the list, which leaves the instance as this test found it.
+  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
+  await expectNoErrorBoundary(page);
+});
+
+test("refuses a second grant for the same person", async ({ page, seed }) => {
+  // The API owns this copy (ADR 030), so the console renders whatever it says
+  // rather than guessing at a duplicate from the status code.
+  const operator = await seed.user();
+  const colleague = await seed.user();
+  await signIn(page, operator);
+
+  await page.goto("/settings/admins");
+  for (const attempt of [1, 2]) {
+    await page.getByRole("button", { name: "Add admin", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Add admin" });
+    await dialog.getByRole("combobox", { name: "Person" }).click();
+    await page.getByRole("option", { name: colleague.email }).click();
+    await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+    if (attempt === 1) await expect(dialog).toBeHidden();
+  }
+  await expect(page.getByText(/already/i)).toBeVisible();
+
+  // Leave the instance as found.
+  await page.getByRole("dialog", { name: "Add admin" }).getByRole("button", { name: "Cancel" }).click();
+  const row = page.getByRole("row").filter({ hasText: colleague.email });
+  await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
+  await page.getByRole("menuitem", { name: "Remove admin" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Remove admin", exact: true }).click();
+  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
+});

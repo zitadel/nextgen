@@ -26,7 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { type Grant, queryGrants } from "../../../api/grants-query";
+import { api } from "../../../api/zitadel";
+import { field } from "../../../lib/record";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 /**
@@ -50,7 +51,7 @@ export const Route = createFileRoute("/_authed/settings/admins")({
     nav: { label: "Admins", order: 1, icon: UserRound, view: "settings", group: "WORKSPACE" },
   },
   loader: async () => {
-    const page = await queryGrants(
+    const page = await api.queryGrants(
       { limit: PAGE_SIZE, expand: ["principal"] },
       { project_id: getConsoleProjectId() },
     );
@@ -77,6 +78,8 @@ const SETTINGS_COLUMN = "mx-auto w-full max-w-[704px]";
  * control that never does anything. Add it with the first project that needs it.
  */
 const PAGE_SIZE = 100;
+
+type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 interface AdminRow {
   /** Grant id — what `DELETE /grants/{id}` revokes. */
@@ -151,20 +154,31 @@ function AdminsScreen() {
  * How a grant is labelled.
  *
  * `expand: ["principal"]` embeds the principal so the table needs no read per
- * row, but it is `null` when that principal cannot be loaded — a deleted user
- * leaves its grant behind — and the identity fields are themselves optional
- * (ADR 058: a schema need not designate a display or an identifier). Each
- * fallback is therefore real, ending at the id, which always exists.
+ * row. Every fallback below is real: the property is absent when the expansion
+ * was refused, `null` when the principal cannot be loaded (a deleted user
+ * leaves its grant behind), and a user's identity fields are themselves
+ * optional, since ADR 058 lets a schema designate neither a display nor an
+ * identifier. The chain ends at the id, which always exists — and which is what
+ * the operator needs to know which grant they are revoking.
+ *
+ * The embedded body is a user or a team, discriminated by `principal_type` as
+ * the contract says. They are separate union members and the type ties neither
+ * to that field, so the values are read the way the console reads every other
+ * open record: defensively, by name.
  */
 function toAdminRow(grant: Grant): AdminRow {
-  const principal = grant.principal ?? undefined;
-  const name =
-    principal?.display ?? principal?.identifier ?? principal?.name ?? grant.principal_id;
   return {
     id: grant.id,
-    name,
+    name: principalName(grant) ?? grant.principal_id,
     level: grant.relation.charAt(0).toUpperCase() + grant.relation.slice(1),
   };
+}
+
+function principalName(grant: Grant): string | undefined {
+  if (!grant.principal) return undefined;
+  const principal = grant.principal as unknown as Record<string, unknown>;
+  if (grant.principal_type === "team") return field(principal, "name");
+  return field(principal, "display") ?? field(principal, "identifier");
 }
 
 /**

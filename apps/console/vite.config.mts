@@ -6,7 +6,6 @@ import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
-import { mockGrants } from "./vite-mock-grants";
 
 const consoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
@@ -52,8 +51,6 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     alias: { "@": resolve(import.meta.dirname, "src") },
   },
   plugins: [
-    // Dev-only, opt-in through CONSOLE_MOCK_GRANTS=1; goes with #1118.
-    mockGrants(),
     tailwindcss(),
     devtools(),
     tanstackRouter({

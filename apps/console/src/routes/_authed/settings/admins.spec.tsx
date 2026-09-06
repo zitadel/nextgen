@@ -41,11 +41,31 @@ async function renderAdmins() {
 function grant(overrides: Record<string, unknown> = {}) {
   return {
     id: "asgn_1",
+    project_id: "proj_1",
     principal_type: "user",
     principal_id: "user_1",
+    object_type: "project",
     relation: "admin",
     created_at: "2026-09-01T10:00:00Z",
     ...overrides,
+  };
+}
+
+/**
+ * A user principal as `expand: ["principal"]` embeds it: the same body
+ * `GET /users/{id}` serves, so the envelope travels with the identity fields.
+ */
+function userPrincipal(identity: Record<string, unknown>) {
+  return {
+    id: "user_1",
+    schema: "sch_1",
+    attributes: {},
+    metadata: {
+      created_at: "2026-09-01T10:00:00Z",
+      updated_at: "2026-09-01T10:00:00Z",
+      status: "active",
+    },
+    ...identity,
   };
 }
 
@@ -66,8 +86,12 @@ describe("admins screen", () => {
     // One request, not a read per row: the principal rides along on the list
     // (ADR 059), and ADR 058's resolved identity is what the row shows.
     const bodies = stubGrants(
-      grant({ principal: { id: "user_1", display: "Maya Patel", identifier: "maya@acme.com" } }),
-      grant({ id: "asgn_2", principal_id: "user_2", principal: { identifier: "sol@acme.com" } }),
+      grant({ principal: userPrincipal({ display: "Maya Patel", identifier: "maya@acme.com" }) }),
+      grant({
+        id: "asgn_2",
+        principal_id: "user_2",
+        principal: userPrincipal({ id: "user_2", identifier: "sol@acme.com" }),
+      }),
     );
     await renderAdmins();
 
@@ -90,11 +114,33 @@ describe("admins screen", () => {
   it("renders whatever relation a grant carries, not just admin", async () => {
     // The screen only creates `admin`, but the catalog has three relations and
     // a grant made elsewhere must not be mislabelled.
-    stubGrants(grant({ relation: "viewer", principal: { identifier: "vi@acme.com" } }));
+    stubGrants(grant({ relation: "viewer", principal: userPrincipal({ identifier: "vi@acme.com" }) }));
     await renderAdmins();
 
     const table = within(await screen.findByRole("table"));
     expect(table.getByText("Viewer")).toBeInTheDocument();
+  });
+
+  it("labels a team principal by its name", async () => {
+    // A team grant carries the team body, which has a `name` and no identity
+    // chain. `principal_type` is what tells the two apart.
+    stubGrants(
+      grant({
+        principal_type: "team",
+        principal_id: "team_1",
+        principal: {
+          id: "team_1",
+          name: "Platform",
+          status: "active",
+          created_at: "2026-09-01T10:00:00Z",
+          updated_at: "2026-09-01T10:00:00Z",
+        },
+      }),
+    );
+    await renderAdmins();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("Platform")).toBeInTheDocument();
   });
 
   it("says so when nobody has been granted access", async () => {
@@ -178,7 +224,7 @@ describe("admins screen", () => {
   });
 
   it("removes an admin after confirming", async () => {
-    stubGrants(grant({ principal: { display: "Maya Patel" } }));
+    stubGrants(grant({ principal: userPrincipal({ display: "Maya Patel" }) }));
     let deleted: string | undefined;
     server.use(
       http.delete(`${GRANTS_URL}/:id`, ({ params }) => {
@@ -198,7 +244,7 @@ describe("admins screen", () => {
   });
 
   it("keeps the row when the removal is cancelled", async () => {
-    stubGrants(grant({ principal: { display: "Maya Patel" } }));
+    stubGrants(grant({ principal: userPrincipal({ display: "Maya Patel" }) }));
     let deleteCalls = 0;
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () => {
