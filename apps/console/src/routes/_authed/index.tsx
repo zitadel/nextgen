@@ -1,44 +1,25 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { LayoutDashboard } from "lucide-react";
-
-import { ComingSoon } from "../../components/coming-soon";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 /**
  * Home.
  *
- * This screen was a **static mock** rendered with the designed dummy data — stat
- * cards reading "SL Mobbin / 142 items", a "142 Total Projects +18,0%" figure, a
- * "Browse all" list of invented folders owned by "Alex Smith", tabs labelled
- * "Tab 2"–"Tab 5", and a Remove button wired to nothing. It was built to show the
- * handed-off layout pixel-for-pixel, but on a screen that otherwise looks like a
- * working console it reads as real data, and the numbers it shows are invented.
+ * **There is no Home screen, so `/` lands on Users.** The designed overview is a
+ * set of figures nothing can compute: the stat cards need an aggregate or count
+ * endpoint (`POST /users/query` and `POST /projects/query` return pages),
+ * "Total Projects" and its trend need a multi-project list and a time series,
+ * and the "Browse all" rows have no resource behind them at all. Rendering a
+ * page that explains this is worse than going somewhere useful, because `/` is
+ * where sign-in, the logo and the claim flow's "Open the console" all land.
  *
- * The mock is parked below rather than deleted: the layout is the design's, and
- * Home will be built on it once there is something true to put in it. What it
- * needs and does not have:
- *
- *   - the stat figures: no aggregate/count endpoint exists (`POST /users/query` and
- *     `POST /projects/query` return pages, and the current query is
- *     scope-pinned until root ADR 053's authorized-project query lands)
- *   - "Total Projects" and its trend: no multi-project list, no time series
- *   - the "Browse all" rows: no resource behind them at all
- *
- * Restore the block below when those land, replacing the dummy constants with
- * loader data — not before.
+ * Users is the target because it is the console's most complete screen. Point
+ * this at the overview when the figures behind it exist, restoring the mock
+ * parked below and replacing its dummy constants with loader data.
  */
 export const Route = createFileRoute("/_authed/")({
-  component: Home,
+  beforeLoad: () => {
+    throw redirect({ to: "/users" });
+  },
 });
-
-function Home() {
-  return (
-    <ComingSoon
-      title="Home"
-      description="The overview screen needs aggregate counts and a multi-project list, neither of which the API exposes yet. Users is the screen that has been designed and built."
-      icon={LayoutDashboard}
-    />
-  );
-}
 
 // --- Parked design mock (see the note above) --------------------------------
 //

@@ -17,7 +17,6 @@ import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/ind
 import { Route as AuthedTeamsIndexRouteImport } from './routes/_authed/teams/index'
 import { Route as AuthedSystemIndexRouteImport } from './routes/_authed/system/index'
 import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
-import { Route as AuthedSessionsIndexRouteImport } from './routes/_authed/sessions/index'
 import { Route as AuthedSchemasIndexRouteImport } from './routes/_authed/schemas/index'
 import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
 import { Route as AuthedFlowDefinitionsIndexRouteImport } from './routes/_authed/flow-definitions/index'
@@ -65,11 +64,6 @@ const AuthedSystemIndexRoute = AuthedSystemIndexRouteImport.update({
 const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedSessionsIndexRoute = AuthedSessionsIndexRouteImport.update({
-  id: '/sessions/',
-  path: '/sessions/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedSchemasIndexRoute = AuthedSchemasIndexRouteImport.update({
@@ -133,7 +127,6 @@ export interface FileRoutesByFullPath {
   '/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
   '/projects/': typeof AuthedProjectsIndexRoute
   '/schemas/': typeof AuthedSchemasIndexRoute
-  '/sessions/': typeof AuthedSessionsIndexRoute
   '/settings/': typeof AuthedSettingsIndexRoute
   '/system/': typeof AuthedSystemIndexRoute
   '/teams/': typeof AuthedTeamsIndexRoute
@@ -152,7 +145,6 @@ export interface FileRoutesByTo {
   '/flow-definitions': typeof AuthedFlowDefinitionsIndexRoute
   '/projects': typeof AuthedProjectsIndexRoute
   '/schemas': typeof AuthedSchemasIndexRoute
-  '/sessions': typeof AuthedSessionsIndexRoute
   '/settings': typeof AuthedSettingsIndexRoute
   '/system': typeof AuthedSystemIndexRoute
   '/teams': typeof AuthedTeamsIndexRoute
@@ -173,7 +165,6 @@ export interface FileRoutesById {
   '/_authed/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
   '/_authed/projects/': typeof AuthedProjectsIndexRoute
   '/_authed/schemas/': typeof AuthedSchemasIndexRoute
-  '/_authed/sessions/': typeof AuthedSessionsIndexRoute
   '/_authed/settings/': typeof AuthedSettingsIndexRoute
   '/_authed/system/': typeof AuthedSystemIndexRoute
   '/_authed/teams/': typeof AuthedTeamsIndexRoute
@@ -194,7 +185,6 @@ export interface FileRouteTypes {
     | '/flow-definitions/'
     | '/projects/'
     | '/schemas/'
-    | '/sessions/'
     | '/settings/'
     | '/system/'
     | '/teams/'
@@ -213,7 +203,6 @@ export interface FileRouteTypes {
     | '/flow-definitions'
     | '/projects'
     | '/schemas'
-    | '/sessions'
     | '/settings'
     | '/system'
     | '/teams'
@@ -233,7 +222,6 @@ export interface FileRouteTypes {
     | '/_authed/flow-definitions/'
     | '/_authed/projects/'
     | '/_authed/schemas/'
-    | '/_authed/sessions/'
     | '/_authed/settings/'
     | '/_authed/system/'
     | '/_authed/teams/'
@@ -302,13 +290,6 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof AuthedSettingsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/sessions/': {
-      id: '/_authed/sessions/'
-      path: '/sessions'
-      fullPath: '/sessions/'
-      preLoaderRoute: typeof AuthedSessionsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/schemas/': {
@@ -388,7 +369,6 @@ interface AuthedRouteChildren {
   AuthedFlowDefinitionsIndexRoute: typeof AuthedFlowDefinitionsIndexRoute
   AuthedProjectsIndexRoute: typeof AuthedProjectsIndexRoute
   AuthedSchemasIndexRoute: typeof AuthedSchemasIndexRoute
-  AuthedSessionsIndexRoute: typeof AuthedSessionsIndexRoute
   AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
   AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
   AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
@@ -407,7 +387,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedFlowDefinitionsIndexRoute: AuthedFlowDefinitionsIndexRoute,
   AuthedProjectsIndexRoute: AuthedProjectsIndexRoute,
   AuthedSchemasIndexRoute: AuthedSchemasIndexRoute,
-  AuthedSessionsIndexRoute: AuthedSessionsIndexRoute,
   AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
   AuthedSystemIndexRoute: AuthedSystemIndexRoute,
   AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
