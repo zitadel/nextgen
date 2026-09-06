@@ -7172,6 +7172,41 @@ func NewClaimStatusCompletedClaimStatusResponse(v ClaimStatusCompleted) ClaimSta
 
 func (*ClaimStatusResponse) getClaimStatusRes() {}
 
+// How long the project can still be claimed. Derived from the project's
+// creation time and the fixed 14-day claim window (ADR 046); it does not
+// depend on the challenge, which has its own much shorter expiry.
+// Ref: #
+type ClaimWindowResponse struct {
+	// The time when the project's claim window closes.
+	ExpiresAt time.Time `json:"expires_at"`
+	// Whether the window has already closed. Reported alongside `expires_at`
+	// rather than left to the client so a skewed browser clock cannot show a
+	// claimable project as expired, or the reverse.
+	Expired bool `json:"expired"`
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *ClaimWindowResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetExpired returns the value of Expired.
+func (s *ClaimWindowResponse) GetExpired() bool {
+	return s.Expired
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *ClaimWindowResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetExpired sets the value of Expired.
+func (s *ClaimWindowResponse) SetExpired(val bool) {
+	s.Expired = val
+}
+
+func (*ClaimWindowResponse) getClaimWindowRes() {}
+
 type CompleteClaimBadRequest ErrorDetails
 
 func (*CompleteClaimBadRequest) completeClaimRes() {}
@@ -12732,6 +12767,7 @@ func (*ErrorDetailsStatusCode) createTeamRes()      {}
 func (*ErrorDetailsStatusCode) deleteTeamRes()      {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes() {}
 func (*ErrorDetailsStatusCode) getClaimStatusRes()  {}
+func (*ErrorDetailsStatusCode) getClaimWindowRes()  {}
 func (*ErrorDetailsStatusCode) getEventRes()        {}
 func (*ErrorDetailsStatusCode) getHealthRes()       {}
 func (*ErrorDetailsStatusCode) getLiveRes()         {}
@@ -19373,6 +19409,14 @@ func (*GetClaimStatusTooManyRequests) getClaimStatusRes() {}
 type GetClaimStatusUnauthorized ErrorDetails
 
 func (*GetClaimStatusUnauthorized) getClaimStatusRes() {}
+
+type GetClaimWindowNotFound ErrorDetails
+
+func (*GetClaimWindowNotFound) getClaimWindowRes() {}
+
+type GetClaimWindowTooManyRequests ErrorDetails
+
+func (*GetClaimWindowTooManyRequests) getClaimWindowRes() {}
 
 // GetEnvironmentByNameErrorResponse represents sum type.
 type GetEnvironmentByNameErrorResponse struct {

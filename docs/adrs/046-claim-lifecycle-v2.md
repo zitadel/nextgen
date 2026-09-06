@@ -248,7 +248,15 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   check so a claimed project keeps answering 409, and `claim/status` reports
   the same final 410 for a pending challenge, taking precedence over challenge
   expiry so a polling client learns the refusal no new challenge can fix. That
-  lets CLI messaging state the deadline honestly. Deleting the project when the window closes stays out
+  lets CLI messaging state the deadline honestly, and the browser leg read it:
+  `GET /claim/window?challenge_id=...` reports `{ expires_at, expired }` for
+  the claim page's countdown. It is unauthenticated, because the page runs it
+  before the developer signs in — the challenge from the claim URL is the same
+  capability `claim/complete` accepts, it is matched rather than spent, and an
+  unresolvable one answers the same 404 a wrong project id gets, so the read
+  confirms nothing about which projects exist. `expired` is decided
+  server-side so a skewed browser clock cannot contradict what the claim legs
+  enforce. Deleting the project when the window closes stays out
   of scope: there is no general scheduled-task infrastructure in the server
   (the audit retention loop is audit-specific), and the proposed ADR 061
   ([#1119](https://github.com/zitadel/nextgen/pull/1119)), which designs one,

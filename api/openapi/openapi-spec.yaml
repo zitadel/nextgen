@@ -118,6 +118,8 @@ paths:
     $ref: endpoints/projects/by_id/claim/status/methods.yaml
   /projects/{project_id}/claim/complete:
     $ref: endpoints/projects/by_id/claim/complete/methods.yaml
+  /projects/{project_id}/claim/window:
+    $ref: endpoints/projects/by_id/claim/window/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/query:

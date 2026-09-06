@@ -11952,6 +11952,45 @@ func (c *MockClaimServiceStatusCall) DoAndReturn(f func(context.Context, string,
 	return c
 }
 
+// Window mocks base method.
+func (m *MockClaimService) Window(ctx context.Context, projectID, challengeID string) (*service.ClaimWindowResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Window", ctx, projectID, challengeID)
+	ret0, _ := ret[0].(*service.ClaimWindowResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Window indicates an expected call of Window.
+func (mr *MockClaimServiceMockRecorder) Window(ctx, projectID, challengeID any) *MockClaimServiceWindowCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Window", reflect.TypeOf((*MockClaimService)(nil).Window), ctx, projectID, challengeID)
+	return &MockClaimServiceWindowCall{Call: call}
+}
+
+// MockClaimServiceWindowCall wrap *gomock.Call
+type MockClaimServiceWindowCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockClaimServiceWindowCall) Return(arg0 *service.ClaimWindowResult, arg1 error) *MockClaimServiceWindowCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockClaimServiceWindowCall) Do(f func(context.Context, string, string) (*service.ClaimWindowResult, error)) *MockClaimServiceWindowCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockClaimServiceWindowCall) DoAndReturn(f func(context.Context, string, string) (*service.ClaimWindowResult, error)) *MockClaimServiceWindowCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockProjectService is a mock of ProjectService interface.
 type MockProjectService struct {
 	ctrl     *gomock.Controller
