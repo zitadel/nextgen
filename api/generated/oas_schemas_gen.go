@@ -10913,6 +10913,12 @@ type CreateReleaseRequest struct {
 	// pin two revisions of the *same* resource — a second revision of the
 	// `human-user` schema is rejected rather than ordered, since a release
 	// describes one state of the project.
+	// The upper bound counts *resources*, not revisions — one release pins at
+	// most one revision of each — so it is a limit on how much a project
+	// configures, not on how often it changes. It keeps the server's
+	// per-pointer revision lookups bounded by the contract rather than by the
+	// request, and is set conservatively: raising it is a spec change, and
+	// widening a bound breaks no client that was already inside it.
 	Pointers []CreateReleasePointer `json:"pointers"`
 	// A short summary of what the release changes, analogous to a git commit
 	// message. Recorded on the release and shown when listing releases.
@@ -40262,7 +40268,8 @@ type Release struct {
 	ProjectID ProjectID       `json:"project_id"`
 	Metadata  ReleaseMetadata `json:"metadata"`
 	// The revisions this release pins, one entry per `(kind, handle)`. Never
-	// empty: a release must contain at least one resource.
+	// empty: a release must contain at least one resource, and never longer
+	// than the set `POST /releases` accepts.
 	Pointers []ReleasePointer `json:"pointers"`
 }
 

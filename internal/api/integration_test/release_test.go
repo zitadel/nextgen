@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -193,31 +194,52 @@ func TestCreateRelease(t *testing.T) {
 		assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, code)
 	})
 
-	// Sent raw rather than through the generated client, which enforces
-	// minItems client-side and would never put the request on the wire. A
-	// caller using curl or a hand-rolled SDK reaches the server, and the
-	// server has to reject it too.
+	// Both size bounds are sent raw rather than through the generated client,
+	// which enforces them client-side and would never put the request on the
+	// wire. A caller using curl or a hand-rolled SDK reaches the server, and
+	// the server has to reject it too.
 	t.Run("an empty pinned set is rejected by the contract", func(t *testing.T) {
-		body := `{"pointers":[]}`
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-			harness.EnsureTestServer(t).URL+"/releases?project_id="+url.QueryEscape(fixture.project),
-			strings.NewReader(body),
-		)
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+fixture.client.Token())
-
-		resp, err := harness.EnsureHttpClient(t).Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		raw, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
-		details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+		status, details := fixture.postRaw(t, `{"pointers":[]}`)
+		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), details.Code)
 	})
+
+	// The revision ids are synthetic: the decoder rejects the set on its size
+	// before the handler resolves any of them, which is the point of bounding
+	// it in the contract rather than in the service.
+	t.Run("a pinned set over the cap is rejected by the contract", func(t *testing.T) {
+		pointers := make([]string, 0, 51)
+		for i := range 51 {
+			pointers = append(pointers, `{"kind":"branding","revision_id":"brnd_`+strconv.Itoa(i)+`"}`)
+		}
+
+		status, details := fixture.postRaw(t, `{"pointers":[`+strings.Join(pointers, ",")+`]}`)
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), details.Code)
+	})
+}
+
+// postRaw posts a hand-written body to POST /releases, bypassing the generated
+// client so requests it would reject client-side still reach the server.
+func (f releaseFixture) postRaw(t *testing.T, body string) (int, *api.ErrorDetails) {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		harness.EnsureTestServer(t).URL+"/releases?project_id="+url.QueryEscape(f.project),
+		strings.NewReader(body),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+f.client.Token())
+
+	resp, err := harness.EnsureHttpClient(t).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp.StatusCode, helpers.MustUnmarshal[api.ErrorDetails](t, raw)
 }
 
 // Revisions are project-scoped, so a release can only pin what its own project
