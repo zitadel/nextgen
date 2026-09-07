@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"maps"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -16,13 +18,17 @@ var allowedGrantRelations = map[string]struct{}{
 	"admin":  {},
 }
 
-// isManagedGrant is the class this HTTP API may Get or Revoke: principal type
-// user or team, object_type project, and relation in {viewer, editor, admin}.
-// Create already writes that triple. Other authz_assignments rows (project-secret
-// setup, owning-team / claim, and future non-project catalog bindings) live in
+// isManagedGrant is the class this HTTP API may Get or Revoke: the system
+// catalog, project scope, principal type user or team, object_type project,
+// and relation in {viewer, editor, admin}. Create already writes that tuple.
+// Other authz_assignments rows (project-secret setup, owning-team / claim,
+// app-group catalog bindings, and team/resource-scoped system rows) live in
 // the same table and must 404 here so a project secret cannot self-lockout,
 // transfer ownership, or revoke an assignment this API would mislabel as project.
 func isManagedGrant(a *domain.AuthzAssignment) bool {
+	if a.CatalogID != domain.SystemCatalogID || a.ScopeKind != domain.AuthzScopeKindProject {
+		return false
+	}
 	switch a.PrincipalType {
 	case domain.AuthzPrincipalTypeUser, domain.AuthzPrincipalTypeTeam:
 		if a.ObjectType != "project" {
@@ -37,12 +43,14 @@ func isManagedGrant(a *domain.AuthzAssignment) bool {
 
 type GrantService struct {
 	v2Pool            *DB
+	refs              UserRefResolver
 	platformProjectID string
 }
 
-func NewGrantService(v2Pool *DB, platformProjectID string) *GrantService {
+func NewGrantService(v2Pool *DB, refs UserRefResolver, platformProjectID string) *GrantService {
 	return &GrantService{
 		v2Pool:            v2Pool,
+		refs:              refs,
 		platformProjectID: platformProjectID,
 	}
 }
@@ -55,7 +63,7 @@ type CreateGrantInput struct {
 	ExpiresAt     *time.Time
 }
 
-func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*domain.AuthzAssignment, error) {
+func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Grant, error) {
 	if err := validateCreateGrant(input); err != nil {
 		return nil, err
 	}
@@ -101,10 +109,17 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*dom
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create grant")
 	}
-	return created, nil
+	grant, err := s.hydrateOne(ctx, created)
+	if err != nil {
+		// The assignment has already committed: a ref/team load failure must
+		// not fail the create — the caller would retry and hit unique
+		// constraints — so the response carries id-only refs (ADR 058).
+		return idOnlyGrant(created), nil
+	}
+	return grant, nil
 }
 
-func (s *GrantService) Get(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error) {
+func (s *GrantService) Get(ctx context.Context, projectID, id string) (*Grant, error) {
 	asgn, err := s.v2Pool.Statements().GetAuthzAssignment(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -115,7 +130,7 @@ func (s *GrantService) Get(ctx context.Context, projectID, id string) (*domain.A
 	if asgn.RevokedAt != nil || !isManagedGrant(asgn) {
 		return nil, domain.ErrGrantNotFound()
 	}
-	return asgn, nil
+	return s.hydrateOne(ctx, asgn)
 }
 
 func (s *GrantService) Revoke(ctx context.Context, projectID, id string) error {
@@ -223,6 +238,424 @@ func (s *GrantService) loadPrincipal(ctx context.Context, stmts AllStatements, h
 		return nil
 	default:
 		return domain.ErrGrantInvalid()
+	}
+}
+
+const (
+	grantFieldCreatedAt     = "created_at"
+	grantFieldPrincipalType = "principal_type"
+	grantFieldPrincipalID   = "principal_id"
+	grantFieldRelation      = "relation"
+	grantFieldExpiresAt     = "expires_at"
+	grantFieldID            = "id"
+)
+
+// GrantPrincipal is the GET-user or GET-team body for expand: ["principal"].
+// Both pointers nil means the principal was requested but could not be loaded.
+type GrantPrincipal struct {
+	User *domain.User
+	Team *domain.Team
+}
+
+// Grant is an assignment plus the resolved principal label for the HTTP API.
+// Principal is nil unless expand was requested; a non-nil Principal with both
+// User and Team nil is the ADR 059 missing-principal case (wire null).
+type Grant struct {
+	Assignment *domain.AuthzAssignment
+	User       *domain.UserRef
+	Team       *TeamRef
+	Principal  *GrantPrincipal
+}
+
+func (g *Grant) attachUser(user *domain.User, ref domain.UserRef, found bool) {
+	if found {
+		g.User = &ref
+		if user != nil {
+			user.Ref = &ref
+		}
+	} else {
+		g.User = &domain.UserRef{UserID: g.Assignment.PrincipalID}
+	}
+	if g.Principal != nil {
+		g.Principal.User = user
+	}
+}
+
+func (g *Grant) attachTeam(team *domain.Team) {
+	if team != nil {
+		g.Team = teamRefFrom(team)
+		if g.Principal != nil {
+			g.Principal.Team = team
+		}
+		return
+	}
+	g.Team = &TeamRef{TeamID: g.Assignment.PrincipalID}
+}
+
+// TeamRef is the label for a team principal. Name is empty when the team
+// cannot be loaded.
+type TeamRef struct {
+	TeamID string
+	Name   string
+}
+
+// ListGrantsRequest is the input for listing the grants of a project.
+type ListGrantsRequest struct {
+	ProjectID        string
+	Limit            int
+	PageToken        string
+	Sorting          *Sorting
+	Filters          []Filter
+	IncludePrincipal bool
+}
+
+// ListGrantsResponse is the output for listing grants.
+type ListGrantsResponse struct {
+	Grants        []*Grant
+	NextPageToken string
+}
+
+// List returns unrevoked managed grants of a project, ordered and paginated
+// with an opaque cursor. Principal refs are hydrated in one batch per page.
+func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (*ListGrantsResponse, error) {
+	if req.ProjectID == "" {
+		return nil, domain.ErrGrantInvalid().WithDetails("project_id is required")
+	}
+
+	filters := make([]database.Filter[domain.AuthzAssignmentField], 0, len(req.Filters))
+	for _, f := range req.Filters {
+		filter, err := grantFilter(f)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, filter)
+	}
+
+	orderBy, err := listOrderBy(req.Sorting, domain.AuthzAssignmentFieldCreatedAt, database.OrderAsc, grantField, domain.AuthzAssignmentFieldID)
+	if err != nil {
+		return nil, err
+	}
+
+	var cursor []byte
+	if req.PageToken != "" {
+		cursor = []byte(req.PageToken)
+	}
+
+	var filter database.Filter[domain.AuthzAssignmentField]
+	if len(filters) > 0 {
+		filter = database.And(filters...)
+	}
+	result, err := s.v2Pool.Statements().ListManagedGrants(ctx, req.ProjectID, &database.ListOptions[domain.AuthzAssignmentField]{
+		Filter: filter,
+		Pagination: database.Page[domain.AuthzAssignmentField]{
+			Limit:   uint32(normalizeLimit(req.Limit)),
+			OrderBy: orderBy,
+			Cursor:  cursor,
+		},
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list grants")
+	}
+
+	grants, err := s.hydrate(ctx, req.IncludePrincipal, result.Items...)
+	if err != nil {
+		return nil, err
+	}
+	return &ListGrantsResponse{
+		Grants:        grants,
+		NextPageToken: string(result.NextCursor),
+	}, nil
+}
+
+func (s *GrantService) hydrateOne(ctx context.Context, asgn *domain.AuthzAssignment) (*Grant, error) {
+	grants, err := s.hydrate(ctx, false, asgn)
+	if err != nil {
+		return nil, err
+	}
+	return grants[0], nil
+}
+
+func idOnlyGrant(asgn *domain.AuthzAssignment) *Grant {
+	g := &Grant{Assignment: asgn}
+	switch asgn.PrincipalType {
+	case domain.AuthzPrincipalTypeUser:
+		g.User = &domain.UserRef{UserID: asgn.PrincipalID}
+	case domain.AuthzPrincipalTypeTeam:
+		g.Team = &TeamRef{TeamID: asgn.PrincipalID}
+	}
+	return g
+}
+
+func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns ...*domain.AuthzAssignment) ([]*Grant, error) {
+	out := make([]*Grant, 0, len(asgns))
+	for _, a := range asgns {
+		g := &Grant{Assignment: a}
+		if includePrincipal {
+			g.Principal = &GrantPrincipal{}
+		}
+		out = append(out, g)
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+
+	homes, err := s.grantsByPrincipalHome(ctx, out)
+	if err != nil {
+		return nil, err
+	}
+
+	users := map[string]*domain.User{}
+	userRefs := map[string]domain.UserRef{}
+	teams := map[string]*domain.Team{}
+	loadCtx := WithAuthzListUnrestricted(ctx)
+	for home, grouped := range homes {
+		homeAsgns := make([]*domain.AuthzAssignment, 0, len(grouped))
+		for _, g := range grouped {
+			homeAsgns = append(homeAsgns, g.Assignment)
+		}
+		userIDs, teamIDs := principalIDs(homeAsgns)
+		var homeUsers map[string]*domain.User
+		if includePrincipal {
+			homeUsers, err = s.loadUsers(loadCtx, home, userIDs, nil)
+			if err != nil {
+				return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant user refs")
+			}
+			maps.Copy(users, homeUsers)
+		}
+		refs, err := s.resolveGrantUserRefs(ctx, home, userIDs, homeUsers)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant user refs")
+		}
+		maps.Copy(userRefs, refs)
+		homeTeams, err := s.loadTeams(loadCtx, home, teamIDs)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant team refs")
+		}
+		maps.Copy(teams, homeTeams)
+	}
+
+	for _, g := range out {
+		switch g.Assignment.PrincipalType {
+		case domain.AuthzPrincipalTypeUser:
+			ref, ok := userRefs[g.Assignment.PrincipalID]
+			g.attachUser(users[g.Assignment.PrincipalID], ref, ok)
+		case domain.AuthzPrincipalTypeTeam:
+			g.attachTeam(teams[g.Assignment.PrincipalID])
+		}
+	}
+	return out, nil
+}
+
+func (s *GrantService) grantsByPrincipalHome(ctx context.Context, grants []*Grant) (map[string][]*Grant, error) {
+	if s.platformProjectID != "" {
+		return map[string][]*Grant{s.platformProjectID: grants}, nil
+	}
+	stmts := s.v2Pool.Statements()
+	homeByPrincipal := make(map[string]string, len(grants))
+	grouped := map[string][]*Grant{}
+	for _, g := range grants {
+		pid := g.Assignment.PrincipalID
+		home, ok := homeByPrincipal[pid]
+		if !ok {
+			scope, err := stmts.GetResourceScope(ctx, pid)
+			if err != nil {
+				if _, miss := errors.AsType[*database.NoRowFoundError](err); miss {
+					homeByPrincipal[pid] = ""
+					continue
+				}
+				return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant principal homes")
+			}
+			home = scope.ProjectID
+			homeByPrincipal[pid] = home
+		}
+		if home == "" {
+			continue
+		}
+		grouped[home] = append(grouped[home], g)
+	}
+	return grouped, nil
+}
+
+func (s *GrantService) resolveGrantUserRefs(ctx context.Context, projectID string, userIDs []string, users map[string]*domain.User) (map[string]domain.UserRef, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+	if users != nil {
+		loaded := make([]*domain.User, 0, len(users))
+		for _, user := range users {
+			loaded = append(loaded, user)
+		}
+		return s.refs.ResolveRefsForUsers(ctx, projectID, loaded)
+	}
+	return s.refs.ResolveUserRefs(ctx, projectID, userIDs)
+}
+
+func principalIDs(asgns []*domain.AuthzAssignment) (userIDs, teamIDs []string) {
+	seenUsers := map[string]struct{}{}
+	seenTeams := map[string]struct{}{}
+	for _, a := range asgns {
+		switch a.PrincipalType {
+		case domain.AuthzPrincipalTypeUser:
+			if _, ok := seenUsers[a.PrincipalID]; ok {
+				continue
+			}
+			seenUsers[a.PrincipalID] = struct{}{}
+			userIDs = append(userIDs, a.PrincipalID)
+		case domain.AuthzPrincipalTypeTeam:
+			if _, ok := seenTeams[a.PrincipalID]; ok {
+				continue
+			}
+			seenTeams[a.PrincipalID] = struct{}{}
+			teamIDs = append(teamIDs, a.PrincipalID)
+		}
+	}
+	return userIDs, teamIDs
+}
+
+func (s *GrantService) loadUsers(ctx context.Context, projectID string, userIDs []string, attributeKeys []string) (map[string]*domain.User, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+	listed, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Or(equalIDFilters(domain.UserFieldID, userIDs)...),
+		),
+		Pagination: database.Page[domain.UserField]{
+			Limit: uint32(len(userIDs)),
+			OrderBy: database.OrderBy[domain.UserField]{
+				Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+				Direction: database.OrderAsc,
+			},
+		},
+	}, UserQueryOptions{AttributeKeys: attributeKeys})
+	if err != nil {
+		return nil, err
+	}
+	return indexByID(listed.Items, func(u *domain.User) string { return u.ID }), nil
+}
+
+func (s *GrantService) loadTeams(ctx context.Context, projectID string, teamIDs []string) (map[string]*domain.Team, error) {
+	if len(teamIDs) == 0 {
+		return nil, nil
+	}
+	listed, err := s.v2Pool.Statements().ListTeams(ctx, &database.ListOptions[domain.TeamField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+			database.Or(equalIDFilters(domain.TeamFieldID, teamIDs)...),
+			visibleTeamStatusFilter(),
+		),
+		Pagination: database.Page[domain.TeamField]{
+			Limit: uint32(len(teamIDs)),
+			OrderBy: database.OrderBy[domain.TeamField]{
+				Columns:   []database.Column[domain.TeamField]{database.Col(domain.TeamFieldID)},
+				Direction: database.OrderAsc,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return indexByID(listed.Items, func(t *domain.Team) string { return t.ID }), nil
+}
+
+func equalIDFilters[F ~uint8](field F, ids []string) []database.Filter[F] {
+	filters := make([]database.Filter[F], 0, len(ids))
+	for _, id := range ids {
+		filters = append(filters, database.Equal(database.Col(field), id))
+	}
+	return filters
+}
+
+func indexByID[T any](items []*T, id func(*T) string) map[string]*T {
+	out := make(map[string]*T, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if key := id(item); key != "" {
+			out[key] = item
+		}
+	}
+	return out
+}
+
+func teamRefFrom(team *domain.Team) *TeamRef {
+	return &TeamRef{TeamID: team.ID, Name: team.Name}
+}
+
+func grantFilter(f Filter) (database.Filter[domain.AuthzAssignmentField], error) {
+	switch f.Field {
+	case grantFieldCreatedAt:
+		return createdAtFilter(f.Operation, database.Col(domain.AuthzAssignmentFieldCreatedAt), f.Value)
+	case grantFieldExpiresAt:
+		return expiresAtFilter(f)
+	case grantFieldPrincipalType:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		switch value {
+		case domain.AuthzPrincipalTypeUser.String(), domain.AuthzPrincipalTypeTeam.String():
+		default:
+			return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown principal_type %q", value))
+		}
+		return stringEqualsFilter(f.Operation, database.Col(domain.AuthzAssignmentFieldPrincipalType), value)
+	case grantFieldPrincipalID:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.AuthzAssignmentFieldPrincipalID), value)
+	case grantFieldRelation:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := allowedGrantRelations[value]; !ok {
+			return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown relation %q", value))
+		}
+		return stringEqualsFilter(f.Operation, database.Col(domain.AuthzAssignmentFieldRelation), value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
+	}
+}
+
+func expiresAtFilter(f Filter) (database.Filter[domain.AuthzAssignmentField], error) {
+	if f.Value == nil {
+		switch f.Operation {
+		case filterOpEquals:
+			return database.Equal(database.Col(domain.AuthzAssignmentFieldExpiresAt), nil), nil
+		default:
+			return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for a null expires_at", f.Operation))
+		}
+	}
+	return timestampFilter("expires_at", f.Operation, database.Col(domain.AuthzAssignmentFieldExpiresAt), f.Value)
+}
+
+func stringEqualsFilter[F ~uint8](op string, col database.Column[F], value string) (database.Filter[F], error) {
+	switch op {
+	case filterOpEquals:
+		return database.StringEqual(col, value), nil
+	case filterOpNotEquals, filterOpContains, filterOpNotContains:
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
+	}
+}
+
+func grantField(field string) (domain.AuthzAssignmentField, error) {
+	switch field {
+	case grantFieldCreatedAt:
+		return domain.AuthzAssignmentFieldCreatedAt, nil
+	case grantFieldExpiresAt:
+		return domain.AuthzAssignmentFieldExpiresAt, nil
+	case grantFieldID:
+		return domain.AuthzAssignmentFieldID, nil
+	default:
+		return domain.AuthzAssignmentFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}
 }
 
