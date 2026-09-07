@@ -79,15 +79,6 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, def.ID, listed.Items[0].ID)
 
-	def.Name = "Updated Login"
-	def.Status = domain.FlowDefinitionStatusActive
-	require.NoError(t, stmts.UpdateFlowDefinition(ctx, def))
-
-	got, err = stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "Updated Login", got.Name)
-	assert.Equal(t, domain.FlowDefinitionStatusActive, got.Status)
-
 	require.NoError(t, stmts.DeleteFlowDefinitionByID(ctx, project.ID, def.ID))
 	_, err = stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
 	require.Error(t, err)

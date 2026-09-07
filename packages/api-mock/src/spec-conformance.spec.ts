@@ -17,7 +17,6 @@
  *   - GET  /projects/:id                → GetProjectResponse
  *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
  *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
- *   - PUT  /flow_definitions/:id        → UpdateFlowDefinitionResponse
  *
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
@@ -41,7 +40,6 @@ import {
   GetMySessionResponse,
   GetProjectResponse,
   ListFlowDefinitionsResponse,
-  UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
@@ -555,30 +553,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
-  });
-
-  test("PUT /flow_definitions/:id matches UpdateFlowDefinitionResponse", async () => {
-    const create = await fetch(`${BASE}/flow_definitions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        project_id: "proj_conformance_update",
-        flow_definition: validFlowDefinitionBody(),
-      }),
-    });
-    const { id } = (await create.json()) as { id: string };
-    // Spec: `updateFlowDefinition` is flat-by-id `PUT /flow_definitions/{id}`
-    // (no project_id query). The body wraps the definition under
-    // `flow_definition` (flow-definition-update-request.yaml), unlike the
-    // create envelope.
-    const res = await fetch(`${BASE}/flow_definitions/${id}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(() => UpdateFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 });
 

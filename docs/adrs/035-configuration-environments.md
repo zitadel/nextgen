@@ -87,7 +87,7 @@ Each release also records **audit metadata** — who created it, when, and from 
 
 These fields are set at construction time and never mutate.
 
-**A release is a closed boundary.** An environment sees only what is inside its current release: resources outside the release are invisible, and drafted revisions on the server that never made it into a release do not exist at runtime. Per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) operates outside any release.
+**A release is a closed boundary.** An environment sees only what is inside its current release: resources outside the release are invisible, and drafted revisions on the server that never made it into a release do not exist at runtime. Per-resource CRUD (`POST /schemas`, `POST /flow_definitions`, …) operates outside any release.
 
 > Exception: users carry their own user-schema revision. A user record persists the sch_… id of the user-schema revision it was created against.
 
@@ -171,7 +171,7 @@ Tailored for the CLI: a single endpoint that backs `zitadel deploy` (and `zitade
 
 \* Endpoint name is a placeholder; a shorter form may replace it.
 
-Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) remains available and creates a new revision on write. It does not touch any environment's current deployment.
+Direct per-resource CRUD (`POST /schemas`, `POST /flow_definitions`, …) remains available and creates a new revision on write. It does not touch any environment's current deployment.
 
 ### CLI
 

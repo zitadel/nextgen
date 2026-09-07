@@ -119,15 +119,6 @@ func TestManagementAuthz(t *testing.T) {
 			listResp, err := foreign.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: victimID})
 			require.NoError(t, err)
 			assertAuthzStatus(t, listResp, 404, "flowdef.not_found")
-
-			updResp, err := foreign.UpdateFlowDefinition(t.Context(), newUpdateFlowDefinitionRequest(fixture), api.UpdateFlowDefinitionParams{ID: "flowdef_irrelevant"})
-			require.NoError(t, err)
-			assertAuthzError(t, updResp, "flowdef.not_found")
-
-			// Fabricated ids miss RSI → idempotent delete 204 (same as never existed).
-			delResp, err := foreign.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{ID: "flowdef_irrelevant"})
-			require.NoError(t, err)
-			assert.IsType(t, &api.DeleteFlowDefinitionNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {

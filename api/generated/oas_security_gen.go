@@ -101,9 +101,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateUserOperation: []string{
 		"user.write",
 	},
-	DeleteFlowDefinitionOperation: []string{
-		"flow_definition.delete",
-	},
 	DeleteGrantOperation: []string{
 		"project.write",
 	},
@@ -209,9 +206,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
-	},
-	UpdateFlowDefinitionOperation: []string{
-		"flow_definition.write",
 	},
 	UpdateTeamOperation: []string{
 		"team.write",

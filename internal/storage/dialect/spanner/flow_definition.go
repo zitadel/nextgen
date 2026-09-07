@@ -22,10 +22,6 @@ const (
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = @p1 AND id = @p2`
 
-	updateFlowDefinitionStmt = `UPDATE flow_definitions SET ` +
-		`name = @p1, schema_version = @p2, status = @p3, purposes = @p4, ` +
-		`definition = @p5, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p6 AND id = @p7 THEN RETURN created_at, updated_at`
-
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
 		`FROM flow_definitions`
 )
@@ -83,28 +79,6 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, pro
 	return f.scanFlowDefinition(row)
 }
 
-func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	content, err := flowdefinition.Marshal(entity)
-	if err != nil {
-		return err
-	}
-	definition, err := encodeNullJSON(content)
-	if err != nil {
-		return wrapError(err)
-	}
-	purposes := flowdefinition.PurposeStrings(entity)
-	stmt := buildStatement(updateFlowDefinitionStmt,
-		entity.Name,
-		entity.SchemaVersion,
-		entity.Status.String(),
-		purposes,
-		definition,
-		entity.ProjectID,
-		entity.ID,
-	).statement()
-	return f.db.Write(ctx, stmt, scanFlowDefinitionTimestamps(entity))
-}
-
 func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition) func(*spanner.RowIterator) error {
 	return func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
@@ -114,6 +88,7 @@ func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition) func(*spanner.R
 	}
 }
 
+// ListFlowDefinitions implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 	opts := flowdefinition.EnsureListOptions(filter)
 

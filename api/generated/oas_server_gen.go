@@ -172,15 +172,6 @@ type Handler interface {
 	//
 	// POST /users
 	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
-	// DeleteFlowDefinition implements deleteFlowDefinition operation.
-	//
-	// Delete a flow definition by id.
-	// If the flow definition is currently being used by a flow, the deletion will fail.
-	// If the flow definition is the last active flow definition for a given purpose, the deletion will
-	// fail to prevent disruption of new flows being started for that purpose.
-	//
-	// DELETE /flow_definitions/{id}
-	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
 	// DeleteGrant implements deleteGrant operation.
 	//
 	// Soft-revokes a grant this API manages and emits `authz.revoked`.
@@ -567,13 +558,6 @@ type Handler interface {
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
-	// UpdateFlowDefinition implements updateFlowDefinition operation.
-	//
-	// Update a flow definition by id. This endpoint replaces the existing flow definition.
-	// If `flow_definition.status` is omitted, the current status is preserved.
-	//
-	// PUT /flow_definitions/{id}
-	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
 	// UpdateTeam implements updateTeam operation.
 	//
 	// Update team. Only active teams can be updated.
