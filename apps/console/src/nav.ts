@@ -1,12 +1,28 @@
 /**
- * Navigation metadata for the Figma admin sidebar (a single flat list, no group
- * headings; order is driven by `order`).
+ * Navigation metadata for the Figma sidebar. The shell has two views: Portal
+ * (a single flat list, no group headings; order is driven by `order`) and
+ * Settings (grouped under the frames' `ACCOUNT` / `WORKSPACE` headings —
+ * `section` below decides membership).
  *
  * Built routes attach their entry via `staticData` (Console ADR 0001) so the
  * sidebar stays in sync with the route tree — every row in the sidebar is a
  * screen that exists.
  */
 import type { NavIcon } from "./components/app-shell/icons";
+
+/** Settings-view group ids — the frames' `ACCOUNT` / `WORKSPACE` headings. */
+export type SettingsSection = (typeof SETTINGS_GROUPS)[number]["section"];
+
+/**
+ * The settings groups in design order (Figma `1568:97804`), with the headings
+ * the sidebar renders. A group with no built screen under it is not drawn —
+ * same argument as `DESIGN_ONLY_NAV` below: a heading over nothing advertises
+ * a section that does not exist.
+ */
+export const SETTINGS_GROUPS = [
+  { section: "account", label: "Account" },
+  { section: "workspace", label: "Workspace" },
+] as const;
 
 export interface NavMeta {
   /** Sidebar label. */
@@ -30,6 +46,14 @@ export interface NavMeta {
    * not silently orphan the child.
    */
   parent?: string;
+  /**
+   * Settings-view group this entry renders under. Present = the entry belongs
+   * to the Settings sidebar (grouped, `SETTINGS_GROUPS` order); absent = the
+   * entry is Portal chrome. The shell filters on this, so a settings route
+   * never leaks into the portal list and vice versa — `app-shell.spec`'s exact
+   * portal-order assertion is the guard.
+   */
+  section?: SettingsSection;
 }
 
 /**
