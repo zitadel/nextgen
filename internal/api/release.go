@@ -28,13 +28,19 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 		})
 	}
 
-	result, err := h.releaseService.Create(ctx, service.CreateReleaseInput{
+	input := service.CreateReleaseInput{
 		ProjectID: string(params.ProjectID),
 		Pointers:  pointers,
-		Message:   optStringPtr(req.Message),
-		GitSHA:    optStringPtr(req.GitSha),
 		GitDirty:  req.GitDirty.Or(false),
-	})
+	}
+	if message, ok := req.Message.Get(); ok {
+		input.Message = &message
+	}
+	if gitSHA, ok := req.GitSha.Get(); ok {
+		input.GitSHA = &gitSHA
+	}
+
+	result, err := h.releaseService.Create(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -79,32 +85,27 @@ func toAPIReleaseMetadata(entity *domain.Release) api.ReleaseMetadata {
 		GitDirty:  entity.Metadata.GitDirty,
 		CreatedAt: entity.CreatedAt,
 	}
-	metadata.Message = nilableString(entity.Metadata.Message)
-	metadata.GitSha = nilableString(entity.Metadata.GitSHA)
-	metadata.CreatedBy = nilableString(entity.Metadata.CreatedBy)
-	if entity.Metadata.CreatedByType != nil {
-		metadata.CreatedByType = api.NewOptNilReleaseMetadataCreatedByType(
-			api.ReleaseMetadataCreatedByType(*entity.Metadata.CreatedByType))
+	if message := entity.Metadata.Message; message != nil {
+		metadata.Message.SetTo(*message)
+	} else {
+		metadata.Message.SetToNull()
+	}
+	if gitSHA := entity.Metadata.GitSHA; gitSHA != nil {
+		metadata.GitSha.SetTo(*gitSHA)
+	} else {
+		metadata.GitSha.SetToNull()
+	}
+	if createdBy := entity.Metadata.CreatedBy; createdBy != nil {
+		metadata.CreatedBy.SetTo(*createdBy)
+	} else {
+		metadata.CreatedBy.SetToNull()
+	}
+	if createdByType := entity.Metadata.CreatedByType; createdByType != nil {
+		metadata.CreatedByType.SetTo(api.ReleaseMetadataCreatedByType(*createdByType))
 	} else {
 		metadata.CreatedByType.SetToNull()
 	}
 	return metadata
-}
-
-func nilableString(value *string) api.OptNilString {
-	if value == nil {
-		var out api.OptNilString
-		out.SetToNull()
-		return out
-	}
-	return api.NewOptNilString(*value)
-}
-
-func optStringPtr(value api.OptString) *string {
-	if !value.Set {
-		return nil
-	}
-	return &value.Value
 }
 
 // releaseErrorResponse maps the release error codes onto statuses. A pinned
