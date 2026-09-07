@@ -138,9 +138,9 @@ func NewRelease(projectID string, pointers []ReleasePointer, metadata ReleaseMet
 	// Sorts into a new slice: the caller's argument is not ours to reorder.
 	sorted := slices.SortedFunc(slices.Values(pointers), compareReleasePointers)
 
-	// Adjacent after sorting, so one pass finds every collision. A set with a
-	// duplicated handle cannot be hashed: the two entries tie under the
-	// comparator, so the same set could order either way.
+	// Adjacent after sorting, so one pass finds every collision. A release
+	// describes one state of the project, so two revisions of the same
+	// resource are a contradiction rather than an ordering problem.
 	//
 	// Cross-resource validation — that every revision exists, and that the
 	// references between them resolve — needs database reads and arrives with
@@ -164,16 +164,23 @@ func NewRelease(projectID string, pointers []ReleasePointer, metadata ReleaseMet
 // excluded, so re-submitting the same revisions under a new message resolves
 // to the release that already pins them.
 //
-// Exported because the bundle constructor derives the same key from content it
-// has just allocated revisions for, and the two must agree.
+// Exported so a caller holding a set of pointers can derive the key without a
+// Release: the storage round-trip tests check that what came back out of a
+// dialect still hashes to what went in.
 func ReleaseContentHash(pointers []ReleasePointer) string {
 	return releaseContentHash(slices.SortedFunc(slices.Values(pointers), compareReleasePointers))
 }
 
+// compareReleasePointers orders a set canonically. RevisionID is the last key
+// only to make the order total: NewRelease rejects a set that ties on kind and
+// handle, so it never decides anything there, but ReleaseContentHash sorts
+// without that check and would otherwise hash such a set differently run to
+// run, since the sort is not stable.
 func compareReleasePointers(a, b ReleasePointer) int {
 	return cmp.Or(
 		cmp.Compare(a.Kind.String(), b.Kind.String()),
 		cmp.Compare(a.Handle, b.Handle),
+		cmp.Compare(a.RevisionID, b.RevisionID),
 	)
 }
 
