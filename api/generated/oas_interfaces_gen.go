@@ -97,6 +97,10 @@ type GetClaimStatusRes interface {
 	getClaimStatusRes()
 }
 
+type GetClaimWindowRes interface {
+	getClaimWindowRes()
+}
+
 type GetEnvironmentByNameRes interface {
 	getEnvironmentByNameRes()
 }

@@ -56,6 +56,15 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 		return nil, err
 	}
 
+	// The spec says minProperties: 1, but ogen generates no check for it on a
+	// map body -- its validator walks the entries and an empty map has none. So
+	// an empty body would reach here and no-op, telling a client its update
+	// succeeded when it sent nothing. Refuse it.
+	if len(req) == 0 {
+		return nil, domain.ErrRequestInvalid().
+			WithMessage("the request body must name at least one variable")
+	}
+
 	owner := variableOwner(params.ProjectID, params.EnvironmentName)
 	writes := make([]service.VariableToSet, 0, len(req))
 	for name, input := range req {

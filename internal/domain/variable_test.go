@@ -20,6 +20,43 @@ var variableOwner = domain.VariableOwner{
 	EnvironmentName: "env-1",
 }
 
+func TestVariableName_Bounds(t *testing.T) {
+	t.Parallel()
+
+	// The wire contract caps a name at 255. The regex does not bound length, so
+	// without an explicit check the domain would store a name the API schema
+	// calls invalid and could never send back.
+	t.Run("rejects a name longer than the wire contract allows", func(t *testing.T) {
+		t.Parallel()
+
+		tooLong := strings.Repeat("a", domain.MaxVariableNameLength+1)
+		require.Regexp(t, domain.NameRegex, tooLong, "the name is only invalid for its length")
+
+		_, err := domain.NewVariable(tooLong, variableOwner, "v")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
+	})
+
+	t.Run("accepts a name at the limit", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := domain.NewVariable(strings.Repeat("a", domain.MaxVariableNameLength), variableOwner, "v")
+		require.NoError(t, err)
+	})
+
+	// Both constructors validate, so a secret cannot slip a name past the bound.
+	t.Run("the secret constructor bounds the name too", func(t *testing.T) {
+		t.Parallel()
+
+		// No EXPECT: the name is rejected before anything reaches the crypter.
+		encrypter := cryptomock.NewMockEncrypter(gomock.NewController(t))
+
+		_, err := domain.NewSecretVariable(strings.Repeat("a", domain.MaxVariableNameLength+1), variableOwner, "v", encrypter)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
+	})
+}
+
 func TestNewVariable(t *testing.T) {
 	t.Parallel()
 

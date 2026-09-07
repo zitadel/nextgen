@@ -83,12 +83,16 @@ func TestVariables(t *testing.T) {
 	// up in an environment's read, so a name an environment needs is a name
 	// that environment has to hold.
 	t.Run("an environment does not inherit the project's variables", func(t *testing.T) {
-		assert.NotContains(t, get(t, prod), "RETRY_COUNT")
-		assert.NotContains(t, get(t, prod), "VERBOSE")
+		// One snapshot, several assertions: the point is what this read holds,
+		// and re-reading between assertions would only be a second chance to
+		// observe something different.
+		vars := get(t, prod)
+		assert.NotContains(t, vars, "RETRY_COUNT")
+		assert.NotContains(t, vars, "VERBOSE")
 
-		// And the project level does not see into the environment either.
+		// And a sibling environment sees neither the project's nor prod's.
 		staging := api.NewOptEnvironmentName("staging")
-		assert.NotContains(t, get(t, staging), "HOST", "a sibling environment holds nothing yet")
+		assert.NotContains(t, get(t, staging), "HOST")
 	})
 
 	t.Run("a secret is reported as held and never returned", func(t *testing.T) {
@@ -200,6 +204,18 @@ func TestVariables(t *testing.T) {
 			api.NewVariableScalarVariable(api.NewStringVariableScalar("example.com")),
 			get(t, api.OptEnvironmentName{})["HOST"],
 			"the project's value is untouched by an environment's delete")
+	})
+
+	// minProperties: 1 is in the contract, but ogen generates no check for it on
+	// a map body, so without the handler's own guard an empty body would answer
+	// 200 and change nothing — telling a client its update landed when it sent
+	// none.
+	t.Run("an empty body is rejected rather than silently doing nothing", func(t *testing.T) {
+		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{})
+		status, code, _, ok := errorResponseParts(t, res)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, res))
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrRequestInvalid().Code, code)
 	})
 
 	// The pattern is in the contract for the path parameter, so a malformed

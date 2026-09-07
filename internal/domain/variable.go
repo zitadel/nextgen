@@ -11,6 +11,12 @@ import (
 const PrefixVariable ResourcePrefix = "var"
 const MaxVariableStringLength = 1 << 14 // 16k
 
+// MaxVariableNameLength bounds a name. The regex alone does not: `^\w+$`
+// matches any length, so without this a caller could store a name the wire
+// contract (components/schemas/variable-name.yaml) declares invalid and could
+// never send back. Keep the two in step.
+const MaxVariableNameLength = 255
+
 func ErrVariableNotFound() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("not_found"), "variable: not found", nil, nil)
 }
@@ -56,8 +62,8 @@ func NewVariable(name string, owner VariableOwner, value any) (*Variable, error)
 	if err := validateVariableValue(value); err != nil {
 		return nil, err
 	}
-	if !NameRegex.MatchString(name) {
-		return nil, ErrInvalidVariableName()
+	if err := validateVariableName(name); err != nil {
+		return nil, err
 	}
 	return &Variable{
 		Name:     name,
@@ -74,8 +80,8 @@ func NewSecretVariable(name string, owner VariableOwner, value any, encrypter cr
 	if err := validateVariableValue(value); err != nil {
 		return nil, err
 	}
-	if !NameRegex.MatchString(name) {
-		return nil, ErrInvalidVariableName()
+	if err := validateVariableName(name); err != nil {
+		return nil, err
 	}
 	jsonValue, err := json.Marshal(value)
 	if err != nil {
@@ -91,6 +97,18 @@ func NewSecretVariable(name string, owner VariableOwner, value any, encrypter cr
 		Value:    encrypted,
 		IsSecret: true,
 	}, nil
+}
+
+func validateVariableName(name string) error {
+	if !NameRegex.MatchString(name) {
+		return ErrInvalidVariableName()
+	}
+	if len(name) > MaxVariableNameLength {
+		return ErrInvalidVariableName().WithDetails(map[string]string{
+			"reason": fmt.Sprintf("the name can be at most %d characters", MaxVariableNameLength),
+		})
+	}
+	return nil
 }
 
 func validateVariableValue(value any) error {
