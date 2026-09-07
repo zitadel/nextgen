@@ -63,6 +63,11 @@ type ProjectStatements interface {
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
+	// SetProjectPasswordHashPolicy writes the hashing method the project's
+	// passwords are written with. A nil policy clears the choice, which returns
+	// the project to the deployment default. Returns a [database.NoRowFoundError]
+	// when no project carries the id.
+	SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)

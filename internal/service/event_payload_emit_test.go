@@ -61,7 +61,7 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
 
 	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
 	got, err := svc.Create(ctx, "Acme", []string{"*.vercel.app"}, true)
@@ -117,9 +117,9 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
 
-	_, err = svc.Update(t.Context(), "proj_1", "renamed")
+	_, err = svc.Update(t.Context(), service.UpdateProjectRequest{ID: "proj_1", Name: new("renamed")})
 	require.NoError(t, err)
 	require.NotNil(t, gotEvent)
 	assert.Equal(t, domain.EventTypeProjectUpdated, gotEvent.EventType)
@@ -127,6 +127,90 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
 	assert.Equal(t, "renamed", payload.Name)
 	assert.Nil(t, payload.PreviewOrigins)
+	assert.Nil(t, payload.PasswordHashAlgorithm, "a rename says nothing about hashing")
+}
+
+// Changing how a project hashes passwords is a security decision, so the audit
+// trail has to say which method it moved to -- and, when a project stops
+// choosing, that it moved back to the deployment's.
+func TestProjectUpdated_PayloadCarriesPasswordHashAlgorithm(t *testing.T) {
+	t.Parallel()
+
+	newService := func(t *testing.T, gotEvent **domain.Event) service.ProjectService {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		keyService := servicemocks.NewMockKeyService(ctrl)
+		statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+		statements := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(statements).AnyTimes()
+		pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+				return tx(ctx, statementer)
+			},
+		).AnyTimes()
+		statementer.EXPECT().Statements().Return(statements).AnyTimes()
+		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").
+			Return(&domain.Project{ID: "proj_1", Name: "kept"}, nil)
+		statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, ev *domain.Event) error {
+				*gotEvent = ev
+				return nil
+			},
+		)
+
+		const baseURL = "https://example.com/api/schemas"
+		schemaValidator, err := domain.NewSchemaValidator(baseURL)
+		require.NoError(t, err)
+		return service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+	}
+
+	payloadOf := func(t *testing.T, event *domain.Event) domain.ProjectPayload {
+		t.Helper()
+		require.NotNil(t, event)
+		var payload domain.ProjectPayload
+		require.NoError(t, json.Unmarshal(event.Payload, &payload))
+		return payload
+	}
+
+	t.Run("names the method a project moved to", func(t *testing.T) {
+		t.Parallel()
+
+		var gotEvent *domain.Event
+		svc := newService(t, &gotEvent)
+		policy, err := domain.NewPasswordHashPolicy("bcrypt", map[string]any{"cost": 12})
+		require.NoError(t, err)
+
+		_, err = svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_1",
+			PasswordHashPolicy: &policy,
+		})
+		require.NoError(t, err)
+
+		payload := payloadOf(t, gotEvent)
+		require.NotNil(t, payload.PasswordHashAlgorithm)
+		assert.Equal(t, "bcrypt", *payload.PasswordHashAlgorithm)
+		assert.Empty(t, payload.Name, "the delta carries only what the request named")
+	})
+
+	t.Run("records a project handing hashing back to the deployment", func(t *testing.T) {
+		t.Parallel()
+
+		var gotEvent *domain.Event
+		svc := newService(t, &gotEvent)
+		var cleared *domain.PasswordHashPolicy
+
+		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_1",
+			PasswordHashPolicy: &cleared,
+		})
+		require.NoError(t, err)
+
+		payload := payloadOf(t, gotEvent)
+		require.NotNil(t, payload.PasswordHashAlgorithm, "clearing is a change, not a silence")
+		assert.Empty(t, *payload.PasswordHashAlgorithm)
+	})
 }
 
 func TestAuthAttempt_CheckPayloadIncludesAttemptID(t *testing.T) {
@@ -288,7 +372,7 @@ func TestSetPasswordAction_UsesPasswordRowID(t *testing.T) {
 		ProjectID: "proj_1",
 		UserID:    "user_1",
 		Password:  "s3cret",
-	}, hasher)
+	}, service.FixedProjectHasherResolver{Hasher: hasher})
 	require.NoError(t, action.Prepare(t.Context()))
 
 	stmts := servicemocks.NewMockAllStatements(ctrl)
@@ -410,7 +494,7 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
 
 	_, err = svc.Create(middleware.WithRequestIDContext(t.Context(), "req_kind"), "Acme", nil, true)
 	require.NoError(t, err)

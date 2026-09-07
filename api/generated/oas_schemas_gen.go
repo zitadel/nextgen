@@ -29549,6 +29549,69 @@ func (o OptNilPageToken) Or(d PageToken) PageToken {
 	return d
 }
 
+// NewOptNilPasswordHashPolicy returns new OptNilPasswordHashPolicy with value set to v.
+func NewOptNilPasswordHashPolicy(v PasswordHashPolicy) OptNilPasswordHashPolicy {
+	return OptNilPasswordHashPolicy{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilPasswordHashPolicy is optional nullable PasswordHashPolicy.
+type OptNilPasswordHashPolicy struct {
+	Value PasswordHashPolicy
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilPasswordHashPolicy was set.
+func (o OptNilPasswordHashPolicy) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilPasswordHashPolicy) Reset() {
+	var v PasswordHashPolicy
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilPasswordHashPolicy) SetTo(v PasswordHashPolicy) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilPasswordHashPolicy) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilPasswordHashPolicy) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v PasswordHashPolicy
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilPasswordHashPolicy) Get() (v PasswordHashPolicy, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilPasswordHashPolicy) Or(d PasswordHashPolicy) PasswordHashPolicy {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilProjectCreatedEventActorType returns new OptNilProjectCreatedEventActorType with value set to v.
 func NewOptNilProjectCreatedEventActorType(v ProjectCreatedEventActorType) OptNilProjectCreatedEventActorType {
 	return OptNilProjectCreatedEventActorType{
@@ -31182,6 +31245,52 @@ func (o OptPasskeyFactorPayloadAuthenticatorAttachment) Or(d PasskeyFactorPayloa
 	return d
 }
 
+// NewOptPasswordHashPolicyParamsHash returns new OptPasswordHashPolicyParamsHash with value set to v.
+func NewOptPasswordHashPolicyParamsHash(v PasswordHashPolicyParamsHash) OptPasswordHashPolicyParamsHash {
+	return OptPasswordHashPolicyParamsHash{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPasswordHashPolicyParamsHash is optional PasswordHashPolicyParamsHash.
+type OptPasswordHashPolicyParamsHash struct {
+	Value PasswordHashPolicyParamsHash
+	Set   bool
+}
+
+// IsSet returns true if OptPasswordHashPolicyParamsHash was set.
+func (o OptPasswordHashPolicyParamsHash) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPasswordHashPolicyParamsHash) Reset() {
+	var v PasswordHashPolicyParamsHash
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPasswordHashPolicyParamsHash) SetTo(v PasswordHashPolicyParamsHash) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPasswordHashPolicyParamsHash) Get() (v PasswordHashPolicyParamsHash, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPasswordHashPolicyParamsHash) Or(d PasswordHashPolicyParamsHash) PasswordHashPolicyParamsHash {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -31360,6 +31469,52 @@ func (o OptProjNotFoundDetails) Get() (v ProjNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjNotFoundDetails) Or(d ProjNotFoundDetails) ProjNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjPasswordHashInvalidDetails returns new OptProjPasswordHashInvalidDetails with value set to v.
+func NewOptProjPasswordHashInvalidDetails(v ProjPasswordHashInvalidDetails) OptProjPasswordHashInvalidDetails {
+	return OptProjPasswordHashInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjPasswordHashInvalidDetails is optional ProjPasswordHashInvalidDetails.
+type OptProjPasswordHashInvalidDetails struct {
+	Value ProjPasswordHashInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjPasswordHashInvalidDetails was set.
+func (o OptProjPasswordHashInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjPasswordHashInvalidDetails) Reset() {
+	var v ProjPasswordHashInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjPasswordHashInvalidDetails) SetTo(v ProjPasswordHashInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjPasswordHashInvalidDetails) Get() (v ProjPasswordHashInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjPasswordHashInvalidDetails) Or(d ProjPasswordHashInvalidDetails) ProjPasswordHashInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -33824,6 +33979,271 @@ type PasswordChallengePayload struct{}
 // Ref: #
 type PasswordFactorPayload struct{}
 
+// The method a project's passwords are hashed with. A project that has not set
+// one hashes with the server default, which is argon2id unless the deployment
+// configured otherwise.
+// This governs hashing only. Passwords already stored keep verifying under the
+// method they were written with, and nothing is rehashed when the policy
+// changes: a password moves to the new method the next time its owner sets one.
+// Ref: #
+type PasswordHashPolicy struct {
+	// The hashing algorithm. Only algorithms that can hash appear here; the
+	// legacy encodings the server can still verify for imported users
+	// (md5, phpass, drupal7) are not among them.
+	Algorithm PasswordHashPolicyAlgorithm `json:"algorithm"`
+	// The algorithm's cost parameters. Exactly the parameters the chosen
+	// algorithm takes must be given: `time`, `memory` and `threads` for argon2i
+	// and argon2id; `cost` for bcrypt and scrypt; `rounds` and `hash` for
+	// pbkdf2 and sha2. A parameter another algorithm takes is rejected rather
+	// than ignored, and a missing one is not filled in from a default, because
+	// cost is the whole of a hashing method's strength.
+	// Values outside the limits the deployment configured are rejected, as is
+	// an algorithm the deployment cannot verify: hashing with a method that
+	// cannot be read back would lock out every user whose password was written
+	// that way.
+	Params PasswordHashPolicyParams `json:"params"`
+}
+
+// GetAlgorithm returns the value of Algorithm.
+func (s *PasswordHashPolicy) GetAlgorithm() PasswordHashPolicyAlgorithm {
+	return s.Algorithm
+}
+
+// GetParams returns the value of Params.
+func (s *PasswordHashPolicy) GetParams() PasswordHashPolicyParams {
+	return s.Params
+}
+
+// SetAlgorithm sets the value of Algorithm.
+func (s *PasswordHashPolicy) SetAlgorithm(val PasswordHashPolicyAlgorithm) {
+	s.Algorithm = val
+}
+
+// SetParams sets the value of Params.
+func (s *PasswordHashPolicy) SetParams(val PasswordHashPolicyParams) {
+	s.Params = val
+}
+
+// The hashing algorithm. Only algorithms that can hash appear here; the
+// legacy encodings the server can still verify for imported users
+// (md5, phpass, drupal7) are not among them.
+type PasswordHashPolicyAlgorithm string
+
+const (
+	PasswordHashPolicyAlgorithmArgon2i  PasswordHashPolicyAlgorithm = "argon2i"
+	PasswordHashPolicyAlgorithmArgon2id PasswordHashPolicyAlgorithm = "argon2id"
+	PasswordHashPolicyAlgorithmBcrypt   PasswordHashPolicyAlgorithm = "bcrypt"
+	PasswordHashPolicyAlgorithmScrypt   PasswordHashPolicyAlgorithm = "scrypt"
+	PasswordHashPolicyAlgorithmPbkdf2   PasswordHashPolicyAlgorithm = "pbkdf2"
+	PasswordHashPolicyAlgorithmSha2     PasswordHashPolicyAlgorithm = "sha2"
+)
+
+// AllValues returns all PasswordHashPolicyAlgorithm values.
+func (PasswordHashPolicyAlgorithm) AllValues() []PasswordHashPolicyAlgorithm {
+	return []PasswordHashPolicyAlgorithm{
+		PasswordHashPolicyAlgorithmArgon2i,
+		PasswordHashPolicyAlgorithmArgon2id,
+		PasswordHashPolicyAlgorithmBcrypt,
+		PasswordHashPolicyAlgorithmScrypt,
+		PasswordHashPolicyAlgorithmPbkdf2,
+		PasswordHashPolicyAlgorithmSha2,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordHashPolicyAlgorithm) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordHashPolicyAlgorithmArgon2i:
+		return []byte(s), nil
+	case PasswordHashPolicyAlgorithmArgon2id:
+		return []byte(s), nil
+	case PasswordHashPolicyAlgorithmBcrypt:
+		return []byte(s), nil
+	case PasswordHashPolicyAlgorithmScrypt:
+		return []byte(s), nil
+	case PasswordHashPolicyAlgorithmPbkdf2:
+		return []byte(s), nil
+	case PasswordHashPolicyAlgorithmSha2:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordHashPolicyAlgorithm) UnmarshalText(data []byte) error {
+	switch PasswordHashPolicyAlgorithm(data) {
+	case PasswordHashPolicyAlgorithmArgon2i:
+		*s = PasswordHashPolicyAlgorithmArgon2i
+		return nil
+	case PasswordHashPolicyAlgorithmArgon2id:
+		*s = PasswordHashPolicyAlgorithmArgon2id
+		return nil
+	case PasswordHashPolicyAlgorithmBcrypt:
+		*s = PasswordHashPolicyAlgorithmBcrypt
+		return nil
+	case PasswordHashPolicyAlgorithmScrypt:
+		*s = PasswordHashPolicyAlgorithmScrypt
+		return nil
+	case PasswordHashPolicyAlgorithmPbkdf2:
+		*s = PasswordHashPolicyAlgorithmPbkdf2
+		return nil
+	case PasswordHashPolicyAlgorithmSha2:
+		*s = PasswordHashPolicyAlgorithmSha2
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The algorithm's cost parameters. Exactly the parameters the chosen
+// algorithm takes must be given: `time`, `memory` and `threads` for argon2i
+// and argon2id; `cost` for bcrypt and scrypt; `rounds` and `hash` for
+// pbkdf2 and sha2. A parameter another algorithm takes is rejected rather
+// than ignored, and a missing one is not filled in from a default, because
+// cost is the whole of a hashing method's strength.
+// Values outside the limits the deployment configured are rejected, as is
+// an algorithm the deployment cannot verify: hashing with a method that
+// cannot be read back would lock out every user whose password was written
+// that way.
+type PasswordHashPolicyParams struct {
+	// Argon2 passes over memory.
+	Time OptInt `json:"time"`
+	// Argon2 memory in KiB.
+	Memory OptInt `json:"memory"`
+	// Argon2 lanes.
+	Threads OptInt `json:"threads"`
+	// Bcrypt cost, or scrypt's log2 of the CPU/memory cost.
+	Cost OptInt `json:"cost"`
+	// Pbkdf2 or sha2 iteration count.
+	Rounds OptInt `json:"rounds"`
+	// The underlying hash for pbkdf2 and sha2.
+	Hash OptPasswordHashPolicyParamsHash `json:"hash"`
+}
+
+// GetTime returns the value of Time.
+func (s *PasswordHashPolicyParams) GetTime() OptInt {
+	return s.Time
+}
+
+// GetMemory returns the value of Memory.
+func (s *PasswordHashPolicyParams) GetMemory() OptInt {
+	return s.Memory
+}
+
+// GetThreads returns the value of Threads.
+func (s *PasswordHashPolicyParams) GetThreads() OptInt {
+	return s.Threads
+}
+
+// GetCost returns the value of Cost.
+func (s *PasswordHashPolicyParams) GetCost() OptInt {
+	return s.Cost
+}
+
+// GetRounds returns the value of Rounds.
+func (s *PasswordHashPolicyParams) GetRounds() OptInt {
+	return s.Rounds
+}
+
+// GetHash returns the value of Hash.
+func (s *PasswordHashPolicyParams) GetHash() OptPasswordHashPolicyParamsHash {
+	return s.Hash
+}
+
+// SetTime sets the value of Time.
+func (s *PasswordHashPolicyParams) SetTime(val OptInt) {
+	s.Time = val
+}
+
+// SetMemory sets the value of Memory.
+func (s *PasswordHashPolicyParams) SetMemory(val OptInt) {
+	s.Memory = val
+}
+
+// SetThreads sets the value of Threads.
+func (s *PasswordHashPolicyParams) SetThreads(val OptInt) {
+	s.Threads = val
+}
+
+// SetCost sets the value of Cost.
+func (s *PasswordHashPolicyParams) SetCost(val OptInt) {
+	s.Cost = val
+}
+
+// SetRounds sets the value of Rounds.
+func (s *PasswordHashPolicyParams) SetRounds(val OptInt) {
+	s.Rounds = val
+}
+
+// SetHash sets the value of Hash.
+func (s *PasswordHashPolicyParams) SetHash(val OptPasswordHashPolicyParamsHash) {
+	s.Hash = val
+}
+
+// The underlying hash for pbkdf2 and sha2.
+type PasswordHashPolicyParamsHash string
+
+const (
+	PasswordHashPolicyParamsHashSHA1   PasswordHashPolicyParamsHash = "sha1"
+	PasswordHashPolicyParamsHashSha224 PasswordHashPolicyParamsHash = "sha224"
+	PasswordHashPolicyParamsHashSHA256 PasswordHashPolicyParamsHash = "sha256"
+	PasswordHashPolicyParamsHashSha384 PasswordHashPolicyParamsHash = "sha384"
+	PasswordHashPolicyParamsHashSha512 PasswordHashPolicyParamsHash = "sha512"
+)
+
+// AllValues returns all PasswordHashPolicyParamsHash values.
+func (PasswordHashPolicyParamsHash) AllValues() []PasswordHashPolicyParamsHash {
+	return []PasswordHashPolicyParamsHash{
+		PasswordHashPolicyParamsHashSHA1,
+		PasswordHashPolicyParamsHashSha224,
+		PasswordHashPolicyParamsHashSHA256,
+		PasswordHashPolicyParamsHashSha384,
+		PasswordHashPolicyParamsHashSha512,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordHashPolicyParamsHash) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordHashPolicyParamsHashSHA1:
+		return []byte(s), nil
+	case PasswordHashPolicyParamsHashSha224:
+		return []byte(s), nil
+	case PasswordHashPolicyParamsHashSHA256:
+		return []byte(s), nil
+	case PasswordHashPolicyParamsHashSha384:
+		return []byte(s), nil
+	case PasswordHashPolicyParamsHashSha512:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordHashPolicyParamsHash) UnmarshalText(data []byte) error {
+	switch PasswordHashPolicyParamsHash(data) {
+	case PasswordHashPolicyParamsHashSHA1:
+		*s = PasswordHashPolicyParamsHashSHA1
+		return nil
+	case PasswordHashPolicyParamsHashSha224:
+		*s = PasswordHashPolicyParamsHashSha224
+		return nil
+	case PasswordHashPolicyParamsHashSHA256:
+		*s = PasswordHashPolicyParamsHashSHA256
+		return nil
+	case PasswordHashPolicyParamsHashSha384:
+		*s = PasswordHashPolicyParamsHashSha384
+		return nil
+	case PasswordHashPolicyParamsHashSha512:
+		*s = PasswordHashPolicyParamsHashSha512
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Proof for `password` method.
 // Ref: #
 type PasswordProof struct {
@@ -33847,15 +34267,16 @@ func (*PatchProjectBadRequest) patchProjectRes() {}
 
 // PatchProjectErrorResponse represents sum type.
 type PatchProjectErrorResponse struct {
-	Type                 PatchProjectErrorResponseType // switch on this field
-	AuthUnauthorized     AuthUnauthorized
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	ProjMissingID        ProjMissingID
-	ProjNameInvalid      ProjNameInvalid
-	ProjNotFound         ProjNotFound
-	ProjPermissionDenied ProjPermissionDenied
-	ReqInvalid           ReqInvalid
+	Type                    PatchProjectErrorResponseType // switch on this field
+	AuthUnauthorized        AuthUnauthorized
+	EvtInvalid              EvtInvalid
+	Internal                Internal
+	ProjMissingID           ProjMissingID
+	ProjNameInvalid         ProjNameInvalid
+	ProjNotFound            ProjNotFound
+	ProjPasswordHashInvalid ProjPasswordHashInvalid
+	ProjPermissionDenied    ProjPermissionDenied
+	ReqInvalid              ReqInvalid
 }
 
 // PatchProjectErrorResponseType is oneOf type of PatchProjectErrorResponse.
@@ -33863,14 +34284,15 @@ type PatchProjectErrorResponseType string
 
 // Possible values for PatchProjectErrorResponseType.
 const (
-	AuthUnauthorizedPatchProjectErrorResponse     PatchProjectErrorResponseType = "auth.unauthorized"
-	EvtInvalidPatchProjectErrorResponse           PatchProjectErrorResponseType = "evt.invalid"
-	InternalPatchProjectErrorResponse             PatchProjectErrorResponseType = "internal"
-	ProjMissingIDPatchProjectErrorResponse        PatchProjectErrorResponseType = "proj.missing_id"
-	ProjNameInvalidPatchProjectErrorResponse      PatchProjectErrorResponseType = "proj.name_invalid"
-	ProjNotFoundPatchProjectErrorResponse         PatchProjectErrorResponseType = "proj.not_found"
-	ProjPermissionDeniedPatchProjectErrorResponse PatchProjectErrorResponseType = "proj.permission_denied"
-	ReqInvalidPatchProjectErrorResponse           PatchProjectErrorResponseType = "req.invalid"
+	AuthUnauthorizedPatchProjectErrorResponse        PatchProjectErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchProjectErrorResponse              PatchProjectErrorResponseType = "evt.invalid"
+	InternalPatchProjectErrorResponse                PatchProjectErrorResponseType = "internal"
+	ProjMissingIDPatchProjectErrorResponse           PatchProjectErrorResponseType = "proj.missing_id"
+	ProjNameInvalidPatchProjectErrorResponse         PatchProjectErrorResponseType = "proj.name_invalid"
+	ProjNotFoundPatchProjectErrorResponse            PatchProjectErrorResponseType = "proj.not_found"
+	ProjPasswordHashInvalidPatchProjectErrorResponse PatchProjectErrorResponseType = "proj.password_hash_invalid"
+	ProjPermissionDeniedPatchProjectErrorResponse    PatchProjectErrorResponseType = "proj.permission_denied"
+	ReqInvalidPatchProjectErrorResponse              PatchProjectErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether PatchProjectErrorResponse is AuthUnauthorized.
@@ -33901,6 +34323,11 @@ func (s PatchProjectErrorResponse) IsProjNameInvalid() bool {
 // IsProjNotFound reports whether PatchProjectErrorResponse is ProjNotFound.
 func (s PatchProjectErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundPatchProjectErrorResponse
+}
+
+// IsProjPasswordHashInvalid reports whether PatchProjectErrorResponse is ProjPasswordHashInvalid.
+func (s PatchProjectErrorResponse) IsProjPasswordHashInvalid() bool {
+	return s.Type == ProjPasswordHashInvalidPatchProjectErrorResponse
 }
 
 // IsProjPermissionDenied reports whether PatchProjectErrorResponse is ProjPermissionDenied.
@@ -34039,6 +34466,27 @@ func NewProjNotFoundPatchProjectErrorResponse(v ProjNotFound) PatchProjectErrorR
 	return s
 }
 
+// SetProjPasswordHashInvalid sets PatchProjectErrorResponse to ProjPasswordHashInvalid.
+func (s *PatchProjectErrorResponse) SetProjPasswordHashInvalid(v ProjPasswordHashInvalid) {
+	s.Type = ProjPasswordHashInvalidPatchProjectErrorResponse
+	s.ProjPasswordHashInvalid = v
+}
+
+// GetProjPasswordHashInvalid returns ProjPasswordHashInvalid and true boolean if PatchProjectErrorResponse is ProjPasswordHashInvalid.
+func (s PatchProjectErrorResponse) GetProjPasswordHashInvalid() (v ProjPasswordHashInvalid, ok bool) {
+	if !s.IsProjPasswordHashInvalid() {
+		return v, false
+	}
+	return s.ProjPasswordHashInvalid, true
+}
+
+// NewProjPasswordHashInvalidPatchProjectErrorResponse returns new PatchProjectErrorResponse from ProjPasswordHashInvalid.
+func NewProjPasswordHashInvalidPatchProjectErrorResponse(v ProjPasswordHashInvalid) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetProjPasswordHashInvalid(v)
+	return s
+}
+
 // SetProjPermissionDenied sets PatchProjectErrorResponse to ProjPermissionDenied.
 func (s *PatchProjectErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
 	s.Type = ProjPermissionDeniedPatchProjectErrorResponse
@@ -34117,6 +34565,10 @@ func (*PatchProjectNotFound) patchProjectRes() {}
 type PatchProjectRequest struct {
 	// The name of the project.
 	Name OptNilString `json:"name"`
+	// The method this project's passwords are hashed with. Send null to drop the
+	// project's own method and go back to the server default; leave the field
+	// out to keep whatever the project has.
+	PasswordHash OptNilPasswordHashPolicy `json:"password_hash"`
 }
 
 // GetName returns the value of Name.
@@ -34124,9 +34576,19 @@ func (s *PatchProjectRequest) GetName() OptNilString {
 	return s.Name
 }
 
+// GetPasswordHash returns the value of PasswordHash.
+func (s *PatchProjectRequest) GetPasswordHash() OptNilPasswordHashPolicy {
+	return s.PasswordHash
+}
+
 // SetName sets the value of Name.
 func (s *PatchProjectRequest) SetName(val OptNilString) {
 	s.Name = val
+}
+
+// SetPasswordHash sets the value of PasswordHash.
+func (s *PatchProjectRequest) SetPasswordHash(val OptNilPasswordHashPolicy) {
+	s.PasswordHash = val
 }
 
 type PatchProjectUnauthorized ErrorDetails
@@ -34342,6 +34804,59 @@ func (*ProjNotFound) initClaimRes() {}
 type ProjNotFoundDetails map[string]jx.Raw
 
 func (s *ProjNotFoundDetails) init() ProjNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjPasswordHashInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjPasswordHashInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjPasswordHashInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjPasswordHashInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjPasswordHashInvalid) GetDetails() OptProjPasswordHashInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjPasswordHashInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjPasswordHashInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjPasswordHashInvalid) SetDetails(val OptProjPasswordHashInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjPasswordHashInvalidDetails map[string]jx.Raw
+
+func (s *ProjPasswordHashInvalidDetails) init() ProjPasswordHashInvalidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -35303,6 +35818,10 @@ type ProjectID string
 type ProjectPayload struct {
 	Name           OptString `json:"name"`
 	PreviewOrigins []string  `json:"preview_origins"`
+	// The password hashing algorithm the project switched to. The empty string
+	// means it was handed back to the server default. Absent when the update
+	// did not touch hashing.
+	PasswordHashAlgorithm OptString `json:"password_hash_algorithm"`
 }
 
 // GetName returns the value of Name.
@@ -35315,6 +35834,11 @@ func (s *ProjectPayload) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
 }
 
+// GetPasswordHashAlgorithm returns the value of PasswordHashAlgorithm.
+func (s *ProjectPayload) GetPasswordHashAlgorithm() OptString {
+	return s.PasswordHashAlgorithm
+}
+
 // SetName sets the value of Name.
 func (s *ProjectPayload) SetName(val OptString) {
 	s.Name = val
@@ -35323,6 +35847,11 @@ func (s *ProjectPayload) SetName(val OptString) {
 // SetPreviewOrigins sets the value of PreviewOrigins.
 func (s *ProjectPayload) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
+}
+
+// SetPasswordHashAlgorithm sets the value of PasswordHashAlgorithm.
+func (s *ProjectPayload) SetPasswordHashAlgorithm(val OptString) {
+	s.PasswordHashAlgorithm = val
 }
 
 // The current state of a project.
@@ -35338,6 +35867,9 @@ type ProjectResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	// The time when the project was last updated.
 	UpdatedAt time.Time `json:"updated_at"`
+	// The method this project's passwords are hashed with. Null when the project
+	// uses the server default.
+	PasswordHash OptNilPasswordHashPolicy `json:"password_hash"`
 }
 
 // GetID returns the value of ID.
@@ -35365,6 +35897,11 @@ func (s *ProjectResponse) GetUpdatedAt() time.Time {
 	return s.UpdatedAt
 }
 
+// GetPasswordHash returns the value of PasswordHash.
+func (s *ProjectResponse) GetPasswordHash() OptNilPasswordHashPolicy {
+	return s.PasswordHash
+}
+
 // SetID sets the value of ID.
 func (s *ProjectResponse) SetID(val string) {
 	s.ID = val
@@ -35388,6 +35925,11 @@ func (s *ProjectResponse) SetCreatedAt(val time.Time) {
 // SetUpdatedAt sets the value of UpdatedAt.
 func (s *ProjectResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
+}
+
+// SetPasswordHash sets the value of PasswordHash.
+func (s *ProjectResponse) SetPasswordHash(val OptNilPasswordHashPolicy) {
+	s.PasswordHash = val
 }
 
 func (*ProjectResponse) getProjectRes()   {}

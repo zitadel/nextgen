@@ -21,6 +21,14 @@ type RequestAPIPayload struct {
 type ProjectPayload struct {
 	Name           string   `json:"name,omitempty"`
 	PreviewOrigins []string `json:"preview_origins,omitempty"`
+	// PasswordHashAlgorithm records a change to the method the project's
+	// passwords are hashed with (ADR 029 §Hashing). It is a pointer so the
+	// delta can tell "not touched" (absent) from "handed back to the deployment
+	// default", which is the empty string: the project then names no algorithm
+	// of its own, which is the same thing the row stores. The cost parameters
+	// stay out of the audit trail -- the algorithm is what a reader is checking,
+	// and the full method is readable from the project.
+	PasswordHashAlgorithm *string `json:"password_hash_algorithm,omitempty"`
 }
 
 // ProjectCreatedPayload is an alias kept for call-site clarity.

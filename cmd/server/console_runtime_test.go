@@ -171,7 +171,7 @@ func (f *fakeProjectService) Get(context.Context, string) (*domain.Project, erro
 	panic("unused")
 }
 
-func (f *fakeProjectService) Update(context.Context, string, string) (*domain.Project, error) {
+func (f *fakeProjectService) Update(context.Context, service.UpdateProjectRequest) (*domain.Project, error) {
 	panic("unused")
 }
 

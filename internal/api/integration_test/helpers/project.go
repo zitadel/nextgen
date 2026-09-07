@@ -19,6 +19,7 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 			BuiltinSchemaBaseURL,
 			h.EnsureSchemaValidator(t),
 			h.EnsureKeyService(t),
+			h.EnsureHasherFactory(t),
 		)
 	}
 	return h.projectService.value

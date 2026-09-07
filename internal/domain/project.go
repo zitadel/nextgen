@@ -52,6 +52,10 @@ type Project struct {
 	// PreviewOrigins are the allowed origins for the preview secret.
 	// Callers must set this field before the project is persisted.
 	PreviewOrigins []string
+	// PasswordHashPolicy is the hashing method this project's passwords are
+	// written with. Nil means the deployment default, which is what a project
+	// runs on until an admin chooses otherwise. See [PasswordHashPolicy].
+	PasswordHashPolicy *PasswordHashPolicy
 }
 
 func NewProject(name string, previewOrigins []string) (*Project, error) {

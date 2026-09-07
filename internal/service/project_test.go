@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/zitadel/nextgen/internal/crypto"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -63,6 +64,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 		baseURL,
 		schemaValidator,
 		keyService,
+		testHasherFactory(t),
 	)
 
 	return
@@ -354,7 +356,10 @@ func TestProjectService_Update(t *testing.T) {
 			svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 			tc.setupStmt(statements)
 
-			got, err := svc.Update(context.Background(), tc.id, tc.projectName)
+			got, err := svc.Update(context.Background(), service.UpdateProjectRequest{
+				ID:   tc.id,
+				Name: &tc.projectName,
+			})
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)
@@ -366,6 +371,160 @@ func TestProjectService_Update(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A PATCH names a set of fields; what it does not name it must not touch. The
+// hashing policy adds a third state to that -- absent, set, and set to nothing
+// -- because "go back to the deployment default" is an instruction an admin has
+// to be able to give.
+func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
+	t.Parallel()
+
+	policy := func(t *testing.T, algorithm string, params map[string]any) *domain.PasswordHashPolicy {
+		t.Helper()
+		p, err := domain.NewPasswordHashPolicy(algorithm, params)
+		require.NoError(t, err)
+		return p
+	}
+
+	t.Run("sets a policy without renaming", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		want := policy(t, "bcrypt", map[string]any{"cost": 12})
+
+		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil)
+		// No UpdateProject: the caller named no name, so nothing renames. The
+		// row is read instead, so the answer carries the project as it stands.
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").
+			Return(&domain.Project{ID: "proj_aaa", Name: "kept", PasswordHashPolicy: want}, nil)
+
+		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_aaa",
+			PasswordHashPolicy: &want,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "kept", got.Name)
+		assert.Equal(t, want, got.PasswordHashPolicy)
+	})
+
+	t.Run("clears a policy on explicit null", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		var cleared *domain.PasswordHashPolicy
+
+		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", nil).Return(nil)
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").
+			Return(&domain.Project{ID: "proj_aaa", Name: "kept"}, nil)
+
+		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_aaa",
+			PasswordHashPolicy: &cleared,
+		})
+		require.NoError(t, err)
+		assert.Nil(t, got.PasswordHashPolicy)
+	})
+
+	t.Run("renames and sets a policy in one write", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		want := policy(t, "bcrypt", map[string]any{"cost": 12})
+
+		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil)
+		// The rename reads the row back, which is how the policy just written
+		// reaches the response without a second read.
+		statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, project *domain.Project) error {
+				project.PasswordHashPolicy = want
+				return nil
+			})
+
+		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_aaa",
+			Name:               new("renamed"),
+			PasswordHashPolicy: &want,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "renamed", got.Name)
+		assert.Equal(t, want, got.PasswordHashPolicy)
+	})
+
+	t.Run("leaves the policy alone when the body does not mention it", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		// No SetProjectPasswordHashPolicy: a rename must not clear a policy.
+		statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
+
+		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:   "proj_aaa",
+			Name: new("renamed"),
+		})
+		require.NoError(t, err)
+	})
+
+	// A body naming nothing at all is still the bad request it was when the
+	// name was the only patchable field; the new field widens what counts as
+	// naming something, it does not make an empty body meaningful.
+	t.Run("an empty body is still a bad request", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
+
+		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{ID: "proj_aaa"})
+		require.ErrorIs(t, err, domain.ErrProjectNameInvalid())
+	})
+
+	// The deployment's limits are the bar, and nothing is written when the
+	// method does not clear it -- including the rename that came with it.
+	t.Run("refuses a method outside the deployment's limits", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
+		tooCheap := policy(t, "bcrypt", map[string]any{"cost": 4})
+
+		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_aaa",
+			Name:               new("renamed"),
+			PasswordHashPolicy: &tooCheap,
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrProjectPasswordHashInvalid())
+		assert.Nil(t, got)
+	})
+
+	t.Run("refuses a method the deployment cannot verify", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
+		// testHasherFactory registers bcrypt and argon2 verifiers only, so a
+		// scrypt hash could never be read back.
+		unverifiable := policy(t, "scrypt", map[string]any{"cost": 15})
+
+		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_aaa",
+			PasswordHashPolicy: &unverifiable,
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrProjectPasswordHashInvalid())
+	})
+
+	t.Run("reports a project that is not there", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		want := policy(t, "bcrypt", map[string]any{"cost": 12})
+		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_missing", want).
+			Return(database.NewNoRowFoundError(nil))
+
+		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_missing",
+			PasswordHashPolicy: &want,
+		})
+		require.ErrorIs(t, err, domain.ErrProjectNotFound())
+	})
 }
 
 func TestProjectService_Delete(t *testing.T) {
@@ -765,4 +924,29 @@ func TestProjectService_DefaultProject(t *testing.T) {
 		require.ErrorAs(t, err, &de)
 		assert.Equal(t, domain.ErrProjectNotFound().Code, de.Code)
 	})
+}
+
+// testHasherFactory is the deployment hashing configuration the project tests
+// run against: bcrypt at cost 10, bounded to 10..16, so a project asking for
+// cost 12 is accepted and one asking for cost 4 is not.
+func testHasherFactory(t *testing.T) *crypto.HasherFactory {
+	t.Helper()
+	cfg := crypto.HashConfig{
+		Verifiers: []crypto.HashName{crypto.HashNameBcrypt, crypto.HashNameArgon2},
+		Hasher: crypto.HasherConfig{
+			Algorithm: crypto.HashNameBcrypt,
+			Params:    map[string]any{"cost": 10},
+		},
+		Limits: crypto.HashLimitsConfig{
+			Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+			Argon2: crypto.Argon2LimitsConfig{
+				MinTime: 1, MaxTime: 8,
+				MinMemory: 32 * 1024, MaxMemory: 256 * 1024,
+				MinThreads: 1, MaxThreads: 8,
+			},
+		},
+	}
+	factory, err := cfg.NewHasherFactory()
+	require.NoError(t, err)
+	return factory
 }
