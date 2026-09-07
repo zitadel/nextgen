@@ -141,9 +141,14 @@ func TestListReleasesPagesNewestFirst(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListReleasesResponse{}, second, helpers.MustMarshal(t, second))
-	for _, item := range second.(*api.ListReleasesResponse).Releases {
+	last := second.(*api.ListReleasesResponse)
+	for _, item := range last.Releases {
 		got = append(got, item.ID)
 	}
+
+	// The final page omits the token rather than sending it as null, which is
+	// what the schema documents and what every other list endpoint does.
+	assert.False(t, last.NextPageToken.Set, "expected no next_page_token on the final page")
 
 	// Newest first, so the creation order reversed.
 	assert.Equal(t, []api.ReleaseID{want[2], want[1], want[0]}, got)
