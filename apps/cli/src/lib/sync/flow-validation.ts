@@ -15,7 +15,7 @@ import type { ResourceEntry, SyncAction } from "./types.js";
  * (a schema revision would otherwise publish before the flow update
  * fails).
  *
- * Only actions that upload a flow (create/revise, including repin-forced
+ * Only actions that upload a flow (create/update/revise, including repin-forced
  * revisions) are validated: an unchanged flow is never re-judged, so a
  * validator behavior change cannot break an already-applied project.
  *
