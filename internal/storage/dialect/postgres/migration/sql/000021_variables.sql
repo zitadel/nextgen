@@ -1,15 +1,16 @@
 -- +goose Up
 -- One row per variable: a value entered by one owner under one name.
 --
--- The owner ids below the project are NOT NULL with an empty-string default
--- rather than nullable. Empty means "not scoped at this level", which keeps the
--- natural key usable as a primary key (a nullable column cannot be), makes
--- uniqueness per owner enforceable without NULLS NOT DISTINCT, and matches the
--- domain, where the unset owner id is also "".
+-- environment_name is NOT NULL with an empty-string default rather than
+-- nullable. Empty means "not scoped to an environment", which keeps the natural
+-- key usable as a primary key (a nullable column cannot be), makes uniqueness
+-- per owner enforceable without NULLS NOT DISTINCT, and matches the domain,
+-- where the unset environment is also "".
 --
--- project_id is the exception. It has to be set: an empty owner id reads as a
--- wildcard on read, so a variable with no project would be visible from every
--- project. Being always set, it can also carry the foreign key.
+-- Both owner columns are matched exactly on read, so the empty string is an
+-- address of its own -- the project level -- and not a wildcard. project_id has
+-- to be set all the same: it carries the foreign key, and a variable with no
+-- project would belong to nothing.
 CREATE TABLE zitadel_nextgen.variables (
     name             TEXT NOT NULL CHECK (name <> '')
     , project_id     TEXT NOT NULL CHECK (project_id <> '')
@@ -19,9 +20,6 @@ CREATE TABLE zitadel_nextgen.variables (
     -- "not scoped to an environment", and no environment row answers to it.
     -- TODO: check the environment exists on the write path instead.
     , environment_name TEXT NOT NULL DEFAULT ''
-    , team_id        TEXT NOT NULL DEFAULT ''
-    , user_schema_id TEXT NOT NULL DEFAULT ''
-    , user_id        TEXT NOT NULL DEFAULT ''
     , value          JSONB NOT NULL
     , is_secret      BOOLEAN NOT NULL DEFAULT FALSE
     , created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -31,7 +29,7 @@ CREATE TABLE zitadel_nextgen.variables (
     -- from existing at the same owner under one name, which would make a read
     -- return both with no rule for choosing between them. It is also the
     -- upsert conflict target and the only way to address a row.
-    , PRIMARY KEY (name, project_id, environment_name, team_id, user_schema_id, user_id)
+    , PRIMARY KEY (name, project_id, environment_name)
 );
 
 -- The primary key leads with name, so nothing above serves a read of one

@@ -32,6 +32,10 @@ func ErrNoVariableOwnerProjectID() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("no_project_id"), "a variable must be owned by a project", nil, nil)
 }
 
+func ErrVariablePermissionDenied() Error {
+	return newError(PrefixVariable.ErrorCodePrefix("permission_denied"), "variable: permission denied", nil, nil)
+}
+
 func ErrFailedToDecryptVariable(parent error) Error {
 	return newError(PrefixVariable.ErrorCodePrefix("decryption_failed"), "failed to decrypt variable", nil, parent)
 }
@@ -137,77 +141,34 @@ type VariableOwner struct {
 	// check belongs on the write path, against GetEnvironmentByName. Until
 	// then a typo scopes a variable into invisibility rather than failing.
 	EnvironmentName string
-	TeamID          string
-	UserSchemaID    string
-	UserID          string
 }
 
-func (owner *VariableOwner) HasAccessTo(variable *Variable) bool {
-	return (variable.Owner.ProjectID == "" || variable.Owner.ProjectID == owner.ProjectID) &&
-		(variable.Owner.EnvironmentName == "" || variable.Owner.EnvironmentName == owner.EnvironmentName) &&
-		(variable.Owner.TeamID == "" || variable.Owner.TeamID == owner.TeamID) &&
-		(variable.Owner.UserSchemaID == "" || variable.Owner.UserSchemaID == owner.UserSchemaID) &&
-		(variable.Owner.UserID == "" || variable.Owner.UserID == owner.UserID)
-}
-
-// IsMoreSpecificThan reports whether owner sits closer to a requester than
-// other does, which is what decides between two variables of the same name.
-func (owner *VariableOwner) IsMoreSpecificThan(other VariableOwner) bool {
-	return owner.specificity() > other.specificity()
-}
-
-// Owner levels, narrowest first. A level is worth more than every level below
-// it combined, so summing the levels an owner sets orders owners the way a
-// lexicographic comparison from the narrowest level down would: an owner naming
-// a user outranks one naming a whole team, however many broader levels that one
-// also names.
-const (
-	variableOwnerLevelProject = 1 << iota
-	variableOwnerLevelEnvironment
-	variableOwnerLevelTeam
-	variableOwnerLevelUserSchema
-	variableOwnerLevelUser
-)
-
-// specificity ranks an owner against its siblings. The levels are independent
-// -- a variable can belong to a user in a team of a project without naming an
-// environment or a user schema -- so the levels an owner sets are a set, not a
-// depth, and the rank has to account for each of them.
+// HasAccessTo reports whether variable belongs to owner. An owner reaches
+// exactly what it entered itself: nothing is inherited from a broader owner,
+// and nothing is visible from a narrower one.
 //
-// It runs from 0 for an owner scoped to nothing up to 31 for one naming every
-// level. Only the ordering of the numbers means anything; the values themselves
-// are not a level count and must not be read as one.
-func (owner *VariableOwner) specificity() (rank int) {
-	if owner.ProjectID != "" {
-		rank += variableOwnerLevelProject
-	}
-	if owner.EnvironmentName != "" {
-		rank += variableOwnerLevelEnvironment
-	}
-	if owner.TeamID != "" {
-		rank += variableOwnerLevelTeam
-	}
-	if owner.UserSchemaID != "" {
-		rank += variableOwnerLevelUserSchema
-	}
-	if owner.UserID != "" {
-		rank += variableOwnerLevelUser
-	}
-	return rank
+// The predicate used to admit a row whose level was unset, so a project value
+// was readable from every environment of that project. Dropping that makes the
+// owner an address rather than a position in a ladder -- one name at one owner
+// is one variable, and a read never has two rows to choose between. A value
+// that should hold everywhere is entered at the project and read from the
+// project; an environment that wants it has to enter it.
+//
+// This is the predicate [github.com/zitadel/nextgen/internal/storage/variable.VisibleTo]
+// compiles into SQL, and the two are proven equal there.
+func (owner *VariableOwner) HasAccessTo(variable *Variable) bool {
+	return variable.Owner == *owner
 }
 
+// VariableListToMap keys a read by name. The primary key is name plus owner and
+// a read admits one owner, so the names in variables are already unique: there
+// is no ranking to do here and no row to discard. It stayed a function rather
+// than becoming an inline loop because the uniqueness it relies on is a
+// property of the read, and this is where to look when that changes.
 func VariableListToMap(variables []*Variable) (vars map[string]*Variable) {
-	vars = make(map[string]*Variable)
+	vars = make(map[string]*Variable, len(variables))
 	for _, v := range variables {
-		existing, ok := vars[v.Name]
-		if !ok {
-			vars[v.Name] = v
-			continue
-		}
-
-		if v.Owner.IsMoreSpecificThan(existing.Owner) {
-			vars[v.Name] = v
-		}
+		vars[v.Name] = v
 	}
 	return vars
 }

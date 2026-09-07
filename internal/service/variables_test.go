@@ -25,16 +25,28 @@ func newMockedVariableService(t *testing.T) (service.VariableService, *servicemo
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
+
+	// A batch of more than one variable is written inside a transaction, so the
+	// same statements have to be reachable through the transactional statementer
+	// as through the pool. Wired unconditionally: whether a case opens a
+	// transaction is the service's decision, and the assertions are on
+	// SetVariable either way.
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		},
+	).AnyTimes()
+
 	keys := servicemocks.NewMockKeyService(ctrl)
 	return service.NewVariableService(service.NewPool(pool), keys), statements, keys
 }
 
 var (
 	variablesRequester = domain.VariableOwner{
-		ProjectID:    "project-1",
-		TeamID:       "team-1",
-		UserSchemaID: "user-schema-1",
-		UserID:       "user-1",
+		ProjectID:       "project-1",
+		EnvironmentName: "prod",
 	}
 	variablesProjectOwner = domain.VariableOwner{ProjectID: variablesRequester.ProjectID}
 )
@@ -79,7 +91,13 @@ func TestVariableService_GetVariables(t *testing.T) {
 	})
 }
 
-func TestVariableService_SetVariable(t *testing.T) {
+// setOne is the single-variable batch, which the service deliberately writes
+// without opening a transaction.
+func setOne(name string, value any, isSecret bool) []service.VariableToSet {
+	return []service.VariableToSet{{Name: name, Value: value, IsSecret: isSecret}}
+}
+
+func TestVariableService_SetVariables(t *testing.T) {
 	t.Run("stores a plain variable without consulting the key service", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
@@ -89,11 +107,12 @@ func TestVariableService_SetVariable(t *testing.T) {
 			DoAndReturn(func(_ context.Context, v *domain.Variable) error {
 				assert.Equal(t, "theme", v.Name)
 				assert.Equal(t, "dark", v.Value)
+				assert.Equal(t, variablesRequester, v.Owner)
 				assert.False(t, v.IsSecret)
 				return nil
 			})
 
-		require.NoError(t, svc.SetVariable(t.Context(), "theme", variablesRequester, "dark", false))
+		require.NoError(t, svc.SetVariables(t.Context(), variablesRequester, setOne("theme", "dark", false)))
 	})
 
 	t.Run("encrypts a secret with the project's secret key", func(t *testing.T) {
@@ -114,7 +133,7 @@ func TestVariableService_SetVariable(t *testing.T) {
 				return nil
 			})
 
-		require.NoError(t, svc.SetVariable(t.Context(), "token", variablesRequester, "s3cret", true))
+		require.NoError(t, svc.SetVariables(t.Context(), variablesRequester, setOne("token", "s3cret", true)))
 	})
 
 	// A failing key lookup used to fall through into encryption with a nil
@@ -128,7 +147,7 @@ func TestVariableService_SetVariable(t *testing.T) {
 			Return(nil, sentinel)
 
 		// No SetVariable EXPECT: a write here would fail the test.
-		err := svc.SetVariable(t.Context(), "token", variablesRequester, "s3cret", true)
+		err := svc.SetVariables(t.Context(), variablesRequester, setOne("token", "s3cret", true))
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
 	})
@@ -137,7 +156,63 @@ func TestVariableService_SetVariable(t *testing.T) {
 		svc, _, _ := newMockedVariableService(t)
 
 		// No storage EXPECT: validation happens in the constructor.
-		err := svc.SetVariable(t.Context(), "bad name", variablesRequester, "v", false)
+		err := svc.SetVariables(t.Context(), variablesRequester, setOne("bad name", "v", false))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
+	})
+
+	t.Run("an empty batch is a no-op", func(t *testing.T) {
+		svc, _, _ := newMockedVariableService(t)
+
+		// No storage and no key EXPECT: nothing may be reached.
+		require.NoError(t, svc.SetVariables(t.Context(), variablesRequester, nil))
+	})
+
+	// The key is fetched once for the batch, not once per secret: a PATCH
+	// carrying several secrets is one key lookup.
+	t.Run("looks the project key up once however many secrets the batch holds", func(t *testing.T) {
+		svc, statements, keys := newMockedVariableService(t)
+
+		crypter := cryptomock.NewMockCrypter(gomock.NewController(t))
+		crypter.EXPECT().Encrypt(gomock.Any()).Return("ciphertext", nil).Times(2)
+
+		keys.EXPECT().
+			GetProjectCrypter(gomock.Any(), variablesRequester.ProjectID, domain.EncryptionKeyPurposeSecret).
+			Return(crypter, nil).
+			Times(1)
+
+		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil).Times(3)
+
+		require.NoError(t, svc.SetVariables(t.Context(), variablesRequester, []service.VariableToSet{
+			{Name: "client_id", Value: "public", IsSecret: false},
+			{Name: "client_secret", Value: "s3cret", IsSecret: true},
+			{Name: "signing_secret", Value: "s3cret2", IsSecret: true},
+		}))
+	})
+
+	// Several names go in one transaction, so a failure partway through takes
+	// the earlier writes with it rather than leaving half a PATCH applied.
+	t.Run("writes a multi-name batch in one transaction", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+		require.NoError(t, svc.SetVariables(t.Context(), variablesRequester, []service.VariableToSet{
+			{Name: "host", Value: "example.com", IsSecret: false},
+			{Name: "retries", Value: 3, IsSecret: false},
+		}))
+	})
+
+	// Every value is constructed before any of them is written, so a bad name
+	// late in the batch stops the earlier ones from reaching storage.
+	t.Run("rejects the whole batch when one entry is invalid", func(t *testing.T) {
+		svc, _, _ := newMockedVariableService(t)
+
+		// No storage EXPECT: not even the valid first entry may be written.
+		err := svc.SetVariables(t.Context(), variablesRequester, []service.VariableToSet{
+			{Name: "good", Value: "v", IsSecret: false},
+			{Name: "bad name", Value: "v", IsSecret: false},
+		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
 	})

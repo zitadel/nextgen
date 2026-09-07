@@ -12693,40 +12693,40 @@ func (c *MockVariableServiceReplaceVariablesCall) DoAndReturn(f func(context.Con
 	return c
 }
 
-// SetVariable mocks base method.
-func (m *MockVariableService) SetVariable(ctx context.Context, name string, owner domain.VariableOwner, value any, isSecret bool) error {
+// SetVariables mocks base method.
+func (m *MockVariableService) SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []service.VariableToSet) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetVariable", ctx, name, owner, value, isSecret)
+	ret := m.ctrl.Call(m, "SetVariables", ctx, owner, variablesToSet)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SetVariable indicates an expected call of SetVariable.
-func (mr *MockVariableServiceMockRecorder) SetVariable(ctx, name, owner, value, isSecret any) *MockVariableServiceSetVariableCall {
+// SetVariables indicates an expected call of SetVariables.
+func (mr *MockVariableServiceMockRecorder) SetVariables(ctx, owner, variablesToSet any) *MockVariableServiceSetVariablesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVariable", reflect.TypeOf((*MockVariableService)(nil).SetVariable), ctx, name, owner, value, isSecret)
-	return &MockVariableServiceSetVariableCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVariables", reflect.TypeOf((*MockVariableService)(nil).SetVariables), ctx, owner, variablesToSet)
+	return &MockVariableServiceSetVariablesCall{Call: call}
 }
 
-// MockVariableServiceSetVariableCall wrap *gomock.Call
-type MockVariableServiceSetVariableCall struct {
+// MockVariableServiceSetVariablesCall wrap *gomock.Call
+type MockVariableServiceSetVariablesCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockVariableServiceSetVariableCall) Return(arg0 error) *MockVariableServiceSetVariableCall {
+func (c *MockVariableServiceSetVariablesCall) Return(arg0 error) *MockVariableServiceSetVariablesCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockVariableServiceSetVariableCall) Do(f func(context.Context, string, domain.VariableOwner, any, bool) error) *MockVariableServiceSetVariableCall {
+func (c *MockVariableServiceSetVariablesCall) Do(f func(context.Context, domain.VariableOwner, []service.VariableToSet) error) *MockVariableServiceSetVariablesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockVariableServiceSetVariableCall) DoAndReturn(f func(context.Context, string, domain.VariableOwner, any, bool) error) *MockVariableServiceSetVariableCall {
+func (c *MockVariableServiceSetVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, []service.VariableToSet) error) *MockVariableServiceSetVariablesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

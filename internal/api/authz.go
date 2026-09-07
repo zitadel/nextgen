@@ -128,6 +128,16 @@ var environmentAccess = resourceAccess{
 	denied:    domain.ErrEnvironmentPermissionDenied,
 }
 
+// variableAccess gates the project's variables and secrets (ADR 061). Like
+// grants and events, a variable has no minted id and no resource_scope_index
+// row — it is addressed by name under the project_id the request carries — so
+// every op is project-scoped and there is no kind to check.
+var variableAccess = resourceAccess{
+	readMiss:  domain.ErrVariableNotFound,
+	writeMiss: domain.ErrVariableNotFound,
+	denied:    domain.ErrVariablePermissionDenied,
+}
+
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
 // project-scoped (no RSI kind); credential ceiling is project.write like other
 // management resources until #420 mints a fine-grained events relation.

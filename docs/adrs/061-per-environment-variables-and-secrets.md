@@ -57,7 +57,7 @@ non-sensitive values are one mechanism, separated by a flag on the row.
 
 A variable is `(name, owner, value, is_secret)`. A secret is a variable whose
 value is stored encrypted; everything else about it is identical: same table,
-same read path, same reference syntax, same resolution rule.
+same read path, same reference syntax, same ownership.
 
 Values are JSON scalars: a string, a bool, or a number. The value travels
 through JSON in both directions, so the set of types is JSON's, and a number
@@ -113,62 +113,65 @@ right and every reader has to strip. Whether a value is secret is a property of
 the value, not of the reference to it, and the document that references it does
 not change when the flag does.
 
-### 3. The owner is a set of independent levels
+### 3. The owner is the project, optionally one of its environments
 
-A variable belongs to an owner made of five levels. Only the project is
-required; the rest are independent of one another, so any combination is valid:
+A variable belongs to an owner of two levels. Only the project is required:
 
 | Level              | Meaning                             | Required |
 |--------------------|-------------------------------------|----------|
 | `project_id`       | the project the variable belongs to | yes      |
 | `environment_name` | one environment of that project     | no       |
-| `team_id`          | one team                            | no       |
-| `user_schema_id`   | every user of one schema            | no       |
-| `user_id`          | one user                            | no       |
 
-A variable can belong to a user in a team of a project without naming an
-environment or a user schema. The levels are **not** a prefix chain: nothing
-requires the level above it to be set.
+An unset environment is stored as the empty string, which is the **project
+level's own address** rather than a wildcard: `(project, "")` and
+`(project, "prod")` are two owners, and a name may be held at both.
 
-The issue asks only for per-environment values, and environment is the level
-that answers it. The other three are here deliberately: per-team, per-schema and
-per-user settings are the same shape (a value entered at a scope, read by
-whoever falls inside it), and settings are expected to move onto this structure
-rather than grow a parallel one.
+An earlier revision of this ADR gave the owner five levels — team, user schema
+and user besides these two — and made them independent of one another. They are
+gone. Nothing consumed them, the visibility and resolution rules they forced
+(§4, §5) were the whole complexity of the design, and re-adding a level later is
+a column and a filter term. Per-team and per-user settings will want something
+of this shape; they can have it when there is a consumer to keep it honest.
 
-### 4. Visibility: unset means inherited, set means own branch
+### 4. Visibility: an owner reaches exactly what it entered
 
-A requester carries the same five-level owner. A variable is visible when, for
-every level, the variable's id is either unset (the variable is owned further
-up, so it is inherited) or equal to the requester's (the variable is on the
-requester's own branch). A requester that is itself unset at a level can only
-read variables that are unset there.
+A read addresses one owner and returns that owner's variables. Nothing is
+inherited from a broader owner and nothing is visible from a narrower one: an
+environment does not see the project's variables, and the project level does not
+see into its environments. A value that has to hold in several environments is
+entered in each of them.
 
 This predicate is enforced **in SQL** (`variable.VisibleTo`), and that is the
 only enforcement there is: a read returns rows as scanned, so an over-admitting
-filter is a leak rather than wasted IO. The domain predicate (`VariableOwner.HasAccessTo`)
-exists so the two can be proven equal over every owner combination in a test.
+filter is a leak rather than wasted IO. The domain predicate
+(`VariableOwner.HasAccessTo`) exists so the two can be proven equal over every
+owner combination in a test.
 
-The project is required for the same reason: an unset level reads as a wildcard,
-so a variable with no project would be visible from every project.
+The project is required so that a variable belongs to something: it carries the
+foreign key, and a projectless row would be owned by nobody.
 
-### 5. Resolution: the narrowest level wins
+An earlier revision admitted a row whose level was unset, so a project value was
+readable from every environment of that project. Equality replaced it. The
+inheriting form is defensible and may come back, but it is not free: it makes a
+read return several rows per name, which forces a rule for choosing between them
+(§5 as it was), and that rule then has to be applied identically by every reader
+— a duplication that produced two readers disagreeing about the same name during
+development of the API. Exact match makes the owner an address, and a name at an
+address a single value.
 
-Storage never collapses rows. A name entered at several owners returns one row
-per owner, and choosing between them is a domain decision, made by ranking the
-owners.
+### 5. Resolution: there is nothing to resolve
 
-An owner's rank is the sum of the levels it sets. Each level outweighs every
-level below it combined, so this is a lexicographic comparison from the
-narrowest level down: a value entered for one user beats a value entered for a
-whole team, however many broader levels that team-level owner also names.
-Counting levels instead would make `{project, environment, team}` beat
-`{project, user}`, which inverts the intent.
+A read admits one owner and the primary key makes a name unique within it, so a
+name yields at most one row. Callers key the result by name and are done.
 
-Ranking, not containment, is what makes this total: two owners neither of which
-contains the other (`{project, environment}` and `{project, user}`) can both be
-visible to one requester, so "most specific" has to be an order, not a partial
-one.
+This section previously ranked owners by specificity — summing the levels an
+owner set, so that each level outweighed every level below it combined — because
+a read could return one row per level. With one owner per read there is no
+ranking, no ordering to get right, and no ranking function to keep two callers
+agreeing on.
+
+Reads are ordered by name, which is enough to be total, so the same owner reading
+twice gets the same slice.
 
 ### 6. Storage: the natural key is the address
 
@@ -177,16 +180,18 @@ one.
   does not already name. This deviates from ADR 047, which assumes a prefixed
   opaque PK per resource. `PrefixVariable` ("var") is still registered, for
   error codes only.
-- **Unset levels are the empty string, not NULL.** That keeps the natural key
-  usable as a primary key, makes per-owner uniqueness enforceable without
-  `NULLS NOT DISTINCT`, and matches the domain, where an unset owner id is also
-  `""`.
+- **An unset environment is the empty string, not NULL.** That keeps the natural
+  key usable as a primary key, makes per-owner uniqueness enforceable without
+  `NULLS NOT DISTINCT`, and matches the domain, where the unset environment is
+  also `""`. Since owners are matched exactly (§4), the empty string is an
+  address — the project level — and never a wildcard.
 - **The primary key is the uniqueness rule.** It is what stops two variables
   existing at one name and owner, which a read would return with no rule for
   choosing between them. It is also the upsert conflict target: writing the same
   name and owner twice replaces the value in place.
-- Reads are ordered by name then owner columns, broadest first, so the same
-  requester reading twice gets the same slice.
+- The primary key is `(name, project_id, environment_name)`.
+- Reads are ordered by name, which is total within one owner, so the same owner
+  reading twice gets the same slice.
 
 ### 7. Secrets are encrypted per project and decrypted by the key that wrote them
 
@@ -220,19 +225,26 @@ one in-memory document from recursing forever:
 ### 9. What this ADR does not decide
 
 Deliberately left open, because they are separable and the first consumer does
-not need them:
+not need them. The API surface is no longer among them: `GET`/`PATCH
+/variables` and `GET`/`DELETE /variables/{variable_name}` address one owner per
+request, taking `project_id` and an optional `environment_name`.
 
-- **Who may read what.** There is no authorization on variables yet. Reading a
-  secret must eventually be a different permission from reading a variable, and
-  the resource has to be registered with the permission catalog (ADRs 032-033)
-  before an API exists.
-- **The API surface.** Error schemas (`api/openapi/.../errors/var-*.yaml`) are
-  defined; endpoints are not.
-- **Reading a secret back.** A resolved document currently contains decrypted
-  secrets with nothing marking which values they are, so a caller cannot redact
-  them from a log or a deploy diff. Whether secrets become write-only (the
-  GitHub model, two mechanisms rather than one) or stay readable with a
-  redaction contract is open.
+- **Fine-grained permissions.** The endpoints (below) sit behind the same
+  project-scoped check as every other management resource, gated on
+  `variable.read` / `variable.write`. Reading a secret must eventually be a
+  different permission from reading a variable, and the resource has to be
+  registered with the permission catalog (ADRs 032-033) for that.
+- **Reading a secret back.** The API answers a secret as `{"secret": true}` and
+  never with a value, which keeps this open rather than settling it. A *resolved
+  document* is the other half and still contains decrypted secrets with nothing
+  marking which values they are, so a caller cannot redact them from a log or a
+  deploy diff. Whether secrets become write-only outright (the GitHub model, two
+  mechanisms rather than one) or gain a redaction contract is undecided.
+- **Whether project-level values should reach an environment.** §4 says they do
+  not, so a name several environments need is entered in each of them. The
+  "set it once" case has no answer yet; giving it one means either bringing back
+  inheritance with a resolution rule, or a merge the caller performs over two
+  reads.
 - **What a deployment does when a referenced value is missing.** §2 leaves an
   unresolved placeholder standing, which is the right behavior for the
   substitution pass and the wrong one for a deploy. Validating a release against
@@ -254,13 +266,15 @@ the owner tuple a tuple of strings.
 The name is currently **not checked** on the way in. Two things follow, and
 neither is decided here:
 
-- **A foreign key is not available while an unset level is `""`.** The natural
-  key needs every owner column non-null, so "not scoped to an environment" is
-  the empty string, and no environment row carries that name. Enforcing the
-  reference therefore means validating on write (the
+- **A foreign key is not available while the project level is `""`.** The
+  natural key needs both owner columns non-null, so "not scoped to an
+  environment" is the empty string, and no environment row carries that name.
+  Enforcing the reference therefore means validating on write (the
   `GetEnvironmentByName` statement already exists) rather than in the schema.
-  Until that lands, a typo scopes a variable into invisibility rather than
-  failing.
+  Until that lands, a typo writes into an owner nothing will ever read from —
+  and with no inheritance to fall back on (§4), what the request meant to reach
+  reads as empty rather than as the project's value. That makes validating on
+  write more pressing than it was, not less.
 - **Renaming or deleting an environment does not touch its variables.** They
   keep pointing at a name nothing answers to. Whichever way that is settled
   (cascade on the name, forbid the rename, or leave the variables orphaned by
@@ -289,25 +303,30 @@ already gives the two different storage behavior.
 release is promoted between environments unchanged, so anything inside it is by
 definition the same everywhere.
 
-**A strict owner chain** (each level requiring the one above). Rejected: it
-cannot express "this user in this team" without inventing an environment and a
-user schema for them, and it makes the resolution rule a depth comparison that
-silently misranks owners once the chain is not a chain.
+**An owner hierarchy** (an environment inheriting the project's variables, the
+narrowest owner winning). This is what the first revision built, and §4 records
+why it went: it makes a read return several rows per name, which needs a rule
+for choosing between them, which every reader then has to apply the same way.
+Not rejected on principle — it is the better answer for values that should hold
+everywhere — but it is a rule to re-derive rather than to keep by default.
 
 **Operating-system environment variables.** Out of scope by the issue: these are
 project data, set through Zitadel, read on the environment serving the request.
 
 ## Consequences
 
-- One table and one syntax cover per-environment configuration, per-team
-  settings, and the IdP client id/secret pair that #851 needs.
+- One table and one syntax cover per-environment configuration and the IdP
+  client id/secret pair that #851 needs. Per-team and per-user settings are not
+  covered; they were, on paper, and §3 says why that was dropped.
 - Storage is the single enforcement point for visibility, so any future caller
   is safe by construction, and the SQL filter is proven equal to the domain
   predicate over every owner combination.
 - Stored secrets survive key rotation, unlike every other ciphertext in the
   system, which is short lived by design.
-- Resolution is total and order-independent: the same set of rows always
-  collapses to the same value.
+- A name at an owner is one value, so there is no resolution step and no way for
+  two callers to disagree about what a name holds.
+- A value that must hold in several environments is entered in each of them, and
+  nothing keeps those copies in step.
 - A missing value ships the literal placeholder until deployment validation
   exists (§9). This is the sharpest edge in the design as it stands.
 - Variables are outside releases, so a deployment is no longer fully described

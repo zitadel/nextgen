@@ -436,97 +436,43 @@ func TestVariableListToMap(t *testing.T) {
 
 	project := VariableOwner{ProjectID: "p"}
 	env := VariableOwner{ProjectID: "p", EnvironmentName: "e"}
-	team := VariableOwner{ProjectID: "p", EnvironmentName: "e", TeamID: "t"}
-	schema := VariableOwner{ProjectID: "p", EnvironmentName: "e", TeamID: "t", UserSchemaID: "s"}
-	user := VariableOwner{ProjectID: "p", EnvironmentName: "e", TeamID: "t", UserSchemaID: "s", UserID: "u"}
 
-	// Storage returns the whole ladder because variables do not override each
-	// other; collapsing it is what picks the value a document actually gets.
-	t.Run("keeps the nearest owner regardless of input order", func(t *testing.T) {
+	// A read admits one owner and the primary key is name plus owner, so the
+	// list this collapses never holds two rows under one name. There is no
+	// ranking left to test -- only that every name arrives and keeps its value.
+	t.Run("keys every variable by name", func(t *testing.T) {
 		t.Parallel()
-
-		for _, order := range [][]*Variable{
-			{{Name: "v", Owner: project, Value: "project"}, {Name: "v", Owner: user, Value: "user"}},
-			{{Name: "v", Owner: user, Value: "user"}, {Name: "v", Owner: project, Value: "project"}},
-			{{Name: "v", Owner: env, Value: "env"}, {Name: "v", Owner: team, Value: "team"}, {Name: "v", Owner: user, Value: "user"}, {Name: "v", Owner: project, Value: "project"}},
-		} {
-			got := VariableListToMap(order)
-			assert.Equal(t, "user", got["v"].Value)
-		}
-	})
-
-	t.Run("ranks every level of the ladder", func(t *testing.T) {
-		t.Parallel()
-
-		assert.True(t, project.IsMoreSpecificThan(VariableOwner{}))
-		assert.True(t, env.IsMoreSpecificThan(project))
-		assert.True(t, team.IsMoreSpecificThan(env))
-		assert.True(t, schema.IsMoreSpecificThan(team))
-		assert.True(t, user.IsMoreSpecificThan(schema))
-
-		assert.False(t, project.IsMoreSpecificThan(env))
-		assert.False(t, env.IsMoreSpecificThan(team))
-		assert.False(t, team.IsMoreSpecificThan(user))
-		assert.False(t, user.IsMoreSpecificThan(user), "an equal owner is not more specific")
-	})
-
-	// The levels are not a chain: an owner may name a user in a team of a
-	// project and name neither an environment nor a user schema, so ranking by
-	// how deep an owner reaches is not enough.
-	t.Run("ranks owners that skip levels", func(t *testing.T) {
-		t.Parallel()
-
-		teamNoEnv := VariableOwner{ProjectID: "p", TeamID: "t"}
-		userInTeam := VariableOwner{ProjectID: "p", TeamID: "t", UserID: "u"}
-
-		assert.True(t, teamNoEnv.IsMoreSpecificThan(project))
-		assert.True(t, userInTeam.IsMoreSpecificThan(teamNoEnv))
-		assert.False(t, teamNoEnv.IsMoreSpecificThan(userInTeam))
-
-		// Setting a level nobody else set narrows the owner, whichever level
-		// it is.
-		assert.True(t, team.IsMoreSpecificThan(teamNoEnv), "the environment is one more level named")
-		assert.True(t, userInTeam.IsMoreSpecificThan(VariableOwner{ProjectID: "p", UserID: "u"}))
-	})
-
-	// Between owners neither of which contains the other, the narrowest level
-	// either one names decides: a value entered for one user beats one entered
-	// for a whole team, however many broader levels the team-level owner also
-	// names.
-	t.Run("ranks the narrowest level ahead of a broader owner naming more levels", func(t *testing.T) {
-		t.Parallel()
-
-		userOnly := VariableOwner{ProjectID: "p", UserID: "u"}
-
-		assert.True(t, userOnly.IsMoreSpecificThan(schema), "a user beats a whole user schema")
-		assert.True(t, userOnly.IsMoreSpecificThan(team), "a user beats a whole team")
-		assert.False(t, schema.IsMoreSpecificThan(userOnly))
-
-		schemaOnly := VariableOwner{ProjectID: "p", UserSchemaID: "s"}
-		assert.True(t, schemaOnly.IsMoreSpecificThan(team), "a user schema beats a whole team")
-		assert.True(t, user.IsMoreSpecificThan(userOnly), "an owner naming every level stays the narrowest")
-	})
-
-	t.Run("collapses owners that skip levels", func(t *testing.T) {
-		t.Parallel()
-
-		userInTeam := VariableOwner{ProjectID: "p", TeamID: "t", UserID: "u"}
 
 		got := VariableListToMap([]*Variable{
-			{Name: "v", Owner: team, Value: "team"},
-			{Name: "v", Owner: userInTeam, Value: "user-in-team"},
+			{Name: "a", Owner: project, Value: "a-value"},
+			{Name: "b", Owner: project, Value: "b-value"},
+		})
+		require.Len(t, got, 2)
+		assert.Equal(t, "a-value", got["a"].Value)
+		assert.Equal(t, "b-value", got["b"].Value)
+		assert.Equal(t, project, got["a"].Owner, "the owner survives the collapse")
+	})
+
+	t.Run("an empty list is an empty map, not nil", func(t *testing.T) {
+		t.Parallel()
+
+		got := VariableListToMap(nil)
+		assert.NotNil(t, got)
+		assert.Empty(t, got)
+	})
+
+	// Owners are not a ladder any more: a name entered on the project and again
+	// on an environment is two variables, and no read returns both. Should one
+	// ever arrive here anyway, the last row wins -- stated so the behaviour is
+	// pinned rather than incidental.
+	t.Run("two rows under one name are not ranked", func(t *testing.T) {
+		t.Parallel()
+
+		got := VariableListToMap([]*Variable{
 			{Name: "v", Owner: project, Value: "project"},
+			{Name: "v", Owner: env, Value: "env"},
 		})
-		assert.Equal(t, "user-in-team", got["v"].Value)
-	})
-
-	t.Run("keeps distinct names apart", func(t *testing.T) {
-		t.Parallel()
-
-		got := VariableListToMap([]*Variable{
-			{Name: "a", Owner: project, Value: "a"},
-			{Name: "b", Owner: user, Value: "b"},
-		})
-		assert.Len(t, got, 2)
+		require.Len(t, got, 1)
+		assert.Equal(t, "env", got["v"].Value)
 	})
 }

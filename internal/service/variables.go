@@ -3,11 +3,18 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+type VariableToSet struct {
+	Name     string
+	Value    any
+	IsSecret bool
+}
 
 // VariableService reads and writes the variables a requester owns or inherits.
 //
@@ -17,19 +24,8 @@ import (
 // reads to the variables the requester may hold, so a value entered for another
 // team can never reach a caller here.
 type VariableService interface {
-	// GetVariables returns every variable the requester can read, narrowed to
-	// names when any are given. Names nobody entered a variable for are simply
-	// absent; an empty result is an ordinary outcome, not an error.
-	// If the variable is stored encrypted, it is not decrypted automatically.
 	GetVariables(ctx context.Context, requester domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	// SetVariable writes variable under its own name and owner, replacing one
-	// already entered at that name and owner. If the [isSecret] flag is set
-	// the variable will be stored encrypted.
-	SetVariable(ctx context.Context, name string, owner domain.VariableOwner, value any, isSecret bool) error
-	// DeleteVariable removes the variable owner entered under name. It returns
-	// [domain.ErrVariableNotFound] when owner entered no such variable, which
-	// includes the case where owner can only see one it inherited: a variable
-	// is deletable only by the owner that entered it.
+	SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
 	ReplaceVariables(ctx context.Context, requester domain.VariableOwner, doc map[string]any) (map[string]any, error)
 }
@@ -57,31 +53,58 @@ func (s *variableService) GetVariables(ctx context.Context, requester domain.Var
 	return variables, nil
 }
 
-func (s *variableService) SetVariable(ctx context.Context,
-	name string, owner domain.VariableOwner,
-	value any, isSecret bool,
-) error {
-	var variable *domain.Variable
+func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error {
+	if len(variablesToSet) == 0 {
+		return nil
+	}
+
+	var crypter crypto.Crypter
 	var err error
 
-	if isSecret {
-		crypter, err := s.keys.GetProjectCrypter(ctx, owner.ProjectID, domain.EncryptionKeyPurposeSecret)
-		if err != nil {
-			return err
-		}
-		variable, err = domain.NewSecretVariable(name, owner, value, crypter)
-		if err != nil {
-			return err
-		}
-	} else {
-		variable, err = domain.NewVariable(name, owner, value)
+	containsSecret := slices.ContainsFunc(variablesToSet, func(set VariableToSet) bool {
+		return set.IsSecret
+	})
+	if containsSecret {
+		crypter, err = s.keys.GetProjectCrypter(ctx, owner.ProjectID, domain.EncryptionKeyPurposeSecret)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := s.v2Pool.Statements().SetVariable(ctx, variable); err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to write variable to database")
+	vars := make([]*domain.Variable, len(variablesToSet), len(variablesToSet))
+	for i, v := range variablesToSet {
+		if v.IsSecret {
+			vars[i], err = domain.NewSecretVariable(v.Name, owner, v.Value, crypter)
+			if err != nil {
+				return err
+			}
+		} else {
+			vars[i], err = domain.NewVariable(v.Name, owner, v.Value)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// no need to start a transaction if there is only one variable
+	if len(vars) == 1 {
+		err = s.v2Pool.Statements().SetVariable(ctx, vars[0])
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to write variable to database")
+		}
+		return nil
+	}
+
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		for _, v := range vars {
+			if err := tx.Statements().SetVariable(ctx, v); err != nil {
+				return domain.ErrInternal(err).WithMessage("failed to write variable to database")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to set variables in the database")
 	}
 	return nil
 }

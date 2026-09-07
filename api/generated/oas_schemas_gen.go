@@ -11682,6 +11682,191 @@ type DeleteUserByIDUnauthorized ErrorDetails
 
 func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 
+// DeleteVariableErrorResponse represents sum type.
+type DeleteVariableErrorResponse struct {
+	Type                DeleteVariableErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	VarNotFound         VarNotFound
+	VarPermissionDenied VarPermissionDenied
+}
+
+// DeleteVariableErrorResponseType is oneOf type of DeleteVariableErrorResponse.
+type DeleteVariableErrorResponseType string
+
+// Possible values for DeleteVariableErrorResponseType.
+const (
+	AuthUnauthorizedDeleteVariableErrorResponse    DeleteVariableErrorResponseType = "auth.unauthorized"
+	InternalDeleteVariableErrorResponse            DeleteVariableErrorResponseType = "internal"
+	ReqInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "req.invalid"
+	VarNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "var.not_found"
+	VarPermissionDeniedDeleteVariableErrorResponse DeleteVariableErrorResponseType = "var.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether DeleteVariableErrorResponse is AuthUnauthorized.
+func (s DeleteVariableErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedDeleteVariableErrorResponse
+}
+
+// IsInternal reports whether DeleteVariableErrorResponse is Internal.
+func (s DeleteVariableErrorResponse) IsInternal() bool {
+	return s.Type == InternalDeleteVariableErrorResponse
+}
+
+// IsReqInvalid reports whether DeleteVariableErrorResponse is ReqInvalid.
+func (s DeleteVariableErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidDeleteVariableErrorResponse
+}
+
+// IsVarNotFound reports whether DeleteVariableErrorResponse is VarNotFound.
+func (s DeleteVariableErrorResponse) IsVarNotFound() bool {
+	return s.Type == VarNotFoundDeleteVariableErrorResponse
+}
+
+// IsVarPermissionDenied reports whether DeleteVariableErrorResponse is VarPermissionDenied.
+func (s DeleteVariableErrorResponse) IsVarPermissionDenied() bool {
+	return s.Type == VarPermissionDeniedDeleteVariableErrorResponse
+}
+
+// SetAuthUnauthorized sets DeleteVariableErrorResponse to AuthUnauthorized.
+func (s *DeleteVariableErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedDeleteVariableErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if DeleteVariableErrorResponse is AuthUnauthorized.
+func (s DeleteVariableErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedDeleteVariableErrorResponse(v AuthUnauthorized) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets DeleteVariableErrorResponse to Internal.
+func (s *DeleteVariableErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalDeleteVariableErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if DeleteVariableErrorResponse is Internal.
+func (s DeleteVariableErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from Internal.
+func NewInternalDeleteVariableErrorResponse(v Internal) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets DeleteVariableErrorResponse to ReqInvalid.
+func (s *DeleteVariableErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidDeleteVariableErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if DeleteVariableErrorResponse is ReqInvalid.
+func (s DeleteVariableErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from ReqInvalid.
+func NewReqInvalidDeleteVariableErrorResponse(v ReqInvalid) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetVarNotFound sets DeleteVariableErrorResponse to VarNotFound.
+func (s *DeleteVariableErrorResponse) SetVarNotFound(v VarNotFound) {
+	s.Type = VarNotFoundDeleteVariableErrorResponse
+	s.VarNotFound = v
+}
+
+// GetVarNotFound returns VarNotFound and true boolean if DeleteVariableErrorResponse is VarNotFound.
+func (s DeleteVariableErrorResponse) GetVarNotFound() (v VarNotFound, ok bool) {
+	if !s.IsVarNotFound() {
+		return v, false
+	}
+	return s.VarNotFound, true
+}
+
+// NewVarNotFoundDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from VarNotFound.
+func NewVarNotFoundDeleteVariableErrorResponse(v VarNotFound) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetVarNotFound(v)
+	return s
+}
+
+// SetVarPermissionDenied sets DeleteVariableErrorResponse to VarPermissionDenied.
+func (s *DeleteVariableErrorResponse) SetVarPermissionDenied(v VarPermissionDenied) {
+	s.Type = VarPermissionDeniedDeleteVariableErrorResponse
+	s.VarPermissionDenied = v
+}
+
+// GetVarPermissionDenied returns VarPermissionDenied and true boolean if DeleteVariableErrorResponse is VarPermissionDenied.
+func (s DeleteVariableErrorResponse) GetVarPermissionDenied() (v VarPermissionDenied, ok bool) {
+	if !s.IsVarPermissionDenied() {
+		return v, false
+	}
+	return s.VarPermissionDenied, true
+}
+
+// NewVarPermissionDeniedDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from VarPermissionDenied.
+func NewVarPermissionDeniedDeleteVariableErrorResponse(v VarPermissionDenied) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetVarPermissionDenied(v)
+	return s
+}
+
+// DeleteVariableErrorResponseStatusCode wraps DeleteVariableErrorResponse with StatusCode.
+type DeleteVariableErrorResponseStatusCode struct {
+	StatusCode int
+	Response   DeleteVariableErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *DeleteVariableErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *DeleteVariableErrorResponseStatusCode) GetResponse() DeleteVariableErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *DeleteVariableErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *DeleteVariableErrorResponseStatusCode) SetResponse(val DeleteVariableErrorResponse) {
+	s.Response = val
+}
+
+func (*DeleteVariableErrorResponseStatusCode) deleteVariableRes() {}
+
+// DeleteVariableNoContent is response for DeleteVariable operation.
+type DeleteVariableNoContent struct{}
+
+func (*DeleteVariableNoContent) deleteVariableRes() {}
+
 // Empty payload for event types with no typed fields
 // (e.g. `project.deleted`, `user.deleted`, `session.expired`).
 // Ref: #
@@ -21285,6 +21470,366 @@ type GetUserByIDUnauthorized ErrorDetails
 
 func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 
+// GetVariableErrorResponse represents sum type.
+type GetVariableErrorResponse struct {
+	Type                GetVariableErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	VarNotFound         VarNotFound
+	VarPermissionDenied VarPermissionDenied
+}
+
+// GetVariableErrorResponseType is oneOf type of GetVariableErrorResponse.
+type GetVariableErrorResponseType string
+
+// Possible values for GetVariableErrorResponseType.
+const (
+	AuthUnauthorizedGetVariableErrorResponse    GetVariableErrorResponseType = "auth.unauthorized"
+	InternalGetVariableErrorResponse            GetVariableErrorResponseType = "internal"
+	ReqInvalidGetVariableErrorResponse          GetVariableErrorResponseType = "req.invalid"
+	VarNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "var.not_found"
+	VarPermissionDeniedGetVariableErrorResponse GetVariableErrorResponseType = "var.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetVariableErrorResponse is AuthUnauthorized.
+func (s GetVariableErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetVariableErrorResponse
+}
+
+// IsInternal reports whether GetVariableErrorResponse is Internal.
+func (s GetVariableErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetVariableErrorResponse
+}
+
+// IsReqInvalid reports whether GetVariableErrorResponse is ReqInvalid.
+func (s GetVariableErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetVariableErrorResponse
+}
+
+// IsVarNotFound reports whether GetVariableErrorResponse is VarNotFound.
+func (s GetVariableErrorResponse) IsVarNotFound() bool {
+	return s.Type == VarNotFoundGetVariableErrorResponse
+}
+
+// IsVarPermissionDenied reports whether GetVariableErrorResponse is VarPermissionDenied.
+func (s GetVariableErrorResponse) IsVarPermissionDenied() bool {
+	return s.Type == VarPermissionDeniedGetVariableErrorResponse
+}
+
+// SetAuthUnauthorized sets GetVariableErrorResponse to AuthUnauthorized.
+func (s *GetVariableErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetVariableErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetVariableErrorResponse is AuthUnauthorized.
+func (s GetVariableErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetVariableErrorResponse returns new GetVariableErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetVariableErrorResponse(v AuthUnauthorized) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetVariableErrorResponse to Internal.
+func (s *GetVariableErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetVariableErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetVariableErrorResponse is Internal.
+func (s GetVariableErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetVariableErrorResponse returns new GetVariableErrorResponse from Internal.
+func NewInternalGetVariableErrorResponse(v Internal) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetVariableErrorResponse to ReqInvalid.
+func (s *GetVariableErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetVariableErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetVariableErrorResponse is ReqInvalid.
+func (s GetVariableErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetVariableErrorResponse returns new GetVariableErrorResponse from ReqInvalid.
+func NewReqInvalidGetVariableErrorResponse(v ReqInvalid) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetVarNotFound sets GetVariableErrorResponse to VarNotFound.
+func (s *GetVariableErrorResponse) SetVarNotFound(v VarNotFound) {
+	s.Type = VarNotFoundGetVariableErrorResponse
+	s.VarNotFound = v
+}
+
+// GetVarNotFound returns VarNotFound and true boolean if GetVariableErrorResponse is VarNotFound.
+func (s GetVariableErrorResponse) GetVarNotFound() (v VarNotFound, ok bool) {
+	if !s.IsVarNotFound() {
+		return v, false
+	}
+	return s.VarNotFound, true
+}
+
+// NewVarNotFoundGetVariableErrorResponse returns new GetVariableErrorResponse from VarNotFound.
+func NewVarNotFoundGetVariableErrorResponse(v VarNotFound) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetVarNotFound(v)
+	return s
+}
+
+// SetVarPermissionDenied sets GetVariableErrorResponse to VarPermissionDenied.
+func (s *GetVariableErrorResponse) SetVarPermissionDenied(v VarPermissionDenied) {
+	s.Type = VarPermissionDeniedGetVariableErrorResponse
+	s.VarPermissionDenied = v
+}
+
+// GetVarPermissionDenied returns VarPermissionDenied and true boolean if GetVariableErrorResponse is VarPermissionDenied.
+func (s GetVariableErrorResponse) GetVarPermissionDenied() (v VarPermissionDenied, ok bool) {
+	if !s.IsVarPermissionDenied() {
+		return v, false
+	}
+	return s.VarPermissionDenied, true
+}
+
+// NewVarPermissionDeniedGetVariableErrorResponse returns new GetVariableErrorResponse from VarPermissionDenied.
+func NewVarPermissionDeniedGetVariableErrorResponse(v VarPermissionDenied) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetVarPermissionDenied(v)
+	return s
+}
+
+// GetVariableErrorResponseStatusCode wraps GetVariableErrorResponse with StatusCode.
+type GetVariableErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetVariableErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetVariableErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetVariableErrorResponseStatusCode) GetResponse() GetVariableErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetVariableErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetVariableErrorResponseStatusCode) SetResponse(val GetVariableErrorResponse) {
+	s.Response = val
+}
+
+func (*GetVariableErrorResponseStatusCode) getVariableRes() {}
+
+// GetVariablesErrorResponse represents sum type.
+type GetVariablesErrorResponse struct {
+	Type                GetVariablesErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	VarNotFound         VarNotFound
+	VarPermissionDenied VarPermissionDenied
+}
+
+// GetVariablesErrorResponseType is oneOf type of GetVariablesErrorResponse.
+type GetVariablesErrorResponseType string
+
+// Possible values for GetVariablesErrorResponseType.
+const (
+	AuthUnauthorizedGetVariablesErrorResponse    GetVariablesErrorResponseType = "auth.unauthorized"
+	InternalGetVariablesErrorResponse            GetVariablesErrorResponseType = "internal"
+	ReqInvalidGetVariablesErrorResponse          GetVariablesErrorResponseType = "req.invalid"
+	VarNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "var.not_found"
+	VarPermissionDeniedGetVariablesErrorResponse GetVariablesErrorResponseType = "var.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetVariablesErrorResponse is AuthUnauthorized.
+func (s GetVariablesErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetVariablesErrorResponse
+}
+
+// IsInternal reports whether GetVariablesErrorResponse is Internal.
+func (s GetVariablesErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetVariablesErrorResponse
+}
+
+// IsReqInvalid reports whether GetVariablesErrorResponse is ReqInvalid.
+func (s GetVariablesErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetVariablesErrorResponse
+}
+
+// IsVarNotFound reports whether GetVariablesErrorResponse is VarNotFound.
+func (s GetVariablesErrorResponse) IsVarNotFound() bool {
+	return s.Type == VarNotFoundGetVariablesErrorResponse
+}
+
+// IsVarPermissionDenied reports whether GetVariablesErrorResponse is VarPermissionDenied.
+func (s GetVariablesErrorResponse) IsVarPermissionDenied() bool {
+	return s.Type == VarPermissionDeniedGetVariablesErrorResponse
+}
+
+// SetAuthUnauthorized sets GetVariablesErrorResponse to AuthUnauthorized.
+func (s *GetVariablesErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetVariablesErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetVariablesErrorResponse is AuthUnauthorized.
+func (s GetVariablesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetVariablesErrorResponse returns new GetVariablesErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetVariablesErrorResponse(v AuthUnauthorized) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetVariablesErrorResponse to Internal.
+func (s *GetVariablesErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetVariablesErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetVariablesErrorResponse is Internal.
+func (s GetVariablesErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetVariablesErrorResponse returns new GetVariablesErrorResponse from Internal.
+func NewInternalGetVariablesErrorResponse(v Internal) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetVariablesErrorResponse to ReqInvalid.
+func (s *GetVariablesErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetVariablesErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetVariablesErrorResponse is ReqInvalid.
+func (s GetVariablesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetVariablesErrorResponse returns new GetVariablesErrorResponse from ReqInvalid.
+func NewReqInvalidGetVariablesErrorResponse(v ReqInvalid) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetVarNotFound sets GetVariablesErrorResponse to VarNotFound.
+func (s *GetVariablesErrorResponse) SetVarNotFound(v VarNotFound) {
+	s.Type = VarNotFoundGetVariablesErrorResponse
+	s.VarNotFound = v
+}
+
+// GetVarNotFound returns VarNotFound and true boolean if GetVariablesErrorResponse is VarNotFound.
+func (s GetVariablesErrorResponse) GetVarNotFound() (v VarNotFound, ok bool) {
+	if !s.IsVarNotFound() {
+		return v, false
+	}
+	return s.VarNotFound, true
+}
+
+// NewVarNotFoundGetVariablesErrorResponse returns new GetVariablesErrorResponse from VarNotFound.
+func NewVarNotFoundGetVariablesErrorResponse(v VarNotFound) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetVarNotFound(v)
+	return s
+}
+
+// SetVarPermissionDenied sets GetVariablesErrorResponse to VarPermissionDenied.
+func (s *GetVariablesErrorResponse) SetVarPermissionDenied(v VarPermissionDenied) {
+	s.Type = VarPermissionDeniedGetVariablesErrorResponse
+	s.VarPermissionDenied = v
+}
+
+// GetVarPermissionDenied returns VarPermissionDenied and true boolean if GetVariablesErrorResponse is VarPermissionDenied.
+func (s GetVariablesErrorResponse) GetVarPermissionDenied() (v VarPermissionDenied, ok bool) {
+	if !s.IsVarPermissionDenied() {
+		return v, false
+	}
+	return s.VarPermissionDenied, true
+}
+
+// NewVarPermissionDeniedGetVariablesErrorResponse returns new GetVariablesErrorResponse from VarPermissionDenied.
+func NewVarPermissionDeniedGetVariablesErrorResponse(v VarPermissionDenied) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetVarPermissionDenied(v)
+	return s
+}
+
+// GetVariablesErrorResponseStatusCode wraps GetVariablesErrorResponse with StatusCode.
+type GetVariablesErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetVariablesErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetVariablesErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetVariablesErrorResponseStatusCode) GetResponse() GetVariablesErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetVariablesErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetVariablesErrorResponseStatusCode) SetResponse(val GetVariablesErrorResponse) {
+	s.Response = val
+}
+
+func (*GetVariablesErrorResponseStatusCode) getVariablesRes() {}
+
 // A collaboration grant binding a principal to a project relation.
 // Ref: #
 type Grant struct {
@@ -25724,6 +26269,52 @@ func (o OptEnvironmentCreatedEventDelegationType) Get() (v EnvironmentCreatedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvironmentCreatedEventDelegationType) Or(d EnvironmentCreatedEventDelegationType) EnvironmentCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvironmentName returns new OptEnvironmentName with value set to v.
+func NewOptEnvironmentName(v EnvironmentName) OptEnvironmentName {
+	return OptEnvironmentName{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvironmentName is optional EnvironmentName.
+type OptEnvironmentName struct {
+	Value EnvironmentName
+	Set   bool
+}
+
+// IsSet returns true if OptEnvironmentName was set.
+func (o OptEnvironmentName) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvironmentName) Reset() {
+	var v EnvironmentName
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvironmentName) SetTo(v EnvironmentName) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvironmentName) Get() (v EnvironmentName, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvironmentName) Or(d EnvironmentName) EnvironmentName {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -33482,6 +34073,236 @@ func (o OptUserSchemaProperties) Or(d UserSchemaProperties) UserSchemaProperties
 	return d
 }
 
+// NewOptVarInvalidNameDetails returns new OptVarInvalidNameDetails with value set to v.
+func NewOptVarInvalidNameDetails(v VarInvalidNameDetails) OptVarInvalidNameDetails {
+	return OptVarInvalidNameDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarInvalidNameDetails is optional VarInvalidNameDetails.
+type OptVarInvalidNameDetails struct {
+	Value VarInvalidNameDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarInvalidNameDetails was set.
+func (o OptVarInvalidNameDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarInvalidNameDetails) Reset() {
+	var v VarInvalidNameDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarInvalidNameDetails) SetTo(v VarInvalidNameDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarInvalidNameDetails) Get() (v VarInvalidNameDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarInvalidNameDetails) Or(d VarInvalidNameDetails) VarInvalidNameDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarInvalidValueDetails returns new OptVarInvalidValueDetails with value set to v.
+func NewOptVarInvalidValueDetails(v VarInvalidValueDetails) OptVarInvalidValueDetails {
+	return OptVarInvalidValueDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarInvalidValueDetails is optional VarInvalidValueDetails.
+type OptVarInvalidValueDetails struct {
+	Value VarInvalidValueDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarInvalidValueDetails was set.
+func (o OptVarInvalidValueDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarInvalidValueDetails) Reset() {
+	var v VarInvalidValueDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarInvalidValueDetails) SetTo(v VarInvalidValueDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarInvalidValueDetails) Get() (v VarInvalidValueDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarInvalidValueDetails) Or(d VarInvalidValueDetails) VarInvalidValueDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarNoProjectIDDetails returns new OptVarNoProjectIDDetails with value set to v.
+func NewOptVarNoProjectIDDetails(v VarNoProjectIDDetails) OptVarNoProjectIDDetails {
+	return OptVarNoProjectIDDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarNoProjectIDDetails is optional VarNoProjectIDDetails.
+type OptVarNoProjectIDDetails struct {
+	Value VarNoProjectIDDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarNoProjectIDDetails was set.
+func (o OptVarNoProjectIDDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarNoProjectIDDetails) Reset() {
+	var v VarNoProjectIDDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarNoProjectIDDetails) SetTo(v VarNoProjectIDDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarNoProjectIDDetails) Get() (v VarNoProjectIDDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarNoProjectIDDetails) Or(d VarNoProjectIDDetails) VarNoProjectIDDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarNotFoundDetails returns new OptVarNotFoundDetails with value set to v.
+func NewOptVarNotFoundDetails(v VarNotFoundDetails) OptVarNotFoundDetails {
+	return OptVarNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarNotFoundDetails is optional VarNotFoundDetails.
+type OptVarNotFoundDetails struct {
+	Value VarNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarNotFoundDetails was set.
+func (o OptVarNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarNotFoundDetails) Reset() {
+	var v VarNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarNotFoundDetails) SetTo(v VarNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarNotFoundDetails) Get() (v VarNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarNotFoundDetails) Or(d VarNotFoundDetails) VarNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarPermissionDeniedDetails returns new OptVarPermissionDeniedDetails with value set to v.
+func NewOptVarPermissionDeniedDetails(v VarPermissionDeniedDetails) OptVarPermissionDeniedDetails {
+	return OptVarPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarPermissionDeniedDetails is optional VarPermissionDeniedDetails.
+type OptVarPermissionDeniedDetails struct {
+	Value VarPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarPermissionDeniedDetails was set.
+func (o OptVarPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarPermissionDeniedDetails) Reset() {
+	var v VarPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarPermissionDeniedDetails) SetTo(v VarPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarPermissionDeniedDetails) Get() (v VarPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarPermissionDeniedDetails) Or(d VarPermissionDeniedDetails) VarPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 type PageToken string
 
 // WebAuthn-specific challenge data for passkey authentication.
@@ -39952,6 +40773,82 @@ func (s *SchemaURL) SetURL(val url.URL) {
 	s.URL = val
 }
 
+// A secret, on the way out. It says that a value is held under this name and
+// that the value is secret; it never carries the value itself.
+// A secret is stored encrypted and reads back as ciphertext, so there is
+// nothing here that could be returned honestly: the plaintext would defeat the
+// encryption, and the ciphertext would be a value no caller can use. Whether
+// secrets ever become readable — and if so under which permission — is left
+// open by ADR 061 §9; this shape is what keeps that question open rather than
+// answering it by accident.
+// Secrets are still usable without being readable: a configuration document
+// referencing `${{ NAME }}` resolves against the decrypted value when it is
+// served (§7).
+// Ref: #
+type SecretVariable struct {
+	// Always `true`. A non-secret variable is returned as a bare scalar instead.
+	Secret SecretVariableSecret `json:"secret"`
+}
+
+// GetSecret returns the value of Secret.
+func (s *SecretVariable) GetSecret() SecretVariableSecret {
+	return s.Secret
+}
+
+// SetSecret sets the value of Secret.
+func (s *SecretVariable) SetSecret(val SecretVariableSecret) {
+	s.Secret = val
+}
+
+// A variable written with its secrecy stated explicitly.
+// Use this form to enter a secret. `{"value": "s3cr3t", "secret": true}` is
+// stored encrypted with the project's active `secret` key (ADR 061 §7) and
+// never reads back; the bare-scalar form is the same write with
+// `secret: false`.
+// Ref: #
+type SecretVariableInput struct {
+	Value VariableScalar `json:"value"`
+	// Whether the value is stored encrypted. Changing it on an existing name
+	// re-writes the value under the new flag — the documents referencing that
+	// name do not change, because secrecy is a property of the value, not of
+	// the reference to it (ADR 061 §2).
+	Secret bool `json:"secret"`
+}
+
+// GetValue returns the value of Value.
+func (s *SecretVariableInput) GetValue() VariableScalar {
+	return s.Value
+}
+
+// GetSecret returns the value of Secret.
+func (s *SecretVariableInput) GetSecret() bool {
+	return s.Secret
+}
+
+// SetValue sets the value of Value.
+func (s *SecretVariableInput) SetValue(val VariableScalar) {
+	s.Value = val
+}
+
+// SetSecret sets the value of Secret.
+func (s *SecretVariableInput) SetSecret(val bool) {
+	s.Secret = val
+}
+
+// Always `true`. A non-secret variable is returned as a bare scalar instead.
+type SecretVariableSecret bool
+
+const (
+	SecretVariableSecretTrue SecretVariableSecret = true
+)
+
+// AllValues returns all SecretVariableSecret values.
+func (SecretVariableSecret) AllValues() []SecretVariableSecret {
+	return []SecretVariableSecret{
+		SecretVariableSecretTrue,
+	}
+}
+
 // Merged schema.
 // Ref: #
 type SessExchangeConflict struct {
@@ -45118,6 +46015,407 @@ type UpdateTeamUnauthorized ErrorDetails
 
 func (*UpdateTeamUnauthorized) updateTeamRes() {}
 
+// UpdateVariablesErrorResponse represents sum type.
+type UpdateVariablesErrorResponse struct {
+	Type                UpdateVariablesErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	Internal            Internal
+	TknInvalid          TknInvalid
+	VarInvalidName      VarInvalidName
+	VarInvalidValue     VarInvalidValue
+	VarNoProjectID      VarNoProjectID
+	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
+	VarNotFound         VarNotFound
+	VarPermissionDenied VarPermissionDenied
+}
+
+// UpdateVariablesErrorResponseType is oneOf type of UpdateVariablesErrorResponse.
+type UpdateVariablesErrorResponseType string
+
+// Possible values for UpdateVariablesErrorResponseType.
+const (
+	AuthUnauthorizedUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedUpdateVariablesErrorResponse UpdateVariablesErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyNotFoundUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "enc_key.not_found"
+	InternalUpdateVariablesErrorResponse            UpdateVariablesErrorResponseType = "internal"
+	TknInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "tkn.invalid"
+	VarInvalidNameUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.invalid_name"
+	VarInvalidValueUpdateVariablesErrorResponse     UpdateVariablesErrorResponseType = "var.invalid_value"
+	VarNoProjectIDUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.no_project_id"
+	ReqInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "enc_key.unknown_alg"
+	VarNotFoundUpdateVariablesErrorResponse         UpdateVariablesErrorResponseType = "var.not_found"
+	VarPermissionDeniedUpdateVariablesErrorResponse UpdateVariablesErrorResponseType = "var.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether UpdateVariablesErrorResponse is AuthUnauthorized.
+func (s UpdateVariablesErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedUpdateVariablesErrorResponse
+}
+
+// IsEncKeyDecryptFailed reports whether UpdateVariablesErrorResponse is EncKeyDecryptFailed.
+func (s UpdateVariablesErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedUpdateVariablesErrorResponse
+}
+
+// IsEncKeyNotFound reports whether UpdateVariablesErrorResponse is EncKeyNotFound.
+func (s UpdateVariablesErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundUpdateVariablesErrorResponse
+}
+
+// IsInternal reports whether UpdateVariablesErrorResponse is Internal.
+func (s UpdateVariablesErrorResponse) IsInternal() bool {
+	return s.Type == InternalUpdateVariablesErrorResponse
+}
+
+// IsTknInvalid reports whether UpdateVariablesErrorResponse is TknInvalid.
+func (s UpdateVariablesErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidUpdateVariablesErrorResponse
+}
+
+// IsVarInvalidName reports whether UpdateVariablesErrorResponse is VarInvalidName.
+func (s UpdateVariablesErrorResponse) IsVarInvalidName() bool {
+	return s.Type == VarInvalidNameUpdateVariablesErrorResponse
+}
+
+// IsVarInvalidValue reports whether UpdateVariablesErrorResponse is VarInvalidValue.
+func (s UpdateVariablesErrorResponse) IsVarInvalidValue() bool {
+	return s.Type == VarInvalidValueUpdateVariablesErrorResponse
+}
+
+// IsVarNoProjectID reports whether UpdateVariablesErrorResponse is VarNoProjectID.
+func (s UpdateVariablesErrorResponse) IsVarNoProjectID() bool {
+	return s.Type == VarNoProjectIDUpdateVariablesErrorResponse
+}
+
+// IsReqInvalid reports whether UpdateVariablesErrorResponse is ReqInvalid.
+func (s UpdateVariablesErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidUpdateVariablesErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether UpdateVariablesErrorResponse is EncKeyUnknownAlg.
+func (s UpdateVariablesErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgUpdateVariablesErrorResponse
+}
+
+// IsVarNotFound reports whether UpdateVariablesErrorResponse is VarNotFound.
+func (s UpdateVariablesErrorResponse) IsVarNotFound() bool {
+	return s.Type == VarNotFoundUpdateVariablesErrorResponse
+}
+
+// IsVarPermissionDenied reports whether UpdateVariablesErrorResponse is VarPermissionDenied.
+func (s UpdateVariablesErrorResponse) IsVarPermissionDenied() bool {
+	return s.Type == VarPermissionDeniedUpdateVariablesErrorResponse
+}
+
+// SetAuthUnauthorized sets UpdateVariablesErrorResponse to AuthUnauthorized.
+func (s *UpdateVariablesErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedUpdateVariablesErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if UpdateVariablesErrorResponse is AuthUnauthorized.
+func (s UpdateVariablesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedUpdateVariablesErrorResponse(v AuthUnauthorized) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEncKeyDecryptFailed sets UpdateVariablesErrorResponse to EncKeyDecryptFailed.
+func (s *UpdateVariablesErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedUpdateVariablesErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if UpdateVariablesErrorResponse is EncKeyDecryptFailed.
+func (s UpdateVariablesErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedUpdateVariablesErrorResponse(v EncKeyDecryptFailed) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets UpdateVariablesErrorResponse to EncKeyNotFound.
+func (s *UpdateVariablesErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundUpdateVariablesErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if UpdateVariablesErrorResponse is EncKeyNotFound.
+func (s UpdateVariablesErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundUpdateVariablesErrorResponse(v EncKeyNotFound) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetInternal sets UpdateVariablesErrorResponse to Internal.
+func (s *UpdateVariablesErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalUpdateVariablesErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if UpdateVariablesErrorResponse is Internal.
+func (s UpdateVariablesErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from Internal.
+func NewInternalUpdateVariablesErrorResponse(v Internal) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalid sets UpdateVariablesErrorResponse to TknInvalid.
+func (s *UpdateVariablesErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidUpdateVariablesErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if UpdateVariablesErrorResponse is TknInvalid.
+func (s UpdateVariablesErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from TknInvalid.
+func NewTknInvalidUpdateVariablesErrorResponse(v TknInvalid) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetTknInvalid(v)
+	return s
+}
+
+// SetVarInvalidName sets UpdateVariablesErrorResponse to VarInvalidName.
+func (s *UpdateVariablesErrorResponse) SetVarInvalidName(v VarInvalidName) {
+	s.Type = VarInvalidNameUpdateVariablesErrorResponse
+	s.VarInvalidName = v
+}
+
+// GetVarInvalidName returns VarInvalidName and true boolean if UpdateVariablesErrorResponse is VarInvalidName.
+func (s UpdateVariablesErrorResponse) GetVarInvalidName() (v VarInvalidName, ok bool) {
+	if !s.IsVarInvalidName() {
+		return v, false
+	}
+	return s.VarInvalidName, true
+}
+
+// NewVarInvalidNameUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from VarInvalidName.
+func NewVarInvalidNameUpdateVariablesErrorResponse(v VarInvalidName) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetVarInvalidName(v)
+	return s
+}
+
+// SetVarInvalidValue sets UpdateVariablesErrorResponse to VarInvalidValue.
+func (s *UpdateVariablesErrorResponse) SetVarInvalidValue(v VarInvalidValue) {
+	s.Type = VarInvalidValueUpdateVariablesErrorResponse
+	s.VarInvalidValue = v
+}
+
+// GetVarInvalidValue returns VarInvalidValue and true boolean if UpdateVariablesErrorResponse is VarInvalidValue.
+func (s UpdateVariablesErrorResponse) GetVarInvalidValue() (v VarInvalidValue, ok bool) {
+	if !s.IsVarInvalidValue() {
+		return v, false
+	}
+	return s.VarInvalidValue, true
+}
+
+// NewVarInvalidValueUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from VarInvalidValue.
+func NewVarInvalidValueUpdateVariablesErrorResponse(v VarInvalidValue) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetVarInvalidValue(v)
+	return s
+}
+
+// SetVarNoProjectID sets UpdateVariablesErrorResponse to VarNoProjectID.
+func (s *UpdateVariablesErrorResponse) SetVarNoProjectID(v VarNoProjectID) {
+	s.Type = VarNoProjectIDUpdateVariablesErrorResponse
+	s.VarNoProjectID = v
+}
+
+// GetVarNoProjectID returns VarNoProjectID and true boolean if UpdateVariablesErrorResponse is VarNoProjectID.
+func (s UpdateVariablesErrorResponse) GetVarNoProjectID() (v VarNoProjectID, ok bool) {
+	if !s.IsVarNoProjectID() {
+		return v, false
+	}
+	return s.VarNoProjectID, true
+}
+
+// NewVarNoProjectIDUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from VarNoProjectID.
+func NewVarNoProjectIDUpdateVariablesErrorResponse(v VarNoProjectID) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetVarNoProjectID(v)
+	return s
+}
+
+// SetReqInvalid sets UpdateVariablesErrorResponse to ReqInvalid.
+func (s *UpdateVariablesErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidUpdateVariablesErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if UpdateVariablesErrorResponse is ReqInvalid.
+func (s UpdateVariablesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from ReqInvalid.
+func NewReqInvalidUpdateVariablesErrorResponse(v ReqInvalid) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetEncKeyUnknownAlg sets UpdateVariablesErrorResponse to EncKeyUnknownAlg.
+func (s *UpdateVariablesErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgUpdateVariablesErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if UpdateVariablesErrorResponse is EncKeyUnknownAlg.
+func (s UpdateVariablesErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgUpdateVariablesErrorResponse(v EncKeyUnknownAlg) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetVarNotFound sets UpdateVariablesErrorResponse to VarNotFound.
+func (s *UpdateVariablesErrorResponse) SetVarNotFound(v VarNotFound) {
+	s.Type = VarNotFoundUpdateVariablesErrorResponse
+	s.VarNotFound = v
+}
+
+// GetVarNotFound returns VarNotFound and true boolean if UpdateVariablesErrorResponse is VarNotFound.
+func (s UpdateVariablesErrorResponse) GetVarNotFound() (v VarNotFound, ok bool) {
+	if !s.IsVarNotFound() {
+		return v, false
+	}
+	return s.VarNotFound, true
+}
+
+// NewVarNotFoundUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from VarNotFound.
+func NewVarNotFoundUpdateVariablesErrorResponse(v VarNotFound) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetVarNotFound(v)
+	return s
+}
+
+// SetVarPermissionDenied sets UpdateVariablesErrorResponse to VarPermissionDenied.
+func (s *UpdateVariablesErrorResponse) SetVarPermissionDenied(v VarPermissionDenied) {
+	s.Type = VarPermissionDeniedUpdateVariablesErrorResponse
+	s.VarPermissionDenied = v
+}
+
+// GetVarPermissionDenied returns VarPermissionDenied and true boolean if UpdateVariablesErrorResponse is VarPermissionDenied.
+func (s UpdateVariablesErrorResponse) GetVarPermissionDenied() (v VarPermissionDenied, ok bool) {
+	if !s.IsVarPermissionDenied() {
+		return v, false
+	}
+	return s.VarPermissionDenied, true
+}
+
+// NewVarPermissionDeniedUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from VarPermissionDenied.
+func NewVarPermissionDeniedUpdateVariablesErrorResponse(v VarPermissionDenied) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetVarPermissionDenied(v)
+	return s
+}
+
+// UpdateVariablesErrorResponseStatusCode wraps UpdateVariablesErrorResponse with StatusCode.
+type UpdateVariablesErrorResponseStatusCode struct {
+	StatusCode int
+	Response   UpdateVariablesErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *UpdateVariablesErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *UpdateVariablesErrorResponseStatusCode) GetResponse() UpdateVariablesErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *UpdateVariablesErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *UpdateVariablesErrorResponseStatusCode) SetResponse(val UpdateVariablesErrorResponse) {
+	s.Response = val
+}
+
+func (*UpdateVariablesErrorResponseStatusCode) updateVariablesRes() {}
+
+// The variables to enter, keyed by name. Each is either a bare scalar (a
+// non-secret value) or an object stating the `secret` flag.
+// This is a patch: a name present here is written at the owner the request
+// addresses, replacing whatever that owner held under it, and a name absent
+// here is left alone. There is no way to remove a variable from this body —
+// deletion is `DELETE /variables/{variable_name}`, so a truncated or half-built
+// request can never silently drop a value.
+// The body is applied whole or not at all. Every value is validated, and every
+// secret encrypted, before anything is written, and the writes themselves share
+// one transaction.
+// Names are written at exactly the owner the request addresses, and reach no
+// further. Writing at the project level does not change what any environment
+// resolves, and writing on one environment does not touch another.
+// Ref: #
+type UpdateVariablesRequest map[string]VariableInput
+
+func (s *UpdateVariablesRequest) init() UpdateVariablesRequest {
+	m := *s
+	if m == nil {
+		m = map[string]VariableInput{}
+		*s = m
+	}
+	return m
+}
+
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of
 // identity.
@@ -47724,6 +49022,537 @@ func (s *UserTeamMembershipStatus) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// Merged schema.
+// Ref: #
+type VarInvalidName struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarInvalidNameDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarInvalidName) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarInvalidName) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarInvalidName) GetDetails() OptVarInvalidNameDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarInvalidName) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarInvalidName) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarInvalidName) SetDetails(val OptVarInvalidNameDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarInvalidNameDetails map[string]jx.Raw
+
+func (s *VarInvalidNameDetails) init() VarInvalidNameDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarInvalidValue struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarInvalidValueDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarInvalidValue) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarInvalidValue) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarInvalidValue) GetDetails() OptVarInvalidValueDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarInvalidValue) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarInvalidValue) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarInvalidValue) SetDetails(val OptVarInvalidValueDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarInvalidValueDetails map[string]jx.Raw
+
+func (s *VarInvalidValueDetails) init() VarInvalidValueDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarNoProjectID struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarNoProjectIDDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarNoProjectID) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarNoProjectID) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarNoProjectID) GetDetails() OptVarNoProjectIDDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarNoProjectID) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarNoProjectID) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarNoProjectID) SetDetails(val OptVarNoProjectIDDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarNoProjectIDDetails map[string]jx.Raw
+
+func (s *VarNoProjectIDDetails) init() VarNoProjectIDDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarNotFound) GetDetails() OptVarNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarNotFound) SetDetails(val OptVarNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarNotFoundDetails map[string]jx.Raw
+
+func (s *VarNotFoundDetails) init() VarNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarPermissionDenied) GetDetails() OptVarPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarPermissionDenied) SetDetails(val OptVarPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarPermissionDeniedDetails map[string]jx.Raw
+
+func (s *VarPermissionDeniedDetails) init() VarPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// One resolved variable. A non-secret variable is its value; a secret is an
+// object saying so and withholding the value.
+// The two forms mirror the update body, so a value read here can be written
+// back unchanged — with the one asymmetry that a secret read back has no value
+// to write.
+// Ref: #
+// Variable represents sum type.
+type Variable struct {
+	Type           VariableType // switch on this field
+	VariableScalar VariableScalar
+	SecretVariable SecretVariable
+}
+
+// VariableType is oneOf type of Variable.
+type VariableType string
+
+// Possible values for VariableType.
+const (
+	VariableScalarVariable VariableType = "VariableScalar"
+	SecretVariableVariable VariableType = "SecretVariable"
+)
+
+// IsVariableScalar reports whether Variable is VariableScalar.
+func (s Variable) IsVariableScalar() bool { return s.Type == VariableScalarVariable }
+
+// IsSecretVariable reports whether Variable is SecretVariable.
+func (s Variable) IsSecretVariable() bool { return s.Type == SecretVariableVariable }
+
+// SetVariableScalar sets Variable to VariableScalar.
+func (s *Variable) SetVariableScalar(v VariableScalar) {
+	s.Type = VariableScalarVariable
+	s.VariableScalar = v
+}
+
+// GetVariableScalar returns VariableScalar and true boolean if Variable is VariableScalar.
+func (s Variable) GetVariableScalar() (v VariableScalar, ok bool) {
+	if !s.IsVariableScalar() {
+		return v, false
+	}
+	return s.VariableScalar, true
+}
+
+// NewVariableScalarVariable returns new Variable from VariableScalar.
+func NewVariableScalarVariable(v VariableScalar) Variable {
+	var s Variable
+	s.SetVariableScalar(v)
+	return s
+}
+
+// SetSecretVariable sets Variable to SecretVariable.
+func (s *Variable) SetSecretVariable(v SecretVariable) {
+	s.Type = SecretVariableVariable
+	s.SecretVariable = v
+}
+
+// GetSecretVariable returns SecretVariable and true boolean if Variable is SecretVariable.
+func (s Variable) GetSecretVariable() (v SecretVariable, ok bool) {
+	if !s.IsSecretVariable() {
+		return v, false
+	}
+	return s.SecretVariable, true
+}
+
+// NewSecretVariableVariable returns new Variable from SecretVariable.
+func NewSecretVariableVariable(v SecretVariable) Variable {
+	var s Variable
+	s.SetSecretVariable(v)
+	return s
+}
+
+func (*Variable) getVariableRes() {}
+
+// One entry of an update. Either a bare scalar, which enters a non-secret
+// value, or an object stating the flag explicitly.
+// The shorthand exists because most variables are not secrets and spelling
+// `{"value": …, "secret": false}` for each of them is noise. Making a value
+// secret is therefore always deliberate: it cannot happen by writing a plain
+// scalar.
+// Ref: #
+// VariableInput represents sum type.
+type VariableInput struct {
+	Type                VariableInputType // switch on this field
+	VariableScalar      VariableScalar
+	SecretVariableInput SecretVariableInput
+}
+
+// VariableInputType is oneOf type of VariableInput.
+type VariableInputType string
+
+// Possible values for VariableInputType.
+const (
+	VariableScalarVariableInput      VariableInputType = "VariableScalar"
+	SecretVariableInputVariableInput VariableInputType = "SecretVariableInput"
+)
+
+// IsVariableScalar reports whether VariableInput is VariableScalar.
+func (s VariableInput) IsVariableScalar() bool { return s.Type == VariableScalarVariableInput }
+
+// IsSecretVariableInput reports whether VariableInput is SecretVariableInput.
+func (s VariableInput) IsSecretVariableInput() bool {
+	return s.Type == SecretVariableInputVariableInput
+}
+
+// SetVariableScalar sets VariableInput to VariableScalar.
+func (s *VariableInput) SetVariableScalar(v VariableScalar) {
+	s.Type = VariableScalarVariableInput
+	s.VariableScalar = v
+}
+
+// GetVariableScalar returns VariableScalar and true boolean if VariableInput is VariableScalar.
+func (s VariableInput) GetVariableScalar() (v VariableScalar, ok bool) {
+	if !s.IsVariableScalar() {
+		return v, false
+	}
+	return s.VariableScalar, true
+}
+
+// NewVariableScalarVariableInput returns new VariableInput from VariableScalar.
+func NewVariableScalarVariableInput(v VariableScalar) VariableInput {
+	var s VariableInput
+	s.SetVariableScalar(v)
+	return s
+}
+
+// SetSecretVariableInput sets VariableInput to SecretVariableInput.
+func (s *VariableInput) SetSecretVariableInput(v SecretVariableInput) {
+	s.Type = SecretVariableInputVariableInput
+	s.SecretVariableInput = v
+}
+
+// GetSecretVariableInput returns SecretVariableInput and true boolean if VariableInput is SecretVariableInput.
+func (s VariableInput) GetSecretVariableInput() (v SecretVariableInput, ok bool) {
+	if !s.IsSecretVariableInput() {
+		return v, false
+	}
+	return s.SecretVariableInput, true
+}
+
+// NewSecretVariableInputVariableInput returns new VariableInput from SecretVariableInput.
+func NewSecretVariableInputVariableInput(v SecretVariableInput) VariableInput {
+	var s VariableInput
+	s.SetSecretVariableInput(v)
+	return s
+}
+
+type VariableName string
+
+// A variable's value. JSON scalars only — a string, a number, or a boolean
+// (ADR 061 §1).
+// The value travels through JSON in both directions, so the set of types is
+// JSON's. A number always reads back as a JSON number however it was written;
+// a type JSON has no scalar for (a timestamp, say) is rejected rather than
+// quietly coming back as the string it serialized to. Strings are capped at
+// 16 KiB: a variable is a configuration value, not a payload (§8).
+// Ref: #
+// VariableScalar represents sum type.
+type VariableScalar struct {
+	Type    VariableScalarType // switch on this field
+	String  string
+	Float64 float64
+	Bool    bool
+}
+
+// VariableScalarType is oneOf type of VariableScalar.
+type VariableScalarType string
+
+// Possible values for VariableScalarType.
+const (
+	StringVariableScalar  VariableScalarType = "string"
+	Float64VariableScalar VariableScalarType = "float64"
+	BoolVariableScalar    VariableScalarType = "bool"
+)
+
+// IsString reports whether VariableScalar is string.
+func (s VariableScalar) IsString() bool { return s.Type == StringVariableScalar }
+
+// IsFloat64 reports whether VariableScalar is float64.
+func (s VariableScalar) IsFloat64() bool { return s.Type == Float64VariableScalar }
+
+// IsBool reports whether VariableScalar is bool.
+func (s VariableScalar) IsBool() bool { return s.Type == BoolVariableScalar }
+
+// SetString sets VariableScalar to string.
+func (s *VariableScalar) SetString(v string) {
+	s.Type = StringVariableScalar
+	s.String = v
+}
+
+// GetString returns string and true boolean if VariableScalar is string.
+func (s VariableScalar) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringVariableScalar returns new VariableScalar from string.
+func NewStringVariableScalar(v string) VariableScalar {
+	var s VariableScalar
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets VariableScalar to float64.
+func (s *VariableScalar) SetFloat64(v float64) {
+	s.Type = Float64VariableScalar
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if VariableScalar is float64.
+func (s VariableScalar) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64VariableScalar returns new VariableScalar from float64.
+func NewFloat64VariableScalar(v float64) VariableScalar {
+	var s VariableScalar
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets VariableScalar to bool.
+func (s *VariableScalar) SetBool(v bool) {
+	s.Type = BoolVariableScalar
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if VariableScalar is bool.
+func (s VariableScalar) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolVariableScalar returns new VariableScalar from bool.
+func NewBoolVariableScalar(v bool) VariableScalar {
+	var s VariableScalar
+	s.SetBool(v)
+	return s
+}
+
+// The variables entered at the owner the request addresses, keyed by name.
+// Only that owner's own variables: the project level does not see into its
+// environments, and an environment does not inherit the project's. One name at
+// that owner is one value, so nothing here had to be chosen between.
+// An empty object is an ordinary answer, not an error — it means nothing has
+// been entered at this owner.
+// Ref: #
+type Variables map[string]Variable
+
+func (s *Variables) init() Variables {
+	m := *s
+	if m == nil {
+		m = map[string]Variable{}
+		*s = m
+	}
+	return m
+}
+
+func (*Variables) getVariablesRes()    {}
+func (*Variables) updateVariablesRes() {}
 
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {

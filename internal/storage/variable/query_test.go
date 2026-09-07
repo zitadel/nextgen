@@ -20,81 +20,70 @@ func TestVisibleTo_AgreesWithHasAccessTo(t *testing.T) {
 	t.Parallel()
 
 	ids := []string{"", "match", "other"}
-	requester := domain.VariableOwner{
-		ProjectID:       "match",
-		EnvironmentName: "match",
-		TeamID:          "match",
-		UserSchemaID:    "match",
-		UserID:          "match",
-	}
+	owner := domain.VariableOwner{ProjectID: "match", EnvironmentName: "match"}
 
 	for _, project := range ids {
 		for _, environment := range ids {
-			for _, team := range ids {
-				for _, schema := range ids {
-					for _, user := range ids {
-						v := &domain.Variable{Owner: domain.VariableOwner{
-							ProjectID:       project,
-							EnvironmentName: environment,
-							TeamID:          team,
-							UserSchemaID:    schema,
-							UserID:          user,
-						}}
+			v := &domain.Variable{Owner: domain.VariableOwner{
+				ProjectID:       project,
+				EnvironmentName: environment,
+			}}
 
-						// The SQL filter admits a row when every column is
-						// either unset or equal to the requester's, which is
-						// the predicate ownerScope compiles per column. The
-						// columns are independent, so every combination has to
-						// agree, not just the nested ones.
-						admitted := (project == "" || project == requester.ProjectID) &&
-							(environment == "" || environment == requester.EnvironmentName) &&
-							(team == "" || team == requester.TeamID) &&
-							(schema == "" || schema == requester.UserSchemaID) &&
-							(user == "" || user == requester.UserID)
+			// VisibleTo compiles one equality per owner column, so a row is
+			// admitted only when both match. The empty string is an ordinary
+			// value here -- the project level's own address -- not a wildcard.
+			admitted := project == owner.ProjectID && environment == owner.EnvironmentName
 
-						assert.Equal(t, admitted, requester.HasAccessTo(v),
-							"project=%q environment=%q team=%q user_schema=%q user=%q", project, environment, team, schema, user)
-					}
-				}
-			}
+			assert.Equal(t, admitted, owner.HasAccessTo(v),
+				"project=%q environment=%q", project, environment)
 		}
 	}
 }
 
-// A requester that is unset at a level can only reach rows that are also unset
-// there. Spelled out separately because it is the case most easily got wrong:
-// an empty requester id must not read as "matches anything".
-func TestVisibleTo_UnsetRequesterLevelMatchesOnlyUnset(t *testing.T) {
+// The two directions the old inheritance predicate got right and equality
+// deliberately does not. Spelled out because dropping inheritance is the
+// behaviour change, and a silent return of it would look like a bug fix.
+func TestVisibleTo_NoInheritanceInEitherDirection(t *testing.T) {
 	t.Parallel()
 
-	projectOnly := domain.VariableOwner{ProjectID: "project-1"}
+	project := domain.VariableOwner{ProjectID: "project-1"}
+	environment := domain.VariableOwner{ProjectID: "project-1", EnvironmentName: "prod"}
 
-	sameProject := &domain.Variable{Owner: domain.VariableOwner{ProjectID: "project-1"}}
-	withTeam := &domain.Variable{Owner: domain.VariableOwner{ProjectID: "project-1", TeamID: "team-1"}}
+	projectVariable := &domain.Variable{Owner: project}
+	environmentVariable := &domain.Variable{Owner: environment}
 
-	assert.True(t, projectOnly.HasAccessTo(sameProject))
-	assert.False(t, projectOnly.HasAccessTo(withTeam),
-		"a project-level requester holds no team, so no team-level variable is on its branch")
+	assert.False(t, environment.HasAccessTo(projectVariable),
+		"an environment does not inherit the project's variables; it has to enter its own")
+	assert.False(t, project.HasAccessTo(environmentVariable),
+		"the project level does not see into its environments")
+
+	assert.True(t, project.HasAccessTo(projectVariable))
+	assert.True(t, environment.HasAccessTo(environmentVariable))
+
+	// A sibling environment is as unreachable as it ever was.
+	sibling := domain.VariableOwner{ProjectID: "project-1", EnvironmentName: "staging"}
+	assert.False(t, sibling.HasAccessTo(environmentVariable))
+
+	// And so is another project, which is what makes project_id mandatory.
+	otherProject := domain.VariableOwner{ProjectID: "project-2"}
+	assert.False(t, otherProject.HasAccessTo(projectVariable))
 }
 
 func TestToDomain_MapsRowsInOrder(t *testing.T) {
 	t.Parallel()
 
 	rows := []*variable.VariableStorage{
-		{Name: "a_variable", ProjectID: "project-1", Value: "a-project"},
-		{Name: "a_variable", ProjectID: "project-1", TeamID: "team-1", Value: "a-team", IsSecret: true},
-		{Name: "b_variable", ProjectID: "project-1", Value: "b-project"},
+		{Name: "a_variable", ProjectID: "project-1", EnvironmentName: "prod", Value: "a-prod"},
+		{Name: "b_variable", ProjectID: "project-1", EnvironmentName: "prod", Value: "b-prod", IsSecret: true},
 	}
 
 	got := variable.ToDomain(rows)
-	require.Len(t, got, 3, "variables do not override, so every row survives the mapping")
+	require.Len(t, got, 2)
 
-	// Scan order is preserved: the query already ordered by name then owner.
-	assert.Equal(t, []any{"a-project", "a-team", "b-project"},
-		[]any{got[0].Value, got[1].Value, got[2].Value})
+	// Scan order is preserved: the query already ordered by name.
+	assert.Equal(t, []any{"a-prod", "b-prod"}, []any{got[0].Value, got[1].Value})
 
-	assert.Equal(t, "a_variable", got[1].Name)
-	assert.Equal(t, domain.VariableOwner{ProjectID: "project-1", TeamID: "team-1"}, got[1].Owner)
-	assert.Equal(t, "a-team", got[1].Value)
+	assert.Equal(t, "b_variable", got[1].Name)
+	assert.Equal(t, domain.VariableOwner{ProjectID: "project-1", EnvironmentName: "prod"}, got[1].Owner)
 	assert.True(t, got[1].IsSecret)
 }

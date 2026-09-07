@@ -63,6 +63,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureKeyService(t),
 			service.NewClaimService(h.EnsureServiceDB(t), "https://console.invalid/ui/console", platform.ID),
 			service.NewGrantService(h.EnsureServiceDB(t), platform.ID),
+			service.NewVariableService(h.EnsureServiceDB(t), h.EnsureKeyService(t)),
 			h.EnsureServiceDB(t),
 			platform.ID,
 		)

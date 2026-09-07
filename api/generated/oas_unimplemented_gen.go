@@ -266,6 +266,18 @@ func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUse
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteVariable implements deleteVariable operation.
+//
+// Removes the variable this owner entered under this name.
+// A variable is deletable only by the owner that entered it. Deleting a name
+// another owner of the same project holds answers `var.not_found` and leaves
+// that owner's value standing.
+//
+// DELETE /variables/{variable_name}
+func (UnimplementedHandler) DeleteVariable(ctx context.Context, params DeleteVariableParams) (r DeleteVariableRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ExchangeHandoff implements exchangeHandoff operation.
 //
 // Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -507,6 +519,36 @@ func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (
 //
 // GET /users/{user_id}
 func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetVariable implements getVariable operation.
+//
+// Reads one variable by name from the owner this request addresses — one
+// environment of the project with `environment_name`, the project level
+// itself without it.
+// A name that owner has not entered answers `var.not_found`, even when
+// another owner of the same project holds it: nothing is inherited. A secret
+// is found but not disclosed: the response is `{"secret": true}`.
+//
+// GET /variables/{variable_name}
+func (UnimplementedHandler) GetVariable(ctx context.Context, params GetVariableParams) (r GetVariableRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetVariables implements getVariables operation.
+//
+// Returns the variables entered at the owner this request addresses, keyed by
+// name — one environment of the project with `environment_name`, the project
+// level itself without it.
+// Owners are separate, not a ladder: an environment does not inherit the
+// project's variables and the project does not see its environments'. Reading
+// everything a project holds therefore means reading each owner in turn.
+// Secret values are not returned. A secret appears as `{"secret": true}`,
+// which says a value is held without disclosing it.
+//
+// GET /variables
+func (UnimplementedHandler) GetVariables(ctx context.Context, params GetVariablesParams) (r GetVariablesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -762,6 +804,25 @@ func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowD
 //
 // PATCH /teams/{team_id}
 func (UnimplementedHandler) UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (r UpdateTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateVariables implements updateVariables operation.
+//
+// Enters or replaces variables at the owner this request addresses.
+// Every name in the body is written at exactly that owner — the project, or
+// the environment named by `environment_name` — and reaches no other. Names
+// not in the body are untouched; nothing here removes a variable, which is
+// what `DELETE /variables/{variable_name}` is for.
+// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
+// stores the value encrypted under the project's active `secret` key, after
+// which it can be referenced but not read back.
+// The body is applied whole or not at all, so a rejected request leaves the
+// owner exactly as it was. Writing the same name and owner twice replaces the
+// value rather than duplicating it, which makes a retry safe.
+//
+// PATCH /variables
+func (UnimplementedHandler) UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (r UpdateVariablesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

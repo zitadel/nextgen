@@ -1,0 +1,15 @@
+title: VariableScalar
+description: |
+  A variable's value. JSON scalars only — a string, a number, or a boolean
+  (ADR 061 §1).
+
+  The value travels through JSON in both directions, so the set of types is
+  JSON's. A number always reads back as a JSON number however it was written;
+  a type JSON has no scalar for (a timestamp, say) is rejected rather than
+  quietly coming back as the string it serialized to. Strings are capped at
+  16 KiB: a variable is a configuration value, not a payload (§8).
+oneOf:
+  - type: string
+    maxLength: 16384
+  - type: number
+  - type: boolean

@@ -5,23 +5,23 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// VisibleTo restricts the variables table to the rows requester may read,
-// optionally narrowed to names. It is [domain.VariableOwner.HasAccessTo] pushed
-// into SQL: for each owner column a row qualifies when the column is unset (the
-// variable is owned further up the hierarchy) or matches the requester exactly
-// (the variable is on the requester's own branch).
+// VisibleTo restricts the variables table to the rows owner entered, optionally
+// narrowed to names. It is [domain.VariableOwner.HasAccessTo] pushed into SQL:
+// every owner column has to match exactly.
 //
-// Filtering here rather than after the scan is what keeps a sibling team's
+// An earlier revision admitted a row whose column was unset, so a project value
+// was readable from every environment. Equality replaced it: an owner is an
+// address, not a position in a ladder, and a name at an owner is one row rather
+// than a set to rank.
+//
+// Filtering here rather than after the scan is what keeps another environment's
 // variable out of a read. The domain predicate is not applied a second time, so
 // unlike the settings ladder this replaced, an unfiltered caller is not safe --
 // every read goes through here.
-func VisibleTo(requester domain.VariableOwner, names ...string) *database.ListOptions[VariableStorageField] {
+func VisibleTo(owner domain.VariableOwner, names ...string) *database.ListOptions[VariableStorageField] {
 	filters := []database.Filter[VariableStorageField]{
-		ownerScope(VariableStorageFieldProjectID, requester.ProjectID),
-		ownerScope(VariableStorageFieldEnvironmentName, requester.EnvironmentName),
-		ownerScope(VariableStorageFieldTeamID, requester.TeamID),
-		ownerScope(VariableStorageFieldUserSchemaID, requester.UserSchemaID),
-		ownerScope(VariableStorageFieldUserID, requester.UserID),
+		database.Equal(database.Col(VariableStorageFieldProjectID), owner.ProjectID),
+		database.Equal(database.Col(VariableStorageFieldEnvironmentName), owner.EnvironmentName),
 	}
 	if len(names) > 0 {
 		filters = append(filters, anyName(names))
@@ -29,40 +29,21 @@ func VisibleTo(requester domain.VariableOwner, names ...string) *database.ListOp
 
 	return &database.ListOptions[VariableStorageField]{
 		Filter:     database.And(filters...),
-		Pagination: database.Page[VariableStorageField]{OrderBy: NameThenOwner()},
+		Pagination: database.Page[VariableStorageField]{OrderBy: ByName()},
 	}
 }
 
-// NameThenOwner gives the read a total order that does not depend on physical
-// row order, so the same requester reading the same table twice gets the same
-// slice. Name leads so rows sharing a name are contiguous; the owner columns
-// then run broadest to narrowest, since the unset owner id is the empty string
-// and sorts before any minted id.
-func NameThenOwner() database.OrderBy[VariableStorageField] {
+// ByName gives the read a total order that does not depend on physical row
+// order, so the same owner reading the same table twice gets the same slice.
+// Name alone is enough to be total: the read admits one owner, and the primary
+// key makes a name unique within it.
+func ByName() database.OrderBy[VariableStorageField] {
 	return database.OrderBy[VariableStorageField]{
 		Columns: []database.Column[VariableStorageField]{
 			database.Col(VariableStorageFieldName),
-			database.Col(VariableStorageFieldProjectID),
-			database.Col(VariableStorageFieldEnvironmentName),
-			database.Col(VariableStorageFieldTeamID),
-			database.Col(VariableStorageFieldUserSchemaID),
-			database.Col(VariableStorageFieldUserID),
 		},
 		Direction: database.OrderAsc,
 	}
-}
-
-// ownerScope matches variables owned at or above requesterID for one column.
-// A requester that is itself unset at this level can only see variables that
-// are also unset there, so the disjunction collapses to a single equality.
-func ownerScope(field VariableStorageField, requesterID string) database.Filter[VariableStorageField] {
-	if requesterID == "" {
-		return database.Equal(database.Col(field), "")
-	}
-	return database.Or(
-		database.Equal(database.Col(field), ""),
-		database.Equal(database.Col(field), requesterID),
-	)
 }
 
 // anyName is an OR over equalities; the database package has no IN filter.
@@ -90,9 +71,6 @@ func RowToDomain(row *VariableStorage) *domain.Variable {
 		Owner: domain.VariableOwner{
 			ProjectID:       row.ProjectID,
 			EnvironmentName: row.EnvironmentName,
-			TeamID:          row.TeamID,
-			UserSchemaID:    row.UserSchemaID,
-			UserID:          row.UserID,
 		},
 		Value:    row.Value,
 		IsSecret: row.IsSecret,

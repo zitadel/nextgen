@@ -1,0 +1,12 @@
+title: VariableInput
+description: |
+  One entry of an update. Either a bare scalar, which enters a non-secret
+  value, or an object stating the flag explicitly.
+
+  The shorthand exists because most variables are not secrets and spelling
+  `{"value": …, "secret": false}` for each of them is noise. Making a value
+  secret is therefore always deliberate: it cannot happen by writing a plain
+  scalar.
+oneOf:
+  - $ref: variable-scalar.yaml
+  - $ref: secret-variable-input.yaml
