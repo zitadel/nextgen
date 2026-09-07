@@ -16,9 +16,11 @@ properties:
     examples: [ standard-login, combined-auth ]
     description: |
       Stable identifier for this flow, used as the target of cross-flow
-      `switch` and `pivot` transitions. Renaming is not supported — the
-      `name` is part of the public contract another definition may
-      reference. Acts as the human display label as well; no separate slug.
+      `switch` and `pivot` transitions. Every revision of a flow shares its
+      `name`; publishing a definition under an existing `name` adds a
+      revision to that flow. Renaming is not supported — the `name` is part
+      of the public contract another definition may reference. Acts as the
+      human display label as well; no separate slug.
 
   status:
     $ref: flow-definition-status.yaml

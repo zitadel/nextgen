@@ -14,10 +14,6 @@ func ErrFlowDefinitionPurposeMismatch() Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("purpose_mismatch"), "flow definition: does not serve requested purpose", nil, nil)
 }
 
-func ErrFlowDefinitionAlreadyExists() Error {
-	return newError(PrefixFlowDefinition.ErrorCodePrefix("already_exists"), "flow definition: already exists", nil, nil)
-}
-
 func ErrFlowDefinitionInvalid(details any, parent error) Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("invalid"), "flow definition: invalid", details, parent)
 }

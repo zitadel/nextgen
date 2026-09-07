@@ -71,6 +71,8 @@ const (
 
 	EventTypeEnvironmentCreated EventType = "environment.created"
 
+	EventTypeReleaseCreated EventType = "release.created"
+
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
 
