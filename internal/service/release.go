@@ -100,7 +100,7 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 		// Two callers pinned the same set at once and this one lost the race.
 		// The winner's release is the answer: the loser asked for a release
 		// pinning exactly that set, and one now exists.
-		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			raced, hashErr := s.getByContentHash(ctx, input.ProjectID, entity.ContentHash)
 			if hashErr != nil {
 				return nil, hashErr
@@ -108,6 +108,15 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 			if raced != nil {
 				return &CreateReleaseOutput{Release: raced}, nil
 			}
+		}
+		// project_id is the only foreign key on releases, and every pinned
+		// revision was read from this project a moment ago, so a violation
+		// means the project was deleted underneath the call.
+		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+			return nil, domain.ErrReleaseProjectNotFound().WithParent(err)
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create release")
 	}

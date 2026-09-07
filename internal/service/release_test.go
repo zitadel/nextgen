@@ -179,6 +179,30 @@ func TestReleaseServiceCreateResolvesRace(t *testing.T) {
 	assert.Equal(t, "rel_winner", result.Release.ID)
 }
 
+// The project can be deleted between the revision reads and the insert. The
+// foreign key is what catches it, and it is the caller's answer rather than a
+// generic internal error, since the release they asked for can never exist.
+func TestReleaseServiceCreateRejectsDeletedProject(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+
+	gomock.InOrder(
+		statements.EXPECT().
+			GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+			Return(nil, new(database.NoRowFoundError)),
+		statements.EXPECT().
+			CreateRelease(gomock.Any(), gomock.Any()).
+			Return(database.NewForeignKeyError("releases", "releases_project_id_fkey", nil)),
+	)
+
+	_, err := svc.Create(t.Context(), releaseInput())
+	require.Error(t, err)
+
+	domErr, ok := errors.AsType[domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, domain.ErrReleaseProjectNotFound().Code, domErr.Code)
+}
+
 func TestReleaseServiceCreateRejectsUnknownRevision(t *testing.T) {
 	svc, statements := newMockedReleaseService(t)
 	statements.EXPECT().
