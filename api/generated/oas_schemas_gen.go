@@ -21305,6 +21305,26 @@ type Grant struct {
 	// When the grant expires. Null when it does not expire. GET still
 	// returns expired unrevoked grants; authorization ignores them.
 	ExpiresAt OptNilDateTime `json:"expires_at"`
+	// Resolved identity of a user principal (ADR 058). Present when
+	// `principal_type` is `user`; omitted for team grants. Degrades to
+	// `user_id` only when the user can no longer be loaded.
+	User OptUserRef `json:"user"`
+	// Resolved identity of a team principal. Present when `principal_type`
+	// is `team`; omitted for user grants. Degrades to `team_id` only when
+	// the team can no longer be loaded. This is a label ref, not the full
+	// Team body.
+	Team OptTeamRef `json:"team"`
+	// The principal named by `principal_id`, present only when the request
+	// asked for it with `expand: ["principal"]` (ADR 059). Absent means it
+	// was not requested; `null` means the principal cannot be loaded
+	// (deleted or missing). GET and create never set this field.
+	// When present, the body is the same representation `GET /users/{id}`
+	// serves for `principal_type=user`, or `GET /teams/{id}` for
+	// `principal_type=team`. Discriminate with the grant's existing
+	// `principal_type`.
+	// Requires `user.read` and `team.read` in addition to `project.read`.
+	// Both are checked on the whole request before the list.
+	Principal OptNilGrantExpandedPrincipal `json:"principal"`
 }
 
 // GetID returns the value of ID.
@@ -21347,6 +21367,21 @@ func (s *Grant) GetExpiresAt() OptNilDateTime {
 	return s.ExpiresAt
 }
 
+// GetUser returns the value of User.
+func (s *Grant) GetUser() OptUserRef {
+	return s.User
+}
+
+// GetTeam returns the value of Team.
+func (s *Grant) GetTeam() OptTeamRef {
+	return s.Team
+}
+
+// GetPrincipal returns the value of Principal.
+func (s *Grant) GetPrincipal() OptNilGrantExpandedPrincipal {
+	return s.Principal
+}
+
 // SetID sets the value of ID.
 func (s *Grant) SetID(val string) {
 	s.ID = val
@@ -21385,6 +21420,21 @@ func (s *Grant) SetCreatedAt(val time.Time) {
 // SetExpiresAt sets the value of ExpiresAt.
 func (s *Grant) SetExpiresAt(val OptNilDateTime) {
 	s.ExpiresAt = val
+}
+
+// SetUser sets the value of User.
+func (s *Grant) SetUser(val OptUserRef) {
+	s.User = val
+}
+
+// SetTeam sets the value of Team.
+func (s *Grant) SetTeam(val OptTeamRef) {
+	s.Team = val
+}
+
+// SetPrincipal sets the value of Principal.
+func (s *Grant) SetPrincipal(val OptNilGrantExpandedPrincipal) {
+	s.Principal = val
 }
 
 func (*Grant) createGrantRes() {}
@@ -21441,6 +21491,192 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 		*s = m
 	}
 	return m
+}
+
+// A related object to embed on each returned grant (ADR 059).
+// - `principal`: the principal named by `principal_id`, as `principal` on
+// each grant. The property is omitted entirely when not requested. When
+// requested, it is the same body `GET /users/{id}` serves for
+// `principal_type=user`, or `GET /teams/{id}` for `principal_type=team`,
+// and `null` when that principal cannot be loaded. Discriminate with the
+// grant's existing `principal_type`.
+// Requires `user.read` and `team.read` in addition to `project.read`.
+// Both are checked on the whole request before the list, because a mixed
+// page is the common case. A caller who may not read either resource
+// receives 403 rather than a silently missing `principal`.
+// Ref: #
+type GrantExpand string
+
+const (
+	GrantExpandPrincipal GrantExpand = "principal"
+)
+
+// AllValues returns all GrantExpand values.
+func (GrantExpand) AllValues() []GrantExpand {
+	return []GrantExpand{
+		GrantExpandPrincipal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GrantExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case GrantExpandPrincipal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GrantExpand) UnmarshalText(data []byte) error {
+	switch GrantExpand(data) {
+	case GrantExpandPrincipal:
+		*s = GrantExpandPrincipal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The principal bound by a grant: the User body when `principal_type` is
+// `user`, or the Team body when `principal_type` is `team`. Same
+// representation as `GET /users/{id}` and `GET /teams/{id}` respectively.
+// Clients discriminate with the grant's existing `principal_type`.
+// Ref: #
+// GrantExpandedPrincipal represents sum type.
+type GrantExpandedPrincipal struct {
+	Type         GrantExpandedPrincipalType // switch on this field
+	User         User
+	TeamResponse TeamResponse
+}
+
+// GrantExpandedPrincipalType is oneOf type of GrantExpandedPrincipal.
+type GrantExpandedPrincipalType string
+
+// Possible values for GrantExpandedPrincipalType.
+const (
+	UserGrantExpandedPrincipal         GrantExpandedPrincipalType = "User"
+	TeamResponseGrantExpandedPrincipal GrantExpandedPrincipalType = "TeamResponse"
+)
+
+// IsUser reports whether GrantExpandedPrincipal is User.
+func (s GrantExpandedPrincipal) IsUser() bool { return s.Type == UserGrantExpandedPrincipal }
+
+// IsTeamResponse reports whether GrantExpandedPrincipal is TeamResponse.
+func (s GrantExpandedPrincipal) IsTeamResponse() bool {
+	return s.Type == TeamResponseGrantExpandedPrincipal
+}
+
+// SetUser sets GrantExpandedPrincipal to User.
+func (s *GrantExpandedPrincipal) SetUser(v User) {
+	s.Type = UserGrantExpandedPrincipal
+	s.User = v
+}
+
+// GetUser returns User and true boolean if GrantExpandedPrincipal is User.
+func (s GrantExpandedPrincipal) GetUser() (v User, ok bool) {
+	if !s.IsUser() {
+		return v, false
+	}
+	return s.User, true
+}
+
+// NewUserGrantExpandedPrincipal returns new GrantExpandedPrincipal from User.
+func NewUserGrantExpandedPrincipal(v User) GrantExpandedPrincipal {
+	var s GrantExpandedPrincipal
+	s.SetUser(v)
+	return s
+}
+
+// SetTeamResponse sets GrantExpandedPrincipal to TeamResponse.
+func (s *GrantExpandedPrincipal) SetTeamResponse(v TeamResponse) {
+	s.Type = TeamResponseGrantExpandedPrincipal
+	s.TeamResponse = v
+}
+
+// GetTeamResponse returns TeamResponse and true boolean if GrantExpandedPrincipal is TeamResponse.
+func (s GrantExpandedPrincipal) GetTeamResponse() (v TeamResponse, ok bool) {
+	if !s.IsTeamResponse() {
+		return v, false
+	}
+	return s.TeamResponse, true
+}
+
+// NewTeamResponseGrantExpandedPrincipal returns new GrantExpandedPrincipal from TeamResponse.
+func NewTeamResponseGrantExpandedPrincipal(v TeamResponse) GrantExpandedPrincipal {
+	var s GrantExpandedPrincipal
+	s.SetTeamResponse(v)
+	return s
+}
+
+// Field to filter grants by:
+// - `created_at`: RFC3339 timestamp
+// - `principal_type`: `user` or `team`
+// - `principal_id`: principal id (`user_<opaque>` or `team_<opaque>`)
+// - `relation`: `viewer`, `editor`, or `admin`
+// - `expires_at`: RFC3339 timestamp (null when the grant does not expire).
+// Ref: #
+type GrantFilterField string
+
+const (
+	GrantFilterFieldCreatedAt     GrantFilterField = "created_at"
+	GrantFilterFieldPrincipalType GrantFilterField = "principal_type"
+	GrantFilterFieldPrincipalID   GrantFilterField = "principal_id"
+	GrantFilterFieldRelation      GrantFilterField = "relation"
+	GrantFilterFieldExpiresAt     GrantFilterField = "expires_at"
+)
+
+// AllValues returns all GrantFilterField values.
+func (GrantFilterField) AllValues() []GrantFilterField {
+	return []GrantFilterField{
+		GrantFilterFieldCreatedAt,
+		GrantFilterFieldPrincipalType,
+		GrantFilterFieldPrincipalID,
+		GrantFilterFieldRelation,
+		GrantFilterFieldExpiresAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GrantFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case GrantFilterFieldCreatedAt:
+		return []byte(s), nil
+	case GrantFilterFieldPrincipalType:
+		return []byte(s), nil
+	case GrantFilterFieldPrincipalID:
+		return []byte(s), nil
+	case GrantFilterFieldRelation:
+		return []byte(s), nil
+	case GrantFilterFieldExpiresAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GrantFilterField) UnmarshalText(data []byte) error {
+	switch GrantFilterField(data) {
+	case GrantFilterFieldCreatedAt:
+		*s = GrantFilterFieldCreatedAt
+		return nil
+	case GrantFilterFieldPrincipalType:
+		*s = GrantFilterFieldPrincipalType
+		return nil
+	case GrantFilterFieldPrincipalID:
+		*s = GrantFilterFieldPrincipalID
+		return nil
+	case GrantFilterFieldRelation:
+		*s = GrantFilterFieldRelation
+		return nil
+	case GrantFilterFieldExpiresAt:
+		*s = GrantFilterFieldExpiresAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Merged schema.
@@ -21775,6 +22011,57 @@ func (s *GrantRelation) UnmarshalText(data []byte) error {
 		return nil
 	case GrantRelationAdmin:
 		*s = GrantRelationAdmin
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Field to sort grants by. Default is `created_at` ascending with `id` as
+// the tiebreaker.
+// Ref: #
+type GrantSortingField string
+
+const (
+	GrantSortingFieldCreatedAt GrantSortingField = "created_at"
+	GrantSortingFieldExpiresAt GrantSortingField = "expires_at"
+	GrantSortingFieldID        GrantSortingField = "id"
+)
+
+// AllValues returns all GrantSortingField values.
+func (GrantSortingField) AllValues() []GrantSortingField {
+	return []GrantSortingField{
+		GrantSortingFieldCreatedAt,
+		GrantSortingFieldExpiresAt,
+		GrantSortingFieldID,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GrantSortingField) MarshalText() ([]byte, error) {
+	switch s {
+	case GrantSortingFieldCreatedAt:
+		return []byte(s), nil
+	case GrantSortingFieldExpiresAt:
+		return []byte(s), nil
+	case GrantSortingFieldID:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GrantSortingField) UnmarshalText(data []byte) error {
+	switch GrantSortingField(data) {
+	case GrantSortingFieldCreatedAt:
+		*s = GrantSortingFieldCreatedAt
+		return nil
+	case GrantSortingFieldExpiresAt:
+		*s = GrantSortingFieldExpiresAt
+		return nil
+	case GrantSortingFieldID:
+		*s = GrantSortingFieldID
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -29486,6 +29773,69 @@ func (o OptNilFlowdefUpdatedEventActorType) Or(d FlowdefUpdatedEventActorType) F
 	return d
 }
 
+// NewOptNilGrantExpandedPrincipal returns new OptNilGrantExpandedPrincipal with value set to v.
+func NewOptNilGrantExpandedPrincipal(v GrantExpandedPrincipal) OptNilGrantExpandedPrincipal {
+	return OptNilGrantExpandedPrincipal{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilGrantExpandedPrincipal is optional nullable GrantExpandedPrincipal.
+type OptNilGrantExpandedPrincipal struct {
+	Value GrantExpandedPrincipal
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilGrantExpandedPrincipal was set.
+func (o OptNilGrantExpandedPrincipal) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilGrantExpandedPrincipal) Reset() {
+	var v GrantExpandedPrincipal
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilGrantExpandedPrincipal) SetTo(v GrantExpandedPrincipal) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilGrantExpandedPrincipal) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilGrantExpandedPrincipal) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v GrantExpandedPrincipal
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilGrantExpandedPrincipal) Get() (v GrantExpandedPrincipal, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilGrantExpandedPrincipal) Or(d GrantExpandedPrincipal) GrantExpandedPrincipal {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilPageToken returns new OptNilPageToken with value set to v.
 func NewOptNilPageToken(v PageToken) OptNilPageToken {
 	return OptNilPageToken{
@@ -31550,6 +31900,52 @@ func (o OptProjectUpdatedEventDelegationType) Or(d ProjectUpdatedEventDelegation
 	return d
 }
 
+// NewOptQueryGrantsRequestSorting returns new OptQueryGrantsRequestSorting with value set to v.
+func NewOptQueryGrantsRequestSorting(v QueryGrantsRequestSorting) OptQueryGrantsRequestSorting {
+	return OptQueryGrantsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryGrantsRequestSorting is optional QueryGrantsRequestSorting.
+type OptQueryGrantsRequestSorting struct {
+	Value QueryGrantsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryGrantsRequestSorting was set.
+func (o OptQueryGrantsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryGrantsRequestSorting) Reset() {
+	var v QueryGrantsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryGrantsRequestSorting) SetTo(v QueryGrantsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryGrantsRequestSorting) Get() (v QueryGrantsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryGrantsRequestSorting) Or(d QueryGrantsRequestSorting) QueryGrantsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptQueryProjectsRequestSorting returns new OptQueryProjectsRequestSorting with value set to v.
 func NewOptQueryProjectsRequestSorting(v QueryProjectsRequestSorting) OptQueryProjectsRequestSorting {
 	return OptQueryProjectsRequestSorting{
@@ -32740,6 +33136,98 @@ func (o OptTeamID) Get() (v TeamID, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptTeamID) Or(d TeamID) TeamID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTeamPermissionDeniedDetails returns new OptTeamPermissionDeniedDetails with value set to v.
+func NewOptTeamPermissionDeniedDetails(v TeamPermissionDeniedDetails) OptTeamPermissionDeniedDetails {
+	return OptTeamPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamPermissionDeniedDetails is optional TeamPermissionDeniedDetails.
+type OptTeamPermissionDeniedDetails struct {
+	Value TeamPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTeamPermissionDeniedDetails was set.
+func (o OptTeamPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamPermissionDeniedDetails) Reset() {
+	var v TeamPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamPermissionDeniedDetails) SetTo(v TeamPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamPermissionDeniedDetails) Get() (v TeamPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamPermissionDeniedDetails) Or(d TeamPermissionDeniedDetails) TeamPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTeamRef returns new OptTeamRef with value set to v.
+func NewOptTeamRef(v TeamRef) OptTeamRef {
+	return OptTeamRef{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamRef is optional TeamRef.
+type OptTeamRef struct {
+	Value TeamRef
+	Set   bool
+}
+
+// IsSet returns true if OptTeamRef was set.
+func (o OptTeamRef) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamRef) Reset() {
+	var v TeamRef
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamRef) SetTo(v TeamRef) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamRef) Get() (v TeamRef, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamRef) Or(d TeamRef) TeamRef {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -35837,6 +36325,472 @@ func (s *ProjectUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+type QueryGrantsBadRequest ErrorDetails
+
+func (*QueryGrantsBadRequest) queryGrantsRes() {}
+
+// QueryGrantsErrorResponse represents sum type.
+type QueryGrantsErrorResponse struct {
+	Type                  QueryGrantsErrorResponseType // switch on this field
+	AuthUnauthorized      AuthUnauthorized
+	GrantInvalid          GrantInvalid
+	GrantNotFound         GrantNotFound
+	GrantPermissionDenied GrantPermissionDenied
+	Internal              Internal
+	NotImplemented        NotImplemented
+	ReqInvalid            ReqInvalid
+	TeamPermissionDenied  TeamPermissionDenied
+	UserPermissionDenied  UserPermissionDenied
+}
+
+// QueryGrantsErrorResponseType is oneOf type of QueryGrantsErrorResponse.
+type QueryGrantsErrorResponseType string
+
+// Possible values for QueryGrantsErrorResponseType.
+const (
+	AuthUnauthorizedQueryGrantsErrorResponse      QueryGrantsErrorResponseType = "auth.unauthorized"
+	GrantInvalidQueryGrantsErrorResponse          QueryGrantsErrorResponseType = "grant.invalid"
+	GrantNotFoundQueryGrantsErrorResponse         QueryGrantsErrorResponseType = "grant.not_found"
+	GrantPermissionDeniedQueryGrantsErrorResponse QueryGrantsErrorResponseType = "grant.permission_denied"
+	InternalQueryGrantsErrorResponse              QueryGrantsErrorResponseType = "internal"
+	NotImplementedQueryGrantsErrorResponse        QueryGrantsErrorResponseType = "not_implemented"
+	ReqInvalidQueryGrantsErrorResponse            QueryGrantsErrorResponseType = "req.invalid"
+	TeamPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "team.permission_denied"
+	UserPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether QueryGrantsErrorResponse is AuthUnauthorized.
+func (s QueryGrantsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedQueryGrantsErrorResponse
+}
+
+// IsGrantInvalid reports whether QueryGrantsErrorResponse is GrantInvalid.
+func (s QueryGrantsErrorResponse) IsGrantInvalid() bool {
+	return s.Type == GrantInvalidQueryGrantsErrorResponse
+}
+
+// IsGrantNotFound reports whether QueryGrantsErrorResponse is GrantNotFound.
+func (s QueryGrantsErrorResponse) IsGrantNotFound() bool {
+	return s.Type == GrantNotFoundQueryGrantsErrorResponse
+}
+
+// IsGrantPermissionDenied reports whether QueryGrantsErrorResponse is GrantPermissionDenied.
+func (s QueryGrantsErrorResponse) IsGrantPermissionDenied() bool {
+	return s.Type == GrantPermissionDeniedQueryGrantsErrorResponse
+}
+
+// IsInternal reports whether QueryGrantsErrorResponse is Internal.
+func (s QueryGrantsErrorResponse) IsInternal() bool {
+	return s.Type == InternalQueryGrantsErrorResponse
+}
+
+// IsNotImplemented reports whether QueryGrantsErrorResponse is NotImplemented.
+func (s QueryGrantsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryGrantsErrorResponse
+}
+
+// IsReqInvalid reports whether QueryGrantsErrorResponse is ReqInvalid.
+func (s QueryGrantsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryGrantsErrorResponse
+}
+
+// IsTeamPermissionDenied reports whether QueryGrantsErrorResponse is TeamPermissionDenied.
+func (s QueryGrantsErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedQueryGrantsErrorResponse
+}
+
+// IsUserPermissionDenied reports whether QueryGrantsErrorResponse is UserPermissionDenied.
+func (s QueryGrantsErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedQueryGrantsErrorResponse
+}
+
+// SetAuthUnauthorized sets QueryGrantsErrorResponse to AuthUnauthorized.
+func (s *QueryGrantsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedQueryGrantsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if QueryGrantsErrorResponse is AuthUnauthorized.
+func (s QueryGrantsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedQueryGrantsErrorResponse(v AuthUnauthorized) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetGrantInvalid sets QueryGrantsErrorResponse to GrantInvalid.
+func (s *QueryGrantsErrorResponse) SetGrantInvalid(v GrantInvalid) {
+	s.Type = GrantInvalidQueryGrantsErrorResponse
+	s.GrantInvalid = v
+}
+
+// GetGrantInvalid returns GrantInvalid and true boolean if QueryGrantsErrorResponse is GrantInvalid.
+func (s QueryGrantsErrorResponse) GetGrantInvalid() (v GrantInvalid, ok bool) {
+	if !s.IsGrantInvalid() {
+		return v, false
+	}
+	return s.GrantInvalid, true
+}
+
+// NewGrantInvalidQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from GrantInvalid.
+func NewGrantInvalidQueryGrantsErrorResponse(v GrantInvalid) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetGrantInvalid(v)
+	return s
+}
+
+// SetGrantNotFound sets QueryGrantsErrorResponse to GrantNotFound.
+func (s *QueryGrantsErrorResponse) SetGrantNotFound(v GrantNotFound) {
+	s.Type = GrantNotFoundQueryGrantsErrorResponse
+	s.GrantNotFound = v
+}
+
+// GetGrantNotFound returns GrantNotFound and true boolean if QueryGrantsErrorResponse is GrantNotFound.
+func (s QueryGrantsErrorResponse) GetGrantNotFound() (v GrantNotFound, ok bool) {
+	if !s.IsGrantNotFound() {
+		return v, false
+	}
+	return s.GrantNotFound, true
+}
+
+// NewGrantNotFoundQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from GrantNotFound.
+func NewGrantNotFoundQueryGrantsErrorResponse(v GrantNotFound) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetGrantNotFound(v)
+	return s
+}
+
+// SetGrantPermissionDenied sets QueryGrantsErrorResponse to GrantPermissionDenied.
+func (s *QueryGrantsErrorResponse) SetGrantPermissionDenied(v GrantPermissionDenied) {
+	s.Type = GrantPermissionDeniedQueryGrantsErrorResponse
+	s.GrantPermissionDenied = v
+}
+
+// GetGrantPermissionDenied returns GrantPermissionDenied and true boolean if QueryGrantsErrorResponse is GrantPermissionDenied.
+func (s QueryGrantsErrorResponse) GetGrantPermissionDenied() (v GrantPermissionDenied, ok bool) {
+	if !s.IsGrantPermissionDenied() {
+		return v, false
+	}
+	return s.GrantPermissionDenied, true
+}
+
+// NewGrantPermissionDeniedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from GrantPermissionDenied.
+func NewGrantPermissionDeniedQueryGrantsErrorResponse(v GrantPermissionDenied) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetGrantPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets QueryGrantsErrorResponse to Internal.
+func (s *QueryGrantsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryGrantsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryGrantsErrorResponse is Internal.
+func (s QueryGrantsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from Internal.
+func NewInternalQueryGrantsErrorResponse(v Internal) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryGrantsErrorResponse to NotImplemented.
+func (s *QueryGrantsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryGrantsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryGrantsErrorResponse is NotImplemented.
+func (s QueryGrantsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from NotImplemented.
+func NewNotImplementedQueryGrantsErrorResponse(v NotImplemented) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets QueryGrantsErrorResponse to ReqInvalid.
+func (s *QueryGrantsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryGrantsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryGrantsErrorResponse is ReqInvalid.
+func (s QueryGrantsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from ReqInvalid.
+func NewReqInvalidQueryGrantsErrorResponse(v ReqInvalid) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets QueryGrantsErrorResponse to TeamPermissionDenied.
+func (s *QueryGrantsErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if QueryGrantsErrorResponse is TeamPermissionDenied.
+func (s QueryGrantsErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedQueryGrantsErrorResponse(v TeamPermissionDenied) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetUserPermissionDenied sets QueryGrantsErrorResponse to UserPermissionDenied.
+func (s *QueryGrantsErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedQueryGrantsErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if QueryGrantsErrorResponse is UserPermissionDenied.
+func (s QueryGrantsErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedQueryGrantsErrorResponse(v UserPermissionDenied) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// QueryGrantsErrorResponseStatusCode wraps QueryGrantsErrorResponse with StatusCode.
+type QueryGrantsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryGrantsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryGrantsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryGrantsErrorResponseStatusCode) GetResponse() QueryGrantsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryGrantsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryGrantsErrorResponseStatusCode) SetResponse(val QueryGrantsErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryGrantsErrorResponseStatusCode) queryGrantsRes() {}
+
+type QueryGrantsForbidden ErrorDetails
+
+func (*QueryGrantsForbidden) queryGrantsRes() {}
+
+// Request to query the grants of a project.
+// Ref: #
+type QueryGrantsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results. Must be sent with the same
+	// `sorting` as the request that issued the token. Omitting `sorting` reuses
+	// the default sort and only succeeds when that default matches the token.
+	PageToken OptNilPageToken `json:"page_token"`
+	// Related objects to embed on each grant (ADR 059). Omit it and no
+	// embedded object is returned. An unrecognised value is rejected.
+	Expand  []GrantExpand                `json:"expand"`
+	Sorting OptQueryGrantsRequestSorting `json:"sorting"`
+	// Filter criteria for querying grants. Combined with AND.
+	Filter []QueryGrantsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryGrantsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryGrantsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetExpand returns the value of Expand.
+func (s *QueryGrantsRequest) GetExpand() []GrantExpand {
+	return s.Expand
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryGrantsRequest) GetSorting() OptQueryGrantsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryGrantsRequest) GetFilter() []QueryGrantsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryGrantsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryGrantsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetExpand sets the value of Expand.
+func (s *QueryGrantsRequest) SetExpand(val []GrantExpand) {
+	s.Expand = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryGrantsRequest) SetSorting(val OptQueryGrantsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryGrantsRequest) SetFilter(val []QueryGrantsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryGrantsRequestFilterItem struct {
+	// The field to filter by.
+	Field     GrantFilterField `json:"field"`
+	Value     OptFilterValue   `json:"value"`
+	Operation FilterOperation  `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryGrantsRequestFilterItem) GetField() GrantFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryGrantsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryGrantsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryGrantsRequestFilterItem) SetField(val GrantFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryGrantsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryGrantsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryGrantsRequestSorting struct {
+	// The field to sort by.
+	Field GrantSortingField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryGrantsRequestSorting) GetField() GrantSortingField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryGrantsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryGrantsRequestSorting) SetField(val GrantSortingField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryGrantsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of grants.
+// Ref: #
+type QueryGrantsResponse struct {
+	Grants []Grant `json:"grants"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results. The follow-up request must repeat the
+	// same `sorting` that produced this token (omit only when both pages use the default).
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetGrants returns the value of Grants.
+func (s *QueryGrantsResponse) GetGrants() []Grant {
+	return s.Grants
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryGrantsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetGrants sets the value of Grants.
+func (s *QueryGrantsResponse) SetGrants(val []Grant) {
+	s.Grants = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryGrantsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryGrantsResponse) queryGrantsRes() {}
+
+type QueryGrantsUnauthorized ErrorDetails
+
+func (*QueryGrantsUnauthorized) queryGrantsRes() {}
 
 type QueryProjectsBadRequest ErrorDetails
 
@@ -43981,6 +44935,92 @@ func (s *TeamPayload) SetName(val OptString) {
 	s.Name = val
 }
 
+// Merged schema.
+// Ref: #
+type TeamPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTeamPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TeamPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TeamPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TeamPermissionDenied) GetDetails() OptTeamPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TeamPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TeamPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TeamPermissionDenied) SetDetails(val OptTeamPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TeamPermissionDeniedDetails map[string]jx.Raw
+
+func (s *TeamPermissionDeniedDetails) init() TeamPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// A resolved reference to a team. Carries the team's id and name so a grant
+// list is readable without embedding the full Team body. Id and display ride
+// `project.read` (ADR 059 rule 8): a reference field carrying only the
+// target's id and display strings needs no gate of its own. Missing or
+// deleted teams degrade to `team_id` only.
+// Ref: #
+type TeamRef struct {
+	// The referenced team's id (`team_<opaque>`). Always present.
+	TeamID string `json:"team_id"`
+	// The team's name. Absent when the team can no longer be loaded.
+	Name OptString `json:"name"`
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *TeamRef) GetTeamID() string {
+	return s.TeamID
+}
+
+// GetName returns the value of Name.
+func (s *TeamRef) GetName() OptString {
+	return s.Name
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *TeamRef) SetTeamID(val string) {
+	s.TeamID = val
+}
+
+// SetName sets the value of Name.
+func (s *TeamRef) SetName(val OptString) {
+	s.Name = val
+}
+
 // Details of a team.
 // Ref: #
 type TeamResponse struct {
@@ -47331,6 +48371,7 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 // `identifier` and `display` are resolved independently from the user
 // schema's `x-identifier` and `x-display` designations, live at read time.
 // Clients render `display`, falling back to `identifier`, then `user_id`.
+// Missing or deleted users degrade to `user_id` only.
 // Ref: #
 type UserRef struct {
 	// The referenced user's id. Always present.
