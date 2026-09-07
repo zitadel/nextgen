@@ -350,6 +350,19 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrVariableExpansionTooLarge())
 	})
 
+	t.Run("refuses a secret referenced as part of a larger string", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", testCrypter("key-1"))
+		require.NoError(t, err)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesRequester, anyNames).Return([]*domain.Variable{secret}, nil)
+
+		got, err := svc.ReplaceVariables(t.Context(), variablesRequester, map[string]any{"token": "Bearer ${{ token }}"})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrSecretNotWholeValue())
+		assert.Nil(t, got)
+	})
+
 	t.Run("reports a key lookup failure", func(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 

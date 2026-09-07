@@ -122,6 +122,10 @@ func (s *variableService) ReplaceVariables(ctx context.Context, requester domain
 	}
 	varMap := domain.VariableListToMap(varList)
 
+	if err := domain.ValidateSecretPlaceholders(placeholders, varMap); err != nil {
+		return nil, err
+	}
+
 	var containsSecrets bool
 	for _, v := range varMap {
 		if v.IsSecret {

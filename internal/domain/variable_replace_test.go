@@ -294,6 +294,71 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		assert.ErrorIs(t, err, ErrFailedToDecryptVariable(nil))
 	})
 
+	// A secret embedded in a larger string would render the text around it into
+	// the resolved value, so the whole-value form is the only one it is
+	// referenceable in. §2 of ADR 061.
+	t.Run("refuses a secret referenced as part of a larger string", func(t *testing.T) {
+		t.Parallel()
+
+		crypter := &crypto.InverseCrypter{}
+		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, "s3cret", crypter)
+		require.NoError(t, err)
+
+		for name, payload := range map[string]string{
+			"prefixed":         `{"token":"prefix-${{ token }}"}`,
+			"trailing space":   `{"token":"${{ token }} "}`,
+			"beside a sibling": `{"token":"${{ host }}${{ token }}"}`,
+			"in a slice":       `{"list":["prefix-${{ token }}"]}`,
+		} {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+
+				doc := decodeDoc(t, payload)
+				found, err := ScanDocumentForVariables(doc)
+				require.NoError(t, err)
+
+				vars := VariableListToMap([]*Variable{secret, plainVar(t, "host", "example.test")})
+				err = ValidateSecretPlaceholders(found, vars)
+				require.Error(t, err)
+				assert.ErrorIs(t, err, ErrSecretNotWholeValue())
+			})
+		}
+	})
+
+	t.Run("allows a secret referenced as an entire value", func(t *testing.T) {
+		t.Parallel()
+
+		crypter := &crypto.InverseCrypter{}
+		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, "s3cret", crypter)
+		require.NoError(t, err)
+
+		doc := decodeDoc(t, `{"token":"${{ token }}","callback":"https://${{ host }}/callback"}`)
+		found, err := ScanDocumentForVariables(doc)
+		require.NoError(t, err)
+
+		vars := VariableListToMap([]*Variable{secret, plainVar(t, "host", "example.test")})
+		// A plain variable embedded in text is untouched by the rule.
+		require.NoError(t, ValidateSecretPlaceholders(found, vars))
+
+		decrypted, err := Variables(vars).DecryptAll(crypter)
+		require.NoError(t, err)
+		require.NoError(t, ReplaceVariables(found, decrypted))
+		assert.Equal(t, "s3cret", doc["token"])
+		assert.Equal(t, "https://example.test/callback", doc["callback"])
+	})
+
+	// The rule only speaks about secrets, and a name nobody entered a variable
+	// for is not one: it stays standing the way §2 says it does.
+	t.Run("says nothing about a placeholder no variable is held for", func(t *testing.T) {
+		t.Parallel()
+
+		doc := decodeDoc(t, `{"token":"prefix-${{ nope }}"}`)
+		found, err := ScanDocumentForVariables(doc)
+		require.NoError(t, err)
+
+		require.NoError(t, ValidateSecretPlaceholders(found, map[string]*Variable{}))
+	})
+
 	// Substitution cannot recurse: the scan already ran, so a value that looks
 	// like a placeholder is written as text and never looked at again.
 	t.Run("does not rescan a written value", func(t *testing.T) {

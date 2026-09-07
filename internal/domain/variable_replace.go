@@ -20,6 +20,10 @@ func ErrVariableDocumentTooDeep() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("document_too_deep"), "variable: document nests too deeply", nil, nil)
 }
 
+func ErrSecretNotWholeValue() Error {
+	return newError(PrefixVariable.ErrorCodePrefix("secret_not_whole_value"), "variable: a secret can only be referenced as an entire value", nil, nil)
+}
+
 func ScanDocumentForVariables(doc map[string]any) (placeholders []VariablePlaceholder, err error) {
 	// The document itself is a map, never a string, so the root needs no
 	// container: nothing replaces the document as a whole.
@@ -64,6 +68,19 @@ func scanNodeForVariables(node any, address ReaderWriter, placeholders *[]Variab
 	return nil
 }
 
+func ValidateSecretPlaceholders(placeholders []VariablePlaceholder, vars map[string]*Variable) error {
+	for _, placeholder := range placeholders {
+		variable, ok := vars[placeholder.VariableName]
+		if !ok || !variable.IsSecret {
+			continue
+		}
+		if !placeholder.isWholeValue() {
+			return ErrSecretNotWholeValue().WithDetails(map[string]any{"variableName": placeholder.VariableName})
+		}
+	}
+	return nil
+}
+
 func ReplaceVariables(placeholders []VariablePlaceholder, vars map[string]*Variable) error {
 	budget := maxExpansionBytes
 
@@ -93,6 +110,16 @@ type VariablePlaceholder struct {
 	// overwritten. This is needed because it is not possible to create a
 	// pointer to a value in a map.
 	Storage ReaderWriter
+}
+
+// isWholeValue reports whether the placeholder is the entire value it sits in,
+// rather than one piece of a larger string.
+func (p VariablePlaceholder) isWholeValue() bool {
+	if p.Storage == nil {
+		return false
+	}
+	container, ok := p.Storage.Read().(string)
+	return ok && container == p.Value
 }
 
 func (p VariablePlaceholder) ReplaceWith(variable *Variable, maxSize int) (replacedBytes int, err error) {

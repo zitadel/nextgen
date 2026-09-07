@@ -78,7 +78,7 @@ A configuration document references a variable by placeholder:
 }
 ```
 
-Three rules:
+Four rules:
 
 - **A value that is one placeholder and nothing else keeps the variable's
   type.** `"${{ RETRY_COUNT }}"` becomes the number `10`, not the string
@@ -87,10 +87,24 @@ Three rules:
 - **A value that wraps text around its placeholders renders into a string.**
   The surrounding text has to survive, so the variable is rendered in place:
   a string contributes itself, any other scalar contributes its JSON form.
+- **A secret is referenceable only as the whole value.** `"client_secret":
+  "${{ GOOGLE_CLIENT_SECRET }}"` resolves; `"a8f3c1-${{ SECRET_TAIL }}"` and
+  `"${{ GOOGLE_CLIENT_SECRET }} "` are refused
+  (`var.secret_not_whole_value`). The previous rule is why: an embedded
+  reference renders into the string holding it, so the literal text around the
+  placeholder becomes part of the resolved secret. That is a secret nobody
+  entered, assembled in a document, and, for a document that is a revision,
+  frozen into an immutable one; a stray trailing space produces a silently
+  wrong credential with nothing to see in the source. The rule is checked
+  before decryption, so a document that breaks it is refused without any secret
+  being decrypted. It binds secrets only: a plain variable in a callback URL is
+  the case the previous rule exists for.
 - **A placeholder nothing was entered for is left standing.** A document may
   legitimately carry a reference that only resolves elsewhere, and the
   substitution pass is not the right place to decide that a deployment is
-  broken. See §9 for where that decision belongs.
+  broken. See §9 for where that decision belongs. A name nothing is held for is
+  not known to be a secret either, so the rule above has nothing to say about
+  it.
 
 **There is no `vars.` / `secrets.` namespace and no `${env.X}` prefix.** Every
 variable lives in one store under one flat name space, so a prefix would carry
@@ -188,7 +202,9 @@ first time a project's secret key is rotated. Key lookups are memoized per
 document, since one document usually holds several secrets under one key.
 
 Reads return the ciphertext. Decryption happens only where a value is being
-substituted into a document.
+substituted into a document, and only for a document whose secret references
+all take the whole-value form of §2 -- the check runs first, so a document that
+embeds one is refused with nothing decrypted.
 
 ### 8. Bounded expansion
 
