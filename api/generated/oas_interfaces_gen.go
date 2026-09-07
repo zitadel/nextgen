@@ -213,6 +213,10 @@ type PatchProjectRes interface {
 	patchProjectRes()
 }
 
+type QueryGrantsRes interface {
+	queryGrantsRes()
+}
+
 type QueryProjectsRes interface {
 	queryProjectsRes()
 }

@@ -1,6 +1,44 @@
+import type { BoxAction } from "./box";
 import { serverKind } from "./oclif/server-kind";
 import type { ZitadelSecret } from "./project";
 import { publicCliCommand } from "./public-cli";
+
+/**
+ * Mirrors domain.ClaimWindow (internal/domain/claim.go): the server refuses
+ * `claim/init` and `claim/complete` with `proj.claim_window_expired` once the
+ * project is more than this many days old. Keep the two in sync — drift here
+ * shows as a wrong printed deadline, the enforcement stays server-side.
+ */
+export const CLAIM_WINDOW_DAYS = 14;
+
+/**
+ * The date after which the platform refuses to claim, from the project's
+ * creation time. Falls back to `now` when creation time is unknown, which is
+ * exact at setup time (the project was just created) and the only caller
+ * without a recorded creation time.
+ */
+export function claimWindowDeadline(createdAt: string | undefined, now = Date.now()): Date {
+  const base = createdAt === undefined ? now : Date.parse(createdAt);
+  return new Date((Number.isNaN(base) ? now : base) + CLAIM_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+}
+
+function deadlinePhrase(deadline?: Date): string {
+  // Time and zone included, not just the date: the server closes the window
+  // at an exact timestamp (created_at + 14 x 24h), and a bare "before Sep 18"
+  // misleads in both directions at the boundary day.
+  const when =
+    deadline === undefined
+      ? `within ${CLAIM_WINDOW_DAYS} days of creation`
+      : `before ${deadline.toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZoneName: "short",
+        })}`;
+  return `attach it ${when}, after that it can no longer be claimed`;
+}
 
 /**
  * Whether this project is attached to a team, as the CLI can tell locally.
@@ -11,7 +49,18 @@ import { publicCliCommand } from "./public-cli";
  */
 export type ClaimState =
   | { kind: "attached"; team_id: string; claimed_at: string }
-  | { kind: "detached" }
+  /**
+   * `claimable` classifies the claim window from the locally recorded
+   * creation time: once it has passed, nudges switch to reconciliation
+   * wording (claimWindowClosedAction). Never proof of anything: the local
+   * record can be stale (a project claimed from another machine still reads
+   * detached), so the claim command stays advertised as the safe check —
+   * the server resolves the grant before the window. Lenient on an unknown
+   * or unparsable creation time (claimable, no deadline) because the server
+   * is the enforcer and the CLI only advises. `deadline` is the ISO date
+   * the window closes, when the creation time is known.
+   */
+  | { kind: "detached"; claimable: boolean; deadline?: string }
   | { kind: "not-applicable" };
 
 /**
@@ -42,10 +91,16 @@ export function isAttached(
  * stay fast and work offline. `zitadel claim` reaches the same conclusion the
  * same way before it decides to skip.
  *
- * **Why cloud only.** Claiming attaches a project to a team on the platform.
- * A local or self-hosted server has no such platform, and `--server local` is
- * the documented dev loop, so an ungated nudge would advertise an impossible
- * action for the entire life of a local project.
+ * **Why cloud only.** Claiming attaches a project to a team on the platform
+ * that hosts it. The cloud always has one. A local or self-hosted server has
+ * one only when it opted into `platform.bootstrap_project`, and that flag
+ * also pins the deployment's console and hosted-login default project to
+ * proj_platform, so it is deliberately NOT a `zitadel start` default — which
+ * means this offline classifier cannot know whether a local claim could
+ * complete. `setup` is online anyway and probes the local server's runtime
+ * document to decide the nudge there; the offline surfaces (`status`,
+ * `doctor`) stay cloud-gated rather than advertise a possibly impossible
+ * action.
  *
  * The local record can be stale in one direction: a project claimed from
  * another machine, or a `.zitadel/secret` restored from a backup, reads as
@@ -54,7 +109,7 @@ export function isAttached(
  * skip rather than an error.
  */
 export function claimState(input: {
-  secret: Pick<ZitadelSecret, "claimed_at" | "team_id">;
+  secret: Pick<ZitadelSecret, "claimed_at" | "team_id"> & { created_at?: string };
   server: string;
 }): ClaimState {
   if (serverKind.value(input.server) !== "cloud") {
@@ -67,26 +122,71 @@ export function claimState(input: {
       claimed_at: input.secret.claimed_at,
     };
   }
-  return { kind: "detached" };
+  const createdAt = Date.parse(input.secret.created_at ?? "");
+  if (Number.isNaN(createdAt)) {
+    return { kind: "detached", claimable: true };
+  }
+  const deadline = claimWindowDeadline(input.secret.created_at);
+  return {
+    kind: "detached",
+    claimable: deadline.getTime() > Date.now(),
+    deadline: deadline.toISOString(),
+  };
 }
 
 /**
  * The nudge for `next_actions`, quoting the command the way `journey-guidance`
  * does.
  *
- * Deliberately says nothing about deletion: unattached projects are framed as
- * temporary, but the epic's 14-day lifetime is not enforced anywhere yet, so
- * promising it would be a lie the product cannot keep.
+ * Names the claim window because the server now enforces it at claim time
+ * (`proj.claim_window_expired`); before that enforcement existed this copy
+ * deliberately promised nothing. It still says nothing about deletion, because
+ * nothing deletes the project when the window closes — it only stops being
+ * claimable (ADR 046 §Non-goals).
  */
-export function claimAction(cliVersion: string): string {
+export function claimAction(cliVersion: string, deadline?: Date): string {
   return (
-    "This project is temporary until you attach it to a team: run " +
-    `${publicCliCommand("claim", cliVersion)} to make it permanent. ` +
+    `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
+    `Run ${publicCliCommand("claim", cliVersion)} to make it permanent. ` +
     "Nothing about the project changes, so users, passkeys, and the issuer keep working."
   );
+}
+
+/**
+ * The same nudge for the human box, with the command on its own styled line.
+ */
+export function claimBoxAction(cliVersion: string, deadline?: Date): BoxAction {
+  return {
+    text:
+      `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
+      "Claiming is independent of the steps above, so you can do it right away; " +
+      "nothing about the project changes, and users, passkeys, and the issuer keep working:",
+    command: publicCliCommand("claim", cliVersion),
+  };
 }
 
 /** The command for `next_commands`. */
 export function claimCommand(cliVersion: string): string {
   return publicCliCommand("claim", cliVersion);
+}
+
+/**
+ * The nudge's counterpart for a closed claim window. Deliberately framed as
+ * reconciliation, not a verdict: the local record can be stale in one
+ * direction (a project claimed from another machine still reads detached
+ * here), so "window closed" from local data alone must not send the user off
+ * to duplicate a project that is already attached and working. Running
+ * `zitadel claim` is safe either way — the server checks the grant before
+ * the window, so an attached project answers with a clean already-claimed
+ * skip, and only a genuinely unattached one gets the final refusal.
+ */
+export function claimWindowClosedAction(cliVersion: string): string {
+  return (
+    `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
+    `closed. Run ${publicCliCommand("claim", cliVersion)} to reconcile: if the project ` +
+    "was attached to a team from another machine it confirms that, and if it was never " +
+    "attached it can no longer be claimed. Either way the project keeps working; " +
+    `${publicCliCommand("setup", cliVersion)} in a fresh directory gets you a new ` +
+    "project you can attach."
+  );
 }
