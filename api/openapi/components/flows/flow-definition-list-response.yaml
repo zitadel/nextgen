@@ -1,4 +1,5 @@
 type: object
+description: List of flow definitions, newest by creation time first.
 required:
   - flow_definitions
 properties:

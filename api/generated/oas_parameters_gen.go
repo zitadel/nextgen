@@ -4513,6 +4513,10 @@ type ListFlowDefinitionsParams struct {
 	ProjectID ProjectID
 	// Filter flow definitions by purpose (e.g., registration, login).
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
+	// The flow name to filter by. Every revision of a flow shares its
+	// `name`, so the result is that flow's revisions, newest by creation
+	// time first.
+	Name OptString `json:",omitempty,omitzero"`
 	// Related entities to embed on each returned flow definition.
 	Expand []FlowDefinitionExpand `json:",omitempty"`
 }
@@ -4550,6 +4554,15 @@ func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListF
 		}
 		if v, ok := packed[key]; ok {
 			params.Purpose = v.(OptListFlowDefinitionsPurpose)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "name",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Name = v.(OptString)
 		}
 	}
 	{
@@ -4785,6 +4798,74 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "purpose",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: name.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotNameVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotNameVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Name.SetTo(paramsDotNameVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Name.Get(); ok {
+					if err := func() error {
+						if err := (validate.String{
+							MinLength:     0,
+							MinLengthSet:  false,
+							MaxLength:     0,
+							MaxLengthSet:  false,
+							Email:         false,
+							Hostname:      false,
+							Regex:         regexMap["^[a-z][a-z0-9-]*$"],
+							MinNumeric:    0,
+							MinNumericSet: false,
+							MaxNumeric:    0,
+							MaxNumericSet: false,
+						}).Validate(string(value)); err != nil {
+							return errors.Wrap(err, "string")
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "name",
 			In:   "query",
 			Err:  err,
 		}

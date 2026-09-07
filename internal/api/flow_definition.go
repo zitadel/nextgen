@@ -327,6 +327,9 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 	if ok {
 		req.Purpose = string(purpose)
 	}
+	if name, ok := params.Name.Get(); ok {
+		req.Name = name
+	}
 	limit, ok := params.Limit.Get()
 	if ok {
 		req.Limit = int(limit)

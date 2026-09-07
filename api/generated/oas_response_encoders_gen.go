@@ -505,23 +505,10 @@ func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http
 
 		return nil
 
-	case *CreateFlowDefinitionBadRequest:
+	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 		span.SetStatus(codes.Error, http.StatusText(400))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *CreateFlowDefinitionConflict:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
