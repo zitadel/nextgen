@@ -48,6 +48,18 @@ func completedClaimChallenge(expiresAt time.Time) *domain.ClaimChallenge {
 	return c
 }
 
+// claimableProject is a fresh unclaimed project row: created now, well inside
+// domain.ClaimWindow. The window tests override CreatedAt.
+func claimableProject() *domain.Project {
+	return &domain.Project{ID: "proj_1", CreatedAt: time.Now()}
+}
+
+func expiredWindowProject() *domain.Project {
+	p := claimableProject()
+	p.CreatedAt = time.Now().Add(-domain.ClaimWindow - time.Hour)
+	return p
+}
+
 func requireClaimConflictDetails(t *testing.T, err error, teamID string) {
 	t.Helper()
 	var de domain.Error
@@ -71,7 +83,7 @@ func TestClaimService_Init(t *testing.T) {
 		{
 			name: "ok",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, captured **domain.ClaimChallenge) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 				s.EXPECT().CreateChallenge(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, entity *domain.ClaimChallenge) error {
@@ -101,7 +113,25 @@ func TestClaimService_Init(t *testing.T) {
 		{
 			name: "already claimed",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, _ **domain.ClaimChallenge) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: teamID}, nil)
+			},
+			wantErr: domain.ErrProjectAlreadyClaimed(),
+		},
+		{
+			name: "claim window closed",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, _ **domain.ClaimChallenge) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
+		},
+		{
+			// Ordering: a claimed project answers 409 even once its window is
+			// past, so the conflict details keep naming the owning team.
+			name: "already claimed wins over closed window",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, _ **domain.ClaimChallenge) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: teamID}, nil)
 			},
 			wantErr: domain.ErrProjectAlreadyClaimed(),
@@ -109,7 +139,7 @@ func TestClaimService_Init(t *testing.T) {
 		{
 			name: "insert failure propagates",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, _ **domain.ClaimChallenge) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 				s.EXPECT().CreateChallenge(gomock.Any(), gomock.Any()).Return(errors.New("boom"))
 			},
@@ -189,6 +219,8 @@ func TestClaimService_Status(t *testing.T) {
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 			},
 			want: &service.ClaimStatusResult{Status: domain.ClaimChallengeStatusPending},
 		},
@@ -197,14 +229,41 @@ func TestClaimService_Status(t *testing.T) {
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrProjectClaimExpired(),
+		},
+		{
+			// Reachable when the window closes between init and poll: Init
+			// refuses to mint once it is already closed.
+			name:       "claim window closed",
+			secretHash: "secret_hash_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
+		},
+		{
+			// Both are 410, but only challenge expiry recovers with a fresh
+			// init, so the final refusal must win.
+			name:       "claim window closed wins over challenge expiry",
+			secretHash: "secret_hash_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
 		},
 		{
 			name:       "completed",
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(claimGrant, nil)
 			},
 			want: &service.ClaimStatusResult{
@@ -215,10 +274,32 @@ func TestClaimService_Status(t *testing.T) {
 			},
 		},
 		{
-			name:       "completed stays completed past expiry",
+			// Grant-first also means completed survives a closed window: the
+			// claim landed in time, and the verdict must not flip afterwards.
+			name:       "completed stays completed past expiry and closed window",
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(claimGrant, nil)
+			},
+			want: &service.ClaimStatusResult{
+				Status:       domain.ClaimChallengeStatusCompleted,
+				TeamID:       teamID,
+				ClaimedAt:    claimedAt,
+				DashboardURL: claimConsoleBase + "/projects/proj_1",
+			},
+		},
+		{
+			// The grant, not the polled challenge, is the claim source of
+			// truth: a project claimed through ANOTHER challenge reports
+			// completed with its owning team, never a false closed-window
+			// verdict, even once day 14 has passed mid-poll.
+			name:       "claimed through another challenge reports completed past the window",
+			secretHash: "secret_hash_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(claimGrant, nil)
 			},
 			want: &service.ClaimStatusResult{
@@ -233,6 +314,7 @@ func TestClaimService_Status(t *testing.T) {
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrInternal(nil),
@@ -264,7 +346,7 @@ func TestClaimService_Complete(t *testing.T) {
 	claimedAt := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
 
 	unclaimedProjectStmts := func(s *servicemocks.MockAllStatements) {
-		s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+		s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 		s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 	}
 
@@ -309,14 +391,36 @@ func TestClaimService_Complete(t *testing.T) {
 			name: "challenge expired",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrProjectClaimExpired(),
+		},
+		{
+			// Both expired: the final refusal must win, matching Status —
+			// a fresh claim init recovers only from an expired challenge.
+			name: "claim window closed wins over challenge expiry",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(past), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
+		},
+		{
+			name: "claim window closed",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrProjectClaimWindowExpired(),
 		},
 		{
 			name: "project claimed via another challenge",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_2"}, nil)
 			},
 			wantErr:      domain.ErrProjectAlreadyClaimed(),
@@ -330,7 +434,7 @@ func TestClaimService_Complete(t *testing.T) {
 			name: "re-spent completed challenge reports already claimed",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(past), nil)
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: teamID}, nil)
 			},
 			wantErr:      domain.ErrProjectAlreadyClaimed(),
@@ -411,7 +515,7 @@ func TestClaimService_Complete(t *testing.T) {
 				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).
 					Return(database.NewUniqueError("authz_assignments", "authz_assignments_one_owning_team", nil))
 				// The post-transaction re-read sees the winner's grant.
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_2"}, nil)
 			},
 			wantErr:      domain.ErrProjectAlreadyClaimed(),
