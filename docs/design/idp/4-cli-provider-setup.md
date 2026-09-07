@@ -80,8 +80,8 @@ For each selected provider:
   `idps` entry to the result envelope's command payload
   (`apps/cli/src/lib/oclif/types.ts`), mirroring the announce step per provider:
   slug, template, callback URI per environment, excluded environments with the
-  declaration kind as reason, console URL, `client_secret_env`, and whether the
-  secret is present.
+  declaration kind as reason, console URL, the variable the connection
+  references for the secret, and whether that variable is set.
   Exclusions are structured so agents can tell a declaration-level exclusion
   from an unconfigured environment without parsing terminal text.
 
@@ -166,7 +166,9 @@ Not in the table:
 
 - `client_id` is prompted.
 - The default slug is the entry's key (`google`, `github`).
-- `client_secret_env` is derived from the slug (e.g., `GOOGLE_CLIENT_SECRET`).
+- The client-secret variable name is derived from the slug (e.g.,
+  `GOOGLE_CLIENT_SECRET`); the connection references it as
+  `"client_secret": "${{ GOOGLE_CLIENT_SECRET }}"`.
 - `provisioning` is a scaffold default rather than vendor knowledge.
 
 The bundled table ages with the installed CLI, so a vendor change reaches new
@@ -199,16 +201,29 @@ the tenant can add rows or accept that the collection step asks for them.
 
 ## Credential Capture
 
+> **Pending reconciliation with [ADR 061](../../adrs/061-per-environment-variables-and-secrets.md).**
+> The reference half of this section is current: the connection file carries
+> `${{ NAME }}` references and never a value. The *storage* half below is not.
+> It writes captured values into `.env.local` and stubs names into
+> `.env.example`, and ADR 061 is explicit that variables are **not**
+> operating-system environment variables — they are project data, written
+> through `PATCH /variables` against the environment being configured and
+> resolved by the engine when it serves the connection. Moving the capture step
+> onto that API, and `plan`'s presence check off `process.env`, is
+> [#851](https://github.com/zitadel/nextgen/issues/851) execution work
+> (area 1, [Open Points](1-resource-model.md#open-points)). What the local
+> development runtime does in the meantime is unchanged.
+
 Credentials are per environment; the connection is not.
 The connection file carries references.
-`client_secret_env` is always a variable name, and `client_id` becomes a
-`${VAR}` reference when it differs per environment
-(area 1, [Open Points](1-resource-model.md#open-points)).
+`client_secret` is always a `${{ NAME }}` reference, and `client_id` becomes
+one when it differs per environment
+([ADR 061](../../adrs/061-per-environment-variables-and-secrets.md)).
 The same revision is promoted to every environment unchanged; each environment
 fills the references with its own values.
 Vendor policy decides which values differ.
 A GitHub OAuth App accepts one callback URL, so GitHub needs one app per origin
-and a `${GITHUB_CLIENT_ID}` per environment.
+and a `${{ GITHUB_CLIENT_ID }}` per environment.
 A Google client accepts several redirect URIs, so one literal client id serves
 every environment.
 
@@ -217,12 +232,12 @@ only environment that exists ([README](README.md#scope-for-851)).
 Adding an environment later means adding values, not editing the connection.
 That depends on [#534](https://github.com/zitadel/nextgen/issues/534) defining
 environments, the secret store holding per-environment secrets, and the engine
-resolving `${VAR}` in the client id.
+resolving `${{ NAME }}` in the client id.
 
 ### Client ID Rules
 
 - **Literal or reference:** `1234-abc.apps.googleusercontent.com` or
-  `${GOOGLE_CLIENT_ID}`, from prompt or flag.
+  `${{ GOOGLE_CLIENT_ID }}`, from prompt or flag.
   References reach the engine unresolved and are resolved per environment (area
   1's syntax).
 - **Flags:** Provider-specific flags (e.g., `--google-client-id`,
@@ -236,9 +251,10 @@ resolving `${VAR}` in the client id.
   non-alphanumerics converted to `_`, suffix `_CLIENT_SECRET`, and prefixed with
   `_` if starting with a digit).
   Examples: `GOOGLE_CLIENT_SECRET` and `GITHUB_CLIENT_SECRET`.
-  Reused connections keep their existing `client_secret_env` name intact.
+  Reused connections keep the variable name they already reference intact.
 - **File Actions:**
-  - Writes `client_secret_env` into the connection file.
+  - Writes the `${{ NAME }}` reference into the connection file as
+    `client_secret`.
   - Stubs the variable name into `.env.example` via `merge-env`.
   - Writes the secret value into `.env.local`.
 
@@ -268,7 +284,7 @@ Missing credentials fall into two distinct execution states:
   to pass in `next_commands`.
   A scan match needs no client id and follows the reuse rule
   ([Create or Reuse](#create-or-reuse)).
-- **Environment Reference:** Passing a `${VAR}` reference defers evaluation to
+- **Environment Reference:** Passing a `${{ NAME }}` reference defers evaluation to
   plan-time presence checks via `E_CREDENTIAL_MISSING`.
 
 ### Missing Secret Value
@@ -421,9 +437,10 @@ never presented as proof that sign-in works.
   References are by slug, so nothing re-pins.
 * **Validation before upload:** the syncer runs the meta-schema and the
   validator rules from areas 1 and 2, with the
-  [`E_CREDENTIAL_MISSING`](#missing-credentials) split for unresolved env refs.
-* **Secret-free previews:** previews display only the variable name
-  (`client_secret_env`).
+  [`E_CREDENTIAL_MISSING`](#missing-credentials) split for unresolved variable
+  references.
+* **Secret-free previews:** previews display only the reference
+  (`${{ GOOGLE_CLIENT_SECRET }}`), never a value.
   Update previews show a field diff once a read endpoint exists.
 * **Delete:** a local file delete schedules a platform delete; what the server
   does with it is the open deletion question (area 1, Open Points).

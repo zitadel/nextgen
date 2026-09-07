@@ -145,14 +145,13 @@ type VariableOwner struct {
 
 // HasAccessTo reports whether variable belongs to owner. An owner reaches
 // exactly what it entered itself: nothing is inherited from a broader owner,
-// and nothing is visible from a narrower one.
+// and nothing is visible from a narrower one (ADR 061 §4).
 //
-// The predicate used to admit a row whose level was unset, so a project value
-// was readable from every environment of that project. Dropping that makes the
-// owner an address rather than a position in a ladder -- one name at one owner
-// is one variable, and a read never has two rows to choose between. A value
-// that should hold everywhere is entered at the project and read from the
-// project; an environment that wants it has to enter it.
+// The owner is an address, not a position in a ladder, which is what keeps one
+// name at one owner to one variable -- a read never has two rows to choose
+// between, so no caller needs a rule for picking one. A value that should hold
+// everywhere is entered at the project and read from the project; an
+// environment that wants it has to enter it.
 //
 // This is the predicate [github.com/zitadel/nextgen/internal/storage/variable.VisibleTo]
 // compiles into SQL, and the two are proven equal there.

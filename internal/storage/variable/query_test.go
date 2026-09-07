@@ -40,9 +40,9 @@ func TestVisibleTo_AgreesWithHasAccessTo(t *testing.T) {
 	}
 }
 
-// The two directions the old inheritance predicate got right and equality
-// deliberately does not. Spelled out because dropping inheritance is the
-// behaviour change, and a silent return of it would look like a bug fix.
+// Both directions in which nothing is inherited. Spelled out because admitting
+// an unset level is the natural thing to reach for here, and doing it would
+// look like a bug fix rather than the contract change it is.
 func TestVisibleTo_NoInheritanceInEitherDirection(t *testing.T) {
 	t.Parallel()
 

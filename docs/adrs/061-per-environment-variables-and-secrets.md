@@ -49,9 +49,47 @@ one unchanged workflow reads them per environment.
 
 ## Decision
 
-A **variable** is a named value entered by an owner, stored once, and
-substituted into configuration documents when they are served. Sensitive and
-non-sensitive values are one mechanism, separated by a flag on the row.
+A **variable** is a named value entered by an owner and stored once, read by
+name or substituted into configuration documents when they are served.
+Sensitive and non-sensitive values are one mechanism, separated by a flag on
+the row.
+
+### Scope: what this decides, and what it deliberately leaves
+
+The smallest thing that carries the first consumer. Everything below the line
+is a separate decision with its own trigger, not an implementation detail of
+this one — none of it should be built before something needs it, and each is
+sized to be added without reworking what is here.
+
+**Decided here:**
+
+- The resource: `(name, owner, value, is_secret)`, owned by a project and
+  optionally one of its environments (§1, §3).
+- `${{ NAME }}` references and the four substitution rules (§2).
+- Owners are addresses, matched exactly, with no inheritance between them —
+  which is what leaves nothing to resolve (§4, §5).
+- Storage: the natural key is the address, no minted id (§6).
+- Secrets encrypted with the project's own key, decrypted by the key that wrote
+  them, and reached by name rather than by resolving a whole document (§7).
+- Bounded expansion (§8).
+- Runtime integration: never resolved on write, read per use case at the point
+  of use, with domain objects carrying references rather than values (§9).
+- The management API: `GET`/`PATCH /variables` and `GET`/`DELETE
+  /variables/{variable_name}`, gated on `variable.read` / `variable.write`
+  behind the same project-scoped check as every other management resource.
+  A secret never reads back.
+
+**Deferred, each with what would trigger it:**
+
+| Deferred | Trigger |
+|---|---|
+| More owner levels: team, user schema, user | A consumer that also answers what should happen when two of them hold one name. Adding a level is a column and a filter term; agreeing its precedence is the work (§3). |
+| Whether a project value should reach an environment — the "set it once" case | A product decision. Today every environment holds its own copy and nothing keeps those copies in step (§4, §10). |
+| A permission for writing or reading a *secret*, distinct from a variable | Registering the resource with the permission catalog (ADRs 032–033). Until then, whoever may edit a project's configuration may write its secrets (§10). |
+| Whether a secret can ever be read back at all | A decision between write-only outright (the GitHub model) and readable under a redaction contract. The API withholds the value today rather than settling it (§7, §10). |
+| Marking, or refusing, secrets inside a resolved document | The redaction contract. Fetching by name already keeps the marking; substitution loses it (§7, §10). |
+| Validating that a target environment resolves every reference before a deployment goes live | Deployments (ADR 035). Until then an unresolved reference ships as its own literal text (§2, §10). |
+| Checking on write that `environment_name` names a real environment | Environment lifecycle. `GetEnvironmentByName` already exists; what a rename or delete does to the variables pointing at a name does not. |
 
 ### 1. One resource, one storage, two flavours
 
@@ -102,7 +140,7 @@ Four rules:
 - **A placeholder nothing was entered for is left standing.** A document may
   legitimately carry a reference that only resolves elsewhere, and the
   substitution pass is not the right place to decide that a deployment is
-  broken. See §9 for where that decision belongs. A name nothing is held for is
+  broken. See §10 for where that decision belongs. A name nothing is held for is
   not known to be a secret either, so the rule above has nothing to say about
   it.
 
@@ -126,12 +164,12 @@ An unset environment is stored as the empty string, which is the **project
 level's own address** rather than a wildcard: `(project, "")` and
 `(project, "prod")` are two owners, and a name may be held at both.
 
-An earlier revision of this ADR gave the owner five levels — team, user schema
-and user besides these two — and made them independent of one another. They are
-gone. Nothing consumed them, the visibility and resolution rules they forced
-(§4, §5) were the whole complexity of the design, and re-adding a level later is
-a column and a filter term. Per-team and per-user settings will want something
-of this shape; they can have it when there is a consumer to keep it honest.
+Two levels, and no more. Team, user-schema and user levels are the obvious next
+ones — per-team and per-user settings are the same shape, a value entered at a
+scope and read by whoever falls inside it — and they are deliberately not here.
+Levels are cheap to add (a column and a filter term) and expensive to carry: it
+is the rules they need, not the columns, that make the design. They can arrive
+with a consumer that keeps them honest.
 
 ### 4. Visibility: an owner reaches exactly what it entered
 
@@ -150,28 +188,24 @@ owner combination in a test.
 The project is required so that a variable belongs to something: it carries the
 foreign key, and a projectless row would be owned by nobody.
 
-An earlier revision admitted a row whose level was unset, so a project value was
-readable from every environment of that project. Equality replaced it. The
-inheriting form is defensible and may come back, but it is not free: it makes a
-read return several rows per name, which forces a rule for choosing between them
-(§5 as it was), and that rule then has to be applied identically by every reader
-— a duplication that produced two readers disagreeing about the same name during
-development of the API. Exact match makes the owner an address, and a name at an
-address a single value.
+The obvious alternative is to admit a row whose environment is unset, so that a
+project value is readable from every environment of that project. It is defensible, and
+it may yet be what the "set it once" case needs (§10) — but it is not free. A read
+that inherits returns several rows per name, which forces a rule for choosing
+between them, and that rule then has to be applied identically by every caller
+that reads a variable. Two callers that disagree about it disagree about what a
+name holds, silently and in only some of the cases. Equality avoids the whole
+class: the owner is an address, and a name at an address is one value.
 
 ### 5. Resolution: there is nothing to resolve
 
 A read admits one owner and the primary key makes a name unique within it, so a
 name yields at most one row. Callers key the result by name and are done.
 
-This section previously ranked owners by specificity — summing the levels an
-owner set, so that each level outweighed every level below it combined — because
-a read could return one row per level. With one owner per read there is no
-ranking, no ordering to get right, and no ranking function to keep two callers
-agreeing on.
-
-Reads are ordered by name, which is enough to be total, so the same owner reading
-twice gets the same slice.
+This is a consequence of §4 rather than a rule of its own, and it is the point of
+§4. Inheritance would need a ranking here — owners ordered by specificity, so
+that the narrowest one wins — and that ranking would be a second thing every
+reader has to get right.
 
 ### 6. Storage: the natural key is the address
 
@@ -185,11 +219,11 @@ twice gets the same slice.
   `NULLS NOT DISTINCT`, and matches the domain, where the unset environment is
   also `""`. Since owners are matched exactly (§4), the empty string is an
   address — the project level — and never a wildcard.
-- **The primary key is the uniqueness rule.** It is what stops two variables
-  existing at one name and owner, which a read would return with no rule for
-  choosing between them. It is also the upsert conflict target: writing the same
-  name and owner twice replaces the value in place.
-- The primary key is `(name, project_id, environment_name)`.
+- **The primary key, `(name, project_id, environment_name)`, is the uniqueness
+  rule.** It is what stops two variables existing at one name and owner, which a
+  read would return with no rule for choosing between them. It is also the
+  upsert conflict target: writing the same name and owner twice replaces the
+  value in place.
 - Reads are ordered by name, which is total within one owner, so the same owner
   reading twice gets the same slice.
 
@@ -206,10 +240,44 @@ so reaching for the active key would make every stored secret unreadable the
 first time a project's secret key is rotated. Key lookups are memoized per
 document, since one document usually holds several secrets under one key.
 
-Reads return the ciphertext. Decryption happens only where a value is being
-substituted into a document, and only for a document whose secret references
-all take the whole-value form of §2 -- the check runs first, so a document that
-embeds one is refused with nothing decrypted.
+Storage reads return the ciphertext; nothing decrypts on the way out of the
+table.
+
+#### Consuming a secret
+
+There are two ways to get a value, and for a secret they are not equivalent.
+
+- **Fetch by name** (`GetDecryptedVariables`) reads the names a caller asks for
+  and decrypts those among them that are secret. **This is the default for a
+  secret.** Nothing the caller did not name is decrypted, and the plaintext
+  reaches only the code that asked for it.
+- **Whole-document substitution** (`ReplaceVariables`) resolves every
+  placeholder in a document at once, secrets included. It is for a document
+  whose values are all wanted together.
+
+Neither is cheaper. Both are one query for the names plus one key lookup per
+distinct key, since key lookups are memoized either way. What differs is what
+ends up decrypted, and how far it then travels. An IdP connection makes it
+concrete: `client_id` is needed at `authorize`, `client_id` and `client_secret`
+at `callback`. Substituting the whole connection at `authorize` decrypts a
+credential that step never uses, and hands it to code with no reason to hold it.
+
+That is the standing cost of substituting a secret, and §10 records that it is
+unpaid: a resolved document carries decrypted values with nothing marking which
+of them were secret, so a caller cannot redact them from a log or a deploy diff.
+Fetching by name does not have that problem -- a decrypted variable still
+reports `is_secret`, so the caller knows which values to keep out of its own
+output. A caller that can name what it needs should.
+
+Substitution still refuses a document whose secret references do not all take
+the whole-value form of §2 -- the check runs before any decryption, so such a
+document is refused with nothing decrypted.
+
+The management API is the third reader, and it returns neither ciphertext nor
+plaintext: a secret reads back as `{"secret": true}`, saying that a value is
+held and not what it is. That is not a further rule so much as a refusal to pick
+one while §10 is open -- ciphertext is useless to a caller and plaintext would
+settle the question by accident.
 
 ### 8. Bounded expansion
 
@@ -222,24 +290,71 @@ one in-memory document from recursing forever:
 | Expansion budget | 1 MiB per document | nothing caps how many places reference one name                                          |
 | Document depth   | 20                 | a document built in memory can contain itself; one that arrived as JSON is far shallower |
 
-### 9. What this ADR does not decide
+### 9. Runtime integration: variables are read per use case
 
-Deliberately left open, because they are separable and the first consumer does
-not need them. The API surface is no longer among them: `GET`/`PATCH
-/variables` and `GET`/`DELETE /variables/{variable_name}` address one owner per
-request, taking `project_id` and an optional `environment_name`.
+Three rules, each a consequence of something above.
 
-- **Fine-grained permissions.** The endpoints (below) sit behind the same
+**Never on write.** A stored document keeps its references verbatim; nothing
+resolves on the way in. A value resolved at write time would be frozen into an
+immutable revision, where it cannot be scrubbed and would come back on a
+rollback — and since one revision is promoted between environments unchanged
+(ADR 035), it would be the wrong value everywhere except where it was written.
+§7 is the secret-flavoured half of the same rule: the plaintext never reaches
+the row.
+
+**On read, per use case.** Resolution belongs to the code about to use the
+value, not to a layer between storage and the domain. A use case knows which
+names it needs and when; nothing above it does. So there is no request-scoped
+preload and no resolve-everything step on a resource read — either would have to
+guess, and guessing means fetching names the request never uses and decrypting
+secrets it never touches, which is what §7 exists to avoid.
+
+A domain object therefore carries references, not resolved values. The object
+written and the object read back are the same shape, a revision hash over it is
+stable, and a document that reaches a log or a diff carries `${{ NAME }}` rather
+than a value.
+
+**Whichever path the use case fits.** `GetVariables` / `GetDecryptedVariables`
+for one that knows its names — the default, and the only way to reach a secret
+(§7). `ReplaceVariables` for one that genuinely wants a whole document resolved
+at once.
+
+For the first consumer that is concrete: an IdP connection is stored and read
+back holding `"client_id": "${{ GITHUB_CLIENT_ID }}"`. The `authorize` step
+reads `GITHUB_CLIENT_ID`; the `callback` step reads `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET`. Neither resolves the connection document.
+
+**What this costs.** A use case that forgets to resolve gets the literal
+placeholder rather than an error, because §2 leaves an unresolved reference
+standing: a `client_id` of `${{ GITHUB_CLIENT_ID }}` reaches the provider and
+fails there. That is the price of making resolution explicit, and the deploy-time
+validation left open in §10 is where it should be caught before a user is.
+
+There is no per-request cache. Two use cases reading one name in one request are
+two queries. Stated so nobody assumes memoization; adding it later changes this
+section and not the storage contract.
+
+### 10. What this ADR does not decide
+
+The Scope section above lists these with the trigger for each; what follows is
+the reasoning behind them.
+
+- **Fine-grained permissions.** Those endpoints sit behind the same
   project-scoped check as every other management resource, gated on
   `variable.read` / `variable.write`. Reading a secret must eventually be a
   different permission from reading a variable, and the resource has to be
   registered with the permission catalog (ADRs 032-033) for that.
 - **Reading a secret back.** The API answers a secret as `{"secret": true}` and
-  never with a value, which keeps this open rather than settling it. A *resolved
-  document* is the other half and still contains decrypted secrets with nothing
-  marking which values they are, so a caller cannot redact them from a log or a
-  deploy diff. Whether secrets become write-only outright (the GitHub model, two
-  mechanisms rather than one) or gain a redaction contract is undecided.
+  never with a value, which keeps this open rather than settling it. Whether
+  secrets become write-only outright (the GitHub model, two mechanisms rather
+  than one) or gain a redaction contract is undecided.
+- **Marking secrets in a resolved document.** A document resolved by
+  `ReplaceVariables` carries decrypted values with nothing saying which of them
+  were secret, so a caller cannot redact them from a log or a deploy diff. §7
+  answers this for the caller that can name what it needs -- a fetched secret
+  stays marked -- and leaves it open for the caller that resolves a whole
+  document. Whether substitution grows a marking contract, or refuses secrets
+  outright and forces the fetch, is undecided.
 - **Whether project-level values should reach an environment.** §4 says they do
   not, so a name several environments need is entered in each of them. The
   "set it once" case has no answer yet; giving it one means either bringing back
@@ -295,7 +410,7 @@ is sensitive, and the name grammar (`\w+`) would have to widen before a
 namespace could be adopted later.
 
 **Separate mechanisms for secrets and variables.** Deferred rather than
-rejected: it is the honest answer to read-back and deploy diffs (§9), but it
+rejected: it is the honest answer to read-back and deploy diffs (§10), but it
 doubles the surface before there is an API to double, and the encryption flag
 already gives the two different storage behavior.
 
@@ -304,11 +419,11 @@ release is promoted between environments unchanged, so anything inside it is by
 definition the same everywhere.
 
 **An owner hierarchy** (an environment inheriting the project's variables, the
-narrowest owner winning). This is what the first revision built, and §4 records
-why it went: it makes a read return several rows per name, which needs a rule
-for choosing between them, which every reader then has to apply the same way.
-Not rejected on principle — it is the better answer for values that should hold
-everywhere — but it is a rule to re-derive rather than to keep by default.
+narrowest owner winning). Deferred rather than rejected, for the reason in §4:
+it makes a read return several rows per name, which needs a rule for choosing
+between them, which every reader then has to apply the same way. It is the
+better answer for a value that should hold everywhere, and §10 keeps that case
+open; it is not something to carry before there is a case for it.
 
 **Operating-system environment variables.** Out of scope by the issue: these are
 project data, set through Zitadel, read on the environment serving the request.
@@ -328,7 +443,7 @@ project data, set through Zitadel, read on the environment serving the request.
 - A value that must hold in several environments is entered in each of them, and
   nothing keeps those copies in step.
 - A missing value ships the literal placeholder until deployment validation
-  exists (§9). This is the sharpest edge in the design as it stands.
+  exists (§10). This is the sharpest edge in the design as it stands.
 - Variables are outside releases, so a deployment is no longer fully described
   by the release it pins: two environments running one release can behave
   differently. That is the point, and it is also a new thing for an audit trail

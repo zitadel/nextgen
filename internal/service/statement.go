@@ -372,23 +372,26 @@ type BrandingStatements interface {
 
 type VariableStatements interface {
 	Statements
-	// GetVariables returns every variable the requester can read, for the given
-	// names (all names when none are given). Variables do not override one
-	// another, so all of them come back: a name held at several owner levels
-	// yields one entry per level, ordered by name and then broadest owner first.
-	// This is the only place the owner predicate is enforced, so a caller never
-	// sees a variable entered for somebody else.
-	GetVariables(ctx context.Context, requester domain.VariableOwner, names ...string) ([]*domain.Variable, error)
+	// GetVariables returns the variables owner entered, for the given names (all
+	// names when none are given), ordered by name. Every owner column is matched
+	// exactly, so a name owner has not entered is absent even when another owner
+	// of the same project holds it -- nothing is inherited. This is the only
+	// place the owner predicate is enforced, so a caller never sees a variable
+	// entered elsewhere.
+	//
+	// The primary key is the name plus the owner, so at most one variable comes
+	// back per name and the caller has nothing to choose between.
+	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	// SetVariable writes variable under its own name and owner, replacing the
 	// value and IsSecret flag of an existing variable with the same name and
-	// owner. The owner levels below the project are independent, so any
-	// combination of them is storable; the project is not optional, and one
-	// that is missing or names no existing project is rejected by the table.
+	// owner. The environment is optional -- unset addresses the project level --
+	// but the project is not, and one that is missing or names no existing
+	// project is rejected by the table.
 	SetVariable(ctx context.Context, variable *domain.Variable) error
 	// DeleteVariable removes the variable owner entered under name. Removing one
 	// that is not there returns NoRowFoundError; it never deletes a variable
 	// with a different owner, since every owner column must match exactly, so
-	// an inherited variable cannot be deleted from further down the hierarchy.
+	// one owner cannot remove what another entered.
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
 }
 

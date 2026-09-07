@@ -461,10 +461,10 @@ func TestVariableListToMap(t *testing.T) {
 		assert.Empty(t, got)
 	})
 
-	// Owners are not a ladder any more: a name entered on the project and again
-	// on an environment is two variables, and no read returns both. Should one
-	// ever arrive here anyway, the last row wins -- stated so the behaviour is
-	// pinned rather than incidental.
+	// Owners are not a ladder: a name entered on the project and again on an
+	// environment is two variables, and no read returns both. Should one ever
+	// arrive here anyway, the last row wins -- stated so the behaviour is pinned
+	// rather than incidental.
 	t.Run("two rows under one name are not ranked", func(t *testing.T) {
 		t.Parallel()
 

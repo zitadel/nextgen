@@ -16,18 +16,20 @@ type VariableToSet struct {
 	IsSecret bool
 }
 
-// VariableService reads and writes the variables a requester owns or inherits.
+// VariableService reads and writes the variables one owner entered (ADR 061).
 //
-// Unlike the settings ladder it replaces, variables do not override one
-// another: a name entered at several owner levels yields one variable per
-// level, and choosing between them is the caller's business. Storage restricts
-// reads to the variables the requester may hold, so a value entered for another
-// team can never reach a caller here.
+// The owner is an address, not a position in a ladder: nothing is inherited
+// from the project by its environments, or seen by the project in them. Storage
+// matches every owner column exactly, so a value entered at another owner can
+// never reach a caller here -- and, since the primary key is the name plus that
+// owner, a read yields at most one variable per name and there is nothing to
+// choose between.
 type VariableService interface {
-	GetVariables(ctx context.Context, requester domain.VariableOwner, names ...string) ([]*domain.Variable, error)
+	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
+	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
-	ReplaceVariables(ctx context.Context, requester domain.VariableOwner, doc map[string]any) (map[string]any, error)
+	ReplaceVariables(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error)
 }
 
 type variableService struct {
@@ -45,12 +47,45 @@ func NewVariableService(
 	}
 }
 
-func (s *variableService) GetVariables(ctx context.Context, requester domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
-	variables, err := s.v2Pool.Statements().GetVariables(ctx, requester, names...)
+func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+	variables, err := s.v2Pool.Statements().GetVariables(ctx, owner, names...)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}
 	return variables, nil
+}
+
+func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+	variables, err := s.GetVariables(ctx, owner, names...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Built once and shared, so several secrets under one key cost one lookup;
+	// built lazily, so a read holding no secret never reaches the key service.
+	var decrypter crypto.Decrypter
+
+	decrypted := make([]*domain.Variable, 0, len(variables))
+	for _, variable := range variables {
+		if !variable.IsSecret {
+			decrypted = append(decrypted, variable)
+			continue
+		}
+		if decrypter == nil {
+			decrypter = s.decrypterOfWritingKey(ctx)
+		}
+		value, err := variable.GetDecryptedValue(decrypter)
+		if err != nil {
+			return nil, domain.ErrFailedToDecryptVariable(err).WithDetails(map[string]any{"name": variable.Name})
+		}
+		decrypted = append(decrypted, &domain.Variable{
+			Name:     variable.Name,
+			Owner:    variable.Owner,
+			Value:    value,
+			IsSecret: true,
+		})
+	}
+	return decrypted, nil
 }
 
 func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error {
@@ -119,7 +154,7 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 	return nil
 }
 
-func (s *variableService) ReplaceVariables(ctx context.Context, requester domain.VariableOwner, doc map[string]any) (map[string]any, error) {
+func (s *variableService) ReplaceVariables(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
 	placeholders, err := domain.ScanDocumentForVariables(doc)
 	if err != nil {
 		return nil, err
@@ -139,7 +174,7 @@ func (s *variableService) ReplaceVariables(ctx context.Context, requester domain
 		variableNames = append(variableNames, placeholder.VariableName)
 	}
 
-	varList, err := s.v2Pool.Statements().GetVariables(ctx, requester, variableNames...)
+	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, variableNames...)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}

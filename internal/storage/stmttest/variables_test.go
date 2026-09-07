@@ -108,10 +108,9 @@ func TestVariablesRoundTrip(t *testing.T) {
 }
 
 // TestVariablesOwnersAreIndependent is the difference from the settings ladder
-// this table replaced, and from this table's own first revision. One name at
-// two owners is two variables, and neither read returns the other's: the
-// project level does not reach into an environment, and an environment does not
-// inherit from the project.
+// this table replaced. One name at two owners is two variables, and neither
+// read returns the other's: the project level does not reach into an
+// environment, and an environment does not inherit from the project.
 func TestVariablesOwnersAreIndependent(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
@@ -132,7 +131,7 @@ func TestVariablesOwnersAreIndependent(t *testing.T) {
 		})
 
 		t.Run("an environment with nothing entered reads nothing", func(t *testing.T) {
-			// The project holds this name, but inheritance is gone: an
+			// The project holds this name, but nothing is inherited: an
 			// environment sees only what was entered on it.
 			sibling := domain.VariableOwner{ProjectID: f.projectID, EnvironmentName: f.environment + "-sibling"}
 			assert.Empty(t, f.get(t, d.stmts, sibling))

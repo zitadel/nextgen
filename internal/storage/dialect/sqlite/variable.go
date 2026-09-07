@@ -36,9 +36,9 @@ func newVariableStatements(client queryExecutor) variableStatements {
 }
 
 // GetVariables implements [service.VariableStatements].
-func (s variableStatements) GetVariables(ctx context.Context, requester domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+func (s variableStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, variablesQuery, variable.VisibleTo(requester, names...), variable.Schema); err != nil {
+	if err := compileRead(&compiler, variablesQuery, variable.VisibleTo(owner, names...), variable.Schema); err != nil {
 		return nil, err
 	}
 

@@ -9,10 +9,9 @@ import (
 // narrowed to names. It is [domain.VariableOwner.HasAccessTo] pushed into SQL:
 // every owner column has to match exactly.
 //
-// An earlier revision admitted a row whose column was unset, so a project value
-// was readable from every environment. Equality replaced it: an owner is an
-// address, not a position in a ladder, and a name at an owner is one row rather
-// than a set to rank.
+// Equality, not the "unset means inherited" form: an owner is an address, not a
+// position in a ladder, so a name at an owner is one row rather than a set to
+// rank (ADR 061 §4).
 //
 // Filtering here rather than after the scan is what keeps another environment's
 // variable out of a read. The domain predicate is not applied a second time, so
