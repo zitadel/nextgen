@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -29,16 +29,22 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 vi.mock("@zitadel/sdk-react", () => ({
+  // Renders children: the claim page projects the claim-window badge into the
+  // widget's `attribution-trailing` slot, so a mock that dropped them would
+  // hide the badge from every assertion below.
   ZitadelLogin: (props: {
     postSignInUrl?: string;
     theme?: string;
     project?: { projectId?: string };
+    children?: React.ReactNode;
   }) => (
     <div
       data-testid="zitadel-login"
       data-post-sign-in-url={props.postSignInUrl}
       data-project-id={props.project?.projectId}
-    />
+    >
+      {props.children}
+    </div>
   ),
 }));
 
@@ -49,6 +55,7 @@ const CLAIM_PATH = `/claim?challenge_id=${CHALLENGE_ID}&project_id=${PROJECT_ID}
 // A path pattern rather than an absolute URL: this spec imports the router
 // statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
 const COMPLETE_PATTERN = `*/api/projects/${PROJECT_ID}/claim/complete`;
+const WINDOW_PATTERN = `*/api/projects/${PROJECT_ID}/claim/window`;
 
 const server = setupServer();
 
@@ -71,6 +78,17 @@ async function renderAt(path: string) {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
   return router;
+}
+
+/** Answers the countdown read with a window closing `days` from now. */
+function stubWindow(days: number, expired = false) {
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  server.use(
+    http.get(WINDOW_PATTERN, () =>
+      HttpResponse.json({ expires_at: expiresAt.toISOString(), expired }),
+    ),
+  );
+  return expiresAt;
 }
 
 /** Records completion calls and answers them with `respond`. */
@@ -289,5 +307,63 @@ describe("claim page", () => {
       await screen.findByRole("heading", { name: "This claim link is not valid" }),
     ).toBeInTheDocument();
     expect(bodies).toHaveLength(0);
+  });
+});
+
+describe("claim window countdown", () => {
+  it("shows the days left beside the sign-up prompt", async () => {
+    fetchSession.mockResolvedValue(null);
+    stubWindow(11);
+
+    await renderAt(CLAIM_PATH);
+
+    // Slotted into the widget's trustmark row, which is where the design
+    // draws it — so it must render inside the widget, not beside it.
+    const widget = await screen.findByTestId("zitadel-login");
+    expect(await within(widget).findByText("Expires in 11 days")).toBeInTheDocument();
+  });
+
+  it("says the window closed when the server reports it expired", async () => {
+    fetchSession.mockResolvedValue(null);
+    stubWindow(-1, true);
+
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByText("Claim window expired")).toBeInTheDocument();
+  });
+
+  it("rounds a deadline later today up to a day rather than down to zero", async () => {
+    fetchSession.mockResolvedValue(null);
+    stubWindow(0.4);
+
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByText("Expires in 1 day")).toBeInTheDocument();
+  });
+
+  it("renders the page without a countdown when the window read fails", async () => {
+    fetchSession.mockResolvedValue(null);
+    server.use(http.get(WINDOW_PATTERN, () => HttpResponse.json({}, { status: 500 })));
+
+    await renderAt(CLAIM_PATH);
+
+    // A read that only decorates must never gate the claim itself.
+    expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+    expect(screen.queryByText(/^Expires in/)).not.toBeInTheDocument();
+  });
+
+  it("shows the window beside an expired claim link", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubWindow(9);
+    stubComplete(() =>
+      HttpResponse.json({ code: "proj.claim_expired", message: "the claim link expired" }, { status: 410 }),
+    );
+
+    await renderAt(CLAIM_PATH);
+
+    // Both are true at once, and the page has to say so: this link is done,
+    // the project is still claimable for another nine days.
+    expect(await screen.findByText("Claim link expired")).toBeInTheDocument();
+    expect(await screen.findByText("Expires in 9 days")).toBeInTheDocument();
   });
 });

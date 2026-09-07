@@ -29,6 +29,7 @@ const (
 	GetAuthAttemptOperation                OperationName = "GetAuthAttempt"
 	GetBrandingByIdOperation               OperationName = "GetBrandingById"
 	GetClaimStatusOperation                OperationName = "GetClaimStatus"
+	GetClaimWindowOperation                OperationName = "GetClaimWindow"
 	GetEnvironmentByNameOperation          OperationName = "GetEnvironmentByName"
 	GetEventOperation                      OperationName = "GetEvent"
 	GetFlowDefinitionOperation             OperationName = "GetFlowDefinition"
