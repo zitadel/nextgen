@@ -659,5 +659,5 @@ func TestGetClaimWindow(t *testing.T) {
 		ChallengeID: api.ChallengeID("ch_" + helpers.RandString(16)),
 	})
 	require.NoError(t, err)
-	assert.IsType(t, &api.ErrorDetailsStatusCode{}, unknown, helpers.MustMarshal(t, unknown))
+	assert.IsType(t, &api.GetClaimWindowNotFound{}, unknown, helpers.MustMarshal(t, unknown))
 }

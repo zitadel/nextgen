@@ -436,7 +436,7 @@ export function completeClaimChallenge(
 ): { status: number; body: CompleteClaim200 | ErrorBody } {
   const challenge = store.claimChallenges.get(challengeId);
   if (!challenge || challenge.projectId !== projectId) {
-    return { status: 404, body: errorBody("not_found", "claim challenge not found") };
+    return { status: 404, body: errorBody("claim_challenge.not_found", "claim challenge not found") };
   }
   // Fail closed on a challenge without its project, mirroring the server's
   // proj.not_found: a claim must never be minted from an inconsistent store,
@@ -683,7 +683,7 @@ export function setupPlatformHandlers() {
 
       const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.projectId !== path.data.project_id) {
-        return HttpResponse.json(errorBody("not_found", "claim challenge not found"), {
+        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
           status: 404,
         });
       }
@@ -755,13 +755,13 @@ export function setupPlatformHandlers() {
 
       const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.projectId !== path.data.project_id) {
-        return HttpResponse.json(errorBody("not_found", "claim challenge not found"), {
+        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
           status: 404,
         });
       }
       const project = store.projects.get(challenge.projectId);
       if (!project) {
-        return HttpResponse.json(errorBody("not_found", "claim challenge not found"), {
+        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
           status: 404,
         });
       }
