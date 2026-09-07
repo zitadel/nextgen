@@ -42,6 +42,29 @@ function flow(): TestFlow {
   return structuredClone(getDefaultLoginFlow()) as unknown as TestFlow;
 }
 
+/**
+ * The default flow with passkey put back on `identifier`, `password` and
+ * `register`.
+ *
+ * The shipped default offers no passkey action — it was removed after testers
+ * hit broken passkey legs — but `schema/passkey-actions` is a rule about any
+ * definition, not about the default, so the tests below build the shape the
+ * rule guards rather than assuming the default still carries it.
+ */
+function passkeyFlow(): TestFlow {
+  const def = flow();
+  const identifier = step(def, "identifier");
+  identifier.actions.push({ name: "passkey", kind: "passkey" });
+  identifier.transitions.passkey = { target: "done" };
+  const password = step(def, "password");
+  password.actions.push({ name: "passkey", kind: "passkey" });
+  password.transitions.passkey = { target: "done" };
+  const register = step(def, "register");
+  register.actions.push({ name: "passkey_register", kind: "passkey_register" });
+  register.transitions.passkey_register = { target: "done" };
+  return def;
+}
+
 function step(def: TestFlow, name: string): TestStep {
   const found = def.steps.find((s) => s.name === name);
   if (!found) throw new Error(`fixture step ${name} missing`);
@@ -228,9 +251,9 @@ describe("steps", () => {
 
   it("rejects an action without a matching transition", () => {
     const def = flow();
-    delete step(def, "identifier").transitions.passkey;
+    delete step(def, "identifier").transitions.register;
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": action "passkey" has no matching transition',
+      'step "identifier": action "register" has no matching transition',
     );
   });
 
@@ -648,7 +671,7 @@ describe("schema-dependent rules", () => {
   it("rejects every step offering a passkey action when the schema disables passkey", () => {
     const disabled = structuredClone(schema);
     (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).passkey!.enabled = false;
-    const issues = validateFlowDefinition(flow(), disabled);
+    const issues = validateFlowDefinition(passkeyFlow(), disabled);
     const msgs = messages(issues);
     expect(msgs).toContain(
       'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
@@ -665,15 +688,15 @@ describe("schema-dependent rules", () => {
   it("rejects passkey actions when the schema has no passkey entry", () => {
     const absent = structuredClone(schema);
     delete (absent["x-auth-methods"] as Record<string, unknown>).passkey;
-    expect(messages(validateFlowDefinition(flow(), absent))).toContain(
+    expect(messages(validateFlowDefinition(passkeyFlow(), absent))).toContain(
       'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
     );
   });
 
   it("accepts passkey and passkey_register actions when passkey is enabled", () => {
-    // The default schema enables passkey; the default flow offers passkey
-    // on identifier/password and passkey_register on register.
-    expect(validateFlowDefinition(flow(), schema)).toEqual([]);
+    // The default schema keeps passkey enabled even though the shipped default
+    // flow no longer offers it, so a definition that does offer it validates.
+    expect(validateFlowDefinition(passkeyFlow(), schema)).toEqual([]);
   });
 
   it("rejects on_success create_user without an upstream identifier", () => {

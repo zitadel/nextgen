@@ -1342,10 +1342,11 @@ describe("plan-time flow validation", () => {
   });
 
   it("fails plan pre-mutation when the scaffolded schema disables passkey (Elina journey)", async () => {
-    // The exact journey the rule protects: scaffold the defaults, flip
-    // x-auth-methods.passkey.enabled to false in the schema, run plan.
-    // The scaffolded flow still offers passkey actions on three steps —
-    // plan must fail before anything mutates, naming each of them.
+    // The exact journey the rule protects: scaffold a passkey-offering
+    // preset, flip x-auth-methods.passkey.enabled to false in the schema,
+    // run plan. Plan must fail before anything mutates, naming each step
+    // that offers passkey. The password-first default is not the fixture
+    // because it declares no passkey action for the rule to catch.
     const cwd = makeCwd();
     try {
       const schemaBody = getDefaultHumanUserSchema() as unknown as Record<
@@ -1361,7 +1362,7 @@ describe("plan-time flow validation", () => {
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", schemaBody);
-      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_A" });
+      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_A", preset: "passkey-first" });
       await writeResource(cwd, ".zitadel/flows", "default.json", flow);
 
       const plan = buildSyncPlan(cwd, [schemaSyncer, makeFlowSyncer()]);
