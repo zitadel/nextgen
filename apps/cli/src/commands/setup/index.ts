@@ -18,10 +18,18 @@ import {
 import { consola } from "consola";
 
 import { brandingDesignLabel } from "../../lib/branding/designs";
-import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
+import { renderBoxActions, wrapForBox } from "../../lib/box";
+import {
+  claimAction,
+  claimBoxAction,
+  claimCommand,
+  claimState,
+  claimWindowDeadline,
+} from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { serverKind } from "../../lib/oclif/server-kind";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -411,14 +419,29 @@ export default class Setup extends BaseCommand {
     // Position in the list carries no staging meaning, so appending is not a
     // way of deferring it.
     //
-    // Empty off the cloud, where nothing can be attached.
-    const claimNudge =
-      claimState({ secret: {}, server: answers.server }).kind === "detached"
-        ? {
-            actions: [claimAction(this.meta.cliVersion)],
-            commands: [claimCommand(this.meta.cliVersion)],
-          }
-        : { actions: [], commands: [] };
+    // Nudged on the cloud, and on a local server that actually hosts the
+    // platform plane: `claimState` is offline and gates local to
+    // not-applicable, but setup is online anyway, so it asks the server's
+    // runtime document (see localServerHostsPlatform). A dry run contacts no
+    // platform, so it previews the nudge for local servers optimistically
+    // instead of probing.
+    // The deadline is concrete because the server enforces the claim window
+    // at claim time and the project was created moments ago, so created_at
+    // computes the same date the platform will hold the user to. A dry run
+    // gets the generic wording: its stand-in project has a fixed past
+    // created_at, and no real window started anyway.
+    const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
+    const nudgeClaim =
+      claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+      (serverKind.value(answers.server) === "local" &&
+        (dryRun || (await localServerHostsPlatform(answers.server))));
+    const claimNudge = nudgeClaim
+      ? {
+          actions: [claimAction(this.meta.cliVersion, deadline)],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
+          commands: [claimCommand(this.meta.cliVersion)],
+        }
+      : { actions: [], boxActions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -444,13 +467,18 @@ export default class Setup extends BaseCommand {
       // status panel separate from the per-step narration above it.
       // `box` accepts ANSI-styled text in the message body, so our
       // pre-coloured rows (path/url/id helpers) survive intact.
+      // `wrapForBox` caps the content at the terminal width: consola sizes
+      // the frame to the longest line, so an unwrapped sentence wider than
+      // the window would break the right border.
       consola.box({
         title: "Zitadel is ready",
-        message: [
-          renderSummary(sections),
-          "",
-          [...installOutcome.boxActions, ...claimNudge.actions].join("\n"),
-        ].join("\n"),
+        message: wrapForBox(
+          [
+            renderSummary(sections),
+            "",
+            renderBoxActions([...installOutcome.boxActions, ...claimNudge.boxActions]),
+          ].join("\n"),
+        ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
       // The envelope's `warnings` never render in non-JSON mode (setup
@@ -537,6 +565,35 @@ async function resolveScaffoldFramework(
     });
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
+}
+
+/**
+ * Whether a local server hosts the platform plane, i.e. whether a claim
+ * started against it can actually complete. `platform.bootstrap_project`
+ * pins the deployment's default project to the well-known proj_platform, and
+ * the console runtime document publishes that resolution, so one public GET
+ * answers the question. Fail closed: an unreadable, absent, or hanging
+ * document means no nudge, never a nudge into a flow that would 401 at
+ * claim/complete — the timeout mirrors checkLocalServerHealth so a socket
+ * that accepts and stalls cannot hang setup after the real work is done.
+ * Exported so the fail-closed behavior is testable without a live server.
+ */
+export async function localServerHostsPlatform(
+  server: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  try {
+    const res = await fetch(new URL("/console/runtime.json", server), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      return false;
+    }
+    const doc = (await res.json()) as { console_project_id?: unknown };
+    return doc.console_project_id === "proj_platform";
+  } catch {
+    return false;
+  }
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
