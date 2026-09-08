@@ -49,6 +49,24 @@ const configuredServerBinary = process.env.ZITADEL_SERVER_BINARY;
 const serverBinary =
   configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
 const seedOnly = process.argv.includes("--seed-only");
+/**
+ * Claim mode boots the deployment's *platform* project and points the console
+ * at it, which is what `claim/complete` authenticates against — without it the
+ * claim page can render but never finish, because the console's session belongs
+ * to the seeded project instead. Opt-in, not the default: pinning the console
+ * to `proj_platform` is exactly the standalone-semantics change the demo and
+ * embedded suites must not see (see `cli-journey-e2e/scripts/run-local.mjs`).
+ */
+const claimMode = process.argv.includes("--claim");
+
+/** The well-known platform project id (`domain.PlatformProjectID`). */
+const PLATFORM_PROJECT_ID = "proj_platform";
+
+if (claimMode) {
+  // Read by the server through the CLI's `start`, which inherits this process's
+  // environment (`packages/testing/src/cli.ts` merges `process.env`).
+  process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = "true";
+}
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -157,6 +175,38 @@ try {
 }
 
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
+
+// Claim mode signs in against the platform project, because that is the only
+// session `claim/complete` accepts. The seeded users stay in the project being
+// claimed — they are its app's users, not the human doing the claiming, who
+// registers through the claim page itself.
+const consoleProjectId = claimMode ? PLATFORM_PROJECT_ID : projectId;
+
+/**
+ * A claim link for the seeded project, so claim mode lands on something
+ * openable instead of leaving the reader to mint one. Best-effort: a failure
+ * costs the link, not the instance.
+ */
+async function mintClaimUrl(): Promise<string | null> {
+  try {
+    const response = await fetch(`${baseUrl}/projects/${projectId}/claim/init`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: "{}",
+    });
+    if (!response.ok) return null;
+    const { challenge_id } = (await response.json()) as { challenge_id?: string };
+    if (!challenge_id) return null;
+    // The server builds claim_url from its configured console base, which is
+    // not this dev server; rebuild it against the origin actually being served.
+    return `${consoleOrigin}/claim?challenge_id=${challenge_id}&project_id=${projectId}`;
+  } catch {
+    return null;
+  }
+}
+
+const claimUrl = claimMode ? await mintClaimUrl() : null;
+
 console.log(
   [
     "",
@@ -168,6 +218,18 @@ console.log(
     `  │  sign in at ${consoleOrigin}/login`,
     `  │    email     ${DEV_USER.email}`,
     `  │    password  ${DEV_USER.password}`,
+    ...(claimMode
+      ? [
+          "  │",
+          `  │  claim mode: console is pinned to ${PLATFORM_PROJECT_ID}, so the`,
+          "  │  seeded credentials above do not exist there — register on the",
+          "  │  claim page instead. List screens will look empty; that is the",
+          "  │  platform project, not the seeded one.",
+          ...(claimUrl
+            ? ["  │", `  │  claim       ${claimUrl}`]
+            : ["  │", "  │  claim       could not mint a link; see claim/init"]),
+        ]
+      : []),
     "  └───────────────────────────────────────────────────────────",
     "",
   ].join("\n"),
@@ -194,14 +256,20 @@ if (seedOnly) {
     /* keep the event loop alive */
   }, 60_000);
 } else {
-  const vite = spawn("corepack", ["pnpm", "--filter", "@zitadel/console", "dev"], {
+  // `--port` from the origin: everything else here honours CONSOLE_DEV_ORIGIN,
+  // and without this vite stays pinned to its config's 5174 and a second
+  // worktree collides with the first.
+  const consolePort = new URL(consoleOrigin).port;
+  const viteArgs = ["pnpm", "--filter", "@zitadel/console", "exec", "vite"];
+  if (consolePort) viteArgs.push("--port", consolePort);
+  const vite = spawn("corepack", viteArgs, {
     cwd: workspaceRoot,
     stdio: "inherit",
     env: {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
       CONSOLE_PROJECT_SECRET: projectSecret,
-      VITE_CONSOLE_PROJECT_ID: projectId,
+      VITE_CONSOLE_PROJECT_ID: consoleProjectId,
     },
   });
   vite.on("exit", (code) => void shutdown(code ?? 0));
