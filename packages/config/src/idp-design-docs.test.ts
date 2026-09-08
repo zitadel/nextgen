@@ -53,7 +53,7 @@ const root = { slug: "g", display_name: "G" };
 const oidcBlock = {
   issuer: "https://a",
   client_id: "c",
-  client_secret_env: "S",
+  client_secret: "${{ S }}",
   scopes: ["openid"],
 };
 const oauth2Block = {
@@ -61,7 +61,7 @@ const oauth2Block = {
   token_endpoint: "https://t",
   userinfo_endpoint: "https://u",
   client_id: "c",
-  client_secret_env: "S",
+  client_secret: "${{ S }}",
 };
 const oidc = { ...root, protocol: "oidc", oidc: oidcBlock };
 const oauth2 = { ...root, protocol: "oauth2", subject_claim: "id", oauth2: oauth2Block };
@@ -98,8 +98,11 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["oauth2 without subject_claim", { ...root, protocol: "oauth2", oauth2: oauth2Block }, false],
   // credentials
   ["oidc missing client_id", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined } }, false],
-  ["oidc missing client_secret_env", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret_env: undefined } }, false],
+  ["oidc missing client_secret", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined } }, false],
   ["literal client_secret in block", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "leak" } }, false],
+  ["client_secret reference with text around it", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "a8f3c1-${{ TAIL }}" } }, false],
+  ["client_secret_env twin (ADR 061)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" } }, false],
+  ["client_id as a variable reference", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: "${{ ID }}" } }, true],
   ["camelCase leftover (clientId)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined, clientId: "c" } }, false],
   ["secret_strategy not shipped", { ...root, protocol: "oidc", oidc: { ...oidcBlock, secret_strategy: "static" } }, false],
   ["token_endpoint_auth_method post", { ...root, protocol: "oidc", oidc: { ...oidcBlock, token_endpoint_auth_method: "client_secret_post" } }, true],
@@ -335,7 +338,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
 
 describe("forward compatibility (1-resource-model.md · Forward compatibility)", () => {
   // The documented extension paths: secret_strategy returns as a closed enum
-  // with secret_params, client_secret_env relaxes from unconditional to
+  // with secret_params, client_secret relaxes from unconditional to
   // conditional, and is_auto_update returns with per-property verification
   // state. Every file valid today must stay valid.
   it("today's examples survive the post-Apple extension", () => {
@@ -344,7 +347,7 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
     };
     for (const block of ["oidc", "oauth2"]) {
       const b = extended.properties[block]!;
-      b.required = b.required.filter((r) => r !== "client_secret_env");
+      b.required = b.required.filter((r) => r !== "client_secret");
       b.properties["secret_strategy"] = { type: "string", enum: ["static", "apple_jwt"], default: "static" };
       b.properties["response_mode"] = { type: "string", enum: ["query", "form_post"], default: "query" };
       b.properties["secret_params"] = {
@@ -364,7 +367,7 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
             required: ["secret_params"],
             properties: { secret_params: { required: ["team_id", "key_id", "private_key_env"] } },
           },
-          else: { required: ["client_secret_env"] },
+          else: { required: ["client_secret"] },
         },
       ];
     }
@@ -398,7 +401,7 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
       validateExtended({
         ...root,
         protocol: "oidc",
-        oidc: { ...oidcBlock, client_secret_env: undefined, secret_strategy: "apple_jwt" },
+        oidc: { ...oidcBlock, client_secret: undefined, secret_strategy: "apple_jwt" },
       }),
     ).toBe(false);
   });
@@ -493,9 +496,9 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
     }
   >;
 
-  // The derivation the doc states: slug = entry key, client_secret_env =
-  // upper-cased key + _CLIENT_SECRET, client_id prompted (taken from the
-  // example), provisioning = scaffold default.
+  // The derivation the doc states: slug = entry key, client_secret references
+  // the variable upper-cased key + _CLIENT_SECRET, client_id prompted (taken
+  // from the example), provisioning = scaffold default.
   const scaffold = (key: string, clientId: string) => {
     const entry = catalog[key]!;
     const { protocol, subject_claim, verified_claims, ...blocks } =
@@ -512,7 +515,7 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
       [protocol]: {
         ...(blocks[protocol] as Record<string, unknown>),
         client_id: clientId,
-        client_secret_env: `${key.toUpperCase()}_CLIENT_SECRET`,
+        client_secret: `\${{ ${key.toUpperCase()}_CLIENT_SECRET }}`,
       },
     };
   };
