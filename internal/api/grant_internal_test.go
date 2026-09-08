@@ -1,12 +1,18 @@
 package api
 
 import (
+	"context"
 	"errors"
+	"net/http"
 	"testing"
+
+	"go.uber.org/mock/gomock"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func TestMapQueryGrantsToService_Expand(t *testing.T) {
@@ -67,4 +73,98 @@ func TestGrantResponse_Principal(t *testing.T) {
 			t.Fatalf("error = %v, want grant not found", err)
 		}
 	})
+}
+
+func TestGrantErrorResponse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  domain.Error
+		want int
+	}{
+		{"invalid", domain.ErrGrantInvalid(), http.StatusBadRequest},
+		{"not_found", domain.ErrGrantNotFound(), http.StatusNotFound},
+		{"principal_not_found", domain.ErrGrantPrincipalNotFound(), http.StatusNotFound},
+		{"already_exists", domain.ErrGrantAlreadyExists(), http.StatusConflict},
+		{"permission_denied", domain.ErrGrantPermissionDenied(), http.StatusForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := grantErrorResponse(tt.err); got.StatusCode != tt.want {
+				t.Fatalf("grantErrorResponse(%q) status = %d, want %d", tt.err.Code, got.StatusCode, tt.want)
+			}
+		})
+	}
+}
+
+func TestQueryGrants_PrincipalExpandCeiling(t *testing.T) {
+	params := api.QueryGrantsParams{ProjectID: api.ProjectID("proj_customer")}
+	expand := &api.QueryGrantsRequest{Expand: []api.GrantExpand{api.GrantExpandPrincipal}}
+	userCtx := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+	secretCtx := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_customer",
+		Scope:         []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		PrincipalID:   "proj_customer",
+	})
+
+	t.Run("session user without read scopes may expand", func(t *testing.T) {
+		h := queryGrantsHandler(t, true, true, true)
+		resp, err := h.QueryGrants(userCtx, expand, params)
+		if err != nil {
+			t.Fatalf("user expand: %v", err)
+		}
+		if _, ok := resp.(*api.QueryGrantsResponse); !ok {
+			t.Fatalf("got %T, want QueryGrantsResponse", resp)
+		}
+	})
+
+	t.Run("operator secret may expand via project.write", func(t *testing.T) {
+		h := queryGrantsHandler(t, true, true, true)
+		resp, err := h.QueryGrants(secretCtx, expand, params)
+		if err != nil {
+			t.Fatalf("secret expand: %v", err)
+		}
+		if _, ok := resp.(*api.QueryGrantsResponse); !ok {
+			t.Fatalf("got %T, want QueryGrantsResponse", resp)
+		}
+	})
+
+	t.Run("session user still needs Check before expand skip", func(t *testing.T) {
+		h := queryGrantsHandler(t, false, true, false)
+		_, err := h.QueryGrants(userCtx, expand, params)
+		assertDomainCode(t, err, domain.ErrGrantPermissionDenied().Code)
+	})
+
+	t.Run("session user without foothold is not found", func(t *testing.T) {
+		h := queryGrantsHandler(t, false, false, false)
+		_, err := h.QueryGrants(userCtx, expand, params)
+		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
+	})
+}
+
+func queryGrantsHandler(t *testing.T, allowed, foothold, expectList bool) Handler {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil).AnyTimes()
+	stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(allowed, foothold, nil).AnyTimes()
+	if expectList {
+		stmts.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+			&database.ListResult[*domain.AuthzAssignment]{}, nil)
+	}
+	db := service.NewPool(pool)
+	return Handler{
+		pool:         db,
+		grantService: service.NewGrantService(db, nil, "proj_platform"),
+	}
 }
