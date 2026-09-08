@@ -118,7 +118,11 @@ func newTestServer(t *testing.T) *testServer {
 	keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
 
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, tokenService, keyService, nil, nil, nil, "")
+	// The release service is a mock rather than nil so a test that reaches a
+	// release endpoint fails on an unexpected call instead of panicking on a
+	// nil interface.
+	releaseService := mocks.NewMockReleaseService(mock)
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil, releaseService, nil, tokenService, keyService, nil, nil, nil, "")
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),
