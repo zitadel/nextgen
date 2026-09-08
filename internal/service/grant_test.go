@@ -397,44 +397,17 @@ func TestGrantService_Get(t *testing.T) {
 	})
 }
 
-func TestGrantService_Revoke_EventUsesAssignmentProject(t *testing.T) {
-	t.Parallel()
-
-	homeTeam := "team_home"
-	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
-		ProjectID: "proj_platform",
-		TeamID:    &homeTeam,
-	})
-	var got *domain.Event
-	svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-		s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(&domain.AuthzAssignment{
-			ID:            "asgn_1",
-			ProjectID:     "proj_customer",
-			PrincipalType: domain.AuthzPrincipalTypeUser,
-			PrincipalID:   "user_grant01",
-			ObjectType:    "project",
-			Relation:      "viewer",
-		}, nil)
-		s.EXPECT().RevokeAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(nil)
-		s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(_ context.Context, ev *domain.Event) error {
-				got = ev
-				return nil
-			})
-	})
-	require.NoError(t, svc.Revoke(ctx, "proj_customer", "asgn_1"))
-	require.NotNil(t, got)
-	assert.Equal(t, domain.EventTypeAuthzRevoked, got.EventType)
-	assert.Equal(t, "proj_customer", got.ProjectID)
-	assert.Nil(t, got.TeamID)
-}
-
 func TestGrantService_Revoke(t *testing.T) {
 	t.Parallel()
 
 	t.Run("ok emits authz.revoked", func(t *testing.T) {
 		t.Parallel()
-		var emitted domain.EventType
+		homeTeam := "team_home"
+		ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
+			ProjectID: "proj_platform",
+			TeamID:    &homeTeam,
+		})
+		var got *domain.Event
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(&domain.AuthzAssignment{
 				ID:            "asgn_1",
@@ -446,13 +419,16 @@ func TestGrantService_Revoke(t *testing.T) {
 			}, nil)
 			s.EXPECT().RevokeAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(nil)
 			s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, e *domain.Event) error {
-					emitted = e.EventType
+				func(_ context.Context, ev *domain.Event) error {
+					got = ev
 					return nil
 				})
 		})
-		require.NoError(t, svc.Revoke(t.Context(), "proj_customer", "asgn_1"))
-		assert.Equal(t, domain.EventTypeAuthzRevoked, emitted)
+		require.NoError(t, svc.Revoke(ctx, "proj_customer", "asgn_1"))
+		require.NotNil(t, got)
+		assert.Equal(t, domain.EventTypeAuthzRevoked, got.EventType)
+		assert.Equal(t, "proj_customer", got.ProjectID)
+		assert.Nil(t, got.TeamID)
 	})
 
 	t.Run("already revoked is not found", func(t *testing.T) {

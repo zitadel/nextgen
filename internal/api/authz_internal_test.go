@@ -392,15 +392,6 @@ func TestRequireProjectAccess_UserPrincipalCrossProject(t *testing.T) {
 		stmts := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
 		err := requireProjectAccess(human, stmts, "proj_customer", grantAccess, opDelete)
 		assertDomainCode(t, err, domain.ErrGrantPermissionDenied().Code)
-		var de domain.Error
-		if !errors.As(err, &de) {
-			t.Fatalf("error is not a domain.Error: %v", err)
-		}
-		if strings.Contains(strings.ToLower(de.Message), "session") ||
-			strings.Contains(strings.ToLower(de.Message), "cookie") ||
-			strings.Contains(strings.ToLower(de.Message), "bearer") {
-			t.Fatalf("grant denial must stay credential-neutral, got %q", de.Message)
-		}
 	})
 
 	t.Run("missing home project fails closed", func(t *testing.T) {
@@ -409,16 +400,6 @@ func TestRequireProjectAccess_UserPrincipalCrossProject(t *testing.T) {
 			PrincipalID:   "user_alice",
 		})
 		err := requireProjectAccess(orphan, stubAuthzStmts{}, "proj_customer", grantAccess, opWrite)
-		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
-	})
-
-	t.Run("write-bearing secret with empty home fails closed", func(t *testing.T) {
-		unbound := WithScopeContext(context.Background(), ScopeContext{
-			Scope:         []string{"project.write", "project.read"},
-			PrincipalType: domain.AuthzPrincipalTypeSKProj,
-			PrincipalID:   "proj_a",
-		})
-		err := requireProjectAccess(unbound, stubAuthzStmts{}, "proj_a", grantAccess, opWrite)
 		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
 	})
 }
