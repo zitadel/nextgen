@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
@@ -65,6 +66,8 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("projects", func(t *testing.T) { battleProjects(t, d) })
 		t.Run("teams", func(t *testing.T) { battleTeams(t, d) })
+		t.Run("grants", func(t *testing.T) { battleGrants(t, d) })
+		t.Run("grants_expires_at", func(t *testing.T) { battleGrantsExpiresAt(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
@@ -132,6 +135,74 @@ func battleTeams(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(team *domain.Team) string { return team.ID }, 2)
+}
+
+func battleGrants(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	want := make([]string, 0, 5)
+	for i := range 5 {
+		a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_battle_"+uniqueSuffix(t)+string(rune('a'+i)), "project", "viewer", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
+		want = append(want, a.ID)
+	}
+	orderAsc := database.OrderBy[domain.AuthzAssignmentField]{
+		Columns:   []database.Column[domain.AuthzAssignmentField]{database.Col(domain.AuthzAssignmentFieldID)},
+		Direction: database.OrderAsc,
+	}
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+		return d.stmts.ListManagedGrants(t.Context(), projectID, &database.ListOptions[domain.AuthzAssignmentField]{
+			Pagination: page,
+		})
+	}, func(a *domain.AuthzAssignment) string { return a.ID }, 2)
+}
+
+// battleGrantsExpiresAt pages a mix of nil and set expires_at values sorted by
+// the nullable column. Ascending and descending must both drain every row;
+// a missing Nullable flag on expires_at would drop the NULL block past the
+// first non-nil cursor (#766).
+func battleGrantsExpiresAt(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	want := make([]string, 0, 4)
+	for range 2 {
+		a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_expnil_"+uniqueSuffix(t), "project", "viewer", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
+		want = append(want, a.ID)
+	}
+	base := time.Now().Add(time.Hour)
+	for i := range 2 {
+		a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, "user_expset_"+uniqueSuffix(t), "project", "editor", domain.NewProjectAssignmentScope())
+		exp := base.Add(time.Duration(i) * time.Hour)
+		a.ExpiresAt = &exp
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
+		want = append(want, a.ID)
+	}
+
+	for name, direction := range map[string]database.OrderDirection{
+		"asc":  database.OrderAsc,
+		"desc": database.OrderDesc,
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.AuthzAssignment], error) {
+				return d.stmts.ListManagedGrants(t.Context(), projectID, &database.ListOptions[domain.AuthzAssignmentField]{
+					Pagination: database.Page[domain.AuthzAssignmentField]{
+						Limit:  2,
+						Cursor: cursor,
+						OrderBy: database.OrderBy[domain.AuthzAssignmentField]{
+							Columns: []database.Column[domain.AuthzAssignmentField]{
+								database.Col(domain.AuthzAssignmentFieldExpiresAt),
+								database.Col(domain.AuthzAssignmentFieldID),
+							},
+							Direction: direction,
+						},
+					},
+				})
+			}, func(a *domain.AuthzAssignment) string { return a.ID })
+			assert.ElementsMatch(t, want, got, "every grant must appear exactly once across all pages")
+		})
+	}
 }
 
 func battleUsers(t *testing.T, d dialect) {

@@ -114,6 +114,7 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 	t.Parallel()
 
 	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+	require.False(t, sessionCookieOperations[api.QueryGrantsOperation])
 
 	t.Run("missing credentials", func(t *testing.T) {
 		t.Parallel()
@@ -134,6 +135,10 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 				name: "delete",
 				req:  httptest.NewRequest(http.MethodDelete, "/grants/asgn_1?project_id=proj_1", nil),
 			},
+			{
+				name: "query",
+				req:  httptest.NewRequest(http.MethodPost, "/grants/query?project_id=proj_1", strings.NewReader(`{}`)),
+			},
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
@@ -151,19 +156,36 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 
 	t.Run("invalid bearer", func(t *testing.T) {
 		t.Parallel()
-		mock := gomock.NewController(t)
-		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
-		srv := newErrorHandlerTestServer(t, tokenService)
+		tests := []struct {
+			name string
+			req  *http.Request
+		}{
+			{
+				name: "create",
+				req:  httptest.NewRequest(http.MethodPost, "/grants?project_id=proj_1", strings.NewReader(`{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`)),
+			},
+			{
+				name: "query",
+				req:  httptest.NewRequest(http.MethodPost, "/grants/query?project_id=proj_1", strings.NewReader(`{}`)),
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				mock := gomock.NewController(t)
+				tokenService := mocks.NewMockTokenService(mock)
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+				srv := newErrorHandlerTestServer(t, tokenService)
 
-		req := httptest.NewRequest(http.MethodPost, "/grants?project_id=proj_1", strings.NewReader(`{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`))
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer garbage")
-		rec := httptest.NewRecorder()
-		srv.ServeHTTP(rec, req)
+				tc.req.Header.Set("Content-Type", "application/json")
+				tc.req.Header.Set("Authorization", "Bearer garbage")
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, tc.req)
 
-		require.Equal(t, http.StatusUnauthorized, rec.Code)
-		require.JSONEq(t, want, rec.Body.String())
+				require.Equal(t, http.StatusUnauthorized, rec.Code)
+				require.JSONEq(t, want, rec.Body.String())
+			})
+		}
 	})
 
 	// Dual-scheme ops try nextgenSession when a cookie is present. A bad
