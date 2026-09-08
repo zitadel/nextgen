@@ -63,10 +63,19 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
 		return nil, err
 	}
-	update, err := patchProjectToService(projectID, req)
-	if err != nil {
-		return nil, err
+
+	update := service.UpdateProjectRequest{ID: projectID}
+	if name, ok := req.Name.Get(); ok {
+		update.Name = &name
 	}
+	if req.PasswordHash.IsSet() {
+		policy, err := passwordHashPolicyToDomain(req.PasswordHash)
+		if err != nil {
+			return nil, err
+		}
+		update.PasswordHashPolicy = &policy
+	}
+
 	project, err := h.projectService.Update(ctx, update)
 	if err != nil {
 		return nil, err
@@ -100,27 +109,6 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 }
 
 // ------------------ Converters ---------------
-
-// patchProjectToService reads a PATCH body as the set of fields it names. A
-// field left out of the body is left out of the update; only what the caller
-// wrote is carried through.
-func patchProjectToService(projectID string, req *api.PatchProjectRequest) (service.UpdateProjectRequest, error) {
-	update := service.UpdateProjectRequest{ID: projectID}
-	// An absent or null name leaves nothing to write; a name that is present
-	// but empty is rejected downstream with proj.name_invalid, the 400 the
-	// contract declares.
-	if name, ok := req.Name.Get(); ok {
-		update.Name = &name
-	}
-	if req.PasswordHash.IsSet() {
-		policy, err := passwordHashPolicyToDomain(req.PasswordHash)
-		if err != nil {
-			return service.UpdateProjectRequest{}, err
-		}
-		update.PasswordHashPolicy = &policy
-	}
-	return update, nil
-}
 
 // passwordHashPolicyToDomain converts a hashing method off the wire. Explicit
 // null is the instruction to stop choosing one, and reaches the domain as a nil

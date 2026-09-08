@@ -231,12 +231,6 @@ func (c *HashConfig) NewHasher() (*PasswapHasher, error) {
 	return factory.Default(), nil
 }
 
-// HasherFactory builds hashers that differ only in how they hash. Every hasher
-// it hands out carries the deployment's full verifier set and cost limits, so a
-// project choosing its own algorithm (ADR 029 §Hashing) changes what new
-// passwords are written with and nothing about what can be read back: a hash
-// written under one project's algorithm stays verifiable everywhere the
-// deployment could already verify it.
 type HasherFactory struct {
 	verifiers      []verifier.Verifier
 	verifierPrefix []string
@@ -245,8 +239,6 @@ type HasherFactory struct {
 	defaultHasher  *PasswapHasher
 }
 
-// NewHasherFactory validates the whole configuration once, so a deployment with
-// an unusable verifier set fails at startup rather than at the first password.
 func (c *HashConfig) NewHasherFactory() (*HasherFactory, error) {
 	verifiers, vPrefixes, err := c.buildVerifiers()
 	if err != nil {
@@ -265,17 +257,10 @@ func (c *HashConfig) NewHasherFactory() (*HasherFactory, error) {
 	return factory, nil
 }
 
-// Default is the hasher configured for the deployment, used by every project
-// that has not chosen one of its own.
 func (f *HasherFactory) Default() *PasswapHasher {
 	return f.defaultHasher
 }
 
-// New builds a hasher that writes with cfg, rejecting an algorithm the
-// deployment cannot hash with. It does not re-check cost parameters: a stored
-// policy was checked by [HasherFactory.Check] when it was written, and the
-// deployment's own hasher has never been held to its own limits -- those bound
-// what may be read in, not what the operator configured.
 func (f *HasherFactory) New(cfg HasherConfig) (*PasswapHasher, error) {
 	hasher, prefixes, err := cfg.buildHasher(f.limits)
 	if err != nil {
@@ -288,25 +273,6 @@ func (f *HasherFactory) New(cfg HasherConfig) (*PasswapHasher, error) {
 	}, nil
 }
 
-// Check accepts cfg only if this deployment would take back what it produces.
-// It is the gate for a hashing method someone chooses at runtime, where an
-// operator's own configuration is trusted and a stranger's is not.
-//
-// Two things have to hold. The deployment must be able to *verify* what the
-// method writes: passwap routes a stored hash to a verifier by its prefix, and
-// hashing with a prefix no configured verifier answers to would lock out every
-// user whose password was written that way. And the cost parameters must sit
-// inside the configured limits, which is the same bar an imported hash has to
-// clear on the way in.
-//
-// Nothing is hashed here. A probe hash would answer both questions by asking
-// passwap rather than by restating its bounds, but it would answer them after
-// allocating whatever the caller asked for -- and "memory: 4194304" is a
-// parameter someone can send. Cost is checked before it is paid.
-//
-// It reports [ErrAlgorithmNotSupported] for an algorithm that cannot hash or
-// cannot be verified here, and [ErrBoundsError] for parameters outside the
-// configured limits.
 func (f *HasherFactory) Check(cfg HasherConfig) error {
 	_, prefixes, err := cfg.buildHasher(f.limits)
 	if err != nil {

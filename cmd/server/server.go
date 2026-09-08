@@ -115,11 +115,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
-	// The factory validates the whole hashing configuration here, so a bad one
-	// fails at startup. Its default is what verifies every stored hash and what
-	// hashes for every project that has not chosen a method of its own; a
-	// project that has chosen one gets a hasher built from the same verifier set
-	// and limits (ADR 029 §Hashing).
 	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
 	if err != nil {
 		return fmt.Errorf("failed to build password hasher: %w", err)

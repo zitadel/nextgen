@@ -44,9 +44,6 @@ func (h *Harness) ensureHasher(t *testing.T) *crypto.PasswapHasher {
 	return h.EnsureHasherFactory(t).Default()
 }
 
-// EnsureProjectHashers is the real per-project resolver over the harness pool,
-// so a test that gives a project its own hashing method exercises the same
-// resolution the server does.
 func (h *Harness) EnsureProjectHashers(t *testing.T) service.ProjectHasherResolver {
 	t.Helper()
 	return service.NewProjectHasherResolver(h.EnsureServiceDB(t), h.EnsureHasherFactory(t))
@@ -64,11 +61,6 @@ func (h *Harness) EnsureHasherFactory(t *testing.T) *crypto.HasherFactory {
 }
 
 func createNewHasherFactory(t *testing.T) *crypto.HasherFactory {
-	// bcrypt hashes fast enough for a test suite and is the default here for
-	// that reason. argon2 is configured too, but only as a verifier and a set of
-	// limits: that is what a project needs to be allowed to choose it, and it is
-	// what lets a test tell a project's own method apart from the deployment's
-	// by the prefix of what comes out.
 	cfg := crypto.HashConfig{
 		Verifiers: []crypto.HashName{crypto.HashNameBcrypt, crypto.HashNameArgon2},
 		Hasher: crypto.HasherConfig{
