@@ -4377,6 +4377,44 @@ func (c *MockAllStatementsNewManagedIDCall) DoAndReturn(f func(string) (string, 
 	return c
 }
 
+// PatchUser mocks base method.
+func (m *MockAllStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchUser", ctx, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchUser indicates an expected call of PatchUser.
+func (mr *MockAllStatementsMockRecorder) PatchUser(ctx, user any) *MockAllStatementsPatchUserCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchUser", reflect.TypeOf((*MockAllStatements)(nil).PatchUser), ctx, user)
+	return &MockAllStatementsPatchUserCall{Call: call}
+}
+
+// MockAllStatementsPatchUserCall wrap *gomock.Call
+type MockAllStatementsPatchUserCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsPatchUserCall) Return(arg0 error) *MockAllStatementsPatchUserCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsPatchUserCall) Do(f func(context.Context, *domain.PatchUser) error) *MockAllStatementsPatchUserCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsPatchUserCall) DoAndReturn(f func(context.Context, *domain.PatchUser) error) *MockAllStatementsPatchUserCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // PersistCatalogVersion mocks base method.
 func (m *MockAllStatements) PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error {
 	m.ctrl.T.Helper()
@@ -7796,6 +7834,44 @@ func (c *MockUserStatementsListUsersCall) Do(f func(context.Context, *database.L
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockUserStatementsListUsersCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// PatchUser mocks base method.
+func (m *MockUserStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchUser", ctx, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchUser indicates an expected call of PatchUser.
+func (mr *MockUserStatementsMockRecorder) PatchUser(ctx, user any) *MockUserStatementsPatchUserCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchUser", reflect.TypeOf((*MockUserStatements)(nil).PatchUser), ctx, user)
+	return &MockUserStatementsPatchUserCall{Call: call}
+}
+
+// MockUserStatementsPatchUserCall wrap *gomock.Call
+type MockUserStatementsPatchUserCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsPatchUserCall) Return(arg0 error) *MockUserStatementsPatchUserCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsPatchUserCall) Do(f func(context.Context, *domain.PatchUser) error) *MockUserStatementsPatchUserCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsPatchUserCall) DoAndReturn(f func(context.Context, *domain.PatchUser) error) *MockUserStatementsPatchUserCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

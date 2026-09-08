@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -366,6 +367,189 @@ func assertUserAttributes(t *testing.T, user *domain.User, want map[string]any) 
 		got[string(attr.Key)] = attr.Value
 	}
 	assert.Equal(t, want, got)
+}
+
+func getUserByID(t *testing.T, stmts service.AllStatements, projectID, userID string) *domain.User {
+	t.Helper()
+
+	got, err := stmts.GetUser(t.Context(), database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
+	), service.UserQueryOptions{})
+	require.NoError(t, err)
+	return got
+}
+
+// patchStateOf builds the post-merge state a patch writes, guarded by the
+// given user's current updated_at.
+func patchStateOf(user *domain.User, attrs ...domain.CreateAttribute) *domain.PatchUser {
+	teamScope := ""
+	if user.LifecycleOwnerTeamID != nil {
+		teamScope = *user.LifecycleOwnerTeamID
+	}
+	return &domain.PatchUser{
+		ProjectID:          user.ProjectID,
+		UserID:             user.ID,
+		SchemaURL:          user.SchemaURL,
+		ExpectedUpdatedAt:  user.Metadata.UpdatedAt,
+		Attributes:         attrs,
+		AttributeTeamScope: teamScope,
+	}
+}
+
+func TestUserStatements_PatchUser(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		mustAttr := func(key domain.AttributeKey, value any, scope domain.AttributeUniqueness) domain.CreateAttribute {
+			attr, err := domain.NewCreateAttribute(key, value, scope)
+			require.NoError(t, err)
+			return *attr
+		}
+
+		t.Run("rewrites to the given state and bumps the guard", func(t *testing.T) {
+			user := newTestUser(t, projectID, schemaURL, "user_patch_rw", "patch-rw@example.com", "Before")
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+			before := getUserByID(t, d.stmts, projectID, user.ID)
+
+			patched := patchStateOf(before,
+				mustAttr("email", "patch-rw-new@example.com", domain.AttributeUniquenessProject),
+				mustAttr("role", "admin", domain.AttributeUniquenessUnspecified),
+			)
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patched))
+
+			after := getUserByID(t, d.stmts, projectID, user.ID)
+			assertUserAttributes(t, after, map[string]any{
+				"email": "patch-rw-new@example.com",
+				"role":  "admin",
+			})
+			assert.Equal(t, schemaURL, after.SchemaURL)
+
+			// The guard moved with the write: replaying the patch against the
+			// pre-patch updated_at writes nothing.
+			err := d.stmts.PatchUser(t.Context(), patchStateOf(before,
+				mustAttr("email", "patch-rw-replay@example.com", domain.AttributeUniquenessProject),
+			))
+			var noRow *database.NoRowFoundError
+			require.ErrorAs(t, err, &noRow)
+			assertUserAttributes(t, getUserByID(t, d.stmts, projectID, user.ID), map[string]any{
+				"email": "patch-rw-new@example.com",
+				"role":  "admin",
+			})
+		})
+
+		t.Run("frees the old unique value and claims the new", func(t *testing.T) {
+			user := newTestUser(t, projectID, schemaURL, "user_patch_claim", "claim-old@example.com", "Claimer")
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+			before := getUserByID(t, d.stmts, projectID, user.ID)
+
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(before,
+				mustAttr("email", "claim-new@example.com", domain.AttributeUniquenessProject),
+			)))
+
+			// The old value is claimable again ...
+			freed := newTestUser(t, projectID, schemaURL, "user_patch_claim2", "claim-old@example.com", "Newcomer")
+			require.NoError(t, d.stmts.CreateUser(t.Context(), freed))
+
+			// ... and the new one is held.
+			taken := newTestUser(t, projectID, schemaURL, "user_patch_claim3", "claim-new@example.com", "TooLate")
+			err := d.stmts.CreateUser(t.Context(), taken)
+			var uniqueErr *database.UniqueError
+			require.ErrorAs(t, err, &uniqueErr)
+		})
+
+		t.Run("a collision with another user's claim writes nothing", func(t *testing.T) {
+			userA := newTestUser(t, projectID, schemaURL, "user_patch_col_a", "collide-a@example.com", "A")
+			userB := newTestUser(t, projectID, schemaURL, "user_patch_col_b", "collide-b@example.com", "B")
+			require.NoError(t, d.stmts.CreateUser(t.Context(), userA))
+			require.NoError(t, d.stmts.CreateUser(t.Context(), userB))
+			beforeB := getUserByID(t, d.stmts, projectID, userB.ID)
+
+			err := d.stmts.PatchUser(t.Context(), patchStateOf(beforeB,
+				mustAttr("email", "collide-a@example.com", domain.AttributeUniquenessProject),
+				mustAttr("name", "B", domain.AttributeUniquenessUnspecified),
+			))
+			var uniqueErr *database.UniqueError
+			require.ErrorAs(t, err, &uniqueErr)
+
+			// The failed patch rolled back entirely: attributes are untouched
+			// and the guard did not move, so the same read still authorizes a
+			// write.
+			assertUserAttributes(t, getUserByID(t, d.stmts, projectID, userB.ID), map[string]any{
+				"email": "collide-b@example.com",
+				"name":  "B",
+			})
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(beforeB,
+				mustAttr("email", "collide-c@example.com", domain.AttributeUniquenessProject),
+				mustAttr("name", "B", domain.AttributeUniquenessUnspecified),
+			)))
+		})
+
+		t.Run("an unchanged unique value survives the rewrite", func(t *testing.T) {
+			user := newTestUser(t, projectID, schemaURL, "user_patch_keep", "keep@example.com", "Keeper")
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+			before := getUserByID(t, d.stmts, projectID, user.ID)
+
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(before,
+				mustAttr("email", "keep@example.com", domain.AttributeUniquenessProject),
+				mustAttr("role", "admin", domain.AttributeUniquenessUnspecified),
+			)))
+
+			// The claim still resolves and still defends.
+			got, err := d.stmts.GetUser(t.Context(),
+				database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				service.UserQueryOptions{
+					Attributes:           []domain.Attribute{{Key: "email", Value: "keep@example.com"}},
+					UniqueAttributesOnly: true,
+				},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, user.ID, got.ID)
+
+			dup := newTestUser(t, projectID, schemaURL, "user_patch_keep2", "keep@example.com", "Impostor")
+			err = d.stmts.CreateUser(t.Context(), dup)
+			var uniqueErr *database.UniqueError
+			require.ErrorAs(t, err, &uniqueErr)
+		})
+
+		t.Run("moves the schema pointer", func(t *testing.T) {
+			const schemaURLv2 = "https://example.com/schemas/test-user-v2"
+			require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+				ProjectID: projectID,
+				URL:       schemaURLv2,
+				Schema:    []byte(`{"type":"object"}`),
+			}))
+			t.Cleanup(func() {
+				_ = d.stmts.DeleteJSONSchemaByID(context.Background(), projectID, schemaURLv2)
+			})
+
+			user := newTestUser(t, projectID, schemaURL, "user_patch_schema", "patch-schema@example.com", "Mover")
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+			before := getUserByID(t, d.stmts, projectID, user.ID)
+
+			patched := patchStateOf(before,
+				mustAttr("email", "patch-schema@example.com", domain.AttributeUniquenessProject),
+			)
+			patched.SchemaURL = schemaURLv2
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patched))
+
+			assert.Equal(t, schemaURLv2, getUserByID(t, d.stmts, projectID, user.ID).SchemaURL)
+		})
+
+		t.Run("an unknown user writes nothing", func(t *testing.T) {
+			err := d.stmts.PatchUser(t.Context(), &domain.PatchUser{
+				ProjectID:         projectID,
+				UserID:            "user_patch_missing",
+				SchemaURL:         schemaURL,
+				ExpectedUpdatedAt: time.Now(),
+				Attributes: domain.CreateAttributes{
+					mustAttr("email", "missing@example.com", domain.AttributeUniquenessProject),
+				},
+			})
+			var noRow *database.NoRowFoundError
+			require.ErrorAs(t, err, &noRow)
+		})
+	})
 }
 
 func TestUserStatements_GetUser_UniqueAttributesOnly(t *testing.T) {

@@ -289,6 +289,13 @@ const DefaultUserTeamsLimit = 10
 type UserStatements interface {
 	Statements
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
+	// PatchUser reconciles the stored user to the given post-merge state:
+	// header (schema_url, updated_at), attribute rows, and unique-attribute
+	// registry rows are all rewritten. It writes nothing and returns a
+	// NoRowFoundError when the row's updated_at no longer matches
+	// [domain.PatchUser.ExpectedUpdatedAt] (concurrent write) or the user is
+	// gone.
+	PatchUser(ctx context.Context, user *domain.PatchUser) error
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error

@@ -169,34 +169,10 @@ func NewCreateUser(params CreateUserParams) (*CreateUser, error) {
 			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
 	}
 
-	var jschema jsonschema.Schema
-	err := json.Unmarshal(params.Schema, &jschema)
+	createAttrs, err := validateAndFlattenAttributes(params.Schema, params.Attributes,
+		"No attributes provided. A user must carry at least one schema-defined property.")
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
-	}
-
-	err = jschema.Validate(params.Attributes)
-	if err != nil {
-		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
-	}
-
-	var mschema map[string]any
-	err = json.Unmarshal(params.Schema, &mschema)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
-	}
-
-	createAttrs, err := CreateAttributesFromMap(params.Attributes, mschema)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
-	}
-
-	// A schema whose properties are all optional validates {}, but a user is
-	// stored as its attribute rows: with none there is nothing to write. The
-	// dialects refuse it too, so catching it here answers 400 instead of 500.
-	if len(createAttrs) == 0 {
-		return nil, ErrUserInvalid().
-			WithMessage("No attributes provided. A user must carry at least one schema-defined property.")
+		return nil, err
 	}
 
 	return &CreateUser{
@@ -206,6 +182,110 @@ func NewCreateUser(params CreateUserParams) (*CreateUser, error) {
 		SchemaURL:               params.SchemaURL,
 		Attributes:              createAttrs,
 	}, nil
+}
+
+// PatchUser is the full post-merge state the patch statement writes — not a
+// delta: the statement reconciles the stored rows to exactly this set.
+type PatchUser struct {
+	ProjectID string
+	UserID    string
+	// SchemaURL is the schema pointer after the patch (unchanged unless the
+	// patch moved it, per ADR 009 §4).
+	SchemaURL string
+	// ExpectedUpdatedAt is the updated_at the merge was computed against. The
+	// statement writes nothing when the row has moved past it, so a lost race
+	// re-merges against fresh state instead of clobbering the interleaved
+	// write.
+	ExpectedUpdatedAt time.Time
+	// Attributes is the complete desired attribute set after the merge.
+	Attributes CreateAttributes
+	// AttributeTeamScope scopes team-unique registry rows.
+	AttributeTeamScope string
+}
+
+// PatchUserParams are the inputs to [NewPatchUser].
+type PatchUserParams struct {
+	// Current is the stored user the patch merges into.
+	Current *User
+	// SchemaURL names the schema the merged document must satisfy: the
+	// current pointer, or the new one when the patch moves it. Schema is that
+	// schema's document.
+	SchemaURL string
+	Schema    []byte
+	// AttributesPatch is merged into the current attributes per
+	// [MergeAttributesPatch]; nil values delete.
+	AttributesPatch map[string]any
+}
+
+// NewPatchUser merges the patch into the user's current attributes and
+// validates the merged document against the target schema, mirroring
+// [NewCreateUser] for the update path.
+func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
+	if params.SchemaURL == "" {
+		return nil, ErrUserInvalid().
+			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
+	}
+
+	current, err := params.Current.Attributes.ToMap()
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to expand stored user attributes")
+	}
+	merged := MergeAttributesPatch(current, params.AttributesPatch)
+
+	patchAttrs, err := validateAndFlattenAttributes(params.Schema, merged,
+		"No attributes left. A user must carry at least one schema-defined property.")
+	if err != nil {
+		return nil, err
+	}
+
+	// Create scopes team-unique registry rows to the initial membership team
+	// first (see [CreateUser.AttributeTeamScope]); a patch has no membership
+	// context, so the fallback applies: lifecycle owner team, else "" (the
+	// project scope). A user created into a team that is not their lifecycle
+	// owner therefore has their team-unique claims re-scoped to the owner on
+	// first patch. Nothing creates such users today; preserving each existing
+	// registry row's team is the upgrade path if that changes.
+	teamScope := ""
+	if params.Current.LifecycleOwnerTeamID != nil {
+		teamScope = *params.Current.LifecycleOwnerTeamID
+	}
+
+	return &PatchUser{
+		ProjectID:          params.Current.ProjectID,
+		UserID:             params.Current.ID,
+		SchemaURL:          params.SchemaURL,
+		ExpectedUpdatedAt:  params.Current.Metadata.UpdatedAt,
+		Attributes:         patchAttrs,
+		AttributeTeamScope: teamScope,
+	}, nil
+}
+
+// validateAndFlattenAttributes validates the document against the schema and
+// flattens it into attribute rows. A document that flattens to no rows is
+// refused with emptyMessage: a user is stored as its attribute rows, so with
+// none there is nothing to write. The dialects refuse it too, so catching it
+// here answers 400 instead of 500.
+func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessage string) (CreateAttributes, error) {
+	var jschema jsonschema.Schema
+	if err := json.Unmarshal(schema, &jschema); err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
+	}
+	if err := jschema.Validate(doc); err != nil {
+		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
+	}
+
+	var mschema map[string]any
+	if err := json.Unmarshal(schema, &mschema); err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
+	}
+	attrs, err := CreateAttributesFromMap(doc, mschema)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
+	}
+	if len(attrs) == 0 {
+		return nil, ErrUserInvalid().WithMessage(emptyMessage)
+	}
+	return attrs, nil
 }
 
 // UserField enumerates the fields of User which can be used for filtering and

@@ -63,6 +63,64 @@ _membership AS (
 SELECT 1;
 `
 
+	// patchUserHeaderStmt rewrites the header row. The updated_at predicate is
+	// the optimistic guard: a row that moved past the value the merge was
+	// computed against matches nothing, and the caller retries from a fresh
+	// read.
+	patchUserHeaderStmt = `
+UPDATE zitadel_nextgen.users
+SET updated_at = NOW(), schema_url = $1
+WHERE project_id = $2 AND id = $3 AND updated_at = $4
+`
+
+	deleteUserUniqueAttributesStmt = `
+DELETE FROM zitadel_nextgen.user_unique_attributes
+WHERE project_id = $1 AND user_id = $2
+`
+
+	deleteUserAttributesStmt = `
+DELETE FROM zitadel_nextgen.user_attributes
+WHERE project_id = $1 AND user_id = $2
+`
+
+	// patchUserAttributesSQL bulk-inserts the full post-merge attribute set
+	// plus its registry rows, mirroring the tail of userInsertSQL. It runs
+	// after the delete statements above, so the whole patch is a full rewrite
+	// of the user's rows; diff-based reconciliation (see
+	// migration/sql/user_examples/patch.sql) is the upgrade path if attribute
+	// counts ever make that churn matter.
+	patchUserAttributesSQL = `
+WITH _input_data AS (
+    SELECT *,
+           unique_scope_txt::zitadel_nextgen.uniqueness_scope AS unique_scope
+    FROM unnest(
+        $4::text[],
+        $5::jsonb[],
+        $6::bytea[],
+        $7::text[]
+    ) AS t(key, value, value_hash, unique_scope_txt)
+),
+_registry AS (
+    INSERT INTO zitadel_nextgen.user_unique_attributes (
+        project_id, user_id, team_id, key, value_hash
+    )
+    SELECT $1, $2,
+           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
+                THEN ''
+                ELSE $3::text
+           END,
+           d.key, d.value_hash
+    FROM _input_data d
+    WHERE d.unique_scope <> 'unspecified'::zitadel_nextgen.uniqueness_scope
+      AND d.value_hash IS NOT NULL
+)
+INSERT INTO zitadel_nextgen.user_attributes (
+    project_id, team_id, user_id, key, value
+)
+SELECT $1, $3::text, $2, d.key, d.value
+FROM _input_data d
+`
+
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM zitadel_nextgen.users`
 
 	userAttributesTable       = "zitadel_nextgen.user_attributes"
@@ -150,25 +208,9 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user create requires attributes")
 	}
-	keys := make([]domain.AttributeKey, len(user.Attributes))
-	values := make([][]byte, len(user.Attributes))
-	hashes := make([][]byte, len(user.Attributes))
-	scopes := make([]string, len(user.Attributes))
-
-	for i, a := range user.Attributes {
-		raw, err := json.Marshal(a.Value)
-		if err != nil {
-			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-		}
-		keys[i] = a.Key
-		values[i] = raw
-		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
-			hashes[i] = nil
-		} else {
-			sum := a.ValueHash
-			hashes[i] = append([]byte(nil), sum[:]...)
-		}
-		scopes[i] = uniquenessScopeLiteral(a.UniqueScope)
+	keys, values, hashes, scopes, err := userAttributeArrays(user.Attributes)
+	if err != nil {
+		return err
 	}
 
 	teamScope := user.AttributeTeamScope()
@@ -195,6 +237,70 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		rsi := newResourceScopeStatements(tx)
 		edges := newAuthzMembershipEdgeStatements(tx)
 		return authz.UserCreated(ctx, &rsi, &edges, user.ProjectID, user.ID, initialTeamID)
+	})
+}
+
+// userAttributeArrays flattens attribute rows into the parallel arrays the
+// bulk insert statements unnest.
+func userAttributeArrays(attrs domain.CreateAttributes) (keys []domain.AttributeKey, values, hashes [][]byte, scopes []string, err error) {
+	keys = make([]domain.AttributeKey, len(attrs))
+	values = make([][]byte, len(attrs))
+	hashes = make([][]byte, len(attrs))
+	scopes = make([]string, len(attrs))
+
+	for i, a := range attrs {
+		raw, err := json.Marshal(a.Value)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+		}
+		keys[i] = a.Key
+		values[i] = raw
+		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
+			hashes[i] = nil
+		} else {
+			sum := a.ValueHash
+			hashes[i] = append([]byte(nil), sum[:]...)
+		}
+		scopes[i] = uniquenessScopeLiteral(a.UniqueScope)
+	}
+	return keys, values, hashes, scopes, nil
+}
+
+// PatchUser implements [service.UserStatements] as a full rewrite of the
+// user's attribute and registry rows; a registry insert colliding with
+// another user's claim still surfaces as a UniqueError.
+func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	if len(user.Attributes) == 0 {
+		return fmt.Errorf("user patch requires attributes")
+	}
+	keys, values, hashes, scopes, err := userAttributeArrays(user.Attributes)
+	if err != nil {
+		return err
+	}
+
+	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
+		tag, err := tx.Exec(ctx, patchUserHeaderStmt,
+			user.SchemaURL, user.ProjectID, user.UserID, user.ExpectedUpdatedAt,
+		)
+		if err != nil {
+			return wrapError(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return wrapError(pgx.ErrNoRows)
+		}
+		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
+			return wrapError(err)
+		}
+		if _, err := tx.Exec(ctx, deleteUserAttributesStmt, user.ProjectID, user.UserID); err != nil {
+			return wrapError(err)
+		}
+		if _, err := tx.Exec(ctx, patchUserAttributesSQL,
+			user.ProjectID, user.UserID, user.AttributeTeamScope,
+			keys, values, hashes, scopes,
+		); err != nil {
+			return wrapError(err)
+		}
+		return nil
 	})
 }
 

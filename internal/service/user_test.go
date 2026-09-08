@@ -10,6 +10,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -291,6 +292,123 @@ func TestUserService_ListUsers_TranslatesQuery(t *testing.T) {
 
 		assert.Nil(t, gotOpts.MembershipTeamID)
 	})
+}
+
+// A patch that loses the race re-merges against the interleaved write
+// (last-write-wins) instead of clobbering it: the stale statement result
+// triggers a fresh read, and the second write carries the interleaved change.
+func TestUserService_PatchUser_LastWriteWinsRetry(t *testing.T) {
+	t.Parallel()
+
+	const schemaJSON = `{
+		"type": "object",
+		"properties": {
+			"email": {"type": "string"},
+			"givenName": {"type": "string"}
+		}
+	}`
+	firstRead := time.Date(2026, 9, 8, 12, 0, 0, 0, time.UTC)
+	secondRead := firstRead.Add(time.Second)
+	storedUser := func(updatedAt time.Time, email string) *domain.User {
+		return &domain.User{
+			ProjectID: "proj_1",
+			SchemaURL: "https://example.test/schema.json",
+			ID:        "user_1",
+			Metadata:  domain.UserMetadata{UpdatedAt: updatedAt},
+			Attributes: domain.Attributes{
+				{Key: "email", Value: email},
+				{Key: "givenName", Value: "Alice"},
+			},
+		}
+	}
+
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return tx(ctx, statementer)
+		},
+	).AnyTimes()
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
+
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{
+			ProjectID: "proj_1",
+			URL:       "https://example.test/schema.json",
+			Schema:    []byte(schemaJSON),
+		}, nil).Times(2)
+
+	gomock.InOrder(
+		stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(storedUser(firstRead, "alice@example.com"), nil),
+		stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, patch *domain.PatchUser) error {
+				assert.Equal(t, firstRead, patch.ExpectedUpdatedAt)
+				return database.NewNoRowFoundError(nil)
+			},
+		),
+		// The retry reads the interleaved writer's state (a new email).
+		stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(storedUser(secondRead, "moved@example.com"), nil),
+		stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, patch *domain.PatchUser) error {
+				assert.Equal(t, secondRead, patch.ExpectedUpdatedAt)
+				email, ok := patch.Attributes.Get("email")
+				require.True(t, ok)
+				assert.Equal(t, "moved@example.com", email.Value, "the re-merge must keep the interleaved write")
+				name, ok := patch.Attributes.Get("givenName")
+				require.True(t, ok)
+				assert.Equal(t, "Alicia", name.Value)
+				return nil
+			},
+		),
+		// Read-back for the response.
+		stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(storedUser(secondRead.Add(time.Second), "moved@example.com"), nil),
+	)
+
+	svcPool := service.NewPool(pool)
+	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool})
+
+	got, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+		ProjectID:  "proj_1",
+		UserID:     "user_1",
+		Attributes: map[string]any{"givenName": "Alicia"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+}
+
+func TestUserService_PatchUser_EmptyPatchRefused(t *testing.T) {
+	t.Parallel()
+
+	svc, _ := newMockedUserService(t)
+	_, err := svc.PatchUser(t.Context(), service.PatchUserInput{ProjectID: "proj_1", UserID: "user_1"})
+	require.ErrorIs(t, err, domain.ErrUserInvalid())
+}
+
+func TestUserService_PatchMyUser_SessionGuards(t *testing.T) {
+	t.Parallel()
+
+	svc, _ := newMockedUserService(t)
+
+	_, err := svc.PatchMyUser(t.Context(), service.PatchMyUserInput{
+		Attributes: map[string]any{"givenName": "Alicia"},
+	})
+	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
+
+	expired := time.Now().Add(-time.Hour)
+	_, err = svc.PatchMyUser(t.Context(), service.PatchMyUserInput{
+		SessionToken: &domain.Token{ProjectID: "proj_1", UserID: "user_1", ExpiresAt: &expired},
+		Attributes:   map[string]any{"givenName": "Alicia"},
+	})
+	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
 }
 
 func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.MockAllStatements) {

@@ -57,6 +57,17 @@ ORDER BY m.user_id, t.name, m.team_id`
 FROM teams
 WHERE project_id = @p1 AND id IN UNNEST(@p2)`
 
+	// patchUserHeaderStmt rewrites the header row. The updated_at predicate is
+	// the optimistic guard: a row that moved past the value the merge was
+	// computed against matches nothing, and the caller retries from a fresh
+	// read.
+	patchUserHeaderStmt = `UPDATE users SET updated_at = CURRENT_TIMESTAMP(), schema_url = @p1
+WHERE project_id = @p2 AND id = @p3 AND updated_at = @p4`
+
+	deleteUserUniqueAttributesStmt = `DELETE FROM user_unique_attributes WHERE project_id = @p1 AND user_id = @p2`
+
+	deleteUserAttributesStmt = `DELETE FROM user_attributes WHERE project_id = @p1 AND user_id = @p2`
+
 	deactivateUserStmt = `UPDATE users SET status = @p1, updated_at = CURRENT_TIMESTAMP()
 WHERE project_id = @p2 AND id = @p3`
 
@@ -99,29 +110,8 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			return err
 		}
 
-		for _, a := range user.Attributes {
-			raw, err := json.Marshal(a.Value)
-			if err != nil {
-				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-			}
-			if _, err := tx.Update(ctx, buildStatement(createUserAttributeStmt,
-				user.ProjectID, teamScope, user.ID, a.Key, string(raw),
-			).statement()); err != nil {
-				return err
-			}
-			if a.UniqueScope == domain.AttributeUniquenessUnspecified {
-				continue
-			}
-			scopeTeamID := teamScope
-			if a.UniqueScope == domain.AttributeUniquenessProject {
-				scopeTeamID = ""
-			}
-			sum := a.ValueHash
-			if _, err := tx.Update(ctx, buildStatement(createUserUniqueAttrStmt,
-				user.ProjectID, user.ID, scopeTeamID, a.Key, append([]byte(nil), sum[:]...),
-			).statement()); err != nil {
-				return err
-			}
+		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, teamScope, user.Attributes); err != nil {
+			return err
 		}
 
 		initialTeamID := ""
@@ -138,6 +128,63 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		rsi := newResourceScopeStatements(tx)
 		edges := newAuthzMembershipEdgeStatements(tx)
 		return authz.UserCreated(ctx, &rsi, &edges, user.ProjectID, user.ID, initialTeamID)
+	})
+}
+
+// insertUserAttributes writes one attribute row per entry, plus a registry
+// row for each unique-scoped value.
+func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID, teamScope string, attrs domain.CreateAttributes) error {
+	for _, a := range attrs {
+		raw, err := json.Marshal(a.Value)
+		if err != nil {
+			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+		}
+		if _, err := tx.Update(ctx, buildStatement(createUserAttributeStmt,
+			projectID, teamScope, userID, a.Key, string(raw),
+		).statement()); err != nil {
+			return err
+		}
+		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
+			continue
+		}
+		scopeTeamID := teamScope
+		if a.UniqueScope == domain.AttributeUniquenessProject {
+			scopeTeamID = ""
+		}
+		sum := a.ValueHash
+		if _, err := tx.Update(ctx, buildStatement(createUserUniqueAttrStmt,
+			projectID, userID, scopeTeamID, a.Key, append([]byte(nil), sum[:]...),
+		).statement()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// PatchUser implements [service.UserStatements] as a full rewrite of the
+// user's attribute and registry rows; a registry insert colliding with
+// another user's claim still surfaces as a UniqueError.
+func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	if len(user.Attributes) == 0 {
+		return fmt.Errorf("user patch requires attributes")
+	}
+	return withTransaction(ctx, us.db, func(ctx context.Context, tx queryExecutor) error {
+		n, err := tx.Update(ctx, buildStatement(patchUserHeaderStmt,
+			user.SchemaURL, user.ProjectID, user.UserID, user.ExpectedUpdatedAt,
+		).statement())
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return wrapError(spanner.ErrRowNotFound)
+		}
+		if _, err := tx.Update(ctx, buildStatement(deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID).statement()); err != nil {
+			return err
+		}
+		if _, err := tx.Update(ctx, buildStatement(deleteUserAttributesStmt, user.ProjectID, user.UserID).statement()); err != nil {
+			return err
+		}
+		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes)
 	})
 }
 
