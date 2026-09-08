@@ -147,8 +147,9 @@ function StateCard({ title, children }: { title: string; children: ReactNode }) 
  * It is about the *project*, not the link in the address bar: an unclaimed
  * project can be claimed for 14 days after it is created (ADR 046), while the
  * link itself lapses in minutes. Both can therefore be true at once — an
- * expired link with eleven days still on the window — which is why it renders
- * beside every outcome rather than instead of one.
+ * expired link with eleven days still on the window — so it renders beside a
+ * failed outcome rather than instead of one. A claimed project is the
+ * exception: nothing is left to count down, and `CompleteClaim` drops it.
  *
  * Days, not a ticking clock: the window is two weeks long, so a
  * second-by-second timer would be motion that never tells the reader anything.
