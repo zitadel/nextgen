@@ -23,8 +23,7 @@ properties:
     type: number
     minimum: 0.5
     maximum: 2
-    default: 1
     description: |
-      Multiplier on the logo's maximum height. The image keeps its intrinsic
+      Multiplier on the logo's maximum height, `1` when omitted. The image keeps its intrinsic
       aspect ratio inside that cap; no width, height or ratio is stored.
     example: 1

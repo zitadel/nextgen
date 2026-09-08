@@ -6852,7 +6852,7 @@ type BrandingShape struct {
 	Radius OptBrandingShapeRadius `json:"radius"`
 	// Spacing and control height.
 	Density OptBrandingShapeDensity `json:"density"`
-	// Multiplier on the logo's maximum height. The image keeps its intrinsic
+	// Multiplier on the logo's maximum height, `1` when omitted. The image keeps its intrinsic
 	// aspect ratio inside that cap; no width, height or ratio is stored.
 	LogoScale OptFloat64 `json:"logo_scale"`
 }
@@ -7150,7 +7150,7 @@ type BrandingTypography struct {
 	// the face, and Zitadel does not inject a stylesheet into a document it
 	// does not own.
 	FontURL OptURI `json:"font_url"`
-	// Multiplier on the base text sizes.
+	// Multiplier on the base text sizes, `1` when omitted.
 	Scale OptFloat64 `json:"scale"`
 }
 

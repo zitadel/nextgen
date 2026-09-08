@@ -35,6 +35,5 @@ properties:
     type: number
     minimum: 0.75
     maximum: 1.25
-    default: 1
-    description: Multiplier on the base text sizes.
+    description: Multiplier on the base text sizes, `1` when omitted.
     example: 1

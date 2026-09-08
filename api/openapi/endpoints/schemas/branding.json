@@ -94,8 +94,7 @@
           "type": "number",
           "minimum": 0.75,
           "maximum": 1.25,
-          "default": 1,
-          "description": "Multiplier on the base text sizes."
+          "description": "Multiplier on the base text sizes, 1 when omitted."
         }
       }
     },
@@ -137,8 +136,7 @@
           "type": "number",
           "minimum": 0.5,
           "maximum": 2,
-          "default": 1,
-          "description": "Multiplier on the logo's maximum height. The image keeps its intrinsic aspect ratio inside that cap, so no width, height or ratio is stored."
+          "description": "Multiplier on the logo's maximum height, 1 when omitted. The image keeps its intrinsic aspect ratio inside that cap, so no width, height or ratio is stored."
         }
       }
     }

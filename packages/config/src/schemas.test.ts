@@ -116,6 +116,32 @@ describe("brandingConfigSchema", () => {
     expect(JSON.stringify(result.error?.issues)).toContain("theme.dark.logo_url");
   });
 
+  it("rejects an http font_url — a stylesheet has no loopback carve-out", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("typography.font_url");
+  });
+
+  it("rejects a URL carrying credentials", () => {
+    for (const [field, doc] of [
+      ["logo_url", { ...base, logo_url: "https://user:pass@cdn.example.com/logo.svg" }],
+      [
+        "typography.font_url",
+        {
+          ...base,
+          typography: { font_family: "Inter", font_url: "https://user:pass@fonts.example.com/c" },
+        },
+      ],
+    ] as const) {
+      const result = brandingConfigSchema.safeParse(doc);
+      expect(result.success, `${field} accepted credentials`).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toContain("credentials");
+    }
+  });
+
   it("accepts the appearance blocks", () => {
     const result = brandingConfigSchema.safeParse({
       ...base,

@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/require"
 
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -103,4 +105,19 @@ func TestBrandingAccessRow(t *testing.T) {
 		domain.ErrBrandingPermissionDenied().Code)
 	assertDomainCode(t, requireProjectAccess(preview, stmts, "proj_a", brandingAccess, opRead),
 		domain.ErrBrandingPermissionDenied().Code)
+}
+
+// `default:` in the schema is materialised by ogen inside Decode, so a default
+// on an optional field would arrive Set on a body that never carried it — and
+// the revision would persist a value the caller did not choose. The contract
+// states these defaults in prose for that reason; this pins the consequence.
+func TestBrandingOmittedScalesStayUnset(t *testing.T) {
+	var body api.Branding
+	require.NoError(t, body.Decode(jx.DecodeStr(`{"shape":{"radius":10},"typography":{"font_family":"Inter"}}`)))
+
+	require.False(t, body.Shape.Value.LogoScale.Set, "logo_scale should not be set by a default")
+	require.False(t, body.Typography.Value.Scale.Set, "scale should not be set by a default")
+
+	require.Zero(t, brandingShapeFromAPI(body.Shape).LogoScale)
+	require.Zero(t, brandingTypographyFromAPI(body.Typography).Scale)
 }

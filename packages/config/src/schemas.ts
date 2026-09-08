@@ -5,7 +5,11 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
-import { isBrandingColor, isBrandingFontFamily } from "./branding-css.js";
+import {
+  isBrandingColor,
+  isBrandingFontFamily,
+  MAX_BRANDING_URL_LENGTH,
+} from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
 export const schemaConfigSchema = CreateSchemaBody;
@@ -47,6 +51,9 @@ export const brandingConfigSchema = z
     // pair as a pair (validateBrandingFontURL in
     // internal/domain/branding_validator.go). plan has to agree, or apply
     // fails after schemas and flows have already been written.
+    validateBrandingAssetUrl(value.typography?.font_url, "typography.font_url", ctx, {
+      loopback: false,
+    });
     if (value.typography?.font_url !== undefined && value.typography.font_family === undefined) {
       ctx.addIssue({
         code: "custom",
@@ -105,8 +112,16 @@ function validateBrandingAssetUrl(
   value: string | undefined,
   field: string,
   ctx: z.RefinementCtx,
+  options: { loopback?: boolean } = {},
 ): void {
   if (value === undefined || value === "") {
+    return;
+  }
+  if (value.length > MAX_BRANDING_URL_LENGTH) {
+    ctx.addIssue({
+      code: "custom",
+      message: `${field} must be at most ${MAX_BRANDING_URL_LENGTH} characters.`,
+    });
     return;
   }
   // Stricter-or-equal than the Go gate (validateBrandingAssetURL): the WHATWG
@@ -129,10 +144,21 @@ function validateBrandingAssetUrl(
     ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
     return;
   }
+  // Fetched by every visitor's browser, so userinfo in it is a credential in
+  // every access log — the server refuses it and so must plan.
+  if (parsed.username !== "" || parsed.password !== "") {
+    ctx.addIssue({
+      code: "custom",
+      message: `${field} must not carry credentials; the URL is fetched by every visitor's browser.`,
+    });
+    return;
+  }
   // Loopback HTTP is the dev-posture carve-out (assets served from the app's
-  // own dev server). Check the raw URL so WHATWG normalisation cannot make
-  // plan accept a host spelling that the Go save gate rejects.
-  if (parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
+  // own dev server), and it covers images only: a stylesheet is styling rather
+  // than an image, so it stays https everywhere. Check the raw URL so WHATWG
+  // normalisation cannot make plan accept a host spelling that the Go save
+  // gate rejects.
+  if (options.loopback !== false && parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
     return;
   }
   if (parsed.protocol !== "https:" || parsed.host === "") {
