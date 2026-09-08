@@ -34715,6 +34715,11 @@ type PasswordHashPolicy struct {
 	// pbkdf2 and sha2. A parameter another algorithm takes is rejected rather
 	// than ignored, and a missing one is not filled in from a default, because
 	// cost is the whole of a hashing method's strength.
+	// The properties below are the union across algorithms, so which of them
+	// apply, and for `hash` which of its values, depends on `algorithm`. They
+	// are not modelled per algorithm here because the code generator renders a
+	// conditional schema as an untyped object, which would cost every client
+	// the types for the whole policy.
 	// Values outside the limits the deployment configured are rejected, as is
 	// an algorithm the deployment cannot verify: hashing with a method that
 	// cannot be read back would lock out every user whose password was written
@@ -34820,6 +34825,11 @@ func (s *PasswordHashPolicyAlgorithm) UnmarshalText(data []byte) error {
 // pbkdf2 and sha2. A parameter another algorithm takes is rejected rather
 // than ignored, and a missing one is not filled in from a default, because
 // cost is the whole of a hashing method's strength.
+// The properties below are the union across algorithms, so which of them
+// apply, and for `hash` which of its values, depends on `algorithm`. They
+// are not modelled per algorithm here because the code generator renders a
+// conditional schema as an untyped object, which would cost every client
+// the types for the whole policy.
 // Values outside the limits the deployment configured are rejected, as is
 // an algorithm the deployment cannot verify: hashing with a method that
 // cannot be read back would lock out every user whose password was written
@@ -34835,7 +34845,10 @@ type PasswordHashPolicyParams struct {
 	Cost OptInt `json:"cost"`
 	// Pbkdf2 or sha2 iteration count.
 	Rounds OptInt `json:"rounds"`
-	// The underlying hash for pbkdf2 and sha2.
+	// The underlying hash. pbkdf2 takes any of the values listed here; sha2
+	// takes only `sha256` and `sha512`, because it is the crypt(3) scheme,
+	// which has no other form. Any other combination is rejected with
+	// `proj.password_hash_invalid`.
 	Hash OptPasswordHashPolicyParamsHash `json:"hash"`
 }
 
@@ -34899,7 +34912,10 @@ func (s *PasswordHashPolicyParams) SetHash(val OptPasswordHashPolicyParamsHash) 
 	s.Hash = val
 }
 
-// The underlying hash for pbkdf2 and sha2.
+// The underlying hash. pbkdf2 takes any of the values listed here; sha2
+// takes only `sha256` and `sha512`, because it is the crypt(3) scheme,
+// which has no other form. Any other combination is rejected with
+// `proj.password_hash_invalid`.
 type PasswordHashPolicyParamsHash string
 
 const (

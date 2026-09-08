@@ -57,14 +57,23 @@ var PasswordHashAlgorithmParams = map[crypto.HashName][]string{
 	crypto.HashNameSha2:     {"rounds", "hash"},
 }
 
-// PasswordHashModes are the underlying hashes pbkdf2 and sha2 take for their
-// "hash" parameter.
-var PasswordHashModes = []crypto.HashMode{
-	crypto.HashModeSHA1,
-	crypto.HashModeSHA224,
-	crypto.HashModeSHA256,
-	crypto.HashModeSHA384,
-	crypto.HashModeSHA512,
+// PasswordHashAlgorithmModes lists the underlying hashes each algorithm accepts
+// for its "hash" parameter. The two that take one do not take the same set:
+// pbkdf2 is defined over any of them, while sha2 is the crypt(3) scheme, which
+// has only a SHA-256 and a SHA-512 form -- there is no sha2 hash to write with
+// sha1. An algorithm absent from this map takes no "hash" parameter at all.
+var PasswordHashAlgorithmModes = map[crypto.HashName][]crypto.HashMode{
+	crypto.HashNamePBKDF2: {
+		crypto.HashModeSHA1,
+		crypto.HashModeSHA224,
+		crypto.HashModeSHA256,
+		crypto.HashModeSHA384,
+		crypto.HashModeSHA512,
+	},
+	crypto.HashNameSha2: {
+		crypto.HashModeSHA256,
+		crypto.HashModeSHA512,
+	},
 }
 
 // NewPasswordHashPolicy validates a hashing method a project asked for. It
@@ -112,22 +121,24 @@ func NewPasswordHashPolicy(algorithm string, params map[string]any) (*PasswordHa
 	return &PasswordHashPolicy{Algorithm: name, Params: normalized}, nil
 }
 
-// validatePasswordHashMode checks the one parameter that is not a number. The
-// crypto layer would reject an unknown mode too, but only after building a
-// hasher around an empty parameter set, which reads back as a bounds failure
-// rather than a typo.
+// validatePasswordHashMode checks the one parameter that is not a number, and
+// checks it against the algorithm rather than against every mode there is. The
+// crypto layer refuses sha2-with-sha1 too, but only from inside the hasher it
+// was building, which reads back as "cannot use sha1 with sha2" rather than as
+// a parameter this algorithm never had.
 func validatePasswordHashMode(algorithm crypto.HashName, params map[string]any) error {
 	raw, ok := params["hash"]
 	if !ok {
 		return nil
 	}
+	allowed := PasswordHashAlgorithmModes[algorithm]
 	text, ok := raw.(string)
-	if !ok || !slices.Contains(PasswordHashModes, crypto.HashMode(text)) {
+	if !ok || !slices.Contains(allowed, crypto.HashMode(text)) {
 		return ErrProjectPasswordHashInvalid().WithDetails(map[string]any{
 			"algorithm": string(algorithm),
 			"parameter": "hash",
-			"reason":    "unknown hash mode",
-			"expected":  PasswordHashModes,
+			"reason":    "hash mode not supported by this algorithm",
+			"expected":  allowed,
 		})
 	}
 	return nil

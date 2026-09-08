@@ -92,6 +92,79 @@ func TestNewPasswordHashPolicy(t *testing.T) {
 		assert.ErrorIs(t, err, ErrProjectPasswordHashInvalid())
 	})
 
+	// pbkdf2 is defined over any of the modes; sha2 is the crypt(3) scheme,
+	// which has only a SHA-256 and a SHA-512 form. Checking the mode against
+	// every mode there is would let sha2-with-sha1 through to the crypto layer,
+	// which refuses it from inside the hasher it was building -- a 400 either
+	// way, but one that reads as a cost failure rather than as a parameter this
+	// algorithm never had.
+	t.Run("checks the hash mode against the algorithm", func(t *testing.T) {
+		t.Parallel()
+
+		for _, mode := range []string{"sha1", "sha224", "sha256", "sha384", "sha512"} {
+			t.Run("pbkdf2 takes "+mode, func(t *testing.T) {
+				t.Parallel()
+
+				policy, err := NewPasswordHashPolicy("pbkdf2", map[string]any{"rounds": 1000, "hash": mode})
+				require.NoError(t, err)
+				assert.Equal(t, mode, policy.Params["hash"])
+			})
+		}
+
+		for _, mode := range []string{"sha256", "sha512"} {
+			t.Run("sha2 takes "+mode, func(t *testing.T) {
+				t.Parallel()
+
+				_, err := NewPasswordHashPolicy("sha2", map[string]any{"rounds": 5000, "hash": mode})
+				require.NoError(t, err)
+			})
+		}
+
+		for _, mode := range []string{"sha1", "sha224", "sha384"} {
+			t.Run("sha2 refuses "+mode, func(t *testing.T) {
+				t.Parallel()
+
+				_, err := NewPasswordHashPolicy("sha2", map[string]any{"rounds": 5000, "hash": mode})
+				require.Error(t, err)
+				assert.ErrorIs(t, err, ErrProjectPasswordHashInvalid())
+			})
+		}
+	})
+
+	// Every mode the domain admits has to be one the crypto layer can actually
+	// build a hasher for, which is the mismatch this pairing exists to keep
+	// from coming back.
+	t.Run("every admitted mode builds a hasher", func(t *testing.T) {
+		t.Parallel()
+
+		factory, err := (&crypto.HashConfig{
+			Verifiers: []crypto.HashName{crypto.HashNamePBKDF2, crypto.HashNameSha2},
+			Hasher: crypto.HasherConfig{
+				Algorithm: crypto.HashNameBcrypt,
+				Params:    map[string]any{"cost": 10},
+			},
+		}).NewHasherFactory()
+		require.NoError(t, err)
+
+		for algorithm, modes := range PasswordHashAlgorithmModes {
+			for _, mode := range modes {
+				t.Run(string(algorithm)+"/"+string(mode), func(t *testing.T) {
+					t.Parallel()
+
+					policy, err := NewPasswordHashPolicy(string(algorithm), map[string]any{
+						"rounds": 5000,
+						"hash":   string(mode),
+					})
+					require.NoError(t, err)
+					// New, not Check: the limits are what Check would measure,
+					// and this is about the algorithm and mode pairing alone.
+					_, err = factory.New(policy.HasherConfig())
+					require.NoError(t, err)
+				})
+			}
+		}
+	})
+
 	// The stored form is lowercase, so a policy written through the API and one
 	// written by an admin who typed "Cost" produce the same row.
 	t.Run("lowercases parameter names", func(t *testing.T) {
