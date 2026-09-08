@@ -29,41 +29,6 @@ func createOwningTeamGrant(t *testing.T, stmts service.AllStatements, a *domain.
 	})
 }
 
-// foreignTeamGrant is a platform-homed user with a team membership there, and
-// optionally that team granted viewer on a customer project.
-type foreignTeamGrant struct {
-	customer, platform, userID, teamID string
-}
-
-func seedForeignTeamGrant(t *testing.T, stmts service.AllStatements, withCustomerAssignment bool) foreignTeamGrant {
-	t.Helper()
-	g := foreignTeamGrant{
-		platform: ensureProject(t, stmts),
-		customer: ensureProject(t, stmts),
-		userID:   "user_home_" + uniqueSuffix(t),
-		teamID:   "team_agency_" + uniqueSuffix(t),
-	}
-	require.NoError(t, stmts.CreateTeam(t.Context(), newTestTeam(g.platform, g.teamID)))
-	require.NoError(t, stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(g.platform, g.teamID, g.userID)))
-	if withCustomerAssignment {
-		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(),
-			newTestAssignment(g.customer, "", domain.AuthzPrincipalTypeTeam, g.teamID, "project", "viewer", domain.NewProjectAssignmentScope())))
-	}
-	return g
-}
-
-func (g foreignTeamGrant) checkParams(objectType, relation string) domain.AuthzCheckParams {
-	return domain.AuthzCheckParams{
-		CatalogID:              domain.SystemCatalogID,
-		ProjectID:              g.customer,
-		PrincipalHomeProjectID: g.platform,
-		PrincipalType:          domain.AuthzPrincipalTypeUser,
-		PrincipalID:            g.userID,
-		ObjectType:             objectType,
-		Relation:               relation,
-	}
-}
-
 func TestAuthzResolverStatements_Cases(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -679,62 +644,6 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 				}
 			}
 			assert.Equal(t, 1, count)
-		})
-
-		// --- E. Params / home ---
-		t.Run("home project id defaults to project", func(t *testing.T) {
-			u := "user_home_def_" + uniqueSuffix(t)
-			team := "team_home_def_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
-			params := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
-			params.PrincipalHomeProjectID = ""
-			allowed, _ := check(t, params)
-			assert.True(t, allowed)
-		})
-
-		t.Run("home project mismatch deny expand", func(t *testing.T) {
-			u := "user_home_mis_" + uniqueSuffix(t)
-			team := "team_home_mis_" + uniqueSuffix(t)
-			other := ensureProject(t, d.stmts)
-			otherTeam := "team_home_other_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(other, otherTeam)))
-			// Membership only in other project; grant team viewer in protected project.
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(other, otherTeam, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
-			assert.False(t, allowed)
-		})
-
-		t.Run("foreign team grant allow via home membership", func(t *testing.T) {
-			g := seedForeignTeamGrant(t, d.stmts, true)
-			allowed, foothold := check(t, g.checkParams("project", "viewer"))
-			assert.True(t, allowed)
-			assert.True(t, foothold)
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), g.customer, g.platform, domain.AuthzPrincipalTypeUser, g.userID)
-			require.NoError(t, err)
-			assert.True(t, ok)
-		})
-
-		t.Run("foreign team grant foothold without allow", func(t *testing.T) {
-			g := seedForeignTeamGrant(t, d.stmts, true)
-			allowed, foothold := check(t, g.checkParams("team", "member"))
-			assert.False(t, allowed)
-			assert.True(t, foothold)
-		})
-
-		t.Run("home membership without assignment is not foothold", func(t *testing.T) {
-			g := seedForeignTeamGrant(t, d.stmts, false)
-			allowed, foothold := check(t, g.checkParams("project", "viewer"))
-			assert.False(t, allowed)
-			assert.False(t, foothold)
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), g.customer, g.platform, domain.AuthzPrincipalTypeUser, g.userID)
-			require.NoError(t, err)
-			assert.False(t, ok)
 		})
 	})
 }

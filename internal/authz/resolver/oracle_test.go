@@ -153,6 +153,13 @@ func TestOracle_HandBuilt(t *testing.T) {
 		assert.False(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", "team", "member"))
 		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
 		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "bob"))
+		assert.False(t, g.OracleFoothold("customer", "", domain.AuthzPrincipalTypeUser, "alice"))
+		assert.False(t, g.OracleFoothold("customer", "customer", domain.AuthzPrincipalTypeUser, "alice"))
+		assert.False(t, g.OracleCheck("customer", "", domain.AuthzPrincipalTypeUser, "alice", "project", "viewer"))
+
+		g.Resources = []*domain.ResourceScope{domain.NewUserResourceScope("customer", "usr_1")}
+		assert.Equal(t, []string{"usr_1"}, g.OracleList("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", domain.ResourceKindUser, "project", "viewer"))
+		assert.Empty(t, g.OracleList("customer", "", domain.AuthzPrincipalTypeUser, "alice", domain.ResourceKindUser, "project", "viewer"))
 
 		noGrant := Graph{
 			Memberships: []*domain.AuthzMembershipEdge{
@@ -160,6 +167,16 @@ func TestOracle_HandBuilt(t *testing.T) {
 			},
 		}
 		assert.False(t, noGrant.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
+	})
+
+	t.Run("local membership shortcut ignores distinct home", func(t *testing.T) {
+		g := Graph{
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("customer", "local", "alice"),
+			},
+		}
+		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
+		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "bob"))
 	})
 
 	t.Run("sk_team constraint", func(t *testing.T) {
