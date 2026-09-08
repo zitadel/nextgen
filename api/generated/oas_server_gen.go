@@ -518,9 +518,13 @@ type Handler interface {
 	// owning-team (`relation=team`) rows are not returned. Grants are not in
 	// `resource_scope_index`; project scope is required on the query (same as
 	// get). Requires `project.read`. `expand: ["principal"]` additionally
-	// requires `user.read` and `team.read` (documented on the expand enum;
-	// those scopes cannot be ANDed onto this security block because they are
-	// body-conditional).
+	// requires `user.read` and `team.read` for project secrets (documented on
+	// the expand enum; those scopes cannot be ANDed onto this security block
+	// because they are body-conditional). A user-bound Console session that
+	// already passed the project Check may expand without those scopes.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)

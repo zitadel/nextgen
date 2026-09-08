@@ -21506,8 +21506,10 @@ type Grant struct {
 	// serves for `principal_type=user`, or `GET /teams/{id}` for
 	// `principal_type=team`. Discriminate with the grant's existing
 	// `principal_type`.
-	// Requires `user.read` and `team.read` in addition to `project.read`.
-	// Both are checked on the whole request before the list.
+	// Requires `user.read` and `team.read` in addition to `project.read`
+	// for project secrets. Both are checked on the whole request before
+	// the list. A user-bound Console session that already passed the
+	// project Check may expand without those scopes.
 	Principal OptNilGrantExpandedPrincipal `json:"principal"`
 }
 
@@ -21684,10 +21686,12 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 // `principal_type=user`, or `GET /teams/{id}` for `principal_type=team`,
 // and `null` when that principal cannot be loaded. Discriminate with the
 // grant's existing `principal_type`.
-// Requires `user.read` and `team.read` in addition to `project.read`.
-// Both are checked on the whole request before the list, because a mixed
-// page is the common case. A caller who may not read either resource
-// receives 403 rather than a silently missing `principal`.
+// Requires `user.read` and `team.read` in addition to `project.read`
+// for project secrets. Both are checked on the whole request before the
+// list, because a mixed page is the common case. A user-bound Console
+// session that already passed the project Check may expand without
+// those scopes. A caller who may not read either resource receives 403
+// rather than a silently missing `principal`.
 // Ref: #
 type GrantExpand string
 

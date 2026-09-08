@@ -74,8 +74,10 @@ properties:
       `principal_type=team`. Discriminate with the grant's existing
       `principal_type`.
 
-      Requires `user.read` and `team.read` in addition to `project.read`.
-      Both are checked on the whole request before the list.
+      Requires `user.read` and `team.read` in addition to `project.read`
+      for project secrets. Both are checked on the whole request before
+      the list. A user-bound Console session that already passed the
+      project Check may expand without those scopes.
     oneOf:
       - $ref: grant-expanded-principal.yaml
       - type: 'null'

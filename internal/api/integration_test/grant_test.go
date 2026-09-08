@@ -579,6 +579,17 @@ func TestGrantQueryExpand(t *testing.T) {
 	})
 }
 
+func grantByID(t *testing.T, grants []api.Grant, id string) api.Grant {
+	t.Helper()
+	for _, g := range grants {
+		if g.ID == id {
+			return g
+		}
+	}
+	t.Fatalf("grant %s not in page %s", id, helpers.MustMarshal(t, grants))
+	return api.Grant{}
+}
+
 func assertGrantNotFound(t *testing.T, resp any) {
 	t.Helper()
 	switch v := resp.(type) {
@@ -588,6 +599,10 @@ func assertGrantNotFound(t *testing.T, resp any) {
 		assert.Equal(t, api.ErrorCode("grant.not_found"), v.Code)
 	case *api.DeleteGrantNotFound:
 		assert.Equal(t, api.ErrorCode("grant.not_found"), v.Code)
+	case *api.QueryGrantsErrorResponseStatusCode:
+		assert.Equal(t, http.StatusNotFound, v.StatusCode)
+		require.True(t, v.Response.IsGrantNotFound(), helpers.MustMarshal(t, resp))
+		assert.Equal(t, "grant.not_found", v.Response.GrantNotFound.Code)
 	default:
 		t.Fatalf("want grant.not_found, got %T %s", resp, helpers.MustMarshal(t, resp))
 	}
@@ -601,7 +616,8 @@ func assertGrantAlreadyExists(t *testing.T, resp any) {
 }
 
 // TestGrantSessionCaller: a platform-homed session with a foothold on a
-// customer project can create, get, and revoke grants there.
+// customer project can create, get, query (including principal expand), and
+// revoke grants there.
 func TestGrantSessionCaller(t *testing.T) {
 	t.Parallel()
 
@@ -649,6 +665,27 @@ func TestGrantSessionCaller(t *testing.T) {
 	require.True(t, ok, helpers.MustMarshal(t, getResp))
 	assert.Equal(t, created.ID, got.ID)
 
+	queryParams := api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)}
+	listResp, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, queryParams)
+	require.NoError(t, err)
+	listed, ok := listResp.(*api.QueryGrantsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, listResp))
+	listedGrant := grantByID(t, listed.Grants, created.ID)
+	assert.False(t, listedGrant.Principal.IsSet())
+
+	expandResp, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
+		Expand: []api.GrantExpand{api.GrantExpandPrincipal},
+	}, queryParams)
+	require.NoError(t, err)
+	expanded, ok := expandResp.(*api.QueryGrantsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, expandResp))
+	expandedGrant := grantByID(t, expanded.Grants, created.ID)
+	require.True(t, expandedGrant.Principal.IsSet())
+	require.False(t, expandedGrant.Principal.IsNull())
+	expandedUser, ok := expandedGrant.Principal.Value.GetUser()
+	require.True(t, ok, "session expand must hydrate the user principal")
+	assert.Equal(t, api.UserID(subjectID), expandedUser.ID)
+
 	delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
 		ID:        created.ID,
 		ProjectID: api.ProjectID(project.ID),
@@ -669,5 +706,11 @@ func TestGrantSessionCaller(t *testing.T) {
 		}, params)
 		require.NoError(t, err)
 		assertGrantNotFound(t, resp)
+
+		queryResp, err := stranger.QueryGrants(t.Context(), &api.QueryGrantsRequest{
+			Expand: []api.GrantExpand{api.GrantExpandPrincipal},
+		}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		assertGrantNotFound(t, queryResp)
 	})
 }
