@@ -558,3 +558,12 @@ If accepted, follow-up documentation must:
   ownership relation; and
 - update the Console/customer-portal contract to use the authorization-filtered
   project query and explain effective-role sources.
+
+## Follow-up: naming the principal without a directory
+
+§4 and §6 take a user id or team id and validate existence without exposing a
+global directory. That leaves callers who know an email or team name, but not
+the opaque id, with no safe way to grant. Options (nested locator `oneOf`,
+flattened XOR fields, a resolve endpoint, invite-on-miss) are compared in
+[`grant-principal-identification.md`](../design/api/grant-principal-identification.md).
+No wire change until that exploration is accepted.

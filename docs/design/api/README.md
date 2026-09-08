@@ -35,6 +35,10 @@ Individual decisions are marked inline in each doc:
 9. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
 10. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
 
+Explorations (not yet decided):
+
+- [`grant-principal-identification.md`](grant-principal-identification.md) — how `POST /grants` could name a user or team without an opaque id and without a platform directory.
+
 ## Sibling doc sets
 
 - [`../glossary.md`](../glossary.md) — canonical vocabulary.
