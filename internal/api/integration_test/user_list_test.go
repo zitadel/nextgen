@@ -160,17 +160,7 @@ func TestQueryUsersSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 
 	operatorID := harness.CreateUserWithTeam(t, project.ID)
-	// MVP catalog: assigned viewer closes to editor/admin Checks (seed until #420).
-	operatorAsgn := &domain.AuthzAssignment{
-		ProjectID:     project.ID,
-		CatalogID:     domain.SystemCatalogID,
-		PrincipalType: domain.AuthzPrincipalTypeUser,
-		PrincipalID:   operatorID,
-		ObjectType:    "project",
-		Relation:      "viewer",
-	}
-	operatorAsgn.ApplyScope(domain.NewProjectAssignmentScope())
-	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), operatorAsgn))
+	harness.SeedProjectViewer(t, project.ID, operatorID)
 
 	subjectID := harness.CreateUserWithTeam(t, project.ID)
 
