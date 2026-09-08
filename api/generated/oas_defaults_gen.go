@@ -11,6 +11,22 @@ func (s *Branding) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *BrandingShape) setDefaults() {
+	{
+		val := float64(1)
+		s.LogoScale.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *BrandingTypography) setDefaults() {
+	{
+		val := float64(1)
+		s.Scale.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *CreateFlowRequest) setDefaults() {
 	{
 		val := bool(false)

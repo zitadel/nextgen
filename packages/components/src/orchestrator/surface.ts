@@ -79,7 +79,7 @@ export class ZitadelSurface extends LitElement {
       // document — the embedding app owns its typography (and its visitors'
       // font-CDN connections). Tenant `font_url` is explicit server-side
       // branding state, so it applies in both modes.
-      const tenantFontUrl = branding?.font_url ?? null;
+      const tenantFontUrl = branding?.typography?.font_url ?? null;
       applyDefaultFont(root, this.variant === "page" && !tenantFontUrl ? undefined : null);
       applyFontUrl(root, tenantFontUrl);
     }

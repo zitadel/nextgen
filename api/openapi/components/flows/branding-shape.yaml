@@ -1,0 +1,30 @@
+type: object
+description: |
+  Corner rounding, spacing and logo size. Shared across theme sides.
+properties:
+  radius:
+    description: |
+      Corner rounding for the card, inputs, buttons and alerts — either a
+      preset name or an integer number of pixels. One value scales the whole
+      corner ramp in proportion, so the card stays rounder than the controls
+      inside it.
+    oneOf:
+      - $ref: branding-radius-preset.yaml
+      - type: integer
+        minimum: 0
+        maximum: 32
+    example: 10
+  density:
+    type: string
+    enum: [compact, regular, comfortable]
+    description: Spacing and control height.
+    example: regular
+  logo_scale:
+    type: number
+    minimum: 0.5
+    maximum: 2
+    default: 1
+    description: |
+      Multiplier on the logo's maximum height. The image keeps its intrinsic
+      aspect ratio inside that cap; no width, height or ratio is stored.
+    example: 1
