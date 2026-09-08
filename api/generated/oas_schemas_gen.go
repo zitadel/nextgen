@@ -3493,11 +3493,11 @@ func (s *AuthMethod) SetEnabled(val bool) {
 // A list of authentication methods supported by the user definition.
 // Ref: #
 type AuthMethods struct {
-	Password  OptAuthMethod `json:"password"`
-	Passkey   OptAuthMethod `json:"passkey"`
-	MagicLink OptAuthMethod `json:"magic_link"`
-	SSO       SSOAuthMethod `json:"sso"`
-	Otp       OptAuthMethod `json:"otp"`
+	Password  OptAuthMethod    `json:"password"`
+	Passkey   OptAuthMethod    `json:"passkey"`
+	MagicLink OptAuthMethod    `json:"magic_link"`
+	SSO       OptSSOAuthMethod `json:"sso"`
+	Otp       OptAuthMethod    `json:"otp"`
 }
 
 // GetPassword returns the value of Password.
@@ -3516,7 +3516,7 @@ func (s *AuthMethods) GetMagicLink() OptAuthMethod {
 }
 
 // GetSSO returns the value of SSO.
-func (s *AuthMethods) GetSSO() SSOAuthMethod {
+func (s *AuthMethods) GetSSO() OptSSOAuthMethod {
 	return s.SSO
 }
 
@@ -3541,7 +3541,7 @@ func (s *AuthMethods) SetMagicLink(val OptAuthMethod) {
 }
 
 // SetSSO sets the value of SSO.
-func (s *AuthMethods) SetSSO(val SSOAuthMethod) {
+func (s *AuthMethods) SetSSO(val OptSSOAuthMethod) {
 	s.SSO = val
 }
 
@@ -32498,6 +32498,52 @@ func (o OptRequestAPIEventDelegationType) Or(d RequestAPIEventDelegationType) Re
 	return d
 }
 
+// NewOptSSOAuthMethod returns new OptSSOAuthMethod with value set to v.
+func NewOptSSOAuthMethod(v SSOAuthMethod) OptSSOAuthMethod {
+	return OptSSOAuthMethod{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSSOAuthMethod is optional SSOAuthMethod.
+type OptSSOAuthMethod struct {
+	Value SSOAuthMethod
+	Set   bool
+}
+
+// IsSet returns true if OptSSOAuthMethod was set.
+func (o OptSSOAuthMethod) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSSOAuthMethod) Reset() {
+	var v SSOAuthMethod
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSSOAuthMethod) SetTo(v SSOAuthMethod) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSSOAuthMethod) Get() (v SSOAuthMethod, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSSOAuthMethod) Or(d SSOAuthMethod) SSOAuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchInvalidRequestDetails returns new OptSchInvalidRequestDetails with value set to v.
 func NewOptSchInvalidRequestDetails(v SchInvalidRequestDetails) OptSchInvalidRequestDetails {
 	return OptSchInvalidRequestDetails{
@@ -40373,7 +40419,35 @@ type RevokeSessionUnauthorized ErrorDetails
 
 func (*RevokeSessionUnauthorized) revokeSessionRes() {}
 
-type SSOAuthMethod jx.Raw
+// Ref: #
+type SSOAuthMethod struct {
+	// Whether the authentication method is enabled or not.
+	Enabled bool `json:"enabled"`
+	// Slugs of the Project-level identity provider connections available to users of this schema. Each
+	// entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does not
+	// by itself make it available here.
+	Providers []string `json:"providers"`
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *SSOAuthMethod) GetEnabled() bool {
+	return s.Enabled
+}
+
+// GetProviders returns the value of Providers.
+func (s *SSOAuthMethod) GetProviders() []string {
+	return s.Providers
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *SSOAuthMethod) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// SetProviders sets the value of Providers.
+func (s *SSOAuthMethod) SetProviders(val []string) {
+	s.Providers = val
+}
 
 // An available SSO identity provider.
 // Ref: #
