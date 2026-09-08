@@ -292,6 +292,112 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 		"x-auth-methods#password": jx.Raw(`"` + password + `"`),
 	})
 	require.Equal(t, "done", done.Response.Step.Name)
+
+	// Reaching this terminal through user_already_exists is still a sign-in,
+	// so it has to carry a token to exchange for a session. terminate gates
+	// the handoff on a resolved user, so the flow must have recorded the user
+	// the identifier lookup pinned on the attempt.
+	handoffToken, hasToken := done.Response.HandoffToken.Get()
+	require.True(t, hasToken, "sign-in via user_already_exists must issue a handoff token")
+	require.NotEmpty(t, handoffToken)
+}
+
+// TestBackToIdentifierRotatesAuthAttempt drives the back action through the
+// real HTTP service and auth-attempt domain. Identifying pins the user as a
+// factor on the attempt, and PrepareUserChallenge refuses a second user
+// challenge on a session-linked attempt — which every flow is, since the flow
+// service links the attempt to the session it runs against. Going back to the
+// identifier and submitting again must therefore land on a rotated attempt;
+// without the rotation this path dies with "The user was already
+// authenticated".
+//
+// The state-machine unit test
+// (TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt) covers the
+// rotation itself against a mocked attempt service; only here does the real
+// guard run.
+func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID:      api.ProjectID(project.ID),
+		FlowDefinition: purposeNavFlowDefinition(schemaURL),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
+
+	const (
+		email    = "back-to-identifier@example.com"
+		password = "very-good-password-1"
+	)
+
+	// Seed the existing user through a registration flow.
+	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
+		ProjectID: api.ProjectID(project.ID),
+		Purpose:   api.CreateFlowRequestPurposeRegister,
+	})
+	require.NoError(t, err)
+	regHeaders := regResp.(*api.FlowResponseHeaders)
+	regID := regHeaders.Response.ID
+	regZflow := mustExtractZflow(t, regHeaders.SetCookie.Value)
+
+	regIDResp := mustSubmitOK(t, client, regID, regZflow, "submit", api.FlowSubmitRequestFields{
+		"email": jx.Raw(`"` + email + `"`),
+	})
+	require.Equal(t, "register-password", regIDResp.Response.Step.Name)
+	regZflow = mustExtractZflow(t, regIDResp.SetCookie.Value)
+
+	regDone := mustSubmitOK(t, client, regID, regZflow, "submit", api.FlowSubmitRequestFields{
+		"x-auth-methods#password": jx.Raw(`"` + password + `"`),
+	})
+	require.Equal(t, "done", regDone.Response.Step.Name)
+
+	// Login flow: resolve the existing user onto the attempt.
+	loginResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
+		ProjectID: api.ProjectID(project.ID),
+		Purpose:   api.CreateFlowRequestPurposeLogin,
+	})
+	require.NoError(t, err)
+	loginHeaders := loginResp.(*api.FlowResponseHeaders)
+	flowID := loginHeaders.Response.ID
+	require.Equal(t, "identifier", loginHeaders.Response.Step.Name)
+	zflow := mustExtractZflow(t, loginHeaders.SetCookie.Value)
+
+	identified := mustSubmitOK(t, client, flowID, zflow, "submit", api.FlowSubmitRequestFields{
+		"email": jx.Raw(`"` + email + `"`),
+	})
+	require.Equal(t, "password", identified.Response.Step.Name)
+	zflow = mustExtractZflow(t, identified.SetCookie.Value)
+
+	// Back to the identifier — no purpose switch, just the back action.
+	back := mustSubmitOK(t, client, flowID, zflow, "back", nil)
+	require.Equal(t, "identifier", back.Response.Step.Name)
+	zflow = mustExtractZflow(t, back.SetCookie.Value)
+
+	// Re-identifying must reach password verification on the rotated
+	// attempt, not die with "The user was already authenticated".
+	reIdentified := mustSubmitOK(t, client, flowID, zflow, "submit", api.FlowSubmitRequestFields{
+		"email": jx.Raw(`"` + email + `"`),
+	})
+	require.Equal(t, "password", reIdentified.Response.Step.Name,
+		"re-identifying after back must reach password verification")
+	zflow = mustExtractZflow(t, reIdentified.SetCookie.Value)
+
+	// And the rotated attempt verifies the password end to end.
+	done := mustSubmitOK(t, client, flowID, zflow, "submit", api.FlowSubmitRequestFields{
+		"x-auth-methods#password": jx.Raw(`"` + password + `"`),
+	})
+	require.Equal(t, "done", done.Response.Step.Name)
+	handoffToken, hasToken := done.Response.HandoffToken.Get()
+	require.True(t, hasToken, "sign-in on the rotated attempt must issue a handoff token")
+	require.NotEmpty(t, handoffToken)
 }
 
 // mustSubmitOK submits a flow action and requires a non-error step response.
