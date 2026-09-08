@@ -15,7 +15,10 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-var variableOwner = domain.VariableOwner{ProjectID: "project-1"}
+var variableOwner = domain.VariableOwner{
+	ProjectID:       "project-1",
+	EnvironmentName: "env-1",
+}
 
 func TestVariableName_Bounds(t *testing.T) {
 	t.Parallel()

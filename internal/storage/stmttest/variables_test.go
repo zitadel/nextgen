@@ -16,11 +16,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// variableFixture is a project and a name, both suffixed per test so cases
-// never collide in a shared database.
+// variableFixture is a project, one of its environments, and a name, all
+// suffixed per test so cases never collide in a shared database.
 type variableFixture struct {
-	name      string
-	projectID string
+	name        string
+	projectID   string
+	environment string
 }
 
 func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixture {
@@ -40,24 +41,22 @@ func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixtu
 	require.Regexp(t, domain.NameRegex, name, "the fixture must use a referenceable name")
 
 	return variableFixture{
-		name:      name,
-		projectID: projectID,
+		name:        name,
+		projectID:   projectID,
+		environment: "env-var-" + suffix,
 	}
 }
 
-// projectOwner addresses the project, which is the whole owner today.
+// projectOwner addresses the project level: the environment left unnamed, which
+// is stored as the empty string and is an address in its own right rather than
+// a wildcard.
 func (f variableFixture) projectOwner() domain.VariableOwner {
 	return domain.VariableOwner{ProjectID: f.projectID}
 }
 
-// otherProject creates a second project and returns its owner, so a test can
-// check that one owner never reaches another's variables.
-func (f variableFixture) otherProject(t *testing.T, stmts service.AllStatements) domain.VariableOwner {
-	t.Helper()
-	projectID := f.projectID + "-other"
-	require.NoError(t, stmts.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
-	return domain.VariableOwner{ProjectID: projectID}
+// environmentOwner addresses one environment of the project.
+func (f variableFixture) environmentOwner() domain.VariableOwner {
+	return domain.VariableOwner{ProjectID: f.projectID, EnvironmentName: f.environment}
 }
 
 // set writes a variable at owner and registers its removal.
@@ -110,29 +109,36 @@ func TestVariablesRoundTrip(t *testing.T) {
 
 // TestVariablesOwnersAreIndependent is the difference from the settings ladder
 // this table replaced. One name at two owners is two variables, and neither
-// read returns the other's.
+// read returns the other's: the project level does not reach into an
+// environment, and an environment does not inherit from the project.
 func TestVariablesOwnersAreIndependent(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
-		other := f.otherProject(t, d.stmts)
 
 		f.set(t, d.stmts, f.projectOwner(), "project", false)
-		f.set(t, d.stmts, other, "other-project", false)
+		f.set(t, d.stmts, f.environmentOwner(), "environment", false)
 
-		t.Run("each owner reads its own value", func(t *testing.T) {
+		t.Run("the project level reads its own value", func(t *testing.T) {
 			got := f.get(t, d.stmts, f.projectOwner())
 			require.Len(t, got, 1, "a read admits one owner, so one name is one row")
 			assert.Equal(t, "project", got[0].Value)
-
-			got = f.get(t, d.stmts, other)
-			require.Len(t, got, 1)
-			assert.Equal(t, "other-project", got[0].Value)
 		})
 
-		t.Run("an owner with nothing entered reads nothing", func(t *testing.T) {
-			// Two projects hold this name, but nothing is inherited: an owner
-			// sees only what was entered on it.
-			assert.Empty(t, f.get(t, d.stmts, domain.VariableOwner{ProjectID: f.projectID + "-third"}))
+		t.Run("the environment reads its own value", func(t *testing.T) {
+			got := f.get(t, d.stmts, f.environmentOwner())
+			require.Len(t, got, 1)
+			assert.Equal(t, "environment", got[0].Value)
+		})
+
+		t.Run("an environment with nothing entered reads nothing", func(t *testing.T) {
+			// The project holds this name, but nothing is inherited: an
+			// environment sees only what was entered on it.
+			sibling := domain.VariableOwner{ProjectID: f.projectID, EnvironmentName: f.environment + "-sibling"}
+			assert.Empty(t, f.get(t, d.stmts, sibling))
+		})
+
+		t.Run("another project sees nothing", func(t *testing.T) {
+			assert.Empty(t, f.get(t, d.stmts, domain.VariableOwner{ProjectID: f.projectID + "-other"}))
 		})
 	})
 }
@@ -145,7 +151,7 @@ func TestVariablesNameFilter(t *testing.T) {
 		owner := f.projectOwner()
 		f.set(t, d.stmts, owner, "wanted", false)
 
-		other := variableFixture{name: f.name + "_other", projectID: f.projectID}
+		other := variableFixture{name: f.name + "_other", projectID: f.projectID, environment: f.environment}
 		other.set(t, d.stmts, owner, "unwanted", false)
 
 		byName, err := d.stmts.GetVariables(t.Context(), owner, f.name)
@@ -175,7 +181,7 @@ func TestVariablesDelete(t *testing.T) {
 
 		// A different owner did not enter this variable, so it cannot remove
 		// it -- every owner column has to match.
-		err := d.stmts.DeleteVariable(t.Context(), domain.VariableOwner{ProjectID: f.projectID + "-other"}, f.name)
+		err := d.stmts.DeleteVariable(t.Context(), f.environmentOwner(), f.name)
 		require.Error(t, err)
 		_, ok := errorsAsNoRowFound(err)
 		assert.True(t, ok, "deleting another owner's variable should report NoRowFoundError, got %v", err)
@@ -193,14 +199,15 @@ func TestVariablesDelete(t *testing.T) {
 }
 
 // TestVariablesOwnerWithoutProjectRejected guards the constraint that keeps a
-// variable from belonging to nothing.
+// variable from belonging to nothing. The environment may be left unnamed --
+// that addresses the project level -- but the project itself may not.
 func TestVariablesOwnerWithoutProjectRejected(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
 
 		err := d.stmts.SetVariable(t.Context(), &domain.Variable{
 			Name:  f.name,
-			Owner: domain.VariableOwner{},
+			Owner: domain.VariableOwner{EnvironmentName: f.environment},
 			Value: "orphan",
 		})
 		require.Error(t, err)
@@ -222,11 +229,13 @@ func TestVariablesProjectForeignKey(t *testing.T) {
 		require.Error(t, err, "a variable cannot belong to a project that is not there")
 
 		f.set(t, d.stmts, f.projectOwner(), "project", false)
+		f.set(t, d.stmts, f.environmentOwner(), "environment", false)
 		require.Len(t, f.get(t, d.stmts, f.projectOwner()), 1)
 
 		_, err = d.stmts.DeleteProjectByID(t.Context(), f.projectID)
 		require.NoError(t, err)
 		assert.Empty(t, f.get(t, d.stmts, f.projectOwner()), "deleting the project takes its variables with it")
+		assert.Empty(t, f.get(t, d.stmts, f.environmentOwner()), "including the ones its environments entered")
 	})
 }
 

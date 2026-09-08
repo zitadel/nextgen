@@ -229,8 +229,10 @@ type Invoker interface {
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// DeleteVariable invokes deleteVariable operation.
 	//
-	// Removes the variable the project entered under this name.
-	// A name the project has not entered answers `var.not_found`.
+	// Removes the variable this owner entered under this name.
+	// A variable is deletable only by the owner that entered it. Deleting a name
+	// another owner of the same project holds answers `var.not_found` and leaves
+	// that owner's value standing.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -432,15 +434,23 @@ type Invoker interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable invokes getVariable operation.
 	//
-	// Reads one variable by name from the project.
-	// A name the project has not entered answers `var.not_found`. A secret is
-	// found but not disclosed: the response is `{"secret": true}`.
+	// Reads one variable by name from the owner this request addresses — one
+	// environment of the project with `environment_name`, the project level
+	// itself without it.
+	// A name that owner has not entered answers `var.not_found`, even when
+	// another owner of the same project holds it: nothing is inherited. A secret
+	// is found but not disclosed: the response is `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables invokes getVariables operation.
 	//
-	// Returns the variables entered on the project, keyed by name.
+	// Returns the variables entered at the owner this request addresses, keyed by
+	// name — one environment of the project with `environment_name`, the project
+	// level itself without it.
+	// Owners are separate, not a ladder: an environment does not inherit the
+	// project's variables and the project does not see its environments'. Reading
+	// everything a project holds therefore means reading each owner in turn.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -655,15 +665,17 @@ type Invoker interface {
 	UpdateTeam(ctx context.Context, request *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables invokes updateVariables operation.
 	//
-	// Enters or replaces variables on the project.
-	// Names not in the body are untouched; nothing here removes a variable, which
-	// is what `DELETE /variables/{variable_name}` is for.
+	// Enters or replaces variables at the owner this request addresses.
+	// Every name in the body is written at exactly that owner — the project, or
+	// the environment named by `environment_name` — and reaches no other. Names
+	// not in the body are untouched; nothing here removes a variable, which is
+	// what `DELETE /variables/{variable_name}` is for.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
 	// which it can be referenced but not read back.
 	// The body is applied whole or not at all, so a rejected request leaves the
-	// project exactly as it was. Writing the same name twice replaces the value
-	// rather than duplicating it, which makes a retry safe.
+	// owner exactly as it was. Writing the same name and owner twice replaces the
+	// value rather than duplicating it, which makes a retry safe.
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
@@ -3171,8 +3183,10 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 
 // DeleteVariable invokes deleteVariable operation.
 //
-// Removes the variable the project entered under this name.
-// A name the project has not entered answers `var.not_found`.
+// Removes the variable this owner entered under this name.
+// A variable is deletable only by the owner that entered it. Deleting a name
+// another owner of the same project holds answers `var.not_found` and leaves
+// that owner's value standing.
 //
 // DELETE /variables/{variable_name}
 func (c *Client) DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error) {
@@ -3255,6 +3269,26 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -6147,9 +6181,12 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 
 // GetVariable invokes getVariable operation.
 //
-// Reads one variable by name from the project.
-// A name the project has not entered answers `var.not_found`. A secret is
-// found but not disclosed: the response is `{"secret": true}`.
+// Reads one variable by name from the owner this request addresses — one
+// environment of the project with `environment_name`, the project level
+// itself without it.
+// A name that owner has not entered answers `var.not_found`, even when
+// another owner of the same project holds it: nothing is inherited. A secret
+// is found but not disclosed: the response is `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (c *Client) GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error) {
@@ -6238,6 +6275,26 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -6298,7 +6355,12 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 
 // GetVariables invokes getVariables operation.
 //
-// Returns the variables entered on the project, keyed by name.
+// Returns the variables entered at the owner this request addresses, keyed by
+// name — one environment of the project with `environment_name`, the project
+// level itself without it.
+// Owners are separate, not a ladder: an environment does not inherit the
+// project's variables and the project does not see its environments'. Reading
+// everything a project holds therefore means reading each owner in turn.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 //
@@ -6362,6 +6424,26 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -10016,15 +10098,17 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 
 // UpdateVariables invokes updateVariables operation.
 //
-// Enters or replaces variables on the project.
-// Names not in the body are untouched; nothing here removes a variable, which
-// is what `DELETE /variables/{variable_name}` is for.
+// Enters or replaces variables at the owner this request addresses.
+// Every name in the body is written at exactly that owner — the project, or
+// the environment named by `environment_name` — and reaches no other. Names
+// not in the body are untouched; nothing here removes a variable, which is
+// what `DELETE /variables/{variable_name}` is for.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
 // which it can be referenced but not read back.
 // The body is applied whole or not at all, so a rejected request leaves the
-// project exactly as it was. Writing the same name twice replaces the value
-// rather than duplicating it, which makes a retry safe.
+// owner exactly as it was. Writing the same name and owner twice replaces the
+// value rather than duplicating it, which makes a retry safe.
 //
 // PATCH /variables
 func (c *Client) UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error) {
@@ -10095,6 +10179,26 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {

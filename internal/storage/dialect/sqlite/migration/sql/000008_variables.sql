@@ -1,15 +1,20 @@
 -- +goose Up
 -- +goose StatementBegin
--- One row per variable. The owner is the project, which is required and
--- references projects. See the postgres migration.
+-- One row per variable. environment_name is NOT NULL with an empty-string
+-- default; the project is required and references projects. See the postgres
+-- migration for why empty rather than NULL.
 CREATE TABLE variables (
     name             TEXT    NOT NULL CHECK (name <> ''),
     project_id       TEXT    NOT NULL CHECK (project_id <> ''),
+    -- Scoped by environment name, not id; it cannot carry a foreign key,
+    -- because the empty string means "not scoped to an environment" and no
+    -- environment row answers to it. See the postgres migration.
+    environment_name TEXT    NOT NULL DEFAULT '',
     value            TEXT    NOT NULL,
     is_secret        INTEGER NOT NULL DEFAULT 0,
     created_at       INTEGER NOT NULL,
     modified_at      INTEGER NOT NULL,
-    PRIMARY KEY (name, project_id),
+    PRIMARY KEY (name, project_id, environment_name),
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
 -- +goose StatementEnd

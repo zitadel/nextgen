@@ -435,7 +435,7 @@ func TestVariableListToMap(t *testing.T) {
 	t.Parallel()
 
 	project := VariableOwner{ProjectID: "p"}
-	other := VariableOwner{ProjectID: "p2"}
+	env := VariableOwner{ProjectID: "p", EnvironmentName: "e"}
 
 	// A read admits one owner and the primary key is name plus owner, so the
 	// list this collapses never holds two rows under one name. There is no
@@ -461,17 +461,18 @@ func TestVariableListToMap(t *testing.T) {
 		assert.Empty(t, got)
 	})
 
-	// Owners are not a ladder: a name entered by two owners is two variables,
-	// and no read returns both. Should one ever arrive here anyway, the last
-	// row wins -- stated so the behaviour is pinned rather than incidental.
+	// Owners are not a ladder: a name entered on the project and again on an
+	// environment is two variables, and no read returns both. Should one ever
+	// arrive here anyway, the last row wins -- stated so the behaviour is pinned
+	// rather than incidental.
 	t.Run("two rows under one name are not ranked", func(t *testing.T) {
 		t.Parallel()
 
 		got := VariableListToMap([]*Variable{
 			{Name: "v", Owner: project, Value: "project"},
-			{Name: "v", Owner: other, Value: "other"},
+			{Name: "v", Owner: env, Value: "env"},
 		})
 		require.Len(t, got, 1)
-		assert.Equal(t, "other", got["v"].Value)
+		assert.Equal(t, "env", got["v"].Value)
 	})
 }

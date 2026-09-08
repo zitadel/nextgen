@@ -20,15 +20,6 @@
 >
 > **Deviates from** [ADR 047](047-dialect-id-generation.md) §Prefix registry: a
 > variable has no minted PK (§6).
->
-> **Not yet implemented:** the environment level of the owner (§3). What shipped
-> owns a variable at the project alone — no `environment_name` column, query
-> parameter or field — so §3's second level, and everything §4 says about the
-> two not seeing each other, describe the design and not the code. Adding the
-> level is an owner column in the table and its primary key, a field on
-> `domain.VariableOwner`, a filter term in `variable.VisibleTo`, and the query
-> parameter on the four endpoints; the write path also has to check the
-> environment exists, which is the row below that nothing enforces today.
 
 ## Context
 
@@ -73,8 +64,7 @@ sized to be added without reworking what is here.
 **Decided here:**
 
 - The resource: `(name, owner, value, is_secret)`, owned by a project and
-  optionally one of its environments (§1, §3). Only the project level is built
-  today; see the note above.
+  optionally one of its environments (§1, §3).
 - `${{ NAME }}` references and the four substitution rules (§2).
 - Owners are addresses, matched exactly, with no inheritance between them —
   which is what leaves nothing to resolve (§4, §5).
@@ -99,8 +89,7 @@ sized to be added without reworking what is here.
 | Whether a secret can ever be read back at all | A decision between write-only outright (the GitHub model) and readable under a redaction contract. The API withholds the value today rather than settling it (§7, §10). |
 | Marking, or refusing, secrets inside a resolved document | The redaction contract. Fetching by name already keeps the marking; substitution loses it (§7, §10). |
 | Validating that a target environment resolves every reference before a deployment goes live | Deployments (ADR 035). Until then an unresolved reference ships as its own literal text (§2, §10). |
-| Building the environment level at all | A consumer that needs a value to differ between two environments of one project. The design is §3–§4; the work is listed in the note at the top. |
-| Checking on write that `environment_name` names a real environment | Environment lifecycle. `GetEnvironmentByName` already exists; what a rename or delete does to the variables pointing at a name does not. Blocks the row above. |
+| Checking on write that `environment_name` names a real environment | Environment lifecycle. `GetEnvironmentByName` already exists; what a rename or delete does to the variables pointing at a name does not. |
 
 ### 1. One resource, one storage, two flavours
 
@@ -164,9 +153,6 @@ not change when the flag does.
 
 ### 3. The owner is the project, optionally one of its environments
 
-> Designed, not built: today the owner is the project alone. The rest of this
-> section is what the second level is meant to be when something needs it.
-
 A variable belongs to an owner of two levels. Only the project is required:
 
 | Level              | Meaning                             | Required |
@@ -186,10 +172,6 @@ is the rules they need, not the columns, that make the design. They can arrive
 with a consumer that keeps them honest.
 
 ### 4. Visibility: an owner reaches exactly what it entered
-
-> With one level built, the only owners this separates are two projects. The
-> environment cases below are what the rule already says about a level that is
-> not there yet.
 
 A read addresses one owner and returns that owner's variables. Nothing is
 inherited from a broader owner and nothing is visible from a narrower one: an

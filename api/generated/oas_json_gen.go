@@ -46316,6 +46316,39 @@ func (s *OptEnvironmentCreatedEventDelegationType) UnmarshalJSON(data []byte) er
 	return s.Decode(d)
 }
 
+// Encode encodes EnvironmentName as json.
+func (o OptEnvironmentName) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes EnvironmentName from json.
+func (o *OptEnvironmentName) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptEnvironmentName to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptEnvironmentName) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptEnvironmentName) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ErrorDetailsDetails as json.
 func (o OptErrorDetailsDetails) Encode(e *jx.Encoder) {
 	if !o.Set {

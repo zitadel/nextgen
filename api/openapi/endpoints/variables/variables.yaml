@@ -1,12 +1,13 @@
 title: Variables
 description: |
-  The variables entered on the project, keyed by name.
+  The variables entered at the owner the request addresses, keyed by name.
 
-  One name on the project is one value, so nothing here had to be chosen
-  between.
+  Only that owner's own variables: the project level does not see into its
+  environments, and an environment does not inherit the project's. One name at
+  that owner is one value, so nothing here had to be chosen between.
 
   An empty object is an ordinary answer, not an error — it means nothing has
-  been entered on this project.
+  been entered at this owner.
 type: object
 propertyNames:
   $ref: ../../components/schemas/variable-name.yaml

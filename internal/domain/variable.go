@@ -147,14 +147,18 @@ func (v *Variable) GetDecryptedValue(decrypter crypto.Decrypter) (any, error) {
 	return value, nil
 }
 
-// VariableOwner addresses the owner a variable belongs to. Today that is the
-// project and nothing else.
-//
-// TODO: ADR 061 §3 also owns variables at one environment of the project. That
-// level is not implemented yet; adding it means another field here, another
-// owner column in storage, and the write path checking the environment exists.
 type VariableOwner struct {
 	ProjectID string
+	// EnvironmentName names the environment of the project the variable belongs
+	// to, by name rather than by id: that is how an environment is addressed
+	// everywhere else, and it is what a request serving an environment knows.
+	//
+	// TODO: nothing checks that the environment exists. The empty string means
+	// "not scoped to an environment", so no environment row can ever match it
+	// and the table cannot carry the reference the way project_id does; the
+	// check belongs on the write path, against GetEnvironmentByName. Until
+	// then a typo scopes a variable into invisibility rather than failing.
+	EnvironmentName string
 }
 
 // HasAccessTo reports whether variable belongs to owner. An owner reaches
@@ -163,7 +167,9 @@ type VariableOwner struct {
 //
 // The owner is an address, not a position in a ladder, which is what keeps one
 // name at one owner to one variable -- a read never has two rows to choose
-// between, so no caller needs a rule for picking one.
+// between, so no caller needs a rule for picking one. A value that should hold
+// everywhere is entered at the project and read from the project; an
+// environment that wants it has to enter it.
 //
 // This is the predicate [github.com/zitadel/nextgen/internal/storage/variable.VisibleTo]
 // compiles into SQL, and the two are proven equal there.

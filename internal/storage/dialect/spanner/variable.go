@@ -14,20 +14,20 @@ import (
 )
 
 const (
-	variablesQuery = `SELECT name, project_id, value, is_secret, created_at, modified_at
+	variablesQuery = `SELECT name, project_id, environment_name, value, is_secret, created_at, modified_at
 FROM variables`
 
 	// INSERT OR UPDATE keys on the primary key, which is the natural key here,
 	// so a rewrite at the same owner and name replaces the value instead of
 	// adding a second variable there.
-	setVariableStmt = `INSERT OR UPDATE INTO variables (name, project_id, value, is_secret, modified_at)
-VALUES (@p1, @p2, @p3, @p4, CURRENT_TIMESTAMP())`
+	setVariableStmt = `INSERT OR UPDATE INTO variables (name, project_id, environment_name, value, is_secret, modified_at)
+VALUES (@p1, @p2, @p3, @p4, @p5, CURRENT_TIMESTAMP())`
 
-	// The owner column is matched exactly, which is the primary key minus the
-	// name -- so this addresses exactly one row, and an owner cannot remove a
-	// variable another one entered.
+	// Both owner columns are matched exactly, which is the primary key minus
+	// the name -- so this addresses exactly one row, and an owner cannot remove
+	// a variable another one entered.
 	deleteVariableStmt = `DELETE FROM variables
-WHERE name = @p1 AND project_id = @p2`
+WHERE name = @p1 AND project_id = @p2 AND environment_name = @p3`
 )
 
 type variableStatements struct{ statement }
@@ -61,7 +61,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 		return err
 	}
 	stmt := buildStatement(setVariableStmt,
-		v.Name, v.Owner.ProjectID,
+		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentName,
 		spanner.NullJSON{Value: json.RawMessage(encoded), Valid: true}, v.IsSecret,
 	).statement()
 	if _, err := s.db.Update(ctx, stmt); err != nil {
@@ -72,7 +72,9 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 
 // DeleteVariable implements [service.VariableStatements].
 func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
-	stmt := buildStatement(deleteVariableStmt, name, owner.ProjectID).statement()
+	stmt := buildStatement(deleteVariableStmt,
+		name, owner.ProjectID, owner.EnvironmentName,
+	).statement()
 	n, err := s.db.Update(ctx, stmt)
 	if err != nil {
 		return wrapError(err)
@@ -91,7 +93,7 @@ func scanVariable(row *spanner.Row) (*variable.VariableStorage, error) {
 		modifiedAt time.Time
 	)
 	if err := row.Columns(
-		&stored.Name, &stored.ProjectID,
+		&stored.Name, &stored.ProjectID, &stored.EnvironmentName,
 		&encoded, &stored.IsSecret, &createdAt, &modifiedAt,
 	); err != nil {
 		return nil, err
