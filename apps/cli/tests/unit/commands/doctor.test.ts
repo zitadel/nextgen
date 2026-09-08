@@ -118,9 +118,13 @@ async function makeHealthyProject(): Promise<string> {
 
 /**
  * Rewrites the secret without `claimed_at`/`team_id`, i.e. a project that has
- * been set up but never claimed — the state every project starts in.
+ * been set up but never claimed — the state every project starts in. The
+ * creation time defaults to recent so the claim window reads as open.
  */
-async function writeDetachedSecret(cwd: string): Promise<void> {
+async function writeDetachedSecret(
+  cwd: string,
+  createdAt = new Date(Date.now() - 60_000).toISOString(),
+): Promise<void> {
   await writeFile(
     join(cwd, ".zitadel/secret"),
     JSON.stringify({
@@ -128,7 +132,7 @@ async function writeDetachedSecret(cwd: string): Promise<void> {
       project_secret: "sk_proj_test",
       preview_secret: "sk_proj_preview",
       preview_origins: [],
-      created_at: "2026-01-01T00:00:00.000Z",
+      created_at: createdAt,
     }),
   );
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
@@ -193,6 +197,28 @@ describe("doctor command", () => {
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
+  // Same advisory posture, reconciliation wording: past the 14-day window
+  // the warning explains both outcomes, and the claim command stays
+  // suggested because the local record can be stale (claimed from another
+  // machine reads detached) and running claim answers authoritatively.
+  it("switches to reconciliation wording once the window has closed", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { ok: boolean; checks: Check[]; next_actions?: string[]; next_commands?: string[] };
+    };
+    expect(json.data.ok).toBe(true);
+    const claim = json.data.checks.find((check) => check.name === "claim");
+    expect(claim?.status).toBe("warn");
+    expect(claim?.message).toContain("claim window has closed");
+    expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
+    expect(json.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim"));
+  });
+
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
   // warning has to survive it rather than being silently "repaired".
   it("leaves the claim warning (and the secret) alone under --fix", async () => {
@@ -208,8 +234,9 @@ describe("doctor command", () => {
     expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(before);
   });
 
-  // A local project has no platform team to attach to, so the nudge must not
-  // follow `zitadel setup --server local` around forever.
+  // A local project's claim depends on server state this offline check
+  // cannot see (platform.bootstrap_project), so the nudge must not follow
+  // `zitadel setup --server local` around; setup probes the server instead.
   it("passes the claim check without a nudge for a local project", async () => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd);
