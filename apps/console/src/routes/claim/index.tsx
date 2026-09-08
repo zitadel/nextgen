@@ -384,12 +384,12 @@ function outcomeCard(outcome: ClaimOutcome, run: () => void) {
       return (
         <StateCard title="This account can't claim the project">
           <p className={BODY_TEXT}>
-            You are signed in with an account from a different project — most likely the app you
-            just set up, which shares this address.
+            The account you are signed in with belongs to a different project.
           </p>
           <p className={BODY_TEXT}>
-            Sign out of that app, then reopen the claim link from your terminal to create an account
-            or sign in for this project.
+            If you signed in to the app you just set up, sign out of it — it shares this address.
+            Then reopen the claim link from your terminal to create an account or sign in for this
+            project.
           </p>
           <Button onClick={run} variant="outline" className="mx-auto w-fit">
             Try again
