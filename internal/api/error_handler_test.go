@@ -154,6 +154,23 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid session cookie", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodPost, "/grants/query?project_id=proj_1", strings.NewReader(`{}`))
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+		srv := newErrorHandlerTestServer(t, tokenService)
+
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "garbage"})
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.JSONEq(t, want, rec.Body.String())
+	})
+
 	t.Run("invalid bearer", func(t *testing.T) {
 		t.Parallel()
 		tests := []struct {

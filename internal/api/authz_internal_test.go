@@ -245,6 +245,22 @@ func TestRequireExpandScope(t *testing.T) {
 			t.Fatalf("code %q, want %q", de.Code, domain.ErrTeamPermissionDenied().Code)
 		}
 	})
+	t.Run("session user does not skip users-query expand ceilings", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID:     "proj_platform",
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		})
+		if hasGranularOrOperator(ctx, "user.read") || hasGranularOrOperator(ctx, "team.read") {
+			t.Fatal("empty-scope user must not satisfy hasGranularOrOperator")
+		}
+		if err := requireMembershipRead(ctx); err == nil {
+			t.Fatal("session users must still need team_membership.read")
+		}
+		if err := requireTeamRead(ctx); err == nil {
+			t.Fatal("session users must still need team.read")
+		}
+	})
 }
 
 func TestMapAuthzDecision(t *testing.T) {
