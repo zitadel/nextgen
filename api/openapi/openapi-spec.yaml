@@ -67,13 +67,8 @@ tags:
   - name: Variables
     description: |
       Named values a project enters and references from configuration documents
-      as `${{ NAME }}` (ADR 061). A variable belongs to the project or to one of
-      its environments, which is how a value that must differ per environment
-      reaches a release that is promoted between them unchanged.
-
-      Those owners are separate rather than a hierarchy: a variable is read,
-      written and deleted at exactly the owner a request addresses, and nothing
-      is inherited in either direction.
+      as `${{ NAME }}` (ADR 061). A variable belongs to the project, which is
+      how a value a release must not carry itself reaches it.
 
       Secrets are the same resource with the value stored encrypted: same
       names, same references, same endpoints. They are write-only — a read says

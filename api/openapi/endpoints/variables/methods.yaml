@@ -2,13 +2,7 @@ get:
   operationId: getVariables
   summary: Get variables
   description: |
-    Returns the variables entered at the owner this request addresses, keyed by
-    name — one environment of the project with `environment_name`, the project
-    level itself without it.
-
-    Owners are separate, not a ladder: an environment does not inherit the
-    project's variables and the project does not see its environments'. Reading
-    everything a project holds therefore means reading each owner in turn.
+    Returns the variables entered on the project, keyed by name.
 
     Secret values are not returned. A secret appears as `{"secret": true}`,
     which says a value is held without disclosing it.
@@ -16,7 +10,6 @@ get:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/environment-name-query.yaml
   security:
     - oauth2:
         - variable.read
@@ -34,25 +27,22 @@ patch:
   operationId: updateVariables
   summary: Update variables
   description: |
-    Enters or replaces variables at the owner this request addresses.
+    Enters or replaces variables on the project.
 
-    Every name in the body is written at exactly that owner — the project, or
-    the environment named by `environment_name` — and reaches no other. Names
-    not in the body are untouched; nothing here removes a variable, which is
-    what `DELETE /variables/{variable_name}` is for.
+    Names not in the body are untouched; nothing here removes a variable, which
+    is what `DELETE /variables/{variable_name}` is for.
 
     A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
     stores the value encrypted under the project's active `secret` key, after
     which it can be referenced but not read back.
 
     The body is applied whole or not at all, so a rejected request leaves the
-    owner exactly as it was. Writing the same name and owner twice replaces the
-    value rather than duplicating it, which makes a retry safe.
+    project exactly as it was. Writing the same name twice replaces the value
+    rather than duplicating it, which makes a retry safe.
   tags:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/environment-name-query.yaml
   security:
     - oauth2:
         - variable.write
@@ -65,9 +55,8 @@ patch:
   responses:
     '200':
       description: |
-        The variables were written. The body is the addressed owner read back,
-        so it also carries whatever that owner held that the write did not
-        touch.
+        The variables were written. The body is the project read back, so it
+        also carries whatever it held that the write did not touch.
       content:
         application/json:
           schema:

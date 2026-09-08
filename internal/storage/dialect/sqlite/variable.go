@@ -12,21 +12,21 @@ import (
 )
 
 const (
-	variablesQuery = `SELECT name, project_id, environment_name, value, is_secret, created_at, modified_at
+	variablesQuery = `SELECT name, project_id, value, is_secret, created_at, modified_at
 FROM variables`
 
 	// The conflict target is the natural key, so a rewrite at the same owner and
 	// name replaces the value instead of adding a second variable there.
-	setVariableStmt = `INSERT INTO variables (name, project_id, environment_name, value, is_secret, created_at, modified_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT (name, project_id, environment_name)
+	setVariableStmt = `INSERT INTO variables (name, project_id, value, is_secret, created_at, modified_at)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT (name, project_id)
 DO UPDATE SET value = excluded.value, is_secret = excluded.is_secret, modified_at = excluded.modified_at`
 
-	// Both owner columns are matched exactly, which is the primary key minus
-	// the name -- so this addresses exactly one row, and an owner cannot remove
-	// a variable another one entered.
+	// The owner column is matched exactly, which is the primary key minus the
+	// name -- so this addresses exactly one row, and an owner cannot remove a
+	// variable another one entered.
 	deleteVariableStmt = `DELETE FROM variables
-WHERE name = ? AND project_id = ? AND environment_name = ?`
+WHERE name = ? AND project_id = ?`
 )
 
 type variableStatements struct{ statement }
@@ -61,7 +61,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 	}
 	now := nowUnixNano()
 	_, err = execAffected(ctx, s.client, setVariableStmt,
-		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentName,
+		v.Name, v.Owner.ProjectID,
 		string(encoded), v.IsSecret, now, now,
 	)
 	return err
@@ -69,9 +69,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 
 // DeleteVariable implements [service.VariableStatements].
 func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
-	n, err := execAffected(ctx, s.client, deleteVariableStmt,
-		name, owner.ProjectID, owner.EnvironmentName,
-	)
+	n, err := execAffected(ctx, s.client, deleteVariableStmt, name, owner.ProjectID)
 	if err != nil {
 		return err
 	}
@@ -89,7 +87,7 @@ func scanVariable(rows *sql.Rows) (*variable.VariableStorage, error) {
 		modifiedNano int64
 	)
 	if err := rows.Scan(
-		&row.Name, &row.ProjectID, &row.EnvironmentName,
+		&row.Name, &row.ProjectID,
 		&encoded, &row.IsSecret, &createdNano, &modifiedNano,
 	); err != nil {
 		return nil, err

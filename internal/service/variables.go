@@ -18,12 +18,11 @@ type VariableToSet struct {
 
 // VariableService reads and writes the variables one owner entered (ADR 061).
 //
-// The owner is an address, not a position in a ladder: nothing is inherited
-// from the project by its environments, or seen by the project in them. Storage
-// matches every owner column exactly, so a value entered at another owner can
-// never reach a caller here -- and, since the primary key is the name plus that
-// owner, a read yields at most one variable per name and there is nothing to
-// choose between.
+// The owner is an address, not a position in a ladder: nothing is inherited.
+// Storage matches every owner column exactly, so a value entered at another
+// owner can never reach a caller here -- and, since the primary key is the name
+// plus that owner, a read yields at most one variable per name and there is
+// nothing to choose between.
 type VariableService interface {
 	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)

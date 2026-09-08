@@ -3,19 +3,15 @@ description: |
   The variables to enter, keyed by name. Each is either a bare scalar (a
   non-secret value) or an object stating the `secret` flag.
 
-  This is a patch: a name present here is written at the owner the request
-  addresses, replacing whatever that owner held under it, and a name absent
-  here is left alone. There is no way to remove a variable from this body —
-  deletion is `DELETE /variables/{variable_name}`, so a truncated or half-built
-  request can never silently drop a value.
+  This is a patch: a name present here is written on the project, replacing
+  whatever it held under that name, and a name absent here is left alone. There
+  is no way to remove a variable from this body — deletion is
+  `DELETE /variables/{variable_name}`, so a truncated or half-built request can
+  never silently drop a value.
 
   The body is applied whole or not at all. Every value is validated, and every
   secret encrypted, before anything is written, and the writes themselves share
   one transaction.
-
-  Names are written at exactly the owner the request addresses, and reach no
-  further. Writing at the project level does not change what any environment
-  resolves, and writing on one environment does not touch another.
 type: object
 minProperties: 1
 propertyNames:

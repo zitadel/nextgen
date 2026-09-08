@@ -2,10 +2,8 @@
 // domain mapping for the variables table.
 //
 // A variable row is one [domain.Variable]: a value entered by one owner under
-// one name. The owner is the project and, optionally, one of its environments.
-// An environment that is not named is stored as the empty string rather than
-// NULL, which keeps the natural key usable as a primary key; only the project
-// is required, and see the postgres migration for why.
+// one name. The owner is the project; see the postgres migration for why the
+// natural key is the primary key.
 //
 // Unlike the settings table this replaces, there is no ladder and no final
 // flag, so storage never collapses rows -- and never has to. A read admits one
@@ -24,18 +22,16 @@ import (
 // owner tuple flattened onto the row and the two row timestamps added, neither
 // of which the domain type carries.
 type VariableStorage struct {
-	Name            string
-	ProjectID       string
-	EnvironmentName string
-	Value           any
-	IsSecret        bool
-	CreatedAt       time.Time
-	ModifiedAt      time.Time
+	Name       string
+	ProjectID  string
+	Value      any
+	IsSecret   bool
+	CreatedAt  time.Time
+	ModifiedAt time.Time
 }
 
-// Schema binds variable filter/order fields. Both owner columns are NOT NULL
-// (environment_name with an empty-string default), so none of the keyset null
-// handling applies.
+// Schema binds variable filter/order fields. Every column is NOT NULL, so none
+// of the keyset null handling applies.
 var Schema = database.NewSchema(map[VariableStorageField]database.FieldBinding[VariableStorage]{
 	VariableStorageFieldName: {
 		SQLName:  "name",
@@ -45,11 +41,6 @@ var Schema = database.NewSchema(map[VariableStorageField]database.FieldBinding[V
 	VariableStorageFieldProjectID: {
 		SQLName:  "project_id",
 		Accessor: func(v *VariableStorage) any { return v.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	VariableStorageFieldEnvironmentName: {
-		SQLName:  "environment_name",
-		Accessor: func(v *VariableStorage) any { return v.EnvironmentName },
 		Coerce:   database.CoerceString,
 	},
 	VariableStorageFieldValue: {
@@ -79,7 +70,6 @@ type VariableStorageField uint8
 const (
 	VariableStorageFieldName VariableStorageField = iota
 	VariableStorageFieldProjectID
-	VariableStorageFieldEnvironmentName
 	VariableStorageFieldValue
 	VariableStorageFieldIsSecret
 	VariableStorageFieldCreatedAt

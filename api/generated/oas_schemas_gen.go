@@ -26746,52 +26746,6 @@ func (o OptEnvironmentCreatedEventDelegationType) Or(d EnvironmentCreatedEventDe
 	return d
 }
 
-// NewOptEnvironmentName returns new OptEnvironmentName with value set to v.
-func NewOptEnvironmentName(v EnvironmentName) OptEnvironmentName {
-	return OptEnvironmentName{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptEnvironmentName is optional EnvironmentName.
-type OptEnvironmentName struct {
-	Value EnvironmentName
-	Set   bool
-}
-
-// IsSet returns true if OptEnvironmentName was set.
-func (o OptEnvironmentName) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptEnvironmentName) Reset() {
-	var v EnvironmentName
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptEnvironmentName) SetTo(v EnvironmentName) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptEnvironmentName) Get() (v EnvironmentName, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptEnvironmentName) Or(d EnvironmentName) EnvironmentName {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -47715,17 +47669,14 @@ func (*UpdateVariablesErrorResponseStatusCode) updateVariablesRes() {}
 
 // The variables to enter, keyed by name. Each is either a bare scalar (a
 // non-secret value) or an object stating the `secret` flag.
-// This is a patch: a name present here is written at the owner the request
-// addresses, replacing whatever that owner held under it, and a name absent
-// here is left alone. There is no way to remove a variable from this body —
-// deletion is `DELETE /variables/{variable_name}`, so a truncated or half-built
-// request can never silently drop a value.
+// This is a patch: a name present here is written on the project, replacing
+// whatever it held under that name, and a name absent here is left alone. There
+// is no way to remove a variable from this body — deletion is
+// `DELETE /variables/{variable_name}`, so a truncated or half-built request can
+// never silently drop a value.
 // The body is applied whole or not at all. Every value is validated, and every
 // secret encrypted, before anything is written, and the writes themselves share
 // one transaction.
-// Names are written at exactly the owner the request addresses, and reach no
-// further. Writing at the project level does not change what any environment
-// resolves, and writing on one environment does not touch another.
 // Ref: #
 type UpdateVariablesRequest map[string]VariableInput
 
@@ -50856,12 +50807,11 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	return s
 }
 
-// The variables entered at the owner the request addresses, keyed by name.
-// Only that owner's own variables: the project level does not see into its
-// environments, and an environment does not inherit the project's. One name at
-// that owner is one value, so nothing here had to be chosen between.
+// The variables entered on the project, keyed by name.
+// One name on the project is one value, so nothing here had to be chosen
+// between.
 // An empty object is an ordinary answer, not an error — it means nothing has
-// been entered at this owner.
+// been entered on this project.
 // Ref: #
 type Variables map[string]Variable
 

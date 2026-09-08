@@ -2,19 +2,15 @@ get:
   operationId: getVariable
   summary: Get a variable
   description: |
-    Reads one variable by name from the owner this request addresses — one
-    environment of the project with `environment_name`, the project level
-    itself without it.
+    Reads one variable by name from the project.
 
-    A name that owner has not entered answers `var.not_found`, even when
-    another owner of the same project holds it: nothing is inherited. A secret
-    is found but not disclosed: the response is `{"secret": true}`.
+    A name the project has not entered answers `var.not_found`. A secret is
+    found but not disclosed: the response is `{"secret": true}`.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
-    - $ref: ../../../components/parameters/environment-name-query.yaml
   security:
     - oauth2:
         - variable.read
@@ -32,17 +28,14 @@ delete:
   operationId: deleteVariable
   summary: Delete a variable
   description: |
-    Removes the variable this owner entered under this name.
+    Removes the variable the project entered under this name.
 
-    A variable is deletable only by the owner that entered it. Deleting a name
-    another owner of the same project holds answers `var.not_found` and leaves
-    that owner's value standing.
+    A name the project has not entered answers `var.not_found`.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
-    - $ref: ../../../components/parameters/environment-name-query.yaml
   security:
     - oauth2:
         - variable.write

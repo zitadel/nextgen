@@ -4,7 +4,7 @@ maxLength: 255
 pattern: '^\w+$'
 example: GITHUB_CLIENT_ID
 description: |
-  A variable's name, unique per owner.
+  A variable's name, unique per project.
 
   Word characters only, which is exactly what the `${{ NAME }}` reference
   syntax can address (ADR 061 §2): a name outside that grammar could be stored
