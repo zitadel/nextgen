@@ -105,18 +105,17 @@ function ClaimScreen() {
         the spent-once state and show the previous outcome. The key remounts it
         instead, which resets the gate without weakening it.
       */}
+      {/*
+        No widget on this leg, so no trustmark row to slot into — the badge
+        stands under the outcome instead, which is why CompleteClaim renders
+        it: only the outcome knows whether a countdown still means anything.
+      */}
       <CompleteClaim
         key={`${project_id}:${challenge_id}`}
         projectId={project_id}
         challengeId={challenge_id}
+        window={window}
       />
-      {/*
-        No widget on this leg, so no trustmark row to slot into — the badge
-        stands under the outcome instead. It still belongs here: "your link
-        expired" and "the project has nine days left" are both true, and the
-        page has to say so.
-      */}
-      {window && <ClaimWindowBadge window={window} />}
     </ClaimShell>
   );
 }
@@ -259,7 +258,15 @@ function ClaimLogin({
  * re-renders and double-mounts, and only the explicit `Try again` button can
  * start another attempt.
  */
-function CompleteClaim({ projectId, challengeId }: { projectId: string; challengeId: string }) {
+function CompleteClaim({
+  projectId,
+  challengeId,
+  window,
+}: {
+  projectId: string;
+  challengeId: string;
+  window?: ClaimWindow;
+}) {
   const [outcome, setOutcome] = useState<ClaimOutcome | null>(null);
   const startedRef = useRef(false);
 
@@ -283,13 +290,31 @@ function CompleteClaim({ projectId, challengeId }: { projectId: string; challeng
     );
   }
 
+  // The window says how long is left to claim. Once the project is claimed —
+  // by this attempt or an earlier one — there is nothing left to count down,
+  // so the badge goes rather than contradicting the outcome above it.
+  const settled = outcome.kind === "claimed" || outcome.kind === "already_claimed";
+  const card = outcomeCard(outcome, run);
+  return (
+    <>
+      {card}
+      {window && !settled && <ClaimWindowBadge window={window} />}
+    </>
+  );
+}
+
+/**
+ * The screen for one completion outcome. Every branch is a state the contract
+ * enumerates (`claim/complete` in the OpenAPI source), not an exception.
+ */
+function outcomeCard(outcome: ClaimOutcome, run: () => void) {
   switch (outcome.kind) {
     case "claimed":
       return (
         <StateCard title="Project claimed">
           <p className={BODY_TEXT}>
-            The project now belongs to your personal team. You can return to your terminal — the CLI
-            picks the claim up on its own.
+            Your project is now permanent. Open the console to manage it and start collaborating
+            with your team.
           </p>
           <Button asChild className="mx-auto w-fit">
             <Link to="/">Open the console</Link>
@@ -349,19 +374,22 @@ function CompleteClaim({ projectId, challengeId }: { projectId: string; challeng
         </StateCard>
       );
     case "unauthenticated":
-      // NOT the sign-in widget again. The loader confirmed an active session
-      // moments ago, so this 401 is almost never a lost cookie — it is the
-      // server's deliberately opaque verdict for a session that cannot claim
-      // (most often: it does not belong to the platform project, e.g. a
-      // deployment running without `platform.bootstrap_project`, which is how
-      // the local testkit boots today). Re-running sign-in mints the same
-      // session and loops forever; an honest dead-end beats a treadmill.
+      // NOT the sign-in widget again: the server collapses "wrong project" and
+      // "no platform project" into one opaque 401, so the page cannot tell
+      // which it is, and re-running sign-in against the same project mints the
+      // same session. Signing out is what the developer can act on, and it is
+      // the common case — a session left over from the app they just scaffolded
+      // on this origin. Offering the account a choice is the account-picker
+      // story, not this screen.
       return (
-        <StateCard title="Your session can't complete this claim">
+        <StateCard title="This account can't claim the project">
           <p className={BODY_TEXT}>
-            The server did not accept the signed-in session for this claim. On a deployment without
-            a platform project, claims cannot complete; otherwise your session may have expired
-            mid-claim — reopen the link from your terminal and sign in again.
+            You are signed in with an account from a different project — most likely the app you
+            just set up, which shares this address.
+          </p>
+          <p className={BODY_TEXT}>
+            Sign out of that app, then reopen the claim link from your terminal to create an account
+            or sign in for this project.
           </p>
           <Button onClick={run} variant="outline" className="mx-auto w-fit">
             Try again
