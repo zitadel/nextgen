@@ -392,6 +392,13 @@ func TestRequireProjectAccess_UserPrincipalCrossProject(t *testing.T) {
 		stmts := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
 		err := requireProjectAccess(human, stmts, "proj_customer", grantAccess, opDelete)
 		assertDomainCode(t, err, domain.ErrGrantPermissionDenied().Code)
+		var de domain.Error
+		if !errors.As(err, &de) {
+			t.Fatalf("error is not a domain.Error: %v", err)
+		}
+		if de.Message != "insufficient permissions to manage grants" {
+			t.Fatalf("grant denial copy = %q, want credential-neutral message", de.Message)
+		}
 	})
 
 	t.Run("missing home project fails closed", func(t *testing.T) {
@@ -670,20 +677,6 @@ func TestRequireResourceAccessDeleteSharedURLElsewhere(t *testing.T) {
 
 	_, err := requireResourceAccess(operator, stmts, "https://example.com/x.json", schemaAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
-}
-
-func TestGrantPermissionDeniedMessageOmitsCredentialHints(t *testing.T) {
-	msg := strings.ToLower(domain.ErrGrantPermissionDenied().Message)
-	for _, banned := range []string{
-		"project secret",
-		"session",
-		"cookie",
-		"bearer",
-	} {
-		if strings.Contains(msg, banned) {
-			t.Fatalf("grant permission_denied must stay credential-neutral, got %q", domain.ErrGrantPermissionDenied().Message)
-		}
-	}
 }
 
 func assertDomainCode(t *testing.T, err error, wantCode string) {
