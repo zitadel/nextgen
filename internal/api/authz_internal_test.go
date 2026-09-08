@@ -513,6 +513,70 @@ func TestRequireProjectListAccess(t *testing.T) {
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 }
 
+// QueryUsers authorizes session callers through requireProjectListAccess on the
+// credential home. Lists must not 404 a Forbidden foothold (that's an empty
+// page) and must still fail closed without home or without any foothold.
+func TestRequireProjectListAccess_UserPrincipal(t *testing.T) {
+	human := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_home",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+
+	t.Run("allow stamps skip", func(t *testing.T) {
+		allow := true
+		foothold := true
+		ctx, err := requireProjectListAccess(human, stubAuthzStmts{allowCheck: &allow, foothold: &foothold}, "proj_home", userAccess, domain.ResourceKindUser)
+		if err != nil {
+			t.Fatalf("session user with Check Allow should proceed: %v", err)
+		}
+		if !service.AuthzListSkipOncePending(ctx) {
+			t.Fatal("Allow must stamp a one-shot EXISTS skip")
+		}
+		if _, ok := service.AuthzListFilterFromContext(ctx); ok {
+			t.Fatal("Allow must not attach EXISTS")
+		}
+	})
+
+	t.Run("foothold without permission is an empty-page filter", func(t *testing.T) {
+		deny := false
+		foothold := true
+		ctx, err := requireProjectListAccess(human, stubAuthzStmts{allowCheck: &deny, foothold: &foothold}, "proj_home", userAccess, domain.ResourceKindUser)
+		if err != nil {
+			t.Fatalf("Forbidden with foothold should proceed for partial-view lists: %v", err)
+		}
+		filter, ok := service.AuthzListFilterFromContext(ctx)
+		if !ok {
+			t.Fatal("Forbidden must attach the EXISTS list filter")
+		}
+		if filter.ResourceKind != domain.ResourceKindUser {
+			t.Fatalf("filter kind = %q, want user", filter.ResourceKind)
+		}
+		if filter.PrincipalHomeProjectID != "proj_home" {
+			t.Fatalf("PrincipalHomeProjectID = %q, want credential home", filter.PrincipalHomeProjectID)
+		}
+		if service.AuthzListSkipOncePending(ctx) {
+			t.Fatal("Forbidden must not stamp the project-wide skip")
+		}
+	})
+
+	t.Run("no foothold is not found", func(t *testing.T) {
+		deny := false
+		foothold := false
+		_, err := requireProjectListAccess(human, stubAuthzStmts{allowCheck: &deny, foothold: &foothold}, "proj_home", userAccess, domain.ResourceKindUser)
+		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+	})
+
+	t.Run("missing home project fails closed", func(t *testing.T) {
+		orphan := WithScopeContext(context.Background(), ScopeContext{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		})
+		_, err := requireProjectListAccess(orphan, stubAuthzStmts{}, "proj_home", userAccess, domain.ResourceKindUser)
+		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+	})
+}
+
 func TestWithAuthzListFilterCopiesConstraintTeamID(t *testing.T) {
 	stmts := stubAuthzStmts{}
 	ctx := WithScopeContext(context.Background(), ScopeContext{
