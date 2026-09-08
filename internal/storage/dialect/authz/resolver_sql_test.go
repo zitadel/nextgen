@@ -181,23 +181,66 @@ func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	assert.Contains(t, w.args, "user_a")
 }
 
+func bindAtFragment(t *testing.T, sql string, args []any, fragment string) any {
+	t.Helper()
+	i := strings.Index(sql, fragment)
+	require.NotEqual(t, -1, i, "missing %q in:\n%s", fragment, sql)
+	n := strings.Count(sql[:i+len(fragment)], "?") - 1
+	require.GreaterOrEqual(t, n, 0)
+	require.Less(t, n, len(args))
+	return args[n]
+}
+
+func assertFootholdHomeSplit(t *testing.T, sql string, args []any, protected, home string) {
+	t.Helper()
+	assert.Equal(t, protected, bindAtFragment(t, sql, args, "a.project_id = ?"), "assignment filter binds the protected project")
+	assert.Equal(t, home, bindAtFragment(t, sql, args, "e.project_id = ?\n          AND e.set_type = 'team'"), "team expand binds the home project")
+	assert.Equal(t, protected, bindAtFragment(t, sql, args, "e.project_id = ?\n          AND e.member_type = 'user'"), "local membership shortcut stays on the protected project")
+}
+
 func TestWriteHasAuthzProjectFootholdDistinctHome(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
 	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_customer", "proj_platform", domain.AuthzPrincipalTypeUser, "user_a")
-	sql := w.b.String()
-	bind := func(fragment string) any {
-		t.Helper()
-		i := strings.Index(sql, fragment)
-		require.NotEqual(t, -1, i, "missing %q in:\n%s", fragment, sql)
-		n := strings.Count(sql[:i+len(fragment)], "?") - 1
-		require.GreaterOrEqual(t, n, 0)
-		require.Less(t, n, len(w.args))
-		return w.args[n]
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_customer", "proj_platform")
+}
+
+func TestWriteHasAuthzProjectFootholdEmptyHomeCoalesces(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", "", domain.AuthzPrincipalTypeUser, "user_a")
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_1", "proj_1")
+}
+
+func TestWriteCheckAuthzDistinctHomeSplit(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:              "cat_sys_1",
+		ProjectID:              "proj_customer",
+		PrincipalHomeProjectID: "proj_platform",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ObjectType:             "project",
+		Relation:               "viewer",
 	}
-	assert.Equal(t, "proj_customer", bind("a.project_id = ?"), "assignment filter binds the protected project")
-	assert.Equal(t, "proj_platform", bind("e.project_id = ?\n          AND e.set_type = 'team'"), "team expand binds the home project")
-	assert.Equal(t, "proj_customer", bind("e.project_id = ?\n          AND e.member_type = 'user'"), "local membership shortcut stays on the protected project")
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_customer", "proj_platform")
+}
+
+func TestWriteCheckAuthzEmptyHomeCoalesces(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:     "cat_sys_1",
+		ProjectID:     "proj_1",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_a",
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_1", "proj_1")
 }
 
 // Folding the constant arms back inside the correlated EXISTS changes only

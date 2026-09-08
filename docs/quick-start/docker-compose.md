@@ -43,6 +43,7 @@ To load demo users on startup, uncomment the `user-file` volume and command over
 
 ```sh
 docker compose run --rm nextgen server \
+  --migrate \
   --user-file /bootstrap/demo-admin.json
 ```
 
