@@ -193,13 +193,17 @@ async function mintClaimUrl(): Promise<string | null> {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: "{}",
+      // A hung endpoint must not hold the dev server hostage for a
+      // convenience link.
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) return null;
     const { challenge_id } = (await response.json()) as { challenge_id?: string };
     if (!challenge_id) return null;
     // The server builds claim_url from its configured console base, which is
     // not this dev server; rebuild it against the origin actually being served.
-    return `${consoleOrigin}/claim?challenge_id=${challenge_id}&project_id=${projectId}`;
+    const query = new URLSearchParams({ challenge_id, project_id: projectId });
+    return `${consoleOrigin}/claim?${query.toString()}`;
   } catch {
     return null;
   }
@@ -258,9 +262,11 @@ if (seedOnly) {
 } else {
   // `--port` from the origin: everything else here honours CONSOLE_DEV_ORIGIN,
   // and without this vite stays pinned to its config's 5174 and a second
-  // worktree collides with the first.
+  // worktree collides with the first. Passed to the `dev` script rather than
+  // around it, so future flags on that script still apply here. No `--`
+  // separator: pnpm swallows the args with one and vite never sees them.
   const consolePort = new URL(consoleOrigin).port;
-  const viteArgs = ["pnpm", "--filter", "@zitadel/console", "exec", "vite"];
+  const viteArgs = ["pnpm", "--filter", "@zitadel/console", "dev"];
   if (consolePort) viteArgs.push("--port", consolePort);
   const vite = spawn("corepack", viteArgs, {
     cwd: workspaceRoot,
