@@ -603,9 +603,6 @@ func TestRequireProjectListAccess(t *testing.T) {
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 }
 
-// QueryUsers authorizes session callers through requireProjectListAccess on the
-// credential home. Lists must not 404 a Forbidden foothold (that's an empty
-// page) and must still fail closed without home or without any foothold.
 func TestRequireProjectListAccess_UserPrincipal(t *testing.T) {
 	human := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID:     "proj_home",

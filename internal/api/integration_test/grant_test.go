@@ -615,9 +615,6 @@ func assertGrantAlreadyExists(t *testing.T, resp any) {
 	assert.Equal(t, api.ErrorCode("grant.already_exists"), conflict.Code)
 }
 
-// TestGrantSessionCaller: a platform-homed session with a foothold on a
-// customer project can create, get, query (including principal expand), and
-// revoke grants there.
 func TestGrantSessionCaller(t *testing.T) {
 	t.Parallel()
 

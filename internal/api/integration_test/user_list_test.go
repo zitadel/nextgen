@@ -153,9 +153,6 @@ func userProp(t *testing.T, user api.User, key string) string {
 	return value
 }
 
-// TestQueryUsersSessionCaller: a user-bound session whose home is the
-// project can list that project's users. QueryUsers has no project_id;
-// the session home is the list scope.
 func TestQueryUsersSessionCaller(t *testing.T) {
 	t.Parallel()
 
