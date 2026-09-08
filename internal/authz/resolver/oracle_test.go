@@ -244,3 +244,69 @@ func TestOracle_HandBuilt(t *testing.T) {
 		}))
 	})
 }
+
+func TestOracle_FootholdPrincipalMatch(t *testing.T) {
+	t.Parallel()
+	closure := []compiler.Implication{
+		{Source: compiler.Relation{Type: "project", Name: "viewer"}, Implied: compiler.Relation{Type: "project", Name: "viewer"}, Depth: 0},
+	}
+
+	t.Run("direct user assignment ignores distinct home", func(t *testing.T) {
+		g := Graph{
+			Closure: closure,
+			Assignments: []*domain.AuthzAssignment{{
+				ProjectID: "customer", CatalogID: "c1",
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "alice",
+				ObjectType: "project", Relation: "viewer",
+				ScopeKind: domain.AuthzScopeKindProject,
+			}},
+		}
+		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
+		assert.True(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", "project", "viewer"))
+		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "bob"))
+	})
+
+	t.Run("team principal assignment ignores distinct home", func(t *testing.T) {
+		g := Graph{
+			Closure: closure,
+			Assignments: []*domain.AuthzAssignment{{
+				ProjectID: "customer", CatalogID: "c1",
+				PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "agency",
+				ObjectType: "project", Relation: "viewer",
+				ScopeKind: domain.AuthzScopeKindProject,
+			}},
+		}
+		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeTeam, "agency"))
+		assert.True(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeTeam, "agency", "project", "viewer"))
+		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "agency"))
+	})
+
+	t.Run("revoked foreign team assignment is not foothold", func(t *testing.T) {
+		revoked := time.Now()
+		g := Graph{
+			Assignments: []*domain.AuthzAssignment{{
+				ProjectID: "customer", CatalogID: "c1",
+				PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "agency",
+				ObjectType: "project", Relation: "viewer",
+				ScopeKind: domain.AuthzScopeKindProject,
+				RevokedAt: &revoked,
+			}},
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("platform", "agency", "alice"),
+			},
+		}
+		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
+		assert.False(t, g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, "alice", "project", "viewer"))
+	})
+
+	t.Run("non-user principal skips local membership shortcut", func(t *testing.T) {
+		g := Graph{
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("customer", "local", "agency"),
+			},
+		}
+		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "agency"))
+		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeTeam, "agency"))
+		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeSKProj, "agency"))
+	})
+}
