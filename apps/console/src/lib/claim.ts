@@ -138,3 +138,40 @@ function membershipStatus(body: Record<string, unknown>): string | undefined {
   const value = (details as Record<string, unknown>).membership_status;
   return typeof value === "string" ? value : undefined;
 }
+
+/**
+ * The project's claim window: how long is left before an unclaimed project
+ * can no longer be claimed at all (ADR 046's 14 days from creation), as
+ * distinct from the claim *link*, which lapses in minutes.
+ *
+ * `expired` is the server's verdict rather than a comparison done here: a
+ * browser clock hours out of step would otherwise contradict what the claim
+ * legs enforce.
+ */
+export interface ClaimWindow {
+  expiresAt: Date;
+  expired: boolean;
+}
+
+/**
+ * Read the claim window for the countdown on the claim page.
+ *
+ * Unauthenticated and idempotent, so it runs before the developer signs in
+ * and survives reloads. It is decoration around the claim, never a gate:
+ * every failure resolves to `undefined` and the page simply renders without a
+ * countdown, because a claim that would have worked must not be blocked by a
+ * read that did not.
+ */
+export async function fetchClaimWindow(
+  projectId: string,
+  challengeId: string,
+): Promise<ClaimWindow | undefined> {
+  try {
+    const result = await api.getClaimWindow(projectId, { challenge_id: challengeId });
+    const expiresAt = new Date(result.expires_at);
+    if (Number.isNaN(expiresAt.getTime())) return undefined;
+    return { expiresAt, expired: result.expired };
+  } catch {
+    return undefined;
+  }
+}
