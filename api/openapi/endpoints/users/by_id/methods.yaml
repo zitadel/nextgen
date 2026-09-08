@@ -111,7 +111,9 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     '409':
-      description: A patched value is unique and already taken by another user.
+      description: |
+        A patched value is unique and already taken by another user, or
+        concurrent writes kept the user changing under the patch; retry.
       content:
         application/json:
           schema:

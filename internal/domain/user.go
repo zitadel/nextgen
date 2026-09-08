@@ -35,6 +35,10 @@ func ErrUserAlreadyExists() Error {
 	return newError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
 }
 
+func ErrUserConflict() Error {
+	return newError(PrefixUser.ErrorCodePrefix("conflict"), "the user was modified concurrently, retry the request", nil, nil)
+}
+
 func ErrUserPermissionDenied() Error {
 	return newError(PrefixUser.ErrorCodePrefix("permission_denied"), "the user management API requires the project secret", nil, nil)
 }

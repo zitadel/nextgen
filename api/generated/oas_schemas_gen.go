@@ -33786,6 +33786,52 @@ func (o OptUserAlreadyExistsDetails) Or(d UserAlreadyExistsDetails) UserAlreadyE
 	return d
 }
 
+// NewOptUserConflictDetails returns new OptUserConflictDetails with value set to v.
+func NewOptUserConflictDetails(v UserConflictDetails) OptUserConflictDetails {
+	return OptUserConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserConflictDetails is optional UserConflictDetails.
+type OptUserConflictDetails struct {
+	Value UserConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserConflictDetails was set.
+func (o OptUserConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserConflictDetails) Reset() {
+	var v UserConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserConflictDetails) SetTo(v UserConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserConflictDetails) Get() (v UserConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserConflictDetails) Or(d UserConflictDetails) UserConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserCreateFailedEventDelegationType returns new OptUserCreateFailedEventDelegationType with value set to v.
 func NewOptUserCreateFailedEventDelegationType(v UserCreateFailedEventDelegationType) OptUserCreateFailedEventDelegationType {
 	return OptUserCreateFailedEventDelegationType{
@@ -34621,6 +34667,7 @@ type PatchMyUserErrorResponse struct {
 	ReqInvalid        ReqInvalid
 	SessTokenInvalid  SessTokenInvalid
 	UserAlreadyExists UserAlreadyExists
+	UserConflict      UserConflict
 	UserInvalid       UserInvalid
 	UserNotFound      UserNotFound
 }
@@ -34635,6 +34682,7 @@ const (
 	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
 	SessTokenInvalidPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "sess.token_invalid"
 	UserAlreadyExistsPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.already_exists"
+	UserConflictPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.conflict"
 	UserInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "user.invalid"
 	UserNotFoundPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.not_found"
 )
@@ -34662,6 +34710,11 @@ func (s PatchMyUserErrorResponse) IsSessTokenInvalid() bool {
 // IsUserAlreadyExists reports whether PatchMyUserErrorResponse is UserAlreadyExists.
 func (s PatchMyUserErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsPatchMyUserErrorResponse
+}
+
+// IsUserConflict reports whether PatchMyUserErrorResponse is UserConflict.
+func (s PatchMyUserErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictPatchMyUserErrorResponse
 }
 
 // IsUserInvalid reports whether PatchMyUserErrorResponse is UserInvalid.
@@ -34776,6 +34829,27 @@ func (s PatchMyUserErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, o
 func NewUserAlreadyExistsPatchMyUserErrorResponse(v UserAlreadyExists) PatchMyUserErrorResponse {
 	var s PatchMyUserErrorResponse
 	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserConflict sets PatchMyUserErrorResponse to UserConflict.
+func (s *PatchMyUserErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictPatchMyUserErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if PatchMyUserErrorResponse is UserConflict.
+func (s PatchMyUserErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from UserConflict.
+func NewUserConflictPatchMyUserErrorResponse(v UserConflict) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetUserConflict(v)
 	return s
 }
 
@@ -35196,6 +35270,7 @@ type PatchUserByIDErrorResponse struct {
 	Internal             Internal
 	ReqInvalid           ReqInvalid
 	UserAlreadyExists    UserAlreadyExists
+	UserConflict         UserConflict
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
@@ -35210,6 +35285,7 @@ const (
 	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
 	ReqInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "req.invalid"
 	UserAlreadyExistsPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "user.already_exists"
+	UserConflictPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.conflict"
 	UserInvalidPatchUserByIDErrorResponse          PatchUserByIDErrorResponseType = "user.invalid"
 	UserNotFoundPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.not_found"
 	UserPermissionDeniedPatchUserByIDErrorResponse PatchUserByIDErrorResponseType = "user.permission_denied"
@@ -35233,6 +35309,11 @@ func (s PatchUserByIDErrorResponse) IsReqInvalid() bool {
 // IsUserAlreadyExists reports whether PatchUserByIDErrorResponse is UserAlreadyExists.
 func (s PatchUserByIDErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsPatchUserByIDErrorResponse
+}
+
+// IsUserConflict reports whether PatchUserByIDErrorResponse is UserConflict.
+func (s PatchUserByIDErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictPatchUserByIDErrorResponse
 }
 
 // IsUserInvalid reports whether PatchUserByIDErrorResponse is UserInvalid.
@@ -35331,6 +35412,27 @@ func (s PatchUserByIDErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists,
 func NewUserAlreadyExistsPatchUserByIDErrorResponse(v UserAlreadyExists) PatchUserByIDErrorResponse {
 	var s PatchUserByIDErrorResponse
 	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserConflict sets PatchUserByIDErrorResponse to UserConflict.
+func (s *PatchUserByIDErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictPatchUserByIDErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if PatchUserByIDErrorResponse is UserConflict.
+func (s PatchUserByIDErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserConflict.
+func NewUserConflictPatchUserByIDErrorResponse(v UserConflict) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetUserConflict(v)
 	return s
 }
 
@@ -47284,6 +47386,59 @@ func (s *UserAlreadyExistsDetails) init() UserAlreadyExistsDetails {
 type UserAttributes map[string]jx.Raw
 
 func (s *UserAttributes) init() UserAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserConflict) GetDetails() OptUserConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserConflict) SetDetails(val OptUserConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserConflictDetails map[string]jx.Raw
+
+func (s *UserConflictDetails) init() UserConflictDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

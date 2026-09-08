@@ -747,9 +747,12 @@ func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error 
 	err := stmts.PatchUser(ctx, o.patch)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			// Either a concurrent write moved the row past the guard, or the
+			// user vanished mid-flight. Surface a conflict, not a 404: the
+			// retry's fresh read is what answers 404 when the user is really
+			// gone.
 			o.stale = true
-			return domain.ErrUserNotFound().
-				WithMessage("The user changed while the patch was being computed. Retry the patch.")
+			return domain.ErrUserConflict()
 		}
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return domain.ErrUserAlreadyExists().WithParent(err)

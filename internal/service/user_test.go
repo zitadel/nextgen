@@ -385,6 +385,51 @@ func TestUserService_PatchUser_LastWriteWinsRetry(t *testing.T) {
 	require.NotNil(t, got)
 }
 
+// When every retry loses the race, the caller gets a 409-mapped conflict,
+// not the stale guard's row-not-found: a 404 would claim the user is gone
+// while it demonstrably exists.
+func TestUserService_PatchUser_ConflictAfterRetriesExhausted(t *testing.T) {
+	t.Parallel()
+
+	const schemaJSON = `{"type": "object", "properties": {"givenName": {"type": "string"}}}`
+
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return tx(ctx, statementer)
+		},
+	).AnyTimes()
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&domain.JSONSchema{Schema: []byte(schemaJSON)}, nil).AnyTimes()
+
+	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&domain.User{
+			ProjectID:  "proj_1",
+			SchemaURL:  "https://example.test/schema.json",
+			ID:         "user_1",
+			Attributes: domain.Attributes{{Key: "givenName", Value: "Alice"}},
+		}, nil).Times(3)
+	stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).
+		Return(database.NewNoRowFoundError(nil)).Times(3)
+
+	svcPool := service.NewPool(pool)
+	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool})
+
+	_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+		ProjectID:  "proj_1",
+		UserID:     "user_1",
+		Attributes: map[string]any{"givenName": "Alicia"},
+	})
+	require.ErrorIs(t, err, domain.ErrUserConflict())
+}
+
 func TestUserService_PatchUser_EmptyPatchRefused(t *testing.T) {
 	t.Parallel()
 

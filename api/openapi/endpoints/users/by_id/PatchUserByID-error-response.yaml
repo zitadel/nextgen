@@ -8,6 +8,7 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
+        - $ref: '../../../components/schemas/errors/user-conflict.yaml'
         - $ref: '../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../components/schemas/errors/user-not_found.yaml'
         - $ref: '../../../components/schemas/errors/user-permission_denied.yaml'
@@ -18,6 +19,7 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
+          user.conflict: '../../../components/schemas/errors/user-conflict.yaml'
           user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
           user.permission_denied: '../../../components/schemas/errors/user-permission_denied.yaml'
@@ -42,6 +44,11 @@ content:
         value:
           code: user.already_exists
           message: 'a user already exists with the given unique attributes'
+      user.conflict:
+        summary: user.conflict
+        value:
+          code: user.conflict
+          message: 'the user was modified concurrently, retry the request'
       user.invalid:
         summary: user.invalid
         value:
