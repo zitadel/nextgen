@@ -141,6 +141,12 @@ func TestCreateRelease(t *testing.T) {
 		assert.Equal(t, created.ID, reused.ID)
 		assert.Equal(t, "initial import", reused.Metadata.Message.Value,
 			"the stored release keeps the message it was created with")
+
+		// The 200 body is built from the release the content-hash lookup
+		// found, which is a different path from the 201 body built off the
+		// entity the insert returned. Without this the reuse response is the
+		// one shape the endpoint answers with that nothing checks.
+		assert.Equal(t, created.Pointers, reused.Pointers)
 	})
 
 	// Changing any pinned revision changes the set, so this is a new release
