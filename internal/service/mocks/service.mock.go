@@ -3754,6 +3754,45 @@ func (c *MockAllStatementsListJSONSchemasCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// ListManagedGrants mocks base method.
+func (m *MockAllStatements) ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListManagedGrants", ctx, projectID, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.AuthzAssignment])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListManagedGrants indicates an expected call of ListManagedGrants.
+func (mr *MockAllStatementsMockRecorder) ListManagedGrants(ctx, projectID, opts any) *MockAllStatementsListManagedGrantsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedGrants", reflect.TypeOf((*MockAllStatements)(nil).ListManagedGrants), ctx, projectID, opts)
+	return &MockAllStatementsListManagedGrantsCall{Call: call}
+}
+
+// MockAllStatementsListManagedGrantsCall wrap *gomock.Call
+type MockAllStatementsListManagedGrantsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListManagedGrantsCall) Return(arg0 *database.ListResult[*domain.AuthzAssignment], arg1 error) *MockAllStatementsListManagedGrantsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListManagedGrantsCall) Do(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAllStatementsListManagedGrantsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListManagedGrantsCall) DoAndReturn(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAllStatementsListManagedGrantsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListProjects mocks base method.
 func (m *MockAllStatements) ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	m.ctrl.T.Helper()
@@ -9879,6 +9918,45 @@ func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) DoAndReturn(f f
 	return c
 }
 
+// ListManagedGrants mocks base method.
+func (m *MockAuthzAssignmentStatements) ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListManagedGrants", ctx, projectID, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.AuthzAssignment])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListManagedGrants indicates an expected call of ListManagedGrants.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListManagedGrants(ctx, projectID, opts any) *MockAuthzAssignmentStatementsListManagedGrantsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedGrants", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListManagedGrants), ctx, projectID, opts)
+	return &MockAuthzAssignmentStatementsListManagedGrantsCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsListManagedGrantsCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListManagedGrantsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) Return(arg0 *database.ListResult[*domain.AuthzAssignment], arg1 error) *MockAuthzAssignmentStatementsListManagedGrantsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) Do(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAuthzAssignmentStatementsListManagedGrantsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) DoAndReturn(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAuthzAssignmentStatementsListManagedGrantsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RevokeAuthzAssignment mocks base method.
 func (m *MockAuthzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()
@@ -12024,6 +12102,45 @@ func (c *MockClaimServiceStatusCall) Do(f func(context.Context, string, string, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockClaimServiceStatusCall) DoAndReturn(f func(context.Context, string, string, string) (*service.ClaimStatusResult, error)) *MockClaimServiceStatusCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Window mocks base method.
+func (m *MockClaimService) Window(ctx context.Context, projectID, challengeID string) (*service.ClaimWindowResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Window", ctx, projectID, challengeID)
+	ret0, _ := ret[0].(*service.ClaimWindowResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Window indicates an expected call of Window.
+func (mr *MockClaimServiceMockRecorder) Window(ctx, projectID, challengeID any) *MockClaimServiceWindowCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Window", reflect.TypeOf((*MockClaimService)(nil).Window), ctx, projectID, challengeID)
+	return &MockClaimServiceWindowCall{Call: call}
+}
+
+// MockClaimServiceWindowCall wrap *gomock.Call
+type MockClaimServiceWindowCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockClaimServiceWindowCall) Return(arg0 *service.ClaimWindowResult, arg1 error) *MockClaimServiceWindowCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockClaimServiceWindowCall) Do(f func(context.Context, string, string) (*service.ClaimWindowResult, error)) *MockClaimServiceWindowCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockClaimServiceWindowCall) DoAndReturn(f func(context.Context, string, string) (*service.ClaimWindowResult, error)) *MockClaimServiceWindowCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

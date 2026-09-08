@@ -59,6 +59,7 @@ func TestProjectErrorResponse(t *testing.T) {
 		{"missing_id", domain.ErrProjectMissingID(), http.StatusBadRequest},
 		{"already_claimed", domain.ErrProjectAlreadyClaimed(), http.StatusConflict},
 		{"claim_expired", domain.ErrProjectClaimExpired(), http.StatusGone},
+		{"claim_window_expired", domain.ErrProjectClaimWindowExpired(), http.StatusGone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

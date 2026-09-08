@@ -318,9 +318,16 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	// (created_at ascending) so every replica answers the same, and cheap
 	// enough to resolve per runtime.json request — no cached state to
 	// invalidate when `zitadel setup` creates the first project.
+	//
+	// The platform project is skipped: it is infrastructure (the claiming
+	// humans and their personal teams, ADR 046 §2), never the deployment's
+	// own product project — and CLI-managed local servers seed it at startup,
+	// which would otherwise make it the "first-created" project of every
+	// local deployment. There is exactly one platform row, so two candidates
+	// suffice to find the earliest real project.
 	result, err := s.v2Pool.Statements().ListProjects(ctx, &database.ListOptions[domain.ProjectField]{
 		Pagination: database.Page[domain.ProjectField]{
-			Limit: 1,
+			Limit: 2,
 			OrderBy: database.OrderBy[domain.ProjectField]{
 				Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldCreatedAt)},
 				Direction: database.OrderAsc,
@@ -330,10 +337,14 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	if err != nil {
 		return nil, mapStorageError(err)
 	}
-	if result == nil || len(result.Items) == 0 {
-		return nil, nil
+	if result != nil {
+		for _, project := range result.Items {
+			if project.ID != domain.PlatformProjectID {
+				return project, nil
+			}
+		}
 	}
-	return result.Items[0], nil
+	return nil, nil
 }
 
 // UpdateProjectRequest is a PATCH: a nil field is one the caller did not

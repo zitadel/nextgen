@@ -93,6 +93,10 @@ type GetClaimStatusRes interface {
 	getClaimStatusRes()
 }
 
+type GetClaimWindowRes interface {
+	getClaimWindowRes()
+}
+
 type GetEnvironmentByNameRes interface {
 	getEnvironmentByNameRes()
 }
@@ -199,6 +203,10 @@ type ListUserTeamsRes interface {
 
 type PatchProjectRes interface {
 	patchProjectRes()
+}
+
+type QueryGrantsRes interface {
+	queryGrantsRes()
 }
 
 type QueryProjectsRes interface {
