@@ -1,5 +1,6 @@
 import { consola } from "consola";
 
+import type { BoxAction } from "../../lib/box";
 import { ZitadelError } from "../../lib/errors";
 import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
 import {
@@ -27,9 +28,11 @@ export type SetupInstallOutcome = {
   /**
    * Journey-staged subset for the human terminal box: the verify mission
    * plus one breadcrumb to `status`/README. Customize/publish guidance stays
-   * out until login demonstrably works (Elina, alpha.15).
+   * out until login demonstrably works (Elina, alpha.15). Structured so the
+   * box renderer can pull each command onto its own styled line; the envelope
+   * strings below stay plain prose.
    */
-  boxActions: string[];
+  boxActions: BoxAction[];
   /** Complete journey for the JSON envelope — agents consume all of it. */
   nextActions: string[];
   nextCommands: string[];
@@ -125,11 +128,21 @@ function outcome(input: {
     `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
     verifyLoginAction(),
   ];
-  const breadcrumb = `Once login works: ${statusCommand} shows your next steps; customizing is covered in your README's Zitadel section.`;
+  const boxActions: BoxAction[] = [
+    ...(input.includeInstallCommand
+      ? [{ text: "Install dependencies:", command: input.install.command }]
+      : []),
+    { text: `Start your project (then open ${input.issuer}/login):`, command: input.devCommand },
+    { text: verifyLoginAction() },
+    {
+      text: "Once login works, this shows your next steps (customizing is covered in your README's Zitadel section):",
+      command: statusCommand,
+    },
+  ];
   return {
     install: input.install,
     devCommand: input.devCommand,
-    boxActions: [...verifyActions, breadcrumb],
+    boxActions,
     nextActions: [...verifyActions, ...customizeAndPublishActions(input.cliVersion)],
     nextCommands: input.includeInstallCommand
       ? [input.install.command, input.devCommand, planCommand]

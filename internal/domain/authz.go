@@ -277,6 +277,21 @@ func (a *AuthzAssignment) ApplyScope(scope AuthzAssignmentScope) {
 	a.ScopeResourceID = scope.ResourceID
 }
 
+// AuthzAssignmentField enumerates assignment columns that can be used for
+// filtering and ordering the managed-grants list.
+type AuthzAssignmentField uint8
+
+const (
+	AuthzAssignmentFieldUnspecified AuthzAssignmentField = iota
+	AuthzAssignmentFieldProjectID
+	AuthzAssignmentFieldID
+	AuthzAssignmentFieldPrincipalType
+	AuthzAssignmentFieldPrincipalID
+	AuthzAssignmentFieldRelation
+	AuthzAssignmentFieldCreatedAt
+	AuthzAssignmentFieldExpiresAt
+)
+
 // NewSKProjProjectSetupAssignment is the grant seeded at CreateProject so the
 // returned full project secret can set up the project via resolver.Check.
 //

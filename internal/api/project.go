@@ -140,6 +140,10 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrProjectClaimExpired().Code:
 		return errorResponseWithStatusCode(http.StatusGone, err)
+	case domain.ErrProjectClaimWindowExpired().Code:
+		// Gone like an expired challenge, but under its own code: a new
+		// challenge fixes claim_expired, nothing fixes a closed window.
+		return errorResponseWithStatusCode(http.StatusGone, err)
 	default:
 		return internalErrorResponse(err)
 	}
