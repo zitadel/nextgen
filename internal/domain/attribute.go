@@ -122,6 +122,26 @@ func MergeAttributesPatch(current, patch map[string]any) map[string]any {
 	return merged
 }
 
+// RegistryTeamScopes resolves the registry team scope of each attribute, index
+// aligned with attrs: project-unique values are project-wide (""), team-unique
+// values keep their already-stored scope when preserved knows the key and fall
+// back to fallback otherwise. Entries for non-unique attributes stay "" and go
+// unused. Pass a nil preserved map when nothing is stored yet (create).
+func (attrs CreateAttributes) RegistryTeamScopes(preserved map[AttributeKey]string, fallback string) []string {
+	scopes := make([]string, len(attrs))
+	for i, a := range attrs {
+		if a.UniqueScope != AttributeUniquenessTeam {
+			continue
+		}
+		if team, ok := preserved[a.Key]; ok {
+			scopes[i] = team
+			continue
+		}
+		scopes[i] = fallback
+	}
+	return scopes
+}
+
 type CreateAttribute struct {
 	Key         AttributeKey        `json:"key"`
 	Value       any                 `json:"value"`

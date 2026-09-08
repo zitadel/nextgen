@@ -203,7 +203,9 @@ type PatchUser struct {
 	ExpectedUpdatedAt time.Time
 	// Attributes is the complete desired attribute set after the merge.
 	Attributes CreateAttributes
-	// AttributeTeamScope scopes team-unique registry rows.
+	// AttributeTeamScope scopes team-unique registry rows claimed for the
+	// first time by this patch; existing claims keep their stored scope (the
+	// statements read it before rewriting).
 	AttributeTeamScope string
 }
 
@@ -242,13 +244,11 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 		return nil, err
 	}
 
-	// Create scopes team-unique registry rows to the initial membership team
-	// first (see [CreateUser.AttributeTeamScope]); a patch has no membership
-	// context, so the fallback applies: lifecycle owner team, else "" (the
-	// project scope). A user created into a team that is not their lifecycle
-	// owner therefore has their team-unique claims re-scoped to the owner on
-	// first patch. Nothing creates such users today; preserving each existing
-	// registry row's team is the upgrade path if that changes.
+	// Fallback scope for team-unique claims not yet in the registry:
+	// lifecycle owner team, else "" (project-wide). Existing claims keep
+	// their stored team scope — the patch statements read it before the
+	// rewrite — because create may have scoped them to an initial membership
+	// team this patch knows nothing about (see [CreateUser.AttributeTeamScope]).
 	teamScope := ""
 	if params.Current.LifecycleOwnerTeamID != nil {
 		teamScope = *params.Current.LifecycleOwnerTeamID

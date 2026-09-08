@@ -512,6 +512,61 @@ func TestUserStatements_PatchUser(t *testing.T) {
 			require.ErrorAs(t, err, &uniqueErr)
 		})
 
+		// Create scopes team-unique claims to the initial membership team; a
+		// patch has no membership context and must not silently re-scope an
+		// existing claim to its own fallback (project-wide here, the user
+		// being self-owned).
+		t.Run("preserves the stored team scope of unique claims", func(t *testing.T) {
+			team := newTestTeam(projectID, "team_patch_scope")
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+
+			user := &domain.CreateUser{
+				ProjectID:               projectID,
+				SchemaURL:               schemaURL,
+				ID:                      "user_patch_scope",
+				InitialMembershipTeamID: &team.ID,
+				Attributes: domain.CreateAttributes{
+					mustAttr("email", "patch-scope@example.com", domain.AttributeUniquenessProject),
+					mustAttr("handle", "scoped-handle", domain.AttributeUniquenessTeam),
+				},
+			}
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+			before := getUserByID(t, d.stmts, projectID, user.ID)
+
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(before,
+				mustAttr("email", "patch-scope@example.com", domain.AttributeUniquenessProject),
+				mustAttr("handle", "scoped-handle", domain.AttributeUniquenessTeam),
+				mustAttr("role", "admin", domain.AttributeUniquenessUnspecified),
+			)))
+
+			// Had the rewrite re-scoped the claim project-wide, this scopeless
+			// claimant would collide with it.
+			unscoped := &domain.CreateUser{
+				ProjectID: projectID,
+				SchemaURL: schemaURL,
+				ID:        "user_patch_scope2",
+				Attributes: domain.CreateAttributes{
+					mustAttr("handle", "scoped-handle", domain.AttributeUniquenessTeam),
+				},
+			}
+			require.NoError(t, d.stmts.CreateUser(t.Context(), unscoped),
+				"the claim must still be scoped to the membership team, not project-wide")
+
+			// And within the original team the claim still defends.
+			sameTeam := &domain.CreateUser{
+				ProjectID:               projectID,
+				SchemaURL:               schemaURL,
+				ID:                      "user_patch_scope3",
+				InitialMembershipTeamID: &team.ID,
+				Attributes: domain.CreateAttributes{
+					mustAttr("handle", "scoped-handle", domain.AttributeUniquenessTeam),
+				},
+			}
+			err := d.stmts.CreateUser(t.Context(), sameTeam)
+			var uniqueErr *database.UniqueError
+			require.ErrorAs(t, err, &uniqueErr)
+		})
+
 		t.Run("moves the schema pointer", func(t *testing.T) {
 			const schemaURLv2 = "https://example.com/schemas/test-user-v2"
 			require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{

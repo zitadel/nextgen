@@ -64,6 +64,8 @@ WHERE project_id = @p1 AND id IN UNNEST(@p2)`
 	patchUserHeaderStmt = `UPDATE users SET updated_at = CURRENT_TIMESTAMP(), schema_url = @p1
 WHERE project_id = @p2 AND id = @p3 AND updated_at = @p4`
 
+	selectUserUniqueAttrScopesStmt = `SELECT key, team_id FROM user_unique_attributes WHERE project_id = @p1 AND user_id = @p2`
+
 	deleteUserUniqueAttributesStmt = `DELETE FROM user_unique_attributes WHERE project_id = @p1 AND user_id = @p2`
 
 	deleteUserAttributesStmt = `DELETE FROM user_attributes WHERE project_id = @p1 AND user_id = @p2`
@@ -110,7 +112,8 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			return err
 		}
 
-		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, teamScope, user.Attributes); err != nil {
+		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, teamScope, user.Attributes,
+			user.Attributes.RegistryTeamScopes(nil, teamScope)); err != nil {
 			return err
 		}
 
@@ -132,33 +135,51 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 }
 
 // insertUserAttributes writes one attribute row per entry, plus a registry
-// row for each unique-scoped value.
-func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID, teamScope string, attrs domain.CreateAttributes) error {
-	for _, a := range attrs {
+// row for each unique-scoped value. registryTeams is index-aligned with attrs
+// (see [domain.CreateAttributes.RegistryTeamScopes]).
+func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID, attrTeamID string, attrs domain.CreateAttributes, registryTeams []string) error {
+	for i, a := range attrs {
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
 		if _, err := tx.Update(ctx, buildStatement(createUserAttributeStmt,
-			projectID, teamScope, userID, a.Key, string(raw),
+			projectID, attrTeamID, userID, a.Key, string(raw),
 		).statement()); err != nil {
 			return err
 		}
 		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
 			continue
 		}
-		scopeTeamID := teamScope
-		if a.UniqueScope == domain.AttributeUniquenessProject {
-			scopeTeamID = ""
-		}
 		sum := a.ValueHash
 		if _, err := tx.Update(ctx, buildStatement(createUserUniqueAttrStmt,
-			projectID, userID, scopeTeamID, a.Key, append([]byte(nil), sum[:]...),
+			projectID, userID, registryTeams[i], a.Key, append([]byte(nil), sum[:]...),
 		).statement()); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// readUserUniqueAttrScopes reads the stored registry team scope per key, so a
+// rewrite keeps the scope an existing claim was created under.
+func readUserUniqueAttrScopes(ctx context.Context, tx queryExecutor, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	scopes := make(map[domain.AttributeKey]string)
+	err := tx.Query(ctx, buildStatement(selectUserUniqueAttrScopesStmt, projectID, userID).statement(),
+		func(iter *spanner.RowIterator) error {
+			return iter.Do(func(row *spanner.Row) error {
+				var key, team string
+				if err := row.Columns(&key, &team); err != nil {
+					return err
+				}
+				scopes[domain.AttributeKey(key)] = team
+				return nil
+			})
+		})
+	if err != nil {
+		return nil, err
+	}
+	return scopes, nil
 }
 
 // PatchUser implements [service.UserStatements] as a full rewrite of the
@@ -178,13 +199,18 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if n == 0 {
 			return wrapError(spanner.ErrRowNotFound)
 		}
+		preserved, err := readUserUniqueAttrScopes(ctx, tx, user.ProjectID, user.UserID)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Update(ctx, buildStatement(deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID).statement()); err != nil {
 			return err
 		}
 		if _, err := tx.Update(ctx, buildStatement(deleteUserAttributesStmt, user.ProjectID, user.UserID).statement()); err != nil {
 			return err
 		}
-		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes)
+		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes,
+			user.Attributes.RegistryTeamScopes(preserved, user.AttributeTeamScope))
 	})
 }
 

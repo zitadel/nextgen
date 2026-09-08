@@ -73,6 +73,11 @@ SET updated_at = NOW(), schema_url = $1
 WHERE project_id = $2 AND id = $3 AND updated_at = $4
 `
 
+	selectUserUniqueAttrScopesStmt = `
+SELECT key, team_id FROM zitadel_nextgen.user_unique_attributes
+WHERE project_id = $1 AND user_id = $2
+`
+
 	deleteUserUniqueAttributesStmt = `
 DELETE FROM zitadel_nextgen.user_unique_attributes
 WHERE project_id = $1 AND user_id = $2
@@ -88,7 +93,9 @@ WHERE project_id = $1 AND user_id = $2
 	// after the delete statements above, so the whole patch is a full rewrite
 	// of the user's rows; diff-based reconciliation (see
 	// migration/sql/user_examples/patch.sql) is the upgrade path if attribute
-	// counts ever make that churn matter.
+	// counts ever make that churn matter. Registry team scopes come
+	// per-attribute ($8), computed from the pre-rewrite rows so an existing
+	// claim keeps the scope create gave it.
 	patchUserAttributesSQL = `
 WITH _input_data AS (
     SELECT *,
@@ -97,19 +104,15 @@ WITH _input_data AS (
         $4::text[],
         $5::jsonb[],
         $6::bytea[],
-        $7::text[]
-    ) AS t(key, value, value_hash, unique_scope_txt)
+        $7::text[],
+        $8::text[]
+    ) AS t(key, value, value_hash, unique_scope_txt, registry_team_id)
 ),
 _registry AS (
     INSERT INTO zitadel_nextgen.user_unique_attributes (
         project_id, user_id, team_id, key, value_hash
     )
-    SELECT $1, $2,
-           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
-                THEN ''
-                ELSE $3::text
-           END,
-           d.key, d.value_hash
+    SELECT $1, $2, d.registry_team_id, d.key, d.value_hash
     FROM _input_data d
     WHERE d.unique_scope <> 'unspecified'::zitadel_nextgen.uniqueness_scope
       AND d.value_hash IS NOT NULL
@@ -288,6 +291,11 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if tag.RowsAffected() == 0 {
 			return wrapError(pgx.ErrNoRows)
 		}
+		preserved, err := readUserUniqueAttrScopes(ctx, tx, user.ProjectID, user.UserID)
+		if err != nil {
+			return err
+		}
+		registryTeams := user.Attributes.RegistryTeamScopes(preserved, user.AttributeTeamScope)
 		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
 			return wrapError(err)
 		}
@@ -296,12 +304,37 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		}
 		if _, err := tx.Exec(ctx, patchUserAttributesSQL,
 			user.ProjectID, user.UserID, user.AttributeTeamScope,
-			keys, values, hashes, scopes,
+			keys, values, hashes, scopes, registryTeams,
 		); err != nil {
 			return wrapError(err)
 		}
 		return nil
 	})
+}
+
+// readUserUniqueAttrScopes reads the stored registry team scope per key, so a
+// rewrite keeps the scope an existing claim was created under.
+func readUserUniqueAttrScopes(ctx context.Context, tx queryExecutor, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	rows, err := tx.Query(ctx, selectUserUniqueAttrScopesStmt, projectID, userID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	scopes := make(map[domain.AttributeKey]string)
+	_, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (struct{}, error) {
+		var (
+			key  domain.AttributeKey
+			team string
+		)
+		if err := row.Scan(&key, &team); err != nil {
+			return struct{}{}, err
+		}
+		scopes[key] = team
+		return struct{}{}, nil
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return scopes, nil
 }
 
 // GetUser implements [service.UserStatements].
