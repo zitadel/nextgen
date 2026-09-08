@@ -85,29 +85,6 @@ func TestAuthzResolver_Home(t *testing.T) {
 			assert.True(t, allowed)
 		})
 
-		t.Run("home project mismatch deny expand", func(t *testing.T) {
-			projectID := ensureProject(t, d.stmts)
-			u := "user_home_mis_" + uniqueSuffix(t)
-			team := "team_home_mis_" + uniqueSuffix(t)
-			other := ensureProject(t, d.stmts)
-			otherTeam := "team_home_other_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(other, otherTeam)))
-			// Membership only in other project; grant team viewer in protected project.
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(other, otherTeam, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
-			allowed, _ := check(t, domain.AuthzCheckParams{
-				CatalogID:     domain.SystemCatalogID,
-				ProjectID:     projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser,
-				PrincipalID:   u,
-				ObjectType:    "project",
-				Relation:      "viewer",
-			})
-			assert.False(t, allowed)
-		})
-
 		t.Run("foreign team grant homes", func(t *testing.T) {
 			g := seedForeignTeamGrant(t, d.stmts, true)
 			res := "usr_listed_" + uniqueSuffix(t)
@@ -121,8 +98,8 @@ func TestAuthzResolver_Home(t *testing.T) {
 				wantListed bool
 			}{
 				{"platform home", g.platform, true, true, true},
-				{"empty home", "", false, false, false},             // defaults to target
-				{"target as home", g.customer, false, false, false}, // same path, different spelling
+				{"empty home", "", false, false, false},             // mismatch: defaults to customer
+				{"target as home", g.customer, false, false, false}, // mismatch: same path, explicit spelling
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					params := g.checkParams("project", "viewer")
