@@ -59,8 +59,9 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 
 // HandleNextgenSession handles the nextgenSession security scheme: the
 // __nextgen_session cookie. It verifies the cookie decrypts to a session
-// token and stashes it for handlers. User-bound sessions also mint
-// ScopeContext so management ops can authorize the human.
+// token and stashes it for handlers. User-bound sessions mint ScopeContext
+// so management ops can authorize the human, unless oauth2 already minted
+// one (dual-scheme OR: console e2e-real sends both).
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
@@ -73,12 +74,19 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
 	ctx = withActorFromToken(ctx, token)
 	if token.UserID != "" {
-		ctx = WithScopeContext(ctx, ScopeContext{
-			ProjectID:     token.ProjectID,
-			Scope:         token.Scope,
-			PrincipalType: domain.AuthzPrincipalTypeUser,
-			PrincipalID:   token.UserID,
-		})
+		// ogen applies every present scheme; later handlers win. Dual-scheme
+		// management ops are OR, and console e2e-real sends both the Vite-injected
+		// project secret and the session cookie. Do not replace an already-minted
+		// oauth2 ScopeContext — the secret is the operator credential those lanes
+		// use. Cookie-only callers still mint below.
+		if _, ok := GetScopeContext(ctx); !ok {
+			ctx = WithScopeContext(ctx, ScopeContext{
+				ProjectID:     token.ProjectID,
+				Scope:         token.Scope,
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   token.UserID,
+			})
+		}
 	}
 	return ctx, nil
 }

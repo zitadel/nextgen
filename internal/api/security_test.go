@@ -209,6 +209,45 @@ func TestHandleNextgenSession(t *testing.T) {
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 
+	t.Run("does not replace oauth2 ScopeContext", func(t *testing.T) {
+		t.Parallel()
+
+		project := &domain.Token{
+			ProjectID: "proj_operator",
+			TokenID:   "token-secret",
+			Type:      domain.TokenTypeProjectToken,
+			Scope:     []string{"project.write", "project.read", "user.read"},
+		}
+		session := &domain.Token{
+			ProjectID: "proj_operator",
+			TokenID:   "token-session",
+			UserID:    "user_alice",
+			Type:      domain.TokenTypeSessionToken,
+			SessionID: new("session-1"),
+		}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(project, nil)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(session, nil)
+
+		handler := NewSecurityHandler(tokenService)
+		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryUsersOperation, api.OAuth2{Token: "raw-bearer"})
+		require.NoError(t, err)
+		ctx, err = handler.HandleNextgenSession(ctx, api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		require.NoError(t, err)
+
+		scope, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, domain.AuthzPrincipalTypeSKProj, scope.PrincipalType)
+		require.Equal(t, "proj_operator", scope.PrincipalID)
+		require.Equal(t, project.Scope, scope.Scope)
+
+		got, ok := sessionTokenFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, session, got)
+	})
+
 	t.Run("non-session token type is rejected", func(t *testing.T) {
 		t.Parallel()
 
