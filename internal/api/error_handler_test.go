@@ -189,6 +189,41 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 	})
 }
 
+func TestOgenErrorHandlerQueryUsersSecurityStaysCredentialNeutral(t *testing.T) {
+	t.Parallel()
+
+	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+	require.False(t, sessionCookieOperations[api.QueryUsersOperation])
+
+	t.Run("missing credentials", func(t *testing.T) {
+		t.Parallel()
+		srv := newErrorHandlerTestServer(t, nil)
+		req := httptest.NewRequest(http.MethodPost, "/users/query", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.JSONEq(t, want, rec.Body.String())
+	})
+
+	t.Run("invalid bearer", func(t *testing.T) {
+		t.Parallel()
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+		srv := newErrorHandlerTestServer(t, tokenService)
+
+		req := httptest.NewRequest(http.MethodPost, "/users/query", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer garbage")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.JSONEq(t, want, rec.Body.String())
+	})
+}
+
 func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	t.Parallel()
 

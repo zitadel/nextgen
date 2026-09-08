@@ -10629,9 +10629,13 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 // handleQueryUsersRequest handles queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// The project comes from the credential, not from a parameter: the operation
-// is bound to the token's own project by construction. This is why it takes
-// no `project_id`, unlike the other query endpoints.
+// The project comes from the credential, not from a parameter: the
+// operation is bound to the credential's home project by construction
+// (oauth2 secret or user-bound session). This is why it takes no
+// `project_id`, unlike the other query endpoints.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /users/query
 func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -10725,11 +10729,29 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, QueryUsersOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

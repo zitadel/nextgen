@@ -571,9 +571,13 @@ type Invoker interface {
 	// QueryUsers invokes queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// The project comes from the credential, not from a parameter: the operation
-	// is bound to the token's own project by construction. This is why it takes
-	// no `project_id`, unlike the other query endpoints.
+	// The project comes from the credential, not from a parameter: the
+	// operation is bound to the credential's home project by construction
+	// (oauth2 secret or user-bound session). This is why it takes no
+	// `project_id`, unlike the other query endpoints.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error)
@@ -8699,9 +8703,13 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // QueryUsers invokes queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// The project comes from the credential, not from a parameter: the operation
-// is bound to the token's own project by construction. This is why it takes
-// no `project_id`, unlike the other query endpoints.
+// The project comes from the credential, not from a parameter: the
+// operation is bound to the credential's home project by construction
+// (oauth2 secret or user-bound session). This is why it takes no
+// `project_id`, unlike the other query endpoints.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /users/query
 func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error) {
@@ -8782,11 +8790,23 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest)
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, QueryUsersOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
