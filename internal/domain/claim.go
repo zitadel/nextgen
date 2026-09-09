@@ -64,6 +64,26 @@ type ClaimConflictDetails struct {
 	DashboardURL string `json:"dashboard_url"`
 }
 
+// ErrClaimNoPlatformProject covers a claim started on a deployment that hosts
+// no platform project: platform.bootstrap_project is off and no
+// platform.project_id pin stands in (cmd/server/config.go). Every claim ends in
+// a claim/complete authenticated by a session on that project (ADR 046 §2), so
+// without one no session anywhere could finish the claim — and claim/init
+// refuses to mint a challenge rather than hand out a link whose browser leg can
+// only fail. This is the plain local `zitadel start` runtime by default, which
+// deliberately does not bootstrap the platform project (it would also become
+// the console's sign-in project); Zitadel Cloud always has one.
+//
+// The message is lifted verbatim into the OpenAPI error schema and rendered by
+// the CLI, so it names the remedy an operator can act on.
+func ErrClaimNoPlatformProject() Error {
+	return newError(
+		PrefixClaim.ErrorCodePrefix("no_platform_project"),
+		"This deployment has no platform project, so projects on it cannot be attached to a team. Enabling platform.bootstrap_project provisions one.",
+		nil, nil,
+	)
+}
+
 // ErrClaimNoPersonalTeam covers a claim/complete session user without an
 // active personal team. Impossible once #527's registration auto-creates it;
 // until then it guards manually seeded platform projects.

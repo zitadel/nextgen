@@ -222,6 +222,10 @@ func TestClaimErrorResponse(t *testing.T) {
 		// Same status as its sibling on purpose: the caller is refused either
 		// way, and only the code tells them whether waiting will help.
 		{"personal_team_not_active", domain.ErrPersonalTeamNotActive("removed"), http.StatusForbidden},
+		// 501, not a 4xx: the deployment lacks the platform project every
+		// claim completes against, so the server does not support claiming
+		// at all — nothing about the request, and nothing a retry fixes.
+		{"no_platform_project", domain.ErrClaimNoPlatformProject(), http.StatusNotImplemented},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

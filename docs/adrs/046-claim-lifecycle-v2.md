@@ -26,6 +26,14 @@
 > check. This is a wire-contract change to an already-implemented flow; do not
 > implement §2's CSRF posture from this ADR alone.
 >
+> **Amendment (2026-09-09):** a deployment without a platform project cannot
+> satisfy [§2](#2-claimcomplete-is-authenticated-by-a-platform-project-session)
+> for any session, so `claim/init` now refuses there with
+> `501 claim.no_platform_project` instead of minting a challenge whose browser
+> leg can only fail. A plain local `zitadel start` runtime is such a
+> deployment by default (`platform.bootstrap_project` is deliberately not a
+> local default); the CLI surfaces the refusal before any link is printed.
+>
 > **Amendment (2026-08-31):** [§4](#4-the-personal-team-is-created-at-registration-not-at-claim)
 > stated that team names are not unique. That was never true of the schema: the
 > teams table has carried a case-insensitive unique index on the name, scoped to

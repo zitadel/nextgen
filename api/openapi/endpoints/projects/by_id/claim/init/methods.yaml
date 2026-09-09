@@ -55,6 +55,17 @@ post:
         application/json:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+    '501':
+      description: |
+        This deployment cannot attach projects to a team: it hosts no platform
+        project (`platform.bootstrap_project` is off and no `platform.project_id`
+        stands in), so no session on it could ever complete a claim. Final for
+        this server — a fresh init does not help; claim on a deployment with
+        the platform project enabled, such as Zitadel Cloud.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/claim-no_platform_project.yaml
     default:
       description: Unexpected error response.
       content:

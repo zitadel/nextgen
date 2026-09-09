@@ -91,11 +91,17 @@ works within 14 days of running `setup` — after that, `setup` a fresh
 project instead.
 
 > **Trying this before deploying to Zitadel Cloud:** claiming needs a server
-> with a platform project bootstrapped, which Zitadel Cloud has by default.
-> To exercise the same flow locally today, run the Docker deploy with the
-> platform project enabled and use `http://localhost:8080` as the `--server`
-> above — see [docker-compose.md](docs/quick-start/docker-compose.md)
-> and [configuration.md § Platform](docs/quick-start/configuration.md#platform).
+> with a platform project bootstrapped, which Zitadel Cloud has by default. A
+> plain local `zitadel start` runtime has none, so `claim` against it stops
+> before opening a browser and says so (`501 claim.no_platform_project`). To
+> exercise the same flow locally today, restart the local server with the
+> platform project enabled — `npx @zitadel/cli@alpha stop`, then
+> `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true npx @zitadel/cli@alpha start`
+> (the local console then signs in through the platform project) — or run the
+> Docker deploy with the platform project enabled and use
+> `http://localhost:8080` as the `--server` above — see
+> [docker-compose.md](docs/quick-start/docker-compose.md) and
+> [configuration.md § Platform](docs/quick-start/configuration.md#platform).
 > This box goes away once claiming against Zitadel Cloud is verified
 > end to end.
 

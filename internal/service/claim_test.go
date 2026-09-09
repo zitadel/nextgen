@@ -559,6 +559,18 @@ func TestClaimService_Complete(t *testing.T) {
 
 func newMockedClaimService(t *testing.T, setupStmt func(*servicemocks.MockAllStatements)) service.ClaimService {
 	t.Helper()
+	return newMockedClaimServiceForPlatform(t, claimPlatformProjID, setupStmt)
+}
+
+// newMockedClaimServiceForPlatform is newMockedClaimService with the platform
+// project id under the caller's control — empty models a deployment that
+// hosts none (platform.bootstrap_project off, no platform.project_id pin).
+func newMockedClaimServiceForPlatform(
+	t *testing.T,
+	platformProjectID string,
+	setupStmt func(*servicemocks.MockAllStatements),
+) service.ClaimService {
+	t.Helper()
 
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
@@ -575,7 +587,22 @@ func newMockedClaimService(t *testing.T, setupStmt func(*servicemocks.MockAllSta
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	setupStmt(statements)
 
-	return service.NewClaimService(service.NewPool(pool), claimConsoleBase, claimPlatformProjID)
+	return service.NewClaimService(service.NewPool(pool), claimConsoleBase, platformProjectID)
+}
+
+// A deployment that hosts no platform project refuses to mint at all:
+// claim/complete rejects every session there, so a challenge could only ever
+// produce a dead link. No statement expectations on purpose — the refusal has
+// to come before any read, and gomock fails the test on the first unexpected
+// call if it does not.
+func TestClaimService_Init_NoPlatformProject(t *testing.T) {
+	t.Parallel()
+
+	svc := newMockedClaimServiceForPlatform(t, "", func(*servicemocks.MockAllStatements) {})
+
+	got, err := svc.Init(t.Context(), "proj_1", "secret_hash_1")
+	require.ErrorIs(t, err, domain.ErrClaimNoPlatformProject())
+	assert.Nil(t, got)
 }
 
 func TestClaimService_Window(t *testing.T) {

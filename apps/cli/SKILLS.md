@@ -215,6 +215,16 @@ the CLI's help layer, not the envelope.
   `410 proj.claim_window_expired`, the command exits `E_VALIDATION`, and a
   fresh link does **not** help — only a fresh `setup` yields a claimable
   project (the old one keeps working, it just can't be attached anymore).
+  A server that hosts no platform project — a plain local `zitadel start`
+  runtime by default, or a self-hosted server without
+  `platform.bootstrap_project` — answers `claim/init` with
+  `501 claim.no_platform_project`: the command exits `E_VALIDATION` before
+  any link is minted or a browser opens, `claim` is deliberately absent from
+  `next_commands` (a fresh link answers the same 501), and the hint says how
+  to enable the platform project on a local server
+  (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true` on `start`, after `stop`) or to
+  claim on Zitadel Cloud. The project keeps working either way; it just stays
+  temporary.
   `--dry-run` stops before
   anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
   there is nothing to preview, because a claim is decided in a browser.

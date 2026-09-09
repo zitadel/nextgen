@@ -11,7 +11,7 @@ import {
   setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
-import { http, passthrough } from "msw";
+import { http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -298,6 +298,50 @@ describe("claim", () => {
     expect(secret.team_id).toBeUndefined();
   });
 
+  // The server refuses `claim/init` when it hosts no platform project (a plain
+  // local `zitadel start` runtime, or a self-hosted server without
+  // `platform.bootstrap_project`), because no session on it could ever finish
+  // the claim. The command must surface that before any link is printed or a
+  // browser opens, and without the retry nudge a fresh link cannot honor.
+  it("stops before minting a link when the server hosts no platform project", async () => {
+    const { cwd } = await makeProject();
+    server.use(
+      http.post(`${SERVER}/projects/:projectId/claim/init`, () =>
+        HttpResponse.json(
+          {
+            code: "claim.no_platform_project",
+            message:
+              "This deployment has no platform project, so projects on it cannot be attached to a team.",
+          },
+          { status: 501 },
+        ),
+      ),
+    );
+
+    const res = await claim(cwd);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      message: string;
+      hint?: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("no platform project");
+    // A cloud-shaped server is not the developer's to restart, so the hint
+    // points at the cloud and the operator rather than at a local switch.
+    expect(json.hint).toContain("Zitadel Cloud");
+    expect(json.hint).not.toContain("zitadel stop");
+    expect((json.next_commands ?? []).some((command) => command.includes("claim"))).toBe(false);
+
+    const secret = await readSecret(cwd);
+    expect(secret.claimed_at).toBeUndefined();
+    expect(secret.team_id).toBeUndefined();
+  });
+
   it("stops waiting at --timeout and leaves the secret untouched", async () => {
     const { cwd } = await makeProject();
 
@@ -373,6 +417,40 @@ describe("claim", () => {
       expect((await readSecret(cwd)).team_id).toBe("team-local-stub");
     });
 
+    // The local runtime is the one server the developer can restart, so the
+    // refusal's hint carries the concrete fix — the same switch the journey
+    // suite flips — instead of pointing at an operator.
+    it("explains how to enable the platform project on the local server", async () => {
+      const { cwd } = await makeProject();
+      const serverUrl = await startClaimServer(undefined, {
+        status: 501,
+        body: {
+          code: "claim.no_platform_project",
+          message:
+            "This deployment has no platform project, so projects on it cannot be attached to a team.",
+        },
+      });
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+      const res = await runCliForTest([
+        "claim",
+        "--cwd",
+        cwd,
+        "--json",
+        "--server",
+        "local",
+        "--no-open",
+      ]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
+      expect(json.status).toBe("error");
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.hint).toContain("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true");
+      expect(json.hint).toContain("stop");
+      expect((await readSecret(cwd)).team_id).toBeUndefined();
+    });
+
     // No `--json` in the next two: the warning is consola narration, and the
     // envelope silences it.
     it("warns when a local server advertises a remote claim page", async () => {
@@ -410,6 +488,7 @@ describe("claim", () => {
  */
 async function startClaimServer(
   claimUrl = "http://localhost/claim/ch_localstub",
+  initFailure?: { status: number; body: unknown },
 ): Promise<string> {
   const httpServer = createServer((req, res) => {
     const url = req.url ?? "";
@@ -418,6 +497,12 @@ async function startClaimServer(
       return;
     }
     if (url.endsWith("/claim/init")) {
+      if (initFailure) {
+        res
+          .writeHead(initFailure.status, { "content-type": "application/json" })
+          .end(JSON.stringify(initFailure.body));
+        return;
+      }
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           claim_url: claimUrl,

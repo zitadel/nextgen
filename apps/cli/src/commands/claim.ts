@@ -11,7 +11,9 @@ import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { serverKind } from "../lib/oclif/server-kind";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
+import { publicCliCommand } from "../lib/public-cli";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -145,6 +147,10 @@ export default class Claim extends BaseCommand {
       if (isClaimWindowExpired(error)) {
         this.recordTelemetry({ claim_outcome: "window_expired" });
         throw claimWindowExpiredError();
+      }
+      if (isNoPlatformProject(error)) {
+        this.recordTelemetry({ claim_outcome: "no_platform_project" });
+        throw noPlatformProjectError(this.meta.source, this.meta.cliVersion);
       }
       throw error;
     }
@@ -336,6 +342,23 @@ function isClaimWindowExpired(error: unknown): boolean {
   );
 }
 
+/**
+ * A `501 claim.no_platform_project` from `claim/init`: the server hosts no
+ * platform project, so no session on it could ever complete a claim, and it
+ * refuses to mint a link rather than hand out one whose browser leg can only
+ * fail. A plain local `zitadel start` runtime is such a server by default
+ * (`platform.bootstrap_project` is deliberately not a local default — see
+ * claim-state.ts), as is any self-hosted server that never opted in. Branches
+ * on the code alone, as clients are meant to; the status is the server's.
+ */
+function isNoPlatformProject(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    isObject(error.body) &&
+    error.body.code === "claim.no_platform_project"
+  );
+}
+
 function expiredError(message: string): ZitadelError {
   return new ZitadelError("E_VALIDATION", message, {
     hint: "Links are valid for 10 minutes. Start a new one.",
@@ -355,6 +378,33 @@ function claimWindowExpiredError(): ZitadelError {
     {
       hint: "The project itself keeps working. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
     },
+  );
+}
+
+/**
+ * Shaped like the closed window, not the retryable expiry: re-running `claim`
+ * against the same server answers the same 501, so no `nextCommands`, and the
+ * hint names what actually changes the answer. A local runtime gets the
+ * concrete restart — the developer owns that process, and it is the same
+ * one-line switch the journey suite flips — while any other server is pointed
+ * at the cloud or at its operator, since the developer usually cannot restart
+ * it. Either way the project itself is fine: not attached only means temporary.
+ */
+function noPlatformProjectError(source: string, cliVersion: string): ZitadelError {
+  const hint =
+    serverKind.value(source) === "local"
+      ? "A local server started with `zitadel start` has no platform project by default. " +
+        "Claiming works on Zitadel Cloud; to try it against this server, restart it with the " +
+        `platform project enabled: ${publicCliCommand("stop", cliVersion)}, then ` +
+        `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true ${publicCliCommand("start", cliVersion)}. ` +
+        "The local console then signs in through the platform project rather than your app's project."
+      : "Claiming works on Zitadel Cloud, or on a self-hosted server started with " +
+        "platform.bootstrap_project enabled (NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true) — ask its operator.";
+  return new ZitadelError(
+    "E_VALIDATION",
+    "This server has no platform project, so it cannot attach projects to a team. " +
+      "The project keeps working; nothing about it changed — it just stays temporary.",
+    { hint },
   );
 }
 

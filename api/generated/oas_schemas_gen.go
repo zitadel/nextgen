@@ -7483,6 +7483,61 @@ func (s *ClaimNoPersonalTeamDetails) init() ClaimNoPersonalTeamDetails {
 
 // Merged schema.
 // Ref: #
+type ClaimNoPlatformProject struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimNoPlatformProjectDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimNoPlatformProject) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimNoPlatformProject) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimNoPlatformProject) GetDetails() OptClaimNoPlatformProjectDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimNoPlatformProject) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimNoPlatformProject) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimNoPlatformProject) SetDetails(val OptClaimNoPlatformProjectDetails) {
+	s.Details = val
+}
+
+func (*ClaimNoPlatformProject) initClaimRes() {}
+
+// Additional error-specific context.
+type ClaimNoPlatformProjectDetails map[string]jx.Raw
+
+func (s *ClaimNoPlatformProjectDetails) init() ClaimNoPlatformProjectDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type ClaimPersonalTeamNotActive struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -26636,6 +26691,52 @@ func (o OptClaimNoPersonalTeamDetails) Get() (v ClaimNoPersonalTeamDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptClaimNoPersonalTeamDetails) Or(d ClaimNoPersonalTeamDetails) ClaimNoPersonalTeamDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimNoPlatformProjectDetails returns new OptClaimNoPlatformProjectDetails with value set to v.
+func NewOptClaimNoPlatformProjectDetails(v ClaimNoPlatformProjectDetails) OptClaimNoPlatformProjectDetails {
+	return OptClaimNoPlatformProjectDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimNoPlatformProjectDetails is optional ClaimNoPlatformProjectDetails.
+type OptClaimNoPlatformProjectDetails struct {
+	Value ClaimNoPlatformProjectDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimNoPlatformProjectDetails was set.
+func (o OptClaimNoPlatformProjectDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimNoPlatformProjectDetails) Reset() {
+	var v ClaimNoPlatformProjectDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimNoPlatformProjectDetails) SetTo(v ClaimNoPlatformProjectDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimNoPlatformProjectDetails) Get() (v ClaimNoPlatformProjectDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimNoPlatformProjectDetails) Or(d ClaimNoPlatformProjectDetails) ClaimNoPlatformProjectDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

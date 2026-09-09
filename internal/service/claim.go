@@ -144,6 +144,19 @@ func NewClaimService(v2Pool *DB, consoleBaseURL, platformProjectID string) Claim
 }
 
 func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (*ClaimInitResult, error) {
+	// A deployment without a platform project cannot finish any claim: the
+	// browser leg signs in to that project and claim/complete rejects every
+	// session when none is configured (verifyClaimSession). Refusing here,
+	// before a challenge exists, is what keeps the CLI from handing out a
+	// link that can only fail — on such a deployment the console's claim page
+	// falls back to the deployment's own default project, whose origin
+	// allowlist the console's origin does not even satisfy. Checked before
+	// any read on purpose: it is a property of the deployment, not of the
+	// project, and it outranks every project-state answer below.
+	if s.platformProjectID == "" {
+		return nil, domain.ErrClaimNoPlatformProject()
+	}
+
 	var stmts claimStatements = s.v2Pool.Statements()
 	project, grant, err := claimedProjectState(ctx, stmts, projectID)
 	if err != nil {

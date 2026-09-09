@@ -202,6 +202,13 @@ func claimErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		// the console can say that instead of implying the user needs to wait;
 		// the membership status in the details says what would clear it.
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrClaimNoPlatformProject().Code:
+		// The deployment lacks the functionality, not the request: no
+		// platform project means no session anywhere can complete a claim, so
+		// this is the server saying it does not support claiming (ADR 030
+		// reserves 501 for exactly that shape). Final for this server, unlike
+		// the 4xx claim answers — neither a retry nor a fresh init changes it.
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
 	default:
 		// The claim.session_* sentinels only ever leave verifyClaimSession
 		// wrapped in auth.unauthorized. Anything landing here unwrapped is an
