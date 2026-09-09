@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/testing",
-  "version": "1.0.0-alpha.21",
+  "version": "1.0.0-alpha.22",
   "description": "Test-kit for seeded ephemeral local Zitadel instances",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/testing#readme",
   "bugs": {

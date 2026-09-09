@@ -1,5 +1,54 @@
 # @zitadel/server
 
+## 1.0.0-alpha.22
+
+### Minor Changes
+
+- [#1169](https://github.com/zitadel/nextgen/pull/1169) [`c7c737a`](https://github.com/zitadel/nextgen/commit/c7c737a32dd62368161db2ab90d93af800c07198) Thanks [@bastionstack](https://github.com/bastionstack)! - Land the claim page on sign-up with a claim-window countdown, drop passkeys from the shipped default login flow, and fix three sign-in surface defects found in design QA.
+
+  A developer opening a claim link from `zitadel claim` normally has no account on the deployment yet, so the claim page now enters the flow with `purpose="register"`; the register step's own `sign_in` action carries the returning developer back. Beside every state of that page it shows how long the project can still be claimed, read from the new unauthenticated `GET /projects/{project_id}/claim/window?challenge_id=...`, so an expired claim _link_ no longer reads as an expired _project_. The sign-in widget grows an `attribution-trailing` slot for it: the design has always drawn a badge beside the "Secured with Zitadel" trustmark, and the widget could not fill it because nothing on a flow response carries a duration — a host that has one can now put it there, and an embed that ignores the slot renders exactly as before.
+
+  The shipped `password-first` login flow no longer offers `passkey` on `identifier`/`password` or `passkey_register` on `register` — the passkey legs proved unreliable in testing, and the `passkey-first` preset remains the way to offer them.
+
+  Three fixes to the sign-in surface itself: the alert's error icon keeps its 16px size and centres on the first line of text instead of shrinking under a long message and floating above a short one; a terminal step that is about to navigate no longer paints a "you are signed in" screen the host immediately replaces, so one sign-in produces one confirmation; and the sign-up card gains the subtitle every other step already had.
+
+- [#1093](https://github.com/zitadel/nextgen/pull/1093) [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definitions are revisioned: `POST /flow_definitions` publishes a new
+  revision on every call, so a repeated `name` no longer returns 409, and
+  `GET /flow_definitions` accepts a `name` filter that lists one flow's
+  revisions newest first.
+
+- [#1118](https://github.com/zitadel/nextgen/pull/1118) [`c3fbdee`](https://github.com/zitadel/nextgen/commit/c3fbdee479ed94ab6cf511ec8441db68bd9821b5) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Add POST /grants/query to list a project's collaboration grants, with always-on user-ref or team-ref labels and an opt-in `expand: ["principal"]` that embeds the GET user or GET team body.
+
+- [#1155](https://github.com/zitadel/nextgen/pull/1155) [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab) Thanks [@vitorbari](https://github.com/vitorbari)! - The events API defines the `release.created` event type and its payload.
+
+  The payload carries the release's `content_hash`, its audit metadata (`message`, `git_sha`, `git_dirty`) and the `(kind, handle, revision_id)` tuples the release pins, so an audit stream answers what a release changed without reading the releases table. Nothing emits the event until `POST /releases` is implemented.
+
+- [#1115](https://github.com/zitadel/nextgen/pull/1115) [`472a182`](https://github.com/zitadel/nextgen/commit/472a18216b472cdcd76620b1f11f37ce997fcdcb) Thanks [@vitorbari](https://github.com/vitorbari)! - Adds persistence support for **releases** — immutable, project-scoped configuration snapshots that pin one revision of each resource they include.
+
+  Release records store their pinned revisions and assembly metadata. A project-scoped content-hash index prevents duplicate snapshots and provides the storage contract needed for idempotent release orchestration in a follow-up.
+
+- [#1146](https://github.com/zitadel/nextgen/pull/1146) [`e04e3ce`](https://github.com/zitadel/nextgen/commit/e04e3ceba65ac35329c2cde99f9fea1b1530ef32) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Unclaimed projects can now only be claimed within 14 days of creation. After that, claim init and complete return 410 `proj.claim_window_expired` (distinct from the retryable `proj.claim_expired` challenge error), and claim status reports the same final 410 for a pending challenge, taking precedence over challenge expiry so polling clients stop suggesting a futile retry. The claim grant is the status route's source of truth: a project claimed through another concurrent challenge reports `completed` with its owning team, never a false expiry verdict. Nothing is deleted when the window closes.
+
+  Separately, default-project resolution (the console runtime document and the bare hosted login) now skips the built-in platform project in its first-created heuristic: a deployment that once ran with `platform.bootstrap_project` and later disabled it resolves its first real project instead of the leftover platform row. Explicit `platform.project_id` configuration is unchanged.
+
+### Patch Changes
+
+- [#1134](https://github.com/zitadel/nextgen/pull/1134) [`c0bef04`](https://github.com/zitadel/nextgen/commit/c0bef048c305cd4fdac5d44bd1219a3fc08e550a) Thanks [@muhlemmer](https://github.com/muhlemmer)! - createProject response now includes the project name field.
+
+- [#1150](https://github.com/zitadel/nextgen/pull/1150) [`fce5a75`](https://github.com/zitadel/nextgen/commit/fce5a755fee3dab0d1e013b4ab198755d2dda4c5) Thanks [@vitorbari](https://github.com/vitorbari)! - Fix three sign-in dead ends. Choosing "sign in with a passkey" on a password
+  step no longer treats the password box the browser posts alongside it as a
+  submission, so the WebAuthn prompt appears instead of a required-field or
+  invalid-credentials error. Going back to the identifier step now releases the
+  user resolved by the abandoned attempt, so re-entering an address signs in
+  normally instead of failing with "The user was already authenticated". And
+  signing up with an address that already has an account now completes: that
+  sign-in reached the final step without a handoff token, leaving the user
+  unable to exchange it for a session.
+
+- [#1136](https://github.com/zitadel/nextgen/pull/1136) [`1f5e7b9`](https://github.com/zitadel/nextgen/commit/1f5e7b9d8ccd1282a81f8541f359376ddd0947bc) Thanks [@muhlemmer](https://github.com/muhlemmer)! - Flow submit endpoint now rejects requests with unrecognized top-level properties instead of silently ignoring them.
+
+- [#1135](https://github.com/zitadel/nextgen/pull/1135) [`4a637a3`](https://github.com/zitadel/nextgen/commit/4a637a3fed02f969cae61a427d293ca226bd6a4a) Thanks [@muhlemmer](https://github.com/muhlemmer)! - instrumentation.log.level, instrumentation.log.format, and instrumentation.log.streams now accept string names (e.g. debug, json, request) in addition to numeric values.
+
 ## 1.0.0-alpha.21
 
 ### Minor Changes

@@ -1,0 +1,53 @@
+get:
+  operationId: getClaimWindow
+  summary: Get the claim window for a project
+  description: |
+    Read by the claim page in the browser to show how long is left to claim the
+    project. Unauthenticated by design: the claim page runs this before the
+    developer has signed in, and holding the `challenge_id` from the claim URL
+    is the authorization — the same capability `claim/complete` accepts. It
+    reveals only the window, never the project itself, and unlike
+    `claim/complete` it spends nothing, so a reload is free.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
+    - name: challenge_id
+      in: query
+      required: true
+      description: The challenge from the claim URL.
+      schema:
+        $ref: ../../../../../components/schemas/challenge-id.yaml
+  security: []
+  responses:
+    '200':
+      description: The project's claim window.
+      content:
+        application/json:
+          schema:
+            $ref: claim-window-response.yaml
+    '404':
+      description: |
+        No such project, or the challenge does not belong to it. One response
+        for both: a caller without a valid challenge learns nothing about
+        whether the project exists.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '429':
+      description: Too many requests.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml

@@ -93,6 +93,43 @@ describe("meta-schemas", () => {
     }
   });
 
+  // The branding dialect shares one definition between the light and dark
+  // sides and one between the twelve colours, so a broken `$ref` would not
+  // fail loudly — it would quietly stop constraining anything.
+  it("validates a branding descriptor through its shared definitions", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const brandingSchema = metaSchemaFiles().find((f) => f.name === "branding.json");
+    const check = ajv.compile(brandingSchema?.body as object);
+
+    const descriptor = {
+      layout: "centered",
+      logo_url: "https://cdn.example.com/logo.svg",
+      theme: {
+        mode: "auto",
+        light: {
+          logo_url: "https://cdn.example.com/on-light.svg",
+          palette: { primary: "#4F46E5", link: "rebeccapurple" },
+        },
+        dark: {
+          logo_url: "https://cdn.example.com/on-dark.svg",
+          palette: { primary: "color-mix(in oklab, #A5B4FC 40%, white)" },
+        },
+      },
+      typography: { font_family: "Inter, ui-sans-serif, sans-serif", scale: 1 },
+      shape: { radius: 10, density: "regular", logo_scale: 1.5 },
+    };
+    expect(check(descriptor), JSON.stringify(check.errors)).toBe(true);
+
+    // Both sides have to be constrained, not just whichever one the schema
+    // happened to spell out before the definitions were shared.
+    for (const side of ["light", "dark"] as const) {
+      const hostile = {
+        theme: { [side]: { palette: { primary: "red; } :host { display: none" } } },
+      };
+      expect(check(hostile), `${side} accepted an injection`).toBe(false);
+    }
+  });
+
   it("accepts an explicit `action: null` transition, as the OpenAPI contract does", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");

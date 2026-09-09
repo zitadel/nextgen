@@ -1,0 +1,39 @@
+type: object
+description: |
+  The typeface the login surface renders in. One face covers both body and
+  headings; separate heading and mono faces are not modelled yet.
+properties:
+  font_family:
+    type: string
+    minLength: 1
+    maxLength: 256
+    pattern: '^ *(?:"[^"\\;{}]*"|''[^''\\;{}]*''|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*)(?: *, *(?:"[^"\\;{}]*"|''[^''\\;{}]*''|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*))* *$'
+    description: |
+      CSS font stack for body and heading text. Include a generic family so
+      the surface still renders when the named face is unavailable.
+
+      Comma-separated family names, each either an identifier (`Inter`,
+      `ui-sans-serif`, `Helvetica Neue`) or a quoted name (`"APK Futural"`).
+      Anything else is rejected — the stack is written into a stylesheet, so
+      only names are stored, and a quoted name must close the quote it opened.
+    example: Inter, ui-sans-serif, sans-serif
+  font_url:
+    type: string
+    format: uri
+    maxLength: 2048
+    description: |
+      Stylesheet that loads `font_family` — a Google Fonts CSS URL, for
+      example. Must be https; unlike the logo and hero assets there is no
+      loopback carve-out. Rejected without `font_family`, which would name
+      nothing to paint with.
+
+      Stored but not applied to an embedded widget: the embedding page loads
+      the face, and Zitadel does not inject a stylesheet into a document it
+      does not own.
+    example: https://fonts.googleapis.com/css2?family=Inter&display=swap
+  scale:
+    type: number
+    minimum: 0.75
+    maximum: 1.25
+    description: Multiplier on the base text sizes, `1` when omitted.
+    example: 1

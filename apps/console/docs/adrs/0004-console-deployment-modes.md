@@ -150,7 +150,12 @@ That fallback is two behaviors, and both retire together:
   project as the Console sign-in target. The pinned project must already
   exist — a missing one is a startup configuration error, never a create.
 - With no pin, the deployment's first-created project wins, ordered by
-  `created_at` ascending so every replica resolves the same project.
+  `created_at` ascending so every replica resolves the same project, with
+  one exclusion: the built-in platform row (`domain.PlatformProjectID`) is
+  skipped by this guess. It is infrastructure that
+  `platform.bootstrap_project` may have seeded before any customer project
+  existed (and that survives disabling the flag), not the customer's product
+  project; only the pin, or the bootstrap flag itself, selects it.
 
 The pin exists only to override that guess. Once bootstrap always provisions a
 marked platform project, there is no guess left to override, so the pin is
