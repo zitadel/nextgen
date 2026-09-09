@@ -62,7 +62,7 @@ team:
 
 ```sh
 npx @zitadel/cli@alpha start                # local dev only
-npx @zitadel/cli@alpha setup --server local  # or --server https://your-instance.zitadel.cloud
+npx @zitadel/cli@alpha setup --server local  # or --server https://api.zitadel.cloud
 npm run dev
 ```
 
