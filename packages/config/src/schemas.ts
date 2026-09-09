@@ -5,6 +5,11 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
+import {
+  isBrandingColor,
+  isBrandingFontFamily,
+  MAX_BRANDING_URL_LENGTH,
+} from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
 export const schemaConfigSchema = CreateSchemaBody;
@@ -42,15 +47,18 @@ export const brandingConfigSchema = z
         message: "Use either liquid_template_file or an inline liquid_template, not both.",
       });
     }
-    // font_url is read-only in v1: the login component loads it as a
-    // document-level stylesheet (shadow-scoped @font-face never registers
-    // faces), which would give branding.write arbitrary CSS over the embedding
-    // page. The server rejects it too; safe delivery is an ADR 040 follow-up.
-    if (value.font_url !== undefined) {
+    // A stylesheet alone names no face to render in, so the server rejects the
+    // pair as a pair (validateBrandingFontURL in
+    // internal/domain/branding_validator.go). plan has to agree, or apply
+    // fails after schemas and flows have already been written.
+    validateBrandingAssetUrl(value.typography?.font_url, "typography.font_url", ctx, {
+      loopback: false,
+    });
+    if (value.typography?.font_url !== undefined && value.typography.font_family === undefined) {
       ctx.addIssue({
         code: "custom",
         message:
-          "font_url is not writable yet (tenant font delivery needs a safe design, see ADR 040); load fonts from the embedding page instead.",
+          "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in.",
       });
     }
     // Mirror the server's asset URL gate (validateBrandingAssetURL in
@@ -59,14 +67,61 @@ export const brandingConfigSchema = z
     // leave a half-applied run.
     validateBrandingAssetUrl(value.logo_url, "logo_url", ctx);
     validateBrandingAssetUrl(value.hero_url, "hero_url", ctx);
+    validateBrandingAssetUrl(value.theme?.light?.logo_url, "theme.light.logo_url", ctx);
+    validateBrandingAssetUrl(value.theme?.dark?.logo_url, "theme.dark.logo_url", ctx);
+    // The appearance values land in a CSS declaration, so the server stores
+    // only forms it recognises (ValidateBrandingColor / ValidateBrandingFontFamily
+    // in internal/domain/branding_css.go).
+    validateBrandingPalette(value.theme?.light?.palette, "theme.light", ctx);
+    validateBrandingPalette(value.theme?.dark?.palette, "theme.dark", ctx);
+    if (value.typography?.font_family !== undefined && !isBrandingFontFamily(value.typography.font_family)) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          'typography.font_family must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural").',
+      });
+    }
   });
+
+function validateBrandingPalette(
+  palette: Record<string, unknown> | undefined,
+  side: string,
+  ctx: z.RefinementCtx,
+): void {
+  if (!palette) {
+    return;
+  }
+  for (const [key, colour] of Object.entries(palette)) {
+    // A non-string never reaches here: the generated object schema types every
+    // palette value as a string, and Zod skips refinements once the base parse
+    // has failed. The check is what narrows `unknown` for the call below.
+    if (typeof colour !== "string") {
+      continue;
+    }
+    if (isBrandingColor(colour)) {
+      continue;
+    }
+    ctx.addIssue({
+      code: "custom",
+      message: `${side}.palette.${key} must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch().`,
+    });
+  }
+}
 
 function validateBrandingAssetUrl(
   value: string | undefined,
-  field: "logo_url" | "hero_url",
+  field: string,
   ctx: z.RefinementCtx,
+  options: { loopback?: boolean } = {},
 ): void {
   if (value === undefined || value === "") {
+    return;
+  }
+  if (value.length > MAX_BRANDING_URL_LENGTH) {
+    ctx.addIssue({
+      code: "custom",
+      message: `${field} must be at most ${MAX_BRANDING_URL_LENGTH} characters.`,
+    });
     return;
   }
   // Stricter-or-equal than the Go gate (validateBrandingAssetURL): the WHATWG
@@ -89,10 +144,21 @@ function validateBrandingAssetUrl(
     ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
     return;
   }
+  // Fetched by every visitor's browser, so userinfo in it is a credential in
+  // every access log — the server refuses it and so must plan.
+  if (parsed.username !== "" || parsed.password !== "") {
+    ctx.addIssue({
+      code: "custom",
+      message: `${field} must not carry credentials; the URL is fetched by every visitor's browser.`,
+    });
+    return;
+  }
   // Loopback HTTP is the dev-posture carve-out (assets served from the app's
-  // own dev server). Check the raw URL so WHATWG normalisation cannot make
-  // plan accept a host spelling that the Go save gate rejects.
-  if (parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
+  // own dev server), and it covers images only: a stylesheet is styling rather
+  // than an image, so it stays https everywhere. Check the raw URL so WHATWG
+  // normalisation cannot make plan accept a host spelling that the Go save
+  // gate rejects.
+  if (options.loopback !== false && parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
     return;
   }
   if (parsed.protocol !== "https:" || parsed.host === "") {
