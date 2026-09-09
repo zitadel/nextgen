@@ -3,6 +3,7 @@ import { Users } from "lucide-react";
 import { Fragment } from "react";
 
 import { DocumentViewer } from "@/components/document-viewer";
+import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -25,7 +26,7 @@ function SchemaDetail() {
   const methods = schemaAuthMethods(schema);
 
   return (
-    <div className="px-4 pt-9 pb-8 sm:px-8">
+    <div className={DETAIL_PANEL_PAGE}>
       <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
         {/* The `Title` lockup (`1389:190643`): icon tile + eyebrow + title.
             The schema's id is not repeated here — the list row carries it, and

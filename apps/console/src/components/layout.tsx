@@ -39,3 +39,15 @@ export function ContentGrid({
     </div>
   );
 }
+
+/**
+ * The page wrapper for a configuration detail screen — the ones that render a
+ * single `detailPanel` card rather than a title row over a table.
+ *
+ * The frames inset that panel by 24px on every side, and by 16px on the sides
+ * in their narrow variant. Shared because the schema and login-flow screens are
+ * the same composition and had drifted apart: the schema screen carried 36/32,
+ * which matches neither frame. Resource detail screens (users, teams, projects)
+ * are a different composition and keep their own measured insets.
+ */
+export const DETAIL_PANEL_PAGE = "px-4 py-6 sm:px-6";

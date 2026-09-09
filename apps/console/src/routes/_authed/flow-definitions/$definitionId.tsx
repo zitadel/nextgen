@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Link2, Workflow } from "lucide-react";
 
 import { DocumentViewer } from "@/components/document-viewer";
+import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,10 +62,7 @@ function FlowDefinitionDetail() {
   const steps = definition.steps ?? [];
 
   return (
-    // The frame insets the panel 24px from the navbar on every side. (The
-    // schema detail, which this screen otherwise mirrors, uses 36/32 — worth
-    // reconciling, but that is its frame to check, not this one's.)
-    <div className="px-4 py-6 sm:px-6">
+    <div className={DETAIL_PANEL_PAGE}>
       <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
         {/* Title lockup and the identity card sit on one row above the rule;
             they stack below `lg`, where the frame's narrow variant puts the
