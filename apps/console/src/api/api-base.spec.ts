@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { _resetConfigForTesting } from "@zitadel/api/config";
+
 /**
  * Pins both branches of the API base (Console ADR 0002 §4, revised): the
  * embedded production build must target the origin root — `/api` exists only
@@ -14,6 +16,7 @@ describe("apiBase", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
+    _resetConfigForTesting();
   });
 
   it("targets the origin root in production builds", async () => {
