@@ -77,7 +77,7 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 		return ctx, nil
 	}
 	if token.UserID == "" && userBoundSessionOperations[operationName] {
-		return nil, ogenerrors.ErrSkipServerSecurity
+		return ctx, ogenerrors.ErrSkipServerSecurity
 	}
 	ctx = withActorFromToken(ctx, token)
 	if token.UserID != "" {
