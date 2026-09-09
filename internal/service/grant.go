@@ -781,7 +781,7 @@ func principalIDFilter(f Filter, principalType domain.AuthzPrincipalType) (datab
 	if err != nil {
 		return nil, err
 	}
-	idFilter, err := stringEqualsFilter(f.Operation, database.Col(domain.AuthzAssignmentFieldPrincipalID), value)
+	idFilter, err := stringFilter(f.Operation, database.Col(domain.AuthzAssignmentFieldPrincipalID), value)
 	if err != nil {
 		return nil, err
 	}

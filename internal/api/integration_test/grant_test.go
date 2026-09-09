@@ -575,7 +575,9 @@ func TestGrantQueryExpand(t *testing.T) {
 	wantUser, ok := getUser.(*api.User)
 	require.True(t, ok, helpers.MustMarshal(t, getUser))
 	assert.Equal(t, wantUser.Schema, listedUser.User.Value.Schema.Value)
-	assert.Equal(t, wantUser.Attributes, listedUser.User.Value.Attributes.Value)
+	// Grant expand inlines attributes onto GrantUser, so the generated type
+	// is GrantUserAttributes rather than UserAttributes; compare the JSON.
+	assert.JSONEq(t, helpers.MustMarshal(t, wantUser.Attributes), helpers.MustMarshal(t, listedUser.User.Value.Attributes.Value))
 	assert.Equal(t, wantUser.Metadata.Status, listedUser.User.Value.Metadata.Value.Status)
 
 	listedTeam := got[teamGrant.ID]

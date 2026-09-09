@@ -905,6 +905,22 @@ func TestGrantService_List(t *testing.T) {
 		assert.Equal(t, userAsgn.ID, got.Grants[0].Assignment.ID)
 	})
 
+	t.Run("user_id accepts contains", func(t *testing.T) {
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+					require.NotNil(t, opts.Filter)
+					return &database.ListResult[*domain.AuthzAssignment]{Items: []*domain.AuthzAssignment{userAsgn}}, nil
+				})
+		})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{
+			ProjectID: "proj_customer",
+			Filters:   []service.Filter{{Field: "user_id", Operation: "contains", Value: "user_"}},
+		})
+		require.NoError(t, err)
+		require.Len(t, got.Grants, 1)
+	})
+
 	t.Run("filters by team_id", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
