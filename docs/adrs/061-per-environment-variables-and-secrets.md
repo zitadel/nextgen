@@ -91,13 +91,13 @@ There are five ways a value can be rendered:
 
 #### Examples
 
-| Example                                    | Variable value | Result                           | 
-|:-------------------------------------------|:---------------|:---------------------------------|
-| `"client_id": "abcd1234"`                  |                | `"client_id": "abcd1234"`        | 
-| `"retry_count": "${{ RETRY_COUNT }}`       | 5              | `"retry_count": 5,`              | 
-| `"client_id": "${{ CLIENT_ID }}`           | 4321dcba       | `"client_id": "4321dcba"`        |
-| `"timeout": "${{ TIMEOUT_SECONDS }}s"`     | 10             | `"timeout": "10s"`               | 
-| `"client_secret": "${{ CLIENT_SECRET }}" ` | password1234   | `"client_secret": "pasword1234"` |
+| Example                                   | Variable value | Result                            |
+|:------------------------------------------|:---------------|:----------------------------------|
+| `"client_id": "abcd1234"`                 |                | `"client_id": "abcd1234"`         |
+| `"retry_count": "${{ RETRY_COUNT }}"`     | 5              | `"retry_count": 5`                |
+| `"client_id": "${{ CLIENT_ID }}"`         | 4321dcba       | `"client_id": "4321dcba"`         |
+| `"timeout": "${{ TIMEOUT_SECONDS }}s"`    | 10             | `"timeout": "10s"`                |
+| `"client_secret": "${{ CLIENT_SECRET }}"` | password1234   | `"client_secret": "password1234"` |
 
 ### Scope
 
@@ -143,12 +143,12 @@ rotation, that can be different keys.
 
 ### API
 
-Variables and secrets can be managed using `PATH`/`GET`/`DELETE` endpoints on
+Variables and secrets can be managed using `PATCH`/`GET`/`DELETE` endpoints on
 the api. There are no separate endpoints for secrets since they exist in the
 same storage so separating them out in the api would only create a
 mental/syntax overhead.
 
-`PATH` accepts a JSON-document in which the variables are listed to patch.
+`PATCH` accepts a JSON-document in which the variables are listed to patch.
 The keys of the document are the variable names, the values are either a
 JSON scalar (string, number, boolean) or an object with which it is possible
 to mark a variable as secret.

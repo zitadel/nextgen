@@ -29,7 +29,7 @@ type VariableService interface {
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
-	ReplaceVariables(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error)
+	ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error)
 }
 
 type variableService struct {
@@ -174,7 +174,7 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 	return nil
 }
 
-func (s *variableService) ReplaceVariables(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
+func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
 	placeholders, err := domain.ScanDocumentForVariables(doc)
 	if err != nil {
 		return nil, err

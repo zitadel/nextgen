@@ -12816,7 +12816,7 @@ func (c *MockVariableServiceGetVariablesCall) DoAndReturn(f func(context.Context
 }
 
 // ReplaceVariables mocks base method.
-func (m *MockVariableService) ReplaceVariables(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
+func (m *MockVariableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReplaceVariables", ctx, owner, doc)
 	ret0, _ := ret[0].(map[string]any)
@@ -12827,7 +12827,7 @@ func (m *MockVariableService) ReplaceVariables(ctx context.Context, owner domain
 // ReplaceVariables indicates an expected call of ReplaceVariables.
 func (mr *MockVariableServiceMockRecorder) ReplaceVariables(ctx, owner, doc any) *MockVariableServiceReplaceVariablesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceVariables", reflect.TypeOf((*MockVariableService)(nil).ReplaceVariables), ctx, owner, doc)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceVariables", reflect.TypeOf((*MockVariableService)(nil).ReplaceVariablesInPlace), ctx, owner, doc)
 	return &MockVariableServiceReplaceVariablesCall{Call: call}
 }
 
