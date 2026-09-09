@@ -55,8 +55,7 @@ func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAu
 //
 // Publishes a new immutable branding revision for the project. Branding
 // revisions cannot be updated or deleted; every edit publishes a new
-// revision, and flow responses resolve the latest revision per project
-// (see ADR 040).
+// revision, and flow responses resolve the latest revision per project.
 // The `liquid_template` is validated lexically on save (size, encoding,
 // banned patterns such as `<script>` tags, inline event handlers, and the
 // `| raw` filter). Authoritative LiquidJS validation runs at authoring
@@ -329,10 +328,28 @@ func (UnimplementedHandler) GetBrandingById(ctx context.Context, params GetBrand
 // Polled by the CLI while a browser completes the claim. Authorized by the
 // project secret that initiated the challenge. Returns `pending`, or
 // `completed` with the owning team, the claim timestamp, and the dashboard
-// URL once the browser leg has finished.
+// URL once the project is claimed. The claim grant, not the polled
+// challenge, is the source of truth: a project claimed through another
+// concurrent challenge also reports `completed`, and a completed claim
+// keeps reporting `completed` past this challenge's expiry and past the
+// project's claim window.
 //
 // GET /projects/{project_id}/claim/status
 func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (r GetClaimStatusRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetClaimWindow implements getClaimWindow operation.
+//
+// Read by the claim page in the browser to show how long is left to claim the
+// project. Unauthenticated by design: the claim page runs this before the
+// developer has signed in, and holding the `challenge_id` from the claim URL
+// is the authorization — the same capability `claim/complete` accepts. It
+// reveals only the window, never the project itself, and unlike
+// `claim/complete` it spends nothing, so a reload is free.
+//
+// GET /projects/{project_id}/claim/window
+func (UnimplementedHandler) GetClaimWindow(ctx context.Context, params GetClaimWindowParams) (r GetClaimWindowRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -540,9 +557,9 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 //
 // Lists branding revisions for the project, newest first, capped at the
 // 100 most recent. The first entry is the revision flow responses
-// currently resolve. Deliberately unpaginated in v1 — list endpoints
-// gain a real query mechanism together (ADR 031); advertising pagination
-// parameters the server ignores would be worse than none.
+// currently resolve. Deliberately unpaginated in v1 — list endpoints gain a
+// real query mechanism together; advertising pagination parameters the
+// server ignores would be worse than none.
 //
 // GET /branding
 func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandingParams) (r ListBrandingRes, _ error) {
@@ -636,6 +653,24 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 //
 // PATCH /projects/{project_id}
 func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (r PatchProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryGrants implements queryGrants operation.
+//
+// Returns the collaboration grants of a project, paginated with a cursor.
+// Only unrevoked grants this API manages are listed (user or team bound to
+// viewer, editor, or admin), including expired grants so a client can
+// DELETE before re-granting. Project-secret setup (`sk_proj`) and
+// owning-team (`relation=team`) rows are not returned. Grants are not in
+// `resource_scope_index`; project scope is required on the query (same as
+// get). Requires `project.read`. `expand: ["principal"]` additionally
+// requires `user.read` and `team.read` (documented on the expand enum;
+// those scopes cannot be ANDed onto this security block because they are
+// body-conditional).
+//
+// POST /grants/query
+func (UnimplementedHandler) QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (r QueryGrantsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

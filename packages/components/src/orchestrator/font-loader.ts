@@ -7,7 +7,7 @@
  *   (Arimo, named first in `--zl-font-family-sans`). The component ships this
  *   so the auth screens render in the brand font out of the box, even when the
  *   server returns no branding. This is the "default users can override" layer.
- * - The **tenant override** (`applyFontUrl`) — `branding.font_url`, resolved
+ * - The **tenant override** (`applyFontUrl`) — `branding.typography.font_url`, resolved
  *   server-side from the app → team → project branding hierarchy.
  *
  * Both must live at document level, not inside the shadow root: browsers ignore
@@ -37,7 +37,7 @@ const DEFAULT_LINK_ID = "zl-default-font-link";
  * Design-system default brand font. Arimo is the Figma body face and leads the
  * `--zl-font-family-sans` stack; loading it here makes the unbranded auth UI
  * paint in the brand font instead of the system fallback. Tenants override it
- * with `branding.font_url`. Exported so a privacy- or offline-sensitive
+ * with `branding.typography.font_url`. Exported so a privacy- or offline-sensitive
  * deployment can self-host the same face and swap this single URL.
  */
 export const DEFAULT_BRAND_FONT_HREF =
@@ -61,7 +61,7 @@ export const DEFAULT_BRAND_FONT_HREF =
 const registries = new WeakMap<Document, Map<string, Map<ShadowRoot, string>>>();
 
 /**
- * Inject the tenant's `branding.font_url` stylesheet. Pass `null`/`undefined`
+ * Inject the tenant's `branding.typography.font_url` stylesheet. Pass `null`/`undefined`
  * to withdraw this surface's registration (e.g. when a flow resolves with no
  * tenant font); the link disappears once no surface registers a URL.
  */
@@ -72,7 +72,7 @@ export function applyFontUrl(shadowRoot: ShadowRoot, fontUrl: string | null | un
 /**
  * Inject the design-system default font stylesheet. Defaults to
  * {@link DEFAULT_BRAND_FONT_HREF}; pass `null` to withdraw this surface's
- * registration (the orchestrator does this when a tenant `font_url` takes
+ * registration (the orchestrator does this when a tenant font stylesheet takes
  * over, to avoid a redundant request).
  */
 export function applyDefaultFont(

@@ -116,8 +116,7 @@ export const en: Record<string, string> = {
   "password.action.register.link": "Sign up",
 
   "register.title": "Create your account",
-  // Empty by design — the sign-up card has no subheadline (Figma 6593:141743).
-  "register.description": "",
+  "register.description": "Enter your details to get started",
   "register.field.email": "Email",
   "register.field.email.placeholder": "you@example.com",
   "register.field.password": "Password",

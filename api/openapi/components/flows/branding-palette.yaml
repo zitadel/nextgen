@@ -1,0 +1,48 @@
+type: object
+description: |
+  Semantic colours for one theme side. An omitted key uses the maintained
+  default for this side, never the other side's value.
+
+  Every value is a `BrandingColor`, which is where the accepted forms and the
+  reason for them live; what each key paints is below.
+properties:
+  primary:
+    $ref: branding-color.yaml
+    description: Brand colour, and the source the focus rings derive from.
+  on_primary:
+    $ref: branding-color.yaml
+    description: Text and icons drawn on `primary`.
+  background:
+    $ref: branding-color.yaml
+    description: The surface behind the card.
+  surface:
+    $ref: branding-color.yaml
+    description: The card and popover surfaces.
+  muted:
+    $ref: branding-color.yaml
+    description: Neutral fills — the secondary button, accents and muted panels.
+  border:
+    $ref: branding-color.yaml
+    description: Card and control edges.
+  text:
+    $ref: branding-color.yaml
+    description: |
+      Body text, and the foreground of every neutral surface — a side that
+      sets `muted` without `text` keeps the default label colour on it.
+  text_muted:
+    $ref: branding-color.yaml
+    description: Secondary text.
+  link:
+    $ref: branding-color.yaml
+    description: |
+      Link colour. Defaults to the surrounding text colour, so setting it
+      tints exactly the links and nothing else.
+  success:
+    $ref: branding-color.yaml
+    description: Valid fields, success alerts and pills.
+  warning:
+    $ref: branding-color.yaml
+    description: Warning surfaces. Persisted, but nothing renders it yet.
+  error:
+    $ref: branding-color.yaml
+    description: Invalid fields, error alerts and pills.

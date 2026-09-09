@@ -29,6 +29,34 @@ function cli(args: string[], env: NodeJS.ProcessEnv = {}) {
   return runCliForTest([...args, "--server", MOCK_SERVER_URL], env);
 }
 
+function jsonCode(stdout: string): string | undefined {
+  try {
+    return (parseJson(stdout) as { code?: string }).code;
+  } catch {
+    return undefined;
+  }
+}
+
+// `freePort()` bind-then-close races other vitest workers. Doctor maps a
+// failed port check to E_PORT_IN_USE (exit 5); retry once with a new port.
+async function doctorCli(cwd: string, extraArgs: string[] = []) {
+  const fake = await fakeDocker();
+  const env = {
+    PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+    DOCKER_LOG: fake.logPath,
+  };
+  let result = await runDoctorOnce(cwd, extraArgs, env);
+  if (result.exitCode !== 0 && jsonCode(result.stdout) === "E_PORT_IN_USE") {
+    result = await runDoctorOnce(cwd, extraArgs, env);
+  }
+  return result;
+}
+
+async function runDoctorOnce(cwd: string, extraArgs: string[], env: NodeJS.ProcessEnv) {
+  const port = await freePort();
+  return cli(["doctor", "--cwd", cwd, "--json", ...extraArgs, "--port", String(port)], env);
+}
+
 describe("Next setup integration", () => {
   it("sets up, verifies, plans, applies, and preserves idempotency", async () => {
     const cwd = await createNextProject();
@@ -261,13 +289,8 @@ describe("Next setup integration", () => {
     };
     expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe(await expectedCliVersion());
 
-    const fake = await fakeDocker();
-    const port = await freePort();
-    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
-    });
-    expect(doctor.exitCode).toBe(0);
+    const doctor = await doctorCli(cwd);
+    expect(doctor.exitCode, doctor.stdout).toBe(0);
     expect((parseJson(doctor.stdout) as { status: string }).status).toBe("ok");
 
     const noArg = await cli(["status", "--cwd", cwd, "--json"]);
@@ -393,13 +416,8 @@ describe("Next setup integration", () => {
     pkg.dependencies.next = "^14.2.0";
     await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-    const fake = await fakeDocker();
-    const port = await freePort();
-    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
-    });
-    expect(doctor.exitCode).toBe(3);
+    const doctor = await doctorCli(cwd);
+    expect(doctor.exitCode, doctor.stdout).toBe(3);
     const envelope = parseJson(doctor.stdout) as {
       code: string;
       hint?: string;
@@ -588,13 +606,8 @@ describe("Next setup integration", () => {
     // the neutral default — doctor restores the renderer context from
     // zitadel.json rather than assuming setup defaults.
     await rm(join(cwd, "app/login/page.tsx"));
-    const fake = await fakeDocker();
-    const port = await freePort();
-    const fix = await cli(["doctor", "--cwd", cwd, "--json", "--fix", "--port", String(port)], {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
-    });
-    expect(fix.exitCode).toBe(0);
+    const fix = await doctorCli(cwd, ["--fix"]);
+    expect(fix.exitCode, fix.stdout).toBe(0);
     const restored = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(restored).toContain("element.locales = businessLocales");
   });

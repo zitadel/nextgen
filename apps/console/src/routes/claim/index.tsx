@@ -3,12 +3,18 @@ import { ZitadelLogin, type ZitadelProject } from "@zitadel/sdk-react";
 import { Loader2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { apiBase } from "../../api/zitadel";
 import { fetchSession } from "../../auth/session";
 import { ZitadelMark } from "../../components/app-shell/icons";
-import { type ClaimOutcome, completeProjectClaim } from "../../lib/claim";
+import {
+  type ClaimOutcome,
+  type ClaimWindow,
+  completeProjectClaim,
+  fetchClaimWindow,
+} from "../../lib/claim";
 import { getConsoleProjectId, getPublishableKey } from "../../runtime/runtime";
 import { useTheme } from "../../theme";
 
@@ -39,9 +45,20 @@ export const Route = createFileRoute("/claim/")({
     challenge_id: typeof search.challenge_id === "string" ? search.challenge_id : undefined,
     project_id: typeof search.project_id === "string" ? search.project_id : undefined,
   }),
-  // A read, not the completion: the mutation lives in the component so loader
-  // re-runs (preloads, invalidations) can never spend the single-use challenge.
-  loader: async () => ({ session: await fetchSession() }),
+  // Reads, not the completion: the mutation lives in the component so loader
+  // re-runs (preloads, invalidations) can never spend the single-use
+  // challenge. `fetchClaimWindow` is idempotent and resolves to `undefined`
+  // on any failure, so the two run together and neither can fail the route.
+  loader: async ({ location }) => {
+    const search = location.search as ClaimSearch;
+    const [session, window] = await Promise.all([
+      fetchSession(),
+      search.challenge_id && search.project_id
+        ? fetchClaimWindow(search.project_id, search.challenge_id)
+        : undefined,
+    ]);
+    return { session, window };
+  },
   component: ClaimScreen,
 });
 
@@ -55,7 +72,7 @@ const BODY_TEXT = "text-muted-foreground text-sm";
 
 function ClaimScreen() {
   const { challenge_id, project_id } = Route.useSearch();
-  const { session } = Route.useLoaderData();
+  const { session, window } = Route.useLoaderData();
 
   if (!challenge_id || !project_id) {
     return (
@@ -71,9 +88,11 @@ function ClaimScreen() {
   }
 
   if (!session) {
+    // The widget owns the trustmark row the badge belongs on, so the window
+    // rides into it through the widget's `attribution-trailing` slot.
     return (
       <ClaimShell>
-        <ClaimLogin challengeId={challenge_id} projectId={project_id} />
+        <ClaimLogin challengeId={challenge_id} projectId={project_id} window={window} />
       </ClaimShell>
     );
   }
@@ -86,10 +105,16 @@ function ClaimScreen() {
         the spent-once state and show the previous outcome. The key remounts it
         instead, which resets the gate without weakening it.
       */}
+      {/*
+        No widget on this leg, so no trustmark row to slot into — the badge
+        stands under the outcome instead, which is why CompleteClaim renders
+        it: only the outcome knows whether a countdown still means anything.
+      */}
       <CompleteClaim
         key={`${project_id}:${challenge_id}`}
         projectId={project_id}
         challengeId={challenge_id}
+        window={window}
       />
     </ClaimShell>
   );
@@ -116,14 +141,67 @@ function StateCard({ title, children }: { title: string; children: ReactNode }) 
 }
 
 /**
+ * The claim window, as the badge the design draws beside the trustmark
+ * ("Blocks / signup", `Badge` variant `secondary`).
+ *
+ * It is about the *project*, not the link in the address bar: an unclaimed
+ * project can be claimed for 14 days after it is created (ADR 046), while the
+ * link itself lapses in minutes. Both can therefore be true at once — an
+ * expired link with eleven days still on the window — so it renders beside a
+ * failed outcome rather than instead of one. A claimed project is the
+ * exception: nothing is left to count down, and `CompleteClaim` drops it.
+ *
+ * Days, not a ticking clock: the window is two weeks long, so a
+ * second-by-second timer would be motion that never tells the reader anything.
+ * `expired` is the server's verdict; the day count is only ever derived for
+ * display, and "today" is the skew case — a deadline already past that the
+ * server still calls open.
+ */
+function ClaimWindowBadge({ window, slot }: { window: ClaimWindow; slot?: string }) {
+  const days = daysUntil(window.expiresAt);
+  return (
+    <Badge variant="secondary" slot={slot}>
+      {window.expired ? "Claim window expired" : days === 0 ? "Expires today" : `Expires in ${days} ${days === 1 ? "day" : "days"}`}
+    </Badge>
+  );
+}
+
+/**
+ * Whole days from now until `at`, rounded up so a deadline later today reads
+ * as a day left rather than as zero-and-expired, and floored at 0 — the server
+ * owns the expired verdict, and a clock a few minutes fast must not produce a
+ * negative count next to a window it still calls open.
+ */
+function daysUntil(at: Date): number {
+  const ms = at.getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+}
+
+/**
  * The sign-in/registration leg: the embedded widget against the platform
  * project, exactly as `login.tsx` builds it (per-element project handle —
  * see that file for why attributes would lose to the app-wide
- * `configureZitadel()`). `purpose="login"` runs the project's default login
- * flow, whose definition owns the registration affordance; a claim-specific
- * flow would attach here via the widget's flow key once one exists.
+ * `configureZitadel()`).
+ *
+ * `purpose="register"`, not `"login"`: a developer arriving from `zitadel
+ * claim` in their terminal has, in the normal case, no account on this
+ * deployment yet, so the sign-in step is a dead end they have to notice a
+ * link to escape. The default flow's `register` purpose enters at the
+ * `register` step (`packages/config/defaults/default-login.json`), whose
+ * `sign_in` action navigates back to `identifier` for the returning
+ * developer — so the rarer case costs one click and the common case costs
+ * none. A claim-specific flow would attach here via the widget's flow key
+ * once one exists.
  */
-function ClaimLogin({ challengeId, projectId }: { challengeId: string; projectId: string }) {
+function ClaimLogin({
+  challengeId,
+  projectId,
+  window,
+}: {
+  challengeId: string;
+  projectId: string;
+  window?: ClaimWindow;
+}) {
   const { resolved: theme } = useTheme();
   const consoleProjectId = getConsoleProjectId();
   const publishableKey = getPublishableKey();
@@ -153,8 +231,24 @@ function ClaimLogin({ challengeId, projectId }: { challengeId: string; projectId
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <p className={BODY_TEXT}>Sign in or create an account to claim your project.</p>
-      <ZitadelLogin project={project} purpose="login" theme={theme} postSignInUrl={postSignInUrl} />
+      <p className={BODY_TEXT}>Create an account or sign in to claim your project.</p>
+      <ZitadelLogin
+        project={project}
+        purpose="register"
+        theme={theme}
+        postSignInUrl={postSignInUrl}
+      >
+        {/*
+          Light-DOM content projected into the widget's shadow trustmark row,
+          which is what puts the badge on that row and keeps it styled by the
+          console rather than by the widget. `slot` goes on the badge itself,
+          not a wrapper: a wrapping span is blockified as a flex item and its
+          line box makes the row 24px tall, which pushes the badge 1.5px off
+          the mark's centre line. The badge is already `inline-flex` at the
+          design's 20px, so it centres exactly.
+        */}
+        {window && <ClaimWindowBadge window={window} slot="attribution-trailing" />}
+      </ZitadelLogin>
     </div>
   );
 }
@@ -165,7 +259,15 @@ function ClaimLogin({ challengeId, projectId }: { challengeId: string; projectId
  * re-renders and double-mounts, and only the explicit `Try again` button can
  * start another attempt.
  */
-function CompleteClaim({ projectId, challengeId }: { projectId: string; challengeId: string }) {
+function CompleteClaim({
+  projectId,
+  challengeId,
+  window,
+}: {
+  projectId: string;
+  challengeId: string;
+  window?: ClaimWindow;
+}) {
   const [outcome, setOutcome] = useState<ClaimOutcome | null>(null);
   const startedRef = useRef(false);
 
@@ -189,13 +291,31 @@ function CompleteClaim({ projectId, challengeId }: { projectId: string; challeng
     );
   }
 
+  // The window says how long is left to claim. Once the project is claimed —
+  // by this attempt or an earlier one — there is nothing left to count down,
+  // so the badge goes rather than contradicting the outcome above it.
+  const settled = outcome.kind === "claimed" || outcome.kind === "already_claimed";
+  const card = outcomeCard(outcome, run);
+  return (
+    <>
+      {card}
+      {window && !settled && <ClaimWindowBadge window={window} />}
+    </>
+  );
+}
+
+/**
+ * The screen for one completion outcome. Every branch is a state the contract
+ * enumerates (`claim/complete` in the OpenAPI source), not an exception.
+ */
+function outcomeCard(outcome: ClaimOutcome, run: () => void) {
   switch (outcome.kind) {
     case "claimed":
       return (
         <StateCard title="Project claimed">
           <p className={BODY_TEXT}>
-            The project now belongs to your personal team. You can return to your terminal — the CLI
-            picks the claim up on its own.
+            Your project is now permanent. Open the console to manage it and start collaborating
+            with your team.
           </p>
           <Button asChild className="mx-auto w-fit">
             <Link to="/">Open the console</Link>
@@ -255,19 +375,22 @@ function CompleteClaim({ projectId, challengeId }: { projectId: string; challeng
         </StateCard>
       );
     case "unauthenticated":
-      // NOT the sign-in widget again. The loader confirmed an active session
-      // moments ago, so this 401 is almost never a lost cookie — it is the
-      // server's deliberately opaque verdict for a session that cannot claim
-      // (most often: it does not belong to the platform project, e.g. a
-      // deployment running without `platform.bootstrap_project`, which is how
-      // the local testkit boots today). Re-running sign-in mints the same
-      // session and loops forever; an honest dead-end beats a treadmill.
+      // NOT the sign-in widget again: the server collapses "wrong project" and
+      // "no platform project" into one opaque 401, so the page cannot tell
+      // which it is, and re-running sign-in against the same project mints the
+      // same session. Signing out is what the developer can act on, and it is
+      // the common case — a session left over from the app they just scaffolded
+      // on this origin. Offering the account a choice is the account-picker
+      // story, not this screen.
       return (
-        <StateCard title="Your session can't complete this claim">
+        <StateCard title="This account can't claim the project">
           <p className={BODY_TEXT}>
-            The server did not accept the signed-in session for this claim. On a deployment without
-            a platform project, claims cannot complete; otherwise your session may have expired
-            mid-claim — reopen the link from your terminal and sign in again.
+            The account you are signed in with belongs to a different project.
+          </p>
+          <p className={BODY_TEXT}>
+            If you signed in to the app you just set up, sign out of it — it shares this address.
+            Then reopen the claim link from your terminal to create an account or sign in for this
+            project.
           </p>
           <Button onClick={run} variant="outline" className="mx-auto w-fit">
             Try again
