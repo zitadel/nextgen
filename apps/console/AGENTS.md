@@ -80,11 +80,42 @@ rule).
 
 ```sh
 moon run console:dev-real   # seeded real backend + dev server (default loop)
+moon run console:dev-claim  # same, but for the claim page (see below)
 moon run console:dev        # dev server only on http://localhost:5174
 moon run console:typecheck
 moon run console:test
 moon run console:build
 ```
+
+## The claim page needs `dev-claim`, not `dev-real`
+
+`dev-real` boots one ordinary project and signs the console into it. The claim
+page is the console acting as the *platform's* claim surface, and
+`claim/complete` only accepts a session belonging to the platform project — so
+on `dev-real` the page renders but the claim always fails with "This account
+can't claim the project". That is the harness, not a defect.
+
+`moon run console:dev-claim` boots the platform project, pins the console to it,
+and prints a ready claim link. The trade-off is why it is opt-in: pinning the
+console to `proj_platform` changes the standalone semantics the demo and
+embedded suites rely on, and the seeded users live in the project being claimed
+rather than the platform one, so list screens read empty and you register on the
+claim page instead of signing in with the seeded credentials.
+
+Three things that break either loop before it starts, none of which say so
+clearly:
+
+- **Build the CLI first** (`moon run cli:build`). Both loops shell out to it to
+  start the server; without a built bundle the server starts unmigrated and dies
+  with `no such table: projects`.
+- **Reinstall after a rebase** (`pnpm install`). A stale `node_modules` fails the
+  built CLI on a missing transitive dependency, not on anything you changed.
+- **A raw binary needs `--migrate`.** Migrations are opt-in since #1152; the CLI
+  passes the flag for you, so this only bites when launching `dist/server/nextgen`
+  by hand.
+
+`CONSOLE_DEV_ORIGIN` sets the console's port for both loops, so a second worktree
+can run beside the first.
 
 ## Develop against real data, not the mock
 

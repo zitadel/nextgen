@@ -5939,36 +5939,32 @@ type BeginUserPasskeyRegistrationUnauthorized ErrorDetails
 
 func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes() {}
 
-// Branding configuration. Appears in two places with one shape:
-// - On flow responses as a read-only projection: the server resolves the
-// latest branding revision for the project per step response (falling
-// back to built-in defaults when none is stored). Branding is configured
-// via the Branding API / `zitadel apply`, not the Flow API.
-// - As the request body of `POST /branding`, which publishes the same
-// shape as a new immutable revision (see ADR 040).
+// Branding configuration, used in two places with one shape: as the request
+// body of `POST /branding`, which publishes it as a new immutable revision,
+// and as a read-only projection on flow responses, which carries the
+// project's latest revision.
+// Every field is optional. An omitted key uses Zitadel's maintained default,
+// so a revision carrying one colour is as valid as one carrying the whole
+// object.
 // Ref: #
 type Branding struct {
-	// Layout preset selector. The default.liquid master template uses this
-	// to branch into layout variants. Customers who eject the template
-	// can ignore this field entirely; it also serves as the degrade target
-	// when a custom template fails component-side validation.
+	// Layout preset the bundled template branches on, and the degrade target
+	// when a custom template fails validation. Ejected templates may ignore
+	// it. Selects a template rather than restyling the widget, so it is not
+	// an appearance control.
 	Layout OptBrandingLayout `json:"layout"`
-	// The LiquidJS template string for rendering this step. The orchestrator
-	// parses this template, injects the capability dictionaries as context,
-	// and renders the output HTML into its Shadow DOM.
+	// The LiquidJS template for rendering this step. The orchestrator renders
+	// it into its Shadow DOM with the capability dictionaries as context.
 	LiquidTemplate OptString `json:"liquid_template"`
-	// Team logo URL.
+	// Fallback mark, used only when neither `theme.light.logo_url` nor
+	// `theme.dark.logo_url` is set. Prefer the per-side marks — one file
+	// cannot serve both surfaces.
 	LogoURL OptURI `json:"logo_url"`
-	// Custom font stylesheet URL (e.g., Google Fonts CSS). Read-only in
-	// v1: `POST /branding` rejects a non-empty value, because the login
-	// component loads this stylesheet at document level (shadow-scoped
-	// `@font-face` rules never register faces) and an arbitrary URL would
-	// grant `branding.write` page-wide CSS control over the embedding
-	// application. Safe tenant font delivery is an ADR 040 follow-up;
-	// until then, load fonts from the embedding page.
-	FontURL OptURI `json:"font_url"`
-	// Hero/background image URL (used by split layout).
-	HeroURL OptURI `json:"hero_url"`
+	// Hero/background image URL, used by the split layout.
+	HeroURL    OptURI                `json:"hero_url"`
+	Theme      OptBrandingTheme      `json:"theme"`
+	Typography OptBrandingTypography `json:"typography"`
+	Shape      OptBrandingShape      `json:"shape"`
 }
 
 // GetLayout returns the value of Layout.
@@ -5986,14 +5982,24 @@ func (s *Branding) GetLogoURL() OptURI {
 	return s.LogoURL
 }
 
-// GetFontURL returns the value of FontURL.
-func (s *Branding) GetFontURL() OptURI {
-	return s.FontURL
-}
-
 // GetHeroURL returns the value of HeroURL.
 func (s *Branding) GetHeroURL() OptURI {
 	return s.HeroURL
+}
+
+// GetTheme returns the value of Theme.
+func (s *Branding) GetTheme() OptBrandingTheme {
+	return s.Theme
+}
+
+// GetTypography returns the value of Typography.
+func (s *Branding) GetTypography() OptBrandingTypography {
+	return s.Typography
+}
+
+// GetShape returns the value of Shape.
+func (s *Branding) GetShape() OptBrandingShape {
+	return s.Shape
 }
 
 // SetLayout sets the value of Layout.
@@ -6011,15 +6017,27 @@ func (s *Branding) SetLogoURL(val OptURI) {
 	s.LogoURL = val
 }
 
-// SetFontURL sets the value of FontURL.
-func (s *Branding) SetFontURL(val OptURI) {
-	s.FontURL = val
-}
-
 // SetHeroURL sets the value of HeroURL.
 func (s *Branding) SetHeroURL(val OptURI) {
 	s.HeroURL = val
 }
+
+// SetTheme sets the value of Theme.
+func (s *Branding) SetTheme(val OptBrandingTheme) {
+	s.Theme = val
+}
+
+// SetTypography sets the value of Typography.
+func (s *Branding) SetTypography(val OptBrandingTypography) {
+	s.Typography = val
+}
+
+// SetShape sets the value of Shape.
+func (s *Branding) SetShape(val OptBrandingShape) {
+	s.Shape = val
+}
+
+type BrandingColor string
 
 // Merged schema.
 // Ref: #
@@ -6515,10 +6533,10 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
-// Layout preset selector. The default.liquid master template uses this
-// to branch into layout variants. Customers who eject the template
-// can ignore this field entirely; it also serves as the degrade target
-// when a custom template fails component-side validation.
+// Layout preset the bundled template branches on, and the degrade target
+// when a custom template fails validation. Ejected templates may ignore
+// it. Selects a template rather than restyling the widget, so it is not
+// an appearance control.
 type BrandingLayout string
 
 const (
@@ -6554,6 +6572,225 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 		return nil
 	case BrandingLayoutSplit:
 		*s = BrandingLayoutSplit
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Semantic colours for one theme side. An omitted key uses the maintained
+// default for this side, never the other side's value.
+// Every value is a `BrandingColor`, which is where the accepted forms and the
+// reason for them live; what each key paints is below.
+// Ref: #
+type BrandingPalette struct {
+	// Brand colour, and the source the focus rings derive from.
+	Primary OptBrandingColor `json:"primary"`
+	// Text and icons drawn on `primary`.
+	OnPrimary OptBrandingColor `json:"on_primary"`
+	// The surface behind the card.
+	Background OptBrandingColor `json:"background"`
+	// The card and popover surfaces.
+	Surface OptBrandingColor `json:"surface"`
+	// Neutral fills — the secondary button, accents and muted panels.
+	Muted OptBrandingColor `json:"muted"`
+	// Card and control edges.
+	Border OptBrandingColor `json:"border"`
+	// Body text, and the foreground of every neutral surface — a side that
+	// sets `muted` without `text` keeps the default label colour on it.
+	Text OptBrandingColor `json:"text"`
+	// Secondary text.
+	TextMuted OptBrandingColor `json:"text_muted"`
+	// Link colour. Defaults to the surrounding text colour, so setting it
+	// tints exactly the links and nothing else.
+	Link OptBrandingColor `json:"link"`
+	// Valid fields, success alerts and pills.
+	Success OptBrandingColor `json:"success"`
+	// Warning surfaces. Persisted, but nothing renders it yet.
+	Warning OptBrandingColor `json:"warning"`
+	// Invalid fields, error alerts and pills.
+	Error OptBrandingColor `json:"error"`
+}
+
+// GetPrimary returns the value of Primary.
+func (s *BrandingPalette) GetPrimary() OptBrandingColor {
+	return s.Primary
+}
+
+// GetOnPrimary returns the value of OnPrimary.
+func (s *BrandingPalette) GetOnPrimary() OptBrandingColor {
+	return s.OnPrimary
+}
+
+// GetBackground returns the value of Background.
+func (s *BrandingPalette) GetBackground() OptBrandingColor {
+	return s.Background
+}
+
+// GetSurface returns the value of Surface.
+func (s *BrandingPalette) GetSurface() OptBrandingColor {
+	return s.Surface
+}
+
+// GetMuted returns the value of Muted.
+func (s *BrandingPalette) GetMuted() OptBrandingColor {
+	return s.Muted
+}
+
+// GetBorder returns the value of Border.
+func (s *BrandingPalette) GetBorder() OptBrandingColor {
+	return s.Border
+}
+
+// GetText returns the value of Text.
+func (s *BrandingPalette) GetText() OptBrandingColor {
+	return s.Text
+}
+
+// GetTextMuted returns the value of TextMuted.
+func (s *BrandingPalette) GetTextMuted() OptBrandingColor {
+	return s.TextMuted
+}
+
+// GetLink returns the value of Link.
+func (s *BrandingPalette) GetLink() OptBrandingColor {
+	return s.Link
+}
+
+// GetSuccess returns the value of Success.
+func (s *BrandingPalette) GetSuccess() OptBrandingColor {
+	return s.Success
+}
+
+// GetWarning returns the value of Warning.
+func (s *BrandingPalette) GetWarning() OptBrandingColor {
+	return s.Warning
+}
+
+// GetError returns the value of Error.
+func (s *BrandingPalette) GetError() OptBrandingColor {
+	return s.Error
+}
+
+// SetPrimary sets the value of Primary.
+func (s *BrandingPalette) SetPrimary(val OptBrandingColor) {
+	s.Primary = val
+}
+
+// SetOnPrimary sets the value of OnPrimary.
+func (s *BrandingPalette) SetOnPrimary(val OptBrandingColor) {
+	s.OnPrimary = val
+}
+
+// SetBackground sets the value of Background.
+func (s *BrandingPalette) SetBackground(val OptBrandingColor) {
+	s.Background = val
+}
+
+// SetSurface sets the value of Surface.
+func (s *BrandingPalette) SetSurface(val OptBrandingColor) {
+	s.Surface = val
+}
+
+// SetMuted sets the value of Muted.
+func (s *BrandingPalette) SetMuted(val OptBrandingColor) {
+	s.Muted = val
+}
+
+// SetBorder sets the value of Border.
+func (s *BrandingPalette) SetBorder(val OptBrandingColor) {
+	s.Border = val
+}
+
+// SetText sets the value of Text.
+func (s *BrandingPalette) SetText(val OptBrandingColor) {
+	s.Text = val
+}
+
+// SetTextMuted sets the value of TextMuted.
+func (s *BrandingPalette) SetTextMuted(val OptBrandingColor) {
+	s.TextMuted = val
+}
+
+// SetLink sets the value of Link.
+func (s *BrandingPalette) SetLink(val OptBrandingColor) {
+	s.Link = val
+}
+
+// SetSuccess sets the value of Success.
+func (s *BrandingPalette) SetSuccess(val OptBrandingColor) {
+	s.Success = val
+}
+
+// SetWarning sets the value of Warning.
+func (s *BrandingPalette) SetWarning(val OptBrandingColor) {
+	s.Warning = val
+}
+
+// SetError sets the value of Error.
+func (s *BrandingPalette) SetError(val OptBrandingColor) {
+	s.Error = val
+}
+
+// A named corner rounding: `none` (0), `sm` (4), `md` (8), `lg` (12), and
+// `full` (pill). Send `full` for a pill rather than a large pixel value.
+// Ref: #
+type BrandingRadiusPreset string
+
+const (
+	BrandingRadiusPresetNone BrandingRadiusPreset = "none"
+	BrandingRadiusPresetSm   BrandingRadiusPreset = "sm"
+	BrandingRadiusPresetMd   BrandingRadiusPreset = "md"
+	BrandingRadiusPresetLg   BrandingRadiusPreset = "lg"
+	BrandingRadiusPresetFull BrandingRadiusPreset = "full"
+)
+
+// AllValues returns all BrandingRadiusPreset values.
+func (BrandingRadiusPreset) AllValues() []BrandingRadiusPreset {
+	return []BrandingRadiusPreset{
+		BrandingRadiusPresetNone,
+		BrandingRadiusPresetSm,
+		BrandingRadiusPresetMd,
+		BrandingRadiusPresetLg,
+		BrandingRadiusPresetFull,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s BrandingRadiusPreset) MarshalText() ([]byte, error) {
+	switch s {
+	case BrandingRadiusPresetNone:
+		return []byte(s), nil
+	case BrandingRadiusPresetSm:
+		return []byte(s), nil
+	case BrandingRadiusPresetMd:
+		return []byte(s), nil
+	case BrandingRadiusPresetLg:
+		return []byte(s), nil
+	case BrandingRadiusPresetFull:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *BrandingRadiusPreset) UnmarshalText(data []byte) error {
+	switch BrandingRadiusPreset(data) {
+	case BrandingRadiusPresetNone:
+		*s = BrandingRadiusPresetNone
+		return nil
+	case BrandingRadiusPresetSm:
+		*s = BrandingRadiusPresetSm
+		return nil
+	case BrandingRadiusPresetMd:
+		*s = BrandingRadiusPresetMd
+		return nil
+	case BrandingRadiusPresetLg:
+		*s = BrandingRadiusPresetLg
+		return nil
+	case BrandingRadiusPresetFull:
+		*s = BrandingRadiusPresetFull
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -6604,6 +6841,348 @@ func (s *BrandingRevisionResponse) SetBranding(val Branding) {
 
 func (*BrandingRevisionResponse) createBrandingRes()  {}
 func (*BrandingRevisionResponse) getBrandingByIdRes() {}
+
+// Corner rounding, spacing and logo size. Shared across theme sides.
+// Ref: #
+type BrandingShape struct {
+	// Corner rounding for the card, inputs, buttons and alerts — either a
+	// preset name or an integer number of pixels. One value scales the whole
+	// corner ramp in proportion, so the card stays rounder than the controls
+	// inside it.
+	Radius OptBrandingShapeRadius `json:"radius"`
+	// Spacing and control height.
+	Density OptBrandingShapeDensity `json:"density"`
+	// Multiplier on the logo's maximum height, `1` when omitted. The image keeps its intrinsic
+	// aspect ratio inside that cap; no width, height or ratio is stored.
+	LogoScale OptFloat64 `json:"logo_scale"`
+}
+
+// GetRadius returns the value of Radius.
+func (s *BrandingShape) GetRadius() OptBrandingShapeRadius {
+	return s.Radius
+}
+
+// GetDensity returns the value of Density.
+func (s *BrandingShape) GetDensity() OptBrandingShapeDensity {
+	return s.Density
+}
+
+// GetLogoScale returns the value of LogoScale.
+func (s *BrandingShape) GetLogoScale() OptFloat64 {
+	return s.LogoScale
+}
+
+// SetRadius sets the value of Radius.
+func (s *BrandingShape) SetRadius(val OptBrandingShapeRadius) {
+	s.Radius = val
+}
+
+// SetDensity sets the value of Density.
+func (s *BrandingShape) SetDensity(val OptBrandingShapeDensity) {
+	s.Density = val
+}
+
+// SetLogoScale sets the value of LogoScale.
+func (s *BrandingShape) SetLogoScale(val OptFloat64) {
+	s.LogoScale = val
+}
+
+// Spacing and control height.
+type BrandingShapeDensity string
+
+const (
+	BrandingShapeDensityCompact     BrandingShapeDensity = "compact"
+	BrandingShapeDensityRegular     BrandingShapeDensity = "regular"
+	BrandingShapeDensityComfortable BrandingShapeDensity = "comfortable"
+)
+
+// AllValues returns all BrandingShapeDensity values.
+func (BrandingShapeDensity) AllValues() []BrandingShapeDensity {
+	return []BrandingShapeDensity{
+		BrandingShapeDensityCompact,
+		BrandingShapeDensityRegular,
+		BrandingShapeDensityComfortable,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s BrandingShapeDensity) MarshalText() ([]byte, error) {
+	switch s {
+	case BrandingShapeDensityCompact:
+		return []byte(s), nil
+	case BrandingShapeDensityRegular:
+		return []byte(s), nil
+	case BrandingShapeDensityComfortable:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *BrandingShapeDensity) UnmarshalText(data []byte) error {
+	switch BrandingShapeDensity(data) {
+	case BrandingShapeDensityCompact:
+		*s = BrandingShapeDensityCompact
+		return nil
+	case BrandingShapeDensityRegular:
+		*s = BrandingShapeDensityRegular
+		return nil
+	case BrandingShapeDensityComfortable:
+		*s = BrandingShapeDensityComfortable
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Corner rounding for the card, inputs, buttons and alerts — either a
+// preset name or an integer number of pixels. One value scales the whole
+// corner ramp in proportion, so the card stays rounder than the controls
+// inside it.
+// BrandingShapeRadius represents sum type.
+type BrandingShapeRadius struct {
+	Type                 BrandingShapeRadiusType // switch on this field
+	BrandingRadiusPreset BrandingRadiusPreset
+	Int                  int
+}
+
+// BrandingShapeRadiusType is oneOf type of BrandingShapeRadius.
+type BrandingShapeRadiusType string
+
+// Possible values for BrandingShapeRadiusType.
+const (
+	BrandingRadiusPresetBrandingShapeRadius BrandingShapeRadiusType = "BrandingRadiusPreset"
+	IntBrandingShapeRadius                  BrandingShapeRadiusType = "int"
+)
+
+// IsBrandingRadiusPreset reports whether BrandingShapeRadius is BrandingRadiusPreset.
+func (s BrandingShapeRadius) IsBrandingRadiusPreset() bool {
+	return s.Type == BrandingRadiusPresetBrandingShapeRadius
+}
+
+// IsInt reports whether BrandingShapeRadius is int.
+func (s BrandingShapeRadius) IsInt() bool { return s.Type == IntBrandingShapeRadius }
+
+// SetBrandingRadiusPreset sets BrandingShapeRadius to BrandingRadiusPreset.
+func (s *BrandingShapeRadius) SetBrandingRadiusPreset(v BrandingRadiusPreset) {
+	s.Type = BrandingRadiusPresetBrandingShapeRadius
+	s.BrandingRadiusPreset = v
+}
+
+// GetBrandingRadiusPreset returns BrandingRadiusPreset and true boolean if BrandingShapeRadius is BrandingRadiusPreset.
+func (s BrandingShapeRadius) GetBrandingRadiusPreset() (v BrandingRadiusPreset, ok bool) {
+	if !s.IsBrandingRadiusPreset() {
+		return v, false
+	}
+	return s.BrandingRadiusPreset, true
+}
+
+// NewBrandingRadiusPresetBrandingShapeRadius returns new BrandingShapeRadius from BrandingRadiusPreset.
+func NewBrandingRadiusPresetBrandingShapeRadius(v BrandingRadiusPreset) BrandingShapeRadius {
+	var s BrandingShapeRadius
+	s.SetBrandingRadiusPreset(v)
+	return s
+}
+
+// SetInt sets BrandingShapeRadius to int.
+func (s *BrandingShapeRadius) SetInt(v int) {
+	s.Type = IntBrandingShapeRadius
+	s.Int = v
+}
+
+// GetInt returns int and true boolean if BrandingShapeRadius is int.
+func (s BrandingShapeRadius) GetInt() (v int, ok bool) {
+	if !s.IsInt() {
+		return v, false
+	}
+	return s.Int, true
+}
+
+// NewIntBrandingShapeRadius returns new BrandingShapeRadius from int.
+func NewIntBrandingShapeRadius(v int) BrandingShapeRadius {
+	var s BrandingShapeRadius
+	s.SetInt(v)
+	return s
+}
+
+// The theme sides this project publishes, and which of them may run.
+// Publishing one side makes it the only theme that resolves, even under `auto`
+// or an operating-system preference for the other. Publishing both lets `auto`
+// follow the operating system, each side using its own logo and palette.
+// The element-level `theme` property overrides `mode`, but cannot select a
+// side the project never published.
+// Ref: #
+type BrandingTheme struct {
+	// Which published side may run. `auto` follows the operating system.
+	Mode  OptBrandingThemeMode `json:"mode"`
+	Light OptBrandingThemeSide `json:"light"`
+	Dark  OptBrandingThemeSide `json:"dark"`
+}
+
+// GetMode returns the value of Mode.
+func (s *BrandingTheme) GetMode() OptBrandingThemeMode {
+	return s.Mode
+}
+
+// GetLight returns the value of Light.
+func (s *BrandingTheme) GetLight() OptBrandingThemeSide {
+	return s.Light
+}
+
+// GetDark returns the value of Dark.
+func (s *BrandingTheme) GetDark() OptBrandingThemeSide {
+	return s.Dark
+}
+
+// SetMode sets the value of Mode.
+func (s *BrandingTheme) SetMode(val OptBrandingThemeMode) {
+	s.Mode = val
+}
+
+// SetLight sets the value of Light.
+func (s *BrandingTheme) SetLight(val OptBrandingThemeSide) {
+	s.Light = val
+}
+
+// SetDark sets the value of Dark.
+func (s *BrandingTheme) SetDark(val OptBrandingThemeSide) {
+	s.Dark = val
+}
+
+// Which published side may run. `auto` follows the operating system.
+type BrandingThemeMode string
+
+const (
+	BrandingThemeModeLight BrandingThemeMode = "light"
+	BrandingThemeModeDark  BrandingThemeMode = "dark"
+	BrandingThemeModeAuto  BrandingThemeMode = "auto"
+)
+
+// AllValues returns all BrandingThemeMode values.
+func (BrandingThemeMode) AllValues() []BrandingThemeMode {
+	return []BrandingThemeMode{
+		BrandingThemeModeLight,
+		BrandingThemeModeDark,
+		BrandingThemeModeAuto,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s BrandingThemeMode) MarshalText() ([]byte, error) {
+	switch s {
+	case BrandingThemeModeLight:
+		return []byte(s), nil
+	case BrandingThemeModeDark:
+		return []byte(s), nil
+	case BrandingThemeModeAuto:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *BrandingThemeMode) UnmarshalText(data []byte) error {
+	switch BrandingThemeMode(data) {
+	case BrandingThemeModeLight:
+		*s = BrandingThemeModeLight
+		return nil
+	case BrandingThemeModeDark:
+		*s = BrandingThemeModeDark
+		return nil
+	case BrandingThemeModeAuto:
+		*s = BrandingThemeModeAuto
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// One complete theme side. Light and dark are independent surfaces — neither
+// inherits from the other, and a side that is absent is never used, whatever
+// `mode` or the operating system asks for.
+// Ref: #
+type BrandingThemeSide struct {
+	// The mark for this surface. A logo is never recoloured, so each side
+	// carries its own file. Absent means no mark on this side, unless the
+	// top-level `logo_url` is the only one set.
+	LogoURL OptURI             `json:"logo_url"`
+	Palette OptBrandingPalette `json:"palette"`
+}
+
+// GetLogoURL returns the value of LogoURL.
+func (s *BrandingThemeSide) GetLogoURL() OptURI {
+	return s.LogoURL
+}
+
+// GetPalette returns the value of Palette.
+func (s *BrandingThemeSide) GetPalette() OptBrandingPalette {
+	return s.Palette
+}
+
+// SetLogoURL sets the value of LogoURL.
+func (s *BrandingThemeSide) SetLogoURL(val OptURI) {
+	s.LogoURL = val
+}
+
+// SetPalette sets the value of Palette.
+func (s *BrandingThemeSide) SetPalette(val OptBrandingPalette) {
+	s.Palette = val
+}
+
+// The typeface the login surface renders in. One face covers both body and
+// headings; separate heading and mono faces are not modelled yet.
+// Ref: #
+type BrandingTypography struct {
+	// CSS font stack for body and heading text. Include a generic family so
+	// the surface still renders when the named face is unavailable.
+	// Comma-separated family names, each either an identifier (`Inter`,
+	// `ui-sans-serif`, `Helvetica Neue`) or a quoted name (`"APK Futural"`).
+	// Anything else is rejected — the stack is written into a stylesheet, so
+	// only names are stored, and a quoted name must close the quote it opened.
+	FontFamily OptString `json:"font_family"`
+	// Stylesheet that loads `font_family` — a Google Fonts CSS URL, for
+	// example. Must be https; unlike the logo and hero assets there is no
+	// loopback carve-out. Rejected without `font_family`, which would name
+	// nothing to paint with.
+	// Stored but not applied to an embedded widget: the embedding page loads
+	// the face, and Zitadel does not inject a stylesheet into a document it
+	// does not own.
+	FontURL OptURI `json:"font_url"`
+	// Multiplier on the base text sizes, `1` when omitted.
+	Scale OptFloat64 `json:"scale"`
+}
+
+// GetFontFamily returns the value of FontFamily.
+func (s *BrandingTypography) GetFontFamily() OptString {
+	return s.FontFamily
+}
+
+// GetFontURL returns the value of FontURL.
+func (s *BrandingTypography) GetFontURL() OptURI {
+	return s.FontURL
+}
+
+// GetScale returns the value of Scale.
+func (s *BrandingTypography) GetScale() OptFloat64 {
+	return s.Scale
+}
+
+// SetFontFamily sets the value of FontFamily.
+func (s *BrandingTypography) SetFontFamily(val OptString) {
+	s.FontFamily = val
+}
+
+// SetFontURL sets the value of FontURL.
+func (s *BrandingTypography) SetFontURL(val OptURI) {
+	s.FontURL = val
+}
+
+// SetScale sets the value of Scale.
+func (s *BrandingTypography) SetScale(val OptFloat64) {
+	s.Scale = val
+}
 
 type ChallengeID string
 
@@ -25964,6 +26543,52 @@ func (o OptBranding) Or(d Branding) Branding {
 	return d
 }
 
+// NewOptBrandingColor returns new OptBrandingColor with value set to v.
+func NewOptBrandingColor(v BrandingColor) OptBrandingColor {
+	return OptBrandingColor{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingColor is optional BrandingColor.
+type OptBrandingColor struct {
+	Value BrandingColor
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingColor was set.
+func (o OptBrandingColor) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingColor) Reset() {
+	var v BrandingColor
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingColor) SetTo(v BrandingColor) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingColor) Get() (v BrandingColor, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingColor) Or(d BrandingColor) BrandingColor {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptBrandingCreatedEventDelegationType returns new OptBrandingCreatedEventDelegationType with value set to v.
 func NewOptBrandingCreatedEventDelegationType(v BrandingCreatedEventDelegationType) OptBrandingCreatedEventDelegationType {
 	return OptBrandingCreatedEventDelegationType{
@@ -26050,6 +26675,374 @@ func (o OptBrandingLayout) Get() (v BrandingLayout, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptBrandingLayout) Or(d BrandingLayout) BrandingLayout {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingPalette returns new OptBrandingPalette with value set to v.
+func NewOptBrandingPalette(v BrandingPalette) OptBrandingPalette {
+	return OptBrandingPalette{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingPalette is optional BrandingPalette.
+type OptBrandingPalette struct {
+	Value BrandingPalette
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingPalette was set.
+func (o OptBrandingPalette) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingPalette) Reset() {
+	var v BrandingPalette
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingPalette) SetTo(v BrandingPalette) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingPalette) Get() (v BrandingPalette, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingPalette) Or(d BrandingPalette) BrandingPalette {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingShape returns new OptBrandingShape with value set to v.
+func NewOptBrandingShape(v BrandingShape) OptBrandingShape {
+	return OptBrandingShape{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingShape is optional BrandingShape.
+type OptBrandingShape struct {
+	Value BrandingShape
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingShape was set.
+func (o OptBrandingShape) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingShape) Reset() {
+	var v BrandingShape
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingShape) SetTo(v BrandingShape) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingShape) Get() (v BrandingShape, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingShape) Or(d BrandingShape) BrandingShape {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingShapeDensity returns new OptBrandingShapeDensity with value set to v.
+func NewOptBrandingShapeDensity(v BrandingShapeDensity) OptBrandingShapeDensity {
+	return OptBrandingShapeDensity{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingShapeDensity is optional BrandingShapeDensity.
+type OptBrandingShapeDensity struct {
+	Value BrandingShapeDensity
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingShapeDensity was set.
+func (o OptBrandingShapeDensity) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingShapeDensity) Reset() {
+	var v BrandingShapeDensity
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingShapeDensity) SetTo(v BrandingShapeDensity) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingShapeDensity) Get() (v BrandingShapeDensity, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingShapeDensity) Or(d BrandingShapeDensity) BrandingShapeDensity {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingShapeRadius returns new OptBrandingShapeRadius with value set to v.
+func NewOptBrandingShapeRadius(v BrandingShapeRadius) OptBrandingShapeRadius {
+	return OptBrandingShapeRadius{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingShapeRadius is optional BrandingShapeRadius.
+type OptBrandingShapeRadius struct {
+	Value BrandingShapeRadius
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingShapeRadius was set.
+func (o OptBrandingShapeRadius) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingShapeRadius) Reset() {
+	var v BrandingShapeRadius
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingShapeRadius) SetTo(v BrandingShapeRadius) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingShapeRadius) Get() (v BrandingShapeRadius, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingShapeRadius) Or(d BrandingShapeRadius) BrandingShapeRadius {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingTheme returns new OptBrandingTheme with value set to v.
+func NewOptBrandingTheme(v BrandingTheme) OptBrandingTheme {
+	return OptBrandingTheme{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingTheme is optional BrandingTheme.
+type OptBrandingTheme struct {
+	Value BrandingTheme
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingTheme was set.
+func (o OptBrandingTheme) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingTheme) Reset() {
+	var v BrandingTheme
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingTheme) SetTo(v BrandingTheme) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingTheme) Get() (v BrandingTheme, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingTheme) Or(d BrandingTheme) BrandingTheme {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingThemeMode returns new OptBrandingThemeMode with value set to v.
+func NewOptBrandingThemeMode(v BrandingThemeMode) OptBrandingThemeMode {
+	return OptBrandingThemeMode{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingThemeMode is optional BrandingThemeMode.
+type OptBrandingThemeMode struct {
+	Value BrandingThemeMode
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingThemeMode was set.
+func (o OptBrandingThemeMode) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingThemeMode) Reset() {
+	var v BrandingThemeMode
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingThemeMode) SetTo(v BrandingThemeMode) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingThemeMode) Get() (v BrandingThemeMode, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingThemeMode) Or(d BrandingThemeMode) BrandingThemeMode {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingThemeSide returns new OptBrandingThemeSide with value set to v.
+func NewOptBrandingThemeSide(v BrandingThemeSide) OptBrandingThemeSide {
+	return OptBrandingThemeSide{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingThemeSide is optional BrandingThemeSide.
+type OptBrandingThemeSide struct {
+	Value BrandingThemeSide
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingThemeSide was set.
+func (o OptBrandingThemeSide) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingThemeSide) Reset() {
+	var v BrandingThemeSide
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingThemeSide) SetTo(v BrandingThemeSide) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingThemeSide) Get() (v BrandingThemeSide, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingThemeSide) Or(d BrandingThemeSide) BrandingThemeSide {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingTypography returns new OptBrandingTypography with value set to v.
+func NewOptBrandingTypography(v BrandingTypography) OptBrandingTypography {
+	return OptBrandingTypography{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingTypography is optional BrandingTypography.
+type OptBrandingTypography struct {
+	Value BrandingTypography
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingTypography was set.
+func (o OptBrandingTypography) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingTypography) Reset() {
+	var v BrandingTypography
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingTypography) SetTo(v BrandingTypography) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingTypography) Get() (v BrandingTypography, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingTypography) Or(d BrandingTypography) BrandingTypography {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -27108,6 +28101,52 @@ func (o OptFilterValue) Get() (v FilterValue, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFilterValue) Or(d FilterValue) FilterValue {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFloat64 returns new OptFloat64 with value set to v.
+func NewOptFloat64(v float64) OptFloat64 {
+	return OptFloat64{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFloat64 is optional float64.
+type OptFloat64 struct {
+	Value float64
+	Set   bool
+}
+
+// IsSet returns true if OptFloat64 was set.
+func (o OptFloat64) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFloat64) Reset() {
+	var v float64
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFloat64) SetTo(v float64) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFloat64) Get() (v float64, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFloat64) Or(d float64) float64 {
 	if v, ok := o.Get(); ok {
 		return v
 	}
