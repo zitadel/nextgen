@@ -12815,41 +12815,41 @@ func (c *MockVariableServiceGetVariablesCall) DoAndReturn(f func(context.Context
 	return c
 }
 
-// ReplaceVariables mocks base method.
+// ReplaceVariablesInPlace mocks base method.
 func (m *MockVariableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReplaceVariables", ctx, owner, doc)
+	ret := m.ctrl.Call(m, "ReplaceVariablesInPlace", ctx, owner, doc)
 	ret0, _ := ret[0].(map[string]any)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ReplaceVariables indicates an expected call of ReplaceVariables.
-func (mr *MockVariableServiceMockRecorder) ReplaceVariables(ctx, owner, doc any) *MockVariableServiceReplaceVariablesCall {
+// ReplaceVariablesInPlace indicates an expected call of ReplaceVariablesInPlace.
+func (mr *MockVariableServiceMockRecorder) ReplaceVariablesInPlace(ctx, owner, doc any) *MockVariableServiceReplaceVariablesInPlaceCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceVariables", reflect.TypeOf((*MockVariableService)(nil).ReplaceVariablesInPlace), ctx, owner, doc)
-	return &MockVariableServiceReplaceVariablesCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceVariablesInPlace", reflect.TypeOf((*MockVariableService)(nil).ReplaceVariablesInPlace), ctx, owner, doc)
+	return &MockVariableServiceReplaceVariablesInPlaceCall{Call: call}
 }
 
-// MockVariableServiceReplaceVariablesCall wrap *gomock.Call
-type MockVariableServiceReplaceVariablesCall struct {
+// MockVariableServiceReplaceVariablesInPlaceCall wrap *gomock.Call
+type MockVariableServiceReplaceVariablesInPlaceCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockVariableServiceReplaceVariablesCall) Return(arg0 map[string]any, arg1 error) *MockVariableServiceReplaceVariablesCall {
+func (c *MockVariableServiceReplaceVariablesInPlaceCall) Return(arg0 map[string]any, arg1 error) *MockVariableServiceReplaceVariablesInPlaceCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockVariableServiceReplaceVariablesCall) Do(f func(context.Context, domain.VariableOwner, map[string]any) (map[string]any, error)) *MockVariableServiceReplaceVariablesCall {
+func (c *MockVariableServiceReplaceVariablesInPlaceCall) Do(f func(context.Context, domain.VariableOwner, map[string]any) (map[string]any, error)) *MockVariableServiceReplaceVariablesInPlaceCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockVariableServiceReplaceVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, map[string]any) (map[string]any, error)) *MockVariableServiceReplaceVariablesCall {
+func (c *MockVariableServiceReplaceVariablesInPlaceCall) DoAndReturn(f func(context.Context, domain.VariableOwner, map[string]any) (map[string]any, error)) *MockVariableServiceReplaceVariablesInPlaceCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
