@@ -169,7 +169,7 @@ function SchemasScreen() {
 }
 
 /**
- * `Schema Row`.
+ * One row of the schema directory.
  *
  * Four columns — name + sign-in methods, the attributes it collects, its
  * metadata, and the row menu. The design system's note on the component is the

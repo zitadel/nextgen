@@ -40,8 +40,8 @@ const ROLES_WIDTH = "min-w-0 flex-1";
 const SMALL = "h-8 gap-1 px-2.5 text-xs";
 
 /**
- * The "Projects (optional)" block from the Add user drawer
- * (the three annotated states).
+ * The "Projects (optional)" block from the Add user drawer, in its three
+ * annotated states.
  *
  * **`availableRoles` is empty in the app, by construction.** No endpoint serves a
  * role catalogue: ADR 034 places app roles in the app-group permission catalog,

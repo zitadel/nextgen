@@ -20,7 +20,7 @@ import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/s
 import { userAttributes, userIdentity, userIdentitySecondary } from "../../../lib/user";
 
 /**
- * User detail (`Filled` and `Authentication` variants).
+ * User detail — the overview and authentication tabs.
  *
  * Much of the design cannot be built yet, and what is missing is *data*, not
  * markup. Rather than render labels with nothing behind them, each is left out
