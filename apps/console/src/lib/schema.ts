@@ -84,7 +84,7 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
  * The columns the users table shows, unioned across every schema the loaded
  * users actually reference.
  *
- * The design (`277:288291`) has no fixed column set: its `Filled` variant lists
+ * The design has no fixed column set: its `Filled` variant lists
  * Given name / Family name / Company name / Email while `Minimal` lists only
  * Email, because the user model is `additionalProperties: true` keyed on
  * `schema`. The design decisions log (D4) settles what to show — every
