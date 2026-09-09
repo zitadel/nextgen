@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,6 +24,7 @@ export async function main(options = {}) {
   const args = options.args ?? forwardedArgs();
   const env = options.env ?? process.env;
   const runFn = options.run ?? run;
+  const assertFreshInstallFn = options.assertFreshInstall ?? assertFreshInstall;
   const runCaptureFn = options.runCapture ?? runCapture;
   const buildCliFn = options.buildCli ?? buildCli;
   const buildLocalServerBinaryFn = options.buildLocalServerBinary ?? buildLocalServerBinary;
@@ -34,6 +36,7 @@ export async function main(options = {}) {
   const cliCwd = options.cwd ?? cliCwdFor(env);
   let registryProcess;
 
+  await assertFreshInstallFn();
   await buildCliFn({ env });
 
   if (shouldUseLocalServerBinary(args, env)) {
@@ -77,6 +80,26 @@ export async function main(options = {}) {
     if (registryProcess) {
       await stopLocalRegistryFn(registryProcess);
     }
+  }
+}
+
+// A stale install (lockfile changed since the last `pnpm install`) makes the
+// task chain behind every CLI command fail deep inside cli:test with
+// misleading module-resolution errors, so fail fast with the remedy instead.
+// mtime is a heuristic: a branch switch can rewrite an unchanged lockfile and
+// report stale, but the remedy is then a fast no-op install.
+export async function assertFreshInstall(root = repoRoot, statFn = stat) {
+  const lockfile = await statFn(join(root, "pnpm-lock.yaml")).catch(() => undefined);
+  if (!lockfile) {
+    return;
+  }
+  const installed = await statFn(join(root, "node_modules", ".pnpm", "lock.yaml")).catch(
+    () => undefined,
+  );
+  if (!installed || installed.mtimeMs < lockfile.mtimeMs) {
+    throw new Error(
+      "workspace dependencies are missing or older than pnpm-lock.yaml. Run: corepack pnpm install --frozen-lockfile",
+    );
   }
 }
 
