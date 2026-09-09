@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -26,12 +27,10 @@ func TestReleaseAccessRow(t *testing.T) {
 		PrincipalID:   "proj_a",
 	})
 
-	if err := requireProjectAccess(operator, stmts, "proj_a", releaseAccess, opWrite); err != nil {
-		t.Fatalf("own-project write with the project secret should pass: %v", err)
-	}
-	if err := requireProjectAccess(operator, stmts, "proj_a", releaseAccess, opRead); err != nil {
-		t.Fatalf("own-project read with the project secret should pass: %v", err)
-	}
+	require.NoError(t, requireProjectAccess(operator, stmts, "proj_a", releaseAccess, opWrite),
+		"own-project write with the project secret should pass")
+	require.NoError(t, requireProjectAccess(operator, stmts, "proj_a", releaseAccess, opRead),
+		"own-project read with the project secret should pass")
 
 	assertDomainCode(t, requireProjectAccess(operator, stmts, "proj_b", releaseAccess, opWrite),
 		domain.ErrReleaseProjectNotFound().Code)
