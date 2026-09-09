@@ -250,15 +250,19 @@ func (s *GrantService) resolveLocator(ctx context.Context, stmts AllStatements, 
 }
 
 func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllStatements, home, identifier string) (string, error) {
-	keys, err := s.designatedIdentifierKeys(ctx, stmts, home)
+	urlsByKey, err := s.designatedIdentifierKeys(ctx, stmts, home)
 	if err != nil {
 		return "", err
 	}
 	found := map[string]struct{}{}
-	for _, key := range keys {
+	for key, urls := range urlsByKey {
+		if len(urls) == 0 {
+			continue
+		}
 		user, err := stmts.GetUser(ctx, database.And(
 			database.Equal(database.Col(domain.UserFieldProjectID), home),
 			database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+			database.Or(equalIDFilters(domain.UserFieldSchemaURL, urls)...),
 		), UserQueryOptions{
 			Attributes:           []domain.Attribute{{Key: domain.AttributeKey(key), Value: identifier}},
 			UniqueAttributesOnly: true,
@@ -293,7 +297,11 @@ func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllSta
 	return "", domain.ErrGrantPrincipalNotFound()
 }
 
-func (s *GrantService) designatedIdentifierKeys(ctx context.Context, stmts AllStatements, projectID string) ([]string, error) {
+// designatedIdentifierKeys maps each x-identifier property to the schema URLs
+// that designate it. Lookup must be scoped to those schemas so a unique value
+// on a property that is not designated (another schema's notification email,
+// for example) cannot be selected.
+func (s *GrantService) designatedIdentifierKeys(ctx context.Context, stmts AllStatements, projectID string) (map[string][]string, error) {
 	ctx = WithAuthzListUnrestricted(ctx)
 	list := func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
 		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
@@ -315,23 +323,18 @@ func (s *GrantService) designatedIdentifierKeys(ctx context.Context, stmts AllSt
 	if err != nil {
 		return nil, err
 	}
-	var keys []string
-	seen := map[string]struct{}{}
+	urlsByKey := map[string][]string{}
 	for schema, err := range first.Iterate(list) {
 		if err != nil {
 			return nil, err
 		}
 		key := domain.DesignatedIdentifier(schema.Schema)
-		if key == "" {
+		if key == "" || schema.URL == "" {
 			continue
 		}
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		keys = append(keys, key)
+		urlsByKey[key] = append(urlsByKey[key], schema.URL)
 	}
-	return keys, nil
+	return urlsByKey, nil
 }
 
 func (s *GrantService) resolveTeamByName(ctx context.Context, stmts AllStatements, home, name string) (string, error) {

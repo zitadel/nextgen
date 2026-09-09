@@ -312,6 +312,110 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		assert.Nil(t, got)
 	})
 
+	t.Run("identifier skips unique value on undesignated schema", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+				Items: []*domain.JSONSchema{
+					{
+						ProjectID: grantPlatformProjID,
+						URL:       "https://s/human",
+						Kind:      domain.JSONSchemaKindUserSchema,
+						Schema:    []byte(schemaDoc),
+					},
+					{
+						ProjectID: grantPlatformProjID,
+						URL:       "https://s/machine",
+						Kind:      domain.JSONSchemaKindUserSchema,
+						Schema:    []byte(`{"properties":{"email":{"type":"string","x-unique":"project"}}}`),
+					},
+				},
+			}, nil)
+			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, filter database.Filter[domain.UserField], opts service.UserQueryOptions) (*domain.User, error) {
+					assert.True(t, filter.Restricts(database.Col(domain.UserFieldSchemaURL)))
+					assert.Equal(t, []string{"https://s/human"}, schemaURLEquals(t, filter))
+					require.Len(t, opts.Attributes, 1)
+					assert.Equal(t, domain.AttributeKey("email"), opts.Attributes[0].Key)
+					return &domain.User{
+						ProjectID: grantPlatformProjID,
+						ID:        userID,
+						SchemaURL: "https://s/human",
+						Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
+					}, nil
+				})
+			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, a *domain.AuthzAssignment) error {
+					assert.Equal(t, userID, a.PrincipalID)
+					a.ID = "asgn_designated"
+					a.CreatedAt = time.Now()
+					a.UpdatedAt = a.CreatedAt
+					return nil
+				})
+			s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID:  "proj_customer",
+			Identifier: "alice@acme.com",
+			Relation:   "viewer",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, userID, got.Assignment.PrincipalID)
+	})
+
+	t.Run("identifier matches among schemas that share a designation", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+				Items: []*domain.JSONSchema{
+					{
+						ProjectID: grantPlatformProjID,
+						URL:       "https://s/human",
+						Kind:      domain.JSONSchemaKindUserSchema,
+						Schema:    []byte(schemaDoc),
+					},
+					{
+						ProjectID: grantPlatformProjID,
+						URL:       "https://s/admin",
+						Kind:      domain.JSONSchemaKindUserSchema,
+						Schema:    []byte(schemaDoc),
+					},
+				},
+			}, nil)
+			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, filter database.Filter[domain.UserField], opts service.UserQueryOptions) (*domain.User, error) {
+					assert.True(t, filter.Restricts(database.Col(domain.UserFieldSchemaURL)))
+					assert.ElementsMatch(t, []string{"https://s/human", "https://s/admin"}, schemaURLEquals(t, filter))
+					require.Len(t, opts.Attributes, 1)
+					assert.Equal(t, domain.AttributeKey("email"), opts.Attributes[0].Key)
+					return &domain.User{
+						ProjectID: grantPlatformProjID,
+						ID:        userID,
+						SchemaURL: "https://s/human",
+						Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
+					}, nil
+				})
+			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, a *domain.AuthzAssignment) error {
+					assert.Equal(t, userID, a.PrincipalID)
+					a.ID = "asgn_shared"
+					a.CreatedAt = time.Now()
+					a.UpdatedAt = a.CreatedAt
+					return nil
+				})
+			s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID:  "proj_customer",
+			Identifier: "alice@acme.com",
+			Relation:   "viewer",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, userID, got.Assignment.PrincipalID)
+	})
+
 	t.Run("team name locates active team", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
@@ -630,6 +734,39 @@ func expectActiveTeamPrincipal(s *servicemocks.MockAllStatements, teamID string)
 		ID:        teamID,
 		Status:    domain.TeamStatusActive,
 	}, nil)
+}
+
+func schemaURLEquals(t *testing.T, filter database.Filter[domain.UserField]) []string {
+	t.Helper()
+	var urls []string
+	var walk func(database.Filter[domain.UserField])
+	walk = func(f database.Filter[domain.UserField]) {
+		switch v := f.(type) {
+		case database.AndFilter[domain.UserField]:
+			for _, child := range v.Filters {
+				walk(child)
+			}
+		case database.OrFilter[domain.UserField]:
+			for _, child := range v.Filters {
+				walk(child)
+			}
+		case *database.CompareFilter[domain.UserField]:
+			if v.Op != database.OpEqual {
+				return
+			}
+			col := database.Col(domain.UserFieldSchemaURL)
+			for _, term := range v.Terms {
+				if term.Column != col {
+					continue
+				}
+				url, ok := term.Value.(string)
+				require.True(t, ok, "schema_url filter value must be a string")
+				urls = append(urls, url)
+			}
+		}
+	}
+	walk(filter)
+	return urls
 }
 
 func expectHydrateTeam(s *servicemocks.MockAllStatements, teamID string) {
