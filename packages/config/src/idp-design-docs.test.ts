@@ -268,7 +268,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = () =>
     JSON.parse(
-      readFileSync(join(repoRoot, "packages/config/meta-schemas/flow-definition.json"), "utf8"),
+      readFileSync(join(repoRoot, "api/openapi/endpoints/schemas/flow-definition.json"), "utf8"),
     ) as {
       $defs: {
         Step: {
@@ -445,7 +445,7 @@ describe("dialect dependency (x-verify removed in #901)", () => {
 
   it("the dialect's x-* vocabulary matches the note in area 1", () => {
     const dialect = JSON.parse(
-      readFileSync(join(repoRoot, "packages/config/meta-schemas/user-property.json"), "utf8"),
+      readFileSync(join(repoRoot, "api/openapi/endpoints/schemas/user-property.json"), "utf8"),
     ) as { properties: Record<string, unknown> };
     const annotations = Object.keys(dialect.properties)
       .filter((k) => k.startsWith("x-"))

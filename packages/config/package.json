@@ -71,9 +71,10 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "typecheck": "tsc --build tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "sync-schemas": "node scripts/sync-meta-schemas.mjs",
+    "build": "node scripts/sync-meta-schemas.mjs && tsdown",
+    "typecheck": "node scripts/sync-meta-schemas.mjs && tsc --build tsconfig.json",
+    "test": "node scripts/sync-meta-schemas.mjs && vitest run --passWithNoTests",
     "lint": "oxlint ."
   },
   "dependencies": {

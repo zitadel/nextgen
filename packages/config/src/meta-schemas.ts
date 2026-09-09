@@ -5,9 +5,10 @@
  * `$schema` pointer, and agents read the dialect files before authoring
  * edits — no docs crawl, no hosted schema required.
  *
- * The files under `meta-schemas/` are committed copies of
- * `api/openapi/endpoints/schemas/*.json` (the source the server embeds);
- * a drift-audit test keeps them byte-identical in the monorepo.
+ * The files under `meta-schemas/` are generated: `scripts/sync-meta-schemas.mjs`
+ * copies them from `api/openapi/endpoints/schemas/*.json` (the source the
+ * server embeds) ahead of build, typecheck and test. Edit the source, never
+ * the copy.
  */
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with {
   type: "json",
