@@ -177,9 +177,6 @@
           },
           "examples": [
             [
-              "google"
-            ],
-            [
               "google",
               "github"
             ]
