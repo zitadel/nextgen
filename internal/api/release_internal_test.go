@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 )
 
 // Pins the release resource-flavored answers through the resolver gate. The
@@ -59,62 +58,18 @@ func TestReleaseAccessRow(t *testing.T) {
 		assertDomainCode(t, requireProjectAccess(operator, narrow, "proj_a", releaseAccess, opWrite),
 			domain.ErrReleasePermissionDenied().Code)
 	})
-}
 
-// Listing narrows rather than refusing when the credential holds a foothold in
-// the project but not the permission, so a partial view is a page of the
-// releases the caller may see instead of a 403.
-func TestReleaseListAccess(t *testing.T) {
-	stmts := stubAuthzStmts{}
-	operator := WithScopeContext(context.Background(), ScopeContext{
-		ProjectID:     "proj_a",
-		Scope:         []string{"project.write", "project.read"},
-		PrincipalType: domain.AuthzPrincipalTypeSKProj,
-		PrincipalID:   "proj_a",
+	// Listing runs a different gate, so the codes it refuses with are worth
+	// pinning too. How that gate narrows a partial view is machinery every
+	// resource shares, and TestRequireProjectListAccess already covers it.
+	t.Run("listing refuses with the same release-flavored codes", func(t *testing.T) {
+		_, err := requireProjectListAccess(operator, stmts, "proj_b", releaseAccess, domain.ResourceKindRelease)
+		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
+
+		_, err = requireProjectListAccess(preview, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+
+		_, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 	})
-	preview := WithScopeContext(context.Background(), ScopeContext{
-		ProjectID:     "proj_a",
-		Scope:         []string{"project.read"},
-		PrincipalType: domain.AuthzPrincipalTypeSKProj,
-		PrincipalID:   "proj_a",
-	})
-
-	ctx, err := requireProjectListAccess(operator, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
-	if err != nil {
-		t.Fatalf("project-wide Allow should proceed: %v", err)
-	}
-	if !service.AuthzListSkipOncePending(ctx) {
-		t.Fatal("Allow must stamp a one-shot EXISTS skip")
-	}
-	if _, ok := service.AuthzListFilterFromContext(ctx); ok {
-		t.Fatal("Allow must not attach EXISTS")
-	}
-
-	deny := false
-	foothold := true
-	narrow := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
-	ctx, err = requireProjectListAccess(operator, narrow, "proj_a", releaseAccess, domain.ResourceKindRelease)
-	if err != nil {
-		t.Fatalf("Forbidden with foothold should proceed for partial-view lists: %v", err)
-	}
-	filter, ok := service.AuthzListFilterFromContext(ctx)
-	if !ok {
-		t.Fatal("Forbidden must attach the EXISTS list filter")
-	}
-	// The kind is what scopes the filter to releases; the wrong one here would
-	// silently filter the list against another resource's scope rows.
-	if filter.ResourceKind != domain.ResourceKindRelease {
-		t.Fatalf("filter kind = %q, want release", filter.ResourceKind)
-	}
-
-	// Reads miss rather than deny, so the list is no oracle for projects the
-	// caller cannot see.
-	_, err = requireProjectListAccess(operator, stmts, "proj_b", releaseAccess, domain.ResourceKindRelease)
-	assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
-
-	_, err = requireProjectListAccess(preview, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
-	assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
-
-	_, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
-	assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 }
