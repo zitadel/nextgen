@@ -27,16 +27,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
  * instances on a screen mock — the mock wires `Select`-shaped triggers to
  * Combobox menus, so its trigger differs from the canonical one:
  *
- * - `Combobox / Item` (`430:4114`) — the trigger. `Type=Default | Multiple |
+ * - `Combobox / Item` — the trigger. `Type=Default | Multiple |
  *   Invalid` × `Default | Active | Focus | Disabled`. `h-9`, `gap-1.5`,
  *   `pl-2.5 pr-1 py-1`, `rounded-md`, `border-input`, `shadow-xs`,
  *   `bg-background dark:bg-input/30`; optional inline addon glyph at 50% opacity;
  *   trailing 24px box holding a 12px chevron.
- * - `Combobox / Combobox List` (`21473:103072`) — `rounded-lg`, `bg-popover`,
+ * - `Combobox / Combobox List` — `rounded-lg`, `bg-popover`,
  *   `shadow-md`, hairline in `foreground/10`.
- * - `Combobox / Menu Item` (`17379:199232`) — `Type=Simple` (32px, one line) and
+ * - `Combobox / Menu Item` — `Type=Simple` (32px, one line) and
  *   `Type=Custom` (48px, label over description).
- * - `Multiple Selection Item` (`21180:30054`) — the removable chip.
+ * - `Multiple Selection Item` — the removable chip.
  */
 
 const TRIGGER_BASE =
