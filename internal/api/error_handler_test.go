@@ -272,6 +272,51 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 	}
 }
 
+func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
+	t.Parallel()
+
+	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
+		{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
+		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
+		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
+		{"users query", http.MethodPost, "/users/query", `{}`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			token := &domain.Token{
+				ProjectID: "project-1",
+				TokenID:   "token-1",
+				Type:      domain.TokenTypeSessionToken,
+				SessionID: new("session-1"),
+			}
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "building").Return(token, nil)
+			srv := newErrorHandlerTestServer(t, tokenService)
+
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			if tc.method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "building"})
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusUnauthorized, rec.Code)
+			require.JSONEq(t, want, rec.Body.String())
+		})
+	}
+}
+
 func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	t.Parallel()
 

@@ -61,7 +61,8 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 // __nextgen_session cookie. It verifies the cookie decrypts to a session
 // token and stashes it for handlers. User-bound sessions mint ScopeContext
 // so management ops can authorize the human, unless oauth2 already minted
-// one (dual-scheme OR).
+// one (dual-scheme OR). Anonymous sessions skip the grant/user-query ops
+// so a leftover building cookie cannot 401 a valid Bearer.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
@@ -72,16 +73,20 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
+	if _, ok := GetScopeContext(ctx); ok {
+		return ctx, nil
+	}
+	if token.UserID == "" && userBoundSessionOperations[operationName] {
+		return nil, ogenerrors.ErrSkipServerSecurity
+	}
 	ctx = withActorFromToken(ctx, token)
 	if token.UserID != "" {
-		if _, ok := GetScopeContext(ctx); !ok {
-			ctx = WithScopeContext(ctx, ScopeContext{
-				ProjectID:     token.ProjectID,
-				Scope:         token.Scope,
-				PrincipalType: domain.AuthzPrincipalTypeUser,
-				PrincipalID:   token.UserID,
-			})
-		}
+		ctx = WithScopeContext(ctx, ScopeContext{
+			ProjectID:     token.ProjectID,
+			Scope:         token.Scope,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   token.UserID,
+		})
 	}
 	return ctx, nil
 }
@@ -95,6 +100,16 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.RevokeMySessionOperation: true,
 	api.GetMyUserOperation:       true,
 	api.CompleteClaimOperation:   true,
+}
+
+// userBoundSessionOperations require a session with UserID. Anonymous
+// building cookies Skip so dual-scheme oauth2 can still satisfy.
+var userBoundSessionOperations = map[api.OperationName]bool{
+	api.CreateGrantOperation: true,
+	api.GetGrantOperation:    true,
+	api.DeleteGrantOperation: true,
+	api.QueryGrantsOperation: true,
+	api.QueryUsersOperation:  true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

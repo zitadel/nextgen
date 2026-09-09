@@ -86,11 +86,24 @@ func assertManagedGrantEvent(t *testing.T, got *domain.Event, typ domain.EventTy
 	require.NotNil(t, got.EntityID)
 	assert.Equal(t, entityID, *got.EntityID)
 
-	var payload domain.AuthzGrantedPayload
-	require.NoError(t, json.Unmarshal(got.Payload, &payload))
-	assert.Equal(t, domain.AuthzGrantedPayload{
-		PrincipalType: "user",
-		PrincipalID:   "user_grant01",
-		Relation:      "viewer",
-	}, payload)
+	switch typ {
+	case domain.EventTypeAuthzGranted:
+		var payload domain.AuthzGrantedPayload
+		require.NoError(t, json.Unmarshal(got.Payload, &payload))
+		assert.Equal(t, domain.AuthzGrantedPayload{
+			PrincipalType: "user",
+			PrincipalID:   "user_grant01",
+			Relation:      "viewer",
+		}, payload)
+	case domain.EventTypeAuthzRevoked:
+		var payload domain.AuthzRevokedPayload
+		require.NoError(t, json.Unmarshal(got.Payload, &payload))
+		assert.Equal(t, domain.AuthzRevokedPayload{
+			PrincipalType: "user",
+			PrincipalID:   "user_grant01",
+			Relation:      "viewer",
+		}, payload)
+	default:
+		t.Fatalf("unexpected event type %s", typ)
+	}
 }
