@@ -2,6 +2,13 @@ import { spawn } from "node:child_process";
 
 import { ZitadelError } from "../errors";
 import {
+  EMPTY_ENV,
+  EMPTY_SUMMARY,
+  type EnvSummary,
+  type ResolvedEnv,
+  envSummary,
+} from "./env-vars";
+import {
   CONTAINER_DATA_DIR,
   CONTAINER_HTTP_PORT,
   type ContainerIdentity,
@@ -20,9 +27,14 @@ export type DockerRunSpec = {
   port: number;
   dataDir: string;
   identity?: ContainerIdentity;
+  /**
+   * Project variables, passed as bare `--env NAME` so Docker copies each
+   * value from the docker client's environment; no value appears in argv.
+   */
+  env?: ResolvedEnv;
 };
 
-export function dockerRunArgs(spec: DockerRunSpec): string[] {
+export function dockerRunArgs(spec: DockerRunSpec, envNames: readonly string[] = []): string[] {
   const args = [
     "run",
     "--detach",
@@ -32,6 +44,9 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
     `127.0.0.1:${spec.port}:${CONTAINER_HTTP_PORT}`,
     "--volume",
     `${spec.dataDir}:${CONTAINER_DATA_DIR}`,
+    // Project variables first: Docker takes the last value for a repeated
+    // name, so the CLI's own settings below always win.
+    ...envNames.flatMap((name) => ["--env", name]),
     "--env",
     `NEXTGEN_SERVER_ADDRESS=:${CONTAINER_HTTP_PORT}`,
     "--env",
@@ -57,11 +72,14 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
   return args;
 }
 
-export async function runDocker(args: string[]): Promise<DockerResult> {
+export async function runDocker(
+  args: string[],
+  env: Readonly<Record<string, string>> = {},
+): Promise<DockerResult> {
   return new Promise((resolve, reject) => {
     const child = spawn("docker", args, {
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env: { ...process.env, ...env },
     });
     let stdout = "";
     let stderr = "";
@@ -161,10 +179,13 @@ export async function inspectContainer(containerName: string): Promise<{
   return { exists: true, running: running === "true", id, image: imageParts.join(" ") };
 }
 
-export async function startContainer(spec: DockerRunSpec): Promise<string> {
-  const args = dockerRunArgs(spec);
-  const result = await requireDocker(args, "Start local Zitadel container");
-  return result.stdout.trim();
+export async function startContainer(
+  spec: DockerRunSpec,
+): Promise<{ containerId: string; env: EnvSummary }> {
+  const env = spec.env ?? EMPTY_ENV;
+  const args = dockerRunArgs(spec, env.injected);
+  const result = await requireDocker(args, "Start local Zitadel container", env.values);
+  return { containerId: result.stdout.trim(), env: envSummary(env) };
 }
 
 export async function stopAndRemoveContainer(containerName: string): Promise<void> {
@@ -206,6 +227,7 @@ export function metadataFromStart(input: {
   image: string;
   port: number;
   serverUrl: string;
+  env?: EnvSummary;
 }): RuntimeMetadata {
   return {
     schema_version: 1,
@@ -218,13 +240,18 @@ export function metadataFromStart(input: {
     data_dir: input.cwdDataDir,
     created_at: new Date().toISOString(),
     cli_version: input.cliVersion,
+    env: envSummary(input.env ?? EMPTY_SUMMARY),
   };
 }
 
-export async function requireDocker(args: string[], action: string): Promise<DockerResult> {
+export async function requireDocker(
+  args: string[],
+  action: string,
+  env: Readonly<Record<string, string>> = {},
+): Promise<DockerResult> {
   let result: DockerResult;
   try {
-    result = await runDocker(args);
+    result = await runDocker(args, env);
   } catch (error) {
     throw dockerError(action, args, error);
   }

@@ -46,6 +46,8 @@ Each invocation prints one JSON object:
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+- `warnings`: non-fatal advisories on a `status: "ok"` run, often empty.
+  `start` uses it for project variables with no local value.
 - `plan` and `apply` also emit `data.changes`: one row per touched resource
   (`{kind, action, file, id?, previous_id?}`, action ∈ create/update/revision/
   delete). Plan rows preview; apply rows report, with the resulting platform
@@ -242,6 +244,9 @@ the CLI's help layer, not the envelope.
   platform plane (`platform.bootstrap_project`), where the claim can actually
   complete.
 - `status` — summarize the local runtime and project state.
+  `data.server.runtime.env` repeats the `injected`/`missing` variable names
+  recorded at the last `start` (empty lists for a runtime started before this
+  field existed).
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
 - `start` — start the managed local Zitadel server and persist runtime metadata
@@ -251,7 +256,21 @@ the CLI's help layer, not the envelope.
   `dev+<short-commit>` source build it launched. That label names the revision
   the binary was built from, which after a Moon cache hit can be an earlier
   commit whose server sources are byte-identical. Use `--runtime docker` or
-  `--image` for the Docker backend.
+  `--image` for the Docker backend. Variables referenced by any `.json` file
+  under `.zitadel/` (`${VAR}` placeholders and `*_env` keys, the same references
+  `plan` and `apply` check) are resolved at spawn from `.env.local`, then
+  `.env`, then the shell, and handed to the runtime through its environment
+  only (bare `--env NAME` on Docker), so no value reaches `argv`, logs,
+  `runtime.json`, or `--json`. `data.runtime.env` and `runtime.json` carry
+  `injected` and `missing` as name lists. A missing value is a top-level
+  `warnings` entry naming the variable, not a failure; the runtime starts
+  without it and is not updated in place, so add the value and run `stop` then
+  `start`. `start` repeats the warning when it finds the runtime already
+  running. An empty value counts as unset, and `PATH`, `NODE_OPTIONS`,
+  `LD_*`, `DYLD_*` and `NEXTGEN_SERVER_*` are never taken from a project
+  file. The scan runs before any runtime is stopped, so a `.zitadel/*.json`
+  that is not valid JSON fails `start` with `E_VALIDATION` naming the file and
+  leaves a running runtime alone.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes

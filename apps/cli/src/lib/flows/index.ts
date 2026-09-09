@@ -21,7 +21,7 @@
  */
 export { buildFlow } from "./build";
 export { validateFlows } from "./validate";
-export { flowEnvRefs } from "./env-refs";
+export { envRefs, projectEnvRefs } from "./env-refs";
 
 /**
  * Relative directory (from the project root) where local flow files
