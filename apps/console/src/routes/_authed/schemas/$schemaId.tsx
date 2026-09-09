@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 import { Fragment } from "react";
 
-import { SchemaDocumentViewer } from "@/components/schema-document-viewer";
+import { DocumentViewer } from "@/components/document-viewer";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -72,7 +72,7 @@ function SchemaDetail() {
               <div className="lg:w-[468px] lg:shrink-0">
                 <SchemaFieldsPanel schema={schema} />
               </div>
-              <SchemaDocumentViewer schema={schema} />
+              <DocumentViewer document={schema} noun="schema" />
             </div>
           </TabsContent>
 
