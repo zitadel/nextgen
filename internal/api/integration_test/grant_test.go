@@ -18,6 +18,42 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
+func userIDGrant(userID string, rel api.CreateGrantRequestRelation) *api.CreateGrantRequest {
+	return &api.CreateGrantRequest{
+		Relation: rel,
+		User: api.NewOptUserLocator(api.UserLocator{
+			UserID: api.NewOptUserID(api.UserID(userID)),
+		}),
+	}
+}
+
+func teamIDGrant(teamID string, rel api.CreateGrantRequestRelation) *api.CreateGrantRequest {
+	return &api.CreateGrantRequest{
+		Relation: rel,
+		Team: api.NewOptTeamLocator(api.TeamLocator{
+			TeamID: api.NewOptTeamID(api.TeamID(teamID)),
+		}),
+	}
+}
+
+func userIdentifierGrant(identifier string, rel api.CreateGrantRequestRelation) *api.CreateGrantRequest {
+	return &api.CreateGrantRequest{
+		Relation: rel,
+		User: api.NewOptUserLocator(api.UserLocator{
+			Identifier: api.NewOptString(identifier),
+		}),
+	}
+}
+
+func teamNameGrant(name string, rel api.CreateGrantRequestRelation) *api.CreateGrantRequest {
+	return &api.CreateGrantRequest{
+		Relation: rel,
+		Team: api.NewOptTeamLocator(api.TeamLocator{
+			Name: api.NewOptString(name),
+		}),
+	}
+}
+
 func TestGrantCreateGetRevoke(t *testing.T) {
 	t.Parallel()
 
@@ -37,25 +73,19 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		t.Parallel()
 
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		createResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-			PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-			PrincipalID:   userID,
-			Relation:      api.CreateGrantRequestRelationViewer,
-		}, params())
+		createResp, err := client.CreateGrant(t.Context(), userIDGrant(userID, api.CreateGrantRequestRelationViewer), params())
 		require.NoError(t, err)
 		created, ok := createResp.(*api.Grant)
 		require.True(t, ok, helpers.MustMarshal(t, createResp))
 		assert.True(t, strings.HasPrefix(created.ID, "asgn_"), created.ID)
 		assert.Equal(t, project.ID, created.ProjectID)
-		assert.Equal(t, userID, created.PrincipalID)
-		assert.Equal(t, api.GrantPrincipalTypeUser, created.PrincipalType)
 		assert.Equal(t, api.GrantRelationViewer, created.Relation)
 		assert.Equal(t, api.GrantObjectTypeProject, created.ObjectType)
 		require.True(t, created.User.IsSet())
 		assert.Equal(t, api.UserID(userID), created.User.Value.UserID)
 		assert.True(t, created.User.Value.Identifier.IsSet())
 		assert.False(t, created.Team.IsSet())
-		assert.False(t, created.Principal.IsSet())
+		assert.False(t, created.User.Value.Schema.IsSet())
 
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
 			ID:        created.ID,
@@ -90,21 +120,15 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		createResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-			PrincipalType: api.CreateGrantRequestPrincipalTypeTeam,
-			PrincipalID:   team.ID,
-			Relation:      api.CreateGrantRequestRelationEditor,
-		}, params())
+		createResp, err := client.CreateGrant(t.Context(), teamIDGrant(team.ID, api.CreateGrantRequestRelationEditor), params())
 		require.NoError(t, err)
 		created, ok := createResp.(*api.Grant)
 		require.True(t, ok, helpers.MustMarshal(t, createResp))
-		assert.Equal(t, api.GrantPrincipalTypeTeam, created.PrincipalType)
 		assert.Equal(t, api.GrantRelationEditor, created.Relation)
 		require.True(t, created.Team.IsSet())
 		assert.Equal(t, team.ID, created.Team.Value.TeamID)
 		assert.Equal(t, team.Name, created.Team.Value.Name.Or(""))
 		assert.False(t, created.User.IsSet())
-		assert.False(t, created.Principal.IsSet())
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
 			ID:        created.ID,
@@ -118,11 +142,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		t.Parallel()
 
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		req := &api.CreateGrantRequest{
-			PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-			PrincipalID:   userID,
-			Relation:      api.CreateGrantRequestRelationAdmin,
-		}
+		req := userIDGrant(userID, api.CreateGrantRequestRelationAdmin)
 		first, err := client.CreateGrant(t.Context(), req, params())
 		require.NoError(t, err)
 		require.IsType(t, &api.Grant{}, first, helpers.MustMarshal(t, first))
@@ -142,11 +162,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		harness.SetProjectSecretOnApiClient(t, foreign, other)
 
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		resp, err := foreign.CreateGrant(t.Context(), &api.CreateGrantRequest{
-			PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-			PrincipalID:   userID,
-			Relation:      api.CreateGrantRequestRelationViewer,
-		}, params())
+		resp, err := foreign.CreateGrant(t.Context(), userIDGrant(userID, api.CreateGrantRequestRelationViewer), params())
 		require.NoError(t, err)
 		assertGrantNotFound(t, resp)
 	})
@@ -155,11 +171,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		t.Parallel()
 
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		req := &api.CreateGrantRequest{
-			PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-			PrincipalID:   userID,
-			Relation:      api.CreateGrantRequestRelationViewer,
-		}
+		req := userIDGrant(userID, api.CreateGrantRequestRelationViewer)
 		first, err := client.CreateGrant(t.Context(), req, params())
 		require.NoError(t, err)
 		created, ok := first.(*api.Grant)
@@ -243,6 +255,78 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 	})
 }
 
+func TestGrantCreateLocators(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	platformClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, platformClient, platform)
+
+	params := api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)}
+
+	t.Run("create by identifier", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		user, ok := userResp.(*api.User)
+		require.True(t, ok, helpers.MustMarshal(t, userResp))
+		require.True(t, user.Identifier.IsSet())
+
+		createResp, err := client.CreateGrant(t.Context(), userIdentifierGrant(strings.ToUpper(user.Identifier.Value), api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		created, ok := createResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, createResp))
+		require.True(t, created.User.IsSet())
+		assert.Equal(t, api.UserID(userID), created.User.Value.UserID)
+	})
+
+	t.Run("create by team name", func(t *testing.T) {
+		t.Parallel()
+		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+			ProjectID: platform.ID,
+			Name:      helpers.TeamName(),
+		})
+		require.NoError(t, err)
+
+		createResp, err := client.CreateGrant(t.Context(), teamNameGrant(strings.ToUpper(team.Name), api.CreateGrantRequestRelationAdmin), params)
+		require.NoError(t, err)
+		created, ok := createResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, createResp))
+		require.True(t, created.Team.IsSet())
+		assert.Equal(t, team.ID, created.Team.Value.TeamID)
+		assert.Equal(t, team.Name, created.Team.Value.Name.Or(""))
+	})
+
+	t.Run("unknown identifier is principal not found", func(t *testing.T) {
+		t.Parallel()
+		resp, err := client.CreateGrant(t.Context(), userIdentifierGrant("nobody@example.com", api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		assertGrantPrincipalNotFound(t, resp)
+	})
+
+	t.Run("both user and team is invalid", func(t *testing.T) {
+		t.Parallel()
+		resp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationViewer,
+			User:     api.NewOptUserLocator(api.UserLocator{UserID: api.NewOptUserID("user_1")}),
+			Team:     api.NewOptTeamLocator(api.TeamLocator{TeamID: api.NewOptTeamID("team_1")}),
+		}, params)
+		require.NoError(t, err)
+		bad, ok := resp.(*api.CreateGrantBadRequest)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("grant.invalid"), bad.Code)
+	})
+}
+
 func TestGrantQuery(t *testing.T) {
 	t.Parallel()
 
@@ -260,11 +344,7 @@ func TestGrantQuery(t *testing.T) {
 	}
 
 	userID := harness.CreateUserWithTeam(t, platform.ID)
-	userGrantResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-		PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-		PrincipalID:   userID,
-		Relation:      api.CreateGrantRequestRelationViewer,
-	}, api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
+	userGrantResp, err := client.CreateGrant(t.Context(), userIDGrant(userID, api.CreateGrantRequestRelationViewer), api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	userGrant, ok := userGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, userGrantResp))
@@ -274,21 +354,13 @@ func TestGrantQuery(t *testing.T) {
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
-	teamGrantResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-		PrincipalType: api.CreateGrantRequestPrincipalTypeTeam,
-		PrincipalID:   team.ID,
-		Relation:      api.CreateGrantRequestRelationEditor,
-	}, api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
+	teamGrantResp, err := client.CreateGrant(t.Context(), teamIDGrant(team.ID, api.CreateGrantRequestRelationEditor), api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	teamGrant, ok := teamGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, teamGrantResp))
 
 	revokedUserID := harness.CreateUserWithTeam(t, platform.ID)
-	revokedResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-		PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-		PrincipalID:   revokedUserID,
-		Relation:      api.CreateGrantRequestRelationAdmin,
-	}, api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
+	revokedResp, err := client.CreateGrant(t.Context(), userIDGrant(revokedUserID, api.CreateGrantRequestRelationAdmin), api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	revokedGrant, ok := revokedResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, revokedResp))
@@ -356,24 +428,23 @@ func TestGrantQuery(t *testing.T) {
 	assert.True(t, listedUser.User.Value.Identifier.IsSet())
 	assert.Equal(t, "email", listedUser.User.Value.IdentifierProperty.Or(""))
 	assert.False(t, listedUser.Team.IsSet())
-	assert.False(t, listedUser.Principal.IsSet())
+	assert.False(t, listedUser.User.Value.Schema.IsSet())
 
 	listedTeam := got[teamGrant.ID]
 	require.True(t, listedTeam.Team.IsSet())
 	assert.Equal(t, team.ID, listedTeam.Team.Value.TeamID)
 	assert.Equal(t, team.Name, listedTeam.Team.Value.Name.Or(""))
 	assert.False(t, listedTeam.User.IsSet())
-	assert.False(t, listedTeam.Principal.IsSet())
+	assert.False(t, listedTeam.Team.Value.Status.IsSet())
 
 	getUser, err := client.GetGrant(t.Context(), getParams(userGrant.ID))
 	require.NoError(t, err)
 	gotUser, ok := getUser.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, getUser))
 	assert.Equal(t, listedUser.ID, gotUser.ID)
-	assert.Equal(t, listedUser.PrincipalID, gotUser.PrincipalID)
 	assert.Equal(t, listedUser.User, gotUser.User)
 	assert.Equal(t, listedUser.Team, gotUser.Team)
-	assert.False(t, gotUser.Principal.IsSet())
+	assert.False(t, gotUser.User.Value.Schema.IsSet())
 
 	getTeam, err := client.GetGrant(t.Context(), getParams(teamGrant.ID))
 	require.NoError(t, err)
@@ -391,14 +462,25 @@ func TestGrantQuery(t *testing.T) {
 
 	usersOnly := queryGrants(t, &api.QueryGrantsRequest{
 		Filter: []api.QueryGrantsRequestFilterItem{{
-			Field:     api.GrantFilterFieldPrincipalType,
+			Field:     api.GrantFilterFieldUserID,
 			Operation: api.FilterOperationEquals,
-			Value:     api.NewOptFilterValue(api.NewStringFilterValue("user")),
+			Value:     api.NewOptFilterValue(api.NewStringFilterValue(userID)),
 		}},
 	})
-	for _, g := range usersOnly.Grants {
-		assert.Equal(t, api.GrantPrincipalTypeUser, g.PrincipalType)
-	}
+	require.Len(t, usersOnly.Grants, 1)
+	require.True(t, usersOnly.Grants[0].User.IsSet())
+	assert.Equal(t, api.UserID(userID), usersOnly.Grants[0].User.Value.UserID)
+
+	teamsOnly := queryGrants(t, &api.QueryGrantsRequest{
+		Filter: []api.QueryGrantsRequestFilterItem{{
+			Field:     api.GrantFilterFieldTeamID,
+			Operation: api.FilterOperationEquals,
+			Value:     api.NewOptFilterValue(api.NewStringFilterValue(team.ID)),
+		}},
+	})
+	require.Len(t, teamsOnly.Grants, 1)
+	require.True(t, teamsOnly.Grants[0].Team.IsSet())
+	assert.Equal(t, team.ID, teamsOnly.Grants[0].Team.Value.TeamID)
 
 	t.Run("401 without token", func(t *testing.T) {
 		anon, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -439,11 +521,7 @@ func TestGrantQueryExpand(t *testing.T) {
 	expandPrincipal := []api.GrantExpand{api.GrantExpandPrincipal}
 
 	userID := harness.CreateUserWithTeam(t, platform.ID)
-	userGrantResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-		PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-		PrincipalID:   userID,
-		Relation:      api.CreateGrantRequestRelationViewer,
-	}, createParams)
+	userGrantResp, err := client.CreateGrant(t.Context(), userIDGrant(userID, api.CreateGrantRequestRelationViewer), createParams)
 	require.NoError(t, err)
 	userGrant, ok := userGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, userGrantResp))
@@ -453,21 +531,13 @@ func TestGrantQueryExpand(t *testing.T) {
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
-	teamGrantResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-		PrincipalType: api.CreateGrantRequestPrincipalTypeTeam,
-		PrincipalID:   team.ID,
-		Relation:      api.CreateGrantRequestRelationEditor,
-	}, createParams)
+	teamGrantResp, err := client.CreateGrant(t.Context(), teamIDGrant(team.ID, api.CreateGrantRequestRelationEditor), createParams)
 	require.NoError(t, err)
 	teamGrant, ok := teamGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, teamGrantResp))
 
 	deletedUserID := harness.CreateUserWithTeam(t, platform.ID)
-	deletedGrantResp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
-		PrincipalType: api.CreateGrantRequestPrincipalTypeUser,
-		PrincipalID:   deletedUserID,
-		Relation:      api.CreateGrantRequestRelationAdmin,
-	}, createParams)
+	deletedGrantResp, err := client.CreateGrant(t.Context(), userIDGrant(deletedUserID, api.CreateGrantRequestRelationAdmin), createParams)
 	require.NoError(t, err)
 	deletedGrant, ok := deletedGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, deletedGrantResp))
@@ -498,33 +568,31 @@ func TestGrantQueryExpand(t *testing.T) {
 
 	listedUser := got[userGrant.ID]
 	require.True(t, listedUser.User.IsSet())
-	require.True(t, listedUser.Principal.IsSet())
-	require.False(t, listedUser.Principal.IsNull())
-	expandedUser, ok := listedUser.Principal.Value.GetUser()
-	require.True(t, ok, "user grant principal must be the User body")
+	require.True(t, listedUser.User.Value.Schema.IsSet())
+	require.True(t, listedUser.User.Value.Metadata.IsSet())
 	getUser, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
 	require.NoError(t, err)
 	wantUser, ok := getUser.(*api.User)
 	require.True(t, ok, helpers.MustMarshal(t, getUser))
-	assert.Equal(t, *wantUser, expandedUser)
+	assert.Equal(t, wantUser.Schema, listedUser.User.Value.Schema.Value)
+	assert.Equal(t, wantUser.Attributes, listedUser.User.Value.Attributes.Value)
+	assert.Equal(t, wantUser.Metadata.Status, listedUser.User.Value.Metadata.Value.Status)
 
 	listedTeam := got[teamGrant.ID]
 	require.True(t, listedTeam.Team.IsSet())
-	require.True(t, listedTeam.Principal.IsSet())
-	require.False(t, listedTeam.Principal.IsNull())
-	expandedTeam, ok := listedTeam.Principal.Value.GetTeamResponse()
-	require.True(t, ok, "team grant principal must be the Team body")
+	require.True(t, listedTeam.Team.Value.Status.IsSet())
 	getTeam, err := platformClient.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(team.ID)})
 	require.NoError(t, err)
 	wantTeam, ok := getTeam.(*api.TeamResponse)
 	require.True(t, ok, helpers.MustMarshal(t, getTeam))
-	assert.Equal(t, *wantTeam, expandedTeam)
+	assert.Equal(t, wantTeam.Status, listedTeam.Team.Value.Status.Value)
+	assert.Equal(t, wantTeam.CreatedAt, listedTeam.Team.Value.CreatedAt.Value)
+	assert.Equal(t, wantTeam.UpdatedAt, listedTeam.Team.Value.UpdatedAt.Value)
 
 	listedDeleted := got[deletedGrant.ID]
 	require.True(t, listedDeleted.User.IsSet())
 	assert.Equal(t, api.UserID(deletedUserID), listedDeleted.User.Value.UserID)
-	require.True(t, listedDeleted.Principal.IsSet())
-	assert.True(t, listedDeleted.Principal.IsNull())
+	assert.False(t, listedDeleted.User.Value.Schema.IsSet())
 
 	withoutExpand := queryGrants(t, &api.QueryGrantsRequest{Limit: api.NewOptLimit(1)})
 	withExpand := queryGrants(t, &api.QueryGrantsRequest{
@@ -546,8 +614,8 @@ func TestGrantQueryExpand(t *testing.T) {
 	require.Len(t, followWithout.Grants, 1)
 	require.Len(t, followWith.Grants, 1)
 	assert.Equal(t, followWithout.Grants[0].ID, followWith.Grants[0].ID)
-	assert.False(t, followWithout.Grants[0].Principal.IsSet())
-	assert.True(t, followWith.Grants[0].Principal.IsSet())
+	assert.False(t, followWithout.Grants[0].User.Value.Schema.IsSet() || followWithout.Grants[0].Team.Value.Status.IsSet())
+	assert.True(t, followWith.Grants[0].User.Value.Schema.IsSet() || followWith.Grants[0].Team.Value.Status.IsSet())
 
 	t.Run("unknown expand is 400", func(t *testing.T) {
 		body := `{"expand":["nope"]}`
@@ -577,6 +645,20 @@ func TestGrantQueryExpand(t *testing.T) {
 		require.IsType(t, &api.QueryGrantsForbidden{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("grant.permission_denied"), resp.(*api.QueryGrantsForbidden).Code)
 	})
+
+	t.Run("GET expand inlines extras", func(t *testing.T) {
+		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+			ID:        userGrant.ID,
+			ProjectID: api.ProjectID(project.ID),
+			Expand:    expandPrincipal,
+		})
+		require.NoError(t, err)
+		got, ok := getResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, getResp))
+		require.True(t, got.User.IsSet())
+		assert.True(t, got.User.Value.Schema.IsSet())
+		assert.True(t, got.User.Value.Metadata.IsSet())
+	})
 }
 
 func assertGrantNotFound(t *testing.T, resp any) {
@@ -591,6 +673,13 @@ func assertGrantNotFound(t *testing.T, resp any) {
 	default:
 		t.Fatalf("want grant.not_found, got %T %s", resp, helpers.MustMarshal(t, resp))
 	}
+}
+
+func assertGrantPrincipalNotFound(t *testing.T, resp any) {
+	t.Helper()
+	nf, ok := resp.(*api.CreateGrantNotFound)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	assert.Equal(t, api.ErrorCode("grant.principal_not_found"), nf.Code)
 }
 
 func assertGrantAlreadyExists(t *testing.T, resp any) {

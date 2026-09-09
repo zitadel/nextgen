@@ -101,10 +101,12 @@ type Invoker interface {
 	//
 	// Bind a user or team to `project.viewer`, `project.editor`, or
 	// `project.admin` on the project identified by the `project-id` header.
-	// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-	// created here — claim owns that path. An unrevoked grant with the same
-	// principal and relation occupies the unique key even after `expires_at`;
-	// DELETE it before re-creating.
+	// Name the principal with `user` (`user_id` or `identifier`) or `team`
+	// (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+	// (`project.team`) grants are not created here — claim owns that path. An
+	// unrevoked grant with the same principal and relation occupies the unique
+	// key even after `expires_at`; DELETE it before re-creating.
+	// Create does not accept `expand`; the 201 `user` / `team` are refs only.
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -336,6 +338,8 @@ type Invoker interface {
 	// `resource_scope_index`; project scope is required on the query (same as
 	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
 	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	// `expand=principal` adds envelope fields on `user` or `team` and requires
+	// `user.read` and `team.read` in addition to `project.read`.
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -526,10 +530,10 @@ type Invoker interface {
 	// DELETE before re-granting. Project-secret setup (`sk_proj`) and
 	// owning-team (`relation=team`) rows are not returned. Grants are not in
 	// `resource_scope_index`; project scope is required on the query (same as
-	// get). Requires `project.read`. `expand: ["principal"]` additionally
-	// requires `user.read` and `team.read` (documented on the expand enum;
-	// those scopes cannot be ANDed onto this security block because they are
-	// body-conditional).
+	// get). Requires `project.read`. `expand: ["principal"]` adds envelope
+	// fields on `user` / `team` and additionally requires `user.read` and
+	// `team.read` (documented on the expand enum; those scopes cannot be ANDed
+	// onto this security block because they are body-conditional).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -1468,10 +1472,12 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 //
 // Bind a user or team to `project.viewer`, `project.editor`, or
 // `project.admin` on the project identified by the `project-id` header.
-// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-// created here — claim owns that path. An unrevoked grant with the same
-// principal and relation occupies the unique key even after `expires_at`;
-// DELETE it before re-creating.
+// Name the principal with `user` (`user_id` or `identifier`) or `team`
+// (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+// (`project.team`) grants are not created here — claim owns that path. An
+// unrevoked grant with the same principal and relation occupies the unique
+// key even after `expires_at`; DELETE it before re-creating.
+// Create does not accept `expand`; the 201 `user` / `team` are refs only.
 //
 // POST /grants
 func (c *Client) CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error) {
@@ -4526,6 +4532,8 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // `resource_scope_index`; project scope is required on the query (same as
 // events). Misses, revoked rows, project-secret setup (`sk_proj`),
 // owning-team (`relation=team`) rows, and cross-project ids return 404.
+// `expand=principal` adds envelope fields on `user` or `team` and requires
+// `user.read` and `team.read` in addition to `project.read`.
 //
 // GET /grants/{id}
 func (c *Client) GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error) {
@@ -4605,6 +4613,32 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "expand" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Expand != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Expand {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
 			}
 			return nil
 		}); err != nil {
@@ -8076,10 +8110,10 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 // DELETE before re-granting. Project-secret setup (`sk_proj`) and
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
-// get). Requires `project.read`. `expand: ["principal"]` additionally
-// requires `user.read` and `team.read` (documented on the expand enum;
-// those scopes cannot be ANDed onto this security block because they are
-// body-conditional).
+// get). Requires `project.read`. `expand: ["principal"]` adds envelope
+// fields on `user` / `team` and additionally requires `user.read` and
+// `team.read` (documented on the expand enum; those scopes cannot be ANDed
+// onto this security block because they are body-conditional).
 //
 // POST /grants/query
 func (c *Client) QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error) {

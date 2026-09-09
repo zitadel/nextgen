@@ -9624,29 +9624,25 @@ type CreateGrantNotFound ErrorDetails
 
 func (*CreateGrantNotFound) createGrantRes() {}
 
+// Bind a user or a team. Exactly one of `user` or `team`. Shared fields are
+// `relation` and optional `expires_at`. Sending both locators or neither is
+// `grant.invalid`.
 // Ref: #
 type CreateGrantRequest struct {
-	// Kind of principal to bind. `sk_proj` and owning-team grants are not accepted.
-	PrincipalType CreateGrantRequestPrincipalType `json:"principal_type"`
-	// Principal id (`user_<opaque>` or `team_<opaque>`). The principal must
-	// exist in the platform project when a platform project is configured.
-	PrincipalID string `json:"principal_id"`
 	// Catalog relation on `object_type` `project`. `team` (owning-team) is not allowed.
 	Relation CreateGrantRequestRelation `json:"relation"`
 	// Optional expiry. Must be in the future when set. Expiry stops
 	// authorization but does not free the unique binding; DELETE the grant
 	// before posting the same principal and relation again.
 	ExpiresAt OptDateTime `json:"expires_at"`
-}
-
-// GetPrincipalType returns the value of PrincipalType.
-func (s *CreateGrantRequest) GetPrincipalType() CreateGrantRequestPrincipalType {
-	return s.PrincipalType
-}
-
-// GetPrincipalID returns the value of PrincipalID.
-func (s *CreateGrantRequest) GetPrincipalID() string {
-	return s.PrincipalID
+	// User to bind. Exactly one of `user_id` or `identifier`. The user must
+	// exist in the platform project when a platform project is configured.
+	// Mutually exclusive with `team`.
+	User OptUserLocator `json:"user"`
+	// Team to bind. Exactly one of `team_id` or `name`. The team must exist
+	// in the platform project when a platform project is configured.
+	// Mutually exclusive with `user`.
+	Team OptTeamLocator `json:"team"`
 }
 
 // GetRelation returns the value of Relation.
@@ -9659,14 +9655,14 @@ func (s *CreateGrantRequest) GetExpiresAt() OptDateTime {
 	return s.ExpiresAt
 }
 
-// SetPrincipalType sets the value of PrincipalType.
-func (s *CreateGrantRequest) SetPrincipalType(val CreateGrantRequestPrincipalType) {
-	s.PrincipalType = val
+// GetUser returns the value of User.
+func (s *CreateGrantRequest) GetUser() OptUserLocator {
+	return s.User
 }
 
-// SetPrincipalID sets the value of PrincipalID.
-func (s *CreateGrantRequest) SetPrincipalID(val string) {
-	s.PrincipalID = val
+// GetTeam returns the value of Team.
+func (s *CreateGrantRequest) GetTeam() OptTeamLocator {
+	return s.Team
 }
 
 // SetRelation sets the value of Relation.
@@ -9679,46 +9675,14 @@ func (s *CreateGrantRequest) SetExpiresAt(val OptDateTime) {
 	s.ExpiresAt = val
 }
 
-// Kind of principal to bind. `sk_proj` and owning-team grants are not accepted.
-type CreateGrantRequestPrincipalType string
-
-const (
-	CreateGrantRequestPrincipalTypeUser CreateGrantRequestPrincipalType = "user"
-	CreateGrantRequestPrincipalTypeTeam CreateGrantRequestPrincipalType = "team"
-)
-
-// AllValues returns all CreateGrantRequestPrincipalType values.
-func (CreateGrantRequestPrincipalType) AllValues() []CreateGrantRequestPrincipalType {
-	return []CreateGrantRequestPrincipalType{
-		CreateGrantRequestPrincipalTypeUser,
-		CreateGrantRequestPrincipalTypeTeam,
-	}
+// SetUser sets the value of User.
+func (s *CreateGrantRequest) SetUser(val OptUserLocator) {
+	s.User = val
 }
 
-// MarshalText implements encoding.TextMarshaler.
-func (s CreateGrantRequestPrincipalType) MarshalText() ([]byte, error) {
-	switch s {
-	case CreateGrantRequestPrincipalTypeUser:
-		return []byte(s), nil
-	case CreateGrantRequestPrincipalTypeTeam:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *CreateGrantRequestPrincipalType) UnmarshalText(data []byte) error {
-	switch CreateGrantRequestPrincipalType(data) {
-	case CreateGrantRequestPrincipalTypeUser:
-		*s = CreateGrantRequestPrincipalTypeUser
-		return nil
-	case CreateGrantRequestPrincipalTypeTeam:
-		*s = CreateGrantRequestPrincipalTypeTeam
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
+// SetTeam sets the value of Team.
+func (s *CreateGrantRequest) SetTeam(val OptTeamLocator) {
+	s.Team = val
 }
 
 // Catalog relation on `object_type` `project`. `team` (owning-team) is not allowed.
@@ -20730,6 +20694,8 @@ type GetGrantErrorResponse struct {
 	GrantPermissionDenied GrantPermissionDenied
 	Internal              Internal
 	ReqInvalid            ReqInvalid
+	TeamPermissionDenied  TeamPermissionDenied
+	UserPermissionDenied  UserPermissionDenied
 }
 
 // GetGrantErrorResponseType is oneOf type of GetGrantErrorResponse.
@@ -20742,6 +20708,8 @@ const (
 	GrantPermissionDeniedGetGrantErrorResponse GetGrantErrorResponseType = "grant.permission_denied"
 	InternalGetGrantErrorResponse              GetGrantErrorResponseType = "internal"
 	ReqInvalidGetGrantErrorResponse            GetGrantErrorResponseType = "req.invalid"
+	TeamPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "team.permission_denied"
+	UserPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthUnauthorized reports whether GetGrantErrorResponse is AuthUnauthorized.
@@ -20764,6 +20732,16 @@ func (s GetGrantErrorResponse) IsInternal() bool { return s.Type == InternalGetG
 
 // IsReqInvalid reports whether GetGrantErrorResponse is ReqInvalid.
 func (s GetGrantErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetGrantErrorResponse }
+
+// IsTeamPermissionDenied reports whether GetGrantErrorResponse is TeamPermissionDenied.
+func (s GetGrantErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedGetGrantErrorResponse
+}
+
+// IsUserPermissionDenied reports whether GetGrantErrorResponse is UserPermissionDenied.
+func (s GetGrantErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedGetGrantErrorResponse
+}
 
 // SetAuthUnauthorized sets GetGrantErrorResponse to AuthUnauthorized.
 func (s *GetGrantErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
@@ -20867,6 +20845,48 @@ func (s GetGrantErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetGrantErrorResponse(v ReqInvalid) GetGrantErrorResponse {
 	var s GetGrantErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets GetGrantErrorResponse to TeamPermissionDenied.
+func (s *GetGrantErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedGetGrantErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if GetGrantErrorResponse is TeamPermissionDenied.
+func (s GetGrantErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedGetGrantErrorResponse returns new GetGrantErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedGetGrantErrorResponse(v TeamPermissionDenied) GetGrantErrorResponse {
+	var s GetGrantErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetUserPermissionDenied sets GetGrantErrorResponse to UserPermissionDenied.
+func (s *GetGrantErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedGetGrantErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if GetGrantErrorResponse is UserPermissionDenied.
+func (s GetGrantErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedGetGrantErrorResponse returns new GetGrantErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedGetGrantErrorResponse(v UserPermissionDenied) GetGrantErrorResponse {
+	var s GetGrantErrorResponse
+	s.SetUserPermissionDenied(v)
 	return s
 }
 
@@ -22048,17 +22068,16 @@ type GetUserByIDUnauthorized ErrorDetails
 
 func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 
-// A collaboration grant binding a principal to a project relation.
+// A collaboration grant binding a user or a team to a project relation.
+// Discriminate on which of `user` or `team` is present. Those objects are
+// always refs (`user_id` / `team_id`); expand adds extra fields on the same
+// object rather than a sibling.
 // Ref: #
 type Grant struct {
 	// Managed assignment id (`asgn_<opaque>`).
 	ID string `json:"id"`
 	// Project this grant is scoped to.
 	ProjectID string `json:"project_id"`
-	// Kind of principal bound by this grant.
-	PrincipalType GrantPrincipalType `json:"principal_type"`
-	// Principal id (`user_<opaque>` or `team_<opaque>`).
-	PrincipalID string `json:"principal_id"`
 	// Catalog object type. Always `project` for this API.
 	ObjectType GrantObjectType `json:"object_type"`
 	// Catalog relation on the project.
@@ -22068,26 +22087,12 @@ type Grant struct {
 	// When the grant expires. Null when it does not expire. GET still
 	// returns expired unrevoked grants; authorization ignores them.
 	ExpiresAt OptNilDateTime `json:"expires_at"`
-	// Resolved identity of a user principal (ADR 058). Present when
-	// `principal_type` is `user`; omitted for team grants. Degrades to
-	// `user_id` only when the user can no longer be loaded.
-	User OptUserRef `json:"user"`
-	// Resolved identity of a team principal. Present when `principal_type`
-	// is `team`; omitted for user grants. Degrades to `team_id` only when
-	// the team can no longer be loaded. This is a label ref, not the full
-	// Team body.
-	Team OptTeamRef `json:"team"`
-	// The principal named by `principal_id`, present only when the request
-	// asked for it with `expand: ["principal"]` (ADR 059). Absent means it
-	// was not requested; `null` means the principal cannot be loaded
-	// (deleted or missing). GET and create never set this field.
-	// When present, the body is the same representation `GET /users/{id}`
-	// serves for `principal_type=user`, or `GET /teams/{id}` for
-	// `principal_type=team`. Discriminate with the grant's existing
-	// `principal_type`.
-	// Requires `user.read` and `team.read` in addition to `project.read`.
-	// Both are checked on the whole request before the list.
-	Principal OptNilGrantExpandedPrincipal `json:"principal"`
+	// Present on a user grant. Omit on a team grant. Always a user-ref
+	// (`user_id`); expand adds envelope fields on this same object.
+	User OptGrantUser `json:"user"`
+	// Present on a team grant. Omit on a user grant. Always a team-ref
+	// (`team_id`); expand adds envelope fields on this same object.
+	Team OptGrantTeam `json:"team"`
 }
 
 // GetID returns the value of ID.
@@ -22098,16 +22103,6 @@ func (s *Grant) GetID() string {
 // GetProjectID returns the value of ProjectID.
 func (s *Grant) GetProjectID() string {
 	return s.ProjectID
-}
-
-// GetPrincipalType returns the value of PrincipalType.
-func (s *Grant) GetPrincipalType() GrantPrincipalType {
-	return s.PrincipalType
-}
-
-// GetPrincipalID returns the value of PrincipalID.
-func (s *Grant) GetPrincipalID() string {
-	return s.PrincipalID
 }
 
 // GetObjectType returns the value of ObjectType.
@@ -22131,18 +22126,13 @@ func (s *Grant) GetExpiresAt() OptNilDateTime {
 }
 
 // GetUser returns the value of User.
-func (s *Grant) GetUser() OptUserRef {
+func (s *Grant) GetUser() OptGrantUser {
 	return s.User
 }
 
 // GetTeam returns the value of Team.
-func (s *Grant) GetTeam() OptTeamRef {
+func (s *Grant) GetTeam() OptGrantTeam {
 	return s.Team
-}
-
-// GetPrincipal returns the value of Principal.
-func (s *Grant) GetPrincipal() OptNilGrantExpandedPrincipal {
-	return s.Principal
 }
 
 // SetID sets the value of ID.
@@ -22153,16 +22143,6 @@ func (s *Grant) SetID(val string) {
 // SetProjectID sets the value of ProjectID.
 func (s *Grant) SetProjectID(val string) {
 	s.ProjectID = val
-}
-
-// SetPrincipalType sets the value of PrincipalType.
-func (s *Grant) SetPrincipalType(val GrantPrincipalType) {
-	s.PrincipalType = val
-}
-
-// SetPrincipalID sets the value of PrincipalID.
-func (s *Grant) SetPrincipalID(val string) {
-	s.PrincipalID = val
 }
 
 // SetObjectType sets the value of ObjectType.
@@ -22186,18 +22166,13 @@ func (s *Grant) SetExpiresAt(val OptNilDateTime) {
 }
 
 // SetUser sets the value of User.
-func (s *Grant) SetUser(val OptUserRef) {
+func (s *Grant) SetUser(val OptGrantUser) {
 	s.User = val
 }
 
 // SetTeam sets the value of Team.
-func (s *Grant) SetTeam(val OptTeamRef) {
+func (s *Grant) SetTeam(val OptGrantTeam) {
 	s.Team = val
-}
-
-// SetPrincipal sets the value of Principal.
-func (s *Grant) SetPrincipal(val OptNilGrantExpandedPrincipal) {
-	s.Principal = val
 }
 
 func (*Grant) createGrantRes() {}
@@ -22256,17 +22231,17 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 	return m
 }
 
-// A related object to embed on each returned grant (ADR 059).
-// - `principal`: the principal named by `principal_id`, as `principal` on
-// each grant. The property is omitted entirely when not requested. When
-// requested, it is the same body `GET /users/{id}` serves for
-// `principal_type=user`, or `GET /teams/{id}` for `principal_type=team`,
-// and `null` when that principal cannot be loaded. Discriminate with the
-// grant's existing `principal_type`.
+// Expand the bound user or team on each returned grant (ADR 059, grant
+// exception: extras are inlined onto `user` / `team`, not a sibling).
+// - `principal`: add User envelope fields (`schema`, `attributes`,
+// `metadata`) on `user`, or Team `status` / `created_at` / `updated_at`
+// on `team`. The ref (`user_id` / `team_id`) is always present. When the
+// principal cannot be loaded, the object stays a degraded ref — the same
+// shape as not expanding.
 // Requires `user.read` and `team.read` in addition to `project.read`.
 // Both are checked on the whole request before the list, because a mixed
 // page is the common case. A caller who may not read either resource
-// receives 403 rather than a silently missing `principal`.
+// receives 403 rather than silently omitting extras.
 // Ref: #
 type GrantExpand string
 
@@ -22302,100 +22277,29 @@ func (s *GrantExpand) UnmarshalText(data []byte) error {
 	}
 }
 
-// The principal bound by a grant: the User body when `principal_type` is
-// `user`, or the Team body when `principal_type` is `team`. Same
-// representation as `GET /users/{id}` and `GET /teams/{id}` respectively.
-// Clients discriminate with the grant's existing `principal_type`.
-// Ref: #
-// GrantExpandedPrincipal represents sum type.
-type GrantExpandedPrincipal struct {
-	Type         GrantExpandedPrincipalType // switch on this field
-	User         User
-	TeamResponse TeamResponse
-}
-
-// GrantExpandedPrincipalType is oneOf type of GrantExpandedPrincipal.
-type GrantExpandedPrincipalType string
-
-// Possible values for GrantExpandedPrincipalType.
-const (
-	UserGrantExpandedPrincipal         GrantExpandedPrincipalType = "User"
-	TeamResponseGrantExpandedPrincipal GrantExpandedPrincipalType = "TeamResponse"
-)
-
-// IsUser reports whether GrantExpandedPrincipal is User.
-func (s GrantExpandedPrincipal) IsUser() bool { return s.Type == UserGrantExpandedPrincipal }
-
-// IsTeamResponse reports whether GrantExpandedPrincipal is TeamResponse.
-func (s GrantExpandedPrincipal) IsTeamResponse() bool {
-	return s.Type == TeamResponseGrantExpandedPrincipal
-}
-
-// SetUser sets GrantExpandedPrincipal to User.
-func (s *GrantExpandedPrincipal) SetUser(v User) {
-	s.Type = UserGrantExpandedPrincipal
-	s.User = v
-}
-
-// GetUser returns User and true boolean if GrantExpandedPrincipal is User.
-func (s GrantExpandedPrincipal) GetUser() (v User, ok bool) {
-	if !s.IsUser() {
-		return v, false
-	}
-	return s.User, true
-}
-
-// NewUserGrantExpandedPrincipal returns new GrantExpandedPrincipal from User.
-func NewUserGrantExpandedPrincipal(v User) GrantExpandedPrincipal {
-	var s GrantExpandedPrincipal
-	s.SetUser(v)
-	return s
-}
-
-// SetTeamResponse sets GrantExpandedPrincipal to TeamResponse.
-func (s *GrantExpandedPrincipal) SetTeamResponse(v TeamResponse) {
-	s.Type = TeamResponseGrantExpandedPrincipal
-	s.TeamResponse = v
-}
-
-// GetTeamResponse returns TeamResponse and true boolean if GrantExpandedPrincipal is TeamResponse.
-func (s GrantExpandedPrincipal) GetTeamResponse() (v TeamResponse, ok bool) {
-	if !s.IsTeamResponse() {
-		return v, false
-	}
-	return s.TeamResponse, true
-}
-
-// NewTeamResponseGrantExpandedPrincipal returns new GrantExpandedPrincipal from TeamResponse.
-func NewTeamResponseGrantExpandedPrincipal(v TeamResponse) GrantExpandedPrincipal {
-	var s GrantExpandedPrincipal
-	s.SetTeamResponse(v)
-	return s
-}
-
 // Field to filter grants by:
 // - `created_at`: RFC3339 timestamp
-// - `principal_type`: `user` or `team`
-// - `principal_id`: principal id (`user_<opaque>` or `team_<opaque>`)
+// - `user_id`: user principal id (`user_<opaque>`)
+// - `team_id`: team principal id (`team_<opaque>`)
 // - `relation`: `viewer`, `editor`, or `admin`
 // - `expires_at`: RFC3339 timestamp (null when the grant does not expire).
 // Ref: #
 type GrantFilterField string
 
 const (
-	GrantFilterFieldCreatedAt     GrantFilterField = "created_at"
-	GrantFilterFieldPrincipalType GrantFilterField = "principal_type"
-	GrantFilterFieldPrincipalID   GrantFilterField = "principal_id"
-	GrantFilterFieldRelation      GrantFilterField = "relation"
-	GrantFilterFieldExpiresAt     GrantFilterField = "expires_at"
+	GrantFilterFieldCreatedAt GrantFilterField = "created_at"
+	GrantFilterFieldUserID    GrantFilterField = "user_id"
+	GrantFilterFieldTeamID    GrantFilterField = "team_id"
+	GrantFilterFieldRelation  GrantFilterField = "relation"
+	GrantFilterFieldExpiresAt GrantFilterField = "expires_at"
 )
 
 // AllValues returns all GrantFilterField values.
 func (GrantFilterField) AllValues() []GrantFilterField {
 	return []GrantFilterField{
 		GrantFilterFieldCreatedAt,
-		GrantFilterFieldPrincipalType,
-		GrantFilterFieldPrincipalID,
+		GrantFilterFieldUserID,
+		GrantFilterFieldTeamID,
 		GrantFilterFieldRelation,
 		GrantFilterFieldExpiresAt,
 	}
@@ -22406,9 +22310,9 @@ func (s GrantFilterField) MarshalText() ([]byte, error) {
 	switch s {
 	case GrantFilterFieldCreatedAt:
 		return []byte(s), nil
-	case GrantFilterFieldPrincipalType:
+	case GrantFilterFieldUserID:
 		return []byte(s), nil
-	case GrantFilterFieldPrincipalID:
+	case GrantFilterFieldTeamID:
 		return []byte(s), nil
 	case GrantFilterFieldRelation:
 		return []byte(s), nil
@@ -22425,11 +22329,11 @@ func (s *GrantFilterField) UnmarshalText(data []byte) error {
 	case GrantFilterFieldCreatedAt:
 		*s = GrantFilterFieldCreatedAt
 		return nil
-	case GrantFilterFieldPrincipalType:
-		*s = GrantFilterFieldPrincipalType
+	case GrantFilterFieldUserID:
+		*s = GrantFilterFieldUserID
 		return nil
-	case GrantFilterFieldPrincipalID:
-		*s = GrantFilterFieldPrincipalID
+	case GrantFilterFieldTeamID:
+		*s = GrantFilterFieldTeamID
 		return nil
 	case GrantFilterFieldRelation:
 		*s = GrantFilterFieldRelation
@@ -22689,48 +22593,6 @@ func (s *GrantPrincipalNotFoundDetails) init() GrantPrincipalNotFoundDetails {
 	return m
 }
 
-// Kind of principal bound by this grant.
-type GrantPrincipalType string
-
-const (
-	GrantPrincipalTypeUser GrantPrincipalType = "user"
-	GrantPrincipalTypeTeam GrantPrincipalType = "team"
-)
-
-// AllValues returns all GrantPrincipalType values.
-func (GrantPrincipalType) AllValues() []GrantPrincipalType {
-	return []GrantPrincipalType{
-		GrantPrincipalTypeUser,
-		GrantPrincipalTypeTeam,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s GrantPrincipalType) MarshalText() ([]byte, error) {
-	switch s {
-	case GrantPrincipalTypeUser:
-		return []byte(s), nil
-	case GrantPrincipalTypeTeam:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *GrantPrincipalType) UnmarshalText(data []byte) error {
-	switch GrantPrincipalType(data) {
-	case GrantPrincipalTypeUser:
-		*s = GrantPrincipalTypeUser
-		return nil
-	case GrantPrincipalTypeTeam:
-		*s = GrantPrincipalTypeTeam
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
 // Catalog relation on the project.
 type GrantRelation string
 
@@ -22829,6 +22691,186 @@ func (s *GrantSortingField) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type GrantTeam struct {
+	// The referenced team's id (`team_<opaque>`). Always present.
+	TeamID string `json:"team_id"`
+	// The team's name. Absent when the team can no longer be loaded.
+	Name OptString `json:"name"`
+	// Team lifecycle. Present only when the request asked for
+	// `expand: ["principal"]` and the team could be loaded.
+	Status OptTeamStatus `json:"status"`
+	// When the team was created. Present only when expand loaded the team.
+	CreatedAt OptDateTime `json:"created_at"`
+	// When the team was last updated. Present only when expand loaded the team.
+	UpdatedAt OptDateTime `json:"updated_at"`
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *GrantTeam) GetTeamID() string {
+	return s.TeamID
+}
+
+// GetName returns the value of Name.
+func (s *GrantTeam) GetName() OptString {
+	return s.Name
+}
+
+// GetStatus returns the value of Status.
+func (s *GrantTeam) GetStatus() OptTeamStatus {
+	return s.Status
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *GrantTeam) GetCreatedAt() OptDateTime {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *GrantTeam) GetUpdatedAt() OptDateTime {
+	return s.UpdatedAt
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *GrantTeam) SetTeamID(val string) {
+	s.TeamID = val
+}
+
+// SetName sets the value of Name.
+func (s *GrantTeam) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetStatus sets the value of Status.
+func (s *GrantTeam) SetStatus(val OptTeamStatus) {
+	s.Status = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *GrantTeam) SetCreatedAt(val OptDateTime) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *GrantTeam) SetUpdatedAt(val OptDateTime) {
+	s.UpdatedAt = val
+}
+
+// Merged schema.
+// Ref: #
+type GrantUser struct {
+	// The referenced user's id. Always present.
+	UserID UserID `json:"user_id"`
+	// The current value of the schema's designated identifier
+	// (`x-identifier`). Absent when the schema designates no identifier or
+	// the user carries no value for it.
+	Identifier OptString `json:"identifier"`
+	// The schema property `identifier` came from, so clients can reach the
+	// property's schema for semantics (a mailto link, a field label)
+	// instead of guessing from the value. Present exactly when
+	// `identifier` is.
+	IdentifierProperty OptString `json:"identifier_property"`
+	// The `x-display` rendering — the designated properties' values joined
+	// in list order. Purely presentational, with no source attribution.
+	// Absent when the schema designates no display properties or the user
+	// carries no values for them.
+	Display OptString `json:"display"`
+	// The schema that defines `attributes`. Present only when the request
+	// asked for `expand: ["principal"]` and the user could be loaded.
+	Schema OptString `json:"schema"`
+	// The user's schema document. Present only when the request asked
+	// for `expand: ["principal"]` and the user could be loaded.
+	Attributes OptGrantUserAttributes `json:"attributes"`
+	// Server-owned user envelope. Present only when the request asked
+	// for `expand: ["principal"]` and the user could be loaded. Grant
+	// expand does not populate `lifecycle_owner_team`.
+	Metadata OptUserMetadata `json:"metadata"`
+}
+
+// GetUserID returns the value of UserID.
+func (s *GrantUser) GetUserID() UserID {
+	return s.UserID
+}
+
+// GetIdentifier returns the value of Identifier.
+func (s *GrantUser) GetIdentifier() OptString {
+	return s.Identifier
+}
+
+// GetIdentifierProperty returns the value of IdentifierProperty.
+func (s *GrantUser) GetIdentifierProperty() OptString {
+	return s.IdentifierProperty
+}
+
+// GetDisplay returns the value of Display.
+func (s *GrantUser) GetDisplay() OptString {
+	return s.Display
+}
+
+// GetSchema returns the value of Schema.
+func (s *GrantUser) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetAttributes returns the value of Attributes.
+func (s *GrantUser) GetAttributes() OptGrantUserAttributes {
+	return s.Attributes
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *GrantUser) GetMetadata() OptUserMetadata {
+	return s.Metadata
+}
+
+// SetUserID sets the value of UserID.
+func (s *GrantUser) SetUserID(val UserID) {
+	s.UserID = val
+}
+
+// SetIdentifier sets the value of Identifier.
+func (s *GrantUser) SetIdentifier(val OptString) {
+	s.Identifier = val
+}
+
+// SetIdentifierProperty sets the value of IdentifierProperty.
+func (s *GrantUser) SetIdentifierProperty(val OptString) {
+	s.IdentifierProperty = val
+}
+
+// SetDisplay sets the value of Display.
+func (s *GrantUser) SetDisplay(val OptString) {
+	s.Display = val
+}
+
+// SetSchema sets the value of Schema.
+func (s *GrantUser) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetAttributes sets the value of Attributes.
+func (s *GrantUser) SetAttributes(val OptGrantUserAttributes) {
+	s.Attributes = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *GrantUser) SetMetadata(val OptUserMetadata) {
+	s.Metadata = val
+}
+
+// The user's schema document. Present only when the request asked
+// for `expand: ["principal"]` and the user could be loaded.
+type GrantUserAttributes map[string]jx.Raw
+
+func (s *GrantUserAttributes) init() GrantUserAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // The handoff token and metadata for session exchange.
@@ -29448,6 +29490,144 @@ func (o OptGrantPrincipalNotFoundDetails) Or(d GrantPrincipalNotFoundDetails) Gr
 	return d
 }
 
+// NewOptGrantTeam returns new OptGrantTeam with value set to v.
+func NewOptGrantTeam(v GrantTeam) OptGrantTeam {
+	return OptGrantTeam{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGrantTeam is optional GrantTeam.
+type OptGrantTeam struct {
+	Value GrantTeam
+	Set   bool
+}
+
+// IsSet returns true if OptGrantTeam was set.
+func (o OptGrantTeam) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGrantTeam) Reset() {
+	var v GrantTeam
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGrantTeam) SetTo(v GrantTeam) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGrantTeam) Get() (v GrantTeam, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGrantTeam) Or(d GrantTeam) GrantTeam {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptGrantUser returns new OptGrantUser with value set to v.
+func NewOptGrantUser(v GrantUser) OptGrantUser {
+	return OptGrantUser{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGrantUser is optional GrantUser.
+type OptGrantUser struct {
+	Value GrantUser
+	Set   bool
+}
+
+// IsSet returns true if OptGrantUser was set.
+func (o OptGrantUser) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGrantUser) Reset() {
+	var v GrantUser
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGrantUser) SetTo(v GrantUser) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGrantUser) Get() (v GrantUser, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGrantUser) Or(d GrantUser) GrantUser {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptGrantUserAttributes returns new OptGrantUserAttributes with value set to v.
+func NewOptGrantUserAttributes(v GrantUserAttributes) OptGrantUserAttributes {
+	return OptGrantUserAttributes{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGrantUserAttributes is optional GrantUserAttributes.
+type OptGrantUserAttributes struct {
+	Value GrantUserAttributes
+	Set   bool
+}
+
+// IsSet returns true if OptGrantUserAttributes was set.
+func (o OptGrantUserAttributes) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGrantUserAttributes) Reset() {
+	var v GrantUserAttributes
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGrantUserAttributes) SetTo(v GrantUserAttributes) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGrantUserAttributes) Get() (v GrantUserAttributes, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGrantUserAttributes) Or(d GrantUserAttributes) GrantUserAttributes {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInt returns new OptInt with value set to v.
 func NewOptInt(v int) OptInt {
 	return OptInt{
@@ -30990,69 +31170,6 @@ func (o OptNilFlowdefUpdatedEventActorType) Get() (v FlowdefUpdatedEventActorTyp
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilFlowdefUpdatedEventActorType) Or(d FlowdefUpdatedEventActorType) FlowdefUpdatedEventActorType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptNilGrantExpandedPrincipal returns new OptNilGrantExpandedPrincipal with value set to v.
-func NewOptNilGrantExpandedPrincipal(v GrantExpandedPrincipal) OptNilGrantExpandedPrincipal {
-	return OptNilGrantExpandedPrincipal{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilGrantExpandedPrincipal is optional nullable GrantExpandedPrincipal.
-type OptNilGrantExpandedPrincipal struct {
-	Value GrantExpandedPrincipal
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilGrantExpandedPrincipal was set.
-func (o OptNilGrantExpandedPrincipal) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilGrantExpandedPrincipal) Reset() {
-	var v GrantExpandedPrincipal
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilGrantExpandedPrincipal) SetTo(v GrantExpandedPrincipal) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilGrantExpandedPrincipal) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilGrantExpandedPrincipal) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v GrantExpandedPrincipal
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilGrantExpandedPrincipal) Get() (v GrantExpandedPrincipal, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilGrantExpandedPrincipal) Or(d GrantExpandedPrincipal) GrantExpandedPrincipal {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -34411,6 +34528,52 @@ func (o OptTeamID) Or(d TeamID) TeamID {
 	return d
 }
 
+// NewOptTeamLocator returns new OptTeamLocator with value set to v.
+func NewOptTeamLocator(v TeamLocator) OptTeamLocator {
+	return OptTeamLocator{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamLocator is optional TeamLocator.
+type OptTeamLocator struct {
+	Value TeamLocator
+	Set   bool
+}
+
+// IsSet returns true if OptTeamLocator was set.
+func (o OptTeamLocator) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamLocator) Reset() {
+	var v TeamLocator
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamLocator) SetTo(v TeamLocator) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamLocator) Get() (v TeamLocator, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamLocator) Or(d TeamLocator) TeamLocator {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptTeamPermissionDeniedDetails returns new OptTeamPermissionDeniedDetails with value set to v.
 func NewOptTeamPermissionDeniedDetails(v TeamPermissionDeniedDetails) OptTeamPermissionDeniedDetails {
 	return OptTeamPermissionDeniedDetails{
@@ -34457,38 +34620,38 @@ func (o OptTeamPermissionDeniedDetails) Or(d TeamPermissionDeniedDetails) TeamPe
 	return d
 }
 
-// NewOptTeamRef returns new OptTeamRef with value set to v.
-func NewOptTeamRef(v TeamRef) OptTeamRef {
-	return OptTeamRef{
+// NewOptTeamStatus returns new OptTeamStatus with value set to v.
+func NewOptTeamStatus(v TeamStatus) OptTeamStatus {
+	return OptTeamStatus{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptTeamRef is optional TeamRef.
-type OptTeamRef struct {
-	Value TeamRef
+// OptTeamStatus is optional TeamStatus.
+type OptTeamStatus struct {
+	Value TeamStatus
 	Set   bool
 }
 
-// IsSet returns true if OptTeamRef was set.
-func (o OptTeamRef) IsSet() bool { return o.Set }
+// IsSet returns true if OptTeamStatus was set.
+func (o OptTeamStatus) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptTeamRef) Reset() {
-	var v TeamRef
+func (o *OptTeamStatus) Reset() {
+	var v TeamStatus
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptTeamRef) SetTo(v TeamRef) {
+func (o *OptTeamStatus) SetTo(v TeamStatus) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptTeamRef) Get() (v TeamRef, ok bool) {
+func (o OptTeamStatus) Get() (v TeamStatus, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -34496,7 +34659,7 @@ func (o OptTeamRef) Get() (v TeamRef, ok bool) {
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptTeamRef) Or(d TeamRef) TeamRef {
+func (o OptTeamStatus) Or(d TeamStatus) TeamStatus {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -34963,6 +35126,52 @@ func (o OptUserDeletedEventDelegationType) Or(d UserDeletedEventDelegationType) 
 	return d
 }
 
+// NewOptUserID returns new OptUserID with value set to v.
+func NewOptUserID(v UserID) OptUserID {
+	return OptUserID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserID is optional UserID.
+type OptUserID struct {
+	Value UserID
+	Set   bool
+}
+
+// IsSet returns true if OptUserID was set.
+func (o OptUserID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserID) Reset() {
+	var v UserID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserID) SetTo(v UserID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserID) Get() (v UserID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserID) Or(d UserID) UserID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserInvalidDetails returns new OptUserInvalidDetails with value set to v.
 func NewOptUserInvalidDetails(v UserInvalidDetails) OptUserInvalidDetails {
 	return OptUserInvalidDetails{
@@ -35003,6 +35212,98 @@ func (o OptUserInvalidDetails) Get() (v UserInvalidDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserInvalidDetails) Or(d UserInvalidDetails) UserInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserLocator returns new OptUserLocator with value set to v.
+func NewOptUserLocator(v UserLocator) OptUserLocator {
+	return OptUserLocator{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserLocator is optional UserLocator.
+type OptUserLocator struct {
+	Value UserLocator
+	Set   bool
+}
+
+// IsSet returns true if OptUserLocator was set.
+func (o OptUserLocator) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserLocator) Reset() {
+	var v UserLocator
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserLocator) SetTo(v UserLocator) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserLocator) Get() (v UserLocator, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserLocator) Or(d UserLocator) UserLocator {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserMetadata returns new OptUserMetadata with value set to v.
+func NewOptUserMetadata(v UserMetadata) OptUserMetadata {
+	return OptUserMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserMetadata is optional UserMetadata.
+type OptUserMetadata struct {
+	Value UserMetadata
+	Set   bool
+}
+
+// IsSet returns true if OptUserMetadata was set.
+func (o OptUserMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserMetadata) Reset() {
+	var v UserMetadata
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserMetadata) SetTo(v UserMetadata) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserMetadata) Get() (v UserMetadata, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserMetadata) Or(d UserMetadata) UserMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -37955,8 +38256,9 @@ type QueryGrantsRequest struct {
 	// `sorting` as the request that issued the token. Omitting `sorting` reuses
 	// the default sort and only succeeds when that default matches the token.
 	PageToken OptNilPageToken `json:"page_token"`
-	// Related objects to embed on each grant (ADR 059). Omit it and no
-	// embedded object is returned. An unrecognised value is rejected.
+	// Extra principal fields to add onto each grant's `user` or `team`
+	// (ADR 059 grant exception). Omit it and those objects stay refs. An
+	// unrecognised value is rejected.
 	Expand  []GrantExpand                `json:"expand"`
 	Sorting OptQueryGrantsRequestSorting `json:"sorting"`
 	// Filter criteria for querying grants. Combined with AND.
@@ -46239,6 +46541,37 @@ func (s *TeamFilterField) UnmarshalText(data []byte) error {
 
 type TeamID string
 
+// Name a team with exactly one of `team_id` or `name`. Sending both,
+// neither, or any other field is `grant.invalid`.
+// Ref: #
+type TeamLocator struct {
+	// Platform-homed team id (`team_<opaque>`). The team must be active.
+	TeamID OptTeamID `json:"team_id"`
+	// Team name, unique per project case-insensitively. Looked up in
+	// the platform project. The team must be active.
+	Name OptString `json:"name"`
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *TeamLocator) GetTeamID() OptTeamID {
+	return s.TeamID
+}
+
+// GetName returns the value of Name.
+func (s *TeamLocator) GetName() OptString {
+	return s.Name
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *TeamLocator) SetTeamID(val OptTeamID) {
+	s.TeamID = val
+}
+
+// SetName sets the value of Name.
+func (s *TeamLocator) SetName(val OptString) {
+	s.Name = val
+}
+
 // Shared allowlisted fields for `team.created` (snapshot) and
 // `team.updated` (delta: only changed fields present).
 // Ref: #
@@ -46307,39 +46640,6 @@ func (s *TeamPermissionDeniedDetails) init() TeamPermissionDeniedDetails {
 		*s = m
 	}
 	return m
-}
-
-// A resolved reference to a team. Carries the team's id and name so a grant
-// list is readable without embedding the full Team body. Id and display ride
-// `project.read` (ADR 059 rule 8): a reference field carrying only the
-// target's id and display strings needs no gate of its own. Missing or
-// deleted teams degrade to `team_id` only.
-// Ref: #
-type TeamRef struct {
-	// The referenced team's id (`team_<opaque>`). Always present.
-	TeamID string `json:"team_id"`
-	// The team's name. Absent when the team can no longer be loaded.
-	Name OptString `json:"name"`
-}
-
-// GetTeamID returns the value of TeamID.
-func (s *TeamRef) GetTeamID() string {
-	return s.TeamID
-}
-
-// GetName returns the value of Name.
-func (s *TeamRef) GetName() OptString {
-	return s.Name
-}
-
-// SetTeamID sets the value of TeamID.
-func (s *TeamRef) SetTeamID(val string) {
-	s.TeamID = val
-}
-
-// SetName sets the value of Name.
-func (s *TeamRef) SetName(val OptString) {
-	s.Name = val
 }
 
 // Details of a team.
@@ -49296,6 +49596,38 @@ func (s *UserInvalidDetails) init() UserInvalidDetails {
 		*s = m
 	}
 	return m
+}
+
+// Name a user with exactly one of `user_id` or `identifier`. Sending both,
+// neither, or any other field is `grant.invalid`.
+// Ref: #
+type UserLocator struct {
+	// Platform-homed user id (`user_<opaque>`). The user must be active.
+	UserID OptUserID `json:"user_id"`
+	// The user schema's designated identifier (`x-identifier`), looked
+	// up in the platform project. Exactly one active match is required;
+	// zero or several resolve as not found.
+	Identifier OptString `json:"identifier"`
+}
+
+// GetUserID returns the value of UserID.
+func (s *UserLocator) GetUserID() OptUserID {
+	return s.UserID
+}
+
+// GetIdentifier returns the value of Identifier.
+func (s *UserLocator) GetIdentifier() OptString {
+	return s.Identifier
+}
+
+// SetUserID sets the value of UserID.
+func (s *UserLocator) SetUserID(val OptUserID) {
+	s.UserID = val
+}
+
+// SetIdentifier sets the value of Identifier.
+func (s *UserLocator) SetIdentifier(val OptString) {
+	s.Identifier = val
 }
 
 // Ref: #

@@ -10,6 +10,8 @@ get:
     `resource_scope_index`; project scope is required on the query (same as
     events). Misses, revoked rows, project-secret setup (`sk_proj`),
     owning-team (`relation=team`) rows, and cross-project ids return 404.
+    `expand=principal` adds envelope fields on `user` or `team` and requires
+    `user.read` and `team.read` in addition to `project.read`.
   tags:
     - Grants
   security:
@@ -23,6 +25,17 @@ get:
         type: string
       description: Managed assignment id (`asgn_<opaque>`).
     - $ref: ../../../components/parameters/project-id.yaml
+    - name: expand
+      in: query
+      required: false
+      description: |
+        Extra principal fields to add onto `user` or `team`. Same enum and
+        `user.read` + `team.read` gate as `POST /grants/query`.
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: ../query/grant-expand.yaml
   responses:
     '200':
       description: The grant.

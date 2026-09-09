@@ -1,0 +1,27 @@
+title: GrantUser
+description: |
+  User bound by this grant. Always a user-ref (`user_id`, never `id`).
+  `expand: ["principal"]` adds the User envelope fields `schema`,
+  `attributes`, and `metadata` on this same object. Missing users degrade to
+  `user_id` only, with or without expand (ADR 059 grant exception).
+allOf:
+  - $ref: ../../components/schemas/user-ref.yaml
+  - type: object
+    properties:
+      schema:
+        type: string
+        description: |
+          The schema that defines `attributes`. Present only when the request
+          asked for `expand: ["principal"]` and the user could be loaded.
+      attributes:
+        type: object
+        additionalProperties: true
+        description: |
+          The user's schema document. Present only when the request asked
+          for `expand: ["principal"]` and the user could be loaded.
+      metadata:
+        description: |
+          Server-owned user envelope. Present only when the request asked
+          for `expand: ["principal"]` and the user could be loaded. Grant
+          expand does not populate `lifecycle_owner_team`.
+        $ref: ../users/user-metadata.yaml

@@ -36,7 +36,7 @@ import { getConsoleProjectId } from "../../../runtime/runtime";
  *
  * **Not an invite flow.** The design draws `Invite`, a `Pending` status and
  * revoke/resend actions, but a grant is only ever created against a person who
- * already exists: `POST /grants` takes a `principal_id`, and the grant resource
+ * already exists: `POST /grants` takes a user locator, and the grant resource
  * carries no status field, so there is no pending state to render and nothing
  * to revoke before signup. #769 says the same in its scope — the colleague signs
  * up through a separately shared link, and access is given afterwards. The
@@ -99,7 +99,8 @@ function AdminsScreen() {
   // still be made an admin.
   const alreadyAdmins = grants
     .filter((grant) => grant.relation === "admin")
-    .map((grant) => grant.principal_id);
+    .map((grant) => grant.user?.user_id ?? grant.team?.team_id)
+    .filter((id): id is string => Boolean(id));
 
   return (
     <div className={`${RESOURCE_PAGE} pt-11`}>
@@ -159,32 +160,33 @@ function AdminsScreen() {
 /**
  * How a grant is labelled.
  *
- * `expand: ["principal"]` embeds the principal so the table needs no read per
- * row. Every fallback below is real: the property is absent when the expansion
- * was refused, `null` when the principal cannot be loaded (a deleted user
- * leaves its grant behind), and a user's identity fields are themselves
- * optional, since ADR 058 lets a schema designate neither a display nor an
- * identifier. The chain ends at the id, which always exists — and which is what
- * the operator needs to know which grant they are revoking.
+ * `expand: ["principal"]` copies envelope fields onto the same `user` / `team`
+ * ref so the table needs no read per row. A deleted user leaves its grant
+ * behind as a degraded ref (`user_id` / `team_id` only). A user's identity
+ * fields are themselves optional, since ADR 058 lets a schema designate
+ * neither a display nor an identifier. The chain ends at that id, which
+ * always exists — and which is what the operator needs to know which grant
+ * they are revoking.
  *
- * The embedded body is a user or a team, discriminated by `principal_type` as
- * the contract says. They are separate union members and the type ties neither
- * to that field, so the values are read the way the console reads every other
- * open record: defensively, by name.
+ * Discriminate on which of `user` or `team` is present. They are separate
+ * objects and the type ties neither to a kind field, so the values are read
+ * the way the console reads every other open record: defensively, by name.
  */
 function toAdminRow(grant: Grant): AdminRow {
   return {
     id: grant.id,
-    name: principalName(grant) ?? grant.principal_id,
+    name: principalName(grant) ?? grant.user?.user_id ?? grant.team?.team_id ?? grant.id,
     level: grant.relation.charAt(0).toUpperCase() + grant.relation.slice(1),
   };
 }
 
 function principalName(grant: Grant): string | undefined {
-  if (!grant.principal) return undefined;
-  const principal = grant.principal as unknown as Record<string, unknown>;
-  if (grant.principal_type === "team") return field(principal, "name");
-  return field(principal, "display") ?? field(principal, "identifier");
+  if (grant.team) {
+    return grant.team.name;
+  }
+  if (!grant.user) return undefined;
+  const user = grant.user as unknown as Record<string, unknown>;
+  return field(user, "display") ?? field(user, "identifier");
 }
 
 /**

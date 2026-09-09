@@ -1,10 +1,13 @@
+title: Grant
+description: |
+  A collaboration grant binding a user or a team to a project relation.
+  Discriminate on which of `user` or `team` is present. Those objects are
+  always refs (`user_id` / `team_id`); expand adds extra fields on the same
+  object rather than a sibling.
 type: object
-description: A collaboration grant binding a principal to a project relation.
 required:
   - id
   - project_id
-  - principal_type
-  - principal_id
   - object_type
   - relation
   - created_at
@@ -15,15 +18,6 @@ properties:
   project_id:
     type: string
     description: Project this grant is scoped to.
-  principal_type:
-    type: string
-    enum:
-      - user
-      - team
-    description: Kind of principal bound by this grant.
-  principal_id:
-    type: string
-    description: Principal id (`user_<opaque>` or `team_<opaque>`).
   object_type:
     type: string
     enum:
@@ -50,32 +44,11 @@ properties:
       - type: 'null'
   user:
     description: |
-      Resolved identity of a user principal (ADR 058). Present when
-      `principal_type` is `user`; omitted for team grants. Degrades to
-      `user_id` only when the user can no longer be loaded.
-    $ref: ../../components/schemas/user-ref.yaml
+      Present on a user grant. Omit on a team grant. Always a user-ref
+      (`user_id`); expand adds envelope fields on this same object.
+    $ref: grant-user.yaml
   team:
     description: |
-      Resolved identity of a team principal. Present when `principal_type`
-      is `team`; omitted for user grants. Degrades to `team_id` only when
-      the team can no longer be loaded. This is a label ref, not the full
-      Team body.
-    $ref: ../../components/schemas/team-ref.yaml
-  principal:
-    readOnly: true
-    description: |
-      The principal named by `principal_id`, present only when the request
-      asked for it with `expand: ["principal"]` (ADR 059). Absent means it
-      was not requested; `null` means the principal cannot be loaded
-      (deleted or missing). GET and create never set this field.
-
-      When present, the body is the same representation `GET /users/{id}`
-      serves for `principal_type=user`, or `GET /teams/{id}` for
-      `principal_type=team`. Discriminate with the grant's existing
-      `principal_type`.
-
-      Requires `user.read` and `team.read` in addition to `project.read`.
-      Both are checked on the whole request before the list.
-    oneOf:
-      - $ref: grant-expanded-principal.yaml
-      - type: 'null'
+      Present on a team grant. Omit on a user grant. Always a team-ref
+      (`team_id`); expand adds envelope fields on this same object.
+    $ref: grant-team.yaml
