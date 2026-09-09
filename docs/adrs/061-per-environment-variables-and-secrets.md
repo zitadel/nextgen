@@ -89,7 +89,7 @@ sized to be added without reworking what is here.
 | Whether a secret can ever be read back at all | A decision between write-only outright (the GitHub model) and readable under a redaction contract. The API withholds the value today rather than settling it (§7, §10). |
 | Marking, or refusing, secrets inside a resolved document | The redaction contract. Fetching by name already keeps the marking; substitution loses it (§7, §10). |
 | Validating that a target environment resolves every reference before a deployment goes live | Deployments (ADR 035). Until then an unresolved reference ships as its own literal text (§2, §10). |
-| Checking on write that `environment_name` names a real environment | Environment lifecycle. `GetEnvironmentByName` already exists; what a rename or delete does to the variables pointing at a name does not. |
+| What a *rename* of an environment does to the variables scoped to it | Environment lifecycle. Nothing renames an environment today, and the foreign key below refuses one while variables point at the old name, so the question is posed rather than answered. |
 
 ### 1. One resource, one storage, two flavours
 
@@ -219,6 +219,10 @@ reader has to get right.
   `NULLS NOT DISTINCT`, and matches the domain, where the unset environment is
   also `""`. Since owners are matched exactly (§4), the empty string is an
   address — the project level — and never a wildcard.
+- **Both owner columns carry a foreign key**, the environment through a
+  generated column. See the section on the environment level below: the empty
+  string is what stops the constraint sitting on `environment_name` directly,
+  and `NULLIF` is what gets around it without giving the address up.
 - **The primary key, `(name, project_id, environment_name)`, is the uniqueness
   rule.** It is what stops two variables existing at one name and owner, which a
   read would return with no rule for choosing between them. It is also the
@@ -366,7 +370,7 @@ the reasoning behind them.
   a target environment before it goes live belongs with deployments (ADR 035),
   not here.
 
-## The environment level is a name, and the name is not enforced
+## The environment level is a name, and the name is a foreign key
 
 Environments landed as a resource while this was being written (#532): a project
 holds environments of `(project_id, id, name)`, the name is unique per project,
@@ -378,22 +382,62 @@ matches how an environment is addressed everywhere else, keeps a variable
 readable by a request that knows only which environment it is serving, and keeps
 the owner tuple a tuple of strings.
 
-The name is currently **not checked** on the way in. Two things follow, and
-neither is decided here:
+The name is **enforced by the database**, against the same
+`(project_id, name)` the wire addresses.
 
-- **A foreign key is not available while the project level is `""`.** The
-  natural key needs both owner columns non-null, so "not scoped to an
-  environment" is the empty string, and no environment row carries that name.
-  Enforcing the reference therefore means validating on write (the
-  `GetEnvironmentByName` statement already exists) rather than in the schema.
-  Until that lands, a typo writes into an owner nothing will ever read from —
-  and with no inheritance to fall back on (§4), what the request meant to reach
-  reads as empty rather than as the project's value. That makes validating on
-  write more pressing than it was, not less.
-- **Renaming or deleting an environment does not touch its variables.** They
-  keep pointing at a name nothing answers to. Whichever way that is settled
-  (cascade on the name, forbid the rename, or leave the variables orphaned by
-  design), it belongs with the environment lifecycle rather than here.
+### The empty string is the obstacle, and `NULLIF` is the way past it
+
+A foreign key cannot sit on `environment_name` directly. `""` is the project
+level (§3, §6), an address of its own held by a real row, and no environment
+answers to that name, so the constraint would reject every project-level
+variable. Giving the column up to `NULL` instead would cost the primary key,
+which cannot span a nullable column, and §6 is the reason that key is what it is.
+
+So the reference sits on a generated column beside it:
+
+```sql
+environment_ref TEXT GENERATED ALWAYS AS (NULLIF(environment_name, '')) STORED
+FOREIGN KEY (project_id, environment_ref) REFERENCES environments (project_id, name)
+```
+
+`NULLIF` maps exactly one address, the project level, to `NULL`, and a
+composite foreign key is not checked when any of its columns is `NULL`
+(`MATCH SIMPLE`, and the same in all three dialects). The two cases fall out:
+
+| Owner | `environment_ref` | Constraint |
+|---|---|---|
+| `(project, "")` | `NULL` | not checked: the project level needs no environment |
+| `(project, "prod")` | `"prod"` | checked: `prod` must exist on that project |
+
+The column is derived, never written, and not bound in `variable.Schema`. The
+row shape, the primary key, the upsert conflict target and every statement still
+address `environment_name`; nothing above the DDL changed.
+
+Two things follow:
+
+- **A name nothing answers to is refused on write.** Previously a typo wrote
+  into an owner nothing would ever read from, and with no inheritance to fall
+  back on (§4) what the request meant to reach read as empty rather than as the
+  project's value, a wrong answer with nothing to see. The write now fails, and
+  the service reports it as `env.not_found` rather than an internal error.
+- **Deleting an environment takes its variables with it**, the way deleting a
+  project does. Project-level variables are untouched: their `environment_ref`
+  is `NULL`, so no cascade reaches them.
+
+### No `ON UPDATE CASCADE`, deliberately
+
+Spanner has no `ON UPDATE` clause on a foreign key at all (it is a parse error,
+not a no-op), so cascading a rename in Postgres and SQLite would put the three
+dialects out of parity on a domain-visible behavior, which is exactly what the
+storage contract tests exist to prevent.
+
+Nothing renames an environment today: the API is create, get and list. Until
+something does, the constraint refuses a rename while variables point at the old
+name, in every dialect. That is the third of the three options this ADR
+previously left open (cascade the name, forbid the rename, or orphan the rows)
+and it is the one that decides the least: it cannot silently strand a variable,
+and whichever answer the environment lifecycle eventually wants is still
+available.
 
 ## Alternatives considered
 
@@ -442,6 +486,9 @@ project data, set through Zitadel, read on the environment serving the request.
   two callers to disagree about what a name holds.
 - A value that must hold in several environments is entered in each of them, and
   nothing keeps those copies in step.
+- An environment-scoped variable cannot name an environment that does not exist,
+  and does not outlive the one it names. The cost is that an environment cannot
+  be renamed while variables point at it, which nothing can do today.
 - A missing value ships the literal placeholder until deployment validation
   exists (§10). This is the sharpest edge in the design as it stands.
 - Variables are outside releases, so a deployment is no longer fully described

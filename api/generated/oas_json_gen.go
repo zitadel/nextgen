@@ -74769,6 +74769,22 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EnvNotFoundUpdateVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("env.not_found")
+		{
+			s := s.EnvNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalUpdateVariablesErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -74948,6 +74964,9 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "enc_key.not_found":
 					s.Type = EncKeyNotFoundUpdateVariablesErrorResponse
 					found = true
+				case "env.not_found":
+					s.Type = EnvNotFoundUpdateVariablesErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalUpdateVariablesErrorResponse
 					found = true
@@ -74999,6 +75018,10 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyNotFoundUpdateVariablesErrorResponse:
 		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EnvNotFoundUpdateVariablesErrorResponse:
+		if err := s.EnvNotFound.Decode(d); err != nil {
 			return err
 		}
 	case InternalUpdateVariablesErrorResponse:

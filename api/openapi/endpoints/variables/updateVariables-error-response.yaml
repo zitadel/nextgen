@@ -7,6 +7,7 @@ content:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/env-not_found.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/var-invalid_name.yaml'
@@ -22,6 +23,7 @@ content:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          env.not_found: '../../components/schemas/errors/env-not_found.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           var.invalid_name: '../../components/schemas/errors/var-invalid_name.yaml'
@@ -47,6 +49,11 @@ content:
         value:
           code: enc_key.not_found
           message: 'encryption key not found'
+      env.not_found:
+        summary: env.not_found
+        value:
+          code: env.not_found
+          message: 'environment not found'
       internal:
         summary: internal
         value:

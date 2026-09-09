@@ -16,10 +16,26 @@ CREATE TABLE zitadel_nextgen.variables (
     , project_id     TEXT NOT NULL CHECK (project_id <> '')
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
     -- Scoped by environment name, not id, the way an environment is addressed
-    -- everywhere else. It cannot carry a foreign key: the empty string means
-    -- "not scoped to an environment", and no environment row answers to it.
-    -- TODO: check the environment exists on the write path instead.
+    -- everywhere else, and the way a request serving an environment knows it.
     , environment_name TEXT NOT NULL DEFAULT ''
+    -- The environment reference, carried by a generated column so that the
+    -- empty string above can stay a real address while the reference is still
+    -- enforced by the database.
+    --
+    -- A foreign key cannot sit on environment_name itself: '' is the project
+    -- level and no environment row answers to it, so every project-level
+    -- variable would violate the constraint. NULLIF maps exactly that address
+    -- to NULL, and a composite foreign key is not checked when any of its
+    -- columns is NULL (MATCH SIMPLE). So a project-level row skips the
+    -- constraint, an environment-scoped row is held to it, and a typo is
+    -- refused on write instead of scoping a variable into invisibility --
+    -- which, with no inheritance to fall back on, read as empty rather than as
+    -- the project's value.
+    --
+    -- STORED because a foreign key needs a materialized column. It is derived,
+    -- never written, and deliberately not bound in variable.Schema: the row
+    -- shape and every statement address environment_name.
+    , environment_ref TEXT GENERATED ALWAYS AS (NULLIF(environment_name, '')) STORED
     , value          JSONB NOT NULL
     , is_secret      BOOLEAN NOT NULL DEFAULT FALSE
     , created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -30,6 +46,17 @@ CREATE TABLE zitadel_nextgen.variables (
     -- return both with no rule for choosing between them. It is also the
     -- upsert conflict target and the only way to address a row.
     , PRIMARY KEY (name, project_id, environment_name)
+
+    -- Deleting an environment takes its variables with it, the way deleting a
+    -- project does. Note there is no ON UPDATE clause: Spanner has no
+    -- ON UPDATE CASCADE, so cascading a rename here would put the three
+    -- dialects out of parity. Nothing renames an environment today, and until
+    -- something does this constraint refuses the rename in every dialect
+    -- rather than silently orphaning the rows that point at the old name.
+    , CONSTRAINT fk_variables_environment
+        FOREIGN KEY (project_id, environment_ref)
+        REFERENCES zitadel_nextgen.environments (project_id, name)
+        ON DELETE CASCADE
 );
 
 -- The primary key leads with name, so nothing above serves a read of one

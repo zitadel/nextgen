@@ -7,6 +7,13 @@
 // NULL, which keeps the natural key usable as a primary key; only the project
 // is required, and see the postgres migration for why.
 //
+// Both owner columns carry a foreign key. The environment reaches its through a
+// generated column (NULLIF of environment_name), which is what lets the empty
+// string stay an address while a name that no environment answers to is still
+// refused by the database. That column is deliberately not bound in [Schema]:
+// it is derived and never written, and every statement addresses
+// environment_name.
+//
 // Unlike the settings table this replaces, there is no ladder and no final
 // flag, so storage never collapses rows -- and never has to. A read admits one
 // owner exactly ([VisibleTo], which is [domain.VariableOwner.HasAccessTo]

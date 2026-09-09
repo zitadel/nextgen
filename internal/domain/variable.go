@@ -153,11 +153,14 @@ type VariableOwner struct {
 	// to, by name rather than by id: that is how an environment is addressed
 	// everywhere else, and it is what a request serving an environment knows.
 	//
-	// TODO: nothing checks that the environment exists. The empty string means
-	// "not scoped to an environment", so no environment row can ever match it
-	// and the table cannot carry the reference the way project_id does; the
-	// check belongs on the write path, against GetEnvironmentByName. Until
-	// then a typo scopes a variable into invisibility rather than failing.
+	// The empty string means "not scoped to an environment" -- the project
+	// level, an address of its own rather than a wildcard. Anything else has to
+	// name an environment that exists: the table carries a foreign key onto
+	// (project_id, name), reached through a generated column so that the empty
+	// string can stay an address while the reference is still enforced by the
+	// database. A name nothing answers to is refused on write rather than
+	// scoping the variable into invisibility, and deleting an environment takes
+	// its variables with it.
 	EnvironmentName string
 }
 

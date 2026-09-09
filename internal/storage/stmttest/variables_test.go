@@ -40,11 +40,47 @@ func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixtu
 	name := "login_appearance_" + strings.ReplaceAll(suffix, "-", "_")
 	require.Regexp(t, domain.NameRegex, name, "the fixture must use a referenceable name")
 
+	// environment_name is a real foreign key too, through the generated
+	// environment_ref column, so the environment has to exist before a variable
+	// can scope to it.
+	environment := environmentNameFrom(t, "env-var-"+suffix)
+	require.NoError(t, stmts.CreateEnvironment(t.Context(), &domain.Environment{
+		ProjectID: projectID,
+		Name:      environment,
+	}))
+
 	return variableFixture{
 		name:        name,
 		projectID:   projectID,
-		environment: "env-var-" + suffix,
+		environment: environment,
 	}
+}
+
+// environmentNameFrom bends a test suffix into the shape an environment name is
+// validated into: a lowercase DNS-style label of at most 63 characters. The
+// suffix carries the test name, so it holds underscores and easily runs past
+// the length limit; neither would get past the environments table. Collisions
+// do not matter -- the name is unique per project and every fixture builds its
+// own project.
+func environmentNameFrom(t *testing.T, raw string) string {
+	t.Helper()
+	label := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r + ('a' - 'A')
+		default:
+			return '-'
+		}
+	}, raw)
+	if len(label) > domain.EnvironmentNameMaxLength {
+		label = label[:domain.EnvironmentNameMaxLength]
+	}
+	label = strings.Trim(label, "-")
+	require.Regexp(t, domain.EnvironmentNamePattern, label,
+		"the fixture must use a name the environment resource would accept")
+	return label
 }
 
 // projectOwner addresses the project level: the environment left unnamed, which
@@ -237,6 +273,45 @@ func TestVariablesProjectForeignKey(t *testing.T) {
 		assert.Empty(t, f.get(t, d.stmts, f.projectOwner()), "deleting the project takes its variables with it")
 		assert.Empty(t, f.get(t, d.stmts, f.environmentOwner()), "including the ones its environments entered")
 	})
+}
+
+// TestVariablesEnvironmentForeignKey covers the environment half of the owner
+// being a real reference (ADR 061). It is the case the empty string makes
+// awkward: ” is the project level, an address of its own that no environment
+// row answers to, so the constraint rides a generated column (NULLIF of
+// environment_name) that is NULL for exactly that address. Both halves of that
+// are asserted here -- the project level writes with no environment in sight,
+// and a scoped variable cannot name one that is not there.
+func TestVariablesEnvironmentForeignKey(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newVariableFixture(t, d.stmts)
+
+		err := d.stmts.SetVariable(t.Context(), &domain.Variable{
+			Name:  f.name,
+			Owner: domain.VariableOwner{ProjectID: f.projectID, EnvironmentName: f.environment + "-missing"},
+			Value: "orphan",
+		})
+		require.Error(t, err, "a variable cannot scope to an environment that is not there")
+		_, isFK := errorsAsForeignKey(err)
+		assert.True(t, isFK, "the refusal has to be the reference failing, not some other write error: %v", err)
+
+		// The project level is the address the constraint must not reach: it
+		// names no environment, and there is none for it to name.
+		f.set(t, d.stmts, f.projectOwner(), "project", false)
+		require.Len(t, f.get(t, d.stmts, f.projectOwner()), 1,
+			"the project level writes without an environment to reference")
+
+		f.set(t, d.stmts, f.environmentOwner(), "environment", false)
+		require.Len(t, f.get(t, d.stmts, f.environmentOwner()), 1)
+	})
+}
+
+func errorsAsForeignKey(err error) (*database.ForeignKeyError, bool) {
+	var target *database.ForeignKeyError
+	if errors.As(err, &target) {
+		return target, true
+	}
+	return nil, false
 }
 
 func errorsAsNoRowFound(err error) (*database.NoRowFoundError, bool) {

@@ -125,23 +125,43 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 	if len(vars) == 1 {
 		err = s.v2Pool.Statements().SetVariable(ctx, vars[0])
 		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to write variable to database")
+			return setVariableError(err)
 		}
 		return nil
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		for _, v := range vars {
+			// The cause travels: a Spanner abort has to stay matchable for
+			// ReadWriteTransaction to retry the callback.
 			if err := tx.Statements().SetVariable(ctx, v); err != nil {
-				return domain.ErrInternal(err).WithMessage("failed to write variable to database")
+				return err
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to set variables in the database")
+		return setVariableError(err)
 	}
 	return nil
+}
+
+// setVariableError names the one write failure a caller can act on. The
+// variables table references (project_id, name) on environments, so an owner
+// naming an environment that does not exist is refused by the database rather
+// than stored where nothing would ever read it -- which, with no inheritance to
+// fall back on, would read as empty rather than as the project's value.
+//
+// The project reference fails the same way, but it cannot be reached here: the
+// project is resolved from the request before a variable is built.
+func setVariableError(err error) error {
+	if de, ok := errors.AsType[domain.Error](err); ok {
+		return de
+	}
+	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+		return domain.ErrEnvironmentNotFound().WithParent(err)
+	}
+	return domain.ErrInternal(err).WithMessage("failed to write variable to database")
 }
 
 func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
