@@ -1,0 +1,21 @@
+type: object
+description: |
+  The theme sides this project publishes, and which of them may run.
+
+  Publishing one side makes it the only theme that resolves, even under `auto`
+  or an operating-system preference for the other. Publishing both lets `auto`
+  follow the operating system, each side using its own logo and palette.
+
+  The element-level `theme` property overrides `mode`, but cannot select a
+  side the project never published.
+properties:
+  mode:
+    type: string
+    enum: [light, dark, auto]
+    description: |
+      Which published side may run. `auto` follows the operating system.
+    example: auto
+  light:
+    $ref: branding-theme-side.yaml
+  dark:
+    $ref: branding-theme-side.yaml

@@ -195,7 +195,7 @@ function mapTypography(typography: BrandingTypography | undefined): Record<strin
 function mapShape(shape: BrandingShape | undefined): Record<string, string> {
   if (!shape) return {};
   const out: Record<string, string> = {};
-  if (shape.radius && RADIUS_MAP[shape.radius]) {
+  if (typeof shape.radius === "string" && RADIUS_MAP[shape.radius]) {
     const radius = RADIUS_MAP[shape.radius];
     // The three steps the atoms actually draw with: `md` for controls (inputs,
     // buttons), `lg` for the alert, `xl` for the card. Scaling them off one
