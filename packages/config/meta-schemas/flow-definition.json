@@ -181,7 +181,7 @@
               "github"
             ]
           ],
-          "description": "Slugs of the identity provider connections offered on this step. Each entry must match the `slug` of a connection in the project; the connection supplies the display name and template at render time. When non-empty, the step must define a `transitions.callback` entry — the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
+          "description": "List of connection slugs offered on this step. Each entry must match the `slug` of a connection in the project; the connection supplies the display name and template at render time. When non-empty, the step must define a `transitions.callback` entry — the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
         },
         "on_success": {
           "type": "string",
