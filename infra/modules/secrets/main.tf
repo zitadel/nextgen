@@ -64,8 +64,7 @@ resource "google_secret_manager_secret_iam_member" "deploy_version_adder" {
 #
 # `migrate` never actually uses the key: it runs goose and exits without
 # building a crypter. If a later change makes the key unnecessary here, the
-# grant and the mount should both come off — tracked in the follow-up issue
-# referenced in infra/README.md.
+# grant and the mount should both come off — tracked in #1193.
 resource "google_secret_manager_secret_iam_member" "migrator_accessor" {
   for_each = google_secret_manager_secret.runtime
 

@@ -185,5 +185,5 @@ being startable the moment that flag is set.
 
 That makes the mount a consequence of shared config loading rather than
 something the migration needs, so it is worth removing if that ever stops being
-true. Tracked as a follow-up issue; the grant in `infra/modules/secrets` and the
-volume in `infra/modules/cloud-run` come off together.
+true. Tracked in #1193; the grant in `infra/modules/secrets` and the volume in
+`infra/modules/cloud-run` come off together.

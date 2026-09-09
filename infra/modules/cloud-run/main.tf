@@ -175,7 +175,7 @@ resource "google_cloud_run_v2_job" "migrate" {
       # `migrate` never uses the key: it runs goose and exits without building
       # a crypter. Mounting it is what keeps the job startable, not something
       # the migration needs, so it should come off if that ever stops being
-      # true. See the follow-up issue in infra/README.md.
+      # true. Tracked in #1193.
       dynamic "volumes" {
         for_each = var.runtime_secrets_ready ? [1] : []
         content {
