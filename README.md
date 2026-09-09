@@ -86,7 +86,9 @@ npx @zitadel/cli@alpha claim
 This opens a browser so you can sign in with your own Zitadel account (not
 one of the app's end users) and attach the project to your team. The link
 prints before any browser opens, so it works over SSH or headless too
-(`--no-open`); nothing about the running project changes.
+(`--no-open`); nothing about the running project changes. Claiming only
+works within 14 days of running `setup` — after that, `setup` a fresh
+project instead.
 
 > **Trying this before deploying to Zitadel Cloud:** claiming needs a server
 > with a platform project bootstrapped, which Zitadel Cloud has by default.
