@@ -144,7 +144,7 @@ describe("run-cli wrapper", () => {
     const statFor = (mtimes: Record<string, number>) => async (path: string) => {
       const mtimeMs = mtimes[path];
       if (mtimeMs === undefined) {
-        throw new Error(`ENOENT: ${path}`);
+        throw Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" });
       }
       return { mtimeMs };
     };
@@ -162,6 +162,11 @@ describe("run-cli wrapper", () => {
       runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 2000 })),
     ).resolves.toBeUndefined();
     await expect(runCli.assertFreshInstall("/repo", statFor({}))).resolves.toBeUndefined();
+    await expect(
+      runCli.assertFreshInstall("/repo", async () => {
+        throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+      }),
+    ).rejects.toThrow("EACCES");
   });
 
   it("fails before building anything when the install is stale", async () => {

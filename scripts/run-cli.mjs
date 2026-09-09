@@ -89,13 +89,23 @@ export async function main(options = {}) {
 // mtime is a heuristic: a branch switch can rewrite an unchanged lockfile and
 // report stale, but the remedy is then a fast no-op install.
 export async function assertFreshInstall(root = repoRoot, statFn = stat) {
-  const lockfile = await statFn(join(root, "pnpm-lock.yaml")).catch(() => undefined);
+  // Only "not there" counts as missing; EACCES and friends are real problems
+  // the guard must not silently shrug off.
+  const statIfExists = async (path) => {
+    try {
+      return await statFn(path);
+    } catch (error) {
+      if (error?.code === "ENOENT" || error?.code === "ENOTDIR") {
+        return undefined;
+      }
+      throw error;
+    }
+  };
+  const lockfile = await statIfExists(join(root, "pnpm-lock.yaml"));
   if (!lockfile) {
     return;
   }
-  const installed = await statFn(join(root, "node_modules", ".pnpm", "lock.yaml")).catch(
-    () => undefined,
-  );
+  const installed = await statIfExists(join(root, "node_modules", ".pnpm", "lock.yaml"));
   if (!installed || installed.mtimeMs < lockfile.mtimeMs) {
     throw new Error(
       "workspace dependencies are missing or older than pnpm-lock.yaml. Run: corepack pnpm install --frozen-lockfile",
