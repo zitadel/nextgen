@@ -1,12 +1,17 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 type RunCliModule = {
+  assertFreshInstall: (
+    root?: string,
+    statFn?: (path: string) => Promise<{ mtimeMs: number }>,
+  ) => Promise<void>;
   cliCwdFor: (env?: Record<string, string | undefined>, fallback?: string) => string;
   commandName: (args: string[]) => string | undefined;
   main: (options: {
     args?: string[];
     cwd?: string;
     env?: Record<string, string | undefined>;
+    assertFreshInstall?: () => Promise<void>;
     buildCli?: (options: { env: Record<string, string | undefined> }) => Promise<void>;
     buildLocalServerBinary?: (options: {
       env: Record<string, string | undefined>;
@@ -135,6 +140,47 @@ describe("run-cli wrapper", () => {
     ).toBe(false);
   });
 
+  it("flags a stale or missing install and stays quiet on a fresh one", async () => {
+    const statFor = (mtimes: Record<string, number>) => async (path: string) => {
+      const mtimeMs = mtimes[path];
+      if (mtimeMs === undefined) {
+        throw new Error(`ENOENT: ${path}`);
+      }
+      return { mtimeMs };
+    };
+    const lockfile = "/repo/pnpm-lock.yaml";
+    const installed = "/repo/node_modules/.pnpm/lock.yaml";
+    const remedy = "corepack pnpm install --frozen-lockfile";
+
+    await expect(
+      runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 1000 })),
+    ).rejects.toThrow(remedy);
+    await expect(
+      runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000 })),
+    ).rejects.toThrow(remedy);
+    await expect(
+      runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 2000 })),
+    ).resolves.toBeUndefined();
+    await expect(runCli.assertFreshInstall("/repo", statFor({}))).resolves.toBeUndefined();
+  });
+
+  it("fails before building anything when the install is stale", async () => {
+    const buildCli = vi.fn(noop);
+
+    await expect(
+      runCli.main({
+        args: ["doctor"],
+        env: { PATH: "/bin" },
+        assertFreshInstall: async () => {
+          throw new Error("Run: corepack pnpm install --frozen-lockfile");
+        },
+        buildCli,
+        run: vi.fn(noop),
+      }),
+    ).rejects.toThrow("corepack pnpm install --frozen-lockfile");
+    expect(buildCli).not.toHaveBeenCalled();
+  });
+
   it("builds and injects a local server binary for the default binary start runtime", async () => {
     const calls: string[] = [];
     const env = { PATH: "/bin" };
@@ -143,6 +189,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start"],
       env,
+      assertFreshInstall: noop,
       buildCli: async (options) => {
         calls.push("build-cli");
         expect(options.env).toBe(env);
@@ -185,6 +232,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start", "--runtime", "docker"],
       env,
+      assertFreshInstall: noop,
       buildCli: async (options) => {
         calls.push("build-cli");
         expect(options.env).toBe(env);
@@ -226,6 +274,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start", "--image", "custom:tag"],
       env: { PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage,
@@ -249,6 +298,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start"],
       env: { PATH: "/bin", ZITADEL_LOCAL_IMAGE: "custom:tag" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage,
@@ -271,6 +321,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start", "--runtime", "binary"],
       env: { PATH: "/bin", ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage: vi.fn(noop),
@@ -291,6 +342,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start", "--dry-run"],
       env: { PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage: vi.fn(noop),
@@ -310,6 +362,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["doctor"],
       env: { PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage,
@@ -326,6 +379,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["setup", "--server", "local", "--skip-install"],
       env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalRuntimeImage: vi.fn(noop),
       run,
@@ -362,6 +416,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["setup", "--server", "local"],
       env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalRuntimeImage: vi.fn(noop),
       prepareLocalRegistry,
@@ -399,6 +454,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["setup", "--server", "local", "--json"],
       env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalRuntimeImage: vi.fn(noop),
       prepareLocalRegistry,
