@@ -389,9 +389,7 @@ describe("local runtime commands", () => {
       injected: ["FROM_SHELL", "GITHUB_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET"],
       missing: ["ABSENT_VAR"],
     });
-    expect(envelope.warnings).toEqual([
-      expect.stringMatching(/^Variable ABSENT_VAR is referenced/),
-    ]);
+    expect(envelope.warnings).toEqual([expect.stringMatching(/^ABSENT_VAR is referenced/)]);
     expect(result.stdout).not.toContain("canary");
     expect(result.stderr).not.toContain("canary");
 
@@ -415,7 +413,7 @@ describe("local runtime commands", () => {
     });
     expect(again.exitCode).toBe(0);
     expect(parseJson(again.stdout)).toMatchObject({
-      warnings: [expect.stringMatching(/^Variable ABSENT_VAR is referenced/)],
+      warnings: [expect.stringMatching(/^ABSENT_VAR is referenced/)],
       data: {
         title: "Local Zitadel server is already running.",
         runtime: { env: envelope.data.runtime.env },
@@ -479,7 +477,7 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     expect(parseJson(result.stdout)).toMatchObject({
-      warnings: [expect.stringMatching(/^Variable GITHUB_CLIENT_SECRET is referenced/)],
+      warnings: [expect.stringMatching(/^GITHUB_CLIENT_SECRET is referenced/)],
       data: {
         title: "Local Zitadel server is already running.",
         runtime: { env: recorded },

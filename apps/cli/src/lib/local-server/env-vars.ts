@@ -123,17 +123,9 @@ export const loadProjectEnv = async (
 ): Promise<ResolvedEnv> =>
   names.length === 0 ? EMPTY_ENV : resolveEnvNames(names, [await loadEnvFiles(cwd), processEnv]);
 
-/**
- * Envelope warnings for declared names that had no value at spawn. Names
- * only. A running runtime is not hot-updated, so the fix is a restart.
- */
-export const envWarnings = ({ missing }: EnvSummary): readonly string[] => {
-  if (missing.length === 0) {
-    return [];
-  }
-  const [noun, verb, pronoun] =
-    missing.length === 1 ? ["Variable", "is", "it"] : ["Variables", "are", "them"];
-  return [
-    `${noun} ${missing.join(", ")} ${verb} referenced by the project but not set in ${ENV_FILES.join(", ")} or the environment. The runtime is running without ${pronoun}; add the value, then run \`zitadel stop\` and \`zitadel start\`.`,
-  ];
-};
+/** One warning per declared name that had no value at spawn. Names only. */
+export const envWarnings = ({ missing }: EnvSummary): readonly string[] =>
+  missing.map(
+    (name) =>
+      `${name} is referenced by the project but not set in ${ENV_FILES.join(", ")} or the environment; add it, then run \`zitadel stop\` and \`zitadel start\`.`,
+  );

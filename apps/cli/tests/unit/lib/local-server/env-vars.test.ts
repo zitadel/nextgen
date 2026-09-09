@@ -111,15 +111,13 @@ describe("dev-runtime env resolution", () => {
     expect(resolved).toBe(EMPTY_ENV);
   });
 
-  it("phrases the missing-variable warning with names only", () => {
+  it("emits one warning per missing name, names only", () => {
     expect(envWarnings(EMPTY_ENV)).toEqual([]);
-    expect(envWarnings({ injected: [], missing: ["GOOGLE_CLIENT_SECRET"] })).toEqual([
-      expect.stringMatching(
-        /^Variable GOOGLE_CLIENT_SECRET is referenced .* \.env\.local, \.env .* run `zitadel stop` and `zitadel start`\.$/,
-      ),
-    ]);
     expect(envWarnings({ injected: [], missing: ["A", "B"] })).toEqual([
-      expect.stringMatching(/^Variables A, B are referenced/),
+      expect.stringMatching(
+        /^A is referenced .* \.env\.local, \.env .* `zitadel stop` and `zitadel start`\.$/,
+      ),
+      expect.stringMatching(/^B is referenced/),
     ]);
   });
 });
