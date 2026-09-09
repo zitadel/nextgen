@@ -338,7 +338,7 @@ describe("add user sheet", () => {
   // });
 
   it("marks fields the schema does not require, and leaves required ones unmarked", async () => {
-    // `Optional` (`27843:10611`) sits beside the label, driven by the schema's
+    // `Optional` sits beside the label, driven by the schema's
     // `required` array rather than by which fields the design happens to mark.
     stubSchemas({ sch_business: BUSINESS });
     await openSheet();
