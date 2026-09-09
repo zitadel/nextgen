@@ -77,6 +77,13 @@ resource "google_cloud_run_v2_service" "zitadel" {
         }
       }
 
+      # `server` does not migrate: since #1152 that needs --migrate, and the
+      # image's own CMD is ["--migrate"]. Setting args explicitly overrides
+      # that CMD and states the contract in code — the job migrates, the
+      # service serves — instead of inheriting it from whatever a console
+      # deploy last left behind.
+      args = ["server"]
+
       dynamic "env" {
         for_each = var.runtime_secrets_ready ? [1] : []
         content {
@@ -87,6 +94,17 @@ resource "google_cloud_run_v2_service" "zitadel" {
               version = "latest"
             }
           }
+        }
+      }
+
+      # Gated with the mount on purpose: refusing to generate a key is only
+      # safe once a key is actually mounted, or the service could not start at
+      # all while runtime_secrets_ready is still false.
+      dynamic "env" {
+        for_each = var.runtime_secrets_ready ? [1] : []
+        content {
+          name  = "NEXTGEN_SERVER_GENERATE_MASTER_KEY"
+          value = "false"
         }
       }
 
@@ -107,7 +125,6 @@ resource "google_cloud_run_v2_service" "zitadel" {
       # deploy and a deploy cannot undo an apply.
       template[0].containers[0].image,
       template[0].containers[0].command,
-      template[0].containers[0].args,
       template[0].containers[0].startup_probe,
       template[0].containers[0].liveness_probe,
       # The live container is named `nextgen-1` from an earlier console deploy.
@@ -150,17 +167,69 @@ resource "google_cloud_run_v2_job" "migrate" {
         egress = "ALL_TRAFFIC"
       }
 
+      # The job carries the same secrets as the service. The DSN is the point
+      # of the job; the master key is here because `migrate` loads the same
+      # configuration as `server`, and with generation disabled (#1151) a start
+      # that finds no key fails — in loadConfig, which `migrate` calls too.
+      #
+      # `migrate` never uses the key: it runs goose and exits without building
+      # a crypter. Mounting it is what keeps the job startable, not something
+      # the migration needs, so it should come off if that ever stops being
+      # true. See the follow-up issue in infra/README.md.
+      dynamic "volumes" {
+        for_each = var.runtime_secrets_ready ? [1] : []
+        content {
+          name = "master-key"
+          secret {
+            secret = var.master_key_secret_id
+            items {
+              path    = local.master_key_file_name
+              version = "latest"
+            }
+          }
+        }
+      }
+
       containers {
         # Create-time bootstrap value, for the same reason as the service
-        # above; `image` is ignored below, so what the job actually carries is
-        # whatever was last set on it out of band — today an old zitadel image,
-        # not this placeholder.
-        #
-        # Nothing invokes the job either way: the binary has no `migrate`
-        # subcommand (#1138), so migrations run at server startup and pointing
-        # this at a release would start a server that never exits and fail on
-        # the timeout below.
+        # above; `image` is ignored below, so what the job carries in practice
+        # is whatever the deploy workflow last set — today an old zitadel image
+        # left over from before this configuration existed.
         image = "us-docker.pkg.dev/cloudrun/container/hello-job"
+
+        # Apply schema and exit. `nextgen migrate` arrived in #1152; before it,
+        # this job could not be wired at all, because the only command was
+        # `server` and it would never have exited.
+        args = ["migrate"]
+
+        dynamic "volume_mounts" {
+          for_each = var.runtime_secrets_ready ? [1] : []
+          content {
+            name       = "master-key"
+            mount_path = local.master_key_dir
+          }
+        }
+
+        dynamic "env" {
+          for_each = var.runtime_secrets_ready ? [1] : []
+          content {
+            name = "NEXTGEN_DATABASE_POSTGRES"
+            value_source {
+              secret_key_ref {
+                secret  = var.database_postgres_secret_id
+                version = "latest"
+              }
+            }
+          }
+        }
+
+        dynamic "env" {
+          for_each = var.runtime_secrets_ready ? [1] : []
+          content {
+            name  = "NEXTGEN_SERVER_GENERATE_MASTER_KEY"
+            value = "false"
+          }
+        }
 
         resources {
           limits = {
@@ -174,11 +243,10 @@ resource "google_cloud_run_v2_job" "migrate" {
 
   lifecycle {
     ignore_changes = [
-      # Deploy workflow owns release-specific fields via `gcloud run jobs update`.
+      # Same split as the service: the deploy workflow owns the release, this
+      # module owns the configuration.
       template[0].template[0].containers[0].image,
       template[0].template[0].containers[0].command,
-      template[0].template[0].containers[0].args,
-      template[0].template[0].containers[0].env,
       # Same reasoning as the service above — gcloud stamps these fields
       # on every update; Terraform should not fight them.
       client,

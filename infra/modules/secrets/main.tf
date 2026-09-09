@@ -55,7 +55,22 @@ resource "google_secret_manager_secret_iam_member" "deploy_version_adder" {
   member    = "serviceAccount:${var.github_deploy_sa_email}"
 }
 
-# Deliberately absent: a binding for the migrator service account. The
-# zitadel-migrate-<env> job has no work to do yet — the released binary has no
-# `migrate` subcommand, so migrations run at server startup instead. Grant the
-# migrator access when that command lands.
+# The migration job reads the same secrets. `nextgen migrate` (#1152) loads the
+# same configuration as `server`, so it needs the DSN for obvious reasons and
+# the master key for a less obvious one: with master key generation disabled
+# (#1151), a start that finds no key fails rather than minting one — and that
+# check runs in loadConfig, which `migrate` calls too. Mounting the same key on
+# both is what keeps the job startable once generation is off.
+#
+# `migrate` never actually uses the key: it runs goose and exits without
+# building a crypter. If a later change makes the key unnecessary here, the
+# grant and the mount should both come off — tracked in the follow-up issue
+# referenced in infra/README.md.
+resource "google_secret_manager_secret_iam_member" "migrator_accessor" {
+  for_each = google_secret_manager_secret.runtime
+
+  project   = var.project_id
+  secret_id = each.value.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.migrator_sa_email}"
+}

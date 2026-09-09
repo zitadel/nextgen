@@ -56,6 +56,7 @@ module "secrets" {
   project_id             = var.project_id
   environment            = var.environment
   run_sa_email           = module.iam.run_sa_email
+  migrator_sa_email      = module.iam.migrator_sa_email
   github_deploy_sa_email = var.github_deploy_sa_email
 
   depends_on = [module.project]

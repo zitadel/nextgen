@@ -163,8 +163,27 @@ After that the flag stays true and deploys are just the workflow.
 
 ## Migrations
 
-`zitadel-migrate-<environment>` exists but is **not wired**. The released binary
-has no `migrate` subcommand — its only command is `server`, which runs
-`pool.Migrate(ctx)` at startup. Running the job today would start a server that
-never exits and fail on the job timeout, so the deploy workflow lets the service
-migrate on start. Wire the job once a `migrate` command exists.
+Schema changes run as their own step, in `zitadel-migrate-<environment>`, before
+the service is updated. The deploy workflow points the job at the release,
+executes it, waits, and only then rolls the service.
+
+This became possible with `nextgen migrate` (#1152). The same change made it
+necessary: `server` no longer migrates unless `--migrate` is passed, and the
+image's `CMD` of `["--migrate"]` is overridden by the `args` this module sets.
+So the split is explicit on both sides — the job runs `migrate`, the service
+runs `server` — rather than depending on which argv a container happens to
+inherit.
+
+### Why the job carries the master key
+
+It does not use it. `migrate` runs goose and exits without building a crypter.
+
+It is mounted because `migrate` loads the same configuration as `server`, and
+with master key generation disabled (#1151) a start that finds no key fails —
+in `loadConfig`, which `migrate` calls too. Without the mount the job would stop
+being startable the moment that flag is set.
+
+That makes the mount a consequence of shared config loading rather than
+something the migration needs, so it is worth removing if that ever stops being
+true. Tracked as a follow-up issue; the grant in `infra/modules/secrets` and the
+volume in `infra/modules/cloud-run` come off together.

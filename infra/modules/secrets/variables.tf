@@ -13,6 +13,11 @@ variable "run_sa_email" {
   type        = string
 }
 
+variable "migrator_sa_email" {
+  description = "Migration job service account; reads the same secrets at job start"
+  type        = string
+}
+
 variable "github_deploy_sa_email" {
   description = "Email of the github-deploy SA from the mgmt project; adds secret versions during deploy"
   type        = string
