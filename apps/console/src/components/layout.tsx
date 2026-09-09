@@ -42,7 +42,7 @@ export function ContentGrid({
 
 /**
  * The page wrapper for a configuration detail screen — the ones that render a
- * single `detailPanel` card rather than a title row over a table.
+ * single panel card rather than a title row over a table.
  *
  * The frames inset that panel by 24px on every side, and by 16px on the sides
  * in their narrow variant. Shared because the schema and login-flow screens are

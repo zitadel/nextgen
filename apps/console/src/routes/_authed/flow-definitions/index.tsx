@@ -91,9 +91,8 @@ function LoginFlowsScreen() {
         </h1>
       </div>
 
-      {/* The design's `directoryRow` card — rows run edge to edge and carry
-          their own `px-6`, so the dividers between them are full-bleed. The
-          same card the user-schema directory draws. */}
+      {/* Rows run edge to edge and carry their own `px-6`, so the dividers
+          between them are full-bleed. Same card as the user-schema directory. */}
       <Card className="mt-3 gap-0 overflow-hidden border-foreground/10 py-0 shadow-xs">
         {flows.length === 0 ? (
           <p className="px-6 py-8 text-center text-sm text-muted-foreground">
@@ -108,7 +107,7 @@ function LoginFlowsScreen() {
 }
 
 /**
- * One row of the flows directory (`1850:19283`).
+ * One row of the flows directory.
  *
  * Five columns — name over its purposes, the definition's step names as chips,
  * the user schema, the last change, and the row menu. The whole row is the
