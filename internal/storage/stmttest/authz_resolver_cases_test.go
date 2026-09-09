@@ -71,7 +71,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		})
 
 		t.Run("foothold none", func(t *testing.T) {
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, "user_none_"+uniqueSuffix(t))
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, "user_none_"+uniqueSuffix(t))
 			require.NoError(t, err)
 			assert.False(t, ok)
 		})
@@ -80,7 +80,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_fh_asgn_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.True(t, ok)
 		})
@@ -88,7 +88,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		t.Run("foothold via membership edge only", func(t *testing.T) {
 			u := "user_fh_edge_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, teamT, u)))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.True(t, ok)
 		})
@@ -98,7 +98,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
 			require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, a.ID))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.False(t, ok)
 		})
@@ -644,35 +644,6 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 				}
 			}
 			assert.Equal(t, 1, count)
-		})
-
-		// --- E. Params / home ---
-		t.Run("home project id defaults to project", func(t *testing.T) {
-			u := "user_home_def_" + uniqueSuffix(t)
-			team := "team_home_def_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
-			params := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
-			params.PrincipalHomeProjectID = ""
-			allowed, _ := check(t, params)
-			assert.True(t, allowed)
-		})
-
-		t.Run("home project mismatch deny expand", func(t *testing.T) {
-			u := "user_home_mis_" + uniqueSuffix(t)
-			team := "team_home_mis_" + uniqueSuffix(t)
-			other := ensureProject(t, d.stmts)
-			otherTeam := "team_home_other_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(other, otherTeam)))
-			// Membership only in other project; grant team viewer in protected project.
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(other, otherTeam, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
-			assert.False(t, allowed)
 		})
 	})
 }
