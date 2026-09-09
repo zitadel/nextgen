@@ -51,7 +51,12 @@ export function validateBranding(
   }
 
   out.logo_url = sanitiseUrl(out.logo_url, "logo_url", issues, { allowed: allowLoopbackHttp });
-  out.font_url = sanitiseUrl(out.font_url, "font_url", issues);
+  if (out.typography?.font_url) {
+    out.typography = {
+      ...out.typography,
+      font_url: sanitiseUrl(out.typography.font_url, "typography.font_url", issues),
+    };
+  }
   out.hero_url = sanitiseUrl(out.hero_url, "hero_url", issues, { allowed: allowLoopbackHttp });
   if (out.assets) {
     out.assets = {

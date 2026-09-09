@@ -52,13 +52,113 @@ describe("brandingConfigSchema", () => {
     }
   });
 
-  it("rejects font_url — read-only in v1 (ADR 040)", () => {
+  it("rejects font_url without a font family", () => {
     const result = brandingConfigSchema.safeParse({
       ...base,
-      font_url: "https://fonts.example.com/css2",
+      typography: { font_url: "https://fonts.example.com/css2" },
     });
     expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("font_url is not writable yet");
+    expect(JSON.stringify(result.error?.issues)).toContain("needs a typography.font_family");
+  });
+
+  it("accepts font_url alongside the family it loads", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      typography: {
+        font_family: "Inter, ui-sans-serif, sans-serif",
+        font_url: "https://fonts.example.com/css2",
+      },
+    });
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it("rejects a palette colour that could close its CSS declaration", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      theme: { light: { palette: { primary: "red; } :host { display: none" } } },
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("theme.light.palette.primary");
+  });
+
+  it("rejects a non-string palette value", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      theme: { light: { palette: { primary: 123 } } },
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("expected string");
+  });
+
+  it("rejects a colour that fetches a URL", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      theme: { dark: { palette: { background: "url(https://evil.example/beacon.png)" } } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a font stack that could close its CSS declaration", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      typography: { font_family: "Inter; } :host { display: none" },
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("typography.font_family");
+  });
+
+  it("rejects an http theme-side logo", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      theme: { dark: { logo_url: "http://cdn.example.com/on-dark.svg" } },
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("theme.dark.logo_url");
+  });
+
+  it("rejects an http font_url — a stylesheet has no loopback carve-out", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("typography.font_url");
+  });
+
+  it("rejects a URL carrying credentials", () => {
+    for (const [field, doc] of [
+      ["logo_url", { ...base, logo_url: "https://user:pass@cdn.example.com/logo.svg" }],
+      [
+        "typography.font_url",
+        {
+          ...base,
+          typography: { font_family: "Inter", font_url: "https://user:pass@fonts.example.com/c" },
+        },
+      ],
+    ] as const) {
+      const result = brandingConfigSchema.safeParse(doc);
+      expect(result.success, `${field} accepted credentials`).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toContain("credentials");
+    }
+  });
+
+  it("accepts the appearance blocks", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      theme: {
+        mode: "auto",
+        light: {
+          logo_url: "https://cdn.example.com/on-light.svg",
+          palette: { primary: "#4F46E5", link: "rebeccapurple" },
+        },
+        dark: {
+          logo_url: "https://cdn.example.com/on-dark.svg",
+          palette: { primary: "color-mix(in oklab, #A5B4FC 40%, white)" },
+        },
+      },
+      shape: { radius: 10, density: "regular", logo_scale: 1.5 },
+    });
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
   it("rejects unknown keys and double template carriers", () => {
