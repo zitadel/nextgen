@@ -71,17 +71,19 @@ describe("dev-runtime env resolution", () => {
     expect(resolved.missing).toEqual(["constructor", "__proto__", "toString"]);
   });
 
-  it("drops reserved names instead of letting a project file set them", () => {
+  it("drops reserved names, in any case, instead of letting a project file set them", () => {
     const resolved = resolveEnvNames(
       [
         "PATH",
+        "Path",
         "NODE_OPTIONS",
+        "node_options",
         "LD_PRELOAD",
         "DYLD_INSERT_LIBRARIES",
         "NEXTGEN_SERVER_DATA_DIR",
         "OK",
       ],
-      [{ PATH: "/evil", NODE_OPTIONS: "--require evil.js", OK: "fine" }],
+      [{ PATH: "/evil", Path: "/evil", NODE_OPTIONS: "--require evil.js", OK: "fine" }],
     );
     expect(resolved).toEqual({ values: { OK: "fine" }, injected: ["OK"], missing: [] });
   });

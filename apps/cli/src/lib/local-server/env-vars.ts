@@ -41,9 +41,10 @@ export const EMPTY_ENV: ResolvedEnv = { ...EMPTY_SUMMARY, values: {} };
 /**
  * Names a project file may reference but must never be allowed to set on the
  * spawned process: the loader and the CLI's own server settings. A checked-in
- * `.env` overriding `NODE_OPTIONS` would run code on `zitadel start`.
+ * `.env` overriding `NODE_OPTIONS` would run code on `zitadel start`. Matched
+ * case-insensitively because Windows treats `Path` and `PATH` as one variable.
  */
-export const RESERVED_ENV = /^(PATH|NODE_OPTIONS|LD_.*|DYLD_.*|NEXTGEN_SERVER_.*)$/;
+export const RESERVED_ENV = /^(PATH|NODE_OPTIONS|LD_.*|DYLD_.*|NEXTGEN_SERVER_.*)$/i;
 
 /** True for an `env` block read back from `runtime.json`; names only. */
 export const isEnvSummary = (value: unknown): value is EnvSummary =>

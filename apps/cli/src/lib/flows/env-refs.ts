@@ -47,30 +47,41 @@ const collect = (node: unknown): readonly string[] => {
  * Deliberately reads every `.json` file rather than the resource directories
  * the syncers own: `start` only looks names up, so scanning a file that is not
  * a resource costs one extra lookup at most, and a new resource kind is covered
- * the day its directory appears. Only `local/` is skipped: the runtime writes
- * there while running. Extend the skip (`meta/`, `state.json`) if another
- * non-resource file ever produces false references.
+ * the day its directory appears. Only `local/` is skipped, without entering
+ * it: the runtime writes there while running. Extend the skip (`meta/`,
+ * `state.json`) if another non-resource file ever produces false references.
  */
 export const projectEnvRefs = async (cwd: string): Promise<string[]> => {
-  const entries = await readdir(join(cwd, ZITADEL_DIR), {
-    recursive: true,
-    withFileTypes: true,
-  }).catch((error: unknown) => {
+  const files = await jsonFiles(join(cwd, ZITADEL_DIR), [LOCAL_DIR]);
+  const documents = await Promise.all(files.map(readJson));
+  return unique(documents.flatMap(envRefs));
+};
+
+/**
+ * Every `*.json` under `dir`, walking directories explicitly so `skip` entries
+ * are never entered; a recursive `readdir` would enumerate the runtime's data
+ * directory before it could be filtered out.
+ */
+const jsonFiles = async (dir: string, skip: readonly string[] = []): Promise<string[]> => {
+  const entries = await readdir(dir, { withFileTypes: true }).catch((error: unknown) => {
     if (isObject(error) && error.code === "ENOENT") {
       return [];
     }
     throw error;
   });
-  const isResource = (entry: (typeof entries)[number]) =>
-    entry.isFile() &&
-    entry.name.endsWith(".json") &&
-    !entry.parentPath.startsWith(join(cwd, ZITADEL_DIR, LOCAL_DIR));
-  const documents = await Promise.all(entries.filter(isResource).map(readJson));
-  return unique(documents.flatMap(envRefs));
+  const nested = await Promise.all(
+    entries.map((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return skip.includes(entry.name) ? [] : jsonFiles(path);
+      }
+      return entry.isFile() && entry.name.endsWith(".json") ? [path] : [];
+    }),
+  );
+  return nested.flat();
 };
 
-const readJson = async (entry: { parentPath: string; name: string }): Promise<unknown> => {
-  const path = join(entry.parentPath, entry.name);
+const readJson = async (path: string): Promise<unknown> => {
   const raw = await readFile(path, "utf8");
   try {
     return JSON.parse(raw.replace(/^\uFEFF/, ""));
