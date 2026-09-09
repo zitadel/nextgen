@@ -108,6 +108,10 @@ func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *Creat
 // created here — claim owns that path. An unrevoked grant with the same
 // principal and relation occupies the unique key even after `expires_at`;
 // DELETE it before re-creating.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). Session callers are authorized as
+// the human against the target project (home may differ). CSRF/Origin
+// for cookie mutations is a follow-up (#1140).
 //
 // POST /grants
 func (UnimplementedHandler) CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (r CreateGrantRes, _ error) {
@@ -236,6 +240,9 @@ func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params Del
 // Already-revoked, missing, project-secret setup, and owning-team grants
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // DELETE /grants/{id}
 func (UnimplementedHandler) DeleteGrant(ctx context.Context, params DeleteGrantParams) (r DeleteGrantRes, _ error) {
@@ -405,6 +412,9 @@ func (UnimplementedHandler) GetFlowStep(ctx context.Context, params GetFlowStepP
 // `resource_scope_index`; project scope is required on the query (same as
 // events). Misses, revoked rows, project-secret setup (`sk_proj`),
 // owning-team (`relation=team`) rows, and cross-project ids return 404.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // GET /grants/{id}
 func (UnimplementedHandler) GetGrant(ctx context.Context, params GetGrantParams) (r GetGrantRes, _ error) {
@@ -665,9 +675,13 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
 // get). Requires `project.read`. `expand: ["principal"]` additionally
-// requires `user.read` and `team.read` (documented on the expand enum;
-// those scopes cannot be ANDed onto this security block because they are
-// body-conditional).
+// requires `user.read` and `team.read` for project secrets (documented on
+// the expand enum; those scopes cannot be ANDed onto this security block
+// because they are body-conditional). A user-bound Console session that
+// already passed the project Check may expand without those scopes.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /grants/query
 func (UnimplementedHandler) QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (r QueryGrantsRes, _ error) {
@@ -706,9 +720,13 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 // QueryUsers implements queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// The project comes from the credential, not from a parameter: the operation
-// is bound to the token's own project by construction. This is why it takes
-// no `project_id`, unlike the other query endpoints.
+// The project comes from the credential, not from a parameter: the
+// operation is bound to the credential's home project by construction
+// (oauth2 secret or user-bound session). This is why it takes no
+// `project_id`, unlike the other query endpoints.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /users/query
 func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest) (r QueryUsersRes, _ error) {

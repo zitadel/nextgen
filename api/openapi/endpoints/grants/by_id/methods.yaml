@@ -10,11 +10,16 @@ get:
     `resource_scope_index`; project scope is required on the query (same as
     events). Misses, revoked rows, project-secret setup (`sk_proj`),
     owning-team (`relation=team`) rows, and cross-project ids return 404.
+
+    Accepts either a project secret (`oauth2`) or a user-bound Console
+    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+    is a follow-up (#1140).
   tags:
     - Grants
   security:
     - oauth2:
         - project.read
+    - nextgenSession: []
   parameters:
     - name: id
       in: path
@@ -61,11 +66,16 @@ delete:
     Already-revoked, missing, project-secret setup, and owning-team grants
     return 404. The row is not un-revoked. Expired grants can still be
     revoked so the unique binding can be reused.
+
+    Accepts either a project secret (`oauth2`) or a user-bound Console
+    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+    is a follow-up (#1140).
   tags:
     - Grants
   security:
     - oauth2:
         - project.write
+    - nextgenSession: []
   parameters:
     - name: id
       in: path

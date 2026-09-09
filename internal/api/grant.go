@@ -51,15 +51,18 @@ func (h *Handler) QueryGrants(ctx context.Context, req *api.QueryGrantsRequest, 
 	}
 	svcReq := mapQueryGrantsToService(string(params.ProjectID), req)
 	if svcReq.IncludePrincipal {
-		// Constructors stay in this function so gen_openapi_errors can see
-		// user.permission_denied / team.permission_denied on the operation.
-		if !hasGranularOrOperator(ctx, "user.read") {
-			return nil, domain.ErrUserPermissionDenied().
-				WithMessage("expanding a grant principal requires user.read")
-		}
-		if !hasGranularOrOperator(ctx, "team.read") {
-			return nil, domain.ErrTeamPermissionDenied().
-				WithMessage("expanding a grant principal requires team.read")
+		scope, ok := GetScopeContext(ctx)
+		if !ok || scope.PrincipalType != domain.AuthzPrincipalTypeUser {
+			// Constructors stay in this function so gen_openapi_errors can see
+			// user.permission_denied / team.permission_denied on the operation.
+			if !hasGranularOrOperator(ctx, "user.read") {
+				return nil, domain.ErrUserPermissionDenied().
+					WithMessage("expanding a grant principal requires user.read")
+			}
+			if !hasGranularOrOperator(ctx, "team.read") {
+				return nil, domain.ErrTeamPermissionDenied().
+					WithMessage("expanding a grant principal requires team.read")
+			}
 		}
 	}
 	listed, err := h.grantService.List(ctx, svcReq)

@@ -105,6 +105,10 @@ type Invoker interface {
 	// created here — claim owns that path. An unrevoked grant with the same
 	// principal and relation occupies the unique key even after `expires_at`;
 	// DELETE it before re-creating.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the target project (home may differ). CSRF/Origin
+	// for cookie mutations is a follow-up (#1140).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -206,6 +210,9 @@ type Invoker interface {
 	// Already-revoked, missing, project-secret setup, and owning-team grants
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -336,6 +343,9 @@ type Invoker interface {
 	// `resource_scope_index`; project scope is required on the query (same as
 	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
 	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -527,9 +537,13 @@ type Invoker interface {
 	// owning-team (`relation=team`) rows are not returned. Grants are not in
 	// `resource_scope_index`; project scope is required on the query (same as
 	// get). Requires `project.read`. `expand: ["principal"]` additionally
-	// requires `user.read` and `team.read` (documented on the expand enum;
-	// those scopes cannot be ANDed onto this security block because they are
-	// body-conditional).
+	// requires `user.read` and `team.read` for project secrets (documented on
+	// the expand enum; those scopes cannot be ANDed onto this security block
+	// because they are body-conditional). A user-bound Console session that
+	// already passed the project Check may expand without those scopes.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -556,9 +570,13 @@ type Invoker interface {
 	// QueryUsers invokes queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// The project comes from the credential, not from a parameter: the operation
-	// is bound to the token's own project by construction. This is why it takes
-	// no `project_id`, unlike the other query endpoints.
+	// The project comes from the credential, not from a parameter: the
+	// operation is bound to the credential's home project by construction
+	// (oauth2 secret or user-bound session). This is why it takes no
+	// `project_id`, unlike the other query endpoints.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error)
@@ -1472,6 +1490,10 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // created here — claim owns that path. An unrevoked grant with the same
 // principal and relation occupies the unique key even after `expires_at`;
 // DELETE it before re-creating.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). Session callers are authorized as
+// the human against the target project (home may differ). CSRF/Origin
+// for cookie mutations is a follow-up (#1140).
 //
 // POST /grants
 func (c *Client) CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error) {
@@ -1573,11 +1595,23 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, CreateGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2726,6 +2760,9 @@ func (c *Client) sendDeleteFlowDefinition(ctx context.Context, params DeleteFlow
 // Already-revoked, missing, project-secret setup, and owning-team grants
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // DELETE /grants/{id}
 func (c *Client) DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error) {
@@ -2833,11 +2870,23 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, DeleteGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4526,6 +4575,9 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // `resource_scope_index`; project scope is required on the query (same as
 // events). Misses, revoked rows, project-secret setup (`sk_proj`),
 // owning-team (`relation=team`) rows, and cross-project ids return 404.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // GET /grants/{id}
 func (c *Client) GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error) {
@@ -4633,11 +4685,23 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8077,9 +8141,13 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
 // get). Requires `project.read`. `expand: ["principal"]` additionally
-// requires `user.read` and `team.read` (documented on the expand enum;
-// those scopes cannot be ANDed onto this security block because they are
-// body-conditional).
+// requires `user.read` and `team.read` for project secrets (documented on
+// the expand enum; those scopes cannot be ANDed onto this security block
+// because they are body-conditional). A user-bound Console session that
+// already passed the project Check may expand without those scopes.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /grants/query
 func (c *Client) QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error) {
@@ -8181,11 +8249,23 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, QueryGrantsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8621,9 +8701,13 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // QueryUsers invokes queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// The project comes from the credential, not from a parameter: the operation
-// is bound to the token's own project by construction. This is why it takes
-// no `project_id`, unlike the other query endpoints.
+// The project comes from the credential, not from a parameter: the
+// operation is bound to the credential's home project by construction
+// (oauth2 secret or user-bound session). This is why it takes no
+// `project_id`, unlike the other query endpoints.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /users/query
 func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error) {
@@ -8704,11 +8788,23 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest)
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, QueryUsersOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
