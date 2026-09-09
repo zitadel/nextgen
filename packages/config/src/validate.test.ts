@@ -243,7 +243,7 @@ describe("steps", () => {
   it("rejects sso_providers without transitions.callback", () => {
     const def = flow();
     const s = step(def, "identifier");
-    s.sso_providers = [{ id: "idp", name: "IdP", template: "generic" }];
+    s.sso_providers = ["idp"];
     expect(messages(validateFlowDefinition(def))).toContain(
       'step "identifier": has sso_providers but is missing transitions.callback',
     );
