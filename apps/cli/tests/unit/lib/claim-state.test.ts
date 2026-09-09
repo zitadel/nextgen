@@ -7,6 +7,8 @@ import {
   claimWindowClosedAction,
   claimWindowDeadline,
   isAttached,
+  setupClaimAction,
+  setupClaimBoxAction,
 } from "../../../src/lib/claim-state";
 
 const ATTACHED = { claimed_at: "2026-08-01T10:00:00.000Z", team_id: "team-001" };
@@ -119,6 +121,30 @@ describe("claim copy", () => {
     expect(box.text).not.toContain("npx");
   });
 
+  // The setup nudge is the one surface that names the data-loss stake
+  // (product decision: temporary projects get purged after the window);
+  // status and doctor keep the older wording until product aligns them.
+  it("setup nudge names the deadline and the data-loss stake", () => {
+    const withDeadline = setupClaimAction(
+      "0.1.0",
+      claimWindowDeadline("2026-09-04T10:00:00.000Z"),
+    );
+    expect(withDeadline).toContain("Claim your Project before ");
+    expect(withDeadline).toContain("2026");
+    expect(withDeadline).toContain("its data may be lost");
+    expect(withDeadline).toContain("npx @zitadel/cli@latest claim");
+
+    const fallback = setupClaimAction("0.1.0");
+    expect(fallback).toContain("within 14 days of creation");
+  });
+
+  it("boxes the setup nudge with the command pulled out of the prose", () => {
+    const box = setupClaimBoxAction("0.1.0");
+    expect(box.command).toBe("npx @zitadel/cli@latest claim");
+    expect(box.text).toContain("temporary and its data may be lost");
+    expect(box.text).not.toContain("npx");
+  });
+
   // The closed-window counterpart stays reconciliatory: the local record can
   // be stale (claimed from another machine reads detached), so it keeps
   // quoting the claim command as the safe authoritative check alongside the
@@ -138,6 +164,8 @@ describe("claim copy", () => {
     expect(claimAction("0.1.0")).not.toMatch(/\bunclaimed\b/i);
     expect(claimBoxAction("0.1.0").text).not.toMatch(/\bunclaimed\b/i);
     expect(claimWindowClosedAction("0.1.0")).not.toMatch(/\bunclaimed\b/i);
+    expect(setupClaimAction("0.1.0")).not.toMatch(/\bunclaimed\b/i);
+    expect(setupClaimBoxAction("0.1.0").text).not.toMatch(/\bunclaimed\b/i);
   });
 });
 

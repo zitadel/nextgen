@@ -22,21 +22,27 @@ export function claimWindowDeadline(createdAt: string | undefined, now = Date.no
   return new Date((Number.isNaN(base) ? now : base) + CLAIM_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 }
 
+/**
+ * Time and zone included, not just the date: the server closes the window
+ * at an exact timestamp (created_at + 14 x 24h), and a bare "before Sep 18"
+ * misleads in both directions at the boundary day.
+ */
+function formatDeadline(deadline: Date): string {
+  return deadline.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
 function deadlinePhrase(deadline?: Date): string {
-  // Time and zone included, not just the date: the server closes the window
-  // at an exact timestamp (created_at + 14 x 24h), and a bare "before Sep 18"
-  // misleads in both directions at the boundary day.
   const when =
     deadline === undefined
       ? `within ${CLAIM_WINDOW_DAYS} days of creation`
-      : `before ${deadline.toLocaleString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZoneName: "short",
-        })}`;
+      : `before ${formatDeadline(deadline)}`;
   return `attach it ${when}, after that it can no longer be claimed`;
 }
 
@@ -161,6 +167,38 @@ export function claimBoxAction(cliVersion: string, deadline?: Date): BoxAction {
       `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
       "Claiming is independent of the steps above, so you can do it right away; " +
       "nothing about the project changes, and users, passkeys, and the issuer keep working:",
+    command: publicCliCommand("claim", cliVersion),
+  };
+}
+
+/**
+ * The end-of-setup wording, per product decision: unlike {@link claimAction}
+ * (still used by `status` and `doctor`), this copy says the data of a project
+ * that is never claimed may be lost. The platform is moving to purging
+ * temporary projects after the window, superseding the no-deletion stance the
+ * older builders still describe (ADR 046 §Non-goals); the other surfaces
+ * follow once product settles the wording there.
+ */
+function setupClaimSentence(deadline?: Date): string {
+  const when =
+    deadline === undefined
+      ? `within ${CLAIM_WINDOW_DAYS} days of creation`
+      : `before ${formatDeadline(deadline)}`;
+  return (
+    `Claim your Project ${when} to make it permanent and start collaborating with your team. ` +
+    "Until then, your Project is temporary and its data may be lost."
+  );
+}
+
+/** The setup nudge for `next_actions`, quoting the command in prose. */
+export function setupClaimAction(cliVersion: string, deadline?: Date): string {
+  return `${setupClaimSentence(deadline)} Run ${publicCliCommand("claim", cliVersion)}.`;
+}
+
+/** The same setup nudge for the human box, with the command on its own styled line. */
+export function setupClaimBoxAction(cliVersion: string, deadline?: Date): BoxAction {
+  return {
+    text: setupClaimSentence(deadline),
     command: publicCliCommand("claim", cliVersion),
   };
 }

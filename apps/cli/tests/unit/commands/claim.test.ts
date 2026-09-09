@@ -135,12 +135,26 @@ describe("claim", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { project_id: string; team_id: string; claimed_at: string; dashboard_url: string };
+      data: {
+        title: string;
+        project_id: string;
+        team_id: string;
+        claimed_at: string;
+        dashboard_url: string;
+        next_actions: string[];
+      };
     };
     expect(json.status).toBe("ok");
     expect(json.data.project_id).toBe(project.id);
     expect(json.data.team_id).toMatch(/^team-/);
     expect(json.data.dashboard_url).toContain(json.data.team_id);
+    // The human output speaks permanence and points at the Console; the team
+    // id stays available here in the envelope.
+    expect(json.data.title).toBe("Your Project is now permanent.");
+    expect(json.data.next_actions).toEqual([
+      "Manage your Project and collaborate in the Console:",
+      json.data.dashboard_url,
+    ]);
 
     const secret = await readSecret(cwd);
     expect(secret.team_id).toBe(json.data.team_id);
