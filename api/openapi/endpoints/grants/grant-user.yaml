@@ -17,8 +17,10 @@ allOf:
         type: object
         additionalProperties: true
         description: |
-          The user's schema document. Present only when the request asked
-          for `expand: ["principal"]` and the user could be loaded.
+          The user's content, satisfying the schema named by `schema`. Property
+          names and types are determined entirely by that schema. Present only
+          when the request asked for `expand: ["principal"]` and the user
+          could be loaded.
       metadata:
         description: |
           Server-owned user envelope. Present only when the request asked

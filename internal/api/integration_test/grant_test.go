@@ -325,6 +325,18 @@ func TestGrantCreateLocators(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("grant.invalid"), bad.Code)
 	})
+
+	t.Run("extra user locator field is req.invalid", func(t *testing.T) {
+		t.Parallel()
+		assertCreateGrantReqInvalid(t, client.Token(), project.ID,
+			`{"relation":"viewer","user":{"user_id":"user_1","extra":"nope"}}`)
+	})
+
+	t.Run("extra team locator field is req.invalid", func(t *testing.T) {
+		t.Parallel()
+		assertCreateGrantReqInvalid(t, client.Token(), project.ID,
+			`{"relation":"admin","team":{"team_id":"team_1","extra":"nope"}}`)
+	})
 }
 
 func TestGrantQuery(t *testing.T) {
@@ -675,6 +687,25 @@ func assertGrantNotFound(t *testing.T, resp any) {
 	default:
 		t.Fatalf("want grant.not_found, got %T %s", resp, helpers.MustMarshal(t, resp))
 	}
+}
+
+func assertCreateGrantReqInvalid(t *testing.T, token, projectID, body string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		harness.EnsureTestServer(t).URL+"/grants?project_id="+url.QueryEscape(projectID),
+		strings.NewReader(body),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := harness.EnsureHttpClient(t).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
+	details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+	assert.Equal(t, api.ErrorCode("req.invalid"), details.Code)
 }
 
 func assertGrantPrincipalNotFound(t *testing.T, resp any) {

@@ -1,7 +1,8 @@
 title: TeamLocator
 description: |
-  Name a team with exactly one of `team_id` or `name`. Sending both,
-  neither, or any other field is `grant.invalid`.
+  Name a team with exactly one of `team_id` or `name`. Sending both
+  or neither is `grant.invalid`. Unknown properties are rejected by
+  `additionalProperties: false` as `req.invalid` before the handler runs.
 type: object
 additionalProperties: false
 properties:

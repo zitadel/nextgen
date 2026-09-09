@@ -22781,8 +22781,10 @@ type GrantUser struct {
 	// The schema that defines `attributes`. Present only when the request
 	// asked for `expand: ["principal"]` and the user could be loaded.
 	Schema OptString `json:"schema"`
-	// The user's schema document. Present only when the request asked
-	// for `expand: ["principal"]` and the user could be loaded.
+	// The user's content, satisfying the schema named by `schema`. Property
+	// names and types are determined entirely by that schema. Present only
+	// when the request asked for `expand: ["principal"]` and the user
+	// could be loaded.
 	Attributes OptGrantUserAttributes `json:"attributes"`
 	// Server-owned user envelope. Present only when the request asked
 	// for `expand: ["principal"]` and the user could be loaded. Grant
@@ -22860,8 +22862,10 @@ func (s *GrantUser) SetMetadata(val OptUserMetadata) {
 	s.Metadata = val
 }
 
-// The user's schema document. Present only when the request asked
-// for `expand: ["principal"]` and the user could be loaded.
+// The user's content, satisfying the schema named by `schema`. Property
+// names and types are determined entirely by that schema. Present only
+// when the request asked for `expand: ["principal"]` and the user
+// could be loaded.
 type GrantUserAttributes map[string]jx.Raw
 
 func (s *GrantUserAttributes) init() GrantUserAttributes {
@@ -46541,8 +46545,9 @@ func (s *TeamFilterField) UnmarshalText(data []byte) error {
 
 type TeamID string
 
-// Name a team with exactly one of `team_id` or `name`. Sending both,
-// neither, or any other field is `grant.invalid`.
+// Name a team with exactly one of `team_id` or `name`. Sending both
+// or neither is `grant.invalid`. Unknown properties are rejected by
+// `additionalProperties: false` as `req.invalid` before the handler runs.
 // Ref: #
 type TeamLocator struct {
 	// Platform-homed team id (`team_<opaque>`). The team must be active.
@@ -49598,8 +49603,9 @@ func (s *UserInvalidDetails) init() UserInvalidDetails {
 	return m
 }
 
-// Name a user with exactly one of `user_id` or `identifier`. Sending both,
-// neither, or any other field is `grant.invalid`.
+// Name a user with exactly one of `user_id` or `identifier`. Sending both
+// or neither is `grant.invalid`. Unknown properties are rejected by
+// `additionalProperties: false` as `req.invalid` before the handler runs.
 // Ref: #
 type UserLocator struct {
 	// Platform-homed user id (`user_<opaque>`). The user must be active.
