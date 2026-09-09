@@ -2,7 +2,7 @@
  * Client-side branding shape consumed by the orchestrator.
  *
  * The five baseline wire fields (`layout`, `liquid_template`, `logo_url`,
- * `font_url`, `hero_url`) come straight from the orval-generated
+ * `hero_url`) come straight from the orval-generated
  * `CreateFlow201Branding`. The v2 "structured extension" blocks (palette /
  * typography / shape / assets / theme) are deliberately client-only — see
  * `docs/design/branding/schema.md` "Proposed structured extension". Once
@@ -46,7 +46,12 @@ export type BrandingTypography = {
 };
 
 export type BrandingShape = {
-  radius?: "none" | "sm" | "md" | "lg" | "full";
+  /**
+   * A preset name or a pixel value. Only the presets reach the tokens today;
+   * mapping a number is #1061, and until then a numeric radius persists on the
+   * revision and leaves the shipped rounding in place.
+   */
+  radius?: "none" | "sm" | "md" | "lg" | "full" | number;
   density?: "compact" | "regular" | "comfortable";
 };
 

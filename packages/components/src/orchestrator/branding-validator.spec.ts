@@ -7,8 +7,8 @@ describe("validateBranding", () => {
     const result = validateBranding({
       layout: "centered",
       logo_url: "https://cdn.example.com/logo.svg",
-      font_url: "https://fonts.example.com/css",
       hero_url: "https://cdn.example.com/hero.jpg",
+      typography: { font_url: "https://fonts.example.com/css" },
     });
     expect(result.issues).toHaveLength(0);
     expect(result.branding?.logo_url).toBe("https://cdn.example.com/logo.svg");
@@ -53,21 +53,21 @@ describe("validateBranding", () => {
       {
         logo_url: "http://127.1/logo.svg",
         hero_url: "http://localhost:3000@evil.example/hero.png",
-        font_url: "http://[::1]:3000/font.css",
+        typography: { font_url: "http://[::1]:3000/font.css" },
         assets: { logo_dark: "http://localhost:3000/dark.svg" },
       },
       { renderingOrigin: "http://127.0.0.1:4173" },
     );
     expect(result.branding?.logo_url).toBeUndefined();
     expect(result.branding?.hero_url).toBeUndefined();
-    expect(result.branding?.font_url).toBeUndefined();
+    expect(result.branding?.typography?.font_url).toBeUndefined();
     expect(result.branding?.assets?.logo_dark).toBeUndefined();
     expect(result.issues).toHaveLength(4);
   });
 
   it("rejects malformed URLs", () => {
-    const result = validateBranding({ font_url: "not-a-url" });
-    expect(result.branding?.font_url).toBeUndefined();
+    const result = validateBranding({ typography: { font_url: "not-a-url" } });
+    expect(result.branding?.typography?.font_url).toBeUndefined();
     expect(result.issues[0]).toMatch(/font_url/);
   });
 

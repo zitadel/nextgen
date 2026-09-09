@@ -436,6 +436,10 @@ func TestBrandingCreate_EventPayloadURLs(t *testing.T) {
 		LiquidTemplate: "<div>{% mandatory_gates %}</div>",
 		LogoURL:        "https://cdn.example.com/logo.svg",
 		HeroURL:        "https://cdn.example.com/hero.png",
+		Typography: domain.BrandingTypography{
+			FontFamily: "Inter, sans-serif",
+			FontURL:    "https://fonts.example.com/css2",
+		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, gotEvent)
@@ -444,7 +448,7 @@ func TestBrandingCreate_EventPayloadURLs(t *testing.T) {
 	assert.Equal(t, domain.BrandingLayoutSplit, payload.Layout)
 	assert.Equal(t, "https://cdn.example.com/logo.svg", payload.LogoURL)
 	assert.Equal(t, "https://cdn.example.com/hero.png", payload.HeroURL)
-	assert.Empty(t, payload.FontURL, "font_url is not writable yet; omit when empty")
+	assert.Equal(t, "https://fonts.example.com/css2", payload.FontURL)
 	assert.NotContains(t, string(gotEvent.Payload), "liquid")
 }
 
