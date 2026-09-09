@@ -20,7 +20,7 @@ import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/s
 import { userAttributes, userIdentity, userIdentitySecondary } from "../../../lib/user";
 
 /**
- * User detail (Figma `467:44362`, `Filled` and `Authentication` variants).
+ * User detail (`Filled` and `Authentication` variants).
  *
  * Much of the design cannot be built yet, and what is missing is *data*, not
  * markup. Rather than render labels with nothing behind them, each is left out
@@ -67,7 +67,7 @@ const PAGE = "px-4 pt-9 pb-8 sm:px-8";
 const HEADING = "text-foreground font-serif text-2xl leading-8 tracking-tight";
 const CARD = "gap-0 rounded-xl py-0";
 // The panel body is 24px in from the card edge and 20px down, with 16px between
-// the header, the divider and the content (Detail Panel `1305:392714`).
+// the header, the divider and the content.
 const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
 const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-foreground";
 // 18px between fields on both axes — not a 4px-scale step, so it is written out.
@@ -101,7 +101,7 @@ function UserDetail() {
         </div>
         <Card className="gap-0 rounded-xl py-0">
           {/* Stacked below `sm`, in a row above it — the mobile frame
-              (`520:80552`) keeps every item flush left and turns the column
+              keeps every item flush left and turns the column
               rule into a tick on its own row between them. */}
           <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-start">
             <MetaValue label="User ID" value={userId} copyable />
@@ -181,7 +181,7 @@ function UserDetail() {
         <TabsContent value="authentication">
           <Card className={CARD}>
             <div className={CARD_HEAD}>
-              {/* `Lucide Icon / Key` (`911:34248`) — the design names the glyph,
+              {/* `Lucide Icon / Key` — the design names the glyph,
                   so it is read off the node rather than picked by meaning. */}
               <span className={PLATE} aria-hidden>
                 <Key className="size-[18px]" />
@@ -208,7 +208,7 @@ function UserDetail() {
                   <span className="text-muted-foreground text-[13px] leading-[22px]">
                     {passkeys.length} registered
                   </span>
-                  {/* The design's only badge here is `Enabled` (`1305:392844`).
+                  {/* The design's only badge here is `Enabled`.
                       With nothing registered the count already says so, and a
                       second capsule reading `None` restates it. */}
                   {passkeys.length > 0 && <Badge variant="secondary">Enabled</Badge>}
