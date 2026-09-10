@@ -51,6 +51,25 @@ type GetUserInput struct {
 	UserID    string
 }
 
+type PatchUserInput struct {
+	ProjectID string
+	UserID    string
+	// SchemaURL, when non-nil, moves the user's schema pointer (ADR 009 §4);
+	// the merged attributes are validated against the new schema.
+	SchemaURL *string
+	// Attributes is the partial attribute patch; nil values delete.
+	Attributes map[string]any
+}
+
+type PatchMyUserInput struct {
+	// SessionToken is the parsed session token, already verified at the API
+	// security boundary.
+	SessionToken *domain.Token
+	// Attributes is the partial attribute patch; nil values delete. The
+	// schema pointer is not self-service: it stays where it is.
+	Attributes map[string]any
+}
+
 type ListUsersInput struct {
 	ProjectID string
 	PageToken string
@@ -109,8 +128,10 @@ type UserService interface {
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
 	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
 	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
+	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
 	SetPassword(ctx context.Context, input SetPasswordInput) (err error)
 	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
+	PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error)
 }
 
 // ---- Implementation -------------------------------------------------------------
@@ -505,6 +526,44 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 	return user, nil
 }
 
+// PatchUser is last-write-wins for the caller: Prepare merges against a
+// fresh read and the patch statement refuses to write over a row whose
+// updated_at moved past that read, so a lost race re-merges against the
+// interleaved write instead of clobbering it.
+func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error) {
+	const maxPatchAttempts = 3
+	for attempt := 1; ; attempt++ {
+		action := NewPatchUserAction(input, s.v2Pool, s.schemaStore)
+		err := s.ApplyActions(ctx, action)
+		if err == nil {
+			break
+		}
+		if action.stale && attempt < maxPatchAttempts {
+			continue
+		}
+		return nil, err
+	}
+
+	// The patch statement does not report the row's new updated_at, so the
+	// response is a read-back, same as create.
+	return s.GetUserByID(ctx, GetUserInput{ProjectID: input.ProjectID, UserID: input.UserID})
+}
+
+func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error) {
+	sessionToken := input.SessionToken
+	if !validSessionToken(sessionToken) {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+
+	// Identity and project both come from the token, so a caller can only
+	// ever patch themself — the same containment GetMyUser relies on.
+	return s.PatchUser(ctx, PatchUserInput{
+		ProjectID:  sessionToken.ProjectID,
+		UserID:     sessionToken.UserID,
+		Attributes: input.Attributes,
+	})
+}
+
 func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
 	action := NewSetUserPasswordAction(input, s.hasher)
 	return s.ApplyActions(ctx, action)
@@ -512,10 +571,7 @@ func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (
 
 func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
 	sessionToken := input.SessionToken
-	if sessionToken == nil {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-	if sessionToken.ExpiresAt != nil && time.Now().After(*sessionToken.ExpiresAt) {
+	if !validSessionToken(sessionToken) {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 
@@ -619,6 +675,103 @@ func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.Cre
 	return nil
 }
 
+// ---- Patch User ACTION -------------------------------------------------------------
+
+type PatchUserAction struct {
+	PatchUserInput
+
+	pool        StatementPool
+	schemaStore domain.JSONSchemaStore
+
+	patch *domain.PatchUser
+	// stale reports that Apply found the row moved past the updated_at the
+	// merge was computed against (or the user disappeared mid-flight). The
+	// service retries the whole action from a fresh read.
+	stale bool
+}
+
+func NewPatchUserAction(input PatchUserInput, pool StatementPool, schemaStore domain.JSONSchemaStore) *PatchUserAction {
+	return &PatchUserAction{
+		PatchUserInput: input,
+		pool:           pool,
+		schemaStore:    schemaStore,
+	}
+}
+
+func (o *PatchUserAction) Prepare(ctx context.Context) error {
+	// The spec already rejects an empty body at decode; this guards callers
+	// that reach the service without going through HTTP.
+	if o.SchemaURL == nil && len(o.Attributes) == 0 {
+		return domain.ErrUserInvalid().
+			WithMessage("Empty patch. Provide attributes to merge and/or a schema to move to.")
+	}
+
+	// Read outside the write transaction: the merge is computed against this
+	// state and the patch statement's updated_at guard is what keeps the
+	// write honest, so the transaction itself stays a pure write.
+	user, err := o.pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), o.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), o.UserID),
+	), UserQueryOptions{})
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrUserNotFound()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+
+	// Read outside the transaction like the user itself: registry mutations
+	// always move the user's updated_at, so the patch statement's guard
+	// catches interleaved changes and the retry re-reads both.
+	storedScopes, err := o.pool.Statements().GetUserUniqueAttributeScopes(ctx, o.ProjectID, o.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to get unique attribute scopes from database")
+	}
+
+	targetSchemaURL := user.SchemaURL
+	if o.SchemaURL != nil {
+		targetSchemaURL = *o.SchemaURL
+	}
+	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, targetSchemaURL)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrUserInvalid().
+				WithMessage("schema is not known to the system. First create a schema, then move users to it.").
+				WithDetails(domain.UserSchemaUnknownDetails{Schema: targetSchemaURL})
+		}
+		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
+	}
+
+	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
+		Current:              user,
+		SchemaURL:            targetSchemaURL,
+		Schema:               schemaEntity.Schema,
+		AttributesPatch:      o.Attributes,
+		StoredRegistryScopes: storedScopes,
+	})
+	return err
+}
+
+func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.PatchUser(ctx, o.patch)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			// Either a concurrent write moved the row past the guard, or the
+			// user vanished mid-flight. Surface a conflict, not a 404: the
+			// retry's fresh read is what answers 404 when the user is really
+			// gone.
+			o.stale = true
+			return domain.ErrUserConflict()
+		}
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return domain.ErrUserAlreadyExists().WithParent(err)
+		}
+		return domain.ErrInternal(err).WithMessage("failed to patch user in the database")
+	}
+	// No event here: user.updated is #877's to emit (events catalog).
+	return nil
+}
+
 // ---- Set Password ACTION -------------------------------------------------------------
 
 type SetPasswordUserAction struct {
@@ -699,6 +852,11 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		EntityType: "user",
 		EntityID:   o.UserID,
 	})
+}
+
+// validSessionToken reports whether the token is present and not expired.
+func validSessionToken(token *domain.Token) bool {
+	return token != nil && (token.ExpiresAt == nil || !time.Now().After(*token.ExpiresAt))
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.
