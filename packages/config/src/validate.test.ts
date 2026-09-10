@@ -24,7 +24,7 @@ type TestStep = {
   fields: string[];
   actions: Array<{ name: string; kind: string; primary?: boolean; text_key?: string }>;
   transitions: Record<string, { target: string; action?: string; purpose?: string }>;
-  sso_providers?: Array<Record<string, string>>;
+  sso_providers?: string[];
   on_success?: string;
   complete?: string;
 };
