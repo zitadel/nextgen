@@ -29,65 +29,84 @@ const INTER_FONT_URL =
  * `zitadel-logo-light.svg` is the white wordmark (for dark surfaces) and
  * `zitadel-logo-dark.svg` is the near-black one (for light surfaces). Pairing
  * them the other way round renders an invisible logo, which reads as a broken
- * layout rather than as a fixture picking the wrong file.
+ * layout rather than as a fixture picking the wrong file — which is why each
+ * mark sits on the theme side it was drawn for.
  */
 export const brandingPresets = {
   centered: {
     layout: "centered",
-    font_url: INTER_FONT_URL,
-    logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
-    palette: {
-      primary: "#4A90D9",
-      on_primary: "#FFFFFF",
-      background: "#F8FAFC",
-      surface: "#FFFFFF",
-      muted: "#F1F5F9",
-      border: "#E2E8F0",
-      text: "#0F172A",
-      text_muted: "#64748B",
-      link: "#2563EB",
+    theme: {
+      mode: "light",
+      light: {
+        logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
+        palette: {
+          primary: "#4A90D9",
+          on_primary: "#FFFFFF",
+          background: "#F8FAFC",
+          surface: "#FFFFFF",
+          muted: "#F1F5F9",
+          border: "#E2E8F0",
+          text: "#0F172A",
+          text_muted: "#64748B",
+          link: "#2563EB",
+        },
+      },
     },
     typography: {
       font_family: "'Inter', ui-sans-serif, system-ui, sans-serif",
+      font_url: INTER_FONT_URL,
     },
     shape: { radius: "md", density: "regular" },
   } satisfies Branding,
   split: {
     layout: "split",
-    font_url: INTER_FONT_URL,
-    logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
     hero_url:
       "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?auto=format&fit=crop&w=1280&q=60",
-    palette: {
-      primary: "#4A90D9",
-      on_primary: "#FFFFFF",
-      background: "#FFFFFF",
-      surface: "#FFFFFF",
-      muted: "#F1F5F9",
-      border: "#E2E8F0",
-      text: "#0F172A",
-      text_muted: "#64748B",
+    theme: {
+      mode: "light",
+      light: {
+        logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
+        palette: {
+          primary: "#4A90D9",
+          on_primary: "#FFFFFF",
+          background: "#FFFFFF",
+          surface: "#FFFFFF",
+          muted: "#F1F5F9",
+          border: "#E2E8F0",
+          text: "#0F172A",
+          text_muted: "#64748B",
+        },
+      },
     },
-    typography: { font_family: "'Inter', ui-sans-serif, system-ui, sans-serif" },
+    typography: {
+      font_family: "'Inter', ui-sans-serif, system-ui, sans-serif",
+      font_url: INTER_FONT_URL,
+    },
   } satisfies Branding,
   dark: {
     layout: "centered",
-    font_url: INTER_FONT_URL,
-    logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
-    palette: {
-      primary: "#7C9CFF",
-      on_primary: "#0A0A0A",
-      background: "#0A0A0A",
-      surface: "#111111",
-      muted: "#1A1A1A",
-      border: "#262626",
-      text: "#FAFAFA",
-      text_muted: "#A1A1AA",
-      link: "#9DBBFF",
+    theme: {
+      mode: "dark",
+      dark: {
+        logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
+        palette: {
+          primary: "#7C9CFF",
+          on_primary: "#0A0A0A",
+          background: "#0A0A0A",
+          surface: "#111111",
+          muted: "#1A1A1A",
+          border: "#262626",
+          text: "#FAFAFA",
+          text_muted: "#A1A1AA",
+          link: "#9DBBFF",
+        },
+      },
     },
-    typography: { font_family: "'Inter', ui-sans-serif, system-ui, sans-serif" },
+    typography: {
+      font_family: "'Inter', ui-sans-serif, system-ui, sans-serif",
+      font_url: INTER_FONT_URL,
+    },
     shape: { radius: "md", density: "regular" },
-    theme: { mode: "dark" },
   } satisfies Branding,
   // The ejected designs, exactly as scaffolded — no palette overrides, so
   // what renders here is the out-of-the-box look a fresh `setup --design`
@@ -95,7 +114,7 @@ export const brandingPresets = {
   "split-template": {
     layout: "split",
     liquid_template: splitTemplate,
-    logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
+    theme: { dark: { logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href } },
     hero_url:
       "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?auto=format&fit=crop&w=1280&q=60",
   } satisfies Branding,
