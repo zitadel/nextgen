@@ -93,8 +93,16 @@ func TestVariableService_GetVariables(t *testing.T) {
 
 // setOne is the single-variable batch, which the service deliberately writes
 // without opening a transaction.
-func setOne(name string, value any, isSecret bool) []service.VariableToSet {
-	return []service.VariableToSet{{Name: name, Value: value, IsSecret: isSecret}}
+func setOne(name string, value any, isSecret bool) service.VariablePatch {
+	return service.VariablePatch{Set: []service.VariableToSet{{Name: name, Value: value, IsSecret: isSecret}}}
+}
+
+func setAll(variables ...service.VariableToSet) service.VariablePatch {
+	return service.VariablePatch{Set: variables}
+}
+
+func removeAll(names ...string) service.VariablePatch {
+	return service.VariablePatch{Remove: names}
 }
 
 func TestVariableService_GetDecryptedVariables(t *testing.T) {
@@ -202,7 +210,7 @@ func TestVariableService_GetDecryptedVariables(t *testing.T) {
 	})
 }
 
-func TestVariableService_SetVariables(t *testing.T) {
+func TestVariableService_ApplyVariables(t *testing.T) {
 	t.Run("stores a plain variable without consulting the key service", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
@@ -217,7 +225,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 				return nil
 			})
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, setOne("theme", "dark", false)))
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, setOne("theme", "dark", false)))
 	})
 
 	t.Run("encrypts a secret with the project's secret key", func(t *testing.T) {
@@ -238,7 +246,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 				return nil
 			})
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, setOne("token", "s3cret", true)))
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, setOne("token", "s3cret", true)))
 	})
 
 	// A failing key lookup used to fall through into encryption with a nil
@@ -252,7 +260,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 			Return(nil, sentinel)
 
 		// No SetVariable EXPECT: a write here would fail the test.
-		err := svc.SetVariables(t.Context(), variablesOwner, setOne("token", "s3cret", true))
+		err := svc.ApplyVariables(t.Context(), variablesOwner, setOne("token", "s3cret", true))
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
 	})
@@ -261,7 +269,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, _, _ := newMockedVariableService(t)
 
 		// No storage EXPECT: validation happens in the constructor.
-		err := svc.SetVariables(t.Context(), variablesOwner, setOne("bad name", "v", false))
+		err := svc.ApplyVariables(t.Context(), variablesOwner, setOne("bad name", "v", false))
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
 	})
@@ -270,7 +278,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, _, _ := newMockedVariableService(t)
 
 		// No storage and no key EXPECT: nothing may be reached.
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, nil))
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, service.VariablePatch{}))
 	})
 
 	// The key is fetched once for the batch, not once per secret: a PATCH
@@ -288,11 +296,11 @@ func TestVariableService_SetVariables(t *testing.T) {
 
 		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil).Times(3)
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "client_id", Value: "public", IsSecret: false},
-			{Name: "client_secret", Value: "s3cret", IsSecret: true},
-			{Name: "signing_secret", Value: "s3cret2", IsSecret: true},
-		}))
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, setAll(
+			service.VariableToSet{Name: "client_id", Value: "public", IsSecret: false},
+			service.VariableToSet{Name: "client_secret", Value: "s3cret", IsSecret: true},
+			service.VariableToSet{Name: "signing_secret", Value: "s3cret2", IsSecret: true},
+		)))
 	})
 
 	// Several names go in one transaction, so a failure partway through takes
@@ -302,10 +310,10 @@ func TestVariableService_SetVariables(t *testing.T) {
 
 		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "host", Value: "example.com", IsSecret: false},
-			{Name: "retries", Value: 3, IsSecret: false},
-		}))
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, setAll(
+			service.VariableToSet{Name: "host", Value: "example.com", IsSecret: false},
+			service.VariableToSet{Name: "retries", Value: 3, IsSecret: false},
+		)))
 	})
 
 	// Every value is constructed before any of them is written, so a bad name
@@ -314,9 +322,80 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, _, _ := newMockedVariableService(t)
 
 		// No storage EXPECT: not even the valid first entry may be written.
-		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "good", Value: "v", IsSecret: false},
-			{Name: "bad name", Value: "v", IsSecret: false},
+		err := svc.ApplyVariables(t.Context(), variablesOwner, setAll(
+			service.VariableToSet{Name: "good", Value: "v", IsSecret: false},
+			service.VariableToSet{Name: "bad name", Value: "v", IsSecret: false},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
+	})
+
+	// A null in the body is a removal (RFC 7386), so a patch can carry names
+	// to remove without carrying anything to write.
+	t.Run("removes the names a patch carries", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		// No key EXPECT: a removal never needs the value, so never a key.
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "theme").Return(nil)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "locale").Return(nil)
+
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, removeAll("theme", "locale")))
+	})
+
+	// The one place a patch differs from DELETE /variables/{name}: a patch says
+	// what the owner holds afterwards, and a name it removes that was not there
+	// already satisfies that. It is also what makes a retry safe.
+	t.Run("removing a name the owner does not hold is not an error", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		statements.EXPECT().
+			DeleteVariable(gomock.Any(), variablesOwner, "theme").
+			Return(database.NewNoRowFoundError(nil))
+
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, removeAll("theme")))
+	})
+
+	t.Run("reports a removal failure that is not a missing row", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		sentinel := errors.New("connection refused")
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "theme").Return(sentinel)
+
+		err := svc.ApplyVariables(t.Context(), variablesOwner, removeAll("theme"))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, sentinel)
+	})
+
+	// Writes and removals share one transaction, so a body that enters one name
+	// and removes another lands whole or not at all. Removals run first.
+	t.Run("applies writes and removals together, removals first", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		gomock.InOrder(
+			statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "legacy_host").Return(nil),
+			statements.EXPECT().
+				SetVariable(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, v *domain.Variable) error {
+					assert.Equal(t, "host", v.Name)
+					return nil
+				}),
+		)
+
+		require.NoError(t, svc.ApplyVariables(t.Context(), variablesOwner, service.VariablePatch{
+			Set:    []service.VariableToSet{{Name: "host", Value: "example.com"}},
+			Remove: []string{"legacy_host"},
+		}))
+	})
+
+	// The whole patch is built before any statement runs, so a bad value beside
+	// a removal stops the removal from happening at all.
+	t.Run("removes nothing when a value in the same patch is invalid", func(t *testing.T) {
+		svc, _, _ := newMockedVariableService(t)
+
+		// No storage EXPECT: the removal must not reach storage either.
+		err := svc.ApplyVariables(t.Context(), variablesOwner, service.VariablePatch{
+			Set:    []service.VariableToSet{{Name: "bad name", Value: "v"}},
+			Remove: []string{"theme"},
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())

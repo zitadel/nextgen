@@ -664,14 +664,18 @@ type Invoker interface {
 	UpdateTeam(ctx context.Context, request *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables invokes updateVariables operation.
 	//
-	// Enters or replaces variables at the owner this request addresses.
-	// Every name in the body is written at exactly that owner — the project, or
+	// Enters, replaces and removes variables at the owner this request
+	// addresses.
+	// Every name in the body is applied at exactly that owner — the project, or
 	// the environment named by `environment_name` — and reaches no other. Names
-	// not in the body are untouched; nothing here removes a variable, which is
-	// what `DELETE /variables/{variable_name}` is for.
+	// not in the body are untouched.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
-	// which it can be referenced but not read back.
+	// which it can be referenced but not read back. `null` removes the name from
+	// this owner (RFC 7386), which is how several variables are removed in one
+	// request; removing a name this owner does not hold is a no-op rather than an
+	// error. `DELETE /variables/{variable_name}` removes exactly one name and
+	// answers `var.not_found` when it was not there.
 	// The body is applied whole or not at all, so a rejected request leaves the
 	// owner exactly as it was. Writing the same name and owner twice replaces the
 	// value rather than duplicating it, which makes a retry safe.
@@ -10096,14 +10100,18 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 
 // UpdateVariables invokes updateVariables operation.
 //
-// Enters or replaces variables at the owner this request addresses.
-// Every name in the body is written at exactly that owner — the project, or
+// Enters, replaces and removes variables at the owner this request
+// addresses.
+// Every name in the body is applied at exactly that owner — the project, or
 // the environment named by `environment_name` — and reaches no other. Names
-// not in the body are untouched; nothing here removes a variable, which is
-// what `DELETE /variables/{variable_name}` is for.
+// not in the body are untouched.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
-// which it can be referenced but not read back.
+// which it can be referenced but not read back. `null` removes the name from
+// this owner (RFC 7386), which is how several variables are removed in one
+// request; removing a name this owner does not hold is a no-op rather than an
+// error. `DELETE /variables/{variable_name}` removes exactly one name and
+// answers `var.not_found` when it was not there.
 // The body is applied whole or not at all, so a rejected request leaves the
 // owner exactly as it was. Writing the same name and owner twice replaces the
 // value rather than duplicating it, which makes a retry safe.

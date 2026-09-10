@@ -176,10 +176,10 @@ func toAPIVariableScalar(value any) (api.VariableScalar, error) {
 	}
 }
 
-// fromAPIVariableInput reads one entry of an update body. A bare scalar is a
-// non-secret value; the object form states the flag. Making a value secret is
-// therefore always written down, never inferred.
 func fromAPIVariableInput(input api.VariableInput) (value any, isSecret bool, err error) {
+	if input.IsNull() {
+		return nil, false, nil
+	}
 	switch input.Type {
 	case api.VariableScalarVariableInput:
 		value, err = fromAPIVariableScalar(input.VariableScalar)

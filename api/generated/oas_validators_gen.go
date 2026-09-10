@@ -9865,6 +9865,8 @@ func (s Variable) Validate() error {
 
 func (s VariableInput) Validate() error {
 	switch s.Type {
+	case NullVariableInput:
+		return nil // no validation needed
 	case VariableScalarVariableInput:
 		if err := s.VariableScalar.Validate(); err != nil {
 			return err

@@ -238,4 +238,124 @@ func TestVariables(t *testing.T) {
 		assert.NotContains(t, vars, "WOULD_HAVE_WORKED",
 			"a rejected body must leave the owner exactly as it was")
 	})
+
+	null := api.NewNullVariableInput(struct{}{})
+
+	// The reason null-as-removal exists: several names go in one request, so a
+	// caller tidying up does not have to walk them one DELETE at a time.
+	t.Run("nulls remove several names in one request", func(t *testing.T) {
+		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+			"BULK_A": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("a")),
+			"BULK_B": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("b")),
+			"BULK_C": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("c")),
+		})
+
+		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+			"BULK_A": null,
+			"BULK_B": null,
+		})
+		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
+		// The response is the owner read back, so it already shows the removal.
+		assert.NotContains(t, *res.(*api.Variables), "BULK_A")
+
+		vars := get(t, api.OptEnvironmentName{})
+		assert.NotContains(t, vars, "BULK_A")
+		assert.NotContains(t, vars, "BULK_B")
+		assert.Equal(t,
+			api.NewVariableScalarVariable(api.NewStringVariableScalar("c")),
+			vars["BULK_C"],
+			"a name the body does not mention is untouched")
+	})
+
+	// One body, three fates: entered, replaced, removed. They share a
+	// transaction, so this is one step for the caller rather than three.
+	t.Run("one body enters, replaces and removes", func(t *testing.T) {
+		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+			"MIX_OLD":      api.NewVariableScalarVariableInput(api.NewStringVariableScalar("old")),
+			"MIX_REPLACED": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("before")),
+		})
+
+		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+			"MIX_NEW":      api.NewVariableScalarVariableInput(api.NewStringVariableScalar("new")),
+			"MIX_REPLACED": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("after")),
+			"MIX_OLD":      null,
+		})
+
+		vars := get(t, api.OptEnvironmentName{})
+		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("new")), vars["MIX_NEW"])
+		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("after")), vars["MIX_REPLACED"])
+		assert.NotContains(t, vars, "MIX_OLD")
+	})
+
+	// The one place a patch differs from DELETE /variables/{name}, which
+	// answers var.not_found: a patch states what the owner holds afterwards,
+	// and a name that was never there already satisfies that. It is also what
+	// makes a retry of the request above safe.
+	t.Run("a null on a name the owner does not hold is not an error", func(t *testing.T) {
+		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+			"NEVER_ENTERED": null,
+		})
+		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
+		assert.NotContains(t, *res.(*api.Variables), "NEVER_ENTERED")
+	})
+
+	// A removal addresses one owner, the same way a write does.
+	t.Run("a null removes only at the owner the request addresses", func(t *testing.T) {
+		shared := api.UpdateVariablesRequest{
+			"SHARED_NAME": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("kept")),
+		}
+		update(t, api.OptEnvironmentName{}, shared)
+		update(t, prod, shared)
+
+		update(t, prod, api.UpdateVariablesRequest{"SHARED_NAME": null})
+
+		assert.NotContains(t, get(t, prod), "SHARED_NAME")
+		assert.Equal(t,
+			api.NewVariableScalarVariable(api.NewStringVariableScalar("kept")),
+			get(t, api.OptEnvironmentName{})["SHARED_NAME"],
+			"the project's value is untouched by an environment's removal")
+	})
+
+	// Secrets are the same resource, so they are removed the same way -- and
+	// this is the removal that cannot be undone, since the value reads back
+	// nowhere.
+	t.Run("a null removes a secret too", func(t *testing.T) {
+		update(t, prod, api.UpdateVariablesRequest{
+			"DOOMED_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+				Value:  api.NewStringVariableScalar("s3cr3t"),
+				Secret: true,
+			}),
+		})
+		require.Contains(t, get(t, prod), "DOOMED_SECRET")
+
+		update(t, prod, api.UpdateVariablesRequest{"DOOMED_SECRET": null})
+		assert.NotContains(t, get(t, prod), "DOOMED_SECRET")
+	})
+
+	// A removal is spelled with a name like any other entry, so it is held to
+	// the same grammar -- and the body still lands whole or not at all.
+	t.Run("a malformed name is rejected even when it is a removal", func(t *testing.T) {
+		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+			"WOULD_HAVE_WORKED_TOO": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
+			"not a name":            null,
+		})
+		status, code, _, ok := errorResponseParts(t, res)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, res))
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrInvalidVariableName().Code, code)
+
+		assert.NotContains(t, get(t, api.OptEnvironmentName{}), "WOULD_HAVE_WORKED_TOO")
+	})
+
+	// A body of nothing but nulls is still a body: minProperties: 1 is about
+	// the request naming something, not about it writing something.
+	t.Run("a body of only nulls is accepted", func(t *testing.T) {
+		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+			"BULK_C": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("c")),
+		})
+
+		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{"BULK_C": null})
+		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
+		assert.NotContains(t, get(t, api.OptEnvironmentName{}), "BULK_C")
+	})
 }

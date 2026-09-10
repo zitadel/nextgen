@@ -81744,6 +81744,9 @@ func (s *Variable) UnmarshalJSON(data []byte) error {
 // Encode encodes VariableInput as json.
 func (s VariableInput) Encode(e *jx.Encoder) {
 	switch s.Type {
+	case NullVariableInput:
+		_ = s.Null
+		e.Null()
 	case VariableScalarVariableInput:
 		s.VariableScalar.Encode(e)
 	case SecretVariableInputVariableInput:
@@ -81763,6 +81766,11 @@ func (s *VariableInput) Decode(d *jx.Decoder) error {
 			return err
 		}
 		s.Type = VariableScalarVariableInput
+	case jx.Null:
+		if err := d.Null(); err != nil {
+			return err
+		}
+		s.Type = NullVariableInput
 	case jx.Object:
 		if err := s.SecretVariableInput.Decode(d); err != nil {
 			return err

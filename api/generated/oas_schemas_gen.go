@@ -48781,15 +48781,22 @@ func (s *UpdateVariablesErrorResponseStatusCode) SetResponse(val UpdateVariables
 func (*UpdateVariablesErrorResponseStatusCode) updateVariablesRes() {}
 
 // The variables to enter, keyed by name. Each is either a bare scalar (a
-// non-secret value) or an object stating the `secret` flag.
+// non-secret value), an object stating the `secret` flag, or `null` to remove
+// the name.
 // This is a patch: a name present here is written at the owner the request
 // addresses, replacing whatever that owner held under it, and a name absent
-// here is left alone. There is no way to remove a variable from this body —
-// deletion is `DELETE /variables/{variable_name}`, so a truncated or half-built
-// request can never silently drop a value.
+// here is left alone. A name whose value is `null` is removed from that owner
+// (RFC 7386), so one request can enter, replace and remove names together —
+// which is also the way to remove several at once. `DELETE
+// /variables/{variable_name}` remains the way to remove exactly one name and
+// be told whether it was there.
+// Removing a name the owner does not hold is not an error: a patch states what
+// the owner holds afterwards, and that name is already absent. That makes a
+// retry safe, and it is the one place this body differs from `DELETE`, which
+// answers `var.not_found`.
 // The body is applied whole or not at all. Every value is validated, and every
-// secret encrypted, before anything is written, and the writes themselves share
-// one transaction.
+// secret encrypted, before anything is written, and the writes and removals
+// share one transaction.
 // Names are written at exactly the owner the request addresses, and reach no
 // further. Writing at the project level does not change what any environment
 // resolves, and writing on one environment does not touch another.
@@ -51750,16 +51757,27 @@ func NewSecretVariableVariable(v SecretVariable) Variable {
 
 func (*Variable) getVariableRes() {}
 
-// One entry of an update. Either a bare scalar, which enters a non-secret
-// value, or an object stating the flag explicitly.
+// One entry of an update. A bare scalar enters a non-secret value, an object
+// states the flag explicitly, and `null` removes the name.
 // The shorthand exists because most variables are not secrets and spelling
 // `{"value": …, "secret": false}` for each of them is noise. Making a value
 // secret is therefore always deliberate: it cannot happen by writing a plain
 // scalar.
+// `null` is the RFC 7386 merge-patch convention: the name is removed at the
+// owner this request addresses, and at no other, which is what lets one request
+// enter, replace and remove names together. Removing a name the owner does not
+// hold is not an error, because a patch states what the owner holds afterwards
+// and that name is already absent. `DELETE /variables/{variable_name}`
+// addresses one name deliberately and still answers `var.not_found` there.
+// A null is a removal wherever it appears, so a body built from client state in
+// which an unset field serializes to `null` removes that variable instead of
+// leaving it alone. A secret removed this way cannot be recovered, since its
+// value reads back nowhere. Send only the names the request means to change.
 // Ref: #
 // VariableInput represents sum type.
 type VariableInput struct {
 	Type                VariableInputType // switch on this field
+	Null                struct{}
 	VariableScalar      VariableScalar
 	SecretVariableInput SecretVariableInput
 }
@@ -51769,9 +51787,13 @@ type VariableInputType string
 
 // Possible values for VariableInputType.
 const (
+	NullVariableInput                VariableInputType = "struct{}"
 	VariableScalarVariableInput      VariableInputType = "VariableScalar"
 	SecretVariableInputVariableInput VariableInputType = "SecretVariableInput"
 )
+
+// IsNull reports whether VariableInput is struct{}.
+func (s VariableInput) IsNull() bool { return s.Type == NullVariableInput }
 
 // IsVariableScalar reports whether VariableInput is VariableScalar.
 func (s VariableInput) IsVariableScalar() bool { return s.Type == VariableScalarVariableInput }
@@ -51779,6 +51801,27 @@ func (s VariableInput) IsVariableScalar() bool { return s.Type == VariableScalar
 // IsSecretVariableInput reports whether VariableInput is SecretVariableInput.
 func (s VariableInput) IsSecretVariableInput() bool {
 	return s.Type == SecretVariableInputVariableInput
+}
+
+// SetNull sets VariableInput to struct{}.
+func (s *VariableInput) SetNull(v struct{}) {
+	s.Type = NullVariableInput
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if VariableInput is struct{}.
+func (s VariableInput) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullVariableInput returns new VariableInput from struct{}.
+func NewNullVariableInput(v struct{}) VariableInput {
+	var s VariableInput
+	s.SetNull(v)
+	return s
 }
 
 // SetVariableScalar sets VariableInput to VariableScalar.

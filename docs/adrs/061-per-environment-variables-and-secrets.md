@@ -150,8 +150,13 @@ mental/syntax overhead.
 
 `PATCH` accepts a JSON-document in which the variables are listed to patch.
 The keys of the document are the variable names, the values are either a
-JSON scalar (string, number, boolean) or an object with which it is possible
-to mark a variable as secret.
+JSON scalar (string, number, boolean), an object with which it is possible
+to mark a variable as secret, or `null`.
+
+`null` removes the name, following RFC 7386 (JSON Merge Patch). That is what
+makes bulk deletion possible: one request can enter, replace and remove any
+number of names at the addressed scope, and all of it lands in one transaction
+or not at all. 
 
 `GET` returns the JSON-document with all the variables stored for the requested
 scope. The filter currently represents the project-ID and environment name.
@@ -159,9 +164,7 @@ Scopes can be added later once a need for them pops up. The values of secrets
 are never returned. The key exists in the document with as value
 `{"isSecret": true}` to indicate that the variable is present.
 
-`DELETE` removes a variable. This is needed because `PATCH` can only add/update
-variables. The variable name and scope of the variable to delete are provided
-with the request.
+`DELETE` removes one variable, named in the path with its scope in the request.
 
 ### Permissions
 
@@ -178,8 +181,8 @@ for different use-cases:
 
 Modifying functions:
 
-- `SetVariables`: Saves a variable to the database. It encrypts the value if the
-  variable is a secret.
+- `SetVariables`: Sets variables to the database. It encrypts the value if the
+  variable is a secret, and removes them if the value is `nil`.
 - `DeleteVariable`: Removes a variable from the database.
 
 Querying functions:

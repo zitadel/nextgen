@@ -106,24 +106,31 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 		}
 	}
 
-	vars := make([]*domain.Variable, len(variablesToSet), len(variablesToSet))
-	for i, v := range variablesToSet {
-		if v.IsSecret {
-			vars[i], err = domain.NewSecretVariable(v.Name, owner, v.Value, crypter)
+	var varsToWrite []*domain.Variable
+	var varsToDelete []string
+	for _, varToSet := range variablesToSet {
+		if varToSet.Value == nil {
+			varsToDelete = append(varsToDelete, varToSet.Name)
+			continue
+		}
+		if varToSet.IsSecret {
+			v, err := domain.NewSecretVariable(varToSet.Name, owner, varToSet.Value, crypter)
 			if err != nil {
 				return err
 			}
+			varsToWrite = append(varsToWrite, v)
 		} else {
-			vars[i], err = domain.NewVariable(v.Name, owner, v.Value)
+			v, err := domain.NewVariable(varToSet.Name, owner, varToSet.Value)
 			if err != nil {
 				return err
 			}
+			varsToWrite = append(varsToWrite, v)
 		}
 	}
 
 	// no need to start a transaction if there is only one variable
-	if len(vars) == 1 {
-		err = s.v2Pool.Statements().SetVariable(ctx, vars[0])
+	if len(varsToWrite) == 1 {
+		err = s.v2Pool.Statements().SetVariable(ctx, varsToWrite[0])
 		if err != nil {
 			return setVariableError(err)
 		}
@@ -131,7 +138,12 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		for _, v := range vars {
+		for _, name := range varsToDelete {
+			if err := tx.Statements().DeleteVariable(ctx, owner, name); err != nil {
+				return err
+			}
+		}
+		for _, v := range varsToWrite {
 			// The cause travels: a Spanner abort has to stay matchable for
 			// ReadWriteTransaction to retry the callback.
 			if err := tx.Statements().SetVariable(ctx, v); err != nil {
