@@ -8694,26 +8694,21 @@ func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
 
 // CreateFlowErrorResponse represents sum type.
 type CreateFlowErrorResponse struct {
-	Type                     CreateFlowErrorResponseType // switch on this field
-	AttInvalidRequest        AttInvalidRequest
-	EncKeyDecryptFailed      EncKeyDecryptFailed
-	EncKeyEncryptFailed      EncKeyEncryptFailed
-	EncKeyNotFound           EncKeyNotFound
-	EvtInvalid               EvtInvalid
-	FlowdefNotFound          FlowdefNotFound
-	FlowdefPurposeMismatch   FlowdefPurposeMismatch
-	FlowIntegrity            FlowIntegrity
-	FlowInvalidPurpose       FlowInvalidPurpose
-	Internal                 Internal
-	TknInvalid               TknInvalid
-	TknInvalidTknid          TknInvalidTknid
-	SchFetchDenied           SchFetchDenied
-	SchFetchDowngrade        SchFetchDowngrade
-	SchFetchTimeout          SchFetchTimeout
-	SchFetchTooLarge         SchFetchTooLarge
-	SchFetchTooManyRedirects SchFetchTooManyRedirects
-	ReqInvalid               ReqInvalid
-	EncKeyUnknownAlg         EncKeyUnknownAlg
+	Type                   CreateFlowErrorResponseType // switch on this field
+	AttInvalidRequest      AttInvalidRequest
+	EncKeyDecryptFailed    EncKeyDecryptFailed
+	EncKeyEncryptFailed    EncKeyEncryptFailed
+	EncKeyNotFound         EncKeyNotFound
+	EvtInvalid             EvtInvalid
+	FlowdefNotFound        FlowdefNotFound
+	FlowdefPurposeMismatch FlowdefPurposeMismatch
+	FlowIntegrity          FlowIntegrity
+	FlowInvalidPurpose     FlowInvalidPurpose
+	Internal               Internal
+	TknInvalid             TknInvalid
+	TknInvalidTknid        TknInvalidTknid
+	ReqInvalid             ReqInvalid
+	EncKeyUnknownAlg       EncKeyUnknownAlg
 }
 
 // CreateFlowErrorResponseType is oneOf type of CreateFlowErrorResponse.
@@ -8721,25 +8716,20 @@ type CreateFlowErrorResponseType string
 
 // Possible values for CreateFlowErrorResponseType.
 const (
-	AttInvalidRequestCreateFlowErrorResponse        CreateFlowErrorResponseType = "att.invalid_request"
-	EncKeyDecryptFailedCreateFlowErrorResponse      CreateFlowErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedCreateFlowErrorResponse      CreateFlowErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "enc_key.not_found"
-	EvtInvalidCreateFlowErrorResponse               CreateFlowErrorResponseType = "evt.invalid"
-	FlowdefNotFoundCreateFlowErrorResponse          CreateFlowErrorResponseType = "flowdef.not_found"
-	FlowdefPurposeMismatchCreateFlowErrorResponse   CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
-	FlowIntegrityCreateFlowErrorResponse            CreateFlowErrorResponseType = "flow.integrity"
-	FlowInvalidPurposeCreateFlowErrorResponse       CreateFlowErrorResponseType = "flow.invalid_purpose"
-	InternalCreateFlowErrorResponse                 CreateFlowErrorResponseType = "internal"
-	TknInvalidCreateFlowErrorResponse               CreateFlowErrorResponseType = "tkn.invalid"
-	TknInvalidTknidCreateFlowErrorResponse          CreateFlowErrorResponseType = "tkn.invalid_tknid"
-	SchFetchDeniedCreateFlowErrorResponse           CreateFlowErrorResponseType = "sch.fetch_denied"
-	SchFetchDowngradeCreateFlowErrorResponse        CreateFlowErrorResponseType = "sch.fetch_downgrade"
-	SchFetchTimeoutCreateFlowErrorResponse          CreateFlowErrorResponseType = "sch.fetch_timeout"
-	SchFetchTooLargeCreateFlowErrorResponse         CreateFlowErrorResponseType = "sch.fetch_too_large"
-	SchFetchTooManyRedirectsCreateFlowErrorResponse CreateFlowErrorResponseType = "sch.fetch_too_many_redirects"
-	ReqInvalidCreateFlowErrorResponse               CreateFlowErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.unknown_alg"
+	AttInvalidRequestCreateFlowErrorResponse      CreateFlowErrorResponseType = "att.invalid_request"
+	EncKeyDecryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
+	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
+	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
+	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
+	FlowInvalidPurposeCreateFlowErrorResponse     CreateFlowErrorResponseType = "flow.invalid_purpose"
+	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
+	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
+	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
 )
 
 // IsAttInvalidRequest reports whether CreateFlowErrorResponse is AttInvalidRequest.
@@ -8798,31 +8788,6 @@ func (s CreateFlowErrorResponse) IsTknInvalid() bool {
 // IsTknInvalidTknid reports whether CreateFlowErrorResponse is TknInvalidTknid.
 func (s CreateFlowErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidCreateFlowErrorResponse
-}
-
-// IsSchFetchDenied reports whether CreateFlowErrorResponse is SchFetchDenied.
-func (s CreateFlowErrorResponse) IsSchFetchDenied() bool {
-	return s.Type == SchFetchDeniedCreateFlowErrorResponse
-}
-
-// IsSchFetchDowngrade reports whether CreateFlowErrorResponse is SchFetchDowngrade.
-func (s CreateFlowErrorResponse) IsSchFetchDowngrade() bool {
-	return s.Type == SchFetchDowngradeCreateFlowErrorResponse
-}
-
-// IsSchFetchTimeout reports whether CreateFlowErrorResponse is SchFetchTimeout.
-func (s CreateFlowErrorResponse) IsSchFetchTimeout() bool {
-	return s.Type == SchFetchTimeoutCreateFlowErrorResponse
-}
-
-// IsSchFetchTooLarge reports whether CreateFlowErrorResponse is SchFetchTooLarge.
-func (s CreateFlowErrorResponse) IsSchFetchTooLarge() bool {
-	return s.Type == SchFetchTooLargeCreateFlowErrorResponse
-}
-
-// IsSchFetchTooManyRedirects reports whether CreateFlowErrorResponse is SchFetchTooManyRedirects.
-func (s CreateFlowErrorResponse) IsSchFetchTooManyRedirects() bool {
-	return s.Type == SchFetchTooManyRedirectsCreateFlowErrorResponse
 }
 
 // IsReqInvalid reports whether CreateFlowErrorResponse is ReqInvalid.
@@ -9084,111 +9049,6 @@ func (s CreateFlowErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, ok boo
 func NewTknInvalidTknidCreateFlowErrorResponse(v TknInvalidTknid) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetTknInvalidTknid(v)
-	return s
-}
-
-// SetSchFetchDenied sets CreateFlowErrorResponse to SchFetchDenied.
-func (s *CreateFlowErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
-	s.Type = SchFetchDeniedCreateFlowErrorResponse
-	s.SchFetchDenied = v
-}
-
-// GetSchFetchDenied returns SchFetchDenied and true boolean if CreateFlowErrorResponse is SchFetchDenied.
-func (s CreateFlowErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
-	if !s.IsSchFetchDenied() {
-		return v, false
-	}
-	return s.SchFetchDenied, true
-}
-
-// NewSchFetchDeniedCreateFlowErrorResponse returns new CreateFlowErrorResponse from SchFetchDenied.
-func NewSchFetchDeniedCreateFlowErrorResponse(v SchFetchDenied) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetSchFetchDenied(v)
-	return s
-}
-
-// SetSchFetchDowngrade sets CreateFlowErrorResponse to SchFetchDowngrade.
-func (s *CreateFlowErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
-	s.Type = SchFetchDowngradeCreateFlowErrorResponse
-	s.SchFetchDowngrade = v
-}
-
-// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if CreateFlowErrorResponse is SchFetchDowngrade.
-func (s CreateFlowErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
-	if !s.IsSchFetchDowngrade() {
-		return v, false
-	}
-	return s.SchFetchDowngrade, true
-}
-
-// NewSchFetchDowngradeCreateFlowErrorResponse returns new CreateFlowErrorResponse from SchFetchDowngrade.
-func NewSchFetchDowngradeCreateFlowErrorResponse(v SchFetchDowngrade) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetSchFetchDowngrade(v)
-	return s
-}
-
-// SetSchFetchTimeout sets CreateFlowErrorResponse to SchFetchTimeout.
-func (s *CreateFlowErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
-	s.Type = SchFetchTimeoutCreateFlowErrorResponse
-	s.SchFetchTimeout = v
-}
-
-// GetSchFetchTimeout returns SchFetchTimeout and true boolean if CreateFlowErrorResponse is SchFetchTimeout.
-func (s CreateFlowErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
-	if !s.IsSchFetchTimeout() {
-		return v, false
-	}
-	return s.SchFetchTimeout, true
-}
-
-// NewSchFetchTimeoutCreateFlowErrorResponse returns new CreateFlowErrorResponse from SchFetchTimeout.
-func NewSchFetchTimeoutCreateFlowErrorResponse(v SchFetchTimeout) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetSchFetchTimeout(v)
-	return s
-}
-
-// SetSchFetchTooLarge sets CreateFlowErrorResponse to SchFetchTooLarge.
-func (s *CreateFlowErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
-	s.Type = SchFetchTooLargeCreateFlowErrorResponse
-	s.SchFetchTooLarge = v
-}
-
-// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if CreateFlowErrorResponse is SchFetchTooLarge.
-func (s CreateFlowErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
-	if !s.IsSchFetchTooLarge() {
-		return v, false
-	}
-	return s.SchFetchTooLarge, true
-}
-
-// NewSchFetchTooLargeCreateFlowErrorResponse returns new CreateFlowErrorResponse from SchFetchTooLarge.
-func NewSchFetchTooLargeCreateFlowErrorResponse(v SchFetchTooLarge) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetSchFetchTooLarge(v)
-	return s
-}
-
-// SetSchFetchTooManyRedirects sets CreateFlowErrorResponse to SchFetchTooManyRedirects.
-func (s *CreateFlowErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
-	s.Type = SchFetchTooManyRedirectsCreateFlowErrorResponse
-	s.SchFetchTooManyRedirects = v
-}
-
-// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if CreateFlowErrorResponse is SchFetchTooManyRedirects.
-func (s CreateFlowErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
-	if !s.IsSchFetchTooManyRedirects() {
-		return v, false
-	}
-	return s.SchFetchTooManyRedirects, true
-}
-
-// NewSchFetchTooManyRedirectsCreateFlowErrorResponse returns new CreateFlowErrorResponse from SchFetchTooManyRedirects.
-func NewSchFetchTooManyRedirectsCreateFlowErrorResponse(v SchFetchTooManyRedirects) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetSchFetchTooManyRedirects(v)
 	return s
 }
 
@@ -21131,23 +20991,18 @@ func (*GetFlowDefinitionErrorResponseStatusCode) getFlowDefinitionRes() {}
 
 // GetFlowStepErrorResponse represents sum type.
 type GetFlowStepErrorResponse struct {
-	Type                     GetFlowStepErrorResponseType // switch on this field
-	EncKeyDecryptFailed      EncKeyDecryptFailed
-	EncKeyNotFound           EncKeyNotFound
-	FlowCompleted            FlowCompleted
-	FlowCookieExpired        FlowCookieExpired
-	FlowCookieInvalid        FlowCookieInvalid
-	FlowIntegrity            FlowIntegrity
-	FlowNotFound             FlowNotFound
-	Internal                 Internal
-	TknInvalid               TknInvalid
-	SchFetchDenied           SchFetchDenied
-	SchFetchDowngrade        SchFetchDowngrade
-	SchFetchTimeout          SchFetchTimeout
-	SchFetchTooLarge         SchFetchTooLarge
-	SchFetchTooManyRedirects SchFetchTooManyRedirects
-	ReqInvalid               ReqInvalid
-	EncKeyUnknownAlg         EncKeyUnknownAlg
+	Type                GetFlowStepErrorResponseType // switch on this field
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	FlowCompleted       FlowCompleted
+	FlowCookieExpired   FlowCookieExpired
+	FlowCookieInvalid   FlowCookieInvalid
+	FlowIntegrity       FlowIntegrity
+	FlowNotFound        FlowNotFound
+	Internal            Internal
+	TknInvalid          TknInvalid
+	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -21155,22 +21010,17 @@ type GetFlowStepErrorResponseType string
 
 // Possible values for GetFlowStepErrorResponseType.
 const (
-	EncKeyDecryptFailedGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyNotFoundGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "enc_key.not_found"
-	FlowCompletedGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "flow.completed"
-	FlowCookieExpiredGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegrityGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "flow.integrity"
-	FlowNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.not_found"
-	InternalGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "internal"
-	TknInvalidGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "tkn.invalid"
-	SchFetchDeniedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "sch.fetch_denied"
-	SchFetchDowngradeGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "sch.fetch_downgrade"
-	SchFetchTimeoutGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "sch.fetch_timeout"
-	SchFetchTooLargeGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "sch.fetch_too_large"
-	SchFetchTooManyRedirectsGetFlowStepErrorResponse GetFlowStepErrorResponseType = "sch.fetch_too_many_redirects"
-	ReqInvalidGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	EncKeyDecryptFailedGetFlowStepErrorResponse GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyNotFoundGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "enc_key.not_found"
+	FlowCompletedGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.completed"
+	FlowCookieExpiredGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegrityGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.integrity"
+	FlowNotFoundGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "flow.not_found"
+	InternalGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "internal"
+	TknInvalidGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "tkn.invalid"
+	ReqInvalidGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 )
 
 // IsEncKeyDecryptFailed reports whether GetFlowStepErrorResponse is EncKeyDecryptFailed.
@@ -21216,31 +21066,6 @@ func (s GetFlowStepErrorResponse) IsInternal() bool {
 // IsTknInvalid reports whether GetFlowStepErrorResponse is TknInvalid.
 func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 	return s.Type == TknInvalidGetFlowStepErrorResponse
-}
-
-// IsSchFetchDenied reports whether GetFlowStepErrorResponse is SchFetchDenied.
-func (s GetFlowStepErrorResponse) IsSchFetchDenied() bool {
-	return s.Type == SchFetchDeniedGetFlowStepErrorResponse
-}
-
-// IsSchFetchDowngrade reports whether GetFlowStepErrorResponse is SchFetchDowngrade.
-func (s GetFlowStepErrorResponse) IsSchFetchDowngrade() bool {
-	return s.Type == SchFetchDowngradeGetFlowStepErrorResponse
-}
-
-// IsSchFetchTimeout reports whether GetFlowStepErrorResponse is SchFetchTimeout.
-func (s GetFlowStepErrorResponse) IsSchFetchTimeout() bool {
-	return s.Type == SchFetchTimeoutGetFlowStepErrorResponse
-}
-
-// IsSchFetchTooLarge reports whether GetFlowStepErrorResponse is SchFetchTooLarge.
-func (s GetFlowStepErrorResponse) IsSchFetchTooLarge() bool {
-	return s.Type == SchFetchTooLargeGetFlowStepErrorResponse
-}
-
-// IsSchFetchTooManyRedirects reports whether GetFlowStepErrorResponse is SchFetchTooManyRedirects.
-func (s GetFlowStepErrorResponse) IsSchFetchTooManyRedirects() bool {
-	return s.Type == SchFetchTooManyRedirectsGetFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether GetFlowStepErrorResponse is ReqInvalid.
@@ -21439,111 +21264,6 @@ func (s GetFlowStepErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
 func NewTknInvalidGetFlowStepErrorResponse(v TknInvalid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetTknInvalid(v)
-	return s
-}
-
-// SetSchFetchDenied sets GetFlowStepErrorResponse to SchFetchDenied.
-func (s *GetFlowStepErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
-	s.Type = SchFetchDeniedGetFlowStepErrorResponse
-	s.SchFetchDenied = v
-}
-
-// GetSchFetchDenied returns SchFetchDenied and true boolean if GetFlowStepErrorResponse is SchFetchDenied.
-func (s GetFlowStepErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
-	if !s.IsSchFetchDenied() {
-		return v, false
-	}
-	return s.SchFetchDenied, true
-}
-
-// NewSchFetchDeniedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from SchFetchDenied.
-func NewSchFetchDeniedGetFlowStepErrorResponse(v SchFetchDenied) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetSchFetchDenied(v)
-	return s
-}
-
-// SetSchFetchDowngrade sets GetFlowStepErrorResponse to SchFetchDowngrade.
-func (s *GetFlowStepErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
-	s.Type = SchFetchDowngradeGetFlowStepErrorResponse
-	s.SchFetchDowngrade = v
-}
-
-// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if GetFlowStepErrorResponse is SchFetchDowngrade.
-func (s GetFlowStepErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
-	if !s.IsSchFetchDowngrade() {
-		return v, false
-	}
-	return s.SchFetchDowngrade, true
-}
-
-// NewSchFetchDowngradeGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from SchFetchDowngrade.
-func NewSchFetchDowngradeGetFlowStepErrorResponse(v SchFetchDowngrade) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetSchFetchDowngrade(v)
-	return s
-}
-
-// SetSchFetchTimeout sets GetFlowStepErrorResponse to SchFetchTimeout.
-func (s *GetFlowStepErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
-	s.Type = SchFetchTimeoutGetFlowStepErrorResponse
-	s.SchFetchTimeout = v
-}
-
-// GetSchFetchTimeout returns SchFetchTimeout and true boolean if GetFlowStepErrorResponse is SchFetchTimeout.
-func (s GetFlowStepErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
-	if !s.IsSchFetchTimeout() {
-		return v, false
-	}
-	return s.SchFetchTimeout, true
-}
-
-// NewSchFetchTimeoutGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from SchFetchTimeout.
-func NewSchFetchTimeoutGetFlowStepErrorResponse(v SchFetchTimeout) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetSchFetchTimeout(v)
-	return s
-}
-
-// SetSchFetchTooLarge sets GetFlowStepErrorResponse to SchFetchTooLarge.
-func (s *GetFlowStepErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
-	s.Type = SchFetchTooLargeGetFlowStepErrorResponse
-	s.SchFetchTooLarge = v
-}
-
-// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if GetFlowStepErrorResponse is SchFetchTooLarge.
-func (s GetFlowStepErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
-	if !s.IsSchFetchTooLarge() {
-		return v, false
-	}
-	return s.SchFetchTooLarge, true
-}
-
-// NewSchFetchTooLargeGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from SchFetchTooLarge.
-func NewSchFetchTooLargeGetFlowStepErrorResponse(v SchFetchTooLarge) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetSchFetchTooLarge(v)
-	return s
-}
-
-// SetSchFetchTooManyRedirects sets GetFlowStepErrorResponse to SchFetchTooManyRedirects.
-func (s *GetFlowStepErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
-	s.Type = SchFetchTooManyRedirectsGetFlowStepErrorResponse
-	s.SchFetchTooManyRedirects = v
-}
-
-// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if GetFlowStepErrorResponse is SchFetchTooManyRedirects.
-func (s GetFlowStepErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
-	if !s.IsSchFetchTooManyRedirects() {
-		return v, false
-	}
-	return s.SchFetchTooManyRedirects, true
-}
-
-// NewSchFetchTooManyRedirectsGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from SchFetchTooManyRedirects.
-func NewSchFetchTooManyRedirectsGetFlowStepErrorResponse(v SchFetchTooManyRedirects) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetSchFetchTooManyRedirects(v)
 	return s
 }
 
@@ -47923,38 +47643,33 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                     SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff      AttAlreadyHandedOff
-	AttInvalidRequest        AttInvalidRequest
-	AttInvalidState          AttInvalidState
-	AttNotCompleted          AttNotCompleted
-	AttNotFound              AttNotFound
-	AttProofRejected         AttProofRejected
-	AttStaleChallenge        AttStaleChallenge
-	EncKeyDecryptFailed      EncKeyDecryptFailed
-	EncKeyEncryptFailed      EncKeyEncryptFailed
-	EncKeyNotFound           EncKeyNotFound
-	EvtInvalid               EvtInvalid
-	FlowCookieExpired        FlowCookieExpired
-	FlowCookieInvalid        FlowCookieInvalid
-	FlowIntegrity            FlowIntegrity
-	FlowInvalidAction        FlowInvalidAction
-	FlowNotFound             FlowNotFound
-	FlowUnsupported          FlowUnsupported
-	Internal                 Internal
-	TknInvalid               TknInvalid
-	SchFetchDenied           SchFetchDenied
-	SchFetchDowngrade        SchFetchDowngrade
-	SchFetchTimeout          SchFetchTimeout
-	SchFetchTooLarge         SchFetchTooLarge
-	SchFetchTooManyRedirects SchFetchTooManyRedirects
-	NotImplemented           NotImplemented
-	ReqInvalid               ReqInvalid
-	EncKeyUnknownAlg         EncKeyUnknownAlg
-	Unavailable              Unavailable
-	UserAlreadyExists        UserAlreadyExists
-	UserInvalid              UserInvalid
-	UserNotFound             UserNotFound
+	Type                SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff AttAlreadyHandedOff
+	AttInvalidRequest   AttInvalidRequest
+	AttInvalidState     AttInvalidState
+	AttNotCompleted     AttNotCompleted
+	AttNotFound         AttNotFound
+	AttProofRejected    AttProofRejected
+	AttStaleChallenge   AttStaleChallenge
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyEncryptFailed EncKeyEncryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	EvtInvalid          EvtInvalid
+	FlowCookieExpired   FlowCookieExpired
+	FlowCookieInvalid   FlowCookieInvalid
+	FlowIntegrity       FlowIntegrity
+	FlowInvalidAction   FlowInvalidAction
+	FlowNotFound        FlowNotFound
+	FlowUnsupported     FlowUnsupported
+	Internal            Internal
+	TknInvalid          TknInvalid
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Unavailable         Unavailable
+	UserAlreadyExists   UserAlreadyExists
+	UserInvalid         UserInvalid
+	UserNotFound        UserNotFound
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -47962,37 +47677,32 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowUnsupportedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "flow.unsupported"
-	InternalSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "tkn.invalid"
-	SchFetchDeniedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "sch.fetch_denied"
-	SchFetchDowngradeSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "sch.fetch_downgrade"
-	SchFetchTimeoutSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "sch.fetch_timeout"
-	SchFetchTooLargeSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "sch.fetch_too_large"
-	SchFetchTooManyRedirectsSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "sch.fetch_too_many_redirects"
-	NotImplementedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.not_found"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowCookieExpiredSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
+	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -48088,31 +47798,6 @@ func (s SubmitFlowStepErrorResponse) IsInternal() bool {
 // IsTknInvalid reports whether SubmitFlowStepErrorResponse is TknInvalid.
 func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 	return s.Type == TknInvalidSubmitFlowStepErrorResponse
-}
-
-// IsSchFetchDenied reports whether SubmitFlowStepErrorResponse is SchFetchDenied.
-func (s SubmitFlowStepErrorResponse) IsSchFetchDenied() bool {
-	return s.Type == SchFetchDeniedSubmitFlowStepErrorResponse
-}
-
-// IsSchFetchDowngrade reports whether SubmitFlowStepErrorResponse is SchFetchDowngrade.
-func (s SubmitFlowStepErrorResponse) IsSchFetchDowngrade() bool {
-	return s.Type == SchFetchDowngradeSubmitFlowStepErrorResponse
-}
-
-// IsSchFetchTimeout reports whether SubmitFlowStepErrorResponse is SchFetchTimeout.
-func (s SubmitFlowStepErrorResponse) IsSchFetchTimeout() bool {
-	return s.Type == SchFetchTimeoutSubmitFlowStepErrorResponse
-}
-
-// IsSchFetchTooLarge reports whether SubmitFlowStepErrorResponse is SchFetchTooLarge.
-func (s SubmitFlowStepErrorResponse) IsSchFetchTooLarge() bool {
-	return s.Type == SchFetchTooLargeSubmitFlowStepErrorResponse
-}
-
-// IsSchFetchTooManyRedirects reports whether SubmitFlowStepErrorResponse is SchFetchTooManyRedirects.
-func (s SubmitFlowStepErrorResponse) IsSchFetchTooManyRedirects() bool {
-	return s.Type == SchFetchTooManyRedirectsSubmitFlowStepErrorResponse
 }
 
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
@@ -48546,111 +48231,6 @@ func (s SubmitFlowStepErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
 func NewTknInvalidSubmitFlowStepErrorResponse(v TknInvalid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetTknInvalid(v)
-	return s
-}
-
-// SetSchFetchDenied sets SubmitFlowStepErrorResponse to SchFetchDenied.
-func (s *SubmitFlowStepErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
-	s.Type = SchFetchDeniedSubmitFlowStepErrorResponse
-	s.SchFetchDenied = v
-}
-
-// GetSchFetchDenied returns SchFetchDenied and true boolean if SubmitFlowStepErrorResponse is SchFetchDenied.
-func (s SubmitFlowStepErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
-	if !s.IsSchFetchDenied() {
-		return v, false
-	}
-	return s.SchFetchDenied, true
-}
-
-// NewSchFetchDeniedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from SchFetchDenied.
-func NewSchFetchDeniedSubmitFlowStepErrorResponse(v SchFetchDenied) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetSchFetchDenied(v)
-	return s
-}
-
-// SetSchFetchDowngrade sets SubmitFlowStepErrorResponse to SchFetchDowngrade.
-func (s *SubmitFlowStepErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
-	s.Type = SchFetchDowngradeSubmitFlowStepErrorResponse
-	s.SchFetchDowngrade = v
-}
-
-// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if SubmitFlowStepErrorResponse is SchFetchDowngrade.
-func (s SubmitFlowStepErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
-	if !s.IsSchFetchDowngrade() {
-		return v, false
-	}
-	return s.SchFetchDowngrade, true
-}
-
-// NewSchFetchDowngradeSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from SchFetchDowngrade.
-func NewSchFetchDowngradeSubmitFlowStepErrorResponse(v SchFetchDowngrade) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetSchFetchDowngrade(v)
-	return s
-}
-
-// SetSchFetchTimeout sets SubmitFlowStepErrorResponse to SchFetchTimeout.
-func (s *SubmitFlowStepErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
-	s.Type = SchFetchTimeoutSubmitFlowStepErrorResponse
-	s.SchFetchTimeout = v
-}
-
-// GetSchFetchTimeout returns SchFetchTimeout and true boolean if SubmitFlowStepErrorResponse is SchFetchTimeout.
-func (s SubmitFlowStepErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
-	if !s.IsSchFetchTimeout() {
-		return v, false
-	}
-	return s.SchFetchTimeout, true
-}
-
-// NewSchFetchTimeoutSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from SchFetchTimeout.
-func NewSchFetchTimeoutSubmitFlowStepErrorResponse(v SchFetchTimeout) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetSchFetchTimeout(v)
-	return s
-}
-
-// SetSchFetchTooLarge sets SubmitFlowStepErrorResponse to SchFetchTooLarge.
-func (s *SubmitFlowStepErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
-	s.Type = SchFetchTooLargeSubmitFlowStepErrorResponse
-	s.SchFetchTooLarge = v
-}
-
-// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if SubmitFlowStepErrorResponse is SchFetchTooLarge.
-func (s SubmitFlowStepErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
-	if !s.IsSchFetchTooLarge() {
-		return v, false
-	}
-	return s.SchFetchTooLarge, true
-}
-
-// NewSchFetchTooLargeSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from SchFetchTooLarge.
-func NewSchFetchTooLargeSubmitFlowStepErrorResponse(v SchFetchTooLarge) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetSchFetchTooLarge(v)
-	return s
-}
-
-// SetSchFetchTooManyRedirects sets SubmitFlowStepErrorResponse to SchFetchTooManyRedirects.
-func (s *SubmitFlowStepErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
-	s.Type = SchFetchTooManyRedirectsSubmitFlowStepErrorResponse
-	s.SchFetchTooManyRedirects = v
-}
-
-// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if SubmitFlowStepErrorResponse is SchFetchTooManyRedirects.
-func (s SubmitFlowStepErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
-	if !s.IsSchFetchTooManyRedirects() {
-		return v, false
-	}
-	return s.SchFetchTooManyRedirects, true
-}
-
-// NewSchFetchTooManyRedirectsSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from SchFetchTooManyRedirects.
-func NewSchFetchTooManyRedirectsSubmitFlowStepErrorResponse(v SchFetchTooManyRedirects) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetSchFetchTooManyRedirects(v)
 	return s
 }
 

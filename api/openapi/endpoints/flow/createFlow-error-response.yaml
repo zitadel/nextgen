@@ -16,11 +16,6 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
-        - $ref: '../../components/schemas/errors/sch-fetch_denied.yaml'
-        - $ref: '../../components/schemas/errors/sch-fetch_downgrade.yaml'
-        - $ref: '../../components/schemas/errors/sch-fetch_timeout.yaml'
-        - $ref: '../../components/schemas/errors/sch-fetch_too_large.yaml'
-        - $ref: '../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
       discriminator:
@@ -38,11 +33,6 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
-          sch.fetch_denied: '../../components/schemas/errors/sch-fetch_denied.yaml'
-          sch.fetch_downgrade: '../../components/schemas/errors/sch-fetch_downgrade.yaml'
-          sch.fetch_timeout: '../../components/schemas/errors/sch-fetch_timeout.yaml'
-          sch.fetch_too_large: '../../components/schemas/errors/sch-fetch_too_large.yaml'
-          sch.fetch_too_many_redirects: '../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
@@ -106,31 +96,6 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
-      sch.fetch_denied:
-        summary: sch.fetch_denied
-        value:
-          code: sch.fetch_denied
-          message: 'the schema URL resolves to an address blocked by the egress policy'
-      sch.fetch_downgrade:
-        summary: sch.fetch_downgrade
-        value:
-          code: sch.fetch_downgrade
-          message: 'fetching the schema URL was redirected from https to http, which is not allowed'
-      sch.fetch_timeout:
-        summary: sch.fetch_timeout
-        value:
-          code: sch.fetch_timeout
-          message: 'fetching the schema URL timed out'
-      sch.fetch_too_large:
-        summary: sch.fetch_too_large
-        value:
-          code: sch.fetch_too_large
-          message: 'the fetched schema document exceeds the configured size limit'
-      sch.fetch_too_many_redirects:
-        summary: sch.fetch_too_many_redirects
-        value:
-          code: sch.fetch_too_many_redirects
-          message: 'fetching the schema URL exceeded the redirect limit'
       req.invalid:
         summary: req.invalid
         value:

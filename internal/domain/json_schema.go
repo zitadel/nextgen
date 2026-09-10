@@ -305,9 +305,12 @@ func (r *JSONSchemaResolver) Resolve(
 	}
 	// Compilation itself does no I/O and never observes ctx, so the
 	// envelope could expire between the last fetch and this point; an
-	// expired resolve must fail, not be cached as success.
+	// expired resolve must fail, not be cached as success. Returned raw
+	// (not classified into a fetch_* code): the schema service classifies
+	// it, so operations whose resolver cannot egress never advertise fetch
+	// errors in their inferred error sets.
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		return nil, classifyFetchError(schemaURL, ctxErr)
+		return nil, ctxErr
 	}
 	r.cache.Add(cacheKey, schema)
 	return schema, nil
