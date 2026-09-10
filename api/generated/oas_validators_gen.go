@@ -3035,8 +3035,8 @@ func (s *CreateReleaseRequest) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Pointers)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -7174,8 +7174,8 @@ func (s *Release) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Pointers)); err != nil {
 			return errors.Wrap(err, "array")
 		}
