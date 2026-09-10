@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -114,17 +115,35 @@ func (c ClientConfig) NewClient() (*http.Client, error) {
 			if len(via) > c.MaxRedirects {
 				return ErrTooManyRedirects
 			}
-			if !c.AllowHTTPSDowngrade && len(via) > 0 {
+			if len(via) > 0 {
 				prev := via[len(via)-1]
-				if prev != nil && prev.URL != nil && req.URL != nil &&
-					strings.EqualFold(prev.URL.Scheme, "https") &&
-					!strings.EqualFold(req.URL.Scheme, "https") {
-					return ErrHTTPSDowngrade
+				if prev != nil && prev.URL != nil && req.URL != nil {
+					if !c.AllowHTTPSDowngrade &&
+						strings.EqualFold(prev.URL.Scheme, "https") &&
+						!strings.EqualFold(req.URL.Scheme, "https") {
+						return ErrHTTPSDowngrade
+					}
+					// Nothing sensitive crosses origins on a redirect (ADR
+					// 061 decision 9). Go itself forwards Authorization to
+					// the same host or a subdomain and synthesizes a Referer
+					// carrying the previous URL's query; both are prepared
+					// on req before this hook runs, so stripping here is
+					// effective.
+					if !sameOrigin(prev.URL, req.URL) {
+						req.Header.Del("Authorization")
+						req.Header.Del("Cookie")
+						req.Header.Del("Referer")
+					}
 				}
 			}
 			return nil
 		},
 	}, nil
+}
+
+// sameOrigin reports whether two URLs share scheme and host:port.
+func sameOrigin(a, b *url.URL) bool {
+	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Host, b.Host)
 }
 
 // policyRoundTripper rejects a request whose URL hostname the policy denies,

@@ -37,7 +37,7 @@ func TestNewHostChecker(t *testing.T) {
 	})
 
 	t.Run("entries that can never match a URL hostname are errors", func(t *testing.T) {
-		for _, entry := range []string{"localhost:8080", "user@host.test", "host .test", "host.test?x", "bad\nhost.test", "bad\rhost.test", "bad\x00host.test"} {
+		for _, entry := range []string{"localhost:8080", "user@host.test", "host .test", "host.test?x", "bad\nhost.test", "bad\rhost.test", "bad\x00host.test", "*.internal.example", "*"} {
 			_, err := httputil.NewHostChecker(entry)
 			require.Error(t, err, "entry %q must be rejected, not become a dead rule", entry)
 		}
