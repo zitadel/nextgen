@@ -17,7 +17,7 @@ properties:
     description: |
       Unique step identifier within this flow. Used as transition targets
       and returned in the API response as `step.name`.
-    pattern: "^[a-z][a-z0-9-]*$"
+    pattern: "^[a-z][a-z0-9_-]*$"
     example: login
 
   fields:

@@ -4055,7 +4055,7 @@ func (s *FlowDefinitionStep) Validate() error {
 			MaxLengthSet:  false,
 			Email:         false,
 			Hostname:      false,
-			Regex:         regexMap["^[a-z][a-z0-9-]*$"],
+			Regex:         regexMap["^[a-z][a-z0-9_-]*$"],
 			MinNumeric:    0,
 			MinNumericSet: false,
 			MaxNumeric:    0,

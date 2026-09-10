@@ -180,7 +180,7 @@
         "name": {
           "type": "string",
           "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`.\n",
-          "pattern": "^[a-z][a-z0-9-]*$",
+          "pattern": "^[a-z][a-z0-9_-]*$",
           "examples": [
             "login"
           ]
