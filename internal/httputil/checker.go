@@ -51,10 +51,11 @@ func NewHostChecker(entry string) (*HostChecker, error) {
 		return &HostChecker{IP: ip}, nil
 	}
 	// A hostname is matched against req.URL.Hostname(), which never carries
-	// a scheme, port, userinfo, path, or whitespace. An entry with any of
-	// those (e.g. "localhost:8080") would be a deny rule that silently never
-	// fires, so it is a configuration error instead.
-	if strings.ContainsAny(entry, " \t:@?#") {
+	// a scheme, port, userinfo, path, whitespace, or control characters. An
+	// entry with any of those (e.g. "localhost:8080") would be a deny rule
+	// that silently never fires, so it is a configuration error instead.
+	badRune := func(r rune) bool { return r <= ' ' || r == 0x7f }
+	if strings.ContainsFunc(entry, badRune) || strings.ContainsAny(entry, ":@?#") {
 		return nil, fmt.Errorf("invalid hostname entry %q: use a bare hostname, IP, or CIDR", entry)
 	}
 	return &HostChecker{Domain: entry}, nil
