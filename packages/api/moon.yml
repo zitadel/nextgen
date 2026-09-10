@@ -12,6 +12,10 @@ tasks:
       - "src/runtime/**/*.ts"
     outputs:
       - "src/generated/**/*"
+    options:
+      # The spec references *-error-response.yaml files that server:generate
+      # and its checks rewrite or prune; see the mutex note on server:generate.
+      mutex: "generated-sources"
 
   lint:
     command: "corepack pnpm exec oxlint ."

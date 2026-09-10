@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 description: |
   Semantic colours for one theme side. An omitted key uses the maintained
   default for this side, never the other side's value.

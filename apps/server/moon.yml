@@ -15,6 +15,7 @@ fileGroups:
     - "/api/**/*.json"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
+    - "/scripts/generate-meta-schemas.ts"
     - "moon.yml"
     - "package.json"
     - "bin/**"
@@ -60,10 +61,16 @@ tasks:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
       - "/api/openapi/endpoints/**/*-error-response.yaml"
+      - "/api/openapi/endpoints/schemas/*.json"
       - "/internal/**/*_enumer.go"
       - "/internal/**/*.mock.go"
     options:
       runFromWorkspaceRoot: true
+      # Generation rewrites files other projects read mid-graph: the JSON
+      # meta-schemas (config:sync-schemas) and the error-response YAML
+      # (api:generate). The shared mutex keeps those from running against a
+      # half-written or pruned tree; CI already runs the pruned check alone.
+      mutex: "generated-sources"
 
   # Generators only write; they never retract. Removing everything and
   # regenerating is how orphaned output gets pruned — whatever does not come
@@ -77,6 +84,7 @@ tasks:
       cache: false
       runInCI: false
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   check-generate:
     command: "node scripts/check-go-generate.mjs"
@@ -91,6 +99,7 @@ tasks:
       - "/scripts/generated-outputs.mjs"
     options:
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   # check-generate plus a prune, so output nothing generates any more fails the
   # build instead of lingering. Deliberately not a dep of vet/test: it deletes
@@ -107,6 +116,7 @@ tasks:
       - "/scripts/dev-process.mjs"
     options:
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   vet:
     command: "go vet ./..."

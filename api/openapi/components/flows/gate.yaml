@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 required: [kind, provider]
 description: |
   A security challenge that must be satisfied before this step's submission

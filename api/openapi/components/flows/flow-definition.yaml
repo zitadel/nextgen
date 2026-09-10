@@ -1,3 +1,4 @@
+x-meta-schema: true
 type: object
 required: [ name, status, user_schema, purposes, steps ]
 description: |
@@ -9,7 +10,14 @@ description: |
   Flow definitions are created by administrators and stored in the project/team
   configuration hierarchy. The engine selects the matching definition based on
   the purpose + audience when a flow is created via POST /flow.
+additionalProperties: false
 properties:
+  "$schema":
+    type: string
+    description: |
+      Editor affordance: path or URL of this file's JSON meta-schema, so an
+      editor validates and autocompletes it. The CLI strips it before upload;
+      the platform ignores it.
   name:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'

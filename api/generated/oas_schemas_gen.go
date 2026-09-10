@@ -5942,16 +5942,25 @@ func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes
 // Branding configuration, used in two places with one shape: as the request
 // body of `POST /branding`, which publishes it as a new immutable revision,
 // and as a read-only projection on flow responses, which carries the
-// project's latest revision.
+// project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+// that `zitadel apply` publishes.
 // Every field is optional. An omitted key uses Zitadel's maintained default,
 // so a revision carrying one colour is as valid as one carrying the whole
 // object.
 // Ref: #
 type Branding struct {
-	// Layout preset the bundled template branches on, and the degrade target
-	// when a custom template fails validation. Ejected templates may ignore
-	// it. Selects a template rather than restyling the widget, so it is not
-	// an appearance control.
+	// Editor affordance: path or URL of this file's JSON meta-schema, so an
+	// editor validates and autocompletes it. The CLI strips it before upload;
+	// the platform ignores it.
+	Schema OptString `json:"$schema"`
+	// Degrade preset (`centered` or `split`) the bundled default template
+	// branches on, and the fallback when a custom template fails validation.
+	// Not the complete design catalog: all named designs (`centered`, `split`,
+	// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+	// these two values; switch designs with
+	// `zitadel branding eject --design <name>` instead of editing this field.
+	// Ejected templates may ignore it. Selects a template rather than restyling
+	// the widget, so it is not an appearance control.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template for rendering this step. The orchestrator renders
 	// it into its Shadow DOM with the capability dictionaries as context.
@@ -5965,6 +5974,11 @@ type Branding struct {
 	Theme      OptBrandingTheme      `json:"theme"`
 	Typography OptBrandingTypography `json:"typography"`
 	Shape      OptBrandingShape      `json:"shape"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *Branding) GetSchema() OptString {
+	return s.Schema
 }
 
 // GetLayout returns the value of Layout.
@@ -6000,6 +6014,11 @@ func (s *Branding) GetTypography() OptBrandingTypography {
 // GetShape returns the value of Shape.
 func (s *Branding) GetShape() OptBrandingShape {
 	return s.Shape
+}
+
+// SetSchema sets the value of Schema.
+func (s *Branding) SetSchema(val OptString) {
+	s.Schema = val
 }
 
 // SetLayout sets the value of Layout.
@@ -6533,10 +6552,14 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
-// Layout preset the bundled template branches on, and the degrade target
-// when a custom template fails validation. Ejected templates may ignore
-// it. Selects a template rather than restyling the widget, so it is not
-// an appearance control.
+// Degrade preset (`centered` or `split`) the bundled default template
+// branches on, and the fallback when a custom template fails validation.
+// Not the complete design catalog: all named designs (`centered`, `split`,
+// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+// these two values; switch designs with
+// `zitadel branding eject --design <name>` instead of editing this field.
+// Ejected templates may ignore it. Selects a template rather than restyling
+// the widget, so it is not an appearance control.
 type BrandingLayout string
 
 const (
@@ -16083,6 +16106,10 @@ func (s *FlowCookieInvalidDetails) init() FlowCookieInvalidDetails {
 // the purpose + audience when a flow is created via POST /flow.
 // Ref: #
 type FlowDefinition struct {
+	// Editor affordance: path or URL of this file's JSON meta-schema, so an
+	// editor validates and autocompletes it. The CLI strips it before upload;
+	// the platform ignores it.
+	Schema OptString `json:"$schema"`
 	// Stable identifier for this flow, used as the target of cross-flow
 	// `switch` and `pivot` transitions. Every revision of a flow shares its
 	// `name`; publishing a definition under an existing `name` adds a
@@ -16106,6 +16133,11 @@ type FlowDefinition struct {
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
 	Steps []FlowDefinitionStep `json:"steps"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *FlowDefinition) GetSchema() OptString {
+	return s.Schema
 }
 
 // GetName returns the value of Name.
@@ -16136,6 +16168,11 @@ func (s *FlowDefinition) GetAudience() OptFlowAudience {
 // GetSteps returns the value of Steps.
 func (s *FlowDefinition) GetSteps() []FlowDefinitionStep {
 	return s.Steps
+}
+
+// SetSchema sets the value of Schema.
+func (s *FlowDefinition) SetSchema(val OptString) {
+	s.Schema = val
 }
 
 // SetName sets the value of Name.
@@ -17245,7 +17282,7 @@ type FlowStep struct {
 	Fields []Field `json:"fields"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
-	Actions []StepAction `json:"actions"`
+	Actions []FlowStepAction `json:"actions"`
 	// Security gates that must be satisfied before the step can be submitted.
 	// The engine injects gates dynamically based on policy, even if they
 	// are not declared in the flow definition.
@@ -17292,7 +17329,7 @@ func (s *FlowStep) GetFields() []Field {
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowStep) GetActions() []StepAction {
+func (s *FlowStep) GetActions() []FlowStepAction {
 	return s.Actions
 }
 
@@ -17342,7 +17379,7 @@ func (s *FlowStep) SetFields(val []Field) {
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowStep) SetActions(val []StepAction) {
+func (s *FlowStep) SetActions(val []FlowStepAction) {
 	s.Actions = val
 }
 
@@ -17359,6 +17396,138 @@ func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
 // SetChallenge sets the value of Challenge.
 func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
 	s.Challenge = val
+}
+
+// An action the engine offers on a runtime step. Every declared action of the
+// definition's step appears here, plus the engine-injected `back` whenever
+// returning to the previous step is possible.
+// Ref: #
+type FlowStepAction struct {
+	// Action identifier. Sent back in the submit request as `action`.
+	Name string `json:"name"`
+	// How the client should treat the action:
+	// - `submit`: collect the step's fields and submit.
+	// - `passkey`: run a WebAuthn assertion, then submit the result.
+	// - `passkey_register`: run a WebAuthn registration, then submit the result.
+	// - `navigate`: submit without collecting fields; pure routing.
+	// - `back`: return the user to the previous step. Engine-injected, never
+	// declared in a flow definition.
+	Kind FlowStepActionKind `json:"kind"`
+	// Marks this as the default/primary action. The runtime template uses
+	// this hint to choose visual emphasis.
+	Primary OptBool `json:"primary"`
+	// Localization key for the action's label, resolved client-side from a
+	// locale dictionary.
+	TextKey OptString `json:"text_key"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowStepAction) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *FlowStepAction) GetKind() FlowStepActionKind {
+	return s.Kind
+}
+
+// GetPrimary returns the value of Primary.
+func (s *FlowStepAction) GetPrimary() OptBool {
+	return s.Primary
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *FlowStepAction) GetTextKey() OptString {
+	return s.TextKey
+}
+
+// SetName sets the value of Name.
+func (s *FlowStepAction) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *FlowStepAction) SetKind(val FlowStepActionKind) {
+	s.Kind = val
+}
+
+// SetPrimary sets the value of Primary.
+func (s *FlowStepAction) SetPrimary(val OptBool) {
+	s.Primary = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *FlowStepAction) SetTextKey(val OptString) {
+	s.TextKey = val
+}
+
+// How the client should treat the action:
+// - `submit`: collect the step's fields and submit.
+// - `passkey`: run a WebAuthn assertion, then submit the result.
+// - `passkey_register`: run a WebAuthn registration, then submit the result.
+// - `navigate`: submit without collecting fields; pure routing.
+// - `back`: return the user to the previous step. Engine-injected, never
+// declared in a flow definition.
+type FlowStepActionKind string
+
+const (
+	FlowStepActionKindSubmit          FlowStepActionKind = "submit"
+	FlowStepActionKindPasskey         FlowStepActionKind = "passkey"
+	FlowStepActionKindPasskeyRegister FlowStepActionKind = "passkey_register"
+	FlowStepActionKindNavigate        FlowStepActionKind = "navigate"
+	FlowStepActionKindBack            FlowStepActionKind = "back"
+)
+
+// AllValues returns all FlowStepActionKind values.
+func (FlowStepActionKind) AllValues() []FlowStepActionKind {
+	return []FlowStepActionKind{
+		FlowStepActionKindSubmit,
+		FlowStepActionKindPasskey,
+		FlowStepActionKindPasskeyRegister,
+		FlowStepActionKindNavigate,
+		FlowStepActionKindBack,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepActionKind) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepActionKindSubmit:
+		return []byte(s), nil
+	case FlowStepActionKindPasskey:
+		return []byte(s), nil
+	case FlowStepActionKindPasskeyRegister:
+		return []byte(s), nil
+	case FlowStepActionKindNavigate:
+		return []byte(s), nil
+	case FlowStepActionKindBack:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepActionKind) UnmarshalText(data []byte) error {
+	switch FlowStepActionKind(data) {
+	case FlowStepActionKindSubmit:
+		*s = FlowStepActionKindSubmit
+		return nil
+	case FlowStepActionKindPasskey:
+		*s = FlowStepActionKindPasskey
+		return nil
+	case FlowStepActionKindPasskeyRegister:
+		*s = FlowStepActionKindPasskeyRegister
+		return nil
+	case FlowStepActionKindNavigate:
+		*s = FlowStepActionKindNavigate
+		return nil
+	case FlowStepActionKindBack:
+		*s = FlowStepActionKindBack
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // A pending authentication challenge issued by the server. Present when the
@@ -44348,14 +44517,16 @@ func (s *SortDirection) UnmarshalText(data []byte) error {
 	}
 }
 
-// Configuration for a user-invokable action on a step. The `name` is sent
-// back in the submit request as `action`; the engine resolves the action's
-// declared `kind` to decide how to handle the submission.
+// An action a flow author declares on a step of a flow definition. The
+// `name` is sent back in the submit request as `action`; the engine resolves
+// the action's declared `kind` to decide how to handle the submission.
 // Ref: #
 type StepAction struct {
 	// Action identifier. Sent back in the submit request as `action`.
 	Name string `json:"name"`
-	// Classifies how the engine handles this action:
+	// Classifies how the engine handles this action. `back` is not declarable:
+	// the engine injects it into runtime steps (see `flow-step-action.yaml`)
+	// whenever going back is available.
 	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
 	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
 	// fires once the returned assertion verifies.
@@ -44363,8 +44534,6 @@ type StepAction struct {
 	// transition fires once the returned attestation verifies.
 	// - `navigate`: route through the transition without running the input
 	// pipeline. Used for pure-routing actions declared in the flow definition.
-	// - `back`: return the user to the previous step. Surfaced by the engine
-	// when going back is available.
 	Kind StepActionKind `json:"kind"`
 	// Marks this as the default/primary action. The runtime template uses
 	// this hint to choose visual emphasis. At most one action per step
@@ -44417,7 +44586,9 @@ func (s *StepAction) SetTextKey(val OptString) {
 	s.TextKey = val
 }
 
-// Classifies how the engine handles this action:
+// Classifies how the engine handles this action. `back` is not declarable:
+// the engine injects it into runtime steps (see `flow-step-action.yaml`)
+// whenever going back is available.
 // - `submit`: collect the step's fields and run validate/dispatch/on_success.
 // - `passkey`: issue a WebAuthn assertion challenge; the matching transition
 // fires once the returned assertion verifies.
@@ -44425,8 +44596,6 @@ func (s *StepAction) SetTextKey(val OptString) {
 // transition fires once the returned attestation verifies.
 // - `navigate`: route through the transition without running the input
 // pipeline. Used for pure-routing actions declared in the flow definition.
-// - `back`: return the user to the previous step. Surfaced by the engine
-// when going back is available.
 type StepActionKind string
 
 const (
@@ -44434,7 +44603,6 @@ const (
 	StepActionKindPasskey         StepActionKind = "passkey"
 	StepActionKindPasskeyRegister StepActionKind = "passkey_register"
 	StepActionKindNavigate        StepActionKind = "navigate"
-	StepActionKindBack            StepActionKind = "back"
 )
 
 // AllValues returns all StepActionKind values.
@@ -44444,7 +44612,6 @@ func (StepActionKind) AllValues() []StepActionKind {
 		StepActionKindPasskey,
 		StepActionKindPasskeyRegister,
 		StepActionKindNavigate,
-		StepActionKindBack,
 	}
 }
 
@@ -44458,8 +44625,6 @@ func (s StepActionKind) MarshalText() ([]byte, error) {
 	case StepActionKindPasskeyRegister:
 		return []byte(s), nil
 	case StepActionKindNavigate:
-		return []byte(s), nil
-	case StepActionKindBack:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -44480,9 +44645,6 @@ func (s *StepActionKind) UnmarshalText(data []byte) error {
 		return nil
 	case StepActionKindNavigate:
 		*s = StepActionKindNavigate
-		return nil
-	case StepActionKindBack:
-		*s = StepActionKindBack
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -49543,14 +49705,18 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 	return m
 }
 
-// This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
-// This is done because a lot of code generators cannot handle that.
+// The meta-schema one property of a customer's user schema is validated
+// against. The generated `user-property.json` adds
+// `allOf: [{$ref: draft-2020-12}]`, which cannot live here because code
+// generators choke on it.
 // Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
 // are accepted without being listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
 // Ref: #
 type UserProperty struct {
+	// The JSON Schema version used for this property schema.
+	Schema OptString `json:"$schema"`
 	// The level of uniqueness for this property, if applicable.
 	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
 	// The claim name for this property, if applicable.
@@ -49563,6 +49729,11 @@ type UserProperty struct {
 	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
+}
+
+// GetSchema returns the value of Schema.
+func (s *UserProperty) GetSchema() OptString {
+	return s.Schema
 }
 
 // GetXMinusUnique returns the value of XMinusUnique.
@@ -49588,6 +49759,11 @@ func (s *UserProperty) GetProperties() OptUserPropertyProperties {
 // GetAdditionalProps returns the value of AdditionalProps.
 func (s *UserProperty) GetAdditionalProps() UserPropertyAdditional {
 	return s.AdditionalProps
+}
+
+// SetSchema sets the value of Schema.
+func (s *UserProperty) SetSchema(val OptString) {
+	s.Schema = val
 }
 
 // SetXMinusUnique sets the value of XMinusUnique.
@@ -49753,8 +49929,9 @@ func (s *UserRef) SetDisplay(val OptString) {
 	s.Display = val
 }
 
-// This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
-// This is done because a lot of code generators cannot handle that.
+// The meta-schema a customer's user schema document is validated against.
+// The generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`,
+// which cannot live here because code generators choke on it.
 // Ref: #
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
