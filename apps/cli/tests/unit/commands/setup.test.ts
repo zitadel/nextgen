@@ -194,7 +194,7 @@ describe("setup command", () => {
   // created, so the claim nudge appearing alongside them is the consistent
   // behaviour, not a leak. Suppressing only this one would make dry run a
   // dishonest preview of the surface under test.
-  it("tells a new cloud project it is temporary until a team is attached", async () => {
+  it("tells a new cloud project it is temporary until claimed", async () => {
     const cwd = await makeNextProject();
 
     const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
@@ -202,7 +202,7 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
   });
 
@@ -228,7 +228,7 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
   });
 
@@ -274,7 +274,7 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_actions.join("\n")).not.toContain("attach it to a team");
+    expect(json.data.next_actions.join("\n")).not.toContain("Claim your Project");
     expect(json.data.next_commands.join("\n")).not.toMatch(/claim/);
   });
 
@@ -303,6 +303,33 @@ describe("setup command", () => {
       expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
     },
   );
+
+  // The INSTALLED section reports the dependency the patcher actually added;
+  // it used to hardcode @zitadel/sdk-next from the Next-only era, which lied
+  // for every other framework.
+  it("names the actually installed SDK package in the summary box", async () => {
+    const react = FRAMEWORK_FIXTURES.find((fixture) => fixture.framework === "react");
+    if (!react) throw new Error("react fixture missing");
+    const cwd = await react.create();
+
+    // No `--json`: the summary box is human-facing consola narration.
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+      "--dry-run",
+      "--skip-install",
+      "--framework",
+      "react",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const output = `${res.stdout}${res.stderr}`;
+    expect(output).toContain("@zitadel/sdk-react");
+    expect(output).not.toContain("@zitadel/sdk-next");
+  });
 
   it("creates CLI-managed projects with a name and without server default seeding", async () => {
     const cwd = await makeNextProject();
