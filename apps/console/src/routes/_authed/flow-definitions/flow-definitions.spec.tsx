@@ -101,6 +101,29 @@ describe("login flows list", () => {
     expect(schema).toHaveAttribute("href", "/schemas/sch_1");
   });
 
+  it("marks a draft flow and leaves an active one unmarked", async () => {
+    const draft = {
+      ...DETAIL_RESPONSE,
+      id: "flow_2",
+      flow_definition: { ...DEFINITION, name: "passkey-login", status: "draft" },
+      user_schema: SCHEMA_EMBED,
+    };
+    server.use(
+      http.get(FLOWS_URL, () =>
+        HttpResponse.json({
+          flow_definitions: [{ ...DETAIL_RESPONSE, user_schema: SCHEMA_EMBED }, draft],
+        }),
+      ),
+    );
+    await renderAt("/flow-definitions");
+
+    // Only the draft is marked: the engine picks the newest *active*
+    // definition, so an all-active list stays exactly as the design draws it.
+    await screen.findByRole("link", { name: "Default login" });
+    expect(screen.getByText("draft")).toBeInTheDocument();
+    expect(screen.queryByText("active")).not.toBeInTheDocument();
+  });
+
   it("asks for the embedded user schema", async () => {
     const seen: string[] = [];
     server.use(

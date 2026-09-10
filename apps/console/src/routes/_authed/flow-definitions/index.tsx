@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Ellipsis, LogIn, Workflow } from "lucide-react";
 
 import { EYEBROW } from "@/components/detail-meta";
+import { StatusBadge } from "@/components/status-badge";
 import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -119,13 +120,25 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
   return (
     <div className="group relative flex flex-col gap-4 border-b border-border px-6 py-3.5 last:border-b-0 hover:bg-accent lg:flex-row lg:items-center lg:gap-6">
       <div className="flex shrink-0 flex-col gap-1 lg:min-w-[220px]">
-        <Link
-          to="/flow-definitions/$definitionId"
-          params={{ definitionId: id }}
-          className="font-serif text-base leading-6 text-foreground opacity-90 group-hover:opacity-100 after:absolute after:inset-0 after:content-['']"
-        >
-          {name}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/flow-definitions/$definitionId"
+            params={{ definitionId: id }}
+            className="font-serif text-base leading-6 text-foreground opacity-90 group-hover:opacity-100 after:absolute after:inset-0 after:content-['']"
+          >
+            {name}
+          </Link>
+          {/* Drafts only. The engine selects the newest *active* definition
+              serving a purpose, so a draft is the row that reads as live but
+              never runs — the one difference in this list that changes what
+              actually happens at sign-in. The frame draws no status because it
+              draws only active flows, so marking just the exception leaves the
+              designed case rendering exactly as drawn.
+
+              This does not show which of several *active* definitions wins;
+              nothing exposes that (#1202). */}
+          {definition.status === "draft" && <StatusBadge status={definition.status} />}
+        </div>
         {purposes && (
           <span className="flex items-center gap-1 text-xs leading-4 font-medium text-muted-foreground">
             <LogIn className="size-3" aria-hidden />
@@ -170,7 +183,11 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
         )}
       </div>
 
-      <dl className="flex shrink-0 items-start gap-1 text-xs leading-4">
+      {/* `items-baseline`, not `items-start`: the label is the display face and
+          the value is the sans, and the two sit differently inside the same
+          16px line box — aligning the boxes leaves the date a pixel below the
+          label. */}
+      <dl className="flex shrink-0 items-baseline gap-1 text-xs leading-4">
         <dt className={EYEBROW}>Last change</dt>
         <dd className="font-medium text-foreground">{formatDate(updatedAt)}</dd>
       </dl>
