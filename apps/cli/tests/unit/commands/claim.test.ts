@@ -165,18 +165,27 @@ describe("claim", () => {
     expect(secret.preview_secret).toBe("sk_preview_test");
   });
 
-  it("prints the link so a user can open it themselves", async () => {
+  it("prints the link and the permanence outcome, without team wording", async () => {
     const { cwd, project } = await makeProject();
 
     // No `--json`: the envelope silences consola, and the point here is the
-    // human-facing narration that carries the link.
+    // human-facing narration — the link on its own line, then the success
+    // block in claim/permanence terms.
     const [res] = await Promise.all([
       runCliForTest(["claim", "--cwd", cwd, "--server", SERVER, "--no-open"]),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(`${res.stdout}${res.stderr}`).toContain("/claim/ch_");
+    const output = `${res.stdout}${res.stderr}`;
+    expect(output).toContain("/claim/ch_");
+    expect(output).toContain("Project claimed");
+    expect(output).toContain("Your Project is now permanent.");
+    expect(output).toContain("Manage your Project and collaborate in the Console:");
+    // The team stays in the envelope and the secret, not in the prose. The
+    // mock's dashboard_url embeds the team id in its path, so assert on the
+    // retired sentence rather than on the raw id.
+    expect(output).not.toContain("attached to team");
   });
 
   it("skips without a network call when the secret already records a team", async () => {
