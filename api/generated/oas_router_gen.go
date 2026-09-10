@@ -130,12 +130,16 @@ var (
 	rn22AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
+	rn50AllowedHeaders = map[string]string{
+		"PATCH": "Content-Type",
+	}
 	rn71AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
 	rn2AllowedHeaders = map[string]string{
 		"DELETE": "Authorization",
 		"GET":    "Authorization",
+		"PATCH":  "Authorization,Content-Type",
 	}
 	rn64AllowedHeaders = map[string]string{
 		"GET": "Authorization",
@@ -1609,12 +1613,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							switch r.Method {
 							case "GET":
 								s.handleGetMyUserRequest([0]string{}, elemIsEscaped, w, r)
+							case "PATCH":
+								s.handlePatchMyUserRequest([0]string{}, elemIsEscaped, w, r)
 							default:
 								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "GET",
-									allowedHeaders: nil,
+									allowedMethods: "GET,PATCH",
+									allowedHeaders: rn50AllowedHeaders,
 									acceptPost:     "",
-									acceptPatch:    "",
+									acceptPatch:    "application/json",
 								})
 							}
 
@@ -1668,12 +1674,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							s.handleGetUserByIDRequest([1]string{
 								args[0],
 							}, elemIsEscaped, w, r)
+						case "PATCH":
+							s.handlePatchUserByIDRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "DELETE,GET",
+								allowedMethods: "DELETE,GET,PATCH",
 								allowedHeaders: rn2AllowedHeaders,
 								acceptPost:     "",
-								acceptPatch:    "",
+								acceptPatch:    "application/json",
 							})
 						}
 
@@ -3459,6 +3469,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.args = args
 								r.count = 0
 								return r, true
+							case "PATCH":
+								r.name = PatchMyUserOperation
+								r.summary = "Update my user information"
+								r.operationID = "patchMyUser"
+								r.operationGroup = ""
+								r.pathPattern = "/users/me"
+								r.args = args
+								r.count = 0
+								return r, true
 							default:
 								return
 							}
@@ -3516,6 +3535,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.name = GetUserByIDOperation
 							r.summary = "Get user by ID"
 							r.operationID = "GetUserByID"
+							r.operationGroup = ""
+							r.pathPattern = "/users/{user_id}"
+							r.args = args
+							r.count = 1
+							return r, true
+						case "PATCH":
+							r.name = PatchUserByIDOperation
+							r.summary = "Update user by ID"
+							r.operationID = "PatchUserByID"
 							r.operationGroup = ""
 							r.pathPattern = "/users/{user_id}"
 							r.args = args

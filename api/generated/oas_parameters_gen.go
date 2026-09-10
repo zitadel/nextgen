@@ -1269,9 +1269,6 @@ type DeleteVariableParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
-	// The environment is named here but stored by its id, so the name is resolved
-	// before the request is served: a name no environment of this project answers
-	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -3446,9 +3443,6 @@ type GetVariableParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
-	// The environment is named here but stored by its id, so the name is resolved
-	// before the request is served: a name no environment of this project answers
-	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -3667,9 +3661,6 @@ type GetVariablesParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
-	// The environment is named here but stored by its id, so the name is resolved
-	// before the request is served: a name no environment of this project answers
-	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -6863,6 +6854,86 @@ func decodePatchProjectParams(args [1]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
+// PatchUserByIDParams is parameters of PatchUserByID operation.
+type PatchUserByIDParams struct {
+	UserID UserID
+}
+
+func unpackPatchUserByIDParams(packed middleware.Parameters) (params PatchUserByIDParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
+	return params
+}
+
+func decodePatchUserByIDParams(args [1]string, argsEscaped bool, r *http.Request) (params PatchUserByIDParams, _ error) {
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // QueryGrantsParams is parameters of queryGrants operation.
 type QueryGrantsParams struct {
 	// The unique identifier of the project.
@@ -7571,9 +7642,6 @@ type UpdateVariablesParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
-	// The environment is named here but stored by its id, so the name is resolved
-	// before the request is served: a name no environment of this project answers
-	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 

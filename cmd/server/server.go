@@ -257,6 +257,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	environmentService := service.NewEnvironmentService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
+	releaseService := service.NewReleaseService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
@@ -347,6 +348,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			teamService,
 			brandingService,
 			environmentService,
+			releaseService,
 			eventService,
 			tokenService,
 			keyService,

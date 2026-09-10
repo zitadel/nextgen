@@ -689,12 +689,35 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 	return r, ht.ErrNotImplemented
 }
 
+// PatchMyUser implements patchMyUser operation.
+//
+// Partially updates the caller's own schema-defined attributes. The merged
+// result is validated against the user's schema before commit. Concurrent
+// writes are last-write-wins.
+//
+// PATCH /users/me
+func (UnimplementedHandler) PatchMyUser(ctx context.Context, req *PatchMyUserRequest) (r PatchMyUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // PatchProject implements patchProject operation.
 //
 // Updates the state of a project.
 //
 // PATCH /projects/{project_id}
 func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (r PatchProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// PatchUserByID implements PatchUserByID operation.
+//
+// Partially updates a user's schema-defined attributes, and optionally
+// moves the user to another registered schema. The merged result is
+// validated against the schema before commit. Concurrent writes are
+// last-write-wins.
+//
+// PATCH /users/{user_id}
+func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (r PatchUserByIDRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -213,8 +213,16 @@ type ListUserTeamsRes interface {
 	listUserTeamsRes()
 }
 
+type PatchMyUserRes interface {
+	patchMyUserRes()
+}
+
 type PatchProjectRes interface {
 	patchProjectRes()
+}
+
+type PatchUserByIDRes interface {
+	patchUserByIDRes()
 }
 
 type QueryGrantsRes interface {
