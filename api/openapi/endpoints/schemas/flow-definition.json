@@ -181,7 +181,7 @@
               "github"
             ]
           ],
-          "description": "List of connection slugs offered on this step. Each entry must match the `slug` of a connection in the project; the connection supplies the display name and template at render time. When non-empty, the step must define a `transitions.callback` entry — the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
+          "description": "List of connection slugs offered on this step. Each entry must match the `slug` of a connection in the project; the connection supplies the display name and template at render time. When non-empty, the step must define a `transitions.callback` entry. The client submits the reserved `sso` action with an `sso_provider_id`; the engine runs the redirect, code exchange, and user resolution itself, then fires one of `callback` (known subject), `identity_unknown` (unknown subject), or `user_already_exists` (unique-property collision) on this step. The flow author never writes a `transitions.sso`."
         },
         "on_success": {
           "type": "string",
@@ -189,7 +189,7 @@
             "create_user",
             "create_user_with_sso"
           ],
-          "description": "Server-side mutation to run after the step's fields validate and before the transition fires. - create_user: materialize the user from collected schema   fields. Used by register flows. - create_user_with_sso: materialize the user from the resolved external identity plus the collected fields. Used by the collection step an `identity_unknown` outcome routes to."
+          "description": "Server-side mutation to run after the step's fields validate and before the transition fires. - create_user: materialize the user from collected schema   fields. Used by register flows. - create_user_with_sso: materialize the user from the resolved external identity plus the collected fields. Used in SSO sign-up: `identity_unknown` routes to this step when the provider claims do not fill every required property, for the user to input them."
         },
         "complete": {
           "type": "string",
