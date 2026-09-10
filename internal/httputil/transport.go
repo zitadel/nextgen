@@ -14,6 +14,11 @@ import (
 // hops included. (Ported from zitadel/zitadel's fix for GHSA-29jh-8cfq-rr8x.)
 func newTransport(policy *Policy) http.RoundTripper {
 	base := http.DefaultTransport.(*http.Transport).Clone()
+	// Direct-only (ADR 061 decision 4): the cloned default transport would
+	// honor HTTP(S)_PROXY, and a proxied fetch dials the proxy's address, so
+	// the Control hook would check the proxy while the proxy reaches the
+	// real, possibly denied, target.
+	base.Proxy = nil
 	if !policy.Enforces() {
 		return base
 	}

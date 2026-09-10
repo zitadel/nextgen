@@ -525,7 +525,23 @@ func classifyFetchError(schemaURL string, err error) error {
 	default:
 		return err
 	}
-	return domErr.WithDetails(SchemaFetchDetails{URL: schemaURL}).WithParent(err)
+	return domErr.WithDetails(SchemaFetchDetails{URL: redactSchemaURL(schemaURL)}).WithParent(err)
+}
+
+// redactSchemaURL strips userinfo, query, and fragment before a failing URL
+// enters client-facing details (ADR 030; ADR 061 decision 8): a $ref or
+// redirect target is not necessarily caller-chosen and may embed credentials
+// or signed tokens. An unparseable string passes through, since it then
+// cannot carry structured components either.
+func redactSchemaURL(schemaURL string) string {
+	u, err := url.Parse(schemaURL)
+	if err != nil {
+		return schemaURL
+	}
+	u.User = nil
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }
 
 // isFetchTimeout matches both the resolve envelope's context deadline and the

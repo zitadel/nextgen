@@ -510,10 +510,10 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
-	// Egress policy for user-injectable URLs (egress-policy ADR). The deny
-	// list blocks by default; allow_list carves exceptions out of it, e.g.
-	// NEXTGEN_HTTPCLIENT_ALLOW_LIST="localhost,127.0.0.0/8" for local
-	// development against loopback schema hosts.
+	// Egress policy for user-injectable URLs (ADR 061). The deny list
+	// blocks by default; allow_list carves exceptions out of it, e.g.
+	// NEXTGEN_HTTPCLIENT_ALLOW_LIST="localhost,127.0.0.0/8,::1/128" for
+	// local development against loopback schema hosts.
 	v.SetDefault("httpclient.max_body_size", 1<<20) // 1 MiB; the only consumer is JSON schema ingest
 	v.SetDefault("httpclient.timeout", 10*time.Second)
 	v.SetDefault("httpclient.max_redirects", 5)

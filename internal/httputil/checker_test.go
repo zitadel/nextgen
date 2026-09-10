@@ -126,6 +126,15 @@ func TestPolicy_CheckAddress(t *testing.T) {
 		require.ErrorAs(t, policy.CheckAddress("169.254.169.254"), &denied)
 	})
 
+	t.Run("trailing-dot spelling cannot bypass a name entry", func(t *testing.T) {
+		policy := mustPolicy(t, []string{"blocked.test"}, nil)
+		var denied *httputil.AddressDeniedError
+		require.ErrorAs(t, policy.CheckAddress("blocked.test."), &denied)
+
+		dotted := mustPolicy(t, []string{"blocked.test."}, nil)
+		require.ErrorAs(t, dotted.CheckAddress("blocked.test"), &denied)
+	})
+
 	t.Run("unmatched domain passes without resolution", func(t *testing.T) {
 		// A domain resolving to a denied IP is the dial-time check's job;
 		// CheckAddress never resolves.
