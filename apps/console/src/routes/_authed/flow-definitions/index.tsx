@@ -15,6 +15,7 @@ import { InlineCode } from "@/components/ui/inline-code";
 import { formatDate } from "@/lib/date";
 import {
   type FlowDefinition,
+  type FlowDefinitionEntry,
   flowDisplayName,
   flowPurposeSummary,
   flowStepNames,
@@ -53,17 +54,12 @@ export interface FlowRow {
 }
 
 // Mapped rather than spread so the wire's snake_case stops at the loader.
-function toFlowRow(entry: {
-  id: string;
-  flow_definition: unknown;
-  user_schema?: unknown;
-  updated_at: string;
-}): FlowRow {
-  const definition = entry.flow_definition as FlowDefinition;
-  // The embed is the same envelope `GET /schemas/{id}` returns — `{ id, schema,
-  // metadata }` — so the displayable document is one level in. Reading the
-  // envelope directly finds no `title` and silently falls back to the id.
-  const embed = entry.user_schema as { schema?: Record<string, unknown> } | null | undefined;
+function toFlowRow(entry: FlowDefinitionEntry): FlowRow {
+  const definition = entry.flow_definition;
+  // The embed is the same envelope `GET /schemas/{id}` returns, so the
+  // displayable document is one level in. Reading the envelope directly finds
+  // no `title` and silently falls back to the id.
+  const embed = entry.user_schema;
   return {
     id: entry.id,
     definition,
@@ -72,10 +68,7 @@ function toFlowRow(entry: {
     // may not read it, which is deliberately distinct from not asking. Either
     // way the row has no name to show, so it omits the column rather than
     // printing the raw id in a slot labelled `USER SCHEMA`.
-    schemaName:
-      embed?.schema && definition.user_schema
-        ? schemaDisplayName(embed.schema, definition.user_schema)
-        : undefined,
+    schemaName: embed ? schemaDisplayName(embed.schema, definition.user_schema) : undefined,
     schemaId: definition.user_schema,
   };
 }

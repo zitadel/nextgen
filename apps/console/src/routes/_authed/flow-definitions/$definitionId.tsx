@@ -30,7 +30,9 @@ import { api } from "../../../api/zitadel";
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
   loader: async ({ params }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
-    const definition = entry.flow_definition as FlowDefinition;
+    // Structurally the list's `flow_definition`; orval just names it once per
+    // operation.
+    const definition: FlowDefinition = entry.flow_definition;
     return {
       definition,
       createdAt: entry.created_at,
@@ -49,7 +51,7 @@ async function resolveSchemaName(id: string | undefined): Promise<string | undef
   if (!id) return undefined;
   try {
     const body = await api.getSchemaById(id);
-    return schemaDisplayName(body.schema as Record<string, unknown>, id);
+    return schemaDisplayName(body.schema, id);
   } catch {
     return undefined;
   }

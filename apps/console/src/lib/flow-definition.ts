@@ -1,33 +1,31 @@
+import type {
+  ListFlowDefinitions200FlowDefinitionsItem,
+  ListFlowDefinitions200FlowDefinitionsItemFlowDefinition,
+  ListFlowDefinitions200FlowDefinitionsItemFlowDefinitionStepsItem,
+} from "@zitadel/api/generated/model";
+
 /**
  * Reading a flow definition for the console's two login-flow screens.
  *
  * A flow definition is configuration, not a resource (decisions log D0a): the
  * screens show the document an operator applies through the CLI, so everything
  * here derives display strings from the wire shape and nothing here writes.
- */
-
-/** One step as the list and detail screens read it. */
-export interface FlowStep {
-  name: string;
-  fields?: string[];
-  actions?: { name: string; kind: string }[];
-}
-
-/**
- * The `flow_definition` object from `GET /flow_definitions`.
  *
- * Narrower than the generated response type on purpose: the two screens read
- * five keys, and pinning the orval name would tie them to whichever operation
- * happened to be listed (`listFlowDefinitions200FlowDefinitionsItem…` and
- * `getFlowDefinition200FlowDefinition` are the same object under two names).
+ * The types are the generated ones, aliased. Orval names the same object once
+ * per operation, so the list and the detail get different names for the
+ * identical schema — the aliases pick the list's and let structural typing
+ * carry the detail's, which keeps the screens off hand-written duplicates that
+ * would drift from the spec.
  */
-export interface FlowDefinition {
-  name: string;
-  status?: string;
-  user_schema?: string;
-  purposes?: Record<string, string>;
-  steps?: FlowStep[];
-}
+
+/** One entry from `GET /flow_definitions`. */
+export type FlowDefinitionEntry = ListFlowDefinitions200FlowDefinitionsItem;
+
+/** The definition document itself. */
+export type FlowDefinition = ListFlowDefinitions200FlowDefinitionsItemFlowDefinition;
+
+/** One step of a definition. */
+export type FlowStep = ListFlowDefinitions200FlowDefinitionsItemFlowDefinitionStepsItem;
 
 /**
  * The purposes a definition serves, in a fixed order rather than the JSON's.
