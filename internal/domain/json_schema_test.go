@@ -687,11 +687,14 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 		client := newEgressClient(t, httputil.ClientConfig{})
 		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, time.Nanosecond, client, nil)
 
+		// The resolver reports the expiry raw; the schema service is what
+		// classifies it into fetch_timeout, keeping fetch codes off
+		// operations whose resolver cannot egress.
 		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
-		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 
 		_, err = resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
-		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout(), "the expired result must not have been cached")
+		require.ErrorIs(t, err, context.DeadlineExceeded, "the expired result must not have been cached")
 	})
 
 	t.Run("resolve timeout bounds the whole ref chain, not each hop", func(t *testing.T) {

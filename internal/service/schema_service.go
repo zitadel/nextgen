@@ -146,6 +146,11 @@ func (s *SchemaService) classifyCreateConflict(ctx context.Context, projectID, s
 func resolveSchemaError(err error) error {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok {
+		// The resolver reports an envelope that expired after the last
+		// fetch as a bare context error (see domain.JSONSchemaResolver.Resolve).
+		if errors.Is(err, context.DeadlineExceeded) {
+			return domain.ErrJSONSchemaFetchTimeout().WithParent(err)
+		}
 		return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 	}
 	switch de.Code {
