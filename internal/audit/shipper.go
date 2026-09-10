@@ -75,8 +75,12 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 		cfg.Interval = DefaultExportConfig().Interval
 	}
 	return &Shipper{
-		cfg:    cfg,
-		src:    src,
+		cfg: cfg,
+		src: src,
+		// Deliberately not the hardened httputil client: the sink URL is
+		// operator YAML, not user-injectable, and sinks legitimately live on
+		// private networks the egress deny list blocks (egress-policy ADR).
+		// Migrate when the sink becomes tenant-configurable.
 		client: &http.Client{Timeout: 10 * time.Second},
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),
