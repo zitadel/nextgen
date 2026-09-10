@@ -181,7 +181,7 @@
               "github"
             ]
           ],
-          "description": "List of connection slugs offered on this step. Each entry must match the `slug` of a connection in the project; the connection supplies the display name and template at render time. When non-empty, the step must define a `transitions.callback` entry. The client submits the reserved `sso` action with an `sso_provider_id`; the engine runs the redirect, code exchange, and user resolution itself, then fires one of `callback` (known subject), `identity_unknown` (unknown subject), or `user_already_exists` (unique-property collision) on this step. The flow author never writes a `transitions.sso`."
+          "description": "List of connection slugs offered on this step. Each entry must match the `slug` of a connection in the project; the connection supplies the display name and template at render time. When non-empty, the step must define a `transitions.callback` entry. The client submits the reserved `sso` action with an `sso_provider_id`; the engine runs the redirect, code exchange, and user resolution itself, then fires one of `callback` (signed in: a known subject, or an account created from complete provider claims), `identity_unknown` (unknown subject with required properties that need to be collected), or `user_already_exists` (unique-property collision) on this step. The flow author never writes a `transitions.sso`."
         },
         "on_success": {
           "type": "string",
@@ -204,7 +204,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/Transition"
           },
-          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces: - `user_not_found` - emitted when a unique field (`x-unique`) does not match an existing user. - `user_already_exists` - emitted when registration matches an existing user. - `identity_unknown` - emitted when SSO resolution finds no user for the provider's subject; flips a login flow to register. - `callback` - emitted when an external system returns control to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into."
+          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces: - `user_not_found` - emitted when a unique field (`x-unique`) does not match an existing user. - `user_already_exists` - emitted when registration matches an existing user. - `identity_unknown` - emitted when SSO resolution finds no user for the provider's subject and required properties need to be collected; flips a login flow to register. - `callback` - emitted when an external system returns control to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into."
         }
       }
     },

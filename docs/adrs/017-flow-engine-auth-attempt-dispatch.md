@@ -298,14 +298,23 @@ wire; the manifest gains `create_user_with_sso` and `link_sso`; the `purposes`
 enum gains `link_account` (with `user_not_found` flipping it to `register`).
 The two mechanisms decided above accommodate this without change.
 
-**Amendment (#851, social login).** Ceremony resolution does not reuse
-`user_not_found` for an unknown subject. A shared entry step hosts both the
-typed identifier and the provider buttons, and one transition key has one
-target, so `user_not_found` keeps its typed-identifier route and a new
-outcome, `identity_unknown`, routes the unknown SSO subject to the collection
-step. It flips `CurrentPurpose` from `login` to `register` exactly as
-`user_not_found` does. `user_link_required` is not added: account linking is
-out of scope for #851, and the outcome returns with the linking journey. See
+**Amendment (#851, social login).** When an identity provider returns a subject
+that matches no user and the account cannot be created from the provider
+claims alone, the engine emits a new outcome, `identity_unknown`, rather than
+reusing `user_not_found`. The two stay separate because one login
+step can hold both the typed identifier field and the provider buttons, and a
+transition key has a single target. With a shared outcome, a mistyped email and
+a first-time SSO user would have to go to the same place, and they need
+different places: the email user needs the register entry step, which collects
+every property from scratch, while the SSO user needs a step that keeps the
+resolved external identity and asks only for the properties the provider did
+not supply. So `user_not_found` keeps its target for the typed identifier, and
+`identity_unknown` targets that collection step. On `identity_unknown` the
+engine switches `CurrentPurpose` from `login` to `register`, the same switch it
+makes on `user_not_found`. No `user_link_required` outcome is added. Account
+linking is out of scope for #851, and that outcome arrives together with the
+linking journey.
+See
 [Resolution Branches](../design/idp/3-social-login-flow.md#resolution-branches).
 
 [dispatch]: ../../internal/domain/flow_state_machine.go
