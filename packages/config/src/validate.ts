@@ -80,8 +80,10 @@ export const FLOW_PURPOSES = [
 
 /**
  * Mirrors `purposeFlipTargets` in flow_definition_validator.go: the
- * identifier outcomes only. `identity_unknown` fires from SSO resolution
- * and is covered by the sso_providers routing rule (#1044).
+ * identifier outcomes only. `identity_unknown` comes only from SSO
+ * resolution and is left out here; requiring it on every combined entry
+ * step would reject the shipped default flow. A rule on steps carrying
+ * sso_providers is future work (#1044).
  */
 export const PURPOSE_FLIP_TARGETS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   login: { user_not_found: "register" },

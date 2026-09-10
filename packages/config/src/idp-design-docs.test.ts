@@ -118,6 +118,7 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   // TLS on endpoint URLs (pattern; localhost carve-out for dev)
   ["http issuer rejected", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://accounts.google.com" } }, false],
   ["http localhost issuer allowed (dev)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://localhost:8080" } }, true],
+  ["issuer without a host", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://" } }, false],
   ["http token_endpoint rejected", { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: "http://t.example" } }, false],
   // scopes
   ["oidc scopes absent", { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: undefined } }, false],

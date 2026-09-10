@@ -523,9 +523,10 @@ func validateFlipTableCoverage(def FlowDefinition) error {
 
 // purposeFlipTargets mirrors the identifier half of the engine's flip
 // table. Kept separate so the validator stays pure. identity_unknown also
-// flips login → register but fires only from SSO resolution, so its
-// coverage is a rule on steps carrying sso_providers (#1014), not on
-// every combined entry step.
+// flips login → register but comes only from SSO resolution, so it is
+// left out here: requiring it on every combined entry step would reject
+// the shipped default flow. A rule on steps carrying sso_providers is
+// future work (#1014).
 var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
 	FlowDefinitionPurposeLogin: {
 		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,
