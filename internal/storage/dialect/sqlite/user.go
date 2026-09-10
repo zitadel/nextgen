@@ -52,6 +52,19 @@ ORDER BY m.user_id, t.name, m.team_id`
 FROM teams
 WHERE project_id = ? AND id IN (SELECT value FROM json_each(?))`
 
+	// patchUserHeaderStmt rewrites the header row. The updated_at predicate is
+	// the optimistic guard: a row that moved past the value the merge was
+	// computed against matches nothing, and the caller retries from a fresh
+	// read.
+	patchUserHeaderStmt = `UPDATE users SET updated_at = ?, schema_url = ?
+WHERE project_id = ? AND id = ? AND updated_at = ?`
+
+	selectUserUniqueAttrScopesStmt = `SELECT key, team_id FROM user_unique_attributes WHERE project_id = ? AND user_id = ?`
+
+	deleteUserUniqueAttributesStmt = `DELETE FROM user_unique_attributes WHERE project_id = ? AND user_id = ?`
+
+	deleteUserAttributesStmt = `DELETE FROM user_attributes WHERE project_id = ? AND user_id = ?`
+
 	deactivateUserStmt = `UPDATE users SET status = ?, updated_at = ?
 WHERE project_id = ? AND id = ?`
 
@@ -90,29 +103,9 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			return wrapError(err)
 		}
 
-		for _, a := range user.Attributes {
-			raw, err := json.Marshal(a.Value)
-			if err != nil {
-				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-			}
-			if _, err := tx.Exec(ctx, createUserAttributeStmt,
-				user.ProjectID, teamScope, user.ID, string(a.Key), string(raw),
-			); err != nil {
-				return wrapError(err)
-			}
-			if a.UniqueScope == domain.AttributeUniquenessUnspecified {
-				continue
-			}
-			scopeTeamID := teamScope
-			if a.UniqueScope == domain.AttributeUniquenessProject {
-				scopeTeamID = ""
-			}
-			sum := a.ValueHash
-			if _, err := tx.Exec(ctx, createUserUniqueAttrStmt,
-				user.ProjectID, user.ID, scopeTeamID, string(a.Key), sum[:],
-			); err != nil {
-				return wrapError(err)
-			}
+		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, teamScope, user.Attributes,
+			user.Attributes.RegistryTeamScopes(nil, teamScope)); err != nil {
+			return err
 		}
 
 		initialTeamID := ""
@@ -130,6 +123,83 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		rsi := newResourceScopeStatements(tx)
 		edges := newAuthzMembershipEdgeStatements(tx)
 		return authz.UserCreated(ctx, &rsi, &edges, user.ProjectID, user.ID, initialTeamID)
+	})
+}
+
+// insertUserAttributes writes one attribute row per entry, plus a registry
+// row for each unique-scoped value. registryTeams is index-aligned with attrs
+// (see [domain.CreateAttributes.RegistryTeamScopes]).
+func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID, attrTeamID string, attrs domain.CreateAttributes, registryTeams []string) error {
+	for i, a := range attrs {
+		raw, err := json.Marshal(a.Value)
+		if err != nil {
+			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+		}
+		if _, err := tx.Exec(ctx, createUserAttributeStmt,
+			projectID, attrTeamID, userID, string(a.Key), string(raw),
+		); err != nil {
+			return wrapError(err)
+		}
+		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
+			continue
+		}
+		sum := a.ValueHash
+		if _, err := tx.Exec(ctx, createUserUniqueAttrStmt,
+			projectID, userID, registryTeams[i], string(a.Key), sum[:],
+		); err != nil {
+			return wrapError(err)
+		}
+	}
+	return nil
+}
+
+// GetUserUniqueAttributeScopes implements [service.UserStatements].
+func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	rows, err := us.client.Query(ctx, selectUserUniqueAttrScopesStmt, projectID, userID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+
+	scopes := make(map[domain.AttributeKey]string)
+	for rows.Next() {
+		var key, team string
+		if err := rows.Scan(&key, &team); err != nil {
+			return nil, err
+		}
+		scopes[domain.AttributeKey(key)] = team
+	}
+	return scopes, wrapError(rows.Err())
+}
+
+// PatchUser implements [service.UserStatements] as a full rewrite of the
+// user's attribute and registry rows; a registry insert colliding with
+// another user's claim still surfaces as a UniqueError.
+func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	if len(user.Attributes) == 0 {
+		return fmt.Errorf("user patch requires attributes")
+	}
+	if len(user.RegistryTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	}
+	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
+		n, err := execAffected(ctx, tx, patchUserHeaderStmt,
+			nowUnixNano(), user.SchemaURL, user.ProjectID, user.UserID, user.ExpectedUpdatedAt.UnixNano(),
+		)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return database.NewNoRowFoundError(nil)
+		}
+		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
+			return wrapError(err)
+		}
+		if _, err := tx.Exec(ctx, deleteUserAttributesStmt, user.ProjectID, user.UserID); err != nil {
+			return wrapError(err)
+		}
+		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes,
+			user.RegistryTeamScopes)
 	})
 }
 
