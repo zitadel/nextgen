@@ -10,3 +10,9 @@ properties:
     type: array
     items:
       type: string
+  password_hash_algorithm:
+    type: string
+    description: |
+      The password hashing algorithm the project switched to. The empty string
+      means it was handed back to the server default. Absent when the update
+      did not touch hashing.

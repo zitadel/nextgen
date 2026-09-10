@@ -4530,6 +4530,44 @@ func (c *MockAllStatementsSetAuthAttemptFactorCall) DoAndReturn(f func(context.C
 	return c
 }
 
+// SetProjectPasswordHashPolicy mocks base method.
+func (m *MockAllStatements) SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetProjectPasswordHashPolicy", ctx, projectID, policy)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetProjectPasswordHashPolicy indicates an expected call of SetProjectPasswordHashPolicy.
+func (mr *MockAllStatementsMockRecorder) SetProjectPasswordHashPolicy(ctx, projectID, policy any) *MockAllStatementsSetProjectPasswordHashPolicyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetProjectPasswordHashPolicy", reflect.TypeOf((*MockAllStatements)(nil).SetProjectPasswordHashPolicy), ctx, projectID, policy)
+	return &MockAllStatementsSetProjectPasswordHashPolicyCall{Call: call}
+}
+
+// MockAllStatementsSetProjectPasswordHashPolicyCall wrap *gomock.Call
+type MockAllStatementsSetProjectPasswordHashPolicyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsSetProjectPasswordHashPolicyCall) Return(arg0 error) *MockAllStatementsSetProjectPasswordHashPolicyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsSetProjectPasswordHashPolicyCall) Do(f func(context.Context, string, *domain.PasswordHashPolicy) error) *MockAllStatementsSetProjectPasswordHashPolicyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsSetProjectPasswordHashPolicyCall) DoAndReturn(f func(context.Context, string, *domain.PasswordHashPolicy) error) *MockAllStatementsSetProjectPasswordHashPolicyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // SetUserPassword mocks base method.
 func (m *MockAllStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
 	m.ctrl.T.Helper()
@@ -5294,6 +5332,44 @@ func (c *MockProjectStatementsListProjectsCall) Do(f func(context.Context, *data
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockProjectStatementsListProjectsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockProjectStatementsListProjectsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// SetProjectPasswordHashPolicy mocks base method.
+func (m *MockProjectStatements) SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetProjectPasswordHashPolicy", ctx, projectID, policy)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetProjectPasswordHashPolicy indicates an expected call of SetProjectPasswordHashPolicy.
+func (mr *MockProjectStatementsMockRecorder) SetProjectPasswordHashPolicy(ctx, projectID, policy any) *MockProjectStatementsSetProjectPasswordHashPolicyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetProjectPasswordHashPolicy", reflect.TypeOf((*MockProjectStatements)(nil).SetProjectPasswordHashPolicy), ctx, projectID, policy)
+	return &MockProjectStatementsSetProjectPasswordHashPolicyCall{Call: call}
+}
+
+// MockProjectStatementsSetProjectPasswordHashPolicyCall wrap *gomock.Call
+type MockProjectStatementsSetProjectPasswordHashPolicyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectStatementsSetProjectPasswordHashPolicyCall) Return(arg0 error) *MockProjectStatementsSetProjectPasswordHashPolicyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectStatementsSetProjectPasswordHashPolicyCall) Do(f func(context.Context, string, *domain.PasswordHashPolicy) error) *MockProjectStatementsSetProjectPasswordHashPolicyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectStatementsSetProjectPasswordHashPolicyCall) DoAndReturn(f func(context.Context, string, *domain.PasswordHashPolicy) error) *MockProjectStatementsSetProjectPasswordHashPolicyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -12327,18 +12403,18 @@ func (c *MockProjectServiceListCall) DoAndReturn(f func(context.Context, service
 }
 
 // Update mocks base method.
-func (m *MockProjectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
+func (m *MockProjectService) Update(ctx context.Context, req service.UpdateProjectRequest) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, id, name)
+	ret := m.ctrl.Call(m, "Update", ctx, req)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockProjectServiceMockRecorder) Update(ctx, id, name any) *MockProjectServiceUpdateCall {
+func (mr *MockProjectServiceMockRecorder) Update(ctx, req any) *MockProjectServiceUpdateCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockProjectService)(nil).Update), ctx, id, name)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockProjectService)(nil).Update), ctx, req)
 	return &MockProjectServiceUpdateCall{Call: call}
 }
 
@@ -12354,13 +12430,13 @@ func (c *MockProjectServiceUpdateCall) Return(arg0 *domain.Project, arg1 error) 
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceUpdateCall) Do(f func(context.Context, string, string) (*domain.Project, error)) *MockProjectServiceUpdateCall {
+func (c *MockProjectServiceUpdateCall) Do(f func(context.Context, service.UpdateProjectRequest) (*domain.Project, error)) *MockProjectServiceUpdateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceUpdateCall) DoAndReturn(f func(context.Context, string, string) (*domain.Project, error)) *MockProjectServiceUpdateCall {
+func (c *MockProjectServiceUpdateCall) DoAndReturn(f func(context.Context, service.UpdateProjectRequest) (*domain.Project, error)) *MockProjectServiceUpdateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

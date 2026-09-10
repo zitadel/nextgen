@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -118,7 +117,7 @@ type UserService interface {
 type userService struct {
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
-	hasher      crypto.Hasher
+	hashers     ProjectHasherResolver
 	refs        UserRefResolver
 }
 
@@ -131,13 +130,13 @@ type userService struct {
 func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
-	hasher crypto.Hasher,
+	hashers ProjectHasherResolver,
 	refs UserRefResolver,
 ) UserService {
 	return &userService{
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
-		hasher:      hasher,
+		hashers:     hashers,
 		refs:        refs,
 	}
 }
@@ -506,7 +505,7 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 }
 
 func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	action := NewSetUserPasswordAction(input, s.hasher)
+	action := NewSetUserPasswordAction(input, s.hashers)
 	return s.ApplyActions(ctx, action)
 }
 
@@ -624,20 +623,28 @@ func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.Cre
 type SetPasswordUserAction struct {
 	SetPasswordInput
 
-	hasher crypto.Hasher
+	hashers ProjectHasherResolver
 
 	hash string
 }
 
-func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *SetPasswordUserAction {
+func NewSetUserPasswordAction(input SetPasswordInput, hashers ProjectHasherResolver) *SetPasswordUserAction {
 	return &SetPasswordUserAction{
 		SetPasswordInput: input,
-		hasher:           hasher,
+		hashers:          hashers,
 	}
 }
 
-func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
-	o.hash, err = domain.HashPassword(o.Password, o.hasher)
+// Prepare hashes outside the transaction, which is also where the project's
+// hashing method is resolved: the policy is read for the password in front of
+// it rather than for a hasher wired in at startup, so an admin's change takes
+// effect on the next password rather than the next restart.
+func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
+	hasher, err := o.hashers.HasherForProject(ctx, o.ProjectID)
+	if err != nil {
+		return err
+	}
+	o.hash, err = domain.HashPassword(o.Password, hasher)
 	return err
 }
 

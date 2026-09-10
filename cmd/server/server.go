@@ -168,10 +168,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
-	passwordHasher, err := cfg.PasswordHasher.NewHasher()
+	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
 	if err != nil {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
+	passwordHasher := hasherFactory.Default()
 
 	// ── Repositories ─────────────────
 	serviceDBPool := service.NewPool(pool.(service.Pool))
@@ -221,6 +222,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		builtinPublicBase.String(),
 		schemaValidator,
 		keyService,
+		hasherFactory,
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
@@ -257,10 +259,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	environmentService := service.NewEnvironmentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
+	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
-		passwordHasher,
+		projectHashers,
 		userRefs,
 	)
 
@@ -280,7 +283,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
-		passwordHasher,
+		projectHashers,
 		userService,
 		schemaStore,
 		serviceDBPool,
@@ -489,12 +492,31 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 		crypto.HashNamePHPass,
 		crypto.HashNameDrupal7,
 	})
+	// The limits bound what a stored hash may cost: too cheap and it is not
+	// protecting anything, too dear and reading one back is a denial of service.
+	// They apply to hashes arriving from an import and to a hashing method a
+	// project picks for itself (ADR 029 §Hashing) -- the deployment says what is
+	// acceptable, a project chooses inside it. An algorithm left at zero here
+	// accepts nothing, which is why every algorithm with a verifier a project
+	// may hash with carries a range. Each spans passwap's recommended
+	// parameters: bcrypt 12, argon2id t=3/m=64MiB/p=4, scrypt ln=15,
+	// pbkdf2 290k rounds, sha2 5k rounds.
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
 		Argon2: crypto.Argon2LimitsConfig{
 			MinTime: 1, MaxTime: 10,
 			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
 			MinThreads: 1, MaxThreads: 16,
+		},
+		Scrypt: crypto.ScryptLimitsConfig{
+			MinLN: 12, MaxLN: 20,
+			MinR: 8, MaxR: 8,
+			MinP: 1, MaxP: 4,
+		},
+		PBKDF2: crypto.PBKDF2LimitsConfig{MinRounds: 100_000, MaxRounds: 5_000_000},
+		Sha2: crypto.Sha2LimitsConfig{
+			MinSha256Rounds: 5_000, MaxSha256Rounds: 1_000_000,
+			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
 		},
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review

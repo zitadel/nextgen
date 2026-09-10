@@ -7948,6 +7948,15 @@ func (c *Client) PatchProject(ctx context.Context, request *PatchProjectRequest,
 }
 
 func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequest, params PatchProjectParams) (res PatchProjectRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("patchProject"),
 		semconv.HTTPRequestMethodKey.String("PATCH"),
