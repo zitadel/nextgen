@@ -345,9 +345,17 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	}
 	schema, err := compileSchema(schemaURL, schemaData, depth, r.maxResolveDepth, cache, loader)
 	if err != nil {
-		var domErr Error
-		if loadErr != nil && errors.As(loadErr, &domErr) {
-			return nil, domErr
+		if loadErr != nil {
+			var domErr Error
+			if errors.As(loadErr, &domErr) {
+				return nil, domErr
+			}
+			// A nested lookup that observed the envelope's deadline must
+			// stay recognizable too, or the service reports internal
+			// instead of a timeout.
+			if errors.Is(loadErr, context.DeadlineExceeded) {
+				return nil, loadErr
+			}
 		}
 		return nil, err
 	}
