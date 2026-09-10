@@ -123,17 +123,20 @@ func (c ClientConfig) NewClient() (*http.Client, error) {
 						!strings.EqualFold(req.URL.Scheme, "https") {
 						return ErrHTTPSDowngrade
 					}
-					// Nothing sensitive crosses origins on a redirect (ADR
-					// 061 decision 9). Go itself forwards Authorization to
-					// the same host or a subdomain and synthesizes a Referer
-					// carrying the previous URL's query; both are prepared
-					// on req before this hook runs, so stripping here is
-					// effective.
-					if !sameOrigin(prev.URL, req.URL) {
-						req.Header.Del("Authorization")
-						req.Header.Del("Cookie")
-						req.Header.Del("Referer")
-					}
+				}
+				// Nothing sensitive crosses origins on a redirect (ADR 061
+				// decision 9). Go itself forwards Authorization to the same
+				// host or a subdomain and synthesizes a Referer carrying the
+				// previous URL's query; both are re-prepared on req from the
+				// ORIGINAL request before this hook runs on every hop, so
+				// the comparison must be against the original origin
+				// (via[0]) — comparing hops pairwise would let an A->B->B
+				// chain restore credentials on the B->B hop.
+				first := via[0]
+				if first != nil && first.URL != nil && req.URL != nil && !sameOrigin(first.URL, req.URL) {
+					req.Header.Del("Authorization")
+					req.Header.Del("Cookie")
+					req.Header.Del("Referer")
 				}
 			}
 			return nil

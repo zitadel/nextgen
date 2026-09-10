@@ -208,6 +208,36 @@ func TestNewClient_RedirectHeaderIsolation(t *testing.T) {
 		require.Empty(t, got.referer, "Referer (carrying the previous URL's query) must not cross origins")
 	})
 
+	t.Run("credentials stay stripped on a same-origin hop after a cross-origin one", func(t *testing.T) {
+		// A -> B -> B: net/http rebuilds every redirect request from the
+		// ORIGINAL headers, so the B -> B hop would quietly restore
+		// Authorization if only adjacent hops were compared.
+		var got seen
+		mux := http.NewServeMux()
+		target := httptest.NewServer(mux)
+		defer target.Close()
+		mux.HandleFunc("/hop1", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, target.URL+"/hop2", http.StatusFound)
+		})
+		mux.HandleFunc("/hop2", record(&got))
+		src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, target.URL+"/hop1", http.StatusFound)
+		}))
+		defer src.Close()
+
+		req, err := http.NewRequest(http.MethodGet, src.URL+"/start", nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer token")
+		req.Header.Set("Cookie", "session=abc")
+
+		resp, err := newClient(t, httputil.ClientConfig{MaxRedirects: 5}).Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+
+		require.Empty(t, got.auth, "the original Authorization must not resurface after the origin boundary")
+		require.Empty(t, got.cookie, "the original Cookie must not resurface after the origin boundary")
+	})
+
 	t.Run("a same-origin hop keeps the caller's credentials", func(t *testing.T) {
 		var got seen
 		mux := http.NewServeMux()
