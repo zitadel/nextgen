@@ -34,9 +34,10 @@ type HostChecker struct {
 // CIDR is an error rather than a hostname: hostnames cannot contain "/", and
 // the silent alternative would be a deny rule that never matches.
 func NewHostChecker(entry string) (*HostChecker, error) {
-	// "name." and "name" are the same DNS name; canonicalize so the dotted
-	// spelling cannot bypass a name entry (ADR 061 decision 4).
-	entry = strings.TrimSuffix(entry, ".")
+	// Canonicalize: surrounding whitespace (comma-separated env lists) and a
+	// trailing dot ("name." and "name" are the same DNS name) must not turn
+	// an entry into a rule that never matches (ADR 061 decision 4).
+	entry = strings.TrimSuffix(strings.TrimSpace(entry), ".")
 	if entry == "" {
 		return nil, nil
 	}
@@ -48,6 +49,13 @@ func NewHostChecker(entry string) (*HostChecker, error) {
 	}
 	if ip := net.ParseIP(entry); ip != nil {
 		return &HostChecker{IP: ip}, nil
+	}
+	// A hostname is matched against req.URL.Hostname(), which never carries
+	// a scheme, port, userinfo, path, or whitespace. An entry with any of
+	// those (e.g. "localhost:8080") would be a deny rule that silently never
+	// fires, so it is a configuration error instead.
+	if strings.ContainsAny(entry, " \t:@?#") {
+		return nil, fmt.Errorf("invalid hostname entry %q: use a bare hostname, IP, or CIDR", entry)
 	}
 	return &HostChecker{Domain: entry}, nil
 }

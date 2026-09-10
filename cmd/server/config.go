@@ -102,6 +102,7 @@ func (c Config) Validate() error {
 		c.Session.Validate,
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
+		c.Schema.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
@@ -164,6 +165,15 @@ type SchemaConfig struct {
 	// follows, so recursion depth cannot multiply the per-request
 	// httpclient.timeout into sequential waits.
 	ResolveTimeout time.Duration `mapstructure:"resolve_timeout"`
+}
+
+func (c SchemaConfig) Validate() error {
+	// A negative value would reach context.WithTimeout and fail every
+	// uncached ingest at runtime instead of failing the boot.
+	if c.ResolveTimeout < 0 {
+		return fmt.Errorf("schema.resolve_timeout must not be negative, got %s", c.ResolveTimeout)
+	}
+	return nil
 }
 
 type MasterKeyConfig struct {
