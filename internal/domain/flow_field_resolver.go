@@ -243,8 +243,9 @@ const FlowImplicitOutcomeUserNotFound = "user_not_found"
 const FlowImplicitOutcomeUserAlreadyExists = "user_already_exists"
 
 // FlowImplicitOutcomeIdentityUnknown drives the login → register flip when
-// SSO resolution finds no subject. Raised only by ceremony resolution, never
-// by a typed identifier, so a shared entry step can route the two apart.
+// SSO resolution finds no user for the provider's subject. Raised only by
+// ceremony resolution, never by a typed identifier, so a shared entry step
+// can route the two apart.
 const FlowImplicitOutcomeIdentityUnknown = "identity_unknown"
 
 // implicitOutcomesByChallenge lists the transition outcomes a field
