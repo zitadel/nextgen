@@ -16,6 +16,18 @@
 
 ## Decisions
 
+### D19 · IDP credentials are environment-specific — 2026-09-09
+Client IDs, client secrets, and similar runtime values belong to the target environment, not to the generic IDP connection definition. When the same release is deployed to another environment, the required credentials must exist for that environment; for MVP, do not rely on automatically carrying secrets across environments.
+
+### D18 · One deploy model; no separate promotion flow for MVP — 2026-09-09
+Deploying a release to development, staging, or production is the same operation. Do not introduce a separate "promote" concept for MVP and do not enforce a fixed environment sequence — users may deploy the same release to whichever environment they choose, including directly to production. In the CLI flow, use "Deploy" rather than "Review deployment"; show the diff before confirmation.
+
+### D17 · Enterprise SSO configuration needs a customer-facing surface — 2026-09-09
+B2B / Enterprise SSO is a distinct case from centrally configured social login. The CLI can enable the capability, but a customer's customer must be able to configure its own SAML/OIDC identity provider without using the ZITADEL CLI. Provide that configuration through an API or an embeddable/customer-facing UI surface rather than treating it as a Console handoff by default.
+
+### D16 · CLI is command-driven and automation-friendly — 2026-09-09 · [standing]
+Treat the CLI as a primary execution surface for both developers and agents. Optimize for explicit commands, predictable behavior, good defaults, validation, and automation rather than a deeply guided interactive workflow or terminal UI. Interactive helpers may assist with commands, but should not force users through a prescribed sequence.
+
 ### D15 · Create uses a right-side drawer — 2026-07-31 · [standing]
 Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui default interaction pattern. Fields relevant to the current context (e.g. team) are preselected.
 
@@ -75,7 +87,7 @@ Users/teams/projects are resources; schemas are configuration, not resources —
 
 <!-- New decision: copy this, bump the ID.
 
-### D16 · <decision> — YYYY-MM-DD
+### D20 · <decision> — YYYY-MM-DD
 <one line on why>
 → <next step, who>
 
