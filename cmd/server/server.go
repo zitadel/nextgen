@@ -34,6 +34,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
@@ -192,9 +193,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		}
 	}
 
-	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+	// The hardened egress client guards the one fetch path a platform user
+	// controls: schema ingest by URL. Response size is capped by the client's
+	// MaxBodySize; the resolve timeout bounds one whole $ref chain.
+	egressClient, err := cfg.HTTPClient.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to build egress http client: %w", err)
+	}
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, cfg.Schema.ResolveTimeout, egressClient, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
-	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, nil, builtinPublicBase)
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 0, nil, builtinPublicBase)
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
@@ -501,6 +509,17 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
+	// Egress policy for user-injectable URLs (egress-policy ADR). The deny
+	// list blocks by default; allow_list carves exceptions out of it, e.g.
+	// NEXTGEN_HTTPCLIENT_ALLOW_LIST="localhost,127.0.0.0/8" for local
+	// development against loopback schema hosts.
+	v.SetDefault("httpclient.max_body_size", 1<<20) // 1 MiB; the only consumer is JSON schema ingest
+	v.SetDefault("httpclient.timeout", 10*time.Second)
+	v.SetDefault("httpclient.max_redirects", 5)
+	v.SetDefault("httpclient.allow_https_downgrade", false)
+	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
+	v.SetDefault("httpclient.allow_list", []string{})
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the

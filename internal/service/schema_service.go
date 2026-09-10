@@ -102,7 +102,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		// the duplicate as a commit-time AlreadyExists otherwise.
 		_, err := s.schemaResolver.Resolve(ctx, stmts, input.ProjectID, model.URL, model.Schema)
 		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+			return resolveSchemaError(err)
 		}
 		return audit.Emit(ctx, stmts, audit.EmitSpec{
 			Type:       domain.EventTypeSchemaCreated,
@@ -139,12 +139,40 @@ func (s *SchemaService) classifyCreateConflict(ctx context.Context, projectID, s
 	return domain.ErrJSONSchemaAlreadyExists().WithParent(cause)
 }
 
+// resolveSchemaError maps a failed schema resolution onto the caller-visible
+// error. The resolver already classifies egress failures into the fetch_*
+// codes (with the failing URL in details); re-stamping them here is a no-op
+// at runtime whose only purpose is visibility: the OpenAPI error analysis
+// cannot follow the resolver's $ref loader indirection, so the codes must
+// reach a return position in this package to appear in the schema
+// operations' error sets. Keep this switch in step with
+// domain.classifyFetchError.
+func resolveSchemaError(err error) error {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok {
+		return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+	}
+	switch de.Code {
+	case domain.ErrJSONSchemaFetchDenied().Code:
+		return domain.ErrJSONSchemaFetchDenied().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchTooLarge().Code:
+		return domain.ErrJSONSchemaFetchTooLarge().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchTooManyRedirects().Code:
+		return domain.ErrJSONSchemaFetchTooManyRedirects().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchDowngrade().Code:
+		return domain.ErrJSONSchemaFetchDowngrade().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchTimeout().Code:
+		return domain.ErrJSONSchemaFetchTimeout().WithDetails(de.Details).WithParent(de.Parent)
+	}
+	return de
+}
+
 func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
 	strURI := input.URL.String()
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
 		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+			return resolveSchemaError(err)
 		}
 		return nil
 	})

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -64,6 +65,37 @@ func ErrJSONSchemaRevisionConflict() Error {
 
 func ErrJSONSchemaPermissionDenied() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("permission_denied"), "the schema management API requires the project secret", nil, nil)
+}
+
+// The fetch_* errors report why ingesting a caller-supplied schema URL (or a
+// $ref it follows) was refused. The caller chose the URL, so each failure
+// mode gets its own code and the failing URL rides along as details.
+
+func ErrJSONSchemaFetchDenied() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("fetch_denied"), "the schema URL resolves to an address blocked by the egress policy", nil, nil)
+}
+
+func ErrJSONSchemaFetchTooLarge() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("fetch_too_large"), "the fetched schema document exceeds the configured size limit", nil, nil)
+}
+
+func ErrJSONSchemaFetchTooManyRedirects() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("fetch_too_many_redirects"), "fetching the schema URL exceeded the redirect limit", nil, nil)
+}
+
+func ErrJSONSchemaFetchDowngrade() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("fetch_downgrade"), "fetching the schema URL was redirected from https to http, which is not allowed", nil, nil)
+}
+
+func ErrJSONSchemaFetchTimeout() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("fetch_timeout"), "fetching the schema URL timed out", nil, nil)
+}
+
+// SchemaFetchDetails names the URL a fetch_* error is about — the submitted
+// URL or a nested $ref target (ADR 030: details are explicitly attached,
+// caller-supplied data only).
+type SchemaFetchDetails struct {
+	URL string `json:"url"`
 }
 
 var absoluteScheme = regexp.MustCompile(`^https?://`)
@@ -148,7 +180,10 @@ type JSONSchemaStore interface {
 
 const (
 	DefaultMaxJSONSchemaResolveDepth = 10
-	DefaultMaxJSONSchemaSize         = 1 << 20 // 1 MB
+	// DefaultJSONSchemaResolveTimeout bounds one whole schema ingest,
+	// $ref chain included, so resolve depth cannot multiply the egress
+	// client's per-request timeout into sequential waits (#1114).
+	DefaultJSONSchemaResolveTimeout = 30 * time.Second
 
 	// jsonSchemaResolverCacheKeySep separates project ID and schema URL in [JSONSchemaResolverCacheKey].
 	// Project IDs must not contain this rune (true for typical IDs).
@@ -194,7 +229,7 @@ type JSONSchemaResolver struct {
 	// keyed by projectID and schemaURL
 	cache           *lru.TwoQueueCache[string, *jsonschema.Schema]
 	maxResolveDepth int
-	maxSize         int
+	resolveTimeout  time.Duration
 	httpClient      *http.Client
 	// builtinPublicBase is the absolute URL prefix for product-built-in schemas (no trailing slash).
 	// When empty, builtin embedded schemas are disabled and resolution uses only the store / HTTP ingest.
@@ -206,10 +241,14 @@ type JSONSchemaResolver struct {
 // When builtinPublicBase is non-nil, schema URLs under that prefix are loaded from embedded templates
 // instead of the database; they are not persisted via [JSONSchemaStore.CreateJSONSchema].
 // Persistence is supplied per [JSONSchemaResolver.Resolve] call via [JSONSchemaStore].
+// resolveTimeout bounds one whole [JSONSchemaResolver.Resolve] call including
+// every $ref fetch; 0 means [DefaultJSONSchemaResolveTimeout]. Response size
+// limits are the httpClient's job (MaxBodySize when built from
+// [httputil.ClientConfig]).
 func NewJSONSchemaResolver(
 	cache *lru.TwoQueueCache[string, *jsonschema.Schema],
 	maxResolveDepth int,
-	maxSize int,
+	resolveTimeout time.Duration,
 	httpClient *http.Client,
 	builtinPublicBase *url.URL,
 ) *JSONSchemaResolver {
@@ -219,8 +258,8 @@ func NewJSONSchemaResolver(
 	if maxResolveDepth == 0 {
 		maxResolveDepth = DefaultMaxJSONSchemaResolveDepth
 	}
-	if maxSize == 0 {
-		maxSize = DefaultMaxJSONSchemaSize
+	if resolveTimeout == 0 {
+		resolveTimeout = DefaultJSONSchemaResolveTimeout
 	}
 	var base string
 	if builtinPublicBase != nil {
@@ -229,7 +268,7 @@ func NewJSONSchemaResolver(
 	return &JSONSchemaResolver{
 		cache:             cache,
 		maxResolveDepth:   maxResolveDepth,
-		maxSize:           maxSize,
+		resolveTimeout:    resolveTimeout,
 		httpClient:        httpClient,
 		builtinPublicBase: base,
 	}
@@ -250,6 +289,15 @@ func (r *JSONSchemaResolver) Resolve(
 	cacheKey := jsonSchemaResolverCacheKey(projectID, schemaURL)
 	if schema, ok := r.cache.Get(cacheKey); ok {
 		return schema, nil
+	}
+	// One envelope over the whole $ref chain: without it, resolve depth
+	// multiplies the egress client's per-request timeout into sequential
+	// waits (#1114). Only the ingest path can egress, so the storage-only
+	// resolver stays unbounded.
+	if r.httpClient != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.resolveTimeout)
+		defer cancel()
 	}
 	schema, err := r.resolveRecursively(ctx, store, projectID, schemaURL, 0, rootSchema, nil)
 	if err != nil {
@@ -274,10 +322,27 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	if cache == nil {
 		cache = make(map[string]*jsonschema.Schema)
 	}
+	// The jsonschema library flattens loader errors into strings, so a typed
+	// fetch error (fetch_denied, fetch_timeout, ...) raised while chasing a
+	// $ref would not survive schema.Resolve. Capture the first one and prefer
+	// it over the flattened wrapper.
+	var loadErr error
 	loader := func(url string) ([]byte, error) {
-		return r.loadSchemaPayload(ctx, store, projectID, url)
+		data, err := r.loadSchemaPayload(ctx, store, projectID, url)
+		if err != nil && loadErr == nil {
+			loadErr = err
+		}
+		return data, err
 	}
-	return compileSchema(schemaURL, schemaData, depth, r.maxResolveDepth, cache, loader)
+	schema, err := compileSchema(schemaURL, schemaData, depth, r.maxResolveDepth, cache, loader)
+	if err != nil {
+		var domErr Error
+		if loadErr != nil && errors.As(loadErr, &domErr) {
+			return nil, domErr
+		}
+		return nil, err
+	}
+	return schema, nil
 }
 
 func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string) ([]byte, error) {
@@ -434,9 +499,43 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string) ([]byte, error) {
 	data, err := httputil.Get(ctx, url, r.httpClient, "application/json")
 	if err != nil {
-		return nil, err
+		return nil, classifyFetchError(url, err)
 	}
 	return data, nil
+}
+
+// classifyFetchError maps hardened-client failures onto distinct fetch_*
+// error codes so the caller learns exactly why the URL it chose (or a $ref
+// inside it) was refused. Anything else passes through for the service
+// layer's internal-error fallback.
+func classifyFetchError(schemaURL string, err error) error {
+	var denied *httputil.AddressDeniedError
+	var domErr Error
+	switch {
+	case errors.As(err, &denied):
+		domErr = ErrJSONSchemaFetchDenied()
+	case errors.Is(err, httputil.ErrResponseTooLarge):
+		domErr = ErrJSONSchemaFetchTooLarge()
+	case errors.Is(err, httputil.ErrTooManyRedirects):
+		domErr = ErrJSONSchemaFetchTooManyRedirects()
+	case errors.Is(err, httputil.ErrHTTPSDowngrade):
+		domErr = ErrJSONSchemaFetchDowngrade()
+	case isFetchTimeout(err):
+		domErr = ErrJSONSchemaFetchTimeout()
+	default:
+		return err
+	}
+	return domErr.WithDetails(SchemaFetchDetails{URL: schemaURL}).WithParent(err)
+}
+
+// isFetchTimeout matches both the resolve envelope's context deadline and the
+// client's own per-request and dial timeouts.
+func isFetchTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 func unmarshalJSONSchema(schemaURL string, data []byte) (*jsonschema.Schema, error) {

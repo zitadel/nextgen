@@ -68,3 +68,30 @@ password_hasher:
 schema:
   lru_cache_size: 1000
   builtin_public_base: https://nextgen.com/api/schemas
+  # Bounds one whole schema ingest by URL, every $ref fetch included.
+  # Per-request limits live under httpclient.
+  resolve_timeout: 30s
+
+# Egress policy for outbound fetches of user-supplied URLs (schema ingest by
+# URL today). See the egress-policy ADR. Env: NEXTGEN_HTTPCLIENT_<KEY>, lists
+# comma separated.
+httpclient:
+  # Per-request timeout; schema.resolve_timeout caps the whole ingest.
+  timeout: 10s
+  # Response bodies larger than this are rejected, not truncated.
+  max_body_size: 1048576 # 1 MiB
+  # Redirects are re-checked against the deny list at every hop; 0 refuses
+  # redirects entirely.
+  max_redirects: 5
+  # A redirect from https to http fails unless explicitly allowed.
+  allow_https_downgrade: false
+  # Entries are hostnames (exact match), IPs, or CIDR ranges. Setting this
+  # key REPLACES the built-in default list (localhost, loopback, private,
+  # link-local/cloud-metadata, carrier-grade NAT, benchmark and unspecified
+  # ranges, IPv4 and IPv6) — prefer allow_list for exceptions.
+  # deny_list: [...]
+  # Exceptions carved out of the deny list: a matching target is allowed even
+  # when a deny entry covers it. For local development against loopback
+  # schema hosts:
+  # allow_list: [localhost, 127.0.0.0/8]
+  allow_list: []
