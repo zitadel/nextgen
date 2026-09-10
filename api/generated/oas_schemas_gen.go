@@ -10970,13 +10970,437 @@ func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
 	s.GitDirty = val
 }
 
-type CreateSchemaBadRequest ErrorDetails
+// CreateSchemaErrorResponse represents sum type.
+type CreateSchemaErrorResponse struct {
+	Type                     CreateSchemaErrorResponseType // switch on this field
+	AuthUnauthorized         AuthUnauthorized
+	EvtInvalid               EvtInvalid
+	Internal                 Internal
+	SchAlreadyExists         SchAlreadyExists
+	SchFetchDenied           SchFetchDenied
+	SchFetchDowngrade        SchFetchDowngrade
+	SchFetchTimeout          SchFetchTimeout
+	SchFetchTooLarge         SchFetchTooLarge
+	SchFetchTooManyRedirects SchFetchTooManyRedirects
+	SchInvalidRequest        SchInvalidRequest
+	SchNotFound              SchNotFound
+	SchPermissionDenied      SchPermissionDenied
+	SchRevisionConflict      SchRevisionConflict
+	ReqInvalid               ReqInvalid
+}
 
-func (*CreateSchemaBadRequest) createSchemaRes() {}
+// CreateSchemaErrorResponseType is oneOf type of CreateSchemaErrorResponse.
+type CreateSchemaErrorResponseType string
 
-type CreateSchemaConflict ErrorDetails
+// Possible values for CreateSchemaErrorResponseType.
+const (
+	AuthUnauthorizedCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateSchemaErrorResponse               CreateSchemaErrorResponseType = "evt.invalid"
+	InternalCreateSchemaErrorResponse                 CreateSchemaErrorResponseType = "internal"
+	SchAlreadyExistsCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "sch.already_exists"
+	SchFetchDeniedCreateSchemaErrorResponse           CreateSchemaErrorResponseType = "sch.fetch_denied"
+	SchFetchDowngradeCreateSchemaErrorResponse        CreateSchemaErrorResponseType = "sch.fetch_downgrade"
+	SchFetchTimeoutCreateSchemaErrorResponse          CreateSchemaErrorResponseType = "sch.fetch_timeout"
+	SchFetchTooLargeCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "sch.fetch_too_large"
+	SchFetchTooManyRedirectsCreateSchemaErrorResponse CreateSchemaErrorResponseType = "sch.fetch_too_many_redirects"
+	SchInvalidRequestCreateSchemaErrorResponse        CreateSchemaErrorResponseType = "sch.invalid_request"
+	SchNotFoundCreateSchemaErrorResponse              CreateSchemaErrorResponseType = "sch.not_found"
+	SchPermissionDeniedCreateSchemaErrorResponse      CreateSchemaErrorResponseType = "sch.permission_denied"
+	SchRevisionConflictCreateSchemaErrorResponse      CreateSchemaErrorResponseType = "sch.revision_conflict"
+	ReqInvalidCreateSchemaErrorResponse               CreateSchemaErrorResponseType = "req.invalid"
+)
 
-func (*CreateSchemaConflict) createSchemaRes() {}
+// IsAuthUnauthorized reports whether CreateSchemaErrorResponse is AuthUnauthorized.
+func (s CreateSchemaErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateSchemaErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateSchemaErrorResponse is EvtInvalid.
+func (s CreateSchemaErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateSchemaErrorResponse
+}
+
+// IsInternal reports whether CreateSchemaErrorResponse is Internal.
+func (s CreateSchemaErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateSchemaErrorResponse
+}
+
+// IsSchAlreadyExists reports whether CreateSchemaErrorResponse is SchAlreadyExists.
+func (s CreateSchemaErrorResponse) IsSchAlreadyExists() bool {
+	return s.Type == SchAlreadyExistsCreateSchemaErrorResponse
+}
+
+// IsSchFetchDenied reports whether CreateSchemaErrorResponse is SchFetchDenied.
+func (s CreateSchemaErrorResponse) IsSchFetchDenied() bool {
+	return s.Type == SchFetchDeniedCreateSchemaErrorResponse
+}
+
+// IsSchFetchDowngrade reports whether CreateSchemaErrorResponse is SchFetchDowngrade.
+func (s CreateSchemaErrorResponse) IsSchFetchDowngrade() bool {
+	return s.Type == SchFetchDowngradeCreateSchemaErrorResponse
+}
+
+// IsSchFetchTimeout reports whether CreateSchemaErrorResponse is SchFetchTimeout.
+func (s CreateSchemaErrorResponse) IsSchFetchTimeout() bool {
+	return s.Type == SchFetchTimeoutCreateSchemaErrorResponse
+}
+
+// IsSchFetchTooLarge reports whether CreateSchemaErrorResponse is SchFetchTooLarge.
+func (s CreateSchemaErrorResponse) IsSchFetchTooLarge() bool {
+	return s.Type == SchFetchTooLargeCreateSchemaErrorResponse
+}
+
+// IsSchFetchTooManyRedirects reports whether CreateSchemaErrorResponse is SchFetchTooManyRedirects.
+func (s CreateSchemaErrorResponse) IsSchFetchTooManyRedirects() bool {
+	return s.Type == SchFetchTooManyRedirectsCreateSchemaErrorResponse
+}
+
+// IsSchInvalidRequest reports whether CreateSchemaErrorResponse is SchInvalidRequest.
+func (s CreateSchemaErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestCreateSchemaErrorResponse
+}
+
+// IsSchNotFound reports whether CreateSchemaErrorResponse is SchNotFound.
+func (s CreateSchemaErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundCreateSchemaErrorResponse
+}
+
+// IsSchPermissionDenied reports whether CreateSchemaErrorResponse is SchPermissionDenied.
+func (s CreateSchemaErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedCreateSchemaErrorResponse
+}
+
+// IsSchRevisionConflict reports whether CreateSchemaErrorResponse is SchRevisionConflict.
+func (s CreateSchemaErrorResponse) IsSchRevisionConflict() bool {
+	return s.Type == SchRevisionConflictCreateSchemaErrorResponse
+}
+
+// IsReqInvalid reports whether CreateSchemaErrorResponse is ReqInvalid.
+func (s CreateSchemaErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateSchemaErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateSchemaErrorResponse to AuthUnauthorized.
+func (s *CreateSchemaErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateSchemaErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateSchemaErrorResponse is AuthUnauthorized.
+func (s CreateSchemaErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateSchemaErrorResponse(v AuthUnauthorized) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateSchemaErrorResponse to EvtInvalid.
+func (s *CreateSchemaErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateSchemaErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateSchemaErrorResponse is EvtInvalid.
+func (s CreateSchemaErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateSchemaErrorResponse(v EvtInvalid) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets CreateSchemaErrorResponse to Internal.
+func (s *CreateSchemaErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateSchemaErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateSchemaErrorResponse is Internal.
+func (s CreateSchemaErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from Internal.
+func NewInternalCreateSchemaErrorResponse(v Internal) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchAlreadyExists sets CreateSchemaErrorResponse to SchAlreadyExists.
+func (s *CreateSchemaErrorResponse) SetSchAlreadyExists(v SchAlreadyExists) {
+	s.Type = SchAlreadyExistsCreateSchemaErrorResponse
+	s.SchAlreadyExists = v
+}
+
+// GetSchAlreadyExists returns SchAlreadyExists and true boolean if CreateSchemaErrorResponse is SchAlreadyExists.
+func (s CreateSchemaErrorResponse) GetSchAlreadyExists() (v SchAlreadyExists, ok bool) {
+	if !s.IsSchAlreadyExists() {
+		return v, false
+	}
+	return s.SchAlreadyExists, true
+}
+
+// NewSchAlreadyExistsCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchAlreadyExists.
+func NewSchAlreadyExistsCreateSchemaErrorResponse(v SchAlreadyExists) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchAlreadyExists(v)
+	return s
+}
+
+// SetSchFetchDenied sets CreateSchemaErrorResponse to SchFetchDenied.
+func (s *CreateSchemaErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
+	s.Type = SchFetchDeniedCreateSchemaErrorResponse
+	s.SchFetchDenied = v
+}
+
+// GetSchFetchDenied returns SchFetchDenied and true boolean if CreateSchemaErrorResponse is SchFetchDenied.
+func (s CreateSchemaErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
+	if !s.IsSchFetchDenied() {
+		return v, false
+	}
+	return s.SchFetchDenied, true
+}
+
+// NewSchFetchDeniedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchDenied.
+func NewSchFetchDeniedCreateSchemaErrorResponse(v SchFetchDenied) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchDenied(v)
+	return s
+}
+
+// SetSchFetchDowngrade sets CreateSchemaErrorResponse to SchFetchDowngrade.
+func (s *CreateSchemaErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
+	s.Type = SchFetchDowngradeCreateSchemaErrorResponse
+	s.SchFetchDowngrade = v
+}
+
+// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if CreateSchemaErrorResponse is SchFetchDowngrade.
+func (s CreateSchemaErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
+	if !s.IsSchFetchDowngrade() {
+		return v, false
+	}
+	return s.SchFetchDowngrade, true
+}
+
+// NewSchFetchDowngradeCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchDowngrade.
+func NewSchFetchDowngradeCreateSchemaErrorResponse(v SchFetchDowngrade) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchDowngrade(v)
+	return s
+}
+
+// SetSchFetchTimeout sets CreateSchemaErrorResponse to SchFetchTimeout.
+func (s *CreateSchemaErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
+	s.Type = SchFetchTimeoutCreateSchemaErrorResponse
+	s.SchFetchTimeout = v
+}
+
+// GetSchFetchTimeout returns SchFetchTimeout and true boolean if CreateSchemaErrorResponse is SchFetchTimeout.
+func (s CreateSchemaErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
+	if !s.IsSchFetchTimeout() {
+		return v, false
+	}
+	return s.SchFetchTimeout, true
+}
+
+// NewSchFetchTimeoutCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchTimeout.
+func NewSchFetchTimeoutCreateSchemaErrorResponse(v SchFetchTimeout) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchTimeout(v)
+	return s
+}
+
+// SetSchFetchTooLarge sets CreateSchemaErrorResponse to SchFetchTooLarge.
+func (s *CreateSchemaErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
+	s.Type = SchFetchTooLargeCreateSchemaErrorResponse
+	s.SchFetchTooLarge = v
+}
+
+// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if CreateSchemaErrorResponse is SchFetchTooLarge.
+func (s CreateSchemaErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
+	if !s.IsSchFetchTooLarge() {
+		return v, false
+	}
+	return s.SchFetchTooLarge, true
+}
+
+// NewSchFetchTooLargeCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchTooLarge.
+func NewSchFetchTooLargeCreateSchemaErrorResponse(v SchFetchTooLarge) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchTooLarge(v)
+	return s
+}
+
+// SetSchFetchTooManyRedirects sets CreateSchemaErrorResponse to SchFetchTooManyRedirects.
+func (s *CreateSchemaErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
+	s.Type = SchFetchTooManyRedirectsCreateSchemaErrorResponse
+	s.SchFetchTooManyRedirects = v
+}
+
+// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if CreateSchemaErrorResponse is SchFetchTooManyRedirects.
+func (s CreateSchemaErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
+	if !s.IsSchFetchTooManyRedirects() {
+		return v, false
+	}
+	return s.SchFetchTooManyRedirects, true
+}
+
+// NewSchFetchTooManyRedirectsCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchTooManyRedirects.
+func NewSchFetchTooManyRedirectsCreateSchemaErrorResponse(v SchFetchTooManyRedirects) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchTooManyRedirects(v)
+	return s
+}
+
+// SetSchInvalidRequest sets CreateSchemaErrorResponse to SchInvalidRequest.
+func (s *CreateSchemaErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestCreateSchemaErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if CreateSchemaErrorResponse is SchInvalidRequest.
+func (s CreateSchemaErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestCreateSchemaErrorResponse(v SchInvalidRequest) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchInvalidRequest(v)
+	return s
+}
+
+// SetSchNotFound sets CreateSchemaErrorResponse to SchNotFound.
+func (s *CreateSchemaErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundCreateSchemaErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if CreateSchemaErrorResponse is SchNotFound.
+func (s CreateSchemaErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchNotFound.
+func NewSchNotFoundCreateSchemaErrorResponse(v SchNotFound) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets CreateSchemaErrorResponse to SchPermissionDenied.
+func (s *CreateSchemaErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedCreateSchemaErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if CreateSchemaErrorResponse is SchPermissionDenied.
+func (s CreateSchemaErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedCreateSchemaErrorResponse(v SchPermissionDenied) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchPermissionDenied(v)
+	return s
+}
+
+// SetSchRevisionConflict sets CreateSchemaErrorResponse to SchRevisionConflict.
+func (s *CreateSchemaErrorResponse) SetSchRevisionConflict(v SchRevisionConflict) {
+	s.Type = SchRevisionConflictCreateSchemaErrorResponse
+	s.SchRevisionConflict = v
+}
+
+// GetSchRevisionConflict returns SchRevisionConflict and true boolean if CreateSchemaErrorResponse is SchRevisionConflict.
+func (s CreateSchemaErrorResponse) GetSchRevisionConflict() (v SchRevisionConflict, ok bool) {
+	if !s.IsSchRevisionConflict() {
+		return v, false
+	}
+	return s.SchRevisionConflict, true
+}
+
+// NewSchRevisionConflictCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchRevisionConflict.
+func NewSchRevisionConflictCreateSchemaErrorResponse(v SchRevisionConflict) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchRevisionConflict(v)
+	return s
+}
+
+// SetReqInvalid sets CreateSchemaErrorResponse to ReqInvalid.
+func (s *CreateSchemaErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateSchemaErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateSchemaErrorResponse is ReqInvalid.
+func (s CreateSchemaErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from ReqInvalid.
+func NewReqInvalidCreateSchemaErrorResponse(v ReqInvalid) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateSchemaErrorResponseStatusCode wraps CreateSchemaErrorResponse with StatusCode.
+type CreateSchemaErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateSchemaErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateSchemaErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateSchemaErrorResponseStatusCode) GetResponse() CreateSchemaErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateSchemaErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateSchemaErrorResponseStatusCode) SetResponse(val CreateSchemaErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateSchemaErrorResponseStatusCode) createSchemaRes() {}
 
 // CreateSchemaReq represents sum type.
 type CreateSchemaReq struct {
@@ -13508,7 +13932,6 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 
 func (*ErrorDetailsStatusCode) completeClaimRes()   {}
 func (*ErrorDetailsStatusCode) createBrandingRes()  {}
-func (*ErrorDetailsStatusCode) createSchemaRes()    {}
 func (*ErrorDetailsStatusCode) createTeamRes()      {}
 func (*ErrorDetailsStatusCode) deleteTeamRes()      {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes() {}
@@ -13518,12 +13941,10 @@ func (*ErrorDetailsStatusCode) getEventRes()        {}
 func (*ErrorDetailsStatusCode) getHealthRes()       {}
 func (*ErrorDetailsStatusCode) getLiveRes()         {}
 func (*ErrorDetailsStatusCode) getReadyRes()        {}
-func (*ErrorDetailsStatusCode) getSchemaByIdRes()   {}
 func (*ErrorDetailsStatusCode) getTeamRes()         {}
 func (*ErrorDetailsStatusCode) initClaimRes()       {}
 func (*ErrorDetailsStatusCode) listBrandingRes()    {}
 func (*ErrorDetailsStatusCode) listEventsRes()      {}
-func (*ErrorDetailsStatusCode) listSchemasRes()     {}
 func (*ErrorDetailsStatusCode) queryTeamsRes()      {}
 func (*ErrorDetailsStatusCode) updateTeamRes()      {}
 
@@ -21912,13 +22333,185 @@ func (s *GetReleaseByIdErrorResponseStatusCode) SetResponse(val GetReleaseByIdEr
 
 func (*GetReleaseByIdErrorResponseStatusCode) getReleaseByIdRes() {}
 
-type GetSchemaByIdBadRequest ErrorDetails
+// GetSchemaByIdErrorResponse represents sum type.
+type GetSchemaByIdErrorResponse struct {
+	Type                GetSchemaByIdErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	SchNotFound         SchNotFound
+	SchPermissionDenied SchPermissionDenied
+	ReqInvalid          ReqInvalid
+}
 
-func (*GetSchemaByIdBadRequest) getSchemaByIdRes() {}
+// GetSchemaByIdErrorResponseType is oneOf type of GetSchemaByIdErrorResponse.
+type GetSchemaByIdErrorResponseType string
 
-type GetSchemaByIdNotFound ErrorDetails
+// Possible values for GetSchemaByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetSchemaByIdErrorResponse    GetSchemaByIdErrorResponseType = "auth.unauthorized"
+	InternalGetSchemaByIdErrorResponse            GetSchemaByIdErrorResponseType = "internal"
+	SchNotFoundGetSchemaByIdErrorResponse         GetSchemaByIdErrorResponseType = "sch.not_found"
+	SchPermissionDeniedGetSchemaByIdErrorResponse GetSchemaByIdErrorResponseType = "sch.permission_denied"
+	ReqInvalidGetSchemaByIdErrorResponse          GetSchemaByIdErrorResponseType = "req.invalid"
+)
 
-func (*GetSchemaByIdNotFound) getSchemaByIdRes() {}
+// IsAuthUnauthorized reports whether GetSchemaByIdErrorResponse is AuthUnauthorized.
+func (s GetSchemaByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetSchemaByIdErrorResponse
+}
+
+// IsInternal reports whether GetSchemaByIdErrorResponse is Internal.
+func (s GetSchemaByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetSchemaByIdErrorResponse
+}
+
+// IsSchNotFound reports whether GetSchemaByIdErrorResponse is SchNotFound.
+func (s GetSchemaByIdErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundGetSchemaByIdErrorResponse
+}
+
+// IsSchPermissionDenied reports whether GetSchemaByIdErrorResponse is SchPermissionDenied.
+func (s GetSchemaByIdErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedGetSchemaByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetSchemaByIdErrorResponse is ReqInvalid.
+func (s GetSchemaByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetSchemaByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetSchemaByIdErrorResponse to AuthUnauthorized.
+func (s *GetSchemaByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetSchemaByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetSchemaByIdErrorResponse is AuthUnauthorized.
+func (s GetSchemaByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetSchemaByIdErrorResponse(v AuthUnauthorized) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetSchemaByIdErrorResponse to Internal.
+func (s *GetSchemaByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetSchemaByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetSchemaByIdErrorResponse is Internal.
+func (s GetSchemaByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from Internal.
+func NewInternalGetSchemaByIdErrorResponse(v Internal) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets GetSchemaByIdErrorResponse to SchNotFound.
+func (s *GetSchemaByIdErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundGetSchemaByIdErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if GetSchemaByIdErrorResponse is SchNotFound.
+func (s GetSchemaByIdErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from SchNotFound.
+func NewSchNotFoundGetSchemaByIdErrorResponse(v SchNotFound) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets GetSchemaByIdErrorResponse to SchPermissionDenied.
+func (s *GetSchemaByIdErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedGetSchemaByIdErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if GetSchemaByIdErrorResponse is SchPermissionDenied.
+func (s GetSchemaByIdErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedGetSchemaByIdErrorResponse(v SchPermissionDenied) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetSchPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets GetSchemaByIdErrorResponse to ReqInvalid.
+func (s *GetSchemaByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetSchemaByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetSchemaByIdErrorResponse is ReqInvalid.
+func (s GetSchemaByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetSchemaByIdErrorResponse(v ReqInvalid) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetSchemaByIdErrorResponseStatusCode wraps GetSchemaByIdErrorResponse with StatusCode.
+type GetSchemaByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetSchemaByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetSchemaByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetSchemaByIdErrorResponseStatusCode) GetResponse() GetSchemaByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetSchemaByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetSchemaByIdErrorResponseStatusCode) SetResponse(val GetSchemaByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetSchemaByIdErrorResponseStatusCode) getSchemaByIdRes() {}
 
 // GetSessionErrorResponse represents sum type.
 type GetSessionErrorResponse struct {
@@ -24589,6 +25182,186 @@ func (s *ListReleasesResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*ListReleasesResponse) listReleasesRes() {}
+
+// ListSchemasErrorResponse represents sum type.
+type ListSchemasErrorResponse struct {
+	Type                ListSchemasErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	SchNotFound         SchNotFound
+	SchPermissionDenied SchPermissionDenied
+	ReqInvalid          ReqInvalid
+}
+
+// ListSchemasErrorResponseType is oneOf type of ListSchemasErrorResponse.
+type ListSchemasErrorResponseType string
+
+// Possible values for ListSchemasErrorResponseType.
+const (
+	AuthUnauthorizedListSchemasErrorResponse    ListSchemasErrorResponseType = "auth.unauthorized"
+	InternalListSchemasErrorResponse            ListSchemasErrorResponseType = "internal"
+	SchNotFoundListSchemasErrorResponse         ListSchemasErrorResponseType = "sch.not_found"
+	SchPermissionDeniedListSchemasErrorResponse ListSchemasErrorResponseType = "sch.permission_denied"
+	ReqInvalidListSchemasErrorResponse          ListSchemasErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListSchemasErrorResponse is AuthUnauthorized.
+func (s ListSchemasErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListSchemasErrorResponse
+}
+
+// IsInternal reports whether ListSchemasErrorResponse is Internal.
+func (s ListSchemasErrorResponse) IsInternal() bool {
+	return s.Type == InternalListSchemasErrorResponse
+}
+
+// IsSchNotFound reports whether ListSchemasErrorResponse is SchNotFound.
+func (s ListSchemasErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundListSchemasErrorResponse
+}
+
+// IsSchPermissionDenied reports whether ListSchemasErrorResponse is SchPermissionDenied.
+func (s ListSchemasErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedListSchemasErrorResponse
+}
+
+// IsReqInvalid reports whether ListSchemasErrorResponse is ReqInvalid.
+func (s ListSchemasErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListSchemasErrorResponse
+}
+
+// SetAuthUnauthorized sets ListSchemasErrorResponse to AuthUnauthorized.
+func (s *ListSchemasErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListSchemasErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListSchemasErrorResponse is AuthUnauthorized.
+func (s ListSchemasErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListSchemasErrorResponse returns new ListSchemasErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListSchemasErrorResponse(v AuthUnauthorized) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListSchemasErrorResponse to Internal.
+func (s *ListSchemasErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListSchemasErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListSchemasErrorResponse is Internal.
+func (s ListSchemasErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListSchemasErrorResponse returns new ListSchemasErrorResponse from Internal.
+func NewInternalListSchemasErrorResponse(v Internal) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets ListSchemasErrorResponse to SchNotFound.
+func (s *ListSchemasErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundListSchemasErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if ListSchemasErrorResponse is SchNotFound.
+func (s ListSchemasErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundListSchemasErrorResponse returns new ListSchemasErrorResponse from SchNotFound.
+func NewSchNotFoundListSchemasErrorResponse(v SchNotFound) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets ListSchemasErrorResponse to SchPermissionDenied.
+func (s *ListSchemasErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedListSchemasErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if ListSchemasErrorResponse is SchPermissionDenied.
+func (s ListSchemasErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedListSchemasErrorResponse returns new ListSchemasErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedListSchemasErrorResponse(v SchPermissionDenied) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetSchPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets ListSchemasErrorResponse to ReqInvalid.
+func (s *ListSchemasErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListSchemasErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListSchemasErrorResponse is ReqInvalid.
+func (s ListSchemasErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListSchemasErrorResponse returns new ListSchemasErrorResponse from ReqInvalid.
+func NewReqInvalidListSchemasErrorResponse(v ReqInvalid) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListSchemasErrorResponseStatusCode wraps ListSchemasErrorResponse with StatusCode.
+type ListSchemasErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListSchemasErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListSchemasErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListSchemasErrorResponseStatusCode) GetResponse() ListSchemasErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListSchemasErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListSchemasErrorResponseStatusCode) SetResponse(val ListSchemasErrorResponse) {
+	s.Response = val
+}
+
+func (*ListSchemasErrorResponseStatusCode) listSchemasRes() {}
 
 type ListSchemasKind string
 
@@ -34173,6 +34946,282 @@ func (o OptRequestAPIEventDelegationType) Or(d RequestAPIEventDelegationType) Re
 	return d
 }
 
+// NewOptSchAlreadyExistsDetails returns new OptSchAlreadyExistsDetails with value set to v.
+func NewOptSchAlreadyExistsDetails(v SchAlreadyExistsDetails) OptSchAlreadyExistsDetails {
+	return OptSchAlreadyExistsDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchAlreadyExistsDetails is optional SchAlreadyExistsDetails.
+type OptSchAlreadyExistsDetails struct {
+	Value SchAlreadyExistsDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchAlreadyExistsDetails was set.
+func (o OptSchAlreadyExistsDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchAlreadyExistsDetails) Reset() {
+	var v SchAlreadyExistsDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchAlreadyExistsDetails) SetTo(v SchAlreadyExistsDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchAlreadyExistsDetails) Get() (v SchAlreadyExistsDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchAlreadyExistsDetails) Or(d SchAlreadyExistsDetails) SchAlreadyExistsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchDeniedDetails returns new OptSchFetchDeniedDetails with value set to v.
+func NewOptSchFetchDeniedDetails(v SchFetchDeniedDetails) OptSchFetchDeniedDetails {
+	return OptSchFetchDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchDeniedDetails is optional SchFetchDeniedDetails.
+type OptSchFetchDeniedDetails struct {
+	Value SchFetchDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchDeniedDetails was set.
+func (o OptSchFetchDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchDeniedDetails) Reset() {
+	var v SchFetchDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchDeniedDetails) SetTo(v SchFetchDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchDeniedDetails) Get() (v SchFetchDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchDeniedDetails) Or(d SchFetchDeniedDetails) SchFetchDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchDowngradeDetails returns new OptSchFetchDowngradeDetails with value set to v.
+func NewOptSchFetchDowngradeDetails(v SchFetchDowngradeDetails) OptSchFetchDowngradeDetails {
+	return OptSchFetchDowngradeDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchDowngradeDetails is optional SchFetchDowngradeDetails.
+type OptSchFetchDowngradeDetails struct {
+	Value SchFetchDowngradeDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchDowngradeDetails was set.
+func (o OptSchFetchDowngradeDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchDowngradeDetails) Reset() {
+	var v SchFetchDowngradeDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchDowngradeDetails) SetTo(v SchFetchDowngradeDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchDowngradeDetails) Get() (v SchFetchDowngradeDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchDowngradeDetails) Or(d SchFetchDowngradeDetails) SchFetchDowngradeDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchTimeoutDetails returns new OptSchFetchTimeoutDetails with value set to v.
+func NewOptSchFetchTimeoutDetails(v SchFetchTimeoutDetails) OptSchFetchTimeoutDetails {
+	return OptSchFetchTimeoutDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchTimeoutDetails is optional SchFetchTimeoutDetails.
+type OptSchFetchTimeoutDetails struct {
+	Value SchFetchTimeoutDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchTimeoutDetails was set.
+func (o OptSchFetchTimeoutDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchTimeoutDetails) Reset() {
+	var v SchFetchTimeoutDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchTimeoutDetails) SetTo(v SchFetchTimeoutDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchTimeoutDetails) Get() (v SchFetchTimeoutDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchTimeoutDetails) Or(d SchFetchTimeoutDetails) SchFetchTimeoutDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchTooLargeDetails returns new OptSchFetchTooLargeDetails with value set to v.
+func NewOptSchFetchTooLargeDetails(v SchFetchTooLargeDetails) OptSchFetchTooLargeDetails {
+	return OptSchFetchTooLargeDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchTooLargeDetails is optional SchFetchTooLargeDetails.
+type OptSchFetchTooLargeDetails struct {
+	Value SchFetchTooLargeDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchTooLargeDetails was set.
+func (o OptSchFetchTooLargeDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchTooLargeDetails) Reset() {
+	var v SchFetchTooLargeDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchTooLargeDetails) SetTo(v SchFetchTooLargeDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchTooLargeDetails) Get() (v SchFetchTooLargeDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchTooLargeDetails) Or(d SchFetchTooLargeDetails) SchFetchTooLargeDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchTooManyRedirectsDetails returns new OptSchFetchTooManyRedirectsDetails with value set to v.
+func NewOptSchFetchTooManyRedirectsDetails(v SchFetchTooManyRedirectsDetails) OptSchFetchTooManyRedirectsDetails {
+	return OptSchFetchTooManyRedirectsDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchTooManyRedirectsDetails is optional SchFetchTooManyRedirectsDetails.
+type OptSchFetchTooManyRedirectsDetails struct {
+	Value SchFetchTooManyRedirectsDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchTooManyRedirectsDetails was set.
+func (o OptSchFetchTooManyRedirectsDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchTooManyRedirectsDetails) Reset() {
+	var v SchFetchTooManyRedirectsDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchTooManyRedirectsDetails) SetTo(v SchFetchTooManyRedirectsDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchTooManyRedirectsDetails) Get() (v SchFetchTooManyRedirectsDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchTooManyRedirectsDetails) Or(d SchFetchTooManyRedirectsDetails) SchFetchTooManyRedirectsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchInvalidRequestDetails returns new OptSchInvalidRequestDetails with value set to v.
 func NewOptSchInvalidRequestDetails(v SchInvalidRequestDetails) OptSchInvalidRequestDetails {
 	return OptSchInvalidRequestDetails{
@@ -34305,6 +35354,52 @@ func (o OptSchPermissionDeniedDetails) Get() (v SchPermissionDeniedDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSchPermissionDeniedDetails) Or(d SchPermissionDeniedDetails) SchPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchRevisionConflictDetails returns new OptSchRevisionConflictDetails with value set to v.
+func NewOptSchRevisionConflictDetails(v SchRevisionConflictDetails) OptSchRevisionConflictDetails {
+	return OptSchRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchRevisionConflictDetails is optional SchRevisionConflictDetails.
+type OptSchRevisionConflictDetails struct {
+	Value SchRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchRevisionConflictDetails was set.
+func (o OptSchRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchRevisionConflictDetails) Reset() {
+	var v SchRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchRevisionConflictDetails) SetTo(v SchRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchRevisionConflictDetails) Get() (v SchRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchRevisionConflictDetails) Or(d SchRevisionConflictDetails) SchRevisionConflictDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -43107,6 +44202,324 @@ func (s *SSOProvider) SetTemplate(val string) {
 
 // Merged schema.
 // Ref: #
+type SchAlreadyExists struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchAlreadyExistsDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchAlreadyExists) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchAlreadyExists) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchAlreadyExists) GetDetails() OptSchAlreadyExistsDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchAlreadyExists) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchAlreadyExists) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchAlreadyExists) SetDetails(val OptSchAlreadyExistsDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchAlreadyExistsDetails map[string]jx.Raw
+
+func (s *SchAlreadyExistsDetails) init() SchAlreadyExistsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchDenied) GetDetails() OptSchFetchDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchDenied) SetDetails(val OptSchFetchDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchDeniedDetails map[string]jx.Raw
+
+func (s *SchFetchDeniedDetails) init() SchFetchDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchDowngrade struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchDowngradeDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchDowngrade) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchDowngrade) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchDowngrade) GetDetails() OptSchFetchDowngradeDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchDowngrade) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchDowngrade) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchDowngrade) SetDetails(val OptSchFetchDowngradeDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchDowngradeDetails map[string]jx.Raw
+
+func (s *SchFetchDowngradeDetails) init() SchFetchDowngradeDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchTimeout struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchTimeoutDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchTimeout) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchTimeout) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchTimeout) GetDetails() OptSchFetchTimeoutDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchTimeout) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchTimeout) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchTimeout) SetDetails(val OptSchFetchTimeoutDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchTimeoutDetails map[string]jx.Raw
+
+func (s *SchFetchTimeoutDetails) init() SchFetchTimeoutDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchTooLarge struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchTooLargeDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchTooLarge) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchTooLarge) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchTooLarge) GetDetails() OptSchFetchTooLargeDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchTooLarge) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchTooLarge) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchTooLarge) SetDetails(val OptSchFetchTooLargeDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchTooLargeDetails map[string]jx.Raw
+
+func (s *SchFetchTooLargeDetails) init() SchFetchTooLargeDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchTooManyRedirects struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchTooManyRedirectsDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchTooManyRedirects) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchTooManyRedirects) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchTooManyRedirects) GetDetails() OptSchFetchTooManyRedirectsDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchTooManyRedirects) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchTooManyRedirects) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchTooManyRedirects) SetDetails(val OptSchFetchTooManyRedirectsDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchTooManyRedirectsDetails map[string]jx.Raw
+
+func (s *SchFetchTooManyRedirectsDetails) init() SchFetchTooManyRedirectsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type SchInvalidRequest struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -43256,6 +44669,59 @@ func (s *SchPermissionDenied) SetDetails(val OptSchPermissionDeniedDetails) {
 type SchPermissionDeniedDetails map[string]jx.Raw
 
 func (s *SchPermissionDeniedDetails) init() SchPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchRevisionConflict) GetDetails() OptSchRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchRevisionConflict) SetDetails(val OptSchRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchRevisionConflictDetails map[string]jx.Raw
+
+func (s *SchRevisionConflictDetails) init() SchRevisionConflictDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
