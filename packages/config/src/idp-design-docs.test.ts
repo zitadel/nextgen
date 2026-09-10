@@ -217,7 +217,7 @@ describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () 
   // The two most copy-able snippets in the doc, validated against the exact
   // proposed meta-schema change: shipped auth-methods.json with only the sso
   // slot repointed at the doc's sso-auth-method schema.
-  const metaSchemaDir = join(repoRoot, "packages/config/meta-schemas");
+  const metaSchemaDir = join(repoRoot, "api/openapi/endpoints/schemas");
   const shippedAuthMethod = JSON.parse(
     readFileSync(join(metaSchemaDir, "auth-method.json"), "utf8"),
   ) as object;
