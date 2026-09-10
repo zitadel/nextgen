@@ -14643,6 +14643,86 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchFetchDeniedCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_denied")
+		{
+			s := s.SchFetchDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchDowngradeCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_downgrade")
+		{
+			s := s.SchFetchDowngrade
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTimeoutCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_timeout")
+		{
+			s := s.SchFetchTimeout
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooLargeCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_large")
+		{
+			s := s.SchFetchTooLarge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooManyRedirectsCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_many_redirects")
+		{
+			s := s.SchFetchTooManyRedirects
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -14737,6 +14817,21 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid_tknid":
 					s.Type = TknInvalidTknidCreateFlowErrorResponse
 					found = true
+				case "sch.fetch_denied":
+					s.Type = SchFetchDeniedCreateFlowErrorResponse
+					found = true
+				case "sch.fetch_downgrade":
+					s.Type = SchFetchDowngradeCreateFlowErrorResponse
+					found = true
+				case "sch.fetch_timeout":
+					s.Type = SchFetchTimeoutCreateFlowErrorResponse
+					found = true
+				case "sch.fetch_too_large":
+					s.Type = SchFetchTooLargeCreateFlowErrorResponse
+					found = true
+				case "sch.fetch_too_many_redirects":
+					s.Type = SchFetchTooManyRedirectsCreateFlowErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateFlowErrorResponse
 					found = true
@@ -14803,6 +14898,26 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TknInvalidTknidCreateFlowErrorResponse:
 		if err := s.TknInvalidTknid.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDeniedCreateFlowErrorResponse:
+		if err := s.SchFetchDenied.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDowngradeCreateFlowErrorResponse:
+		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTimeoutCreateFlowErrorResponse:
+		if err := s.SchFetchTimeout.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooLargeCreateFlowErrorResponse:
+		if err := s.SchFetchTooLarge.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooManyRedirectsCreateFlowErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateFlowErrorResponse:
@@ -38239,6 +38354,86 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchFetchDeniedGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_denied")
+		{
+			s := s.SchFetchDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchDowngradeGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_downgrade")
+		{
+			s := s.SchFetchDowngrade
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTimeoutGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_timeout")
+		{
+			s := s.SchFetchTimeout
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooLargeGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_large")
+		{
+			s := s.SchFetchTooLarge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooManyRedirectsGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_many_redirects")
+		{
+			s := s.SchFetchTooManyRedirects
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -38324,6 +38519,21 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid":
 					s.Type = TknInvalidGetFlowStepErrorResponse
 					found = true
+				case "sch.fetch_denied":
+					s.Type = SchFetchDeniedGetFlowStepErrorResponse
+					found = true
+				case "sch.fetch_downgrade":
+					s.Type = SchFetchDowngradeGetFlowStepErrorResponse
+					found = true
+				case "sch.fetch_timeout":
+					s.Type = SchFetchTimeoutGetFlowStepErrorResponse
+					found = true
+				case "sch.fetch_too_large":
+					s.Type = SchFetchTooLargeGetFlowStepErrorResponse
+					found = true
+				case "sch.fetch_too_many_redirects":
+					s.Type = SchFetchTooManyRedirectsGetFlowStepErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetFlowStepErrorResponse
 					found = true
@@ -38378,6 +38588,26 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TknInvalidGetFlowStepErrorResponse:
 		if err := s.TknInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDeniedGetFlowStepErrorResponse:
+		if err := s.SchFetchDenied.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDowngradeGetFlowStepErrorResponse:
+		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTimeoutGetFlowStepErrorResponse:
+		if err := s.SchFetchTimeout.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooLargeGetFlowStepErrorResponse:
+		if err := s.SchFetchTooLarge.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooManyRedirectsGetFlowStepErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetFlowStepErrorResponse:
@@ -75877,6 +76107,86 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchFetchDeniedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_denied")
+		{
+			s := s.SchFetchDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchDowngradeSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_downgrade")
+		{
+			s := s.SchFetchDowngrade
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTimeoutSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_timeout")
+		{
+			s := s.SchFetchTimeout
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooLargeSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_large")
+		{
+			s := s.SchFetchTooLarge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooManyRedirectsSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_many_redirects")
+		{
+			s := s.SchFetchTooManyRedirects
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case NotImplementedSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
@@ -76072,6 +76382,21 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid":
 					s.Type = TknInvalidSubmitFlowStepErrorResponse
 					found = true
+				case "sch.fetch_denied":
+					s.Type = SchFetchDeniedSubmitFlowStepErrorResponse
+					found = true
+				case "sch.fetch_downgrade":
+					s.Type = SchFetchDowngradeSubmitFlowStepErrorResponse
+					found = true
+				case "sch.fetch_timeout":
+					s.Type = SchFetchTimeoutSubmitFlowStepErrorResponse
+					found = true
+				case "sch.fetch_too_large":
+					s.Type = SchFetchTooLargeSubmitFlowStepErrorResponse
+					found = true
+				case "sch.fetch_too_many_redirects":
+					s.Type = SchFetchTooManyRedirectsSubmitFlowStepErrorResponse
+					found = true
 				case "not_implemented":
 					s.Type = NotImplementedSubmitFlowStepErrorResponse
 					found = true
@@ -76181,6 +76506,26 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TknInvalidSubmitFlowStepErrorResponse:
 		if err := s.TknInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDeniedSubmitFlowStepErrorResponse:
+		if err := s.SchFetchDenied.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDowngradeSubmitFlowStepErrorResponse:
+		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTimeoutSubmitFlowStepErrorResponse:
+		if err := s.SchFetchTimeout.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooLargeSubmitFlowStepErrorResponse:
+		if err := s.SchFetchTooLarge.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooManyRedirectsSubmitFlowStepErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Decode(d); err != nil {
 			return err
 		}
 	case NotImplementedSubmitFlowStepErrorResponse:

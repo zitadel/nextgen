@@ -303,6 +303,12 @@ func (r *JSONSchemaResolver) Resolve(
 	if err != nil {
 		return nil, err
 	}
+	// Compilation itself does no I/O and never observes ctx, so the
+	// envelope could expire between the last fetch and this point; an
+	// expired resolve must fail, not be cached as success.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, classifyFetchError(schemaURL, ctxErr)
+	}
 	r.cache.Add(cacheKey, schema)
 	return schema, nil
 }

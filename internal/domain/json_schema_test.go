@@ -679,6 +679,21 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooManyRedirects())
 	})
 
+	t.Run("an envelope that expires during compilation is not cached as success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		// The root document is supplied inline, so compilation performs no
+		// I/O that would observe the context; only the post-compile check
+		// can catch the already-expired 1ns envelope.
+		client := newEgressClient(t, httputil.ClientConfig{})
+		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, time.Nanosecond, client, nil)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
+
+		_, err = resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout(), "the expired result must not have been cached")
+	})
+
 	t.Run("resolve timeout bounds the whole ref chain, not each hop", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mux := http.NewServeMux()

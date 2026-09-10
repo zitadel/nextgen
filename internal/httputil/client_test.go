@@ -34,16 +34,35 @@ func TestClientConfig_Validate(t *testing.T) {
 	require.Error(t, err, "NewClient must run the same validation")
 }
 
-func TestNewClient_BlockedAtDial(t *testing.T) {
+func TestNewClient_LiteralIPBlockedBeforeDial(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
-	// Deny the loopback range the httptest server actually listens on: the
-	// Control hook must block on the resolved address at connect time.
+	// srv.URL carries a literal loopback IP, so the request-level precheck
+	// already matches the CIDR before any dial.
 	client := newClient(t, httputil.ClientConfig{DenyList: []string{"127.0.0.0/8", "::1/128"}})
 	_, err := client.Get(srv.URL)
+	var denied *httputil.AddressDeniedError
+	require.ErrorAs(t, err, &denied)
+}
+
+func TestNewClient_ResolvedAddressBlockedAtDial(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	srvURL, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+
+	// "localhost" passes the name-level precheck (the deny list holds only
+	// CIDRs, and the precheck does not resolve), so the denial can only
+	// come from the Control hook seeing the resolved loopback address at
+	// connect time. This is the DNS-rebinding defense.
+	client := newClient(t, httputil.ClientConfig{DenyList: []string{"127.0.0.0/8", "::1/128"}})
+	_, err = client.Get("http://localhost:" + srvURL.Port() + "/")
 	var denied *httputil.AddressDeniedError
 	require.ErrorAs(t, err, &denied)
 }
