@@ -105,14 +105,16 @@ img[data-zl-asset-broken] {
    `line-height: 1` on the title is the design's, not an oversight: the header
    is a single line whose 6px gap to the description does the separating, so
    leading above the cap height only pads the top of the card. */
-/* Brand mark above the card, from `branding.logo_url`. Bounded the way the
+/* Brand mark above the card, from the resolved side's logo. `--zl-logo-scale`
+   is the tenant's `shape.logo_scale`; it multiplies whatever cap is in force so
+   a host override of the cap keeps working underneath it. Bounded the way the
    split pane's mark is (`img.zl-split__compact`): a tenant asset carries no
    intrinsic size the layout can trust, and an SVG with only a viewBox stretches
    to fill whatever box it lands in — which here is the full page width. */
 .zl-card-logo {
   width: auto;
   max-width: min(12rem, 60%);
-  max-height: var(--zl-card-logo-max-height, 2.5rem);
+  max-height: calc(var(--zl-card-logo-max-height, 2.5rem) * var(--zl-logo-scale, 1));
   object-fit: contain;
 }
 .zl-card-title {
@@ -281,7 +283,7 @@ img[data-zl-asset-broken] {
    template root for a taller lockup. */
 .zl-split__logo {
   max-width: min(16rem, 60%);
-  max-height: var(--zl-split-logo-max-height, 16rem);
+  max-height: calc(var(--zl-split-logo-max-height, 16rem) * var(--zl-logo-scale, 1));
 }
 /* A tenant who sets both assets stacks them in this one pane, so the two solo
    caps stop being independent — and the pane's own gap and padding are only
@@ -298,7 +300,7 @@ img[data-zl-asset-broken] {
    hero, sets the page height. A visible-but-small hero is the honest
    degradation. */
 .zl-split__logo:has(+ .zl-split__hero) {
-  max-height: var(--zl-split-logo-max-height, 8rem);
+  max-height: calc(var(--zl-split-logo-max-height, 8rem) * var(--zl-logo-scale, 1));
 }
 .zl-split__logo:has(+ .zl-split__hero) + .zl-split__hero {
   max-height: min(

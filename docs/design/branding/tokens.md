@@ -191,17 +191,16 @@ Asset URLs live on branding; the host loads them (img, link, background). They a
 
 | Source                               | Applied as                                                                         |
 | ------------------------------------ | ---------------------------------------------------------------------------------- |
-| `logo_url` (baseline)                | `<img>` in the default template; `<zl-logo>` atom reads the attribute if bundled   |
+| `logo_url` (baseline)                | Single-mark fallback, used only when neither side names one                        |
 | `hero_url` (baseline)                | `background-image` on `:host` when the `split` layout is active                    |
 | design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
 | `font_url` (baseline)                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font |
-| `assets.logo_dark` (proposed)        | Swapped by `data-theme="dark"`                                                     |
-| `assets.favicon` (proposed)          | Written to `<link rel="icon">` by the widget on mount                              |
-| `assets.background_image` (proposed) | Additional background slot not covered by `hero_url`                               |
+| `theme.light.logo_url` / `theme.dark.logo_url` | The mark for that side. The orchestrator resolves one from the active theme and hands it to the template as `logo_url`; a side without a mark shows none, because a logo is pixels and is never recoloured |
+| `shape.logo_scale`                   | `--zl-logo-scale`, a multiplier on the logo height caps                            |
 
 ## Dark-mode pairing
 
-Dark mode swaps token values on the root when `data-theme="dark"`. Names stay fixed:
+Light and dark are independent sides of the revision, not a base plus overrides: each carries its own palette, and a key one side omits takes the maintained default for that side rather than the other side's value. Dark mode swaps token values on the root when `data-theme="dark"`. Names stay fixed:
 
 ```css
 :host {
@@ -221,11 +220,15 @@ Atoms stay theme-blind.
 If the structured branding extension in [`schema.md`](schema.md) is adopted, it exposes high-level knobs (`shape.radius: "md"`, `shape.density: "regular"`) that the master template expands to specific token values. Atoms only see the expanded tokens. This keeps the public shape compact while preserving token stability:
 
 ```
-branding.shape.radius: "lg"
-  → --zl-radius-md: 0.75rem
-    --zl-radius-lg: 0.9375rem
-    --zl-radius-xl: 1.3125rem
+branding.shape.radius: "lg"          branding.shape.radius: 10
+  → --zl-radius-xs: 0.1875rem          → --zl-radius-xs: 2.5px
+    --zl-radius-sm: 0.5625rem            --zl-radius-sm: 7.5px
+    --zl-radius-md: 0.75rem              --zl-radius-md: 10px
+    --zl-radius-lg: 0.9375rem            --zl-radius-lg: 12.5px
+    --zl-radius-xl: 1.3125rem            --zl-radius-xl: 17.5px
 ```
+
+One value scales the whole ramp in proportion, so the card stays rounder than the controls inside it. A brand that has a specific corner value sends an integer number of pixels instead of a preset name.
 
 Preset-to-token tables ship in the component package, not in tenant JSON, so `lg` means the same everywhere.
 

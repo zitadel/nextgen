@@ -27,6 +27,7 @@ import {
 } from "./api-client.js";
 import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
+import { resolveLogoUrl } from "./branding.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
@@ -467,6 +468,20 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
+   * The branding a template renders against, with `logo_url` already resolved
+   * to the mark for the active side. Templates read one logo field and get the
+   * right file per surface; the per-side URLs stay on `theme` for a template
+   * that wants to reach them itself.
+   */
+  private brandingForTemplate(): Branding | Record<string, never> {
+    if (!this.branding) {
+      return {};
+    }
+    const logoUrl = resolveLogoUrl(this.branding, this.themeController.theme);
+    return { ...this.branding, logo_url: logoUrl };
+  }
+
+  /**
    * "Secured with Zitadel" attribution chrome injected into every
    * template's page-shell footer slot. Controlled by
    * `branding.attribution.show_zitadel` — defaults to `true` for
@@ -718,7 +733,7 @@ export class ZitadelLogin extends ZitadelSurface {
       messages: [],
       identity: this.deriveIdentity(),
       errors,
-      branding: this.branding ?? {},
+      branding: this.brandingForTemplate(),
       loading: this.loading,
     };
 
