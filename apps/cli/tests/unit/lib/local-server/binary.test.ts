@@ -45,7 +45,7 @@ describe("local server binary helpers", () => {
     expect(runtime.command).toBe("/tmp/fake-nextgen-server --migrate");
     expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
     expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
-    expect(runtime.env).toEqual({ injected: [], missing: [] });
+    expect(runtime.env).toEqual({ injected: [] });
   });
 
   it("passes resolved project variables through the child environment, never argv", async () => {
@@ -61,7 +61,6 @@ describe("local server binary helpers", () => {
       env: {
         values: { GOOGLE_CLIENT_SECRET: "canary-secret" },
         injected: ["GOOGLE_CLIENT_SECRET"],
-        missing: ["GITHUB_CLIENT_SECRET"],
       },
     });
 
@@ -75,7 +74,6 @@ describe("local server binary helpers", () => {
     expect(runtime.command).not.toContain("canary-secret");
     expect(runtime.env).toEqual({
       injected: ["GOOGLE_CLIENT_SECRET"],
-      missing: ["GITHUB_CLIENT_SECRET"],
     });
     expect(JSON.stringify(runtime)).not.toContain("canary-secret");
   });

@@ -27,7 +27,7 @@ import {
   toBrandingWireBody,
   toLocalBrandingBody,
 } from "../branding";
-import { FLOWS_DIR, envRefs } from "../flows";
+import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { ResourceSyncer } from "./types.js";
@@ -67,7 +67,7 @@ export function makeSyncers(opts: {
  * schemas and flows, and runs in the sync engine before any platform call.
  */
 function assertEnvRefs(data: object, env: EnvLookup): void {
-  const missing = envRefs(data).filter((name) => !env[name]);
+  const missing = flowEnvRefs(data).filter((name) => !env[name]);
   if (missing.length > 0) {
     throw new ZitadelError("E_VALIDATION", `Missing environment variables: ${missing.join(", ")}`);
   }

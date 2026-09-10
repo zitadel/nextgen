@@ -129,7 +129,6 @@ describe("local server Docker helpers", () => {
       env: {
         values: { GOOGLE_CLIENT_SECRET: "canary-secret" },
         injected: ["GOOGLE_CLIENT_SECRET"],
-        missing: [],
       },
     });
 
@@ -155,7 +154,7 @@ describe("local server Docker helpers", () => {
       serverUrl: "http://localhost:8090",
       env,
     });
-    expect(metadata.env).toEqual({ injected: ["GOOGLE_CLIENT_SECRET"], missing: [] });
+    expect(metadata.env).toEqual({ injected: ["GOOGLE_CLIENT_SECRET"] });
     expect(JSON.stringify(metadata)).not.toContain("canary-secret");
   });
 });

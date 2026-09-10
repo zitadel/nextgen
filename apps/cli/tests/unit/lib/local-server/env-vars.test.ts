@@ -6,11 +6,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_ENV,
-  envWarnings,
   isEnvSummary,
   loadEnvFiles,
   loadProjectEnv,
-  resolveEnvNames,
 } from "../../../../src/lib/local-server/env-vars";
 
 async function projectWith(files: Record<string, string>): Promise<string> {
@@ -21,9 +19,9 @@ async function projectWith(files: Record<string, string>): Promise<string> {
   return cwd;
 }
 
-describe("dev-runtime env resolution", () => {
-  it("parses KEY=value lines, comments, and quoted values", async () => {
-    const cwd = await projectWith({ ".env": "# comment\nA=1\nB=\"two words\"\nC='single'\n" });
+describe("dev-runtime env", () => {
+  it("parses KEY=value lines, comments, quoted values, and a leading BOM", async () => {
+    const cwd = await projectWith({ ".env": "\uFEFF# comment\nA=1\nB=\"two words\"\nC='single'\n" });
     await expect(loadEnvFiles(cwd)).resolves.toEqual({ A: "1", B: "two words", C: "single" });
   });
 
@@ -41,85 +39,34 @@ describe("dev-runtime env resolution", () => {
     await expect(loadEnvFiles(await projectWith({}))).resolves.toEqual({});
   });
 
-  it("resolves declared names in source order and reports the rest as missing", () => {
-    const resolved = resolveEnvNames(
-      ["FROM_FILE", "FROM_SHELL", "ABSENT", "FROM_FILE"],
-      [{ FROM_FILE: "f" }, { FROM_FILE: "shadowed", FROM_SHELL: "s" }],
-    );
+  it("forwards only ZITADEL_* names, sorted, and never the rest of the files", async () => {
+    const cwd = await projectWith({
+      ".env.local": "ZITADEL_GOOGLE_SECRET=canary\nDATABASE_URL=postgres://nope\nzitadel_lower=no\n",
+      ".env": "ZITADEL_API_KEY=key\nZITADEL_GOOGLE_SECRET=loses\n",
+    });
 
-    expect(resolved.values).toEqual({ FROM_FILE: "f", FROM_SHELL: "s" });
-    expect(resolved.injected).toEqual(["FROM_FILE", "FROM_SHELL"]);
-    expect(resolved.missing).toEqual(["ABSENT"]);
+    await expect(loadProjectEnv(cwd)).resolves.toEqual({
+      values: { ZITADEL_API_KEY: "key", ZITADEL_GOOGLE_SECRET: "canary" },
+      injected: ["ZITADEL_API_KEY", "ZITADEL_GOOGLE_SECRET"],
+    });
   });
 
-  it("treats an empty value as unset, like plan does", () => {
-    const resolved = resolveEnvNames(
-      ["EMPTY", "SHADOWED"],
-      [{ EMPTY: "", SHADOWED: "" }, { SHADOWED: "s" }],
-    );
-    expect(resolved.values).toEqual({ SHADOWED: "s" });
-    expect(resolved.missing).toEqual(["EMPTY"]);
+  it("treats an empty value as unset", async () => {
+    const cwd = await projectWith({ ".env.local": "ZITADEL_EMPTY=\nZITADEL_SET=x\n" });
+    await expect(loadProjectEnv(cwd)).resolves.toEqual({
+      values: { ZITADEL_SET: "x" },
+      injected: ["ZITADEL_SET"],
+    });
   });
 
-  it("ignores prototype-chain names and never injects them", () => {
-    const resolved = resolveEnvNames(
-      ["constructor", "__proto__", "toString", "REAL"],
-      [{ REAL: "r" }],
-    );
-    expect(resolved.values).toEqual({ REAL: "r" });
-    expect(resolved.injected).toEqual(["REAL"]);
-    expect(resolved.missing).toEqual(["constructor", "__proto__", "toString"]);
-  });
-
-  it("drops reserved names, in any case, instead of letting a project file set them", () => {
-    const resolved = resolveEnvNames(
-      [
-        "PATH",
-        "Path",
-        "NODE_OPTIONS",
-        "node_options",
-        "LD_PRELOAD",
-        "DYLD_INSERT_LIBRARIES",
-        "NEXTGEN_SERVER_DATA_DIR",
-        "OK",
-      ],
-      [{ PATH: "/evil", Path: "/evil", NODE_OPTIONS: "--require evil.js", OK: "fine" }],
-    );
-    expect(resolved).toEqual({ values: { OK: "fine" }, injected: ["OK"], missing: [] });
+  it("yields the empty result for a project with no env files", async () => {
+    await expect(loadProjectEnv(await projectWith({}))).resolves.toEqual(EMPTY_ENV);
   });
 
   it("recognises a well-formed env block from runtime.json and rejects the rest", () => {
-    expect(isEnvSummary({ injected: ["A"], missing: [] })).toBe(true);
-    expect(isEnvSummary({ injected: [] })).toBe(false);
-    expect(isEnvSummary({ injected: ["A", 1], missing: [] })).toBe(false);
+    expect(isEnvSummary({ injected: ["A"] })).toBe(true);
+    expect(isEnvSummary({ injected: ["A", 1] })).toBe(false);
+    expect(isEnvSummary({})).toBe(false);
     expect(isEnvSummary(null)).toBe(false);
-  });
-
-  it("only forwards declared names, never the rest of the env files", async () => {
-    const cwd = await projectWith({
-      ".env.local": "GOOGLE_CLIENT_SECRET=canary-secret\nDATABASE_URL=postgres://nope\n",
-    });
-
-    const resolved = await loadProjectEnv(cwd, ["GOOGLE_CLIENT_SECRET"], {});
-
-    expect(resolved.values).toEqual({ GOOGLE_CLIENT_SECRET: "canary-secret" });
-    expect(Object.keys(resolved.values)).not.toContain("DATABASE_URL");
-    expect(resolved.injected).toEqual(["GOOGLE_CLIENT_SECRET"]);
-    expect(resolved.missing).toEqual([]);
-  });
-
-  it("returns the empty result without touching disk when nothing is declared", async () => {
-    const resolved = await loadProjectEnv("/definitely/not/a/dir", []);
-    expect(resolved).toBe(EMPTY_ENV);
-  });
-
-  it("emits one warning per missing name, names only", () => {
-    expect(envWarnings(EMPTY_ENV)).toEqual([]);
-    expect(envWarnings({ injected: [], missing: ["A", "B"] })).toEqual([
-      expect.stringMatching(
-        /^A is referenced .* \.env\.local, \.env .* `zitadel stop` and `zitadel start`\.$/,
-      ),
-      expect.stringMatching(/^B is referenced/),
-    ]);
   });
 });
