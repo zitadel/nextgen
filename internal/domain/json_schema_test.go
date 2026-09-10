@@ -635,6 +635,34 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
 	})
 
+	t.Run("oversized body behind a redirect names the final hop", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		mux.HandleFunc("/start.json", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.URL+"/big.json", http.StatusFound)
+		})
+		mux.HandleFunc("/big.json", func(w http.ResponseWriter, r *http.Request) {
+			// Chunked (no Content-Length), so the overrun surfaces mid-read,
+			// after redirects, where no *url.Error wraps it by default.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.(http.Flusher).Flush()
+			_, _ = w.Write([]byte(`{"padding":"` + strings.Repeat("x", 256) + `"}`))
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxBodySize: 64, MaxRedirects: 5})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL+"/start.json", nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooLarge())
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t, domain.SchemaFetchDetails{URL: srv.URL + "/big.json"}, de.Details,
+			"details must name the hop the oversized body came from, not the requested URL")
+	})
+
 	t.Run("redirect loop yields fetch_too_many_redirects", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mux := http.NewServeMux()
