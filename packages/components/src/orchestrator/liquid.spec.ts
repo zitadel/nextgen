@@ -435,7 +435,7 @@ describe("LiquidJS engine", () => {
   // A template-capability test, not the default flow: the default flow splits
   // email and credential across two steps. The template must still render
   // whatever field set a tenant's flow definition declares on one step,
-  // including an email+password pair (Figma `6593:141983`).
+  // including an email+password pair.
   it("renders an email+password step on one card: autocomplete, forgot link, sign-in CTA", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
@@ -500,7 +500,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain('hierarchy="secondary"');
   });
 
-  it("renders sign-in wrong credentials (6602:180268): inline password error, no form alert", () => {
+  it("renders sign-in wrong credentials: inline password error, no form alert", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
@@ -529,7 +529,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("<zl-alert data-zl-step-error");
   });
 
-  it("renders sign-in server error (6594:125237): heading + body alert, fields unchanged", () => {
+  it("renders sign-in server error: heading + body alert, fields unchanged", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
@@ -559,7 +559,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("Wrong email or password.");
   });
 
-  it("renders sign-up field annotations (6593:141741): autocomplete, help, inline email error", () => {
+  it("renders sign-up field annotations: autocomplete, help, inline email error", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: { type: "email", text_key: "register.field.email", required: true },

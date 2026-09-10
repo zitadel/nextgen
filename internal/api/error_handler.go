@@ -119,6 +119,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return brandingErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEnvironment.ErrorCodePrefix("")):
 		return environmentErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
+		return releaseErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEvent.ErrorCodePrefix("")):
 		return eventErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
