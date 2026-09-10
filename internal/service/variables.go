@@ -128,8 +128,10 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 		}
 	}
 
-	// no need to start a transaction if there is only one variable
-	if len(varsToWrite) == 1 {
+	// no need to start a transaction if there is only one variable -- but a
+	// removal in the same batch is a second statement, and this path returns
+	// before the loop below would run it.
+	if len(varsToWrite) == 1 && len(varsToDelete) == 0 {
 		err = s.v2Pool.Statements().SetVariable(ctx, varsToWrite[0])
 		if err != nil {
 			return setVariableError(err)
@@ -139,7 +141,14 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		for _, name := range varsToDelete {
-			if err := tx.Statements().DeleteVariable(ctx, owner, name); err != nil {
+			err := tx.Statements().DeleteVariable(ctx, owner, name)
+			// Not DeleteVariable's "not found": a body states what the owner
+			// holds afterwards, and a name it never held already satisfies
+			// that. It is also what makes the request safe to retry.
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				continue
+			}
+			if err != nil {
 				return err
 			}
 		}
