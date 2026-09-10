@@ -1,0 +1,17 @@
+type: object
+description: |
+  One complete theme side. Light and dark are independent surfaces — neither
+  inherits from the other, and a side that is absent is never used, whatever
+  `mode` or the operating system asks for.
+properties:
+  logo_url:
+    type: string
+    format: uri
+    maxLength: 2048
+    description: |
+      The mark for this surface. A logo is never recoloured, so each side
+      carries its own file. Absent means no mark on this side, unless the
+      top-level `logo_url` is the only one set.
+    example: https://cdn.example.com/logo-on-light.svg
+  palette:
+    $ref: branding-palette.yaml

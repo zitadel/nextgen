@@ -35,6 +35,8 @@ import type { NavGroup } from "../../nav";
 import { type ThemePreference, useTheme } from "../../theme";
 import { ContextSwitcher } from "./ContextSwitcher";
 import { ZitadelLogo } from "./icons";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { useNavItems } from "./use-nav-items";
 
 /**
@@ -411,10 +413,13 @@ function ContextBar() {
   );
 }
 
-const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
+// `hint` is what the icon cannot say on its own — a monitor glyph reads as
+// "display", not "follow the operating system". The label stays the short
+// name so the radio's accessible name is not a sentence.
+const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", hint: "Light theme", icon: Sun },
+  { value: "dark", label: "Dark", hint: "Dark theme", icon: Moon },
+  { value: "system", label: "System", hint: "Match system theme", icon: Monitor },
 ];
 
 function ThemeToggle() {
@@ -459,28 +464,33 @@ function ThemeToggle() {
       aria-label="Theme"
       className="hidden shrink-0 items-center gap-0.5 rounded-md border border-border p-0.5 sm:inline-flex"
     >
-      {THEME_OPTIONS.map(({ value, label, icon: Icon }, index) => {
+      {THEME_OPTIONS.map(({ value, label, hint, icon: Icon }, index) => {
         const active = preference === value;
         return (
-          <button
-            key={value}
-            ref={(node) => {
-              optionRefs.current[index] = node;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={label}
-            title={label}
-            tabIndex={active ? 0 : -1}
-            onClick={() => setPreference(value)}
-            onKeyDown={(event) => onOptionKeyDown(event, index)}
-            className={`inline-flex size-7 items-center justify-center rounded-sm ${
-              active ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Icon size={15} aria-hidden />
-          </button>
+          <Tooltip key={value}>
+            <TooltipTrigger asChild>
+              <button
+                ref={(node) => {
+                  optionRefs.current[index] = node;
+                }}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                aria-label={label}
+                tabIndex={active ? 0 : -1}
+                onClick={() => setPreference(value)}
+                onKeyDown={(event) => onOptionKeyDown(event, index)}
+                className={`inline-flex size-7 items-center justify-center rounded-sm ${
+                  active
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon size={15} aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{hint}</TooltipContent>
+          </Tooltip>
         );
       })}
     </div>
