@@ -175,10 +175,16 @@ func TestNewClient_HTTPSDowngrade(t *testing.T) {
 }
 
 func TestNewClient_RedirectHeaderIsolation(t *testing.T) {
-	type seen struct{ auth, cookie, referer string }
+	type seen struct{ auth, cookie, referer, apiKey, accept string }
 	record := func(dst *seen) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			*dst = seen{r.Header.Get("Authorization"), r.Header.Get("Cookie"), r.Header.Get("Referer")}
+			*dst = seen{
+				auth:    r.Header.Get("Authorization"),
+				cookie:  r.Header.Get("Cookie"),
+				referer: r.Header.Get("Referer"),
+				apiKey:  r.Header.Get("X-API-Key"),
+				accept:  r.Header.Get("Accept"),
+			}
 			w.WriteHeader(http.StatusOK)
 		}
 	}
@@ -198,6 +204,8 @@ func TestNewClient_RedirectHeaderIsolation(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer token")
 		req.Header.Set("Cookie", "session=abc")
+		req.Header.Set("X-API-Key", "feature-credential")
+		req.Header.Set("Accept", "application/json")
 
 		resp, err := newClient(t, httputil.ClientConfig{MaxRedirects: 5}).Do(req)
 		require.NoError(t, err)
@@ -206,6 +214,26 @@ func TestNewClient_RedirectHeaderIsolation(t *testing.T) {
 		require.Empty(t, got.auth, "Authorization must not cross origins")
 		require.Empty(t, got.cookie, "Cookie must not cross origins")
 		require.Empty(t, got.referer, "Referer (carrying the previous URL's query) must not cross origins")
+		require.Empty(t, got.apiKey, "custom credential headers must not cross origins either")
+		require.Equal(t, "application/json", got.accept, "content negotiation survives the hop")
+	})
+
+	t.Run("a cross-origin redirect never replays a request body", func(t *testing.T) {
+		target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer target.Close()
+		src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// 307 preserves method and body on the next hop.
+			http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+		}))
+		defer src.Close()
+
+		req, err := http.NewRequest(http.MethodPost, src.URL, strings.NewReader(`{"secret":"payload"}`))
+		require.NoError(t, err)
+
+		_, err = newClient(t, httputil.ClientConfig{MaxRedirects: 5}).Do(req)
+		require.ErrorIs(t, err, httputil.ErrCrossOriginRedirectWithBody)
 	})
 
 	t.Run("credentials stay stripped on a same-origin hop after a cross-origin one", func(t *testing.T) {

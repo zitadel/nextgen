@@ -49,7 +49,16 @@ var (
 	ErrTooManyRedirects = errors.New("stopped after too many redirects")
 	// ErrHTTPSDowngrade is returned when a redirect attempts to downgrade from https to http.
 	ErrHTTPSDowngrade = errors.New("redirect downgrade from https to http is not allowed")
+	// ErrCrossOriginRedirectWithBody is returned when following a redirect
+	// would replay the request body on another origin (307/308).
+	ErrCrossOriginRedirectWithBody = errors.New("refusing to replay a request body across origins on redirect")
 )
+
+// crossOriginSafeHeaders are the only request headers that survive a
+// redirect to another origin: content-negotiation basics that cannot carry
+// credentials. An allowlist, because a denylist of sensitive names widens
+// silently (X-API-Key and friends).
+var crossOriginSafeHeaders = []string{"Accept", "Accept-Encoding", "Accept-Language", "User-Agent"}
 
 // ClientConfig builds a hardened egress client. The zero value enforces
 // nothing; defaults are the config loader's job.
@@ -125,18 +134,25 @@ func (c ClientConfig) NewClient() (*http.Client, error) {
 					}
 				}
 				// Nothing sensitive crosses origins on a redirect (ADR 061
-				// decision 9). Go itself forwards Authorization to the same
-				// host or a subdomain and synthesizes a Referer carrying the
-				// previous URL's query; both are re-prepared on req from the
-				// ORIGINAL request before this hook runs on every hop, so
-				// the comparison must be against the original origin
-				// (via[0]) — comparing hops pairwise would let an A->B->B
-				// chain restore credentials on the B->B hop.
+				// decision 9). Go re-prepares every hop's headers from the
+				// ORIGINAL request (so the comparison must be against
+				// via[0]: pairwise comparison would let an A->B->B chain
+				// restore credentials on the B->B hop) and forwards any
+				// caller-supplied header, so only the allowlist survives an
+				// origin change. A 307/308 would also replay the request
+				// body on the foreign origin — refuse that outright.
 				first := via[0]
 				if first != nil && first.URL != nil && req.URL != nil && !sameOrigin(first.URL, req.URL) {
-					req.Header.Del("Authorization")
-					req.Header.Del("Cookie")
-					req.Header.Del("Referer")
+					if req.GetBody != nil || req.ContentLength != 0 {
+						return ErrCrossOriginRedirectWithBody
+					}
+					kept := http.Header{}
+					for _, k := range crossOriginSafeHeaders {
+						if v, ok := req.Header[k]; ok {
+							kept[k] = v
+						}
+					}
+					req.Header = kept
 				}
 			}
 			return nil
