@@ -73,14 +73,17 @@ export class ZitadelSurface extends LitElement {
     if (root) {
       applyBaseTokens(root);
       applyBrandingTokens(root, branding, this.themeController.theme);
-      // Ship the design-system brand face by default on dedicated pages;
-      // drop it when a tenant font takes over so we don't fire a redundant
-      // request. Widget mode never injects the default into the host
-      // document — the embedding app owns its typography (and its visitors'
-      // font-CDN connections). Tenant `font_url` is explicit server-side
-      // branding state, so it applies in both modes.
-      const tenantFontUrl = branding?.font_url ?? null;
-      applyDefaultFont(root, this.variant === "page" && !tenantFontUrl ? undefined : null);
+      // Fonts load as a document-level `<link>`, because `@font-face` inside a
+      // shadow tree never registers. That makes injection a page-wide grant,
+      // so neither face goes into a document we do not own: on a dedicated
+      // page we ship the design-system face and hand over to the tenant's
+      // when there is one, and in widget mode we inject neither. An embedded
+      // widget applies `typography.font_family` and relies on the embedding
+      // app — which owns its typography, its CSP and its visitors' font-CDN
+      // connections — to have loaded the face.
+      const page = this.variant === "page";
+      const tenantFontUrl = page ? (branding?.typography?.font_url ?? null) : null;
+      applyDefaultFont(root, page && !tenantFontUrl ? undefined : null);
       applyFontUrl(root, tenantFontUrl);
     }
     this.dataset.theme = this.themeController.theme;

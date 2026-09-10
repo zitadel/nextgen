@@ -58,15 +58,15 @@ const TITLE = "font-serif text-xl leading-none font-normal";
 const BODY = "flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6";
 const SECTION = "flex flex-col gap-4";
 const LABEL = "font-serif text-sm leading-5 font-normal text-foreground";
-// The design wraps the label in a row so a marker can sit beside it
-// (`27843:12281`), rather than appending to the label text itself.
+// The design wraps the label in a row so a marker can sit beside it, rather
+// than appending to the label text itself.
 const LABEL_ROW = "flex w-full items-center gap-2";
 // The footer sits on the page background rather than a raised surface so
-// scrolling body content passes under it (Figma annotation on `727:63415`).
+// scrolling body content passes under it.
 const FOOTER = "flex-row items-center justify-end gap-3 bg-background px-6 py-4";
 
 /**
- * The Add user drawer (Figma `641:13005` — "User creation: drawer").
+ * The Add user drawer.
  *
  * The form is **schema-driven**: `POST /users` takes an `attributes` object
  * validated against the user schema named in `schema`, so the controls below are

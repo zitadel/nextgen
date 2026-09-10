@@ -27,7 +27,7 @@ function SchemaDetail() {
   return (
     <div className="px-4 pt-9 pb-8 sm:px-8">
       <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
-        {/* The `Title` lockup (`1389:190643`): icon tile + eyebrow + title.
+        {/* The `Title` lockup: icon tile + eyebrow + title.
             The schema's id is not repeated here — the list row carries it, and
             the design's lockup has only the two lines. */}
         <div className="flex items-center gap-3">
