@@ -22,6 +22,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "sharp": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "verdaccio": "6.7.4",
     "vite": "catalog:",
