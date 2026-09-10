@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -695,6 +696,24 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 
 		_, err = resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
 		require.ErrorIs(t, err, context.DeadlineExceeded, "the expired result must not have been cached")
+	})
+
+	t.Run("a nested lookup's deadline error survives the ref loader", func(t *testing.T) {
+		// The jsonschema library flattens loader errors; a store lookup that
+		// observed the expired envelope must still surface as a deadline
+		// error (which the service classifies), not as a flattened string
+		// that becomes internal.
+		ctrl := gomock.NewController(t)
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, fmt.Errorf("query aborted: %w", context.DeadlineExceeded)).AnyTimes()
+
+		client := newEgressClient(t, httputil.ClientConfig{})
+		resolver := newTestResolver(t, client)
+		root := `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/leaf.json"}`
+
+		_, err := resolver.Resolve(ctx, store, projectID, "https://example.test/root.json", []byte(root))
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 
 	t.Run("resolve timeout bounds the whole ref chain, not each hop", func(t *testing.T) {

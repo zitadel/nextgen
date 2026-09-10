@@ -23,8 +23,11 @@ func newTransport(policy *Policy) http.RoundTripper {
 	if !policy.Enforces() {
 		return base
 	}
+	// Mirror http.DefaultTransport's dialer settings: enabling the policy
+	// must change only the address check, never connection timing. The
+	// per-request bound stays http.Client.Timeout.
 	dialer := &net.Dialer{
-		Timeout:   5 * time.Second,
+		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 		Control: func(network, address string, _ syscall.RawConn) error {
 			return checkDialAddress(policy, address)
