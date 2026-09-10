@@ -125,7 +125,7 @@
         "jwks_uri": {
           "type": "string",
           "format": "uri",
-          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?#]\\S*)?$",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides the JWKS endpoint from discovery. Required in practice when the provider exposes no .well-known document, since ID tokens cannot otherwise be validated."
         },
         "id_token_mapping": {
@@ -136,19 +136,19 @@
         "authorization_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?#]\\S*)?$",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides discovery."
         },
         "token_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?#]\\S*)?$",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides discovery."
         },
         "userinfo_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?#]\\S*)?$",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides discovery."
         },
         "client_id": {
@@ -238,19 +238,19 @@
         "authorization_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?#]\\S*)?$",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Where the user is sent to authorize."
         },
         "token_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?#]\\S*)?$",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Where the authorization code is exchanged."
         },
         "userinfo_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?#]\\S*)?$",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Where the authenticated user's profile is fetched."
         },
         "client_id": {

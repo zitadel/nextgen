@@ -124,6 +124,7 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["issuer with a query rejected (OIDC Discovery)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://login.example/tenant?x=1" } }, false],
   ["issuer with port and path", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://login.example:8443/tenant" } }, true],
   ["authorization_endpoint with a query", { ...root, protocol: "oidc", oidc: { ...oidcBlock, authorization_endpoint: "https://login.example/authorize?prompt=select_account" } }, true],
+  ["authorization_endpoint with a fragment rejected (RFC 6749)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, authorization_endpoint: "https://login.example/authorize#x" } }, false],
   ["http token_endpoint rejected", { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: "http://t.example" } }, false],
   // scopes
   ["oidc scopes absent", { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: undefined } }, false],
