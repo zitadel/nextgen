@@ -30,7 +30,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // The top-level surfaces with a design hand-off, in the order the design puts
 // them. `User schemas` nests beneath `Users` (`Schema directory` frame) rather
 // than adding a second top-level row.
-const NAV_ORDER = ["Projects", "Teams", "Users"];
+const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
