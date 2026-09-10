@@ -54,8 +54,11 @@ func NewHostChecker(entry string) (*HostChecker, error) {
 	// a scheme, port, userinfo, path, whitespace, or control characters. An
 	// entry with any of those (e.g. "localhost:8080") would be a deny rule
 	// that silently never fires, so it is a configuration error instead.
+	// "*" also fails here: wildcard matching is unsupported, and accepting
+	// "*.internal.example" as a literal name would be a rule that never
+	// matches any subdomain.
 	badRune := func(r rune) bool { return r <= ' ' || r == 0x7f }
-	if strings.ContainsFunc(entry, badRune) || strings.ContainsAny(entry, ":@?#") {
+	if strings.ContainsFunc(entry, badRune) || strings.ContainsAny(entry, ":@?#*") {
 		return nil, fmt.Errorf("invalid hostname entry %q: use a bare hostname, IP, or CIDR", entry)
 	}
 	return &HostChecker{Domain: entry}, nil

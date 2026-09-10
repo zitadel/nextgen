@@ -174,6 +174,62 @@ func TestNewClient_HTTPSDowngrade(t *testing.T) {
 	})
 }
 
+func TestNewClient_RedirectHeaderIsolation(t *testing.T) {
+	type seen struct{ auth, cookie, referer string }
+	record := func(dst *seen) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			*dst = seen{r.Header.Get("Authorization"), r.Header.Get("Cookie"), r.Header.Get("Referer")}
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+
+	t.Run("a cross-origin hop carries nothing sensitive", func(t *testing.T) {
+		var got seen
+		target := httptest.NewServer(record(&got))
+		defer target.Close()
+		// A second server is a different port, so a different origin; Go on
+		// its own would forward Authorization to the same host.
+		src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, target.URL, http.StatusFound)
+		}))
+		defer src.Close()
+
+		req, err := http.NewRequest(http.MethodGet, src.URL+"/start?secret=1", nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer token")
+		req.Header.Set("Cookie", "session=abc")
+
+		resp, err := newClient(t, httputil.ClientConfig{MaxRedirects: 5}).Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+
+		require.Empty(t, got.auth, "Authorization must not cross origins")
+		require.Empty(t, got.cookie, "Cookie must not cross origins")
+		require.Empty(t, got.referer, "Referer (carrying the previous URL's query) must not cross origins")
+	})
+
+	t.Run("a same-origin hop keeps the caller's credentials", func(t *testing.T) {
+		var got seen
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.URL+"/target", http.StatusFound)
+		})
+		mux.HandleFunc("/target", record(&got))
+
+		req, err := http.NewRequest(http.MethodGet, srv.URL+"/start", nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer token")
+
+		resp, err := newClient(t, httputil.ClientConfig{MaxRedirects: 5}).Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+
+		require.Equal(t, "Bearer token", got.auth, "same-origin redirects keep what the caller supplied")
+	})
+}
+
 func TestNewClient_MaxBodySize(t *testing.T) {
 	const limit = 10
 
