@@ -33069,6 +33069,52 @@ func (o OptPasskeyFactorPayloadAuthenticatorAttachment) Or(d PasskeyFactorPayloa
 	return d
 }
 
+// NewOptPatchUserRequestAttributes returns new OptPatchUserRequestAttributes with value set to v.
+func NewOptPatchUserRequestAttributes(v PatchUserRequestAttributes) OptPatchUserRequestAttributes {
+	return OptPatchUserRequestAttributes{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPatchUserRequestAttributes is optional PatchUserRequestAttributes.
+type OptPatchUserRequestAttributes struct {
+	Value PatchUserRequestAttributes
+	Set   bool
+}
+
+// IsSet returns true if OptPatchUserRequestAttributes was set.
+func (o OptPatchUserRequestAttributes) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPatchUserRequestAttributes) Reset() {
+	var v PatchUserRequestAttributes
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPatchUserRequestAttributes) SetTo(v PatchUserRequestAttributes) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPatchUserRequestAttributes) Get() (v PatchUserRequestAttributes, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPatchUserRequestAttributes) Or(d PatchUserRequestAttributes) PatchUserRequestAttributes {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -35415,6 +35461,52 @@ func (o OptUserAlreadyExistsDetails) Or(d UserAlreadyExistsDetails) UserAlreadyE
 	return d
 }
 
+// NewOptUserConflictDetails returns new OptUserConflictDetails with value set to v.
+func NewOptUserConflictDetails(v UserConflictDetails) OptUserConflictDetails {
+	return OptUserConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserConflictDetails is optional UserConflictDetails.
+type OptUserConflictDetails struct {
+	Value UserConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserConflictDetails was set.
+func (o OptUserConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserConflictDetails) Reset() {
+	var v UserConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserConflictDetails) SetTo(v UserConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserConflictDetails) Get() (v UserConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserConflictDetails) Or(d UserConflictDetails) UserConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserCreateFailedEventDelegationType returns new OptUserCreateFailedEventDelegationType with value set to v.
 func NewOptUserCreateFailedEventDelegationType(v UserCreateFailedEventDelegationType) OptUserCreateFailedEventDelegationType {
 	return OptUserCreateFailedEventDelegationType{
@@ -36234,6 +36326,318 @@ func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
 
+type PatchMyUserBadRequest ErrorDetails
+
+func (*PatchMyUserBadRequest) patchMyUserRes() {}
+
+type PatchMyUserConflict ErrorDetails
+
+func (*PatchMyUserConflict) patchMyUserRes() {}
+
+// PatchMyUserErrorResponse represents sum type.
+type PatchMyUserErrorResponse struct {
+	Type              PatchMyUserErrorResponseType // switch on this field
+	AuthUnauthorized  AuthUnauthorized
+	Internal          Internal
+	ReqInvalid        ReqInvalid
+	SessTokenInvalid  SessTokenInvalid
+	UserAlreadyExists UserAlreadyExists
+	UserConflict      UserConflict
+	UserInvalid       UserInvalid
+	UserNotFound      UserNotFound
+}
+
+// PatchMyUserErrorResponseType is oneOf type of PatchMyUserErrorResponse.
+type PatchMyUserErrorResponseType string
+
+// Possible values for PatchMyUserErrorResponseType.
+const (
+	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
+	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
+	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
+	SessTokenInvalidPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "sess.token_invalid"
+	UserAlreadyExistsPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.already_exists"
+	UserConflictPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.conflict"
+	UserInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "user.invalid"
+	UserNotFoundPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether PatchMyUserErrorResponse is AuthUnauthorized.
+func (s PatchMyUserErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedPatchMyUserErrorResponse
+}
+
+// IsInternal reports whether PatchMyUserErrorResponse is Internal.
+func (s PatchMyUserErrorResponse) IsInternal() bool {
+	return s.Type == InternalPatchMyUserErrorResponse
+}
+
+// IsReqInvalid reports whether PatchMyUserErrorResponse is ReqInvalid.
+func (s PatchMyUserErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidPatchMyUserErrorResponse
+}
+
+// IsSessTokenInvalid reports whether PatchMyUserErrorResponse is SessTokenInvalid.
+func (s PatchMyUserErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidPatchMyUserErrorResponse
+}
+
+// IsUserAlreadyExists reports whether PatchMyUserErrorResponse is UserAlreadyExists.
+func (s PatchMyUserErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsPatchMyUserErrorResponse
+}
+
+// IsUserConflict reports whether PatchMyUserErrorResponse is UserConflict.
+func (s PatchMyUserErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictPatchMyUserErrorResponse
+}
+
+// IsUserInvalid reports whether PatchMyUserErrorResponse is UserInvalid.
+func (s PatchMyUserErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidPatchMyUserErrorResponse
+}
+
+// IsUserNotFound reports whether PatchMyUserErrorResponse is UserNotFound.
+func (s PatchMyUserErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundPatchMyUserErrorResponse
+}
+
+// SetAuthUnauthorized sets PatchMyUserErrorResponse to AuthUnauthorized.
+func (s *PatchMyUserErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedPatchMyUserErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if PatchMyUserErrorResponse is AuthUnauthorized.
+func (s PatchMyUserErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedPatchMyUserErrorResponse(v AuthUnauthorized) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets PatchMyUserErrorResponse to Internal.
+func (s *PatchMyUserErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalPatchMyUserErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if PatchMyUserErrorResponse is Internal.
+func (s PatchMyUserErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from Internal.
+func NewInternalPatchMyUserErrorResponse(v Internal) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets PatchMyUserErrorResponse to ReqInvalid.
+func (s *PatchMyUserErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidPatchMyUserErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if PatchMyUserErrorResponse is ReqInvalid.
+func (s PatchMyUserErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from ReqInvalid.
+func NewReqInvalidPatchMyUserErrorResponse(v ReqInvalid) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessTokenInvalid sets PatchMyUserErrorResponse to SessTokenInvalid.
+func (s *PatchMyUserErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidPatchMyUserErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if PatchMyUserErrorResponse is SessTokenInvalid.
+func (s PatchMyUserErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidPatchMyUserErrorResponse(v SessTokenInvalid) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetSessTokenInvalid(v)
+	return s
+}
+
+// SetUserAlreadyExists sets PatchMyUserErrorResponse to UserAlreadyExists.
+func (s *PatchMyUserErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsPatchMyUserErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if PatchMyUserErrorResponse is UserAlreadyExists.
+func (s PatchMyUserErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsPatchMyUserErrorResponse(v UserAlreadyExists) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserConflict sets PatchMyUserErrorResponse to UserConflict.
+func (s *PatchMyUserErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictPatchMyUserErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if PatchMyUserErrorResponse is UserConflict.
+func (s PatchMyUserErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from UserConflict.
+func NewUserConflictPatchMyUserErrorResponse(v UserConflict) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetUserConflict(v)
+	return s
+}
+
+// SetUserInvalid sets PatchMyUserErrorResponse to UserInvalid.
+func (s *PatchMyUserErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidPatchMyUserErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if PatchMyUserErrorResponse is UserInvalid.
+func (s PatchMyUserErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from UserInvalid.
+func NewUserInvalidPatchMyUserErrorResponse(v UserInvalid) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets PatchMyUserErrorResponse to UserNotFound.
+func (s *PatchMyUserErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundPatchMyUserErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if PatchMyUserErrorResponse is UserNotFound.
+func (s PatchMyUserErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from UserNotFound.
+func NewUserNotFoundPatchMyUserErrorResponse(v UserNotFound) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// PatchMyUserErrorResponseStatusCode wraps PatchMyUserErrorResponse with StatusCode.
+type PatchMyUserErrorResponseStatusCode struct {
+	StatusCode int
+	Response   PatchMyUserErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PatchMyUserErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *PatchMyUserErrorResponseStatusCode) GetResponse() PatchMyUserErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PatchMyUserErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *PatchMyUserErrorResponseStatusCode) SetResponse(val PatchMyUserErrorResponse) {
+	s.Response = val
+}
+
+func (*PatchMyUserErrorResponseStatusCode) patchMyUserRes() {}
+
+// A partial update of the caller's own attributes, merged into the current
+// state: an omitted key stays untouched, an object merges recursively,
+// `null` deletes the attribute, and any other value replaces the stored one.
+// The merged result is validated as a whole against the user's schema.
+// Unlike `PATCH /users/{user_id}`, the schema pointer cannot be moved here:
+// schema upgrades are a management operation.
+// Ref: #
+type PatchMyUserRequest struct {
+	// The changed attributes only. `null` deletes an attribute; omitted
+	// keys are untouched.
+	Attributes PatchMyUserRequestAttributes `json:"attributes"`
+}
+
+// GetAttributes returns the value of Attributes.
+func (s *PatchMyUserRequest) GetAttributes() PatchMyUserRequestAttributes {
+	return s.Attributes
+}
+
+// SetAttributes sets the value of Attributes.
+func (s *PatchMyUserRequest) SetAttributes(val PatchMyUserRequestAttributes) {
+	s.Attributes = val
+}
+
+// The changed attributes only. `null` deletes an attribute; omitted
+// keys are untouched.
+type PatchMyUserRequestAttributes map[string]jx.Raw
+
+func (s *PatchMyUserRequestAttributes) init() PatchMyUserRequestAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type PatchMyUserUnauthorized ErrorDetails
+
+func (*PatchMyUserUnauthorized) patchMyUserRes() {}
+
 type PatchProjectBadRequest ErrorDetails
 
 func (*PatchProjectBadRequest) patchProjectRes() {}
@@ -36525,6 +36929,345 @@ func (s *PatchProjectRequest) SetName(val OptNilString) {
 type PatchProjectUnauthorized ErrorDetails
 
 func (*PatchProjectUnauthorized) patchProjectRes() {}
+
+type PatchUserByIDBadRequest ErrorDetails
+
+func (*PatchUserByIDBadRequest) patchUserByIDRes() {}
+
+type PatchUserByIDConflict ErrorDetails
+
+func (*PatchUserByIDConflict) patchUserByIDRes() {}
+
+// PatchUserByIDErrorResponse represents sum type.
+type PatchUserByIDErrorResponse struct {
+	Type                 PatchUserByIDErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserAlreadyExists    UserAlreadyExists
+	UserConflict         UserConflict
+	UserInvalid          UserInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// PatchUserByIDErrorResponseType is oneOf type of PatchUserByIDErrorResponse.
+type PatchUserByIDErrorResponseType string
+
+// Possible values for PatchUserByIDErrorResponseType.
+const (
+	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
+	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
+	ReqInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "req.invalid"
+	UserAlreadyExistsPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "user.already_exists"
+	UserConflictPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.conflict"
+	UserInvalidPatchUserByIDErrorResponse          PatchUserByIDErrorResponseType = "user.invalid"
+	UserNotFoundPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.not_found"
+	UserPermissionDeniedPatchUserByIDErrorResponse PatchUserByIDErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether PatchUserByIDErrorResponse is AuthUnauthorized.
+func (s PatchUserByIDErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedPatchUserByIDErrorResponse
+}
+
+// IsInternal reports whether PatchUserByIDErrorResponse is Internal.
+func (s PatchUserByIDErrorResponse) IsInternal() bool {
+	return s.Type == InternalPatchUserByIDErrorResponse
+}
+
+// IsReqInvalid reports whether PatchUserByIDErrorResponse is ReqInvalid.
+func (s PatchUserByIDErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidPatchUserByIDErrorResponse
+}
+
+// IsUserAlreadyExists reports whether PatchUserByIDErrorResponse is UserAlreadyExists.
+func (s PatchUserByIDErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsPatchUserByIDErrorResponse
+}
+
+// IsUserConflict reports whether PatchUserByIDErrorResponse is UserConflict.
+func (s PatchUserByIDErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictPatchUserByIDErrorResponse
+}
+
+// IsUserInvalid reports whether PatchUserByIDErrorResponse is UserInvalid.
+func (s PatchUserByIDErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidPatchUserByIDErrorResponse
+}
+
+// IsUserNotFound reports whether PatchUserByIDErrorResponse is UserNotFound.
+func (s PatchUserByIDErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundPatchUserByIDErrorResponse
+}
+
+// IsUserPermissionDenied reports whether PatchUserByIDErrorResponse is UserPermissionDenied.
+func (s PatchUserByIDErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedPatchUserByIDErrorResponse
+}
+
+// SetAuthUnauthorized sets PatchUserByIDErrorResponse to AuthUnauthorized.
+func (s *PatchUserByIDErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedPatchUserByIDErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if PatchUserByIDErrorResponse is AuthUnauthorized.
+func (s PatchUserByIDErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedPatchUserByIDErrorResponse(v AuthUnauthorized) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets PatchUserByIDErrorResponse to Internal.
+func (s *PatchUserByIDErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalPatchUserByIDErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if PatchUserByIDErrorResponse is Internal.
+func (s PatchUserByIDErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from Internal.
+func NewInternalPatchUserByIDErrorResponse(v Internal) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets PatchUserByIDErrorResponse to ReqInvalid.
+func (s *PatchUserByIDErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidPatchUserByIDErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if PatchUserByIDErrorResponse is ReqInvalid.
+func (s PatchUserByIDErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from ReqInvalid.
+func NewReqInvalidPatchUserByIDErrorResponse(v ReqInvalid) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserAlreadyExists sets PatchUserByIDErrorResponse to UserAlreadyExists.
+func (s *PatchUserByIDErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsPatchUserByIDErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if PatchUserByIDErrorResponse is UserAlreadyExists.
+func (s PatchUserByIDErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsPatchUserByIDErrorResponse(v UserAlreadyExists) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserConflict sets PatchUserByIDErrorResponse to UserConflict.
+func (s *PatchUserByIDErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictPatchUserByIDErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if PatchUserByIDErrorResponse is UserConflict.
+func (s PatchUserByIDErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserConflict.
+func NewUserConflictPatchUserByIDErrorResponse(v UserConflict) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetUserConflict(v)
+	return s
+}
+
+// SetUserInvalid sets PatchUserByIDErrorResponse to UserInvalid.
+func (s *PatchUserByIDErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidPatchUserByIDErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if PatchUserByIDErrorResponse is UserInvalid.
+func (s PatchUserByIDErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserInvalid.
+func NewUserInvalidPatchUserByIDErrorResponse(v UserInvalid) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets PatchUserByIDErrorResponse to UserNotFound.
+func (s *PatchUserByIDErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundPatchUserByIDErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if PatchUserByIDErrorResponse is UserNotFound.
+func (s PatchUserByIDErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserNotFound.
+func NewUserNotFoundPatchUserByIDErrorResponse(v UserNotFound) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets PatchUserByIDErrorResponse to UserPermissionDenied.
+func (s *PatchUserByIDErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedPatchUserByIDErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if PatchUserByIDErrorResponse is UserPermissionDenied.
+func (s PatchUserByIDErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedPatchUserByIDErrorResponse(v UserPermissionDenied) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// PatchUserByIDErrorResponseStatusCode wraps PatchUserByIDErrorResponse with StatusCode.
+type PatchUserByIDErrorResponseStatusCode struct {
+	StatusCode int
+	Response   PatchUserByIDErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PatchUserByIDErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *PatchUserByIDErrorResponseStatusCode) GetResponse() PatchUserByIDErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PatchUserByIDErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *PatchUserByIDErrorResponseStatusCode) SetResponse(val PatchUserByIDErrorResponse) {
+	s.Response = val
+}
+
+func (*PatchUserByIDErrorResponseStatusCode) patchUserByIDRes() {}
+
+type PatchUserByIDForbidden ErrorDetails
+
+func (*PatchUserByIDForbidden) patchUserByIDRes() {}
+
+type PatchUserByIDNotFound ErrorDetails
+
+func (*PatchUserByIDNotFound) patchUserByIDRes() {}
+
+type PatchUserByIDUnauthorized ErrorDetails
+
+func (*PatchUserByIDUnauthorized) patchUserByIDRes() {}
+
+// A partial update, merged into the user's current state. At least one of
+// `schema` and `attributes` must be present; an empty patch is rejected with
+// `user.invalid`.
+// `attributes` is merged key by key into the stored attributes: an omitted
+// key stays untouched, an object merges recursively, `null` deletes the
+// attribute, and any other value replaces the stored one. The merged result
+// is validated as a whole against the user's schema, so a patch that deletes
+// or invalidates a required property is rejected with `user.invalid`.
+// `schema` moves the user to another registered schema — the ADR 009 §4
+// upgrade mechanism. The request must be self-contained: merged attributes
+// are validated against the new schema before commit, and every uniqueness
+// claim is recomputed under the new schema's annotations.
+// Ref: #
+type PatchUserRequest struct {
+	// The schema the user follows after this patch. Omit it to keep the
+	// current schema. The schema must already be registered via `/schemas`.
+	Schema OptString `json:"schema"`
+	// The changed attributes only. `null` deletes an attribute; omitted
+	// keys are untouched.
+	Attributes OptPatchUserRequestAttributes `json:"attributes"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *PatchUserRequest) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetAttributes returns the value of Attributes.
+func (s *PatchUserRequest) GetAttributes() OptPatchUserRequestAttributes {
+	return s.Attributes
+}
+
+// SetSchema sets the value of Schema.
+func (s *PatchUserRequest) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetAttributes sets the value of Attributes.
+func (s *PatchUserRequest) SetAttributes(val OptPatchUserRequestAttributes) {
+	s.Attributes = val
+}
+
+// The changed attributes only. `null` deletes an attribute; omitted
+// keys are untouched.
+type PatchUserRequestAttributes map[string]jx.Raw
+
+func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Merged schema.
 // Ref: #
@@ -48603,9 +49346,11 @@ func (s *User) SetTeamsTruncated(val OptBool) {
 	s.TeamsTruncated = val
 }
 
-func (*User) createUserRes()  {}
-func (*User) getMyUserRes()   {}
-func (*User) getUserByIDRes() {}
+func (*User) createUserRes()    {}
+func (*User) getMyUserRes()     {}
+func (*User) getUserByIDRes()   {}
+func (*User) patchMyUserRes()   {}
+func (*User) patchUserByIDRes() {}
 
 // Merged schema.
 // Ref: #
@@ -48665,6 +49410,59 @@ func (s *UserAlreadyExistsDetails) init() UserAlreadyExistsDetails {
 type UserAttributes map[string]jx.Raw
 
 func (s *UserAttributes) init() UserAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserConflict) GetDetails() OptUserConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserConflict) SetDetails(val OptUserConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserConflictDetails map[string]jx.Raw
+
+func (s *UserConflictDetails) init() UserConflictDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -50461,7 +51259,8 @@ func (s *UserNotFound) SetDetails(val OptUserNotFoundDetails) {
 	s.Details = val
 }
 
-func (*UserNotFound) getMyUserRes() {}
+func (*UserNotFound) getMyUserRes()   {}
+func (*UserNotFound) patchMyUserRes() {}
 
 // Additional error-specific context.
 type UserNotFoundDetails map[string]jx.Raw
@@ -51088,6 +51887,7 @@ type VerifyChallengeProofErrorResponse struct {
 	ReqInvalid          ReqInvalid
 	UserAlreadyExists   UserAlreadyExists
 	UserInvalid         UserInvalid
+	UserNotFound        UserNotFound
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -51108,6 +51908,7 @@ const (
 	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
 	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
 	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
+	UserNotFoundVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "user.not_found"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -51173,6 +51974,11 @@ func (s VerifyChallengeProofErrorResponse) IsUserAlreadyExists() bool {
 // IsUserInvalid reports whether VerifyChallengeProofErrorResponse is UserInvalid.
 func (s VerifyChallengeProofErrorResponse) IsUserInvalid() bool {
 	return s.Type == UserInvalidVerifyChallengeProofErrorResponse
+}
+
+// IsUserNotFound reports whether VerifyChallengeProofErrorResponse is UserNotFound.
+func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundVerifyChallengeProofErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets VerifyChallengeProofErrorResponse to AttAlreadyHandedOff.
@@ -51445,6 +52251,27 @@ func (s VerifyChallengeProofErrorResponse) GetUserInvalid() (v UserInvalid, ok b
 func NewUserInvalidVerifyChallengeProofErrorResponse(v UserInvalid) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets VerifyChallengeProofErrorResponse to UserNotFound.
+func (s *VerifyChallengeProofErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundVerifyChallengeProofErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if VerifyChallengeProofErrorResponse is UserNotFound.
+func (s VerifyChallengeProofErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserNotFound.
+func NewUserNotFoundVerifyChallengeProofErrorResponse(v UserNotFound) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserNotFound(v)
 	return s
 }
 

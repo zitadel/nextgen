@@ -1030,7 +1030,7 @@ describe("ClaimCheck", () => {
     const cwd = await makeProject();
     const outcome = await new ClaimCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("temporary until you attach it to a team");
+    expect(outcome.message).toContain("temporary and its data may be lost");
     expect(outcome.details).toEqual({ claimable: true });
   });
 

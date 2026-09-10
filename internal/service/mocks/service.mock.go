@@ -3174,6 +3174,45 @@ func (c *MockAllStatementsGetUserTOTPCall) DoAndReturn(f func(context.Context, d
 	return c
 }
 
+// GetUserUniqueAttributeScopes mocks base method.
+func (m *MockAllStatements) GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserUniqueAttributeScopes", ctx, projectID, userID)
+	ret0, _ := ret[0].(map[domain.AttributeKey]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserUniqueAttributeScopes indicates an expected call of GetUserUniqueAttributeScopes.
+func (mr *MockAllStatementsMockRecorder) GetUserUniqueAttributeScopes(ctx, projectID, userID any) *MockAllStatementsGetUserUniqueAttributeScopesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserUniqueAttributeScopes", reflect.TypeOf((*MockAllStatements)(nil).GetUserUniqueAttributeScopes), ctx, projectID, userID)
+	return &MockAllStatementsGetUserUniqueAttributeScopesCall{Call: call}
+}
+
+// MockAllStatementsGetUserUniqueAttributeScopesCall wrap *gomock.Call
+type MockAllStatementsGetUserUniqueAttributeScopesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetUserUniqueAttributeScopesCall) Return(arg0 map[domain.AttributeKey]string, arg1 error) *MockAllStatementsGetUserUniqueAttributeScopesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetUserUniqueAttributeScopesCall) Do(f func(context.Context, string, string) (map[domain.AttributeKey]string, error)) *MockAllStatementsGetUserUniqueAttributeScopesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetUserUniqueAttributeScopesCall) DoAndReturn(f func(context.Context, string, string) (map[domain.AttributeKey]string, error)) *MockAllStatementsGetUserUniqueAttributeScopesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // HandoffAuthAttempt mocks base method.
 func (m *MockAllStatements) HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error {
 	m.ctrl.T.Helper()
@@ -4373,6 +4412,44 @@ func (c *MockAllStatementsNewManagedIDCall) Do(f func(string) (string, error)) *
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsNewManagedIDCall) DoAndReturn(f func(string) (string, error)) *MockAllStatementsNewManagedIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// PatchUser mocks base method.
+func (m *MockAllStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchUser", ctx, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchUser indicates an expected call of PatchUser.
+func (mr *MockAllStatementsMockRecorder) PatchUser(ctx, user any) *MockAllStatementsPatchUserCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchUser", reflect.TypeOf((*MockAllStatements)(nil).PatchUser), ctx, user)
+	return &MockAllStatementsPatchUserCall{Call: call}
+}
+
+// MockAllStatementsPatchUserCall wrap *gomock.Call
+type MockAllStatementsPatchUserCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsPatchUserCall) Return(arg0 error) *MockAllStatementsPatchUserCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsPatchUserCall) Do(f func(context.Context, *domain.PatchUser) error) *MockAllStatementsPatchUserCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsPatchUserCall) DoAndReturn(f func(context.Context, *domain.PatchUser) error) *MockAllStatementsPatchUserCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -7725,6 +7802,45 @@ func (c *MockUserStatementsGetUserCall) DoAndReturn(f func(context.Context, data
 	return c
 }
 
+// GetUserUniqueAttributeScopes mocks base method.
+func (m *MockUserStatements) GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserUniqueAttributeScopes", ctx, projectID, userID)
+	ret0, _ := ret[0].(map[domain.AttributeKey]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserUniqueAttributeScopes indicates an expected call of GetUserUniqueAttributeScopes.
+func (mr *MockUserStatementsMockRecorder) GetUserUniqueAttributeScopes(ctx, projectID, userID any) *MockUserStatementsGetUserUniqueAttributeScopesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserUniqueAttributeScopes", reflect.TypeOf((*MockUserStatements)(nil).GetUserUniqueAttributeScopes), ctx, projectID, userID)
+	return &MockUserStatementsGetUserUniqueAttributeScopesCall{Call: call}
+}
+
+// MockUserStatementsGetUserUniqueAttributeScopesCall wrap *gomock.Call
+type MockUserStatementsGetUserUniqueAttributeScopesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsGetUserUniqueAttributeScopesCall) Return(arg0 map[domain.AttributeKey]string, arg1 error) *MockUserStatementsGetUserUniqueAttributeScopesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsGetUserUniqueAttributeScopesCall) Do(f func(context.Context, string, string) (map[domain.AttributeKey]string, error)) *MockUserStatementsGetUserUniqueAttributeScopesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsGetUserUniqueAttributeScopesCall) DoAndReturn(f func(context.Context, string, string) (map[domain.AttributeKey]string, error)) *MockUserStatementsGetUserUniqueAttributeScopesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // IsStatements mocks base method.
 func (m *MockUserStatements) IsStatements() {
 	m.ctrl.T.Helper()
@@ -7796,6 +7912,44 @@ func (c *MockUserStatementsListUsersCall) Do(f func(context.Context, *database.L
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockUserStatementsListUsersCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// PatchUser mocks base method.
+func (m *MockUserStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchUser", ctx, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchUser indicates an expected call of PatchUser.
+func (mr *MockUserStatementsMockRecorder) PatchUser(ctx, user any) *MockUserStatementsPatchUserCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchUser", reflect.TypeOf((*MockUserStatements)(nil).PatchUser), ctx, user)
+	return &MockUserStatementsPatchUserCall{Call: call}
+}
+
+// MockUserStatementsPatchUserCall wrap *gomock.Call
+type MockUserStatementsPatchUserCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsPatchUserCall) Return(arg0 error) *MockUserStatementsPatchUserCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsPatchUserCall) Do(f func(context.Context, *domain.PatchUser) error) *MockUserStatementsPatchUserCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsPatchUserCall) DoAndReturn(f func(context.Context, *domain.PatchUser) error) *MockUserStatementsPatchUserCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
