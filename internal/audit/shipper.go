@@ -77,10 +77,7 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 	return &Shipper{
 		cfg: cfg,
 		src: src,
-		// Deliberately not the hardened httputil client: the sink URL is
-		// operator YAML, not user-injectable, and sinks legitimately live on
-		// private networks the egress deny list blocks (egress-policy ADR).
-		// Migrate when the sink becomes tenant-configurable.
+		// Operator-configured URL, not user-injectable: stdlib client by design (ADR 062).
 		client: &http.Client{Timeout: 10 * time.Second},
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),

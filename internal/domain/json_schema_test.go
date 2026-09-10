@@ -635,6 +635,22 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
 	})
 
+	t.Run("redirect loop yields fetch_too_many_redirects", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.URL, http.StatusFound)
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxRedirects: 2})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooManyRedirects())
+	})
+
 	t.Run("resolve timeout bounds the whole ref chain, not each hop", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mux := http.NewServeMux()

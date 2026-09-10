@@ -91,7 +91,8 @@ httpclient:
   # ranges, IPv4 and IPv6) — prefer allow_list for exceptions.
   # deny_list: [...]
   # Exceptions carved out of the deny list: a matching target is allowed even
-  # when a deny entry covers it. For local development against loopback
-  # schema hosts:
+  # when a deny entry covers it. A hostname entry only counters a hostname
+  # deny entry; countering an IP-range denial needs an IP or CIDR entry.
+  # For local development against loopback schema hosts:
   # allow_list: [localhost, 127.0.0.0/8]
   allow_list: []

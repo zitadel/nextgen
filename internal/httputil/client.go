@@ -75,15 +75,22 @@ func (c ClientConfig) Validate() error {
 	return err
 }
 
-// NewClient returns an *http.Client protected against DNS rebinding (dial-time
-// policy check), redirect abuse (hop cap, per-hop revalidation, downgrade
-// block), and oversized responses.
+// NewClient returns an *http.Client protected against DNS rebinding (the
+// dial-time policy check on the resolved IP), hostname-denied targets (a
+// pre-connection check on every request, redirect hops included), redirect
+// abuse (hop cap, downgrade block), and oversized responses.
 func (c ClientConfig) NewClient() (*http.Client, error) {
 	policy, err := NewPolicy(c.DenyList, c.AllowList)
 	if err != nil {
 		return nil, err
 	}
 	var transport http.RoundTripper = newTransport(policy)
+	if policy.Enforces() {
+		// Hostname-level check on every request — the initial one and each
+		// redirect hop reissue through RoundTrip — so hostname entries take
+		// effect before any connection. Resolved IPs stay the dial hook's job.
+		transport = &policyRoundTripper{underlying: transport, policy: policy}
+	}
 	if c.MaxBodySize > 0 {
 		transport = &maxBytesRoundTripper{underlying: transport, maxBytes: c.MaxBodySize}
 	}
@@ -91,7 +98,7 @@ func (c ClientConfig) NewClient() (*http.Client, error) {
 		Transport: transport,
 		Timeout:   c.Timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= c.MaxRedirects {
+			if len(via) > c.MaxRedirects {
 				return ErrTooManyRedirects
 			}
 			if !c.AllowHTTPSDowngrade && len(via) > 0 {
@@ -102,9 +109,25 @@ func (c ClientConfig) NewClient() (*http.Client, error) {
 					return ErrHTTPSDowngrade
 				}
 			}
-			return policy.CheckURL(req.URL, nil)
+			return nil
 		},
 	}, nil
+}
+
+// policyRoundTripper rejects a request whose URL hostname the policy denies,
+// before any connection is opened.
+type policyRoundTripper struct {
+	underlying http.RoundTripper
+	policy     *Policy
+}
+
+var _ http.RoundTripper = (*policyRoundTripper)(nil)
+
+func (p *policyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if err := p.policy.CheckAddress(req.URL.Hostname()); err != nil {
+		return nil, err
+	}
+	return p.underlying.RoundTrip(req)
 }
 
 // maxBytesRoundTripper wraps a RoundTripper to protect against OOM on
