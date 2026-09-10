@@ -62,11 +62,23 @@ The algorithms are fixed: `RSA-OAEP-256` for key wrapping and `A256GCM` for cont
 
 If `server.master_keys` is unset **and** the master key directory is empty, the server generates a 4096-bit RSA key on
 first start, writes it to
-`<server.data_dir>/master-keys/master-key.pem` with mode `0600`, and prints:
+`<server.data_dir>/master-keys/master-key.pem` with mode `0600`, and logs a warning:
 
 ```
-created server master key file at .../master-keys/master-key.pem (generated for local/dev only; configure server.master_keys for production)
+WARN created server master key file (generated for local/dev only; configure server.master_keys for production)
+  path=.../master-keys/master-key.pem disable_with=--disable-master-key-generation
 ```
+
+Set `server.generate_master_key: false` (or pass `--disable-master-key-generation`, which outranks the config file and
+the environment) to refuse that instead: a start with no configured key and an empty key directory then fails with an
+error naming the directory it searched. Do that anywhere a generated key would be wrong rather than convenient — most
+sharply on ephemeral storage, where each instance would otherwise mint its own key and leave the previous instance's
+project KEKs unwrappable.
+
+`server.master_keys` cannot be set from the environment, because it is a map keyed by key id and environment variables
+cannot populate map keys. Any `NEXTGEN_SERVER_MASTER_KEYS_*` variable is dropped; the server logs a warning naming the
+variables it ignored, since a dropped variable is what leaves the server with no key and sends it down the generation
+path.
 
 The key is reused on subsequent starts as long as `server.data_dir` persists.
 `server.data_dir` defaults to a `nextgen-data` directory next to the binary; in the Docker Compose quick start it is
@@ -145,7 +157,7 @@ missing) and merges every file it finds into
 |-----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Config has keys                         | Directory files are added as **decrypt-only** entries (they never get `use_for_encryption`). A directory file whose name equals a config entry's ID **overwrites** that entry |
 | Config has no keys, directory has files | All files are loaded; the one with the newest mtime is marked for encryption                                                                                                  |
-| Neither                                 | A 4096-bit key is generated at `master-keys/master-key.pem` and marked for encryption                                                                                         |
+| Neither                                 | A 4096-bit key is generated at `master-keys/master-key.pem` and marked for encryption, unless `server.generate_master_key` is `false`, which fails the start instead          |
 
 > **⚠ The merge is not skipped when `server.master_keys` is set.** Directory
 > scanning happens on every start, even for a fully explicit configuration, and
