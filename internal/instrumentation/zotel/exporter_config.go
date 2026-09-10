@@ -27,10 +27,7 @@ const (
 
 type ExporterConfig struct {
 	Type ExporterType `mapstructure:"type"`
-	// Endpoint is operator config, so the exporters stay on the SDK's own
-	// HTTP clients rather than the hardened egress client (egress-policy
-	// ADR): the guard targets user-injectable URLs, and collectors
-	// legitimately live on addresses the deny list blocks.
+	// Operator-configured, not user-injectable: exporters keep the SDK's own clients (ADR 062).
 	Endpoint        string        `mapstructure:"endpoint"`
 	Insecure        bool          `mapstructure:"insecure"`
 	BatchDuration   time.Duration `mapstructure:"batch_duration"`

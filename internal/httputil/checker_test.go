@@ -1,10 +1,7 @@
 package httputil_test
 
 import (
-	"errors"
-	"fmt"
 	"net"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,42 +113,28 @@ func TestPolicy_Check(t *testing.T) {
 	}
 }
 
-func TestPolicy_CheckURL(t *testing.T) {
-	mustURL := func(raw string) *url.URL {
-		u, err := url.Parse(raw)
-		require.NoError(t, err)
-		return u
-	}
-
-	t.Run("unmatched hostname resolving to a denied IP is blocked (SSRF pivot)", func(t *testing.T) {
-		policy := mustPolicy(t, []string{"127.0.0.0/8"}, nil)
-		lookup := func(string) ([]net.IP, error) { return []net.IP{net.ParseIP("127.0.0.1")}, nil }
+func TestPolicy_CheckAddress(t *testing.T) {
+	t.Run("hostname deny entry blocks by name, no resolution", func(t *testing.T) {
+		policy := mustPolicy(t, []string{"blocked.test"}, nil)
 		var denied *httputil.AddressDeniedError
-		require.ErrorAs(t, policy.CheckURL(mustURL("https://innocent.test/x"), lookup), &denied)
+		require.ErrorAs(t, policy.CheckAddress("blocked.test"), &denied)
 	})
 
-	t.Run("lookup failure fails closed", func(t *testing.T) {
-		policy := mustPolicy(t, []string{"127.0.0.0/8"}, nil)
-		lookup := func(string) ([]net.IP, error) { return nil, errors.New("nxdomain") }
-		require.Error(t, policy.CheckURL(mustURL("https://innocent.test/x"), lookup))
-	})
-
-	t.Run("literal IP needs no lookup", func(t *testing.T) {
+	t.Run("literal IP host matches CIDR entries", func(t *testing.T) {
 		policy := mustPolicy(t, []string{"169.254.0.0/16"}, nil)
-		failing := func(string) ([]net.IP, error) { return nil, fmt.Errorf("must not be called") }
 		var denied *httputil.AddressDeniedError
-		require.ErrorAs(t, policy.CheckURL(mustURL("http://169.254.169.254/meta"), failing), &denied)
+		require.ErrorAs(t, policy.CheckAddress("169.254.169.254"), &denied)
 	})
 
-	t.Run("allow hostname overrides denied resolved IP", func(t *testing.T) {
+	t.Run("unmatched domain passes without resolution", func(t *testing.T) {
+		// A domain resolving to a denied IP is the dial-time check's job;
+		// CheckAddress never resolves.
+		policy := mustPolicy(t, []string{"127.0.0.0/8"}, nil)
+		require.NoError(t, policy.CheckAddress("innocent.test"))
+	})
+
+	t.Run("allow hostname counters deny hostname", func(t *testing.T) {
 		policy := mustPolicy(t, []string{"localhost", "127.0.0.0/8"}, []string{"localhost"})
-		lookup := func(string) ([]net.IP, error) { return []net.IP{net.ParseIP("127.0.0.1")}, nil }
-		require.NoError(t, policy.CheckURL(mustURL("http://localhost:8080/schema.json"), lookup))
-	})
-
-	t.Run("empty deny list skips resolution entirely", func(t *testing.T) {
-		policy := mustPolicy(t, nil, nil)
-		failing := func(string) ([]net.IP, error) { return nil, fmt.Errorf("must not be called") }
-		require.NoError(t, policy.CheckURL(mustURL("https://innocent.test/x"), failing))
+		require.NoError(t, policy.CheckAddress("localhost"))
 	})
 }

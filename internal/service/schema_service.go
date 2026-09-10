@@ -140,13 +140,9 @@ func (s *SchemaService) classifyCreateConflict(ctx context.Context, projectID, s
 }
 
 // resolveSchemaError maps a failed schema resolution onto the caller-visible
-// error. The resolver already classifies egress failures into the fetch_*
-// codes (with the failing URL in details); re-stamping them here is a no-op
-// at runtime whose only purpose is visibility: the OpenAPI error analysis
-// cannot follow the resolver's $ref loader indirection, so the codes must
-// reach a return position in this package to appear in the schema
-// operations' error sets. Keep this switch in step with
-// domain.classifyFetchError.
+// error. The fetch_* re-stamps are runtime no-ops that put each code in a
+// return position, which the OpenAPI error analysis needs: it cannot see
+// through the resolver's $ref loader indirection (domain.classifyFetchError).
 func resolveSchemaError(err error) error {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok {

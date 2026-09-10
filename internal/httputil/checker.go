@@ -1,10 +1,8 @@
 package httputil
 
 import (
-	"errors"
 	"fmt"
 	"net"
-	"net/url"
 	"strings"
 )
 
@@ -21,14 +19,6 @@ func NewAddressDeniedError(deniedBy string) *AddressDeniedError {
 
 func (e *AddressDeniedError) Error() string {
 	return fmt.Sprintf("address is denied by '%s'", e.deniedBy)
-}
-
-func (e *AddressDeniedError) Is(target error) bool {
-	var addressDeniedErr *AddressDeniedError
-	if !errors.As(target, &addressDeniedErr) {
-		return false
-	}
-	return e.deniedBy == addressDeniedErr.deniedBy
 }
 
 // HostChecker matches one policy entry: a CIDR network, a single IP, or a
@@ -75,10 +65,6 @@ func (c *HostChecker) Matches(ips []net.IP, address string) (rule string, ok boo
 	}
 	return "", false
 }
-
-// IPLookupFunc resolves a hostname to its IP addresses. Injectable for tests;
-// nil means [net.LookupIP].
-type IPLookupFunc func(string) ([]net.IP, error)
 
 // Policy is the egress decision for one client: a target is allowed when it
 // matches the allow list, denied when it matches the deny list, and allowed
@@ -142,34 +128,20 @@ func (p *Policy) Check(ips []net.IP, address string) error {
 	return nil
 }
 
-// CheckURL resolves the URL's hostname and applies Check. A lookup failure
-// fails closed. This URL-layer check exists to fail fast (and to match
-// hostname entries before any connection); the dial-time check in the
-// transport remains authoritative.
-func (p *Policy) CheckURL(u *url.URL, lookup IPLookupFunc) error {
+// CheckAddress applies the policy to a request's URL hostname before any
+// connection is opened: hostname entries match by name, and a literal-IP
+// host also matches IP and CIDR entries. Domains are deliberately not
+// resolved here — the dial-time check in the transport owns resolved
+// addresses, so a DNS answer cannot bypass anything by being checked twice.
+// Consequence: a hostname allow entry only counters a hostname deny entry;
+// a denial by IP range needs an IP or CIDR allow entry.
+func (p *Policy) CheckAddress(hostname string) error {
 	if !p.Enforces() {
 		return nil
 	}
-	hostname := u.Hostname()
-	ips, err := hostnameToIPs(hostname, lookup)
-	if err != nil {
-		return err
+	var ips []net.IP
+	if ip := net.ParseIP(hostname); ip != nil {
+		ips = []net.IP{ip}
 	}
 	return p.Check(ips, hostname)
-}
-
-// hostnameToIPs returns the literal IP when hostname parses as one, and the
-// resolved addresses otherwise.
-func hostnameToIPs(hostname string, lookup IPLookupFunc) ([]net.IP, error) {
-	if ip := net.ParseIP(hostname); ip != nil {
-		return []net.IP{ip}, nil
-	}
-	if lookup == nil {
-		lookup = net.LookupIP
-	}
-	ips, err := lookup(hostname)
-	if err != nil {
-		return nil, fmt.Errorf("hostname lookup for egress check failed: %w", err)
-	}
-	return ips, nil
 }

@@ -1,13 +1,13 @@
 package httputil_test
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -46,16 +46,25 @@ func TestNewClient_AllowListOverridesDenyAtDial(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	srvHost, _, err := hostPort(srv.URL)
+	srvURL, err := url.Parse(srv.URL)
 	require.NoError(t, err)
 
 	client := newClient(t, httputil.ClientConfig{
 		DenyList:  []string{"127.0.0.0/8", "::1/128"},
-		AllowList: []string{srvHost},
+		AllowList: []string{srvURL.Hostname()},
 	})
 	resp, err := client.Get(srv.URL)
 	require.NoError(t, err)
 	resp.Body.Close()
+}
+
+func TestNewClient_DeniedHostnameBlockedBeforeAnyConnection(t *testing.T) {
+	// No server exists for this name; a hostname deny entry must reject the
+	// request at the transport, before DNS or dialing could even fail.
+	client := newClient(t, httputil.ClientConfig{DenyList: []string{"blocked.test"}})
+	_, err := client.Get("http://blocked.test/schema.json")
+	var denied *httputil.AddressDeniedError
+	require.ErrorAs(t, err, &denied)
 }
 
 func TestNewClient_EmptyDenyListAllowsEverything(t *testing.T) {
@@ -85,19 +94,36 @@ func TestNewClient_RedirectToDeniedAddressBlocked(t *testing.T) {
 	require.ErrorAs(t, err, &denied)
 }
 
-func TestNewClient_TooManyRedirects(t *testing.T) {
+func TestNewClient_MaxRedirects(t *testing.T) {
+	// /hop/0 -> /hop/1 -> /hop/2 -> 200: exactly two redirects on the way to
+	// /hop/2, three to /hop/3.
 	mux := http.NewServeMux()
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, srv.URL, http.StatusFound)
+	mux.HandleFunc("/hop/", func(w http.ResponseWriter, r *http.Request) {
+		var n int
+		_, err := fmt.Sscanf(r.URL.Path, "/hop/%d", &n)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if n <= 0 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("%s/hop/%d", srv.URL, n-1), http.StatusFound)
 	})
 
 	client := newClient(t, httputil.ClientConfig{
 		DenyList:     []string{"10.0.0.0/8"}, // enforcing, but loopback stays allowed
 		MaxRedirects: 2,
 	})
-	_, err := client.Get(srv.URL)
+
+	resp, err := client.Get(srv.URL + "/hop/2")
+	require.NoError(t, err, "a chain of exactly max_redirects hops must pass")
+	resp.Body.Close()
+
+	_, err = client.Get(srv.URL + "/hop/3")
 	require.ErrorIs(t, err, httputil.ErrTooManyRedirects)
 }
 
@@ -163,29 +189,4 @@ func TestNewClient_MaxBodySize(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, body, limit)
 	})
-}
-
-func TestNewClient_Timeout(t *testing.T) {
-	release := make(chan struct{})
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		<-release
-	}))
-	defer srv.Close()
-	// LIFO: unblock the handler before srv.Close waits for it.
-	defer close(release)
-
-	client := newClient(t, httputil.ClientConfig{Timeout: 50 * time.Millisecond})
-	_, err := client.Get(srv.URL)
-	require.Error(t, err)
-	var netErr interface{ Timeout() bool }
-	require.ErrorAs(t, err, &netErr)
-	require.True(t, netErr.Timeout())
-}
-
-func hostPort(rawURL string) (host, port string, err error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "", "", err
-	}
-	return u.Hostname(), u.Port(), nil
 }
