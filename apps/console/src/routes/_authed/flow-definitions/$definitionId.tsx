@@ -30,16 +30,12 @@ import { api } from "../../../api/zitadel";
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
   loader: async ({ params }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
-    // Structurally the list's `flow_definition`; orval just names it once per
-    // operation.
+    // Structurally the list's `flow_definition`; orval renames per operation.
     const definition: FlowDefinition = entry.flow_definition;
     return {
       definition,
       createdAt: entry.created_at,
-      // `getFlowDefinition` takes no `expand`, unlike the list, so the schema
-      // behind the header badge costs a second call. It is decoration on a
-      // screen that is already useful without it, so a schema the caller
-      // cannot read drops the badge rather than failing the route.
+      // No `expand` on this endpoint, so the badge costs a second call.
       schemaName: await resolveSchemaName(definition.user_schema),
       schemaId: definition.user_schema,
     };
@@ -66,15 +62,8 @@ function FlowDefinitionDetail() {
   return (
     <div className={DETAIL_PANEL_PAGE}>
       <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
-        {/* Title lockup and the identity card sit on one row above the rule;
-            they stack below `lg`, where the frame's narrow variant puts the
-            card under the title. */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* The badge sits beside the title when there is room and drops to
-              its own line below it otherwise, which is what the frame's narrow
-              variant draws — and what keeps a long schema name from squeezing
-              the title down to an ellipsis. It aligns with the icon tile, not
-              with the title, in that stacked state. */}
+          {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <span
@@ -85,9 +74,6 @@ function FlowDefinitionDetail() {
               </span>
               <h1 className="truncate font-serif text-lg leading-6 text-foreground">{name}</h1>
             </div>
-            {/* The schema the flow operates on, as the frame's outline badge.
-                `Link2` is the frame's glyph: the badge is a reference to
-                another resource, not a status. */}
             {schemaName && schemaId && (
               <Link to="/schemas/$schemaId" params={{ schemaId }} className="w-fit shrink-0">
                 <Badge variant="outline" className="h-5 gap-1 hover:bg-accent">
@@ -98,9 +84,7 @@ function FlowDefinitionDetail() {
             )}
           </div>
 
-          {/* The design draws `EXPIRES AT` as a third value here. Nothing on a
-              flow definition expires — the response carries only `created_at`
-              and `updated_at` — so the card ships with two. */}
+          {/* The frame draws a third value, `EXPIRES AT`; nothing backs it. */}
           <Card className="gap-0 rounded-md py-0 shadow-xs">
             <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-start">
               <MetaValue label="Flow ID" value={definitionId} copyable />
@@ -112,16 +96,11 @@ function FlowDefinitionDetail() {
 
         <Separator />
 
-        {/* No inset: the frame lines `STEPS` up with the title's icon tile, so
-            the section starts at the card's own content edge. (The schema
-            detail insets its equivalent by 8px because a tab strip sits above
-            it and the inset aligns with the tab *label*; there are no tabs
-            here.) */}
+        {/* No inset: `STEPS` lines up with the icon tile. (The schema detail
+            insets its equivalent to clear a tab strip; there are none here.) */}
         <section className="flex flex-col gap-3">
           <h2 className={EYEBROW}>Steps</h2>
-          {/* `table-fixed`: the frame gives the three columns an equal third
-              each, which auto layout would otherwise redistribute towards
-              whichever step happens to collect the most fields. */}
+          {/* `table-fixed`: equal thirds, not redistributed by content. */}
           <Table className="table-fixed">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -150,13 +129,7 @@ function FlowDefinitionDetail() {
   );
 }
 
-/**
- * One step row.
- *
- * A terminal step collects nothing and offers nothing, so both cells fall back
- * to an em dash — the frame's own treatment for the `passkey-upsell` row, and
- * better than two empty cells that read as a rendering fault.
- */
+/** A terminal step collects and offers nothing, so both cells show an em dash. */
 function StepRow({ step }: { step: FlowStep }) {
   const fields = stepFieldNames(step);
   const actions = stepActionNames(step);
@@ -170,10 +143,7 @@ function StepRow({ step }: { step: FlowStep }) {
   );
 }
 
-// The display face, uppercase 12px with 0.72px tracking — the same column
-// treatment the schema field table gives its headers.
 const HEAD_CELL =
   "h-auto px-0 py-3 font-serif text-xs font-normal tracking-[0.72px] text-muted-foreground uppercase";
-// `whitespace-normal` because a register step's field list is longer than a
-// third of the panel, and truncating it hides the fields the row exists to name.
+// `whitespace-normal`: a register step's field list outruns a third of the panel.
 const BODY_CELL = "px-0 py-3 text-sm whitespace-normal";

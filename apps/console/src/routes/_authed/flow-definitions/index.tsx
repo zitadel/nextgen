@@ -27,13 +27,10 @@ import { api } from "../../../api/zitadel";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
-  // Order 4: Users sits at 3, and the frame draws this row directly beneath it
-  // (below the nested `User schemas` entry).
+  // Order 4: Users sits at 3.
   staticData: { nav: { label: "Login flows", order: 4, icon: Workflow } },
   loader: async () => {
-    // `expand=user_schema` embeds the schema document each definition operates
-    // on, which is the only way the row can name it: the definition itself
-    // carries the schema's id, and the row shows `Minimal`, not `sch_01KWH…`.
+    // Without the embed the row has only the schema's id, not its name.
     const page = await api.listFlowDefinitions({
       project_id: getConsoleProjectId(),
       expand: ["user_schema"],
@@ -57,18 +54,12 @@ export interface FlowRow {
 // Mapped rather than spread so the wire's snake_case stops at the loader.
 function toFlowRow(entry: FlowDefinitionEntry): FlowRow {
   const definition = entry.flow_definition;
-  // The embed is the same envelope `GET /schemas/{id}` returns, so the
-  // displayable document is one level in. Reading the envelope directly finds
-  // no `title` and silently falls back to the id.
+  // The embed is the `GET /schemas/{id}` envelope, so the document is one level in.
   const embed = entry.user_schema;
   return {
     id: entry.id,
     definition,
     updatedAt: entry.updated_at,
-    // `expand` returns `null` when the schema no longer resolves or the caller
-    // may not read it, which is deliberately distinct from not asking. Either
-    // way the row has no name to show, so it omits the column rather than
-    // printing the raw id in a slot labelled `USER SCHEMA`.
     schemaName: embed ? schemaDisplayName(embed.schema, definition.user_schema) : undefined,
     schemaId: definition.user_schema,
   };
@@ -85,8 +76,7 @@ function LoginFlowsScreen() {
         </h1>
       </div>
 
-      {/* Rows run edge to edge and carry their own `px-6`, so the dividers
-          between them are full-bleed. Same card as the user-schema directory. */}
+      {/* Rows carry their own `px-6`, so the dividers are full-bleed. */}
       <Card className="mt-3 gap-0 overflow-hidden border-foreground/10 py-0 shadow-xs">
         {flows.length === 0 ? (
           <p className="px-6 py-8 text-center text-sm text-muted-foreground">
@@ -103,14 +93,8 @@ function LoginFlowsScreen() {
 /**
  * One row of the flows directory.
  *
- * Five columns — name over its purposes, the definition's step names as chips,
- * the user schema, the last change, and the row menu. The whole row is the
- * click target via a stretched link, so there is still exactly one focusable
- * control for the destination and middle-click still opens a tab; the menu
- * sits above that overlay.
- *
- * Below `lg` the columns stack. The MVP frame draws a narrow variant of the
- * screen but not of this row, so the stack is the console's reading of it.
+ * The name's stretched link makes the whole row the click target while keeping
+ * one focusable control, so anything else interactive has to sit above it.
  */
 function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRow) {
   const name = flowDisplayName(definition);
@@ -128,15 +112,8 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
           >
             {name}
           </Link>
-          {/* Drafts only. The engine selects the newest *active* definition
-              serving a purpose, so a draft is the row that reads as live but
-              never runs — the one difference in this list that changes what
-              actually happens at sign-in. The frame draws no status because it
-              draws only active flows, so marking just the exception leaves the
-              designed case rendering exactly as drawn.
-
-              This does not show which of several *active* definitions wins;
-              nothing exposes that (#1202). */}
+          {/* Drafts only: the engine never selects one, and the frames draw
+              only active flows. */}
           {definition.status === "draft" && <StatusBadge status={definition.status} />}
         </div>
         {purposes && (
@@ -155,17 +132,11 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
         ))}
       </div>
 
-      {/* Stacked label over value, where `LAST CHANGE` puts the two on one
-          line. The frame draws them differently because they read differently:
-          this column is a name, that one is a date. */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {schemaName && (
           <>
             <span className={EYEBROW}>User schema</span>
-            {/* `relative z-10`, like the row menu: the name link sits under a
-                stretched overlay covering the whole row, so a nested control has
-                to be lifted above it or the row's own destination swallows the
-                click. */}
+            {/* Above the row's stretched link, or it swallows the click. */}
             {schemaId ? (
               <Link
                 to="/schemas/$schemaId"
@@ -183,17 +154,13 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
         )}
       </div>
 
-      {/* `items-baseline`, not `items-start`: the label is the display face and
-          the value is the sans, and the two sit differently inside the same
-          16px line box — aligning the boxes leaves the date a pixel below the
-          label. */}
+      {/* Baseline, not `items-start`: two faces sit differently in one line box. */}
       <dl className="flex shrink-0 items-baseline gap-1 text-xs leading-4">
         <dt className={EYEBROW}>Last change</dt>
         <dd className="font-medium text-foreground">{formatDate(updatedAt)}</dd>
       </dl>
 
-      {/* Above the stretched link, or the row's own destination would swallow
-          the menu's clicks. */}
+      {/* Above the stretched link, or it swallows the menu's clicks. */}
       <div className="absolute top-3.5 right-4 lg:relative lg:top-auto lg:right-auto">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -219,11 +186,5 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
   );
 }
 
-/**
- * The chip lifts to `card` while its row is hovered.
- *
- * `InlineCode` rests on `muted` and the row's hover fill is `accent`, which in
- * the light theme is the same value — the same collision the schema directory
- * documents, and the same fix.
- */
+/** `InlineCode` rests on `muted`, which equals the row's `accent` hover in light. */
 const CHIP = "group-hover:bg-card";
