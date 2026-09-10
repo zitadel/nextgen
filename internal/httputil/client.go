@@ -69,8 +69,18 @@ type ClientConfig struct {
 }
 
 // Validate parses both lists so a malformed entry fails at startup, not at
-// first fetch.
+// first fetch, and rejects negative limits: a negative max_body_size would
+// silently disable the response cap.
 func (c ClientConfig) Validate() error {
+	if c.MaxBodySize < 0 {
+		return fmt.Errorf("max_body_size must not be negative, got %d", c.MaxBodySize)
+	}
+	if c.Timeout < 0 {
+		return fmt.Errorf("timeout must not be negative, got %s", c.Timeout)
+	}
+	if c.MaxRedirects < 0 {
+		return fmt.Errorf("max_redirects must not be negative, got %d", c.MaxRedirects)
+	}
 	_, err := NewPolicy(c.DenyList, c.AllowList)
 	return err
 }
@@ -80,6 +90,9 @@ func (c ClientConfig) Validate() error {
 // pre-connection check on every request, redirect hops included), redirect
 // abuse (hop cap, downgrade block), and oversized responses.
 func (c ClientConfig) NewClient() (*http.Client, error) {
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
 	policy, err := NewPolicy(c.DenyList, c.AllowList)
 	if err != nil {
 		return nil, err

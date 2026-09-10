@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +25,13 @@ func newClient(t *testing.T, cfg httputil.ClientConfig) *http.Client {
 func TestClientConfig_Validate(t *testing.T) {
 	require.NoError(t, httputil.ClientConfig{DenyList: httputil.DefaultDenyList}.Validate())
 	require.Error(t, httputil.ClientConfig{DenyList: []string{"10.0.0.0/99"}}.Validate())
+	// Negative limits must not pass: max_body_size: -1 would silently
+	// disable the response cap.
+	require.Error(t, httputil.ClientConfig{MaxBodySize: -1}.Validate())
+	require.Error(t, httputil.ClientConfig{Timeout: -time.Second}.Validate())
+	require.Error(t, httputil.ClientConfig{MaxRedirects: -1}.Validate())
+	_, err := httputil.ClientConfig{MaxBodySize: -1}.NewClient()
+	require.Error(t, err, "NewClient must run the same validation")
 }
 
 func TestNewClient_BlockedAtDial(t *testing.T) {

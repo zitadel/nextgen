@@ -27,7 +27,7 @@ const (
 
 type ExporterConfig struct {
 	Type ExporterType `mapstructure:"type"`
-	// Operator-configured, not user-injectable: exporters keep the SDK's own clients (ADR 062).
+	// Operator-configured, not user-injectable: exporters keep the SDK's own clients (ADR 061).
 	Endpoint        string        `mapstructure:"endpoint"`
 	Insecure        bool          `mapstructure:"insecure"`
 	BatchDuration   time.Duration `mapstructure:"batch_duration"`

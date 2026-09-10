@@ -11,4 +11,4 @@ most 5 redirects, refuses https-to-http downgrades, and bounds each request
 to 10s with 30s for a whole schema including its `$ref` chain. Rejections
 return distinct errors naming the failing URL. Tune or relax this under the
 new `httpclient` config block; for local development against a loopback
-schema host, set `httpclient.allow_list: [localhost, 127.0.0.0/8]`.
+schema host, set `httpclient.allow_list: [localhost, 127.0.0.0/8, "::1/128"]`.

@@ -94,5 +94,5 @@ httpclient:
   # when a deny entry covers it. A hostname entry only counters a hostname
   # deny entry; countering an IP-range denial needs an IP or CIDR entry.
   # For local development against loopback schema hosts:
-  # allow_list: [localhost, 127.0.0.0/8]
+  # allow_list: [localhost, 127.0.0.0/8, "::1/128"]
   allow_list: []

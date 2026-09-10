@@ -34,6 +34,9 @@ type HostChecker struct {
 // CIDR is an error rather than a hostname: hostnames cannot contain "/", and
 // the silent alternative would be a deny rule that never matches.
 func NewHostChecker(entry string) (*HostChecker, error) {
+	// "name." and "name" are the same DNS name; canonicalize so the dotted
+	// spelling cannot bypass a name entry (ADR 061 decision 4).
+	entry = strings.TrimSuffix(entry, ".")
 	if entry == "" {
 		return nil, nil
 	}
@@ -139,6 +142,7 @@ func (p *Policy) CheckAddress(hostname string) error {
 	if !p.Enforces() {
 		return nil
 	}
+	hostname = strings.TrimSuffix(hostname, ".")
 	var ips []net.IP
 	if ip := net.ParseIP(hostname); ip != nil {
 		ips = []net.IP{ip}
