@@ -71,12 +71,14 @@ describe("meta-schemas", () => {
     );
   });
 
-  // Drift audit: the committed copies must stay identical to the source the
-  // server embeds. Skipped outside the monorepo (published-package CI).
+  // Drift audit: the committed copies must stay byte-identical to the source
+  // the server embeds, as meta-schemas.ts promises. Skipped outside the
+  // monorepo (published-package CI).
   it.skipIf(!existsSync(upstreamDir))("committed copies match api/openapi", () => {
     for (const file of metaSchemaFiles()) {
-      const upstream = JSON.parse(readFileSync(join(upstreamDir, file.name), "utf8")) as object;
-      expect(file.body, `${file.name} drifted from api/openapi/endpoints/schemas`).toEqual(
+      const committed = readFileSync(join(packageRoot, "meta-schemas", file.name), "utf8");
+      const upstream = readFileSync(join(upstreamDir, file.name), "utf8");
+      expect(committed, `${file.name} drifted from api/openapi/endpoints/schemas`).toBe(
         upstream,
       );
     }
