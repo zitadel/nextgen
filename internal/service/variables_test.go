@@ -374,15 +374,15 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 			testVariable(t, "port", variablesProjectOwner, 8080),
 		}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{
+		doc := map[string]any{
 			"url":    "${{ url }}",
 			"port":   "${{ port }}",
 			"nested": map[string]any{"list": []any{"${{ url }}"}},
-		})
-		require.NoError(t, err)
-		assert.Equal(t, "https://example.test", got["url"])
-		assert.Equal(t, 8080, got["port"])
-		assert.Equal(t, "https://example.test", got["nested"].(map[string]any)["list"].([]any)[0])
+		}
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, "https://example.test", doc["url"])
+		assert.Equal(t, 8080, doc["port"])
+		assert.Equal(t, "https://example.test", doc["nested"].(map[string]any)["list"].([]any)[0])
 	})
 
 	// A document with nothing to replace must not reach storage at all: an
@@ -392,9 +392,8 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		// No EXPECT on either mock: any call fails the test.
 		doc := map[string]any{"plain": "no references", "n": float64(1)}
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc)
-		require.NoError(t, err)
-		assert.Equal(t, doc, got)
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, map[string]any{"plain": "no references", "n": float64(1)}, doc)
 	})
 
 	t.Run("asks storage only for the names the document references", func(t *testing.T) {
@@ -408,12 +407,11 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 				return nil, nil
 			})
 
-		_, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{
 			"a": "${{ url }}",
 			"b": "${{ url }}",
 			"c": []any{"${{ url }}"},
-		})
-		require.NoError(t, err)
+		}))
 	})
 
 	t.Run("resolves a name held at several levels to the nearest owner", func(t *testing.T) {
@@ -425,9 +423,9 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 			testVariable(t, "url", variablesOwner, "https://user"),
 		}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"url": "${{ url }}"})
-		require.NoError(t, err)
-		assert.Equal(t, "https://user", got["url"])
+		doc := map[string]any{"url": "${{ url }}"}
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, "https://user", doc["url"])
 	})
 
 	t.Run("decrypts a secret into the document", func(t *testing.T) {
@@ -442,9 +440,9 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(crypter, nil)
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"token": "${{ token }}"})
-		require.NoError(t, err)
-		assert.Equal(t, "s3cret", got["token"])
+		doc := map[string]any{"token": "${{ token }}"}
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, "s3cret", doc["token"])
 	})
 
 	// A variable outlives the key that was active when it was written, unlike a
@@ -462,9 +460,9 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(retired, nil)
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"token": "${{ token }}"})
-		require.NoError(t, err)
-		assert.Equal(t, "s3cret", got["token"])
+		doc := map[string]any{"token": "${{ token }}"}
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, "s3cret", doc["token"])
 	})
 
 	// One key lookup however many secrets one document holds under it.
@@ -481,13 +479,13 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).
 			Return([]*domain.Variable{first, second}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{
+		doc := map[string]any{
 			"first":  "${{ first }}",
 			"second": "${{ second }}",
-		})
-		require.NoError(t, err)
-		assert.Equal(t, "one", got["first"])
-		assert.Equal(t, "two", got["second"])
+		}
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, "one", doc["first"])
+		assert.Equal(t, "two", doc["second"])
 	})
 
 	t.Run("renders a reference embedded in text", func(t *testing.T) {
@@ -497,11 +495,9 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 			testVariable(t, "host", variablesProjectOwner, "example.test"),
 		}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{
-			"callback": "https://${{ host }}/callback",
-		})
-		require.NoError(t, err)
-		assert.Equal(t, "https://example.test/callback", got["callback"])
+		doc := map[string]any{"callback": "https://${{ host }}/callback"}
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, "https://example.test/callback", doc["callback"])
 	})
 
 	t.Run("leaves a reference the owner holds nothing for", func(t *testing.T) {
@@ -509,9 +505,9 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return(nil, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"url": "${{ nope }}"})
-		require.NoError(t, err)
-		assert.Equal(t, "${{ nope }}", got["url"])
+		doc := map[string]any{"url": "${{ nope }}"}
+		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		assert.Equal(t, "${{ nope }}", doc["url"])
 	})
 
 	t.Run("refuses a document that would expand beyond the budget", func(t *testing.T) {
@@ -525,7 +521,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 			doc[string(rune('a'+i%26))+string(rune('a'+i/26))] = "${{ big }}"
 		}
 
-		_, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc)
+		err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrVariableExpansionTooLarge())
 	})
@@ -537,10 +533,12 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		require.NoError(t, err)
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"token": "Bearer ${{ token }}"})
+		doc := map[string]any{"token": "Bearer ${{ token }}"}
+		err = svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrSecretNotWholeValue())
-		assert.Nil(t, got)
+		// The rejected document keeps its placeholder: nothing was written.
+		assert.Equal(t, "Bearer ${{ token }}", doc["token"])
 	})
 
 	t.Run("reports a key lookup failure", func(t *testing.T) {
@@ -553,7 +551,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(nil, sentinel)
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
 
-		_, err = svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"token": "${{ token }}"})
+		err = svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"token": "${{ token }}"})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
 	})
@@ -572,9 +570,10 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		// No key service EXPECT: there is no key id to look up.
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{broken}, nil)
 
-		got, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"token": "${{ token }}"})
-		require.Error(t, err)
-		assert.Nil(t, got)
+		doc := map[string]any{"token": "${{ token }}"}
+		require.Error(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
+		// The placeholder stands: an unreadable secret never lands in the document.
+		assert.Equal(t, "${{ token }}", doc["token"])
 	})
 
 	t.Run("reports a storage failure", func(t *testing.T) {
@@ -583,7 +582,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		sentinel := errors.New("connection refused")
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return(nil, sentinel)
 
-		_, err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"url": "${{ url }}"})
+		err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"url": "${{ url }}"})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
 	})

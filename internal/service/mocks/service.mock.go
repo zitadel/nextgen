@@ -12816,12 +12816,11 @@ func (c *MockVariableServiceGetVariablesCall) DoAndReturn(f func(context.Context
 }
 
 // ReplaceVariablesInPlace mocks base method.
-func (m *MockVariableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
+func (m *MockVariableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReplaceVariablesInPlace", ctx, owner, doc)
-	ret0, _ := ret[0].(map[string]any)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // ReplaceVariablesInPlace indicates an expected call of ReplaceVariablesInPlace.
@@ -12837,19 +12836,19 @@ type MockVariableServiceReplaceVariablesInPlaceCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockVariableServiceReplaceVariablesInPlaceCall) Return(arg0 map[string]any, arg1 error) *MockVariableServiceReplaceVariablesInPlaceCall {
-	c.Call = c.Call.Return(arg0, arg1)
+func (c *MockVariableServiceReplaceVariablesInPlaceCall) Return(arg0 error) *MockVariableServiceReplaceVariablesInPlaceCall {
+	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockVariableServiceReplaceVariablesInPlaceCall) Do(f func(context.Context, domain.VariableOwner, map[string]any) (map[string]any, error)) *MockVariableServiceReplaceVariablesInPlaceCall {
+func (c *MockVariableServiceReplaceVariablesInPlaceCall) Do(f func(context.Context, domain.VariableOwner, map[string]any) error) *MockVariableServiceReplaceVariablesInPlaceCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockVariableServiceReplaceVariablesInPlaceCall) DoAndReturn(f func(context.Context, domain.VariableOwner, map[string]any) (map[string]any, error)) *MockVariableServiceReplaceVariablesInPlaceCall {
+func (c *MockVariableServiceReplaceVariablesInPlaceCall) DoAndReturn(f func(context.Context, domain.VariableOwner, map[string]any) error) *MockVariableServiceReplaceVariablesInPlaceCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

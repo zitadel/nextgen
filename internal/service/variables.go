@@ -29,7 +29,7 @@ type VariableService interface {
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
-	ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error)
+	ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error
 }
 
 type variableService struct {
@@ -174,13 +174,13 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 	return nil
 }
 
-func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (map[string]any, error) {
+func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error {
 	placeholders, err := domain.ScanDocumentForVariables(doc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(placeholders) == 0 {
-		return doc, nil
+		return nil
 	}
 
 	// One name per query term, however many placeholders reference it.
@@ -196,12 +196,12 @@ func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner dom
 
 	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, variableNames...)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
+		return domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}
 	varMap := domain.VariableListToMap(varList)
 
 	if err := domain.ValidateSecretPlaceholders(placeholders, varMap); err != nil {
-		return nil, err
+		return err
 	}
 
 	var containsSecrets bool
@@ -215,15 +215,15 @@ func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner dom
 	if containsSecrets {
 		varMap, err = domain.Variables(varMap).DecryptAll(s.decrypterOfWritingKey(ctx))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	if err := domain.ReplaceVariables(placeholders, varMap); err != nil {
-		return nil, err
+		return err
 	}
 
-	return doc, nil
+	return nil
 }
 
 func (s *variableService) decrypterOfWritingKey(ctx context.Context) crypto.Decrypter {
