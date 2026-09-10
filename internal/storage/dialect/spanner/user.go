@@ -161,11 +161,10 @@ func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, user
 	return nil
 }
 
-// readUserUniqueAttrScopes reads the stored registry team scope per key, so a
-// rewrite keeps the scope an existing claim was created under.
-func readUserUniqueAttrScopes(ctx context.Context, tx queryExecutor, projectID, userID string) (map[domain.AttributeKey]string, error) {
+// GetUserUniqueAttributeScopes implements [service.UserStatements].
+func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error) {
 	scopes := make(map[domain.AttributeKey]string)
-	err := tx.Query(ctx, buildStatement(selectUserUniqueAttrScopesStmt, projectID, userID).statement(),
+	err := us.db.Query(ctx, buildStatement(selectUserUniqueAttrScopesStmt, projectID, userID).statement(),
 		func(iter *spanner.RowIterator) error {
 			return iter.Do(func(row *spanner.Row) error {
 				var key, team string
@@ -189,6 +188,9 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
 	}
+	if len(user.RegistryTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	}
 	return withTransaction(ctx, us.db, func(ctx context.Context, tx queryExecutor) error {
 		n, err := tx.Update(ctx, buildStatement(patchUserHeaderStmt,
 			user.SchemaURL, user.ProjectID, user.UserID, user.ExpectedUpdatedAt,
@@ -199,10 +201,6 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if n == 0 {
 			return wrapError(spanner.ErrRowNotFound)
 		}
-		preserved, err := readUserUniqueAttrScopes(ctx, tx, user.ProjectID, user.UserID)
-		if err != nil {
-			return err
-		}
 		if _, err := tx.Update(ctx, buildStatement(deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID).statement()); err != nil {
 			return err
 		}
@@ -210,7 +208,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 			return err
 		}
 		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes,
-			user.Attributes.RegistryTeamScopes(preserved, user.AttributeTeamScope))
+			user.RegistryTeamScopes)
 	})
 }
 

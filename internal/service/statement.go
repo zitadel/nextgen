@@ -296,6 +296,10 @@ type UserStatements interface {
 	// [domain.PatchUser.ExpectedUpdatedAt] (concurrent write) or the user is
 	// gone.
 	PatchUser(ctx context.Context, user *domain.PatchUser) error
+	// GetUserUniqueAttributeScopes reads the stored registry team scope per
+	// attribute key, so a patch keeps the scope an existing claim was created
+	// under. An unknown user reads as an empty map, not an error.
+	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error

@@ -153,10 +153,9 @@ func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, user
 	return nil
 }
 
-// readUserUniqueAttrScopes reads the stored registry team scope per key, so a
-// rewrite keeps the scope an existing claim was created under.
-func readUserUniqueAttrScopes(ctx context.Context, tx queryExecutor, projectID, userID string) (map[domain.AttributeKey]string, error) {
-	rows, err := tx.Query(ctx, selectUserUniqueAttrScopesStmt, projectID, userID)
+// GetUserUniqueAttributeScopes implements [service.UserStatements].
+func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	rows, err := us.client.Query(ctx, selectUserUniqueAttrScopesStmt, projectID, userID)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -180,6 +179,9 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
 	}
+	if len(user.RegistryTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	}
 	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
 		n, err := execAffected(ctx, tx, patchUserHeaderStmt,
 			nowUnixNano(), user.SchemaURL, user.ProjectID, user.UserID, user.ExpectedUpdatedAt.UnixNano(),
@@ -190,10 +192,6 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if n == 0 {
 			return database.NewNoRowFoundError(nil)
 		}
-		preserved, err := readUserUniqueAttrScopes(ctx, tx, user.ProjectID, user.UserID)
-		if err != nil {
-			return err
-		}
 		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
 			return wrapError(err)
 		}
@@ -201,7 +199,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 			return wrapError(err)
 		}
 		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes,
-			user.Attributes.RegistryTeamScopes(preserved, user.AttributeTeamScope))
+			user.RegistryTeamScopes)
 	})
 }
 

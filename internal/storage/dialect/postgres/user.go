@@ -94,8 +94,8 @@ WHERE project_id = $1 AND user_id = $2
 	// of the user's rows; diff-based reconciliation (see
 	// migration/sql/user_examples/patch.sql) is the upgrade path if attribute
 	// counts ever make that churn matter. Registry team scopes come
-	// per-attribute ($8), computed from the pre-rewrite rows so an existing
-	// claim keeps the scope create gave it.
+	// per-attribute ($8), resolved by the service from the pre-rewrite rows
+	// so an existing claim keeps the scope create gave it.
 	patchUserAttributesSQL = `
 WITH _input_data AS (
     SELECT *,
@@ -276,6 +276,9 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
 	}
+	if len(user.RegistryTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	}
 	keys, values, hashes, scopes, err := userAttributeArrays(user.Attributes)
 	if err != nil {
 		return err
@@ -291,11 +294,6 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if tag.RowsAffected() == 0 {
 			return wrapError(pgx.ErrNoRows)
 		}
-		preserved, err := readUserUniqueAttrScopes(ctx, tx, user.ProjectID, user.UserID)
-		if err != nil {
-			return err
-		}
-		registryTeams := user.Attributes.RegistryTeamScopes(preserved, user.AttributeTeamScope)
 		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
 			return wrapError(err)
 		}
@@ -304,7 +302,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		}
 		if _, err := tx.Exec(ctx, patchUserAttributesSQL,
 			user.ProjectID, user.UserID, user.AttributeTeamScope,
-			keys, values, hashes, scopes, registryTeams,
+			keys, values, hashes, scopes, user.RegistryTeamScopes,
 		); err != nil {
 			return wrapError(err)
 		}
@@ -312,10 +310,9 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	})
 }
 
-// readUserUniqueAttrScopes reads the stored registry team scope per key, so a
-// rewrite keeps the scope an existing claim was created under.
-func readUserUniqueAttrScopes(ctx context.Context, tx queryExecutor, projectID, userID string) (map[domain.AttributeKey]string, error) {
-	rows, err := tx.Query(ctx, selectUserUniqueAttrScopesStmt, projectID, userID)
+// GetUserUniqueAttributeScopes implements [service.UserStatements].
+func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	rows, err := us.client.Query(ctx, selectUserUniqueAttrScopesStmt, projectID, userID)
 	if err != nil {
 		return nil, wrapError(err)
 	}

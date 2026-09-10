@@ -720,6 +720,14 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
 
+	// Read outside the transaction like the user itself: registry mutations
+	// always move the user's updated_at, so the patch statement's guard
+	// catches interleaved changes and the retry re-reads both.
+	storedScopes, err := o.pool.Statements().GetUserUniqueAttributeScopes(ctx, o.ProjectID, o.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to get unique attribute scopes from database")
+	}
+
 	targetSchemaURL := user.SchemaURL
 	if o.SchemaURL != nil {
 		targetSchemaURL = *o.SchemaURL
@@ -735,10 +743,11 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 	}
 
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
-		Current:         user,
-		SchemaURL:       targetSchemaURL,
-		Schema:          schemaEntity.Schema,
-		AttributesPatch: o.Attributes,
+		Current:              user,
+		SchemaURL:            targetSchemaURL,
+		Schema:               schemaEntity.Schema,
+		AttributesPatch:      o.Attributes,
+		StoredRegistryScopes: storedScopes,
 	})
 	return err
 }

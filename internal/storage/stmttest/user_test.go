@@ -381,12 +381,17 @@ func getUserByID(t *testing.T, stmts service.AllStatements, projectID, userID st
 }
 
 // patchStateOf builds the post-merge state a patch writes, guarded by the
-// given user's current updated_at.
-func patchStateOf(user *domain.User, attrs ...domain.CreateAttribute) *domain.PatchUser {
+// given user's current updated_at, with registry scopes resolved from the
+// stored rows the same way the service does.
+func patchStateOf(t *testing.T, stmts service.AllStatements, user *domain.User, attrs ...domain.CreateAttribute) *domain.PatchUser {
+	t.Helper()
+
 	teamScope := ""
 	if user.LifecycleOwnerTeamID != nil {
 		teamScope = *user.LifecycleOwnerTeamID
 	}
+	stored, err := stmts.GetUserUniqueAttributeScopes(t.Context(), user.ProjectID, user.ID)
+	require.NoError(t, err)
 	return &domain.PatchUser{
 		ProjectID:          user.ProjectID,
 		UserID:             user.ID,
@@ -394,6 +399,7 @@ func patchStateOf(user *domain.User, attrs ...domain.CreateAttribute) *domain.Pa
 		ExpectedUpdatedAt:  user.Metadata.UpdatedAt,
 		Attributes:         attrs,
 		AttributeTeamScope: teamScope,
+		RegistryTeamScopes: domain.CreateAttributes(attrs).RegistryTeamScopes(stored, teamScope),
 	}
 }
 
@@ -412,7 +418,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 			before := getUserByID(t, d.stmts, projectID, user.ID)
 
-			patched := patchStateOf(before,
+			patched := patchStateOf(t, d.stmts, before,
 				mustAttr("email", "patch-rw-new@example.com", domain.AttributeUniquenessProject),
 				mustAttr("role", "admin", domain.AttributeUniquenessUnspecified),
 			)
@@ -427,7 +433,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 
 			// The guard moved with the write: replaying the patch against the
 			// pre-patch updated_at writes nothing.
-			err := d.stmts.PatchUser(t.Context(), patchStateOf(before,
+			err := d.stmts.PatchUser(t.Context(), patchStateOf(t, d.stmts, before,
 				mustAttr("email", "patch-rw-replay@example.com", domain.AttributeUniquenessProject),
 			))
 			var noRow *database.NoRowFoundError
@@ -443,7 +449,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 			before := getUserByID(t, d.stmts, projectID, user.ID)
 
-			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(before,
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(t, d.stmts, before,
 				mustAttr("email", "claim-new@example.com", domain.AttributeUniquenessProject),
 			)))
 
@@ -465,7 +471,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 			require.NoError(t, d.stmts.CreateUser(t.Context(), userB))
 			beforeB := getUserByID(t, d.stmts, projectID, userB.ID)
 
-			err := d.stmts.PatchUser(t.Context(), patchStateOf(beforeB,
+			err := d.stmts.PatchUser(t.Context(), patchStateOf(t, d.stmts, beforeB,
 				mustAttr("email", "collide-a@example.com", domain.AttributeUniquenessProject),
 				mustAttr("name", "B", domain.AttributeUniquenessUnspecified),
 			))
@@ -479,7 +485,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 				"email": "collide-b@example.com",
 				"name":  "B",
 			})
-			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(beforeB,
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(t, d.stmts, beforeB,
 				mustAttr("email", "collide-c@example.com", domain.AttributeUniquenessProject),
 				mustAttr("name", "B", domain.AttributeUniquenessUnspecified),
 			)))
@@ -490,7 +496,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 			before := getUserByID(t, d.stmts, projectID, user.ID)
 
-			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(before,
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(t, d.stmts, before,
 				mustAttr("email", "keep@example.com", domain.AttributeUniquenessProject),
 				mustAttr("role", "admin", domain.AttributeUniquenessUnspecified),
 			)))
@@ -533,7 +539,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 			before := getUserByID(t, d.stmts, projectID, user.ID)
 
-			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(before,
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patchStateOf(t, d.stmts, before,
 				mustAttr("email", "patch-scope@example.com", domain.AttributeUniquenessProject),
 				mustAttr("handle", "scoped-handle", domain.AttributeUniquenessTeam),
 				mustAttr("role", "admin", domain.AttributeUniquenessUnspecified),
@@ -582,7 +588,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 			before := getUserByID(t, d.stmts, projectID, user.ID)
 
-			patched := patchStateOf(before,
+			patched := patchStateOf(t, d.stmts, before,
 				mustAttr("email", "patch-schema@example.com", domain.AttributeUniquenessProject),
 			)
 			patched.SchemaURL = schemaURLv2
@@ -600,6 +606,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 				Attributes: domain.CreateAttributes{
 					mustAttr("email", "missing@example.com", domain.AttributeUniquenessProject),
 				},
+				RegistryTeamScopes: []string{""},
 			})
 			var noRow *database.NoRowFoundError
 			require.ErrorAs(t, err, &noRow)
