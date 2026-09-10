@@ -57,7 +57,7 @@ export function claimDeadline(input: {
 }
 
 /**
- * `zitadel claim` — attach this project to a team.
+ * `zitadel claim` — claim this project for a team to make it permanent.
  *
  * Shaped like the device-authorization grant (ADR 046): the CLI mints a
  * challenge with the project secret, hands a URL to a browser, and polls until
@@ -72,7 +72,7 @@ export function claimDeadline(input: {
  */
 export default class Claim extends BaseCommand {
   static override description =
-    "Attach this project to a team so it becomes permanent. Opens a browser to finish signing in.";
+    "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",
@@ -123,7 +123,7 @@ export default class Claim extends BaseCommand {
         data: {
           title: "Zitadel claim was not started.",
           project_id: secret.project_id,
-          would: "Open a browser to attach this project to a team, then record the team in .zitadel/secret.",
+          would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });
@@ -178,7 +178,9 @@ export default class Claim extends BaseCommand {
     // the frame's own content inside the terminal width.
     consola.box({
       title: "Finish in your browser",
-      message: wrapForBox("Sign in at the link below to attach this project to your team."),
+      message: wrapForBox(
+        "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
+      ),
       style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
     });
     consola.log(challenge.claim_url);
@@ -201,18 +203,24 @@ export default class Claim extends BaseCommand {
     // claim that got this far really happened on the platform and the local
     // record must follow it.
     await writeZitadelSecret(cwd, next);
-    consola.success(`Project attached to team ${completed.team_id}`);
+    // The team id stays out of the human output by design (it lives in the
+    // envelope and .zitadel/secret); the user-facing outcome is permanence.
+    consola.success("Project claimed");
 
     this.recordTelemetry({ claim_outcome: "completed", browser_opened: opened });
     return this.emit({
       status: "ok",
       data: {
-        title: "Zitadel project attached to a team.",
+        title: "Your Project is now permanent.",
         project_id: secret.project_id,
         team_id: completed.team_id,
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
-        next_actions: [`Manage the project at ${completed.dashboard_url}.`],
+        // Two entries so the pretty renderer puts the URL on its own line.
+        next_actions: [
+          "Manage your Project and collaborate in the Console:",
+          completed.dashboard_url,
+        ],
       },
     });
   }
@@ -351,9 +359,9 @@ function expiredError(message: string): ZitadelError {
 function claimWindowExpiredError(): ZitadelError {
   return new ZitadelError(
     "E_VALIDATION",
-    `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+    `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
     {
-      hint: "The project itself keeps working. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
+      hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
     },
   );
 }
