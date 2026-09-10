@@ -169,7 +169,7 @@
             "client_secret_post"
           ],
           "default": "client_secret_basic",
-          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
+          "description": "How the client authenticates at the token endpoint."
         },
         "scopes": {
           "type": "array",
@@ -271,7 +271,7 @@
             "client_secret_post"
           ],
           "default": "client_secret_basic",
-          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
+          "description": "How the client authenticates at the token endpoint."
         },
         "scopes": {
           "type": "array",
