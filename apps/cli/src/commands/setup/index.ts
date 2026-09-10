@@ -20,11 +20,11 @@ import { consola } from "consola";
 import { brandingDesignLabel } from "../../lib/branding/designs";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import {
+  claimAction,
+  claimBoxAction,
   claimCommand,
   claimState,
   claimWindowDeadline,
-  setupClaimAction,
-  setupClaimBoxAction,
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
@@ -437,8 +437,8 @@ export default class Setup extends BaseCommand {
         (dryRun || (await localServerHostsPlatform(answers.server))));
     const claimNudge = nudgeClaim
       ? {
-          actions: [setupClaimAction(this.meta.cliVersion, deadline)],
-          boxActions: [setupClaimBoxAction(this.meta.cliVersion, deadline)],
+          actions: [claimAction(this.meta.cliVersion, deadline)],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
           commands: [claimCommand(this.meta.cliVersion)],
         }
       : { actions: [], boxActions: [], commands: [] };

@@ -57,7 +57,7 @@ export function claimDeadline(input: {
 }
 
 /**
- * `zitadel claim` — attach this project to a team.
+ * `zitadel claim` — claim this project for a team to make it permanent.
  *
  * Shaped like the device-authorization grant (ADR 046): the CLI mints a
  * challenge with the project secret, hands a URL to a browser, and polls until
@@ -72,7 +72,7 @@ export function claimDeadline(input: {
  */
 export default class Claim extends BaseCommand {
   static override description =
-    "Attach this project to a team so it becomes permanent. Opens a browser to finish signing in.";
+    "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",
@@ -123,7 +123,7 @@ export default class Claim extends BaseCommand {
         data: {
           title: "Zitadel claim was not started.",
           project_id: secret.project_id,
-          would: "Open a browser to attach this project to a team, then record the team in .zitadel/secret.",
+          would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });
@@ -359,9 +359,9 @@ function expiredError(message: string): ZitadelError {
 function claimWindowExpiredError(): ZitadelError {
   return new ZitadelError(
     "E_VALIDATION",
-    `This project was not attached to a team within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+    `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
     {
-      hint: "The project itself keeps working. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
+      hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
     },
   );
 }
