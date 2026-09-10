@@ -22,23 +22,22 @@ export function claimWindowDeadline(createdAt: string | undefined, now = Date.no
   return new Date((Number.isNaN(base) ? now : base) + CLAIM_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 }
 
-function deadlinePhrase(deadline?: Date): string {
-  // Time and zone included, not just the date: the server closes the window
-  // at an exact timestamp (created_at + 14 x 24h), and a bare "before Sep 18"
-  // misleads in both directions at the boundary day.
-  const when =
-    deadline === undefined
-      ? `within ${CLAIM_WINDOW_DAYS} days of creation`
-      : `before ${deadline.toLocaleString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZoneName: "short",
-        })}`;
-  return `attach it ${when}, after that it can no longer be claimed`;
+/**
+ * Time and zone included, not just the date: the server closes the window
+ * at an exact timestamp (created_at + 14 x 24h), and a bare "before Sep 18"
+ * misleads in both directions at the boundary day.
+ */
+function formatDeadline(deadline: Date): string {
+  return deadline.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
 }
+
 
 /**
  * Whether this project is attached to a team, as the CLI can tell locally.
@@ -135,32 +134,33 @@ export function claimState(input: {
 }
 
 /**
- * The nudge for `next_actions`, quoting the command the way `journey-guidance`
- * does.
- *
- * Names the claim window because the server now enforces it at claim time
- * (`proj.claim_window_expired`); before that enforcement existed this copy
- * deliberately promised nothing. It still says nothing about deletion, because
- * nothing deletes the project when the window closes — it only stops being
- * claimable (ADR 046 §Non-goals).
+ * The one claim nudge, shared by `setup` and `status` (doctor mirrors it with
+ * plain `zitadel` command names). Names the claim window because the server
+ * enforces it at claim time (`proj.claim_window_expired`), and names the
+ * data-loss stake per product decision: temporary projects get purged after
+ * the window. That supersedes the no-deletion stance in ADR 046 §Non-goals;
+ * amending the ADR is the follow-up tracked on PR #1194.
  */
-export function claimAction(cliVersion: string, deadline?: Date): string {
+function claimSentence(deadline?: Date): string {
+  const when =
+    deadline === undefined
+      ? `within ${CLAIM_WINDOW_DAYS} days of creation`
+      : `before ${formatDeadline(deadline)}`;
   return (
-    `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
-    `Run ${publicCliCommand("claim", cliVersion)} to make it permanent. ` +
-    "Nothing about the project changes, so users, passkeys, and the issuer keep working."
+    `Claim your Project ${when} to make it permanent and start collaborating with your team. ` +
+    "Until then, your Project is temporary and its data may be lost."
   );
 }
 
-/**
- * The same nudge for the human box, with the command on its own styled line.
- */
+/** The nudge for `next_actions`, quoting the command in prose. */
+export function claimAction(cliVersion: string, deadline?: Date): string {
+  return `${claimSentence(deadline)} Run ${publicCliCommand("claim", cliVersion)}.`;
+}
+
+/** The same nudge for the human box, with the command on its own styled line. */
 export function claimBoxAction(cliVersion: string, deadline?: Date): BoxAction {
   return {
-    text:
-      `This project is temporary until you attach it to a team: ${deadlinePhrase(deadline)}. ` +
-      "Claiming is independent of the steps above, so you can do it right away; " +
-      "nothing about the project changes, and users, passkeys, and the issuer keep working:",
+    text: claimSentence(deadline),
     command: publicCliCommand("claim", cliVersion),
   };
 }
@@ -183,10 +183,9 @@ export function claimCommand(cliVersion: string): string {
 export function claimWindowClosedAction(cliVersion: string): string {
   return (
     `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
-    `closed. Run ${publicCliCommand("claim", cliVersion)} to reconcile: if the project ` +
-    "was attached to a team from another machine it confirms that, and if it was never " +
-    "attached it can no longer be claimed. Either way the project keeps working; " +
-    `${publicCliCommand("setup", cliVersion)} in a fresh directory gets you a new ` +
-    "project you can attach."
+    `closed. Run ${publicCliCommand("claim", cliVersion)} to reconcile: a project ` +
+    "claimed from another machine confirms its team, and one never claimed can no " +
+    `longer be claimed. ${publicCliCommand("setup", cliVersion)} in a fresh directory ` +
+    "gets you a new project you can claim."
   );
 }
