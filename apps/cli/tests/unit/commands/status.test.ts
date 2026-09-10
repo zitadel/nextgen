@@ -105,7 +105,7 @@ describe("status command", () => {
       };
     };
     expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
-    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
@@ -134,7 +134,7 @@ describe("status command", () => {
     const actions = json.data.next_actions.join("\n");
     expect(actions).toContain("claim window has closed");
     expect(actions).toContain("no longer be claimed");
-    expect(actions).not.toContain("temporary until you attach");
+    expect(actions).not.toContain("its data may be lost");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
@@ -159,7 +159,7 @@ describe("status command", () => {
       team_id: "team-001",
       claimed_at: "2026-01-02T00:00:00.000Z",
     });
-    expect(json.data.next_actions.join("\n")).not.toContain("temporary until you attach");
+    expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
     expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
   });
 
@@ -337,7 +337,7 @@ describe("status command", () => {
     const actions = json.data.next_actions.join("\n");
     expect(actions).not.toContain("register a user");
     expect(actions).not.toContain("Customize what you ask for");
-    expect(actions).toContain("temporary until you attach it to a team");
+    expect(actions).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 });

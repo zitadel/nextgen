@@ -53,6 +53,74 @@ get:
     default:
       $ref: GetUserByID-error-response.yaml
 
+patch:
+  operationId: PatchUserByID
+  summary: Update user by ID
+  description: |
+    Partially updates a user's schema-defined attributes, and optionally
+    moves the user to another registered schema. The merged result is
+    validated against the schema before commit. Concurrent writes are
+    last-write-wins.
+  tags:
+    - Users
+  parameters:
+    - name: user_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../components/schemas/user-id.yaml
+  security:
+    - oauth2:
+        - user.write
+  requestBody:
+    description: The changes to merge into the user.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: patch-user-request.yaml
+  responses:
+    '200':
+      description: Updated user state.
+      content:
+        application/json:
+          schema:
+            $ref: ../user.yaml
+    '400':
+      description: Invalid request body, empty patch, unknown schema, or merged attributes failing schema validation.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Client was not authorized or the session is anonymous.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The credential may not manage users in this project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: User not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: |
+        A patched value is unique and already taken by another user, or
+        concurrent writes kept the user changing under the patch; retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: PatchUserByID-error-response.yaml
+
 delete:
     operationId: DeleteUserByID
     summary: Delete user by ID
