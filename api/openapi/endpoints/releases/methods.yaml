@@ -224,8 +224,8 @@ get:
             lastPage:
               summary: The final page
               description: |
-                `next_page_token` is null when there are no further results.
-                Metadata fields the caller never supplied are null too.
+                `next_page_token` is absent when there are no further results.
+                Metadata fields the caller never supplied are null, not absent.
               value:
                 releases:
                   - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
@@ -237,6 +237,5 @@ get:
                       created_at: '2026-07-13T08:00:00Z'
                       created_by: null
                       created_by_type: null
-                next_page_token: null
     default:
       $ref: listReleases-error-response.yaml

@@ -58,4 +58,18 @@ func TestReleaseAccessRow(t *testing.T) {
 		assertDomainCode(t, requireProjectAccess(operator, narrow, "proj_a", releaseAccess, opWrite),
 			domain.ErrReleasePermissionDenied().Code)
 	})
+
+	// Listing runs a different gate, so the codes it refuses with are worth
+	// pinning too. How that gate narrows a partial view is machinery every
+	// resource shares, and TestRequireProjectListAccess already covers it.
+	t.Run("listing refuses with the same release-flavored codes", func(t *testing.T) {
+		_, err := requireProjectListAccess(operator, stmts, "proj_b", releaseAccess, domain.ResourceKindRelease)
+		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
+
+		_, err = requireProjectListAccess(preview, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+
+		_, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
+	})
 }

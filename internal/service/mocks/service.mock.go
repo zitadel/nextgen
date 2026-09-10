@@ -12428,6 +12428,84 @@ func (c *MockReleaseServiceCreateCall) DoAndReturn(f func(context.Context, servi
 	return c
 }
 
+// Get mocks base method.
+func (m *MockReleaseService) Get(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Get", ctx, projectID, id)
+	ret0, _ := ret[0].(*domain.Release)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Get indicates an expected call of Get.
+func (mr *MockReleaseServiceMockRecorder) Get(ctx, projectID, id any) *MockReleaseServiceGetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockReleaseService)(nil).Get), ctx, projectID, id)
+	return &MockReleaseServiceGetCall{Call: call}
+}
+
+// MockReleaseServiceGetCall wrap *gomock.Call
+type MockReleaseServiceGetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockReleaseServiceGetCall) Return(arg0 *domain.Release, arg1 error) *MockReleaseServiceGetCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockReleaseServiceGetCall) Do(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceGetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockReleaseServiceGetCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceGetCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// List mocks base method.
+func (m *MockReleaseService) List(ctx context.Context, input service.ListReleasesInput) (*service.ListReleasesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, input)
+	ret0, _ := ret[0].(*service.ListReleasesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockReleaseServiceMockRecorder) List(ctx, input any) *MockReleaseServiceListCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockReleaseService)(nil).List), ctx, input)
+	return &MockReleaseServiceListCall{Call: call}
+}
+
+// MockReleaseServiceListCall wrap *gomock.Call
+type MockReleaseServiceListCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockReleaseServiceListCall) Return(arg0 *service.ListReleasesOutput, arg1 error) *MockReleaseServiceListCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockReleaseServiceListCall) Do(f func(context.Context, service.ListReleasesInput) (*service.ListReleasesOutput, error)) *MockReleaseServiceListCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockReleaseServiceListCall) DoAndReturn(f func(context.Context, service.ListReleasesInput) (*service.ListReleasesOutput, error)) *MockReleaseServiceListCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockSessionResolver is a mock of SessionResolver interface.
 type MockSessionResolver struct {
 	ctrl     *gomock.Controller
