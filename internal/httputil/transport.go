@@ -3,6 +3,7 @@ package httputil
 import (
 	"net"
 	"net/http"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -26,17 +27,30 @@ func newTransport(policy *Policy) http.RoundTripper {
 		Timeout:   5 * time.Second,
 		KeepAlive: 30 * time.Second,
 		Control: func(network, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return err
-			}
-			parsedIP := net.ParseIP(host)
-			if parsedIP == nil { // at this point it must be an IP, so this should never happen
-				return &net.DNSError{Err: "invalid IP address", Name: host}
-			}
-			return policy.Check([]net.IP{parsedIP}, host)
+			return checkDialAddress(policy, address)
 		},
 	}
 	base.DialContext = dialer.DialContext
 	return base
+}
+
+// checkDialAddress applies the policy to the exact address the kernel is
+// about to connect to.
+func checkDialAddress(policy *Policy, address string) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	// A zoned IPv6 literal ("fe80::1%eth0") does not parse as an IP. The
+	// zone is irrelevant to the policy, so strip it for matching only — the
+	// dial itself still uses the original address — keeping link-local deny
+	// (and allow) rules effective and attributable.
+	if i := strings.IndexByte(host, '%'); i >= 0 {
+		host = host[:i]
+	}
+	parsedIP := net.ParseIP(host)
+	if parsedIP == nil { // at this point it must be an IP, so this should never happen
+		return &net.DNSError{Err: "invalid IP address", Name: host}
+	}
+	return policy.Check([]net.IP{parsedIP}, host)
 }

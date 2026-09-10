@@ -20,3 +20,18 @@ func TestNewTransportIgnoresEnvironmentProxy(t *testing.T) {
 		require.Nil(t, transport.Proxy, "deny=%v: environment proxying must be disabled", deny)
 	}
 }
+
+// Zoned IPv6 literals ("fe80::1%eth0") reach the dial hook with the zone
+// attached; the policy must still evaluate the address, deny and allow alike.
+func TestCheckDialAddressZonedIPv6(t *testing.T) {
+	denyLinkLocal, err := NewPolicy([]string{"fe80::/10"}, nil)
+	require.NoError(t, err)
+	var denied *AddressDeniedError
+	require.ErrorAs(t, checkDialAddress(denyLinkLocal, "[fe80::1%eth0]:443"), &denied)
+
+	allowZoned, err := NewPolicy([]string{"fe80::/10"}, []string{"fe80::1"})
+	require.NoError(t, err)
+	require.NoError(t, checkDialAddress(allowZoned, "[fe80::1%eth0]:443"))
+
+	require.Error(t, checkDialAddress(denyLinkLocal, "not-an-address"))
+}

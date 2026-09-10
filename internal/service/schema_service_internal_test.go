@@ -21,7 +21,7 @@ func TestResolveSchemaError(t *testing.T) {
 			WithDetails(domain.SchemaFetchDetails{URL: "https://host.test/x.json"}).
 			WithParent(cause)
 
-		out := resolveSchemaError(in)
+		out := resolveSchemaError(in, "https://host.test/x.json")
 		require.ErrorIs(t, out, domain.ErrJSONSchemaFetchDenied())
 		de, ok := errors.AsType[domain.Error](out)
 		require.True(t, ok)
@@ -29,13 +29,17 @@ func TestResolveSchemaError(t *testing.T) {
 		assert.ErrorIs(t, de.Parent, cause)
 	})
 
-	t.Run("a bare envelope expiry becomes fetch_timeout", func(t *testing.T) {
-		out := resolveSchemaError(context.DeadlineExceeded)
+	t.Run("a bare envelope expiry becomes fetch_timeout naming the root URL", func(t *testing.T) {
+		out := resolveSchemaError(context.DeadlineExceeded, "https://host.test/root.json?sig=token")
 		require.ErrorIs(t, out, domain.ErrJSONSchemaFetchTimeout())
+		de, ok := errors.AsType[domain.Error](out)
+		require.True(t, ok)
+		assert.Equal(t, domain.SchemaFetchDetails{URL: "https://host.test/root.json"}, de.Details,
+			"the root URL must ride along, redacted")
 	})
 
 	t.Run("anything else is internal", func(t *testing.T) {
-		out := resolveSchemaError(errors.New("boom"))
+		out := resolveSchemaError(errors.New("boom"), "https://host.test/x.json")
 		require.ErrorIs(t, out, domain.ErrInternal(nil))
 	})
 }

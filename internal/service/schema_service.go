@@ -102,7 +102,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		// the duplicate as a commit-time AlreadyExists otherwise.
 		_, err := s.schemaResolver.Resolve(ctx, stmts, input.ProjectID, model.URL, model.Schema)
 		if err != nil {
-			return resolveSchemaError(err)
+			return resolveSchemaError(err, model.URL)
 		}
 		return audit.Emit(ctx, stmts, audit.EmitSpec{
 			Type:       domain.EventTypeSchemaCreated,
@@ -143,13 +143,15 @@ func (s *SchemaService) classifyCreateConflict(ctx context.Context, projectID, s
 // error. The fetch_* re-stamps are runtime no-ops that put each code in a
 // return position, which the OpenAPI error analysis needs: it cannot see
 // through the resolver's $ref loader indirection (domain.classifyFetchError).
-func resolveSchemaError(err error) error {
+func resolveSchemaError(err error, schemaURL string) error {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok {
 		// The resolver reports an envelope that expired after the last
 		// fetch as a bare context error (see domain.JSONSchemaResolver.Resolve).
 		if errors.Is(err, context.DeadlineExceeded) {
-			return domain.ErrJSONSchemaFetchTimeout().WithParent(err)
+			return domain.ErrJSONSchemaFetchTimeout().
+				WithDetails(domain.SchemaFetchDetails{URL: domain.RedactSchemaURL(schemaURL)}).
+				WithParent(err)
 		}
 		return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 	}
@@ -173,7 +175,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
 		if err != nil {
-			return resolveSchemaError(err)
+			return resolveSchemaError(err, strURI)
 		}
 		return nil
 	})

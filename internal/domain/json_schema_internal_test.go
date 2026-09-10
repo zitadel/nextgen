@@ -62,11 +62,11 @@ func TestClassifyFetchError(t *testing.T) {
 
 func TestRedactSchemaURL(t *testing.T) {
 	assert.Equal(t, "https://host.test/path",
-		redactSchemaURL("https://user:secret@host.test/path?sig=token#frag"),
+		RedactSchemaURL("https://user:secret@host.test/path?sig=token#frag"),
 		"userinfo, query, and fragment must not reach client-facing details")
 	assert.Equal(t, "https://host.test/plain.json",
-		redactSchemaURL("https://host.test/plain.json"))
+		RedactSchemaURL("https://host.test/plain.json"))
 	assert.Equal(t, "http://bad url/",
-		redactSchemaURL("http://bad url/"),
+		RedactSchemaURL("http://bad url/"),
 		"an unparseable string passes through unchanged")
 }
