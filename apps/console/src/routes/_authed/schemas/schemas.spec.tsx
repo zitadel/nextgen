@@ -335,7 +335,7 @@ describe("user schema detail", () => {
   });
 
   it("elides the middle of a deep path, keeping the last two levels", async () => {
-    // `Schema › … › datum › reference` (`1279:366735`). The ellipsis stands for
+    // `Schema › … › datum › reference`. The ellipsis stands for
     // more than one level, so it is inert; the segments either side of it still
     // navigate.
     server.use(
