@@ -1,22 +1,50 @@
+x-meta-schema: true
 type: object
 description: |
   Branding configuration, used in two places with one shape: as the request
   body of `POST /branding`, which publishes it as a new immutable revision,
   and as a read-only projection on flow responses, which carries the
-  project's latest revision.
+  project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+  that `zitadel apply` publishes.
 
   Every field is optional. An omitted key uses Zitadel's maintained default,
   so a revision carrying one colour is as valid as one carrying the whole
   object.
+additionalProperties: false
+# The only place the file on disk differs from the wire: the descriptor may
+# name a template file, which the CLI inlines into `liquid_template` before
+# publishing. The generated editor schema carries it; the API never sees it.
+x-dialect:
+  not:
+    required: [liquid_template, liquid_template_file]
+  properties:
+    liquid_template_file:
+      type: string
+      example: ./login.liquid
+      description: |
+        Path to the LiquidJS template file, relative to this descriptor. The
+        CLI inlines the file content into `liquid_template` when publishing,
+        and writes server state back to the file. Mutually exclusive with
+        `liquid_template`.
 properties:
+  "$schema":
+    type: string
+    description: |
+      Editor affordance: path or URL of this file's JSON meta-schema, so an
+      editor validates and autocompletes it. The CLI strips it before upload;
+      the platform ignores it.
   layout:
     type: string
     enum: [centered, split]
     description: |
-      Layout preset the bundled template branches on, and the degrade target
-      when a custom template fails validation. Ejected templates may ignore
-      it. Selects a template rather than restyling the widget, so it is not
-      an appearance control.
+      Degrade preset (`centered` or `split`) the bundled default template
+      branches on, and the fallback when a custom template fails validation.
+      Not the complete design catalog: all named designs (`centered`, `split`,
+      `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+      these two values; switch designs with
+      `zitadel branding eject --design <name>` instead of editing this field.
+      Ejected templates may ignore it. Selects a template rather than restyling
+      the widget, so it is not an appearance control.
     default: centered
   liquid_template:
     type: string
@@ -32,11 +60,13 @@ properties:
       Fallback mark, used only when neither `theme.light.logo_url` nor
       `theme.dark.logo_url` is set. Prefer the per-side marks — one file
       cannot serve both surfaces.
+    pattern: '^([hH][tT][tT][pP][sS]://|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\[::1\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))'
   hero_url:
     type: string
     format: uri
     maxLength: 2048
     description: Hero/background image URL, used by the split layout.
+    pattern: '^([hH][tT][tT][pP][sS]://|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\[::1\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))'
   theme:
     $ref: branding-theme.yaml
   typography:

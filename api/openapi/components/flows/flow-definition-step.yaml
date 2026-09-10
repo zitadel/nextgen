@@ -1,5 +1,6 @@
 type: object
 required: [name]
+additionalProperties: false
 description: |
   A step in a flow definition. This is the admin-authored configuration,
   not the runtime payload sent to the frontend.
@@ -16,6 +17,7 @@ properties:
     description: |
       Unique step identifier within this flow. Used as transition targets
       and returned in the API response as `step.name`.
+    pattern: "^[a-z][a-z0-9_-]*$"
     example: login
 
   fields:
@@ -28,6 +30,7 @@ properties:
       transition outcome).
     items:
       type: string
+    uniqueItems: true
     default: []
     example: [email, password]
 

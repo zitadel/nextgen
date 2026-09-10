@@ -271,7 +271,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
       readFileSync(join(repoRoot, "api/openapi/endpoints/schemas/flow-definition.json"), "utf8"),
     ) as {
       $defs: {
-        Step: {
+        FlowDefinitionStep: {
           properties: { on_success: { enum: string[] }; sso_providers: { items: object } };
         };
       };
@@ -293,8 +293,8 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
 
   it("validates once both deltas land in the meta-schema", () => {
     const patched = flowMeta();
-    patched.$defs.Step.properties.on_success.enum.push("create_user_with_sso");
-    patched.$defs.Step.properties.sso_providers.items = { type: "string", minLength: 1 };
+    patched.$defs.FlowDefinitionStep.properties.on_success.enum.push("create_user_with_sso");
+    patched.$defs.FlowDefinitionStep.properties.sso_providers.items = { type: "string", minLength: 1 };
     expect(ajv().compile(patched)(flow)).toBe(true);
   });
 

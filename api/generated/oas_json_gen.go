@@ -9737,6 +9737,12 @@ func (s *Branding) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *Branding) encodeFields(e *jx.Encoder) {
 	{
+		if s.Schema.Set {
+			e.FieldStart("$schema")
+			s.Schema.Encode(e)
+		}
+	}
+	{
 		if s.Layout.Set {
 			e.FieldStart("layout")
 			s.Layout.Encode(e)
@@ -9780,14 +9786,15 @@ func (s *Branding) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfBranding = [7]string{
-	0: "layout",
-	1: "liquid_template",
-	2: "logo_url",
-	3: "hero_url",
-	4: "theme",
-	5: "typography",
-	6: "shape",
+var jsonFieldsNameOfBranding = [8]string{
+	0: "$schema",
+	1: "layout",
+	2: "liquid_template",
+	3: "logo_url",
+	4: "hero_url",
+	5: "theme",
+	6: "typography",
+	7: "shape",
 }
 
 // Decode decodes Branding from json.
@@ -9799,6 +9806,16 @@ func (s *Branding) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "$schema":
+			if err := func() error {
+				s.Schema.Reset()
+				if err := s.Schema.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"$schema\"")
+			}
 		case "layout":
 			if err := func() error {
 				s.Layout.Reset()
@@ -9870,7 +9887,7 @@ func (s *Branding) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"shape\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -10899,7 +10916,7 @@ func (s *BrandingPalette) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"error\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -11170,7 +11187,7 @@ func (s *BrandingShape) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"logo_scale\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -11357,7 +11374,7 @@ func (s *BrandingTheme) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"dark\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -11479,7 +11496,7 @@ func (s *BrandingThemeSide) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"palette\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -11576,7 +11593,7 @@ func (s *BrandingTypography) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"scale\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -28773,7 +28790,7 @@ func (s *FlowAudience) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"app_ids\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -29370,6 +29387,12 @@ func (s *FlowDefinition) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	{
+		if s.Schema.Set {
+			e.FieldStart("$schema")
+			s.Schema.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("name")
 		e.Str(s.Name)
 	}
@@ -29401,13 +29424,14 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowDefinition = [6]string{
-	0: "name",
-	1: "status",
-	2: "user_schema",
-	3: "purposes",
-	4: "audience",
-	5: "steps",
+var jsonFieldsNameOfFlowDefinition = [7]string{
+	0: "$schema",
+	1: "name",
+	2: "status",
+	3: "user_schema",
+	4: "purposes",
+	5: "audience",
+	6: "steps",
 }
 
 // Decode decodes FlowDefinition from json.
@@ -29419,8 +29443,18 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "$schema":
+			if err := func() error {
+				s.Schema.Reset()
+				if err := s.Schema.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"$schema\"")
+			}
 		case "name":
-			requiredBitSet[0] |= 1 << 0
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := d.Str()
 				s.Name = string(v)
@@ -29432,7 +29466,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
 		case "status":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				if err := s.Status.Decode(d); err != nil {
 					return err
@@ -29442,7 +29476,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"status\"")
 			}
 		case "user_schema":
-			requiredBitSet[0] |= 1 << 2
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				v, err := d.Str()
 				s.UserSchema = string(v)
@@ -29454,7 +29488,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"user_schema\"")
 			}
 		case "purposes":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				if err := s.Purposes.Decode(d); err != nil {
 					return err
@@ -29474,7 +29508,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"audience\"")
 			}
 		case "steps":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
 				s.Steps = make([]FlowDefinitionStep, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -29492,7 +29526,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"steps\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -29501,7 +29535,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00101111,
+		0b01011110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -30151,7 +30185,7 @@ func (s *FlowDefinitionStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"transitions\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -31970,9 +32004,9 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 		case "actions":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				s.Actions = make([]StepAction, 0)
+				s.Actions = make([]FlowStepAction, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem StepAction
+					var elem FlowStepAction
 					if err := elem.Decode(d); err != nil {
 						return err
 					}
@@ -32075,6 +32109,198 @@ func (s *FlowStep) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStep) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *FlowStepAction) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *FlowStepAction) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
+	{
+		if s.Primary.Set {
+			e.FieldStart("primary")
+			s.Primary.Encode(e)
+		}
+	}
+	{
+		if s.TextKey.Set {
+			e.FieldStart("text_key")
+			s.TextKey.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfFlowStepAction = [4]string{
+	0: "name",
+	1: "kind",
+	2: "primary",
+	3: "text_key",
+}
+
+// Decode decodes FlowStepAction from json.
+func (s *FlowStepAction) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowStepAction to nil")
+	}
+	var requiredBitSet [1]uint8
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "name":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "kind":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "primary":
+			if err := func() error {
+				s.Primary.Reset()
+				if err := s.Primary.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"primary\"")
+			}
+		case "text_key":
+			if err := func() error {
+				s.TextKey.Reset()
+				if err := s.TextKey.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"text_key\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowStepAction")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowStepAction) {
+					name = jsonFieldsNameOfFlowStepAction[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *FlowStepAction) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowStepAction) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowStepActionKind as json.
+func (s FlowStepActionKind) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowStepActionKind from json.
+func (s *FlowStepActionKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowStepActionKind to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowStepActionKind(v) {
+	case FlowStepActionKindSubmit:
+		*s = FlowStepActionKindSubmit
+	case FlowStepActionKindPasskey:
+		*s = FlowStepActionKindPasskey
+	case FlowStepActionKindPasskeyRegister:
+		*s = FlowStepActionKindPasskeyRegister
+	case FlowStepActionKindNavigate:
+		*s = FlowStepActionKindNavigate
+	case FlowStepActionKindBack:
+		*s = FlowStepActionKindBack
+	default:
+		*s = FlowStepActionKind(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowStepActionKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowStepActionKind) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -36631,7 +36857,7 @@ func (s *Gate) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"config\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -67463,7 +67689,7 @@ func (s *SSOProvider) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"template\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -73225,7 +73451,7 @@ func (s *StepAction) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"text_key\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -73304,8 +73530,6 @@ func (s *StepActionKind) Decode(d *jx.Decoder) error {
 		*s = StepActionKindPasskeyRegister
 	case StepActionKindNavigate:
 		*s = StepActionKindNavigate
-	case StepActionKindBack:
-		*s = StepActionKindBack
 	default:
 		*s = StepActionKind(v)
 	}
@@ -81278,6 +81502,10 @@ func (s *UserProperty) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	{
+		e.FieldStart("$schema")
+		e.Str("https://json-schema.org/draft/2020-12/schema")
+	}
+	{
 		if s.XMinusUnique.Set {
 			e.FieldStart("x-unique")
 			s.XMinusUnique.Encode(e)
@@ -81310,11 +81538,12 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserProperty = [4]string{
-	0: "x-unique",
-	1: "x-claim",
-	2: "x-audit",
-	3: "properties",
+var jsonFieldsNameOfUserProperty = [5]string{
+	0: "$schema",
+	1: "x-unique",
+	2: "x-claim",
+	3: "x-audit",
+	4: "properties",
 }
 
 // Decode decodes UserProperty from json.
@@ -81327,6 +81556,16 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "$schema":
+			if err := func() error {
+				s.Schema.Reset()
+				if err := s.Schema.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"$schema\"")
+			}
 		case "x-unique":
 			if err := func() error {
 				s.XMinusUnique.Reset()
