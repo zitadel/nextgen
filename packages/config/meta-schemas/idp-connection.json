@@ -31,7 +31,7 @@
         "oidc",
         "oauth2"
       ],
-      "description": "Selects which protocol block is required and which engine handles the connection. Closed: every value has a server implementation."
+      "description": "Selects which protocol block must be present."
     },
     "template": {
       "type": "string",
@@ -319,7 +319,7 @@
           "enum": [
             "github_primary_email"
           ],
-          "description": "Provider-specific follow-up call after userinfo, implemented in the engine. Closed: every value is implemented behaviour. New values are non-breaking."
+          "description": "Provider-specific follow-up call after userinfo. New values are non-breaking."
         }
       },
       "allOf": [
