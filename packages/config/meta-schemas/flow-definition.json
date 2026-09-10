@@ -151,7 +151,7 @@
               "password"
             ]
           ],
-          "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`, or use the reserved token `x-auth-methods#<method>` (e.g. `x-auth-methods#password`) to collect a credential proof for a method enabled at the schema root. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes - e.g. a property with a non-empty `x-unique` scope makes `user_not_found` a valid `transitions` key on this step."
+          "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema` — naming a nested property by its dotted path (`address.street`), since an object- or array-typed property has no field-shaped input — or use the reserved token `x-auth-methods#<method>` (e.g. `x-auth-methods#password`) to collect a credential proof for a method enabled at the schema root. Collecting a leaf materializes every object above it, so an optional object's own `required` entries must be collected too once any step reaches into it. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes - e.g. a property with a non-empty `x-unique` scope makes `user_not_found` a valid `transitions` key on this step."
         },
         "actions": {
           "type": "array",

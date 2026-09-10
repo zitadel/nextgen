@@ -22,6 +22,7 @@ For the shape and validation rules, see
 | [04](./04-passkey-register/) | `register` | passkey | Passkey signup with provisional user finalized on verify. |
 | [05](./05-combined-login-register/) | `login` + `register` | password | Flip-table coverage between sub-flows. |
 | [06](./06-combined-password-passkey/) | `login` + `register` | password, passkey | Both methods on both purposes plus post-signup passkey upsell. |
+| [07](./07-nested-profile-fields/) | `register` | password | Nested schema properties collected by dotted path. |
 
 The server's embedded default project flow is
 `packages/config/defaults/default-login.json` (via `embed.go`) — that file is
@@ -42,7 +43,9 @@ the properties present on the step — there is no step `type`:
 - A step with `fields` collects user input validated against the
   `user_schema`. Schema annotations (`x-unique`, `x-auth-methods`)
   and reserved credential field names (`x-auth-methods#<method>`)
-  drive implicit dispatch behavior at runtime.
+  drive implicit dispatch behavior at runtime. A nested property is named by
+  its dotted path (`address.street`) — the object itself has no field-shaped
+  input, so collect its leaves.
 - A step with `actions` exposes user-selectable buttons. Two action names are
   engine-handled — `passkey` (login) and `passkey_register` (signup) — and
   trigger the two-phase WebAuthn ceremony.

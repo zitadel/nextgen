@@ -34,7 +34,7 @@ present.
 | Property | Meaning |
 |---|---|
 | `name` | Unique within the definition. Used as the `Transitions` target. |
-| `fields` | Ordered array of user-schema property names or reserved authentication-method fields such as `x-auth-methods#password`. Resolved at runtime to per-field type, validation, uniqueness scope, and `FlowFieldChallenge`. |
+| `fields` | Ordered array of user-schema property names or reserved authentication-method fields such as `x-auth-methods#password`. A nested property is named by its dotted path (`address.street`). Resolved at runtime to per-field type, validation, uniqueness scope, and `FlowFieldChallenge`. |
 | `actions` | Ordered array of `{ name, kind, text_key?, primary? }`. The client echoes `name` back in `submit`. |
 | `gates` | Definition-schema map of gate name → `{ kind, provider, config }`. Captcha is the only gate kind in the enum, but today's runtime neither emits nor enforces gates and rejects `gate_proofs`. |
 | `sso_providers` | Definition-schema list of `{ id, name, template }`. Today's runtime does not emit providers and rejects SSO submissions. |
@@ -71,6 +71,7 @@ Transition values:
 - `user_schema` URL resolves to a user-type schema. May be deferred until promotion to runtime use.
 - **Flip-table coverage.** A definition that serves both `login` and `register` must wire `user_not_found` (login entry) and `user_already_exists` (register entry) on the entry step. Solo-purpose flows don't need the counter outcome. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 - **`on_success` manifest cross-check.** Every credential kind a mutation establishes (per `ManifestForOnSuccess`) must be collected on the step itself or on some upstream step in the graph. `create_user` establishes `{identifier, password}` — both must appear in `fields` somewhere reachable.
+- **Required-field coverage.** Every path the user schema requires is collected by some step. The check descends: a required object contributes its own nested `required` entries, and a required object declaring none is satisfied by any leaf beneath it. Collecting a leaf materializes every object above it, so an optional object's `required` entries come into force as soon as any step reaches into it — and demand nothing when no step does.
 
 ### Step
 
@@ -80,7 +81,7 @@ Transition values:
 - Every key in `transitions` is either an action name declared in this step's `actions` or a reserved engine-emitted outcome.
 - **`back` is a reserved action name.** The engine injects a `back` action on rendered responses when there's a step to return to (non-empty back stack on a non-terminal step). Authors must not declare an action named `back`, regardless of `kind`.
 - When `sso_providers` is non-empty, `transitions.callback` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
-- Every entry in `fields` resolves to a property in the referenced `user_schema`.
+- Every entry in `fields` resolves to a property in the referenced `user_schema`, descending one `properties` level per dotted segment. The property must be scalar: an object or array is rejected, including one that declares `properties` or `items` without spelling out a `type`.
 - A step with an identifier-shaped field (schema property with non-empty `x-unique`) may declare a `user_not_found` transition; absence of the transition means the engine errors on lookup failure rather than routing. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md) for the direction this is heading.
 
 ### Graph

@@ -7,8 +7,9 @@ properties:
   name:
     type: string
     description: |
-      Field name, matching a property in the flow's user schema. Carries
-      the submitted value back to the engine.
+      Field name, matching a property in the flow's user schema — a
+      dotted path (`address.street`) for a nested property. Carries the
+      submitted value back to the engine.
     example: email
   type:
     type: string
@@ -28,7 +29,8 @@ properties:
     default: false
     description: |
       The field MUST be present and non-empty on submit. Mirrors the
-      schema's top-level `required` array.
+      schema's `required` array at every level of the field's path: a
+      nested leaf is required only when each of its ancestors is too.
   value:
     description: Pre-filled value (e.g., an identifier carried over from a pivot).
   validation:
