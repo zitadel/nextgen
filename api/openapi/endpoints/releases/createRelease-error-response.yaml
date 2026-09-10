@@ -5,13 +5,27 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/rel-invalid.yaml'
+        - $ref: '../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../components/schemas/errors/rel-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/rel-project_not_found.yaml'
+        - $ref: '../../components/schemas/errors/rel-revision_not_found.yaml'
+        - $ref: '../../components/schemas/errors/rel-revision_unpinnable.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          rel.invalid: '../../components/schemas/errors/rel-invalid.yaml'
+          rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
+          rel.permission_denied: '../../components/schemas/errors/rel-permission_denied.yaml'
+          rel.project_not_found: '../../components/schemas/errors/rel-project_not_found.yaml'
+          rel.revision_not_found: '../../components/schemas/errors/rel-revision_not_found.yaml'
+          rel.revision_unpinnable: '../../components/schemas/errors/rel-revision_unpinnable.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -19,11 +33,46 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      rel.invalid:
+        summary: rel.invalid
+        value:
+          code: rel.invalid
+          message: 'release: invalid'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.permission_denied:
+        summary: rel.permission_denied
+        value:
+          code: rel.permission_denied
+          message: 'release: requires an operator-grade token bound to the project (project.write or a release.* scope)'
+      rel.project_not_found:
+        summary: rel.project_not_found
+        value:
+          code: rel.project_not_found
+          message: 'release: project not found'
+      rel.revision_not_found:
+        summary: rel.revision_not_found
+        value:
+          code: rel.revision_not_found
+          message: 'release: pinned revision does not exist'
+      rel.revision_unpinnable:
+        summary: rel.revision_unpinnable
+        value:
+          code: rel.revision_unpinnable
+          message: 'release: pinned revision declares no handle'
       req.invalid:
         summary: req.invalid
         value:

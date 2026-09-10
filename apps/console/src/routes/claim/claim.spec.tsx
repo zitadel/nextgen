@@ -135,9 +135,10 @@ describe("claim page", () => {
     // The challenge is single-use (first-claim-wins): one visit must spend it
     // exactly once, whatever React re-renders happen around the effect.
     expect(bodies).toEqual([{ challenge_id: CHALLENGE_ID }]);
-    // The CLI is polling `claim/status`; the page says so instead of
-    // pretending the browser is the end of the story.
-    expect(screen.getByText(/terminal/i)).toBeInTheDocument();
+    // One next step, not two: the console is where the developer goes, and the
+    // CLI picks the claim up on its own without being told to.
+    expect(screen.getByRole("link", { name: "Open the console" })).toBeInTheDocument();
+    expect(screen.queryByText(/terminal/i)).not.toBeInTheDocument();
   });
 
   it("shows the owning team's dashboard when the project is already claimed", async () => {
@@ -267,7 +268,7 @@ describe("claim page", () => {
     await renderAt(CLAIM_PATH);
 
     expect(
-      await screen.findByRole("heading", { name: "Your session can't complete this claim" }),
+      await screen.findByRole("heading", { name: "This account can't claim the project" }),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("zitadel-login")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
@@ -349,6 +350,19 @@ describe("claim window countdown", () => {
 
     // A read that only decorates must never gate the claim itself.
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+    expect(screen.queryByText(/^Expires in/)).not.toBeInTheDocument();
+  });
+
+  it("drops the badge once the project is claimed", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubWindow(9);
+    stubComplete(() =>
+      HttpResponse.json({ project_id: PROJECT_ID, team_id: "team_1", claimed_at: "2026-08-24T10:00:00Z" }),
+    );
+
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByText("Project claimed")).toBeInTheDocument();
     expect(screen.queryByText(/^Expires in/)).not.toBeInTheDocument();
   });
 

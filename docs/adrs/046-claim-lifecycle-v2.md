@@ -13,6 +13,9 @@
 > owning-team grant in `authz_assignments` (the database enforces one owner
 > per project), which anticipates proposed ADR 054 §2. The console claim page
 > is still open (#615), so the browser leg of the flow has no guided UI yet.
+> *(Correction: the console claim page shipped in
+> `feat(console): add the project claim page (#1078)` —
+> `apps/console/src/routes/claim/index.tsx` — closing #615.)*
 >
 > **Proposed amendment — [ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
 > if ADR 053 is accepted, [§2](#2-claimcomplete-is-authenticated-by-a-platform-project-session)'s

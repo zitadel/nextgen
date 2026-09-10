@@ -128,6 +128,17 @@ var environmentAccess = resourceAccess{
 	denied:    domain.ErrEnvironmentPermissionDenied,
 }
 
+// releaseAccess gates the project's release snapshots (ADR 035, #531).
+// Create and get are project-scoped: both carry a project_id and the get
+// filters its lookup by it, so no route resolves a path id through RSI and the
+// kind is only used to narrow a partial-access list.
+var releaseAccess = resourceAccess{
+	kind:      domain.ResourceKindRelease,
+	readMiss:  domain.ErrReleaseNotFound,
+	writeMiss: domain.ErrReleaseProjectNotFound,
+	denied:    domain.ErrReleasePermissionDenied,
+}
+
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
 // project-scoped (no RSI kind); credential ceiling is project.write like other
 // management resources until #420 mints a fine-grained events relation.
