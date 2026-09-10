@@ -13,21 +13,21 @@ import (
 )
 
 const (
-	variablesQuery = `SELECT name, project_id, environment_name, value, is_secret, created_at, modified_at
+	variablesQuery = `SELECT name, project_id, environment_id, value, is_secret, created_at, modified_at
 FROM zitadel_nextgen.variables`
 
 	// The conflict target is the natural key, so a rewrite at the same owner and
 	// name replaces the value instead of adding a second variable there.
-	setVariableStmt = `INSERT INTO zitadel_nextgen.variables (name, project_id, environment_name, value, is_secret)
+	setVariableStmt = `INSERT INTO zitadel_nextgen.variables (name, project_id, environment_id, value, is_secret)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (name, project_id, environment_name)
+ON CONFLICT (name, project_id, environment_id)
 DO UPDATE SET value = EXCLUDED.value, is_secret = EXCLUDED.is_secret, modified_at = NOW()`
 
 	// Both owner columns are matched exactly, which is the primary key minus
 	// the name -- so this addresses exactly one row, and an owner cannot remove
 	// a variable another one entered.
 	deleteVariableStmt = `DELETE FROM zitadel_nextgen.variables
-WHERE name = $1 AND project_id = $2 AND environment_name = $3`
+WHERE name = $1 AND project_id = $2 AND environment_id = $3`
 )
 
 type variableStatements struct{ statement }
@@ -61,7 +61,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 		return err
 	}
 	if _, err := s.client.Exec(ctx, setVariableStmt,
-		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentName,
+		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentID,
 		encoded, v.IsSecret,
 	); err != nil {
 		return wrapError(err)
@@ -72,7 +72,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 // DeleteVariable implements [service.VariableStatements].
 func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
 	tag, err := s.client.Exec(ctx, deleteVariableStmt,
-		name, owner.ProjectID, owner.EnvironmentName,
+		name, owner.ProjectID, owner.EnvironmentID,
 	)
 	if err != nil {
 		return wrapError(err)
@@ -89,7 +89,7 @@ func scanVariable(row pgx.CollectableRow) (*variable.VariableStorage, error) {
 		encoded []byte
 	)
 	if err := row.Scan(
-		&stored.Name, &stored.ProjectID, &stored.EnvironmentName,
+		&stored.Name, &stored.ProjectID, &stored.EnvironmentID,
 		&encoded, &stored.IsSecret, &stored.CreatedAt, &stored.ModifiedAt,
 	); err != nil {
 		return nil, err

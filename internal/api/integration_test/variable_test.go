@@ -358,4 +358,33 @@ func TestVariables(t *testing.T) {
 		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
 		assert.NotContains(t, get(t, api.OptEnvironmentName{}), "BULK_C")
 	})
+
+	// The name addresses the environment on the wire, but the row is keyed on
+	// its id, so the name is resolved before anything is read or written. A
+	// name no environment answers to is therefore the environment reporting
+	// itself absent, not an owner that holds nothing: with nothing inherited,
+	// an empty read would say the project's variables are gone instead.
+	t.Run("an environment name nothing answers to is not found", func(t *testing.T) {
+		missing := api.NewOptEnvironmentName("nope")
+
+		read, err := client.GetVariables(t.Context(), api.GetVariablesParams{
+			ProjectID:       projectID,
+			EnvironmentName: missing,
+		})
+		require.NoError(t, err)
+		status, code, _, ok := errorResponseParts(t, read)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, read))
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrEnvironmentNotFound().Code, code)
+
+		// The write half: an owner that does not exist takes nothing with it.
+		written := update(t, missing, api.UpdateVariablesRequest{
+			"NEVER_LANDS": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
+		})
+		status, code, _, ok = errorResponseParts(t, written)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, written))
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrEnvironmentNotFound().Code, code)
+		assert.NotContains(t, get(t, api.OptEnvironmentName{}), "NEVER_LANDS")
+	})
 }

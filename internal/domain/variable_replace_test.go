@@ -435,7 +435,7 @@ func TestVariableListToMap(t *testing.T) {
 	t.Parallel()
 
 	project := VariableOwner{ProjectID: "p"}
-	env := VariableOwner{ProjectID: "p", EnvironmentName: "e"}
+	env := VariableOwner{ProjectID: "p", EnvironmentID: "e"}
 
 	// A read admits one owner and the primary key is name plus owner, so the
 	// list this collapses never holds two rows under one name. There is no

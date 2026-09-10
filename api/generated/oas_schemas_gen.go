@@ -12370,6 +12370,7 @@ func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 type DeleteVariableErrorResponse struct {
 	Type                DeleteVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	EnvNotFound         EnvNotFound
 	Internal            Internal
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
@@ -12382,6 +12383,7 @@ type DeleteVariableErrorResponseType string
 // Possible values for DeleteVariableErrorResponseType.
 const (
 	AuthUnauthorizedDeleteVariableErrorResponse    DeleteVariableErrorResponseType = "auth.unauthorized"
+	EnvNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "env.not_found"
 	InternalDeleteVariableErrorResponse            DeleteVariableErrorResponseType = "internal"
 	ReqInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "req.invalid"
 	VarNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "var.not_found"
@@ -12391,6 +12393,11 @@ const (
 // IsAuthUnauthorized reports whether DeleteVariableErrorResponse is AuthUnauthorized.
 func (s DeleteVariableErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedDeleteVariableErrorResponse
+}
+
+// IsEnvNotFound reports whether DeleteVariableErrorResponse is EnvNotFound.
+func (s DeleteVariableErrorResponse) IsEnvNotFound() bool {
+	return s.Type == EnvNotFoundDeleteVariableErrorResponse
 }
 
 // IsInternal reports whether DeleteVariableErrorResponse is Internal.
@@ -12431,6 +12438,27 @@ func (s DeleteVariableErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, 
 func NewAuthUnauthorizedDeleteVariableErrorResponse(v AuthUnauthorized) DeleteVariableErrorResponse {
 	var s DeleteVariableErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEnvNotFound sets DeleteVariableErrorResponse to EnvNotFound.
+func (s *DeleteVariableErrorResponse) SetEnvNotFound(v EnvNotFound) {
+	s.Type = EnvNotFoundDeleteVariableErrorResponse
+	s.EnvNotFound = v
+}
+
+// GetEnvNotFound returns EnvNotFound and true boolean if DeleteVariableErrorResponse is EnvNotFound.
+func (s DeleteVariableErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
+	if !s.IsEnvNotFound() {
+		return v, false
+	}
+	return s.EnvNotFound, true
+}
+
+// NewEnvNotFoundDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from EnvNotFound.
+func NewEnvNotFoundDeleteVariableErrorResponse(v EnvNotFound) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetEnvNotFound(v)
 	return s
 }
 
@@ -22237,6 +22265,7 @@ func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 type GetVariableErrorResponse struct {
 	Type                GetVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	EnvNotFound         EnvNotFound
 	Internal            Internal
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
@@ -22249,6 +22278,7 @@ type GetVariableErrorResponseType string
 // Possible values for GetVariableErrorResponseType.
 const (
 	AuthUnauthorizedGetVariableErrorResponse    GetVariableErrorResponseType = "auth.unauthorized"
+	EnvNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "env.not_found"
 	InternalGetVariableErrorResponse            GetVariableErrorResponseType = "internal"
 	ReqInvalidGetVariableErrorResponse          GetVariableErrorResponseType = "req.invalid"
 	VarNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "var.not_found"
@@ -22258,6 +22288,11 @@ const (
 // IsAuthUnauthorized reports whether GetVariableErrorResponse is AuthUnauthorized.
 func (s GetVariableErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetVariableErrorResponse
+}
+
+// IsEnvNotFound reports whether GetVariableErrorResponse is EnvNotFound.
+func (s GetVariableErrorResponse) IsEnvNotFound() bool {
+	return s.Type == EnvNotFoundGetVariableErrorResponse
 }
 
 // IsInternal reports whether GetVariableErrorResponse is Internal.
@@ -22298,6 +22333,27 @@ func (s GetVariableErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok 
 func NewAuthUnauthorizedGetVariableErrorResponse(v AuthUnauthorized) GetVariableErrorResponse {
 	var s GetVariableErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEnvNotFound sets GetVariableErrorResponse to EnvNotFound.
+func (s *GetVariableErrorResponse) SetEnvNotFound(v EnvNotFound) {
+	s.Type = EnvNotFoundGetVariableErrorResponse
+	s.EnvNotFound = v
+}
+
+// GetEnvNotFound returns EnvNotFound and true boolean if GetVariableErrorResponse is EnvNotFound.
+func (s GetVariableErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
+	if !s.IsEnvNotFound() {
+		return v, false
+	}
+	return s.EnvNotFound, true
+}
+
+// NewEnvNotFoundGetVariableErrorResponse returns new GetVariableErrorResponse from EnvNotFound.
+func NewEnvNotFoundGetVariableErrorResponse(v EnvNotFound) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetEnvNotFound(v)
 	return s
 }
 
@@ -22417,6 +22473,7 @@ func (*GetVariableErrorResponseStatusCode) getVariableRes() {}
 type GetVariablesErrorResponse struct {
 	Type                GetVariablesErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	EnvNotFound         EnvNotFound
 	Internal            Internal
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
@@ -22429,6 +22486,7 @@ type GetVariablesErrorResponseType string
 // Possible values for GetVariablesErrorResponseType.
 const (
 	AuthUnauthorizedGetVariablesErrorResponse    GetVariablesErrorResponseType = "auth.unauthorized"
+	EnvNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "env.not_found"
 	InternalGetVariablesErrorResponse            GetVariablesErrorResponseType = "internal"
 	ReqInvalidGetVariablesErrorResponse          GetVariablesErrorResponseType = "req.invalid"
 	VarNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "var.not_found"
@@ -22438,6 +22496,11 @@ const (
 // IsAuthUnauthorized reports whether GetVariablesErrorResponse is AuthUnauthorized.
 func (s GetVariablesErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetVariablesErrorResponse
+}
+
+// IsEnvNotFound reports whether GetVariablesErrorResponse is EnvNotFound.
+func (s GetVariablesErrorResponse) IsEnvNotFound() bool {
+	return s.Type == EnvNotFoundGetVariablesErrorResponse
 }
 
 // IsInternal reports whether GetVariablesErrorResponse is Internal.
@@ -22478,6 +22541,27 @@ func (s GetVariablesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok
 func NewAuthUnauthorizedGetVariablesErrorResponse(v AuthUnauthorized) GetVariablesErrorResponse {
 	var s GetVariablesErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEnvNotFound sets GetVariablesErrorResponse to EnvNotFound.
+func (s *GetVariablesErrorResponse) SetEnvNotFound(v EnvNotFound) {
+	s.Type = EnvNotFoundGetVariablesErrorResponse
+	s.EnvNotFound = v
+}
+
+// GetEnvNotFound returns EnvNotFound and true boolean if GetVariablesErrorResponse is EnvNotFound.
+func (s GetVariablesErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
+	if !s.IsEnvNotFound() {
+		return v, false
+	}
+	return s.EnvNotFound, true
+}
+
+// NewEnvNotFoundGetVariablesErrorResponse returns new GetVariablesErrorResponse from EnvNotFound.
+func NewEnvNotFoundGetVariablesErrorResponse(v EnvNotFound) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetEnvNotFound(v)
 	return s
 }
 

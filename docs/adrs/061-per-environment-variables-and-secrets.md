@@ -102,9 +102,16 @@ There are five ways a value can be rendered:
 ### Scope
 
 The scope of a variable is defined by the creator of the variable. Currently,
-that scope is composed of the project-ID and environment-name. The combination
-of scope and variable-name is unique, meaning "project-A" can have only one
-"MY_VARIABLE" on each of its environments.
+that scope is composed of the project-ID and the environment-ID. The
+combination of scope and variable-name is unique, meaning "project-A" can have
+only one "MY_VARIABLE" on each of its environments.
+
+The scope holds the environment's **ID**, not its name, even though the name is
+what addresses an environment on the wire. A name is not identity: an
+environment that is renamed is the same environment, and a scope keyed on the
+name would have to be rewritten with every rename or block renaming outright.
+The name is resolved to the ID once, at the API edge, and a name no environment
+answers to is `env.not_found` rather than a scope that holds nothing.
 
 Once deployments land, this scope should be expanded to optionally contain the
 deployment-ID. That way the variables in a deployment are snapshot and cannot
@@ -120,9 +127,9 @@ Since a variable is unique by its name and scope, no other identifier is needed.
 
 ### Resolving variables
 
-Depending on the variable-name, project-ID and environment name a variable can
+Depending on the variable-name, project-ID and environment-ID a variable can
 be resolved. This is done by an exact match: variable-name, project-ID and
-environment name need to match the variables scope and name.
+environment-ID need to match the variables scope and name.
 
 Once more scope levels/values are allowed another model might be necessary here
 to allow for inheritance over multiple levels. E.g.: A variable defined at a

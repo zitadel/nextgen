@@ -168,13 +168,15 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 }
 
 // setVariableError names the one write failure a caller can act on. The
-// variables table references (project_id, name) on environments, so an owner
+// variables table references (project_id, id) on environments, so a write
 // naming an environment that does not exist is refused by the database rather
 // than stored where nothing would ever read it -- which, with no inheritance to
 // fall back on, would read as empty rather than as the project's value.
 //
-// The project reference fails the same way, but it cannot be reached here: the
-// project is resolved from the request before a variable is built.
+// The edge resolves the environment name to that id before the write, so the
+// constraint is reached only when the environment is deleted between the two.
+// The project reference fails the same way and is likewise resolved from the
+// request before a variable is built.
 func setVariableError(err error) error {
 	if de, ok := errors.AsType[domain.Error](err); ok {
 		return de

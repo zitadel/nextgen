@@ -19,9 +19,9 @@ import (
 // variableFixture is a project, one of its environments, and a name, all
 // suffixed per test so cases never collide in a shared database.
 type variableFixture struct {
-	name        string
-	projectID   string
-	environment string
+	name          string
+	projectID     string
+	environmentID string
 }
 
 func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixture {
@@ -40,20 +40,30 @@ func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixtu
 	name := "login_appearance_" + strings.ReplaceAll(suffix, "-", "_")
 	require.Regexp(t, domain.NameRegex, name, "the fixture must use a referenceable name")
 
-	// environment_name is a real foreign key too, through the generated
+	// environment_id is a real foreign key too, through the generated
 	// environment_ref column, so the environment has to exist before a variable
-	// can scope to it.
-	environment := environmentNameFrom(t, "env-var-"+suffix)
-	require.NoError(t, stmts.CreateEnvironment(t.Context(), &domain.Environment{
-		ProjectID: projectID,
-		Name:      environment,
-	}))
+	// can scope to it. The id is minted by the create, which is also the only
+	// way to get one an owner could legitimately hold.
+	environment := newTestEnvironment(t, stmts, projectID, "env-var-"+suffix)
 
 	return variableFixture{
-		name:        name,
-		projectID:   projectID,
-		environment: environment,
+		name:          name,
+		projectID:     projectID,
+		environmentID: environment.ID,
 	}
+}
+
+// newTestEnvironment creates one environment on the project and hands back the
+// stored record, whose id is what a variable scopes to.
+func newTestEnvironment(t *testing.T, stmts service.AllStatements, projectID, rawName string) *domain.Environment {
+	t.Helper()
+	environment := &domain.Environment{
+		ProjectID: projectID,
+		Name:      environmentNameFrom(t, rawName),
+	}
+	require.NoError(t, stmts.CreateEnvironment(t.Context(), environment))
+	require.NotEmpty(t, environment.ID, "the create has to mint the id a variable scopes to")
+	return environment
 }
 
 // environmentNameFrom bends a test suffix into the shape an environment name is
@@ -90,9 +100,10 @@ func (f variableFixture) projectOwner() domain.VariableOwner {
 	return domain.VariableOwner{ProjectID: f.projectID}
 }
 
-// environmentOwner addresses one environment of the project.
+// environmentOwner addresses one environment of the project, by the id the
+// table keys on rather than the name the wire carries.
 func (f variableFixture) environmentOwner() domain.VariableOwner {
-	return domain.VariableOwner{ProjectID: f.projectID, EnvironmentName: f.environment}
+	return domain.VariableOwner{ProjectID: f.projectID, EnvironmentID: f.environmentID}
 }
 
 // set writes a variable at owner and registers its removal.
@@ -169,7 +180,8 @@ func TestVariablesOwnersAreIndependent(t *testing.T) {
 		t.Run("an environment with nothing entered reads nothing", func(t *testing.T) {
 			// The project holds this name, but nothing is inherited: an
 			// environment sees only what was entered on it.
-			sibling := domain.VariableOwner{ProjectID: f.projectID, EnvironmentName: f.environment + "-sibling"}
+			other := newTestEnvironment(t, d.stmts, f.projectID, "env-var-sibling-"+uniqueSuffix(t))
+			sibling := domain.VariableOwner{ProjectID: f.projectID, EnvironmentID: other.ID}
 			assert.Empty(t, f.get(t, d.stmts, sibling))
 		})
 
@@ -187,7 +199,7 @@ func TestVariablesNameFilter(t *testing.T) {
 		owner := f.projectOwner()
 		f.set(t, d.stmts, owner, "wanted", false)
 
-		other := variableFixture{name: f.name + "_other", projectID: f.projectID, environment: f.environment}
+		other := variableFixture{name: f.name + "_other", projectID: f.projectID, environmentID: f.environmentID}
 		other.set(t, d.stmts, owner, "unwanted", false)
 
 		byName, err := d.stmts.GetVariables(t.Context(), owner, f.name)
@@ -243,7 +255,7 @@ func TestVariablesOwnerWithoutProjectRejected(t *testing.T) {
 
 		err := d.stmts.SetVariable(t.Context(), &domain.Variable{
 			Name:  f.name,
-			Owner: domain.VariableOwner{EnvironmentName: f.environment},
+			Owner: domain.VariableOwner{EnvironmentID: f.environmentID},
 			Value: "orphan",
 		})
 		require.Error(t, err)
@@ -279,7 +291,7 @@ func TestVariablesProjectForeignKey(t *testing.T) {
 // being a real reference (ADR 061). It is the case the empty string makes
 // awkward: ” is the project level, an address of its own that no environment
 // row answers to, so the constraint rides a generated column (NULLIF of
-// environment_name) that is NULL for exactly that address. Both halves of that
+// environment_id) that is NULL for exactly that address. Both halves of that
 // are asserted here -- the project level writes with no environment in sight,
 // and a scoped variable cannot name one that is not there.
 func TestVariablesEnvironmentForeignKey(t *testing.T) {
@@ -288,7 +300,7 @@ func TestVariablesEnvironmentForeignKey(t *testing.T) {
 
 		err := d.stmts.SetVariable(t.Context(), &domain.Variable{
 			Name:  f.name,
-			Owner: domain.VariableOwner{ProjectID: f.projectID, EnvironmentName: f.environment + "-missing"},
+			Owner: domain.VariableOwner{ProjectID: f.projectID, EnvironmentID: f.environmentID + "-missing"},
 			Value: "orphan",
 		})
 		require.Error(t, err, "a variable cannot scope to an environment that is not there")

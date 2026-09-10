@@ -20081,6 +20081,22 @@ func (s DeleteVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EnvNotFoundDeleteVariableErrorResponse:
+		e.FieldStart("code")
+		e.Str("env.not_found")
+		{
+			s := s.EnvNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalDeleteVariableErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -20174,6 +20190,9 @@ func (s *DeleteVariableErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedDeleteVariableErrorResponse
 					found = true
+				case "env.not_found":
+					s.Type = EnvNotFoundDeleteVariableErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalDeleteVariableErrorResponse
 					found = true
@@ -20202,6 +20221,10 @@ func (s *DeleteVariableErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AuthUnauthorizedDeleteVariableErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EnvNotFoundDeleteVariableErrorResponse:
+		if err := s.EnvNotFound.Decode(d); err != nil {
 			return err
 		}
 	case InternalDeleteVariableErrorResponse:
@@ -40006,6 +40029,22 @@ func (s GetVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EnvNotFoundGetVariableErrorResponse:
+		e.FieldStart("code")
+		e.Str("env.not_found")
+		{
+			s := s.EnvNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalGetVariableErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -40099,6 +40138,9 @@ func (s *GetVariableErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedGetVariableErrorResponse
 					found = true
+				case "env.not_found":
+					s.Type = EnvNotFoundGetVariableErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalGetVariableErrorResponse
 					found = true
@@ -40127,6 +40169,10 @@ func (s *GetVariableErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AuthUnauthorizedGetVariableErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EnvNotFoundGetVariableErrorResponse:
+		if err := s.EnvNotFound.Decode(d); err != nil {
 			return err
 		}
 	case InternalGetVariableErrorResponse:
@@ -40178,6 +40224,22 @@ func (s GetVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("auth.unauthorized")
 		{
 			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EnvNotFoundGetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("env.not_found")
+		{
+			s := s.EnvNotFound
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -40282,6 +40344,9 @@ func (s *GetVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedGetVariablesErrorResponse
 					found = true
+				case "env.not_found":
+					s.Type = EnvNotFoundGetVariablesErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalGetVariablesErrorResponse
 					found = true
@@ -40310,6 +40375,10 @@ func (s *GetVariablesErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AuthUnauthorizedGetVariablesErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EnvNotFoundGetVariablesErrorResponse:
+		if err := s.EnvNotFound.Decode(d); err != nil {
 			return err
 		}
 	case InternalGetVariablesErrorResponse:

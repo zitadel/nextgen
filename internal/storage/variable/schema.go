@@ -3,16 +3,20 @@
 //
 // A variable row is one [domain.Variable]: a value entered by one owner under
 // one name. The owner is the project and, optionally, one of its environments.
-// An environment that is not named is stored as the empty string rather than
-// NULL, which keeps the natural key usable as a primary key; only the project
-// is required, and see the postgres migration for why.
+// An environment that is not addressed is stored as the empty string rather
+// than NULL, which keeps the natural key usable as a primary key; only the
+// project is required, and see the postgres migration for why.
 //
 // Both owner columns carry a foreign key. The environment reaches its through a
-// generated column (NULLIF of environment_name), which is what lets the empty
-// string stay an address while a name that no environment answers to is still
+// generated column (NULLIF of environment_id), which is what lets the empty
+// string stay an address while an id that no environment answers to is still
 // refused by the database. That column is deliberately not bound in [Schema]:
 // it is derived and never written, and every statement addresses
-// environment_name.
+// environment_id.
+//
+// The environment is addressed by id, not by the name the wire carries: the
+// name is resolved once at the edge, so a rename does not have to rewrite
+// every row that points at the environment.
 //
 // Unlike the settings table this replaces, there is no ladder and no final
 // flag, so storage never collapses rows -- and never has to. A read admits one
@@ -31,17 +35,17 @@ import (
 // owner tuple flattened onto the row and the two row timestamps added, neither
 // of which the domain type carries.
 type VariableStorage struct {
-	Name            string
-	ProjectID       string
-	EnvironmentName string
-	Value           any
-	IsSecret        bool
-	CreatedAt       time.Time
-	ModifiedAt      time.Time
+	Name          string
+	ProjectID     string
+	EnvironmentID string
+	Value         any
+	IsSecret      bool
+	CreatedAt     time.Time
+	ModifiedAt    time.Time
 }
 
 // Schema binds variable filter/order fields. Both owner columns are NOT NULL
-// (environment_name with an empty-string default), so none of the keyset null
+// (environment_id with an empty-string default), so none of the keyset null
 // handling applies.
 var Schema = database.NewSchema(map[VariableStorageField]database.FieldBinding[VariableStorage]{
 	VariableStorageFieldName: {
@@ -54,9 +58,9 @@ var Schema = database.NewSchema(map[VariableStorageField]database.FieldBinding[V
 		Accessor: func(v *VariableStorage) any { return v.ProjectID },
 		Coerce:   database.CoerceString,
 	},
-	VariableStorageFieldEnvironmentName: {
-		SQLName:  "environment_name",
-		Accessor: func(v *VariableStorage) any { return v.EnvironmentName },
+	VariableStorageFieldEnvironmentID: {
+		SQLName:  "environment_id",
+		Accessor: func(v *VariableStorage) any { return v.EnvironmentID },
 		Coerce:   database.CoerceString,
 	},
 	VariableStorageFieldValue: {
@@ -86,7 +90,7 @@ type VariableStorageField uint8
 const (
 	VariableStorageFieldName VariableStorageField = iota
 	VariableStorageFieldProjectID
-	VariableStorageFieldEnvironmentName
+	VariableStorageFieldEnvironmentID
 	VariableStorageFieldValue
 	VariableStorageFieldIsSecret
 	VariableStorageFieldCreatedAt

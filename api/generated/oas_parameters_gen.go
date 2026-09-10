@@ -1269,6 +1269,9 @@ type DeleteVariableParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
+	// The environment is named here but stored by its id, so the name is resolved
+	// before the request is served: a name no environment of this project answers
+	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -3443,6 +3446,9 @@ type GetVariableParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
+	// The environment is named here but stored by its id, so the name is resolved
+	// before the request is served: a name no environment of this project answers
+	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -3661,6 +3667,9 @@ type GetVariablesParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
+	// The environment is named here but stored by its id, so the name is resolved
+	// before the request is served: a name no environment of this project answers
+	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -7562,6 +7571,9 @@ type UpdateVariablesParams struct {
 	// not a ladder: a variable entered on the project is not visible from an
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
+	// The environment is named here but stored by its id, so the name is resolved
+	// before the request is served: a name no environment of this project answers
+	// to is `env.not_found`, not an owner that happens to hold nothing.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 

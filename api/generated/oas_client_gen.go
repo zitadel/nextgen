@@ -674,8 +674,7 @@ type Invoker interface {
 	// which it can be referenced but not read back. `null` removes the name from
 	// this owner (RFC 7386), which is how several variables are removed in one
 	// request; removing a name this owner does not hold is a no-op rather than an
-	// error. `DELETE /variables/{variable_name}` removes exactly one name and
-	// answers `var.not_found` when it was not there.
+	// error.
 	// The body is applied whole or not at all, so a rejected request leaves the
 	// owner exactly as it was. Writing the same name and owner twice replaces the
 	// value rather than duplicating it, which makes a retry safe.
@@ -10110,8 +10109,7 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 // which it can be referenced but not read back. `null` removes the name from
 // this owner (RFC 7386), which is how several variables are removed in one
 // request; removing a name this owner does not hold is a no-op rather than an
-// error. `DELETE /variables/{variable_name}` removes exactly one name and
-// answers `var.not_found` when it was not there.
+// error.
 // The body is applied whole or not at all, so a rejected request leaves the
 // owner exactly as it was. Writing the same name and owner twice replaces the
 // value rather than duplicating it, which makes a retry safe.

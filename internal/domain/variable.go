@@ -149,19 +149,21 @@ func (v *Variable) GetDecryptedValue(decrypter crypto.Decrypter) (any, error) {
 
 type VariableOwner struct {
 	ProjectID string
-	// EnvironmentName names the environment of the project the variable belongs
-	// to, by name rather than by id: that is how an environment is addressed
-	// everywhere else, and it is what a request serving an environment knows.
+	// EnvironmentID identifies the environment of the project the variable
+	// belongs to, by id rather than by name. A name is what a request carries
+	// and what the wire addresses, but it is not identity: an environment that
+	// is renamed is still the same environment, and rows keyed on its name
+	// would either have to be rewritten with it or block the rename outright
+	// (#965 owns that decision). The id is resolved from the name once, at the
+	// edge, and everything below this point addresses the environment by it.
 	//
 	// The empty string means "not scoped to an environment" -- the project
 	// level, an address of its own rather than a wildcard. Anything else has to
-	// name an environment that exists: the table carries a foreign key onto
-	// (project_id, name), reached through a generated column so that the empty
+	// identify an environment that exists: the table carries a foreign key onto
+	// (project_id, id), reached through a generated column so that the empty
 	// string can stay an address while the reference is still enforced by the
-	// database. A name nothing answers to is refused on write rather than
-	// scoping the variable into invisibility, and deleting an environment takes
-	// its variables with it.
-	EnvironmentName string
+	// database. Deleting an environment takes its variables with it.
+	EnvironmentID string
 }
 
 // HasAccessTo reports whether variable belongs to owner. An owner reaches

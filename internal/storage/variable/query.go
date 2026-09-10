@@ -20,7 +20,7 @@ import (
 func VisibleTo(owner domain.VariableOwner, names ...string) *database.ListOptions[VariableStorageField] {
 	filters := []database.Filter[VariableStorageField]{
 		database.Equal(database.Col(VariableStorageFieldProjectID), owner.ProjectID),
-		database.Equal(database.Col(VariableStorageFieldEnvironmentName), owner.EnvironmentName),
+		database.Equal(database.Col(VariableStorageFieldEnvironmentID), owner.EnvironmentID),
 	}
 	if len(names) > 0 {
 		filters = append(filters, anyName(names))
@@ -68,8 +68,8 @@ func RowToDomain(row *VariableStorage) *domain.Variable {
 	return &domain.Variable{
 		Name: row.Name,
 		Owner: domain.VariableOwner{
-			ProjectID:       row.ProjectID,
-			EnvironmentName: row.EnvironmentName,
+			ProjectID:     row.ProjectID,
+			EnvironmentID: row.EnvironmentID,
 		},
 		Value:    row.Value,
 		IsSecret: row.IsSecret,

@@ -20,19 +20,19 @@ func TestVisibleTo_AgreesWithHasAccessTo(t *testing.T) {
 	t.Parallel()
 
 	ids := []string{"", "match", "other"}
-	owner := domain.VariableOwner{ProjectID: "match", EnvironmentName: "match"}
+	owner := domain.VariableOwner{ProjectID: "match", EnvironmentID: "match"}
 
 	for _, project := range ids {
 		for _, environment := range ids {
 			v := &domain.Variable{Owner: domain.VariableOwner{
-				ProjectID:       project,
-				EnvironmentName: environment,
+				ProjectID:     project,
+				EnvironmentID: environment,
 			}}
 
 			// VisibleTo compiles one equality per owner column, so a row is
 			// admitted only when both match. The empty string is an ordinary
 			// value here -- the project level's own address -- not a wildcard.
-			admitted := project == owner.ProjectID && environment == owner.EnvironmentName
+			admitted := project == owner.ProjectID && environment == owner.EnvironmentID
 
 			assert.Equal(t, admitted, owner.HasAccessTo(v),
 				"project=%q environment=%q", project, environment)
@@ -47,7 +47,7 @@ func TestVisibleTo_NoInheritanceInEitherDirection(t *testing.T) {
 	t.Parallel()
 
 	project := domain.VariableOwner{ProjectID: "project-1"}
-	environment := domain.VariableOwner{ProjectID: "project-1", EnvironmentName: "prod"}
+	environment := domain.VariableOwner{ProjectID: "project-1", EnvironmentID: "env_prod"}
 
 	projectVariable := &domain.Variable{Owner: project}
 	environmentVariable := &domain.Variable{Owner: environment}
@@ -61,7 +61,7 @@ func TestVisibleTo_NoInheritanceInEitherDirection(t *testing.T) {
 	assert.True(t, environment.HasAccessTo(environmentVariable))
 
 	// A sibling environment is as unreachable as it ever was.
-	sibling := domain.VariableOwner{ProjectID: "project-1", EnvironmentName: "staging"}
+	sibling := domain.VariableOwner{ProjectID: "project-1", EnvironmentID: "env_staging"}
 	assert.False(t, sibling.HasAccessTo(environmentVariable))
 
 	// And so is another project, which is what makes project_id mandatory.
@@ -73,8 +73,8 @@ func TestToDomain_MapsRowsInOrder(t *testing.T) {
 	t.Parallel()
 
 	rows := []*variable.VariableStorage{
-		{Name: "a_variable", ProjectID: "project-1", EnvironmentName: "prod", Value: "a-prod"},
-		{Name: "b_variable", ProjectID: "project-1", EnvironmentName: "prod", Value: "b-prod", IsSecret: true},
+		{Name: "a_variable", ProjectID: "project-1", EnvironmentID: "env_prod", Value: "a-prod"},
+		{Name: "b_variable", ProjectID: "project-1", EnvironmentID: "env_prod", Value: "b-prod", IsSecret: true},
 	}
 
 	got := variable.ToDomain(rows)
@@ -84,6 +84,6 @@ func TestToDomain_MapsRowsInOrder(t *testing.T) {
 	assert.Equal(t, []any{"a-prod", "b-prod"}, []any{got[0].Value, got[1].Value})
 
 	assert.Equal(t, "b_variable", got[1].Name)
-	assert.Equal(t, domain.VariableOwner{ProjectID: "project-1", EnvironmentName: "prod"}, got[1].Owner)
+	assert.Equal(t, domain.VariableOwner{ProjectID: "project-1", EnvironmentID: "env_prod"}, got[1].Owner)
 	assert.True(t, got[1].IsSecret)
 }

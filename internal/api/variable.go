@@ -14,7 +14,12 @@ func (h *Handler) GetVariables(ctx context.Context, params api.GetVariablesParam
 		return nil, err
 	}
 
-	vars, err := h.variableService.GetVariables(ctx, variableOwner(params.ProjectID, params.EnvironmentName))
+	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	if err != nil {
+		return nil, err
+	}
+
+	vars, err := h.variableService.GetVariables(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +37,10 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 	}
 
 	name := string(params.VariableName)
-	owner := variableOwner(params.ProjectID, params.EnvironmentName)
+	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	if err != nil {
+		return nil, err
+	}
 	variables, err := h.variableService.GetVariables(ctx, owner, name)
 	if err != nil {
 		return nil, err
@@ -65,7 +73,11 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 			WithMessage("the request body must name at least one variable")
 	}
 
-	owner := variableOwner(params.ProjectID, params.EnvironmentName)
+	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	if err != nil {
+		return nil, err
+	}
+
 	writes := make([]service.VariableToSet, 0, len(req))
 	for name, input := range req {
 		value, isSecret, err := fromAPIVariableInput(input)
@@ -82,7 +94,7 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 		return nil, err
 	}
 
-	vars, err := h.variableService.GetVariables(ctx, variableOwner(params.ProjectID, params.EnvironmentName))
+	vars, err := h.variableService.GetVariables(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +114,10 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 		return nil, err
 	}
 
-	owner := variableOwner(params.ProjectID, params.EnvironmentName)
+	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	if err != nil {
+		return nil, err
+	}
 	if err := h.variableService.DeleteVariable(ctx, owner, string(params.VariableName)); err != nil {
 		return nil, err
 	}
@@ -111,11 +126,27 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 
 /* ---------------- CONVERTERS ---------------- */
 
-func variableOwner(projectID api.ProjectID, environment api.OptEnvironmentName) domain.VariableOwner {
-	return domain.VariableOwner{
-		ProjectID:       string(projectID),
-		EnvironmentName: string(environment.Value),
+// variableOwner turns the addressed scope into the owner storage matches on.
+// The wire names an environment; the table keys on its id, so the name is
+// resolved here -- once per request, at the edge, which is the only place the
+// name is still the environment's address.
+//
+// An unset environment is the project level, an address of its own, and needs
+// no lookup. A name nothing answers to is env.not_found rather than an empty
+// read: with no inheritance to fall back on, a typo would otherwise report the
+// project's variables as absent instead of saying the environment is not there.
+func (h *Handler) variableOwner(ctx context.Context, projectID api.ProjectID, environment api.OptEnvironmentName) (domain.VariableOwner, error) {
+	owner := domain.VariableOwner{ProjectID: string(projectID)}
+	if !environment.Set || environment.Value == "" {
+		return owner, nil
 	}
+
+	env, err := h.environmentService.GetByName(ctx, owner.ProjectID, string(environment.Value))
+	if err != nil {
+		return domain.VariableOwner{}, err
+	}
+	owner.EnvironmentID = env.ID
+	return owner, nil
 }
 
 // toAPIVariables keys a read by name. The names are already unique -- one read,

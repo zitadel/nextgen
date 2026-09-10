@@ -45,8 +45,8 @@ func newMockedVariableService(t *testing.T) (service.VariableService, *servicemo
 
 var (
 	variablesOwner = domain.VariableOwner{
-		ProjectID:       "project-1",
-		EnvironmentName: "prod",
+		ProjectID:     "project-1",
+		EnvironmentID: "env_prod",
 	}
 	variablesProjectOwner = domain.VariableOwner{ProjectID: variablesOwner.ProjectID}
 )

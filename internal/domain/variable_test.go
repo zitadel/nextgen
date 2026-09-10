@@ -16,8 +16,8 @@ import (
 )
 
 var variableOwner = domain.VariableOwner{
-	ProjectID:       "project-1",
-	EnvironmentName: "env-1",
+	ProjectID:     "project-1",
+	EnvironmentID: "env_1",
 }
 
 func TestVariableName_Bounds(t *testing.T) {
