@@ -35,6 +35,19 @@ func TestNewHostChecker(t *testing.T) {
 		_, err := httputil.NewHostChecker("10.0.0.0/33")
 		require.Error(t, err)
 	})
+
+	t.Run("entries that can never match a URL hostname are errors", func(t *testing.T) {
+		for _, entry := range []string{"localhost:8080", "user@host.test", "host .test", "host.test?x"} {
+			_, err := httputil.NewHostChecker(entry)
+			require.Error(t, err, "entry %q must be rejected, not become a dead rule", entry)
+		}
+	})
+
+	t.Run("surrounding whitespace is trimmed, not rejected", func(t *testing.T) {
+		checker, err := httputil.NewHostChecker(" 127.0.0.1 ")
+		require.NoError(t, err)
+		assert.NotNil(t, checker.IP, "a space-padded IP from a comma-separated env list must still parse as an IP")
+	})
 }
 
 func TestNewPolicy(t *testing.T) {

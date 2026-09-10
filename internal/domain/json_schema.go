@@ -525,7 +525,15 @@ func classifyFetchError(schemaURL string, err error) error {
 	default:
 		return err
 	}
-	return domErr.WithDetails(SchemaFetchDetails{URL: redactSchemaURL(schemaURL)}).WithParent(err)
+	// On a redirect failure the URL that actually failed is the hop the
+	// client last attempted, reported via *url.Error, not the URL the
+	// caller asked for.
+	failingURL := schemaURL
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.URL != "" {
+		failingURL = urlErr.URL
+	}
+	return domErr.WithDetails(SchemaFetchDetails{URL: redactSchemaURL(failingURL)}).WithParent(err)
 }
 
 // redactSchemaURL strips userinfo, query, and fragment before a failing URL

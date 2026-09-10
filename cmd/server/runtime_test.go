@@ -449,3 +449,15 @@ func TestLoadConfigRejectsMalformedDenyListEntry(t *testing.T) {
 	_, err := loadConfig(configPath)
 	require.ErrorContains(t, err, "invalid CIDR entry")
 }
+
+func TestLoadConfigRejectsNegativeResolveTimeout(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("NEXTGEN_SCHEMA_RESOLVE_TIMEOUT", "-5s")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	_, err := loadConfig(configPath)
+	require.ErrorContains(t, err, "schema.resolve_timeout must not be negative")
+}

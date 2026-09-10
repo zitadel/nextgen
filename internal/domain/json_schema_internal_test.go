@@ -48,6 +48,16 @@ func TestClassifyFetchError(t *testing.T) {
 		plain := errors.New("connection refused")
 		assert.Equal(t, plain, classifyFetchError(schemaURL, plain))
 	})
+
+	t.Run("details name the hop that failed, not the requested URL", func(t *testing.T) {
+		// A redirect failure's *url.Error carries the redirect target the
+		// client last attempted; that, redacted, is the URL the caller needs.
+		hopErr := &url.Error{Op: "Get", URL: "http://10.255.255.1/steal?sig=token", Err: httputil.NewAddressDeniedError("10.0.0.0/8")}
+		got := classifyFetchError(schemaURL, hopErr)
+		de, ok := errors.AsType[Error](got)
+		require.True(t, ok)
+		assert.Equal(t, SchemaFetchDetails{URL: "http://10.255.255.1/steal"}, de.Details)
+	})
 }
 
 func TestRedactSchemaURL(t *testing.T) {
