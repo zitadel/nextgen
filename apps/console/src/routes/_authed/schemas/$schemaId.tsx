@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 import { Fragment } from "react";
 
-import { SchemaDocumentViewer } from "@/components/schema-document-viewer";
+import { DocumentViewer } from "@/components/document-viewer";
+import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -25,7 +26,7 @@ function SchemaDetail() {
   const methods = schemaAuthMethods(schema);
 
   return (
-    <div className="px-4 pt-9 pb-8 sm:px-8">
+    <div className={DETAIL_PANEL_PAGE}>
       <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
         {/* The `Title` lockup: icon tile + eyebrow + title.
             The schema's id is not repeated here — the list row carries it, and
@@ -72,7 +73,7 @@ function SchemaDetail() {
               <div className="lg:w-[468px] lg:shrink-0">
                 <SchemaFieldsPanel schema={schema} />
               </div>
-              <SchemaDocumentViewer schema={schema} />
+              <DocumentViewer document={schema} noun="schema" />
             </div>
           </TabsContent>
 
