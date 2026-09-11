@@ -15,7 +15,7 @@ import (
 
 const (
 	createEnvironmentStmt = `INSERT INTO environments (project_id, id, name) VALUES (@p1, @p2, @p3) THEN RETURN created_at`
-	environmentQuery      = `SELECT project_id, id, name, created_at FROM environments`
+	environmentQuery      = `SELECT project_id, id, name, created_at, current_deployment_id FROM environments`
 )
 
 type environmentStatements struct{ statement }
@@ -107,19 +107,21 @@ func (es environmentStatements) ListEnvironments(ctx context.Context, filter *da
 
 func (es environmentStatements) scanEnvironment(row *spanner.Row) (*domain.Environment, error) {
 	var (
-		projectID string
-		id        string
-		name      string
-		createdAt time.Time
+		projectID         string
+		id                string
+		name              string
+		createdAt         time.Time
+		currentDeployment spanner.NullString
 	)
-	if err := row.Columns(&projectID, &id, &name, &createdAt); err != nil {
+	if err := row.Columns(&projectID, &id, &name, &createdAt, &currentDeployment); err != nil {
 		return nil, err
 	}
 	return &domain.Environment{
-		ProjectID: projectID,
-		ID:        id,
-		Name:      name,
-		CreatedAt: createdAt.UTC(),
+		ProjectID:           projectID,
+		ID:                  id,
+		Name:                name,
+		CreatedAt:           createdAt.UTC(),
+		CurrentDeploymentID: spannerNullStringPtr(currentDeployment),
 	}, nil
 }
 

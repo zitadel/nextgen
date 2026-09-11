@@ -46,8 +46,11 @@ func registerDialect(
 }
 
 type dialect struct {
-	name             string
-	stmts            service.AllStatements
+	name  string
+	stmts service.AllStatements
+	// pool opens real transactions, for tests that need to hold locks while
+	// a competing statement runs (e.g. the contended-deploy stamp contract).
+	pool             service.Pool
 	seedTiedProjects func(ctx context.Context, ids []string, createdAt time.Time) error
 	hardDeleteTeam   func(ctx context.Context, projectID, teamID string) error
 	// insertJSONSchemaAt writes a json_schemas row at an exact created_at, which
@@ -98,6 +101,7 @@ func run(m *testing.M) int {
 		dialects = append(dialects, dialect{
 			name:  opener.name,
 			stmts: pool.Statements(),
+			pool:  pool,
 			seedTiedProjects: func(ctx context.Context, ids []string, createdAt time.Time) error {
 				return seed(ctx, pool, ids, createdAt)
 			},

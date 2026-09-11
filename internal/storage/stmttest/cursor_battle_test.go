@@ -19,6 +19,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -74,6 +75,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
 		t.Run("environments", func(t *testing.T) { battleEnvironments(t, d) })
 		t.Run("releases", func(t *testing.T) { battleReleases(t, d) })
+		t.Run("deployments", func(t *testing.T) { battleDeployments(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -386,6 +388,54 @@ func battleEnvironments(t *testing.T, d dialect) {
 				},
 			})
 		}, func(e *domain.Environment) string { return e.ID })
+		assertDrainMatch(t, want, got)
+	})
+}
+
+func battleDeployments(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureDeploymentProject(t, d.stmts)
+	env := createEnvironment(t, d.stmts, projectID, "prod")
+	// Five distinct releases: deploying the release the environment already
+	// runs is idempotent and would give the drain no new row.
+	created := make([]*domain.Deployment, 0, 5)
+	for i := range 5 {
+		rel := createRelease(t, d.stmts, projectID, string(rune('a'+i)), domain.ReleaseMetadata{})
+		created = append(created, createDeployment(t, d.stmts,
+			mustNewDeployment(t, projectID, env.ID, rel.ID, domain.DeploymentReasonDeploy, nil), nil))
+	}
+	// drainIncarnation compares the paged ids against this slice in order, so
+	// it has to be the order the query produces rather than the order the
+	// rows were written: two deployments can land on the same deployed_at,
+	// and the id that breaks that tie is unrelated to insertion order.
+	slices.SortFunc(created, func(a, b *domain.Deployment) int {
+		return cmp.Or(
+			a.DeployedAt.Compare(b.DeployedAt),
+			cmp.Compare(a.ID, b.ID),
+		)
+	})
+	want := make([]string, 0, len(created))
+	for _, entity := range created {
+		want = append(want, entity.ID)
+	}
+	filter := database.And(
+		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
+		database.Equal(database.Col(domain.DeploymentFieldEnvironmentID), env.ID),
+	)
+	orderAsc := deployment.NewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+		return d.stmts.ListDeployments(unfilteredListCtx(t), &database.ListOptions[domain.DeploymentField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(dep *domain.Deployment) string { return dep.ID }, 2)
+
+	t.Run("newest_first_helper", func(t *testing.T) {
+		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Deployment], error) {
+			opts := deployment.ListOptions(projectID, nil, 2)
+			opts.Pagination.Cursor = cursor
+			return d.stmts.ListDeployments(unfilteredListCtx(t), opts)
+		}, func(dep *domain.Deployment) string { return dep.ID })
 		assertDrainMatch(t, want, got)
 	})
 }
