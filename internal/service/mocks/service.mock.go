@@ -12043,6 +12043,82 @@ func (c *MockKeyServiceMigrateToLatestMasterKeyCall) DoAndReturn(f func(context.
 	return c
 }
 
+// SaveEncryptionKey mocks base method.
+func (m *MockKeyService) SaveEncryptionKey(ctx context.Context, stmts service.AllStatements, key *domain.EncryptionKey) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveEncryptionKey", ctx, stmts, key)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveEncryptionKey indicates an expected call of SaveEncryptionKey.
+func (mr *MockKeyServiceMockRecorder) SaveEncryptionKey(ctx, stmts, key any) *MockKeyServiceSaveEncryptionKeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveEncryptionKey", reflect.TypeOf((*MockKeyService)(nil).SaveEncryptionKey), ctx, stmts, key)
+	return &MockKeyServiceSaveEncryptionKeyCall{Call: call}
+}
+
+// MockKeyServiceSaveEncryptionKeyCall wrap *gomock.Call
+type MockKeyServiceSaveEncryptionKeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceSaveEncryptionKeyCall) Return(arg0 error) *MockKeyServiceSaveEncryptionKeyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceSaveEncryptionKeyCall) Do(f func(context.Context, service.AllStatements, *domain.EncryptionKey) error) *MockKeyServiceSaveEncryptionKeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceSaveEncryptionKeyCall) DoAndReturn(f func(context.Context, service.AllStatements, *domain.EncryptionKey) error) *MockKeyServiceSaveEncryptionKeyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// SaveSigningKey mocks base method.
+func (m *MockKeyService) SaveSigningKey(ctx context.Context, stmts service.AllStatements, key *domain.SigningKey) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveSigningKey", ctx, stmts, key)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveSigningKey indicates an expected call of SaveSigningKey.
+func (mr *MockKeyServiceMockRecorder) SaveSigningKey(ctx, stmts, key any) *MockKeyServiceSaveSigningKeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveSigningKey", reflect.TypeOf((*MockKeyService)(nil).SaveSigningKey), ctx, stmts, key)
+	return &MockKeyServiceSaveSigningKeyCall{Call: call}
+}
+
+// MockKeyServiceSaveSigningKeyCall wrap *gomock.Call
+type MockKeyServiceSaveSigningKeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceSaveSigningKeyCall) Return(arg0 error) *MockKeyServiceSaveSigningKeyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceSaveSigningKeyCall) Do(f func(context.Context, service.AllStatements, *domain.SigningKey) error) *MockKeyServiceSaveSigningKeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceSaveSigningKeyCall) DoAndReturn(f func(context.Context, service.AllStatements, *domain.SigningKey) error) *MockKeyServiceSaveSigningKeyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockClaimService is a mock of ClaimService interface.
 type MockClaimService struct {
 	ctrl     *gomock.Controller

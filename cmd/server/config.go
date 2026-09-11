@@ -19,6 +19,7 @@ type Config struct {
 	Database        database.Config        `mapstructure:"database"`
 	PasswordHasher  crypto.HashConfig      `mapstructure:"password_hasher"`
 	Schema          SchemaConfig           `mapstructure:"schema"`
+	Keys            KeysConfig             `mapstructure:"keys"`
 	Session         service.SessionConfig  `mapstructure:"session"`
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
@@ -150,6 +151,20 @@ type ServerConfig struct {
 	// stays on schema.builtin_public_base, which is an identifier namespace,
 	// not an address.
 	PublicBase string `mapstructure:"public_base"`
+}
+
+// KeysConfig sizes the in-process key caches. Both are read-through and hold
+// values, so the only cost of a larger cache is memory; the only cost of a
+// smaller one is a database read on the miss.
+type KeysConfig struct {
+	// CrypterLRUCacheSize bounds the cache of resolved crypters held by key id
+	// and algorithm. A key's material never changes, so an entry never needs
+	// invalidating.
+	CrypterLRUCacheSize int `mapstructure:"crypter_lru_cache_size"`
+	// SigningKeyLRUCacheSize bounds the cache of active signing keys held by
+	// project and purpose. Nothing retires a signing key today; once something
+	// does, this cache needs an eviction path (see GetProjectSigningKey).
+	SigningKeyLRUCacheSize int `mapstructure:"signing_key_lru_cache_size"`
 }
 
 type SchemaConfig struct {

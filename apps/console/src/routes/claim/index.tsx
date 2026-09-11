@@ -259,6 +259,60 @@ function ClaimLogin({
  * re-renders and double-mounts, and only the explicit `Try again` button can
  * start another attempt.
  */
+/**
+ * One claim URL is spent once, however many times this component mounts.
+ *
+ * The ref inside the component gates the effect across re-renders; it cannot
+ * gate mounts, because a fresh instance gets a fresh ref. That gap is not
+ * theoretical: the page has been observed mounting twice on the way back from
+ * the sign-in widget, and the second mount re-spends a challenge the first one
+ * already completed. The server is right to refuse it -- a completed challenge
+ * answers 409 `proj.already_claimed` by contract -- but the refusal resolves
+ * last and replaces "Project claimed" with "Already claimed", so a developer
+ * who just claimed their project is told someone else owns it.
+ *
+ * Keeping the attempt rather than a spent flag is what lets the second mount
+ * render the first one's outcome instead of hanging on the spinner.
+ *
+ * Entries are never dropped: a page that has claimed one project holds one
+ * entry, and forgetting it is what reopens the double-spend.
+ */
+const ATTEMPTS_SLOT = Symbol.for("@zitadel/console/claim:attempts");
+
+function claimAttempts(): Map<string, Promise<ClaimOutcome>> {
+  const slots = globalThis as Record<symbol, unknown>;
+  // On globalThis under a Symbol.for key rather than a module-local Map, for
+  // the reason `@zitadel/api`'s config slot is: a second copy of this module
+  // in the same realm would otherwise keep its own gate, and a gate that only
+  // some of the mounts consult is not a gate. The bundler duplicating a route
+  // module is exactly the case that produced the double spend.
+  slots[ATTEMPTS_SLOT] ??= new Map<string, Promise<ClaimOutcome>>();
+  return slots[ATTEMPTS_SLOT] as Map<string, Promise<ClaimOutcome>>;
+}
+
+/**
+ * Resets the spend gate. Only tests need this -- the gate deliberately outlives
+ * a mount, so a spec that renders the same claim URL more than once would
+ * otherwise replay the first render's outcome.
+ */
+export function resetClaimAttemptsForTests() {
+  claimAttempts().clear();
+}
+
+function spendClaim(projectId: string, challengeId: string, retrying: boolean) {
+  const key = `${projectId}:${challengeId}`;
+  const attempts = claimAttempts();
+  const attempt = attempts.get(key);
+  // A retry is a deliberate second spend -- the outcomes that offer one are the
+  // ones a fresh attempt can resolve -- so it replaces the remembered attempt
+  // rather than reading it.
+  if (attempt && !retrying) return attempt;
+
+  const started = completeProjectClaim(projectId, challengeId);
+  attempts.set(key, started);
+  return started;
+}
+
 function CompleteClaim({
   projectId,
   challengeId,
@@ -271,15 +325,20 @@ function CompleteClaim({
   const [outcome, setOutcome] = useState<ClaimOutcome | null>(null);
   const startedRef = useRef(false);
 
-  const run = useCallback(() => {
-    setOutcome(null);
-    void completeProjectClaim(projectId, challengeId).then(setOutcome);
-  }, [projectId, challengeId]);
+  const run = useCallback(
+    (retrying: boolean) => {
+      setOutcome(null);
+      void spendClaim(projectId, challengeId, retrying).then(setOutcome);
+    },
+    [projectId, challengeId],
+  );
+
+  const retry = useCallback(() => run(true), [run]);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    run();
+    run(false);
   }, [run]);
 
   if (!outcome) {
@@ -295,7 +354,7 @@ function CompleteClaim({
   // by this attempt or an earlier one — there is nothing left to count down,
   // so the badge goes rather than contradicting the outcome above it.
   const settled = outcome.kind === "claimed" || outcome.kind === "already_claimed";
-  const card = outcomeCard(outcome, run);
+  const card = outcomeCard(outcome, retry);
   return (
     <>
       {card}
@@ -308,7 +367,7 @@ function CompleteClaim({
  * The screen for one completion outcome. Every branch is a state the contract
  * enumerates (`claim/complete` in the OpenAPI source), not an exception.
  */
-function outcomeCard(outcome: ClaimOutcome, run: () => void) {
+function outcomeCard(outcome: ClaimOutcome, retry: () => void) {
   switch (outcome.kind) {
     case "claimed":
       return (
@@ -354,7 +413,7 @@ function outcomeCard(outcome: ClaimOutcome, run: () => void) {
           <p className={BODY_TEXT}>
             Signing in again normally provisions one. Retry, or reopen the link from your terminal.
           </p>
-          <Button onClick={run} variant="outline" className="mx-auto w-fit">
+          <Button onClick={retry} variant="outline" className="mx-auto w-fit">
             Try again
           </Button>
         </StateCard>
@@ -392,7 +451,7 @@ function outcomeCard(outcome: ClaimOutcome, run: () => void) {
             Then reopen the claim link from your terminal to create an account or sign in for this
             project.
           </p>
-          <Button onClick={run} variant="outline" className="mx-auto w-fit">
+          <Button onClick={retry} variant="outline" className="mx-auto w-fit">
             Try again
           </Button>
         </StateCard>
@@ -401,7 +460,7 @@ function outcomeCard(outcome: ClaimOutcome, run: () => void) {
       return (
         <StateCard title="The claim did not complete">
           <p className={BODY_TEXT}>{outcome.message}</p>
-          <Button onClick={run} variant="outline" className="mx-auto w-fit">
+          <Button onClick={retry} variant="outline" className="mx-auto w-fit">
             Try again
           </Button>
         </StateCard>
