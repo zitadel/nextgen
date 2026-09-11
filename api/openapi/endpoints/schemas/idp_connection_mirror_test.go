@@ -51,8 +51,12 @@ func TestIdPConnectionMirrorMatchesSchema(t *testing.T) {
 	// The mirror widens it to the two value classes ogen can carry; the schema
 	// keeps the exact set.
 	verifiedClaims := schemaProperties["verified_claims"].(map[string]any)
-	_, ok = verifiedClaims["additionalProperties"]
-	require.True(t, ok, "verified_claims no longer constrains its values, drop this from the test")
+	require.Equal(t, map[string]any{"anyOf": []any{
+		map[string]any{"const": true},
+		map[string]any{"const": "$supplementary_fetch"},
+		map[string]any{"pattern": "^[^$]", "type": "string"},
+	}}, verifiedClaims["additionalProperties"],
+		"the verified_claims value classes changed; widen the mirror's oneOf to match")
 	verifiedClaims["additionalProperties"] = map[string]any{"oneOf": []any{
 		map[string]any{"type": "boolean"},
 		map[string]any{"type": "string"},

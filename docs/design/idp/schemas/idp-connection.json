@@ -59,7 +59,7 @@
         "type": "string",
         "pattern": "^[^$]"
       },
-      "description": "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. May name only properties defined in user schemas; unmatched entries are ignored."
+      "description": "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
     },
     "verified_claims": {
       "type": "object",
