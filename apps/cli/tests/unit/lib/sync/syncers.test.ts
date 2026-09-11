@@ -62,10 +62,35 @@ describe("SchemaSyncer", () => {
       schema.validate({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        "x-identifier": "email",
         "x-auth-methods": { password: { enabled: true } },
-        properties: { email: { type: "string" } },
+        properties: { email: { type: "string", "x-unique": "project" } },
       }),
     ).not.toThrow();
+  });
+
+  it("validate enforces the server's designation rules and names them in the message", () => {
+    // Mirrors validateUserSchemaDesignations (internal/domain/
+    // schema_designation.go): a password-enabled schema must designate an
+    // identifier, and the rendered message must carry the server's own
+    // wording — text-mode plan output prints only the message.
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    let thrown: unknown;
+    try {
+      schema.validate({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        "x-auth-methods": { password: { enabled: true } },
+        properties: { email: { type: "string" } },
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ZitadelError);
+    expect((thrown as ZitadelError).message).toContain(
+      'password authentication is enabled but the schema designates no "x-identifier"',
+    );
   });
 
   it("validate throws E_VALIDATION on a malformed JSON Schema", () => {

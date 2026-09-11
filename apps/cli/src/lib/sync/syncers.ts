@@ -99,9 +99,22 @@ class SchemaSyncer implements ResourceSyncer {
   validate(data: object): void {
     const result = schemaConfigSchema.safeParse(data);
     if (!result.success) {
-      throw new ZitadelError("E_VALIDATION", "Schema file is not a valid Zitadel schema body", {
-        details: { issues: result.error.issues },
-      });
+      // Fold every issue into the message: text-mode output prints only the
+      // message, so a bare "not valid" would leave the designation rules
+      // (ADR 058, mirrored from the server) invisible — the same rendering
+      // validatePlannedFlows uses.
+      const noun = result.error.issues.length === 1 ? "issue" : "issues";
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `Schema file is not a valid Zitadel schema body (${result.error.issues.length} ${noun}):\n` +
+          result.error.issues
+            .map((issue) => `  - ${issue.path.join(".") || "/"}: ${issue.message}`)
+            .join("\n"),
+        {
+          hint: "These are the same rules the server enforces on apply.",
+          details: { issues: result.error.issues },
+        },
+      );
     }
     assertEnvRefs(data, this.env);
   }
