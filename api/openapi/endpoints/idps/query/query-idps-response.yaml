@@ -1,12 +1,13 @@
 type: object
-description: Paginated list of identity provider connections.
+description: |
+  Paginated list of identity provider connections.
 required:
   - idps
 properties:
   idps:
     type: array
     items:
-      $ref: idp-summary.yaml
+      $ref: ../idp-response.yaml
   next_page_token:
     description: |
       Token to pass as `page_token` in the next request to fetch the following page.

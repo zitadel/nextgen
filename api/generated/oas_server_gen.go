@@ -106,17 +106,17 @@ type Handler interface {
 	// Creates or revises a connection document. If the slug does not already
 	// exist, a new connection is created. If a connection with that slug already
 	// exists, a revision is created.
-	// A revision gets a new `revision_id` and leaves `id` alone, so identity
-	// links that reference the connection keep resolving while releases and auth
-	// attempts stay pinned to the revision they captured.
+	// A revision gets a new `revision_id` and does not modify the connection
+	// `id`, so identity links that reference the connection keep resolving while
+	// releases and auth attempts stay pinned to the revision they captured.
 	// Identity fields are fixed for the life of the connection and a revision
 	// that changes one is rejected: `slug`, `protocol`, `subject_claim`, and the
 	// provider coordinates (`issuer` for OIDC, `token_endpoint` and
 	// `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
 	// account a stored subject belongs to, so changing one would silently
 	// repoint existing identities at a different provider.
-	// The document is validated against the `idp-connection.json` meta-schema
-	// before anything is stored.
+	// The document is validated against the `idp-connection.json` schema before
+	// anything is stored.
 	//
 	// POST /idps
 	CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
@@ -346,12 +346,8 @@ type Handler interface {
 	GetHealth(ctx context.Context) (GetHealthRes, error)
 	// GetIdpById implements getIdpById operation.
 	//
-	// Reads one connection by its id, together with the revision it currently
-	// serves.
-	// The lookup is scoped to the project in `project_id`: a connection id
-	// belonging to another project answers not found exactly as an unknown id
-	// does, so the endpoint cannot be used to probe for connections in projects
-	// the caller cannot read.
+	// Reads a connection by its id.
+	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /idps/{id}
 	GetIdpById(ctx context.Context, params GetIdpByIdParams) (GetIdpByIdRes, error)
@@ -579,12 +575,6 @@ type Handler interface {
 	//
 	// Returns the identity provider connections of a project, paginated with a
 	// cursor.
-	// Rows carry the fields a list screen shows and omit the connection
-	// document. Read one document with `GET /idps/{id}` or
-	// `GET /idps/slug/{slug}`.
-	// Each row describes the revision the connection currently serves, so
-	// `display_name`, `protocol`, and `template` are the newest values, not the
-	// ones it was created with.
 	//
 	// POST /idps/query
 	QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)

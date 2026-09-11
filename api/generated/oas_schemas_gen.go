@@ -10191,8 +10191,8 @@ type CreateIdpRequest struct {
 	// file. If its slug does not already exist, a new connection is created.
 	// If a connection with that slug already exists, this becomes a new
 	// revision of it. The document is validated against the
-	// `idp-connection.json` schema before anything is stored, and echoed back
-	// as stored under `definition`.
+	// `idp-connection.json` schema before anything is stored, and returned
+	// as `definition`.
 	Idp IdpConnection `json:"idp"`
 }
 
@@ -23615,9 +23615,8 @@ type IdpConnection struct {
 	// (sso_providers). Unique within the Project.
 	Slug     string      `json:"slug"`
 	Protocol IdpProtocol `json:"protocol"`
-	// Names the catalog entry this file was scaffolded from. Keys vendor knowledge only: glyphs and
-	// button branding, the setup scan/match, and catalog claim tables. Carries no protocol behavior:
-	// conduct comes only from the protocol blocks.
+	// Template hint for rendering the provider (logo, colors). Carries no protocol behavior: conduct
+	// comes only from the protocol blocks.
 	Template OptString `json:"template"`
 	// Shown to the user on the sign-in button.
 	DisplayName string `json:"display_name"`
@@ -23628,8 +23627,8 @@ type IdpConnection struct {
 	// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 	// top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
 	// `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
-	// reserved for future mapping forms. May name properties only some schemas define; unmatched entries
-	// are ignored per schema.
+	// reserved for future mapping forms. May name only properties defined in user schemas; unmatched
+	// entries are ignored.
 	ClaimMapping OptIdpConnectionClaimMapping `json:"claim_mapping"`
 	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim),
 	// the literal `true` (trust this provider unconditionally), or the `$`-pointer
@@ -23638,22 +23637,21 @@ type IdpConnection struct {
 	// reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries
 	// values, not verification state.
 	VerifiedClaims OptIdpConnectionVerifiedClaims `json:"verified_claims"`
-	// How far this provider's data is trusted. `creation` names what happens to a subject that has no
-	// account yet. With `disabled`, the provider never creates a user. With `auto`, the user is created
-	// without a collection step when the mapped claims fill every required property of the schema. A
-	// required property with an `x-unique` scope must also arrive verified according to
-	// `verified_claims`. When a required property is missing or such a property is unverified, the
-	// collection step is shown instead, prefilled with the claims that did arrive. Gating on other
-	// properties will be added when `x-verify` returns to the dialect. The following are deferred and
-	// will be added as additive changes. The `auto_only` value, which creates the user from complete
-	// claims or fails without collecting. The linking policy (`is_linking_allowed`, `auto_linking`),
-	// together with the account-linking journey. `is_auto_update`, together with per-property
-	// verification state.
+	// How far this provider's data is trusted. `creation` defines what happens to a subject that has no
+	// account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
+	// collection step when the mapped claims fill every required property of the schema. A required
+	// property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a
+	// required property is missing or such a property is unverified, the collection step is shown
+	// instead, prefilled with the claims. Gating on other properties will be added when `x-verify`
+	// returns to the dialect. The following are deferred and will be added as additive changes. The
+	// `auto_only` value creates the user from complete claims or fails without collecting. The linking
+	// policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey.
+	// `is_auto_update`, together with per-property verification state.
 	Provisioning OptIdpConnectionProvisioning `json:"provisioning"`
 	// OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or
 	// to serve a provider that exposes no .well-known document.
 	Oidc OptIdpConnectionOidc `json:"oidc"`
-	// OAuth 2.0 connection details. No discovery exists, so all three endpoints are stated explicitly.
+	// OAuth 2.0 connection details.
 	OAuth2 OptIdpConnectionOAuth2 `json:"oauth2"`
 }
 
@@ -23770,8 +23768,8 @@ func (s *IdpConnection) SetOAuth2(val OptIdpConnectionOAuth2) {
 // Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 // top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
 // `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
-// reserved for future mapping forms. May name properties only some schemas define; unmatched entries
-// are ignored per schema.
+// reserved for future mapping forms. May name only properties defined in user schemas; unmatched
+// entries are ignored.
 type IdpConnectionClaimMapping map[string]string
 
 func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
@@ -23783,7 +23781,7 @@ func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
 	return m
 }
 
-// OAuth 2.0 connection details. No discovery exists, so all three endpoints are stated explicitly.
+// OAuth 2.0 connection details.
 type IdpConnectionOAuth2 struct {
 	// Where the user is sent to authorize.
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
@@ -23804,13 +23802,12 @@ type IdpConnectionOAuth2 struct {
 	Scopes []string `json:"scopes"`
 	// Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the
 	// parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token
-	// endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship.
+	// endpoint rejects them.
 	PkceEnabled OptBool `json:"pkce_enabled"`
 	// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
 	// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
 	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-	// `client_assertion` are rejected by the same guard: values here are committed to git and appended
-	// to the public authorize URL, so a credential pasted one level too deep leaks twice.
+	// `client_assertion` are rejected as they could be appended to the public authorize URL.
 	StaticAuthorizeParameters OptIdpConnectionOAuth2StaticAuthorizeParameters `json:"static_authorize_parameters"`
 	// Provider-specific follow-up call after userinfo. New values are non-breaking.
 	SupplementaryFetch OptIdpConnectionOAuth2SupplementaryFetch `json:"supplementary_fetch"`
@@ -23919,8 +23916,7 @@ func (s *IdpConnectionOAuth2) SetSupplementaryFetch(val OptIdpConnectionOAuth2Su
 // Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
 // parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
 // override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-// `client_assertion` are rejected by the same guard: values here are committed to git and appended
-// to the public authorize URL, so a credential pasted one level too deep leaks twice.
+// `client_assertion` are rejected as they could be appended to the public authorize URL.
 type IdpConnectionOAuth2StaticAuthorizeParameters map[string]string
 
 func (s *IdpConnectionOAuth2StaticAuthorizeParameters) init() IdpConnectionOAuth2StaticAuthorizeParameters {
@@ -24041,13 +24037,12 @@ type IdpConnectionOidc struct {
 	Scopes []string `json:"scopes"`
 	// Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the
 	// parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token
-	// endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship.
+	// endpoint rejects them.
 	PkceEnabled OptBool `json:"pkce_enabled"`
 	// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
 	// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
 	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-	// `client_assertion` are rejected by the same guard: values here are committed to git and appended
-	// to the public authorize URL, so a credential pasted one level too deep leaks twice.
+	// `client_assertion` are rejected as they could be appended to the public authorize URL.
 	StaticAuthorizeParameters OptIdpConnectionOidcStaticAuthorizeParameters `json:"static_authorize_parameters"`
 }
 
@@ -24174,8 +24169,7 @@ func (s *IdpConnectionOidc) SetStaticAuthorizeParameters(val OptIdpConnectionOid
 // Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
 // parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
 // override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-// `client_assertion` are rejected by the same guard: values here are committed to git and appended
-// to the public authorize URL, so a credential pasted one level too deep leaks twice.
+// `client_assertion` are rejected as they could be appended to the public authorize URL.
 type IdpConnectionOidcStaticAuthorizeParameters map[string]string
 
 func (s *IdpConnectionOidcStaticAuthorizeParameters) init() IdpConnectionOidcStaticAuthorizeParameters {
@@ -24229,17 +24223,16 @@ func (s *IdpConnectionOidcTokenEndpointAuthMethod) UnmarshalText(data []byte) er
 	}
 }
 
-// How far this provider's data is trusted. `creation` names what happens to a subject that has no
-// account yet. With `disabled`, the provider never creates a user. With `auto`, the user is created
-// without a collection step when the mapped claims fill every required property of the schema. A
-// required property with an `x-unique` scope must also arrive verified according to
-// `verified_claims`. When a required property is missing or such a property is unverified, the
-// collection step is shown instead, prefilled with the claims that did arrive. Gating on other
-// properties will be added when `x-verify` returns to the dialect. The following are deferred and
-// will be added as additive changes. The `auto_only` value, which creates the user from complete
-// claims or fails without collecting. The linking policy (`is_linking_allowed`, `auto_linking`),
-// together with the account-linking journey. `is_auto_update`, together with per-property
-// verification state.
+// How far this provider's data is trusted. `creation` defines what happens to a subject that has no
+// account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
+// collection step when the mapped claims fill every required property of the schema. A required
+// property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a
+// required property is missing or such a property is unverified, the collection step is shown
+// instead, prefilled with the claims. Gating on other properties will be added when `x-verify`
+// returns to the dialect. The following are deferred and will be added as additive changes. The
+// `auto_only` value creates the user from complete claims or fails without collecting. The linking
+// policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey.
+// `is_auto_update`, together with per-property verification state.
 type IdpConnectionProvisioning struct {
 	Creation OptIdpConnectionProvisioningCreation `json:"creation"`
 }
@@ -24425,7 +24418,7 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 	}
 }
 
-// Selects which protocol block must be present.
+// The protocol used by the identity provider.
 // Ref: #
 type IdpProtocol string
 
@@ -24474,19 +24467,16 @@ type IdpResponse struct {
 	// A unique connection id, generated when the connection is created, and shared by
 	// every revision. This id is referenced by the identity links.
 	ID string `json:"id"`
-	// The id of the revision this response carries, which is the newest one.
-	// Auth attempts and releases pin revision ids, so a revise changes this
-	// value and leaves `id` alone.
+	// The latest revision id, pinned by auth attempts and releases.
 	RevisionID string `json:"revision_id"`
-	// The identifier user schemas and flow definitions reference the
-	// connection by. Fixed for the life of the connection.
+	// The identifier by which user schemas and flow definitions reference the
+	// connection. Fixed for the life of the connection.
 	Slug string `json:"slug"`
 	// When the connection was created.
 	CreatedAt time.Time `json:"created_at"`
-	// When the connection was last revised. Equal to `created_at` until the
-	// first revise.
+	// When the connection was last revised.
 	UpdatedAt time.Time `json:"updated_at"`
-	// The stored connection document, echoed as stored.
+	// The stored connection document.
 	Definition IdpConnection `json:"definition"`
 }
 
@@ -24552,109 +24542,6 @@ func (s *IdpResponse) SetDefinition(val IdpConnection) {
 
 func (*IdpResponse) getIdpByIdRes()   {}
 func (*IdpResponse) getIdpBySlugRes() {}
-
-// One row of a connection query: the connection, the revision it serves,
-// and the fields a list shows. The document is not included; read it by id
-// or by slug.
-// Ref: #
-type IdpSummary struct {
-	// The connection id.
-	ID string `json:"id"`
-	// The id of the revision the connection currently serves.
-	RevisionID string `json:"revision_id"`
-	// The identifier user schemas and flow definitions reference the connection by.
-	Slug string `json:"slug"`
-	// The name shown on the sign-in button, from the served revision.
-	DisplayName string      `json:"display_name"`
-	Protocol    IdpProtocol `json:"protocol"`
-	// The catalog entry the connection was scaffolded from, from the served
-	// revision. Absent when the document names none.
-	Template OptString `json:"template"`
-	// When the connection was created.
-	CreatedAt time.Time `json:"created_at"`
-	// When the connection was last revised.
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// GetID returns the value of ID.
-func (s *IdpSummary) GetID() string {
-	return s.ID
-}
-
-// GetRevisionID returns the value of RevisionID.
-func (s *IdpSummary) GetRevisionID() string {
-	return s.RevisionID
-}
-
-// GetSlug returns the value of Slug.
-func (s *IdpSummary) GetSlug() string {
-	return s.Slug
-}
-
-// GetDisplayName returns the value of DisplayName.
-func (s *IdpSummary) GetDisplayName() string {
-	return s.DisplayName
-}
-
-// GetProtocol returns the value of Protocol.
-func (s *IdpSummary) GetProtocol() IdpProtocol {
-	return s.Protocol
-}
-
-// GetTemplate returns the value of Template.
-func (s *IdpSummary) GetTemplate() OptString {
-	return s.Template
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *IdpSummary) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *IdpSummary) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *IdpSummary) SetID(val string) {
-	s.ID = val
-}
-
-// SetRevisionID sets the value of RevisionID.
-func (s *IdpSummary) SetRevisionID(val string) {
-	s.RevisionID = val
-}
-
-// SetSlug sets the value of Slug.
-func (s *IdpSummary) SetSlug(val string) {
-	s.Slug = val
-}
-
-// SetDisplayName sets the value of DisplayName.
-func (s *IdpSummary) SetDisplayName(val string) {
-	s.DisplayName = val
-}
-
-// SetProtocol sets the value of Protocol.
-func (s *IdpSummary) SetProtocol(val IdpProtocol) {
-	s.Protocol = val
-}
-
-// SetTemplate sets the value of Template.
-func (s *IdpSummary) SetTemplate(val OptString) {
-	s.Template = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *IdpSummary) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *IdpSummary) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
 
 // The claim challenge minted for a project.
 // Ref: #
@@ -41789,7 +41676,7 @@ func (s *QueryIdpsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of identity provider connections.
 // Ref: #
 type QueryIdpsResponse struct {
-	Idps []IdpSummary `json:"idps"`
+	Idps []IdpResponse `json:"idps"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
 	// Absent when there are no more results. The follow-up request must repeat the
 	// same `sorting` that produced this token (omit only when both pages use the default).
@@ -41797,7 +41684,7 @@ type QueryIdpsResponse struct {
 }
 
 // GetIdps returns the value of Idps.
-func (s *QueryIdpsResponse) GetIdps() []IdpSummary {
+func (s *QueryIdpsResponse) GetIdps() []IdpResponse {
 	return s.Idps
 }
 
@@ -41807,7 +41694,7 @@ func (s *QueryIdpsResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetIdps sets the value of Idps.
-func (s *QueryIdpsResponse) SetIdps(val []IdpSummary) {
+func (s *QueryIdpsResponse) SetIdps(val []IdpResponse) {
 	s.Idps = val
 }
 

@@ -38,7 +38,7 @@ properties:
       - google
       - github
       - okta
-    description: "Names the catalog entry this file was scaffolded from. Keys vendor knowledge only: glyphs and button branding, the setup scan/match, and catalog claim tables. Carries no protocol behavior: conduct comes only from the protocol blocks."
+    description: "Template hint for rendering the provider (logo, colors). Carries no protocol behavior: conduct comes only from the protocol blocks."
   display_name:
     type: string
     minLength: 1
@@ -53,7 +53,7 @@ properties:
     additionalProperties:
       type: string
       pattern: '^[^$]'
-    description: "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. May name properties only some schemas define; unmatched entries are ignored per schema."
+    description: "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. May name only properties defined in user schemas; unmatched entries are ignored."
   verified_claims:
     type: object
     additionalProperties:
@@ -68,7 +68,7 @@ properties:
   provisioning:
     type: object
     additionalProperties: false
-    description: "How far this provider's data is trusted. `creation` names what happens to a subject that has no account yet. With `disabled`, the provider never creates a user. With `auto`, the user is created without a collection step when the mapped claims fill every required property of the schema. A required property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a required property is missing or such a property is unverified, the collection step is shown instead, prefilled with the claims that did arrive. Gating on other properties will be added when `x-verify` returns to the dialect. The following are deferred and will be added as additive changes. The `auto_only` value, which creates the user from complete claims or fails without collecting. The linking policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey. `is_auto_update`, together with per-property verification state."
+    description: "How far this provider's data is trusted. `creation` defines what happens to a subject that has no account yet. With `disabled`, a user is not created. With `auto`, the user is created without a collection step when the mapped claims fill every required property of the schema. A required property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a required property is missing or such a property is unverified, the collection step is shown instead, prefilled with the claims. Gating on other properties will be added when `x-verify` returns to the dialect. The following are deferred and will be added as additive changes. The `auto_only` value creates the user from complete claims or fails without collecting. The linking policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey. `is_auto_update`, together with per-property verification state."
     properties:
       creation:
         type: string
@@ -143,7 +143,7 @@ properties:
       pkce_enabled:
         type: boolean
         default: true
-        description: Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship.
+        description: Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them.
       static_authorize_parameters:
         type: object
         propertyNames:
@@ -165,11 +165,11 @@ properties:
               - client_assertion
         additionalProperties:
           type: string
-        description: "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected by the same guard: values here are committed to git and appended to the public authorize URL, so a credential pasted one level too deep leaks twice."
+        description: "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected as they could be appended to the public authorize URL."
   oauth2:
     type: object
     additionalProperties: false
-    description: OAuth 2.0 connection details. No discovery exists, so all three endpoints are stated explicitly.
+    description: OAuth 2.0 connection details.
     required:
       - authorization_endpoint
       - token_endpoint
@@ -215,7 +215,7 @@ properties:
       pkce_enabled:
         type: boolean
         default: true
-        description: Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them. Per-provider behaviour is part of the pin-verification before defaults ship.
+        description: Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them.
       static_authorize_parameters:
         type: object
         propertyNames:
@@ -237,7 +237,7 @@ properties:
               - client_assertion
         additionalProperties:
           type: string
-        description: "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected by the same guard: values here are committed to git and appended to the public authorize URL, so a credential pasted one level too deep leaks twice."
+        description: "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected as they could be appended to the public authorize URL."
       supplementary_fetch:
         type: string
         enum:

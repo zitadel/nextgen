@@ -2,13 +2,9 @@ get:
   operationId: getIdpById
   summary: Get an identity provider connection by id
   description: |
-    Reads one connection by its id, together with the revision it currently
-    serves.
+    Reads a connection by its id.
 
-    The lookup is scoped to the project in `project_id`: a connection id
-    belonging to another project answers not found exactly as an unknown id
-    does, so the endpoint cannot be used to probe for connections in projects
-    the caller cannot read.
+    The lookup is scoped to the project in `project_id`.
   tags:
     - Identity Providers
   security:
@@ -31,11 +27,8 @@ get:
           schema:
             $ref: ../idp-response.yaml
           examples:
-            oidc:
-              summary: A connection that has been revised once
-              description: |
-                `created_at` records the creation and `updated_at` the
-                revision that `revision_id` names.
+            revised:
+              summary: A connection that has been revised since it was created.
               value:
                 id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
@@ -47,20 +40,28 @@ get:
                   protocol: oidc
                   template: google
                   display_name: Google
+                  subject_claim: sub
+                  claim_mapping:
+                    email: email
+                    givenName: given_name
+                    familyName: family_name
+                  verified_claims:
+                    email: email_verified
+                  provisioning:
+                    creation: auto
                   oidc:
                     issuer: https://accounts.google.com
-                    client_id: 1234567890-abcdef.apps.googleusercontent.com
+                    id_token_mapping: false
+                    client_id: '${{ GOOGLE_CLIENT_ID }}'
                     client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                    token_endpoint_auth_method: client_secret_basic
                     scopes:
                       - openid
                       - profile
                       - email
-                  claim_mapping:
-                    given_name: given_name
-                    family_name: family_name
-                    email: email
-                  verified_claims:
-                    email: email_verified
+                    pkce_enabled: true
+                    static_authorize_parameters:
+                      prompt: select_account
     '401':
       description: Missing or invalid credentials.
       content:

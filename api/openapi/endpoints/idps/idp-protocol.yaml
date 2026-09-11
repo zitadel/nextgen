@@ -2,4 +2,4 @@ type: string
 enum:
   - oidc
   - oauth2
-description: Selects which protocol block must be present.
+description: The protocol used by the identity provider.

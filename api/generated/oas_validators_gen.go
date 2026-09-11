@@ -5981,29 +5981,6 @@ func (s *IdpResponse) Validate() error {
 	return nil
 }
 
-func (s *IdpSummary) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Protocol.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "protocol",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
 func (s *InitClaimResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

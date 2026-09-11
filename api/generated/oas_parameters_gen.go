@@ -2730,7 +2730,7 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 type GetIdpBySlugParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The connection slug, as written in `.zitadel/idps/<slug>.json`.
+	// The connection slug.
 	Slug string
 }
 
