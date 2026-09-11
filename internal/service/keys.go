@@ -156,11 +156,6 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return crypter, nil
 	}
 
-	crypter, err := s.getCrypterOfKey(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-
 	jweHeader, err := domain.DecodeJWEHeader(key.Key)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
@@ -180,7 +175,7 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return nil, err
 	}
 
-	crypter, err = key.Crypter(kek)
+	crypter, err := key.Crypter(kek)
 	if err != nil {
 		return nil, err
 	}
