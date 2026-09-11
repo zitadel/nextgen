@@ -1,5 +1,26 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.23
+
+### Minor Changes
+
+- [#1156](https://github.com/zitadel/nextgen/pull/1156) [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36) Thanks [@grvijayan](https://github.com/grvijayan)! - Social login gets its configuration contracts. `zitadel setup` now copies two more dialect files into `.zitadel/meta/`: `idp-connection.json`, the schema for a provider connection file, and `sso-auth-method.json`, the shape of the `sso` slot in a user schema. A user schema with `sso.enabled: true` must now list the connection slugs its users may sign in with under `sso.providers`, and a disabled slot must not carry the list. In a flow definition, `identity_unknown` is a reserved transition outcome that switches a login flow to register when a provider returns an unknown user. The editor schema also describes `sso_providers` as a list of connection slugs and `on_success: create_user_with_sso`; the CLI and the API accept those shapes once the rendering and collection-step work lands.
+
+### Patch Changes
+
+- [#1194](https://github.com/zitadel/nextgen/pull/1194) [`c63a477`](https://github.com/zitadel/nextgen/commit/c63a4774039438c43385a2fb410ea914518d3f14) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Polish the claiming journey copy: the claim nudges in `setup`, `status`, and
+  `doctor` now name the claim deadline and the data-loss stake, the `claim`
+  command's help text, pre-browser message, and success output speak in
+  claim/permanence terms, and the team id moved out of the human success output
+  (it stays in the JSON envelope and `.zitadel/secret`). The setup
+  summary's INSTALLED section now reports the SDK package the scaffold actually
+  added and recognizes every supported framework's artifacts instead of always
+  claiming `@zitadel/sdk-next` with Next.js file paths.
+- Updated dependencies [[`df8870e`](https://github.com/zitadel/nextgen/commit/df8870e2b62b464ac917ad5ef277eeacb8399293), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`453f311`](https://github.com/zitadel/nextgen/commit/453f311254d997231dbf94bd344adf3b09d8ef64), [`e719e85`](https://github.com/zitadel/nextgen/commit/e719e856e16f573ca74771195c3cf9da509e448a), [`45b3cc0`](https://github.com/zitadel/nextgen/commit/45b3cc0d242d8ce8480d6e7f22271cb841e7838f), [`099d660`](https://github.com/zitadel/nextgen/commit/099d66095c7ec8d0d4e21b7b96c4120b31ac5a80), [`426515d`](https://github.com/zitadel/nextgen/commit/426515d07fe78b889834c0c87b80e2d25acd312c), [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36), [`ae8035f`](https://github.com/zitadel/nextgen/commit/ae8035f23c3eddb056122bb3262131c4ba9f7433), [`ffa4ace`](https://github.com/zitadel/nextgen/commit/ffa4ace5fcd3ba4613f536ad8e169fc8dd45dd46), [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2), [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad)]:
+  - @zitadel/server@1.0.0-alpha.23
+  - @zitadel/api@1.0.0-alpha.23
+  - @zitadel/config@1.0.0-alpha.23
+
 ## 1.0.0-alpha.22
 
 ### Minor Changes

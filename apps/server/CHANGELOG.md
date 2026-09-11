@@ -1,5 +1,86 @@
 # @zitadel/server
 
+## 1.0.0-alpha.23
+
+### Minor Changes
+
+- [#1180](https://github.com/zitadel/nextgen/pull/1180) [`df8870e`](https://github.com/zitadel/nextgen/commit/df8870e2b62b464ac917ad5ef277eeacb8399293) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Add `PATCH /users/{user_id}` and `PATCH /users/me` to the API: partial attribute updates with null-deletes, validated as a whole against the user's schema, with an optional schema move on the management endpoint.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - An embedded widget no longer injects the tenant font stylesheet into the
+  embedding application's document. The widget applies `typography.font_family`
+  and leaves loading the face to the page around it; a Zitadel-served page still
+  injects, because it owns its own document.
+
+  `typography.scale` and `shape.logo_scale` no longer declare a schema `default`,
+  so an omitted key stays omitted through decoding rather than being persisted as
+  an explicit `1`.
+
+  `zitadel plan` now applies the server's URL rules to `typography.font_url` and
+  rejects credentials in any branding URL, so a value that would fail on publish
+  fails locally first.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - Branding revisions carry login appearance.
+
+  `theme` publishes complete `light` and `dark` sides, each with its own logo and
+  semantic palette; neither side inherits from the other, and a side that is not
+  published is never resolved. `typography` names one face for body and headings
+  plus the stylesheet that loads it. `shape` carries a corner radius — a preset
+  name or a pixel value — along with density and a logo scale.
+
+  `font_url` becomes writable and moves onto `typography`, beside the family it
+  loads. It is stored, not injected: an embedded widget applies the family and
+  relies on the embedding page having loaded the face.
+
+  Appearance values are held to an allowlist, because the widget writes them into
+  a CSS declaration. A colour must be hex, a colour name, or a colour function; a
+  font stack must be identifiers or quoted names. `url()` and `var()` are
+  rejected, asset URLs may not carry credentials, and colours, font stacks and
+  URLs all have length caps. The contract states the same shapes as a JSON Schema
+  `pattern`, so generated clients reject them too.
+
+  Revisions published before these fields existed keep working and use the
+  maintained defaults.
+
+- [#1189](https://github.com/zitadel/nextgen/pull/1189) [`45b3cc0`](https://github.com/zitadel/nextgen/commit/45b3cc0d242d8ce8480d6e7f22271cb841e7838f) Thanks [@bastionstack](https://github.com/bastionstack)! - Show login flows in the Console. The directory lists each flow with its purposes, steps, and user schema, and opening one shows its steps and the JSON or YAML definition to apply with the CLI.
+
+- [#1167](https://github.com/zitadel/nextgen/pull/1167) [`099d660`](https://github.com/zitadel/nextgen/commit/099d66095c7ec8d0d4e21b7b96c4120b31ac5a80) Thanks [@bastionstack](https://github.com/bastionstack)! - Manage who administers a project from the console: Settings now has an Admins screen listing everyone with a grant on the project, adding an existing person as an admin, and removing that access again. The person has to have signed up already, because a grant binds an account rather than an email address.
+
+  The console root and Settings no longer render a page explaining that a screen does not exist: `/` lands on Teams, which is where the claim flow hands a project, and `/settings` lands on the new Admins screen.
+
+- [#1151](https://github.com/zitadel/nextgen/pull/1151) [`426515d`](https://github.com/zitadel/nextgen/commit/426515d07fe78b889834c0c87b80e2d25acd312c) Thanks [@wim07101993](https://github.com/wim07101993)! - The server can now be told to refuse to start rather than generate a master key. Pass `--disable-master-key-generation`, or set `server.generate_master_key: false` / `NEXTGEN_SERVER_GENERATE_MASTER_KEY=false`; a start that finds no key in `server.master_keys` and no key file in the master key directory then fails with an error naming the directory it searched. Generation stays on by default, so a first local start still needs no configuration. Turn it off wherever the data directory is not durable: without it every instance mints its own key, and a project key wrapped by one instance cannot be unwrapped by the next. The server also warns when `NEXTGEN_SERVER_MASTER_KEYS_*` variables are set, which never reach the configuration because master keys are keyed by key id and environment variables cannot populate map keys.
+
+- [#1156](https://github.com/zitadel/nextgen/pull/1156) [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36) Thanks [@grvijayan](https://github.com/grvijayan)! - Social login gets its configuration contracts. `zitadel setup` now copies two more dialect files into `.zitadel/meta/`: `idp-connection.json`, the schema for a provider connection file, and `sso-auth-method.json`, the shape of the `sso` slot in a user schema. A user schema with `sso.enabled: true` must now list the connection slugs its users may sign in with under `sso.providers`, and a disabled slot must not carry the list. In a flow definition, `identity_unknown` is a reserved transition outcome that switches a login flow to register when a provider returns an unknown user. The editor schema also describes `sso_providers` as a list of connection slugs and `on_success: create_user_with_sso`; the CLI and the API accept those shapes once the rendering and collection-step work lands.
+
+- [#1152](https://github.com/zitadel/nextgen/pull/1152) [`ffa4ace`](https://github.com/zitadel/nextgen/commit/ffa4ace5fcd3ba4613f536ad8e169fc8dd45dd46) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Operators can run `nextgen migrate` to apply schema changes and exit without starting the HTTP server. `server` no longer migrates on start unless you pass `--migrate`; `zitadel start` and the published image still migrate.
+
+- [#1129](https://github.com/zitadel/nextgen/pull/1129) [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be created over the API.
+
+  `POST /releases` bundles a release from revisions that already exist, supplied as `(kind, revision_id)` pairs; the handle each revision declares is read from the revision itself and recorded on the release. Submitting a set that a release already pins returns that release with `200` instead of creating a second one, so re-running a deploy on unchanged configuration is a no-op.
+
+  A release pins at most 50 revisions. The bound counts resources rather than revisions — a release holds one revision of each — so it limits how much a project configures, not how often it changes.
+
+  Every release is recorded in the audit stream as `release.created`, carrying what it pinned.
+
+- [#1130](https://github.com/zitadel/nextgen/pull/1130) [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be read back over the API.
+
+  `GET /releases` lists a project's releases newest first, carrying metadata only — the pinned set is omitted. `GET /releases/{release_id}` returns one release with the revisions it pins.
+
+### Patch Changes
+
+- [#1183](https://github.com/zitadel/nextgen/pull/1183) [`453f311`](https://github.com/zitadel/nextgen/commit/453f311254d997231dbf94bd344adf3b09d8ef64) Thanks [@bastionstack](https://github.com/bastionstack)! - Say what a claimed project means, and what to do when an app session blocks the claim.
+
+  The claim success screen offered two competing next steps; it now offers one, and states the outcome rather than the mechanics: your project is permanent, open the console. The claim-window badge disappears once the project is claimed, where a countdown no longer means anything.
+
+  A developer who follows the CLI's own journey signs into the scaffolded app first, and that session then blocks the claim on the same address. The screen that follows named the deployment's missing platform project, which is not something they can act on; it now says the session belongs to another project and to sign out of the app and reopen the claim link.
+
+  The console's theme switcher is icon-only, so its options carry tooltips — a monitor glyph reads as "display", not "follow the operating system".
+
+- [#1172](https://github.com/zitadel/nextgen/pull/1172) [`e719e85`](https://github.com/zitadel/nextgen/commit/e719e856e16f573ca74771195c3cf9da509e448a) Thanks [@bastionstack](https://github.com/bastionstack)! - Console loading, error and not-found states are centred in the content area instead of sitting in its top left corner.
+
+- [#1161](https://github.com/zitadel/nextgen/pull/1161) [`ae8035f`](https://github.com/zitadel/nextgen/commit/ae8035f23c3eddb056122bb3262131c4ba9f7433) Thanks [@muhlemmer](https://github.com/muhlemmer)! - The server no longer mistakes projected-volume metadata for a master key. Keys discovered in the master key directory are identified by file name, and the scan skipped only directories — but a Kubernetes-style projected secret volume (the shape Cloud Run and GKE mount secrets with) also contains `..data`, a _symlink_ to a timestamped directory. Symlinks are not directories, so `..data` was adopted as a key named `..data` and startup failed with `failed to read encryption key file ".../..data": is a directory`.
+
+  Dot-prefixed entries are now skipped, and the scan follows symlinks so a linked directory is skipped like a real one and the modification time that picks the newest key is the key's rather than the link's. A stray `.DS_Store` or editor swap file no longer becomes the deployment's master key either.
+
 ## 1.0.0-alpha.22
 
 ### Minor Changes

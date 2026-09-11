@@ -1,5 +1,7 @@
 # @zitadel/server-linux-x64
 
+## 1.0.0-alpha.23
+
 ## 1.0.0-alpha.22
 
 ### Patch Changes
