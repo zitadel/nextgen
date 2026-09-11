@@ -14,31 +14,40 @@ This means:
 
 ## Environment-gated wildcard rules — LOCKED
 
-Projects carry an `environment` flag: `development`, `preview`, or `production`. Wildcard semantics depend on it.
+> **Amended 2026-09-10.** This section was written before a project had
+> environments under it, so it put the class on the project. A project holds
+> several environments and they do not share one set of origin rules — a
+> project's `dev` accepts `http://localhost:3000` while its `prod` must not.
+> The class therefore belongs to the environment, as a boolean, and the rules
+> below are unchanged other than being read per environment. See
+> [ADR 061](../../adrs/061-environment-lifecycle-and-classes.md).
 
-### `development`
+Each environment carries a `production` flag. Wildcard semantics depend on it.
+
+### Non-production
 
 - `http://localhost:*` — allowed
 - `*.vercel.app`, `*.netlify.app`, `*.pages.dev`, `*.preview-host.example` — allowed
 - Custom domain wildcards — allowed
 
-### `preview`
-
-Same as development, plus stricter rate limits and warning banners in the dashboard.
+Preview-style environments were previously a third class. They differed from
+development only in stricter rate limits and warning banners in the dashboard,
+never in an origin rule, so the class collapses to a boolean here and a rate
+limit that needs to vary per environment is its own field.
 
 Rate limits are enforced at the edge/API layer, before expensive auth, flow,
 and delivery work runs.
 
-### `production`
+### Production
 
 - Shared-hosting wildcards (`*.vercel.app` etc.) — **forbidden**, 400 on save.
 - Explicit origins — allowed.
-- Custom domain wildcards (`*.customer.com`) — allowed (DNS ownership verification is post-MVP; manual dashboard approval at MVP).
+- Custom domain wildcards (`*.customer.com`) — allowed.
 - `localhost` — forbidden.
 
 ### Promotion
 
-Projects default to `development` at creation. Promoting to `production` is a deliberate action that may fail if any configured origin violates the stricter rules.
+Environments default to non-production. Declaring one `production` is a deliberate action that may fail if any configured origin violates the stricter rules.
 
 > **Post-MVP:** a CI integration (GitHub Action, Vercel plugin) that injects the exact preview URL into the project's allowlist during deploy and removes it on teardown. This eliminates the need for preview wildcards entirely for users who adopt it.
 
@@ -76,17 +85,20 @@ The concept is bearer-everywhere, but embedded lit components running on the cus
 
 ## Custom domain wildcards
 
-Custom domain wildcards (`*.customer.com`) are allowed in `production` but MVP uses manual dashboard approval. DNS-based ownership verification is the target.
+Custom domain wildcards (`*.customer.com`) are allowed on a production environment. The declaration is accepted as written, as every other origin declaration is.
 
-> **OPEN:** DNS challenge mechanism. Options: TXT record, CNAME to a verification endpoint, something else. Decision deferred until we have a customer who needs it.
+> **OUT OF SCOPE:** Gating a wildcarded domain on proof of ownership — whether an approval step or a DNS challenge (TXT record, CNAME to a verification endpoint, something else). Nothing verifies the domain today. Revisit when a customer needs it.
 
-## Relation to `zitadel.json` declared issuers
+## Relation to declared issuers
 
-The developer-facing way to declare origins is `environments.*.issuer` / `issuer_pattern` in `zitadel.json` — see [`../platform/configuration-surface.md`](../platform/configuration-surface.md). `npx zitadel push` propagates the declared issuers into the project's `allowed_origins` on the server. The two views are kept in sync by the push command.
+The developer-facing way to declare origins is `issuer` / `issuer_pattern` on each environment, and the CLI propagates the declared issuers into `allowed_origins` on the server. The two views are kept in sync by that command; the declaration is the input and `allowed_origins` is the projection of it.
+
+> **Amended 2026-09-10.** These fields were declared under `environments.*` in `zitadel.json`. They move to `.zitadel/environments/<name>.json`, one file per environment — see [ADR 061](../../adrs/061-environment-lifecycle-and-classes.md). What they mean here is unchanged.
 
 ## See also
 
 - [`../glossary.md`](../glossary.md)
 - [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — bootstrap challenge
 - [`credentials.md`](credentials.md#origin-bound-browser-challenges) — origin-bound nonces
-- [`../platform/configuration-surface.md`](../platform/configuration-surface.md) — `zitadel.json` declared issuers
+- [`../platform/configuration-surface.md`](../platform/configuration-surface.md) — declared issuers
+- [`../../adrs/061-environment-lifecycle-and-classes.md`](../../adrs/061-environment-lifecycle-and-classes.md) — environment lifecycle and the `production` class

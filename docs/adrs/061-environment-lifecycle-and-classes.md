@@ -76,7 +76,23 @@ Which environments does this project need?
   [ ] Other — enter a name
 ```
 
-`dev` is preselected; at least one selection is required. The answer is written as one file per environment under `.zitadel/environments/`, with `dev` given the detected local development origin as its `issuer` (the dev-server port the wizard already asks for), and `prod` marked `production: true` with its `issuer` left for the developer to declare.
+`dev` is preselected; at least one selection is required.
+
+Each selected environment then gets an issuer, because a production environment
+is invalid without one. `dev` is prefilled with the detected local development
+origin — the dev-server port the wizard already asks for — and the rest are
+asked for, blank for a non-production environment and required for `prod`:
+
+```
+Where is prod served?
+
+  https://acme.com
+```
+
+The answers are written as one file per environment under
+`.zitadel/environments/`. A developer who does not know their production origin
+yet leaves `prod` out of the set and adds it later; selecting it and declining
+to name an origin is not an option the wizard offers.
 
 The project itself is created with exactly one environment named `dev`, seeded server-side inside the creation transaction. That is what guarantees the at-least-one invariant for every caller.
 
@@ -123,9 +139,13 @@ One important difference: the contents of `.zitadel/environments/` are not bundl
 | Field | Required | Meaning |
 |---|---|---|
 | `name` | Yes | How the environment is addressed. Lowercase DNS label, at most 63 characters. |
-| `issuer` | Only when `production` | A customer-owned origin, or an array of them, on which the application's UI and OIDC endpoints run. |
-| `issuer_pattern` | Only when `production` | A wildcard pattern for environments whose origin is dynamic. Mutually exclusive with `issuer`. |
+| `issuer` | Optional | A customer-owned origin, or an array of them, on which the application's UI and OIDC endpoints run. |
+| `issuer_pattern` | Optional | A wildcard pattern for environments whose origin is dynamic. Mutually exclusive with `issuer`. |
 | `production` | No, defaults to `false` | The production class toggle. See [decision 8](#8-environments-can-be-marked-as-production). |
+
+Both origin fields are optional and mutually exclusive; exactly one of them is
+required when `production` is true. A non-production environment may declare
+either, or neither — with neither it is inert until an origin is added.
 
 #### Meta-schema
 
@@ -226,7 +246,19 @@ The lifecycle is managed via `zitadel environments list` and `zitadel environmen
 | `zitadel environments list` | read | Lists the project's environments as the server holds them, with each one's current deployment. |
 | `zitadel environments apply` | local → server | Synchronizes environments from local to the server: create, update and delete. |
 
+The CLI is the writing surface. The console reads environments and does not
+write them, so `apply` is one-way: local to server. Pulling a change made
+outside the repo back into `.zitadel/` is a problem every configuration
+resource has equally, and it is not solved here.
+
 `zitadel environments apply` reports its diff before acting; in interactive mode the developer confirms, and in non-interactive mode removals require an explicit `--confirm-removals`, matching the removal-safety rule ADR 035 already defines for `deploy`.
+
+It applies creates and updates before deletes, so the "at least one environment"
+invariant holds at every point of the run. Replacing a sole `dev` with a sole
+`qa` would otherwise delete the last environment first and be rejected by the
+server. The sync engine's shared planner queues deletes first
+(`apps/cli/src/lib/sync/loop.ts`), so this is an ordering environments require
+of it, not one they inherit.
 
 ### 5. The environment is explicit on the API, inferred by the CLI when there is only one
 
@@ -275,12 +307,35 @@ Removing `.zitadel/environments/<name>.json` and running `zitadel environments a
 - **A `production` environment cannot be deleted.** It must first be declared `production: false` in its file and synchronized, and only then removed.
 - **The last environment cannot be deleted.** A project always has at least one.
 
+The deployment records go with it: they answer "what is running where", and a
+deleted environment runs nothing. The releases they referenced are untouched —
+releases are project-scoped artifacts, so one the deleted environment ran stays
+deployable to the others. There is no drain and no undeploy step; deleting the
+slot is what stops the release it was running.
+
+Nothing else reads that history — rollback replays an environment's own past
+deployments, and promote reads the source environment's current one — so
+removing it breaks no other operation. What it does cost is the record that a
+release was ever live there, because no deployment event type exists today
+(`release.created` and `environment.created` do). Defining one belongs to the
+deployments surface (#532); with it, the audit trail survives the delete in the
+events log, where [ADR 048](048-wide-events-internal-audit-primitive.md) puts
+it.
+
 ### 8. Environments can be marked as `production`
 
 **`production: true` rejects localhost issuers and shared-hosting wildcards. The toggle belongs to the environment, not the project.**
 
 `production` is a boolean on the environment, and it decides which origin
 declarations the server will accept.
+
+A boolean rather than a class enum, because the set of names is open. Once a
+developer can call an environment `qa`, `sandbox` or `demo`, there is no class
+to map it to that would not be a guess — the name and the class would stop
+agreeing the moment either is chosen freely. What is actually known today is
+what production must refuse; everything else is one open category with no rule
+of its own. If a second rule appears later — rate limits being the likely one —
+it becomes its own field, not a third class value.
 
 A **non-production** environment accepts:
 
@@ -295,7 +350,8 @@ A **non-production** environment accepts:
 A **production** environment accepts:
 
 - `https://` origins — the same explicit form, and the one production is expected to use.
-- Custom-domain wildcards — `https://*.acme.com`.
+- Custom-domain wildcards — `https://*.acme.com`. Accepted as declared; proving
+  ownership of the domain is out of scope.
 
 and rejects:
 
@@ -327,6 +383,26 @@ The existing read endpoints stay as they are. Three writes are added, all addres
 | `PATCH /environments/{name}` | Update the declaration or the class. A `name` in the payload renames; 409 if taken. |
 | `DELETE /environments/{name}` | Delete, subject to the production and last-environment guards. |
 
+### Authorization
+
+Environments get their own permissions, like every other project-scoped
+configuration resource: `environment.read`, `environment.write` (create, update,
+rename and the `production` toggle) and `environment.delete`. They are added to
+the [system permission catalog](../design/api/system-permission-catalog.md)
+beside `domain.*` and `allowed_origin.*`, and follow its conventions — flat
+`{resource}.{verb}`, `read` covering get and list, and `project.write` not
+implying any of them.
+
+Scope comes from the grant, as it does for every other entry in that catalog, so
+a grant covers a project's environments rather than one of them. That answers
+what [#958](https://github.com/zitadel/nextgen/issues/958) is waiting on here.
+Per-environment grants stay possible without new machinery — `authz_assignments`
+already has a `resource` scope kind — but nothing grants at that scope, and the
+`production` class carries origin rules, not authorization weight. A principal
+who can create an environment can therefore also promote one to production, or
+demote and delete it; the guards in decision 7 are invariants the server
+enforces on everyone, not a second permission tier.
+
 ### Events
 
 `environment.created` exists; two more are added:
@@ -340,6 +416,15 @@ The existing read endpoints stay as they are. Three writes are added, all addres
 
 Environments join `resources` in `.zitadel/state.json`, the map the sync engine already keys by file path — `".zitadel/environments/dev.json": { "id": "env_01KX…", "hash": "…" }`.
 
+Because the key is the path, a rename has to move it. `apply` renames the file
+and rewrites the state key under the same id, and does so after the server has
+confirmed the rename. Leaving the key on the old path would make the next run
+read a missing path as a delete and the new path as a create — destroying the
+identity the rename exists to preserve. A run interrupted between the two
+recovers on the next `apply`: the id is on the server, so a state entry whose
+path no longer exists is re-keyed to the file holding that id rather than
+treated as a removal.
+
 ## Alternatives considered
 
-**Environments in `zitadel.json`.** That file is the CLI's own pointer config — which server to talk to, the renderer id, the preset — and the console never reads it. An environment is a server resource with an id, events, permissions and a read API, and the console has to be an equal authority over it. Putting it in `zitadel.json` would make the CLI its only writer.
+**Environments in `zitadel.json`.** That file is the CLI's own pointer config — which server to talk to, the renderer id, the preset — and the console never reads it. An environment is a server resource with an id, events, permissions and a read API, and the console has to be able to show it. Putting it in `zitadel.json` would make the CLI the only surface that knows the set exists.
