@@ -111,8 +111,8 @@ type Handler interface {
 	// releases and auth attempts stay pinned to the revision they captured.
 	// Identity fields are fixed for the life of the connection and a revision
 	// that changes one is rejected: `slug`, `protocol`, `subject_claim`, and the
-	// provider coordinates (`issuer` for OIDC, `token_endpoint` and
-	// `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+	// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
+	// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
 	// account a stored subject belongs to, so changing one would silently
 	// repoint existing identities at a different provider.
 	// The document is validated against the `idp-connection.json` schema before
