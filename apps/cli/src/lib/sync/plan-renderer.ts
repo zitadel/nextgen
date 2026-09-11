@@ -743,21 +743,34 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
     }
 
     case "revise": {
-      const header = `${blkPad}# ${action.path} will publish a new revision`;
+      const headerSuffix = action.repin ? " (re-pin user_schema)" : "";
+      const header = `${blkPad}# ${action.path} will publish a new revision${headerSuffix}`;
       const opening = `${blkPad}~ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.yellow, tty));
 
+      // A repin revision ships with `user_schema` rewritten to the revision
+      // id the schema revise mints (or already minted, for crash recovery) —
+      // render the content the executor will actually POST.
+      const newWithId: Record<string, unknown> = {
+        id: KNOWN_AFTER_APPLY,
+        ...normalized(action.syncer, action.content),
+        ...(action.repin ? { user_schema: action.repin.newId ?? KNOWN_AFTER_APPLY } : {}),
+      };
       if (action.oldContent) {
         const oldWithId: Record<string, unknown> = {
           id: action.previousId,
           ...normalized(action.syncer, action.oldContent),
         };
-        const newWithId: Record<string, unknown> = {
-          id: KNOWN_AFTER_APPLY,
-          ...normalized(action.syncer, action.content),
-        };
         renderDiff(oldWithId, newWithId, FIELD_COL, tty, lines);
+      } else if (action.repin) {
+        lines.push(
+          paint(
+            `${" ".repeat(FIELD_COL)}~ user_schema = "${action.repin.previousId}" -> ${action.repin.newId ? `"${action.repin.newId}"` : KNOWN_AFTER_APPLY}`,
+            A.yellow,
+            tty,
+          ),
+        );
       } else {
         lines.push(
           `${" ".repeat(FIELD_COL)}  # (field diff unavailable — no read endpoint for ${action.syncer.kind})`,
