@@ -36,7 +36,12 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	schemaValidator, err := domain.NewSchemaValidator(testSchemaBase)
 	require.NoError(t, err)
 
-	keys := service.NewKeyService(pool, *masterKeys)
+	encryptionKeys, err := service.NewLRUEncryptionKeyCache(64)
+	require.NoError(t, err)
+	signingKeys, err := service.NewLRUSigningKeyCache(64)
+	require.NoError(t, err)
+
+	keys := service.NewKeyService(pool, *masterKeys, encryptionKeys, signingKeys)
 	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys), keys
 }
 

@@ -130,20 +130,18 @@ func (s *projectService) create(ctx context.Context, project *domain.Project, se
 		}
 		keyset.Activate(nil)
 
-		if err := s.keyService.SaveEncryptionKey(ctx, keyset.KeyEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project key encryption key in the database")
+		for _, encryptionKey := range []*domain.EncryptionKey{
+			keyset.KeyEncryptionKey,
+			keyset.TokenEncryptionKey,
+			keyset.SecretEncryptionKey,
+			keyset.CookieEncryptionKey,
+		} {
+			if err := s.keyService.SaveEncryptionKey(ctx, tx.Statements(), encryptionKey); err != nil {
+				return err
+			}
 		}
-		if err := s.keyService.SaveEncryptionKey(ctx, keyset.TokenEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project token encryption key in the database")
-		}
-		if err := s.keyService.SaveEncryptionKey(ctx, keyset.SecretEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project secret encryption key in the database")
-		}
-		if err := s.keyService.SaveEncryptionKey(ctx, keyset.CookieEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project cookie encryption key in the database")
-		}
-		if err := s.keyService.SaveSigningKey(ctx, keyset.TokenSigningKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project token signing key in the database")
+		if err := s.keyService.SaveSigningKey(ctx, tx.Statements(), keyset.TokenSigningKey); err != nil {
+			return err
 		}
 
 		asgn := domain.NewSKProjProjectSetupAssignment(project.ID)

@@ -37,6 +37,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 
 	keyService := servicemocks.NewMockKeyService(mock)
 	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	expectKeySavesThroughStatements(keyService)
 
 	transaction = servicemocks.NewMockTransactioner[service.AllStatements](mock)
 	statementer = servicemocks.NewMockStatementer[service.AllStatements](mock)
@@ -66,6 +67,27 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	)
 
 	return
+}
+
+// expectKeySavesThroughStatements makes the mocked key service do what the real
+// one does: write through the statements it is handed rather than opening a
+// transaction of its own. That keeps the CreateEncryptionKey/CreateSigningKey
+// expectations on the statements mock meaningful -- they are what proves the
+// key rows go in on the caller's transaction, beside the project row they
+// reference.
+func expectKeySavesThroughStatements(keyService *servicemocks.MockKeyService) {
+	keyService.EXPECT().
+		SaveEncryptionKey(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, stmts service.AllStatements, key *domain.EncryptionKey) error {
+			return stmts.CreateEncryptionKey(ctx, key)
+		}).
+		AnyTimes()
+	keyService.EXPECT().
+		SaveSigningKey(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, stmts service.AllStatements, key *domain.SigningKey) error {
+			return stmts.CreateSigningKey(ctx, key)
+		}).
+		AnyTimes()
 }
 
 func TestProjectService_Create(t *testing.T) {

@@ -44,7 +44,8 @@ func newMockedKeyService(t *testing.T) (
 	})
 	require.NoError(t, err)
 
-	svc = service.NewKeyService(service.NewPool(pool), *pmasterKeys)
+	encryptionKeys, signingKeys := newKeyCaches(t)
+	svc = service.NewKeyService(service.NewPool(pool), *pmasterKeys, encryptionKeys, signingKeys)
 	return svc, statements, *pmasterKeys
 }
 
@@ -261,11 +262,38 @@ func newMigrationKeyService(t *testing.T, masterKeys ...domain.MasterKey) (servi
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 
+	// The migration writes its batches in a transaction, so the same statements
+	// have to be reachable through the transactional statementer. The
+	// assertions stay on UpdateKey either way.
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		},
+	).AnyTimes()
+
 	allMasterKeys, err := domain.NewMasterKeys(masterKeys)
 	require.NoError(t, err)
 
-	return service.NewKeyService(service.NewPool(pool), *allMasterKeys), statements
+	encryptionKeys, signingKeys := newKeyCaches(t)
+	return service.NewKeyService(service.NewPool(pool), *allMasterKeys, encryptionKeys, signingKeys), statements
 }
+
+// newKeyCaches gives each service its own caches, so a hit in one test can
+// never answer a read in another.
+func newKeyCaches(t *testing.T) (service.EncryptionKeyCache, service.SigningKeyCache) {
+	t.Helper()
+	encryptionKeys, err := service.NewLRUEncryptionKeyCache(testKeyCacheSize)
+	require.NoError(t, err)
+	signingKeys, err := service.NewLRUSigningKeyCache(testKeyCacheSize)
+	require.NoError(t, err)
+	return encryptionKeys, signingKeys
+}
+
+// testKeyCacheSize is large enough that nothing a test writes is evicted before
+// it is read back.
+const testKeyCacheSize = 64
 
 // newWrappedKEK returns a project KEK whose material is wrapped by the given
 // crypter, together with the raw material for later verification.
