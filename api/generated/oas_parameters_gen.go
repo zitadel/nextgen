@@ -2603,7 +2603,7 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 type GetIdpByIdParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The connection id, allocated on the first publish.
+	// The connection id, allocated when the connection was created.
 	ID string
 }
 

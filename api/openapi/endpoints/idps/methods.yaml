@@ -102,9 +102,9 @@ post:
             revised:
               summary: A second revision of the Google connection
               description: |
-                The scope list grew. `id` is the one allocated on the first
-                publish, `revision_id` is new, and `updated_at` has moved
-                past `created_at`.
+                The scope list grew. `id` is the one allocated when the
+                connection was created, `revision_id` is new, and `updated_at`
+                has moved past `created_at`.
               value:
                 id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
@@ -136,7 +136,7 @@ post:
             $ref: idp-response.yaml
           examples:
             created:
-              summary: The first publish of the Google connection
+              summary: The Google connection at creation
               value:
                 id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: idprev_01KWH3B72K7M7F0N9WD3P2E4YN

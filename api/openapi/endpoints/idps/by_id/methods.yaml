@@ -19,7 +19,7 @@ get:
     - name: id
       in: path
       required: true
-      description: The connection id, allocated on the first publish.
+      description: The connection id, allocated when the connection was created.
       schema:
         type: string
         example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
@@ -34,7 +34,7 @@ get:
             oidc:
               summary: A connection that has been revised once
               description: |
-                `created_at` records the first publish and `updated_at` the
+                `created_at` records the creation and `updated_at` the
                 revision that `revision_id` names.
               value:
                 id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
