@@ -25,6 +25,14 @@ once and owned centrally, before the second consumer exists.
 
 ## Decision
 
+A note on the word "policy": it is the epic's term (#928, and the
+Server-Side Fetch Policy section it builds on) for this operator-plane,
+process-wide control. It is not a policy object in the product sense (a
+tenant- or project-configurable resource like the password policy), and
+nothing here is project-overridable; decision 10 makes that a rule. If the
+concept is ever renamed to avoid that collision, it should happen
+epic-wide, not in this document alone.
+
 1. **One shared mechanism.** Every fetch of a URL a platform user can
    inject goes through the same hardened egress path. No feature carries
    its own address check (#928).
