@@ -1,0 +1,186 @@
+post:
+  operationId: createIdp
+  summary: Create or revise an identity provider connection
+  description: |
+    Publishes a connection document. The `slug` in the document decides what
+    happens: a slug the project has not used creates a connection, and a slug
+    it already has appends a revision to that connection.
+
+    A revise allocates a new `revision_id` and leaves `id` alone, so identity
+    links that reference the connection keep resolving while releases and auth
+    attempts stay pinned to the revision they captured.
+
+    Identity fields are fixed for the life of the connection and a revision
+    that changes one is rejected: `slug`, `protocol`, `subject_claim`, and the
+    provider coordinates (`issuer` for OIDC, `token_endpoint` and
+    `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+    account a stored subject belongs to, so changing one would silently
+    repoint existing identities at a different provider.
+
+    The document is validated against the `idp-connection.json` meta-schema
+    before anything is stored.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.write
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-idp-request.yaml
+        examples:
+          oidcGoogle:
+            summary: An OIDC connection scaffolded from the Google catalog entry
+            description: |
+              Endpoints are resolved from the issuer's discovery document, so
+              only `issuer` is stated. The secret is a variable reference; the
+              literal never appears in the document.
+            value:
+              idp:
+                slug: google
+                protocol: oidc
+                template: google
+                display_name: Google
+                oidc:
+                  issuer: https://accounts.google.com
+                  client_id: 1234567890-abcdef.apps.googleusercontent.com
+                  client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                  scopes:
+                    - openid
+                    - profile
+                    - email
+                claim_mapping:
+                  given_name: given_name
+                  family_name: family_name
+                  email: email
+                verified_claims:
+                  email: email_verified
+          oauth2Github:
+            summary: An OAuth 2.0 connection that needs a supplementary fetch
+            description: |
+              OAuth 2.0 has no discovery and no `sub` guarantee, so all three
+              endpoints and `subject_claim` are stated. GitHub serves the
+              primary address from a separate endpoint, which is what
+              `supplementary_fetch` selects and what `email` is verified by.
+            value:
+              idp:
+                slug: github
+                protocol: oauth2
+                template: github
+                display_name: GitHub
+                subject_claim: id
+                oauth2:
+                  authorization_endpoint: https://github.com/login/oauth/authorize
+                  token_endpoint: https://github.com/login/oauth/access_token
+                  userinfo_endpoint: https://api.github.com/user
+                  client_id: Iv1.0123456789abcdef
+                  client_secret: '${{ GITHUB_CLIENT_SECRET }}'
+                  scopes:
+                    - read:user
+                    - user:email
+                  supplementary_fetch: github_primary_email
+                claim_mapping:
+                  username: login
+                  email: email
+                verified_claims:
+                  email: $supplementary_fetch
+  responses:
+    '200':
+      description: |
+        The project already had a connection with this slug, so the document
+        was stored as a new revision of it. `id` is unchanged and
+        `revision_id` is new.
+      content:
+        application/json:
+          schema:
+            $ref: idp-response.yaml
+          examples:
+            revised:
+              summary: A second revision of the Google connection
+              description: |
+                The scope list grew. `id` is the one allocated on the first
+                publish, `revision_id` is new, and `updated_at` has moved
+                past `created_at`.
+              value:
+                id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                slug: google
+                created_at: '2026-07-14T09:11:00Z'
+                updated_at: '2026-07-16T14:20:00Z'
+                definition:
+                  slug: google
+                  protocol: oidc
+                  template: google
+                  display_name: Google
+                  oidc:
+                    issuer: https://accounts.google.com
+                    client_id: 1234567890-abcdef.apps.googleusercontent.com
+                    client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                    scopes:
+                      - openid
+                      - profile
+                      - email
+                      - https://www.googleapis.com/auth/user.phonenumbers.read
+    '201':
+      description: |
+        The slug was new to the project, so a connection was created. `id` and
+        `revision_id` were both allocated and `updated_at` equals
+        `created_at`.
+      content:
+        application/json:
+          schema:
+            $ref: idp-response.yaml
+          examples:
+            created:
+              summary: The first publish of the Google connection
+              value:
+                id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
+                slug: google
+                created_at: '2026-07-14T09:11:00Z'
+                updated_at: '2026-07-14T09:11:00Z'
+                definition:
+                  slug: google
+                  protocol: oidc
+                  template: google
+                  display_name: Google
+                  oidc:
+                    issuer: https://accounts.google.com
+                    client_id: 1234567890-abcdef.apps.googleusercontent.com
+                    client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                    scopes:
+                      - openid
+                      - profile
+                      - email
+    '400':
+      description: |
+        The document failed meta-schema validation, or it revises an existing
+        connection and changes a field that is fixed for its life.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createIdp-error-response.yaml

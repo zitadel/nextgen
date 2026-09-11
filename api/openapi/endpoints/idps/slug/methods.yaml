@@ -1,0 +1,91 @@
+get:
+  operationId: getIdpBySlug
+  summary: Get an identity provider connection by slug
+  description: |
+    Reads one connection by the slug user schemas and flow definitions
+    reference it by, together with the revision it currently serves.
+
+    A slug is unique within a project and fixed for the life of the
+    connection, so this resolves the same connection as `GET /idps/{id}` and
+    returns the same body. It exists because the CLI and the console hold
+    slugs from configuration files, not ids.
+
+    The lookup is scoped to the project in `project_id`: a slug used by
+    another project answers not found exactly as an unused slug does, so the
+    endpoint cannot be used to probe for connections in projects the caller
+    cannot read.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - name: slug
+      in: path
+      required: true
+      description: The connection slug, as written in `.zitadel/idps/<slug>.json`.
+      schema:
+        type: string
+        pattern: '^[a-z0-9][a-z0-9_-]*$'
+        maxLength: 64
+        example: google
+  responses:
+    '200':
+      description: The identity provider connection was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../idp-response.yaml
+          examples:
+            oauth2:
+              summary: An OAuth 2.0 connection resolved by slug
+              value:
+                id: idp_01KWHG09JXA7F0N9WD3P2E4YM5
+                revision_id: idprev_01KWHG3B72K7M7F0N9WD3P2E4
+                slug: github
+                created_at: '2026-07-15T11:02:00Z'
+                updated_at: '2026-07-15T11:02:00Z'
+                definition:
+                  slug: github
+                  protocol: oauth2
+                  template: github
+                  display_name: GitHub
+                  subject_claim: id
+                  oauth2:
+                    authorization_endpoint: https://github.com/login/oauth/authorize
+                    token_endpoint: https://github.com/login/oauth/access_token
+                    userinfo_endpoint: https://api.github.com/user
+                    client_id: Iv1.0123456789abcdef
+                    client_secret: '${{ GITHUB_CLIENT_SECRET }}'
+                    scopes:
+                      - read:user
+                      - user:email
+                    supplementary_fetch: github_primary_email
+                  claim_mapping:
+                    username: login
+                    email: email
+                  verified_claims:
+                    email: $supplementary_fetch
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: |
+        No identity provider connection with this slug exists in the given
+        project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getIdpBySlug-error-response.yaml

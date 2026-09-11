@@ -1,0 +1,116 @@
+post:
+  operationId: queryIdps
+  summary: Query identity provider connections
+  description: |
+    Returns the identity provider connections of a project, paginated with a
+    cursor.
+
+    Rows carry the fields a list screen shows and omit the connection
+    document. Read one document with `GET /idps/{id}` or
+    `GET /idps/slug/{slug}`.
+
+    Each row describes the revision the connection currently serves, so
+    `display_name`, `protocol`, and `template` are the newest values, not the
+    ones it was created with.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  requestBody:
+    description: Request to query the identity provider connections of a project.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-idps-request.yaml
+        examples:
+          firstPage:
+            summary: The first page, newest connection first
+            value:
+              limit: 2
+              sorting:
+                field: created_at
+                direction: desc
+          bySlug:
+            summary: Resolve a single slug
+            description: |
+              A slug is unique within the project, so `equals` on it matches
+              at most one row.
+            value:
+              filter:
+                - field: slug
+                  operation: equals
+                  value: google
+  responses:
+    '200':
+      description: The list of identity provider connections was returned successfully.
+      content:
+        application/json:
+          schema:
+            $ref: query-idps-response.yaml
+          examples:
+            firstPage:
+              summary: A page with more results behind it
+              value:
+                idps:
+                  - id: idp_01KWHG09JXA7F0N9WD3P2E4YM5
+                    revision_id: idprev_01KWHG3B72K7M7F0N9WD3P2E4
+                    slug: github
+                    display_name: GitHub
+                    protocol: oauth2
+                    template: github
+                    created_at: '2026-07-15T11:02:00Z'
+                    updated_at: '2026-07-15T11:02:00Z'
+                  - id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                    revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    slug: google
+                    display_name: Google
+                    protocol: oidc
+                    template: google
+                    created_at: '2026-07-14T09:11:00Z'
+                    updated_at: '2026-07-16T14:20:00Z'
+                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+            lastPage:
+              summary: The final page
+              description: |
+                `next_page_token` is absent when there are no further results.
+                `template` is absent on a connection that was written by hand
+                rather than scaffolded from the catalog.
+              value:
+                idps:
+                  - id: idp_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    revision_id: idprev_01KWH8Q5NZT7F0N9WD3P2E4YM
+                    slug: corp_idp
+                    display_name: Corporate SSO
+                    protocol: oidc
+                    created_at: '2026-07-13T08:00:00Z'
+                    updated_at: '2026-07-13T08:00:00Z'
+    '400':
+      description: Invalid request (e.g., invalid query parameters).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: queryIdps-error-response.yaml

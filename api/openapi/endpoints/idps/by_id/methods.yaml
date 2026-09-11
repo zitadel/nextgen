@@ -1,0 +1,85 @@
+get:
+  operationId: getIdpById
+  summary: Get an identity provider connection by id
+  description: |
+    Reads one connection by its id, together with the revision it currently
+    serves.
+
+    The lookup is scoped to the project in `project_id`: a connection id
+    belonging to another project answers not found exactly as an unknown id
+    does, so the endpoint cannot be used to probe for connections in projects
+    the caller cannot read.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - name: id
+      in: path
+      required: true
+      description: The connection id, allocated on the first publish.
+      schema:
+        type: string
+        example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+  responses:
+    '200':
+      description: The identity provider connection was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../idp-response.yaml
+          examples:
+            oidc:
+              summary: A connection that has been revised once
+              description: |
+                `created_at` records the first publish and `updated_at` the
+                revision that `revision_id` names.
+              value:
+                id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                slug: google
+                created_at: '2026-07-14T09:11:00Z'
+                updated_at: '2026-07-16T14:20:00Z'
+                definition:
+                  slug: google
+                  protocol: oidc
+                  template: google
+                  display_name: Google
+                  oidc:
+                    issuer: https://accounts.google.com
+                    client_id: 1234567890-abcdef.apps.googleusercontent.com
+                    client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                    scopes:
+                      - openid
+                      - profile
+                      - email
+                  claim_mapping:
+                    given_name: given_name
+                    family_name: family_name
+                    email: email
+                  verified_claims:
+                    email: email_verified
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: |
+        No identity provider connection with this id exists in the given
+        project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getIdpById-error-response.yaml

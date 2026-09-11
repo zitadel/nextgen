@@ -39,6 +39,12 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Identity Providers
+    description: |
+      External login providers a project offers, each published as a
+      revisioned connection document and referenced by its slug from user
+      schemas and flow definitions. Create-or-revise, query, and read by id
+      or by slug.
   - name: Releases
     description: |
       Immutable, project-scoped configuration snapshots. A release pins one
@@ -152,6 +158,14 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /idps:
+    $ref: endpoints/idps/methods.yaml
+  /idps/query:
+    $ref: endpoints/idps/query/methods.yaml
+  /idps/slug/{slug}:
+    $ref: endpoints/idps/slug/methods.yaml
+  /idps/{id}:
+    $ref: endpoints/idps/by_id/methods.yaml
   /releases:
     $ref: endpoints/releases/methods.yaml
   /releases/{release_id}:

@@ -1,0 +1,44 @@
+type: object
+description: An identity provider connection with the revision it currently serves.
+required:
+  - id
+  - revision_id
+  - slug
+  - definition
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    description: |
+      A unique connection id, generated when the connection is created, and shared by
+      every revision. This id is referenced by the identity links.
+    example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+  revision_id:
+    type: string
+    description: |
+      The id of the revision this response carries, which is the newest one.
+      Auth attempts and releases pin revision ids, so a revise changes this
+      value and leaves `id` alone.
+    example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
+  slug:
+    type: string
+    description: |
+      The identifier user schemas and flow definitions reference the
+      connection by. Fixed for the life of the connection.
+    example: google
+  created_at:
+    type: string
+    format: date-time
+    description: When the connection was created.
+    example: '2026-07-14T09:11:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: |
+      When the connection was last revised. Equal to `created_at` until the
+      first revise.
+    example: '2026-07-14T09:11:00Z'
+  definition:
+    $ref: idp-connection.yaml
+    description: The stored connection document, echoed as stored.

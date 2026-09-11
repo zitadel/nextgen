@@ -101,6 +101,25 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateIdp implements createIdp operation.
+	//
+	// Publishes a connection document. The `slug` in the document decides what
+	// happens: a slug the project has not used creates a connection, and a slug
+	// it already has appends a revision to that connection.
+	// A revise allocates a new `revision_id` and leaves `id` alone, so identity
+	// links that reference the connection keep resolving while releases and auth
+	// attempts stay pinned to the revision they captured.
+	// Identity fields are fixed for the life of the connection and a revision
+	// that changes one is rejected: `slug`, `protocol`, `subject_claim`, and the
+	// provider coordinates (`issuer` for OIDC, `token_endpoint` and
+	// `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+	// account a stored subject belongs to, so changing one would silently
+	// repoint existing identities at a different provider.
+	// The document is validated against the `idp-connection.json` meta-schema
+	// before anything is stored.
+	//
+	// POST /idps
+	CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
 	// CreateProject implements createProject operation.
 	//
 	// Create project.
@@ -325,6 +344,32 @@ type Handler interface {
 	//
 	// GET /healthz
 	GetHealth(ctx context.Context) (GetHealthRes, error)
+	// GetIdpById implements getIdpById operation.
+	//
+	// Reads one connection by its id, together with the revision it currently
+	// serves.
+	// The lookup is scoped to the project in `project_id`: a connection id
+	// belonging to another project answers not found exactly as an unknown id
+	// does, so the endpoint cannot be used to probe for connections in projects
+	// the caller cannot read.
+	//
+	// GET /idps/{id}
+	GetIdpById(ctx context.Context, params GetIdpByIdParams) (GetIdpByIdRes, error)
+	// GetIdpBySlug implements getIdpBySlug operation.
+	//
+	// Reads one connection by the slug user schemas and flow definitions
+	// reference it by, together with the revision it currently serves.
+	// A slug is unique within a project and fixed for the life of the
+	// connection, so this resolves the same connection as `GET /idps/{id}` and
+	// returns the same body. It exists because the CLI and the console hold
+	// slugs from configuration files, not ids.
+	// The lookup is scoped to the project in `project_id`: a slug used by
+	// another project answers not found exactly as an unused slug does, so the
+	// endpoint cannot be used to probe for connections in projects the caller
+	// cannot read.
+	//
+	// GET /idps/slug/{slug}
+	GetIdpBySlug(ctx context.Context, params GetIdpBySlugParams) (GetIdpBySlugRes, error)
 	// GetLive implements getLive operation.
 	//
 	// Check whether the server is started.
@@ -530,6 +575,19 @@ type Handler interface {
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
+	// QueryIdps implements queryIdps operation.
+	//
+	// Returns the identity provider connections of a project, paginated with a
+	// cursor.
+	// Rows carry the fields a list screen shows and omit the connection
+	// document. Read one document with `GET /idps/{id}` or
+	// `GET /idps/slug/{slug}`.
+	// Each row describes the revision the connection currently serves, so
+	// `display_name`, `protocol`, and `template` are the newest values, not the
+	// ones it was created with.
+	//
+	// POST /idps/query
+	QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
 	// QueryProjects implements queryProjects operation.
 	//
 	// Query projects.

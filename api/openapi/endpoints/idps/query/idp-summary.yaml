@@ -1,0 +1,48 @@
+type: object
+description: |
+  One row of a connection query: the connection, the revision it serves,
+  and the fields a list shows. The document is not included; read it by id
+  or by slug.
+required:
+  - id
+  - revision_id
+  - slug
+  - display_name
+  - protocol
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    description: The connection id.
+    example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+  revision_id:
+    type: string
+    description: The id of the revision the connection currently serves.
+    example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
+  slug:
+    type: string
+    description: The identifier user schemas and flow definitions reference the connection by.
+    example: google
+  display_name:
+    type: string
+    description: The name shown on the sign-in button, from the served revision.
+    example: Google
+  protocol:
+    $ref: ../idp-protocol.yaml
+  template:
+    type: string
+    description: |
+      The catalog entry the connection was scaffolded from, from the served
+      revision. Absent when the document names none.
+    example: google
+  created_at:
+    type: string
+    format: date-time
+    description: When the connection was created.
+    example: '2026-07-14T09:11:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: When the connection was last revised.
+    example: '2026-07-14T09:11:00Z'
