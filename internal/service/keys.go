@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -162,17 +163,23 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	}
 
 	// A key wrapped directly by a master key carries that master key's ID; every
-	// other key is wrapped by the project KEK and resolved recursively below.
+	// other key is wrapped by the project KEK and resolved recursively.
+	//
+	// Both arms resolve the wrapping key and then fall through to the one unwrap
+	// and the one Add below. Returning early from either would leave that key
+	// uncached, and the master key arm is the expensive one -- unwrapping under
+	// it is the RSA private-key operation this cache exists to avoid.
+	var kek crypto.Crypter
 	if masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID); masterKey != nil {
-		return key.Crypter(masterKey)
-	}
-
-	// This call does a database call to fetch the key with the given id and
-	// recurses. This can be a performance hit. Maybe caching or a better
-	// database query is required in the future?
-	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
-	if err != nil {
-		return nil, err
+		kek = masterKey
+	} else {
+		// A database read and a recursion, both of which the cache above spares
+		// every caller after the first.
+		resolved, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+		if err != nil {
+			return nil, err
+		}
+		kek = resolved
 	}
 
 	crypter, err := key.Crypter(kek)
