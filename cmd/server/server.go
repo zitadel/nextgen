@@ -204,15 +204,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
-	encryptionKeyCache, err := service.NewLRUEncryptionKeyCache(cfg.Keys.EncryptionKeyLRUCacheSize)
+	crypterCache, err := service.NewLRUCrypterCache(cfg.Keys.CrypterLRUCacheSize)
 	if err != nil {
-		return fmt.Errorf("failed to build encryption key cache: %w", err)
+		return fmt.Errorf("failed to build crypter cache: %w", err)
 	}
 	signingKeyCache, err := service.NewLRUSigningKeyCache(cfg.Keys.SigningKeyLRUCacheSize)
 	if err != nil {
 		return fmt.Errorf("failed to build signing key cache: %w", err)
 	}
-	keyService := service.NewKeyService(serviceDBPool, *masterKey, encryptionKeyCache, signingKeyCache)
+	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
@@ -508,7 +508,7 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 		},
 	})
 	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
-	v.SetDefault("keys.encryption_key_lru_cache_size", 1000)
+	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)

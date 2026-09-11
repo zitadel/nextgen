@@ -26,16 +26,30 @@ type KeyService interface {
 	MigrateToLatestMasterKey(ctx context.Context) error
 }
 
-// EncryptionKeyCache caches encryption keys to reduce the load of on the database.
+// CrypterCache caches the crypter a key resolves to, keyed by the key's id and
+// content encryption algorithm.
 //
-// Values in the cache are values, not pointers to ensure a copy is always
-// returned and the value of the cache cannot be corrupted by accident.
-type EncryptionKeyCache interface {
-	Add(key domain.EncryptionKey) (evicted bool)
-	Get(keyID string) (key domain.EncryptionKey, ok bool)
+// The crypter, not the key row: resolving one unwraps the key's material with
+// the key that wraps it, and for a key wrapped directly by a master key that is
+// an RSA private-key operation on every single call. Caching the row would save
+// the database read and leave that cost untouched, which is the larger half on
+// an authenticated request.
+//
+// A crypter is safe to hand to several callers at once: it holds the unwrapped
+// material and builds everything else per call, mutating nothing.
+//
+// Nothing evicts on rotation, and nothing needs to. Entries are keyed by key
+// id, and a key's material never changes -- re-wrapping it under a new master
+// key (see MigrateToLatestMasterKey) leaves the same bytes inside. A retired
+// key still resolves here on purpose: whatever it encrypted has to stay
+// readable. Which key is *current* is a separate question, and never answered
+// from this cache -- see GetProjectEncryptionKey.
+type CrypterCache interface {
+	Add(keyID string, algorithm jose.ContentEncryption, crypter op.Crypto) (evicted bool)
+	Get(keyID string, algorithm jose.ContentEncryption) (crypter op.Crypto, ok bool)
 }
 
-// SigningKeyCache caches encryption keys to reduce the load of on the database.
+// SigningKeyCache caches signing keys to reduce the load on the database.
 //
 // Values in the cache are values, not pointers to ensure a copy is always
 // returned and the value of the cache cannot be corrupted by accident.
@@ -47,23 +61,23 @@ type SigningKeyCache interface {
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
-	db                 *DB
-	masterKeys         domain.MasterKeys
-	encryptionKeyCache EncryptionKeyCache
-	signingKeyCache    SigningKeyCache
+	db              *DB
+	masterKeys      domain.MasterKeys
+	crypterCache    CrypterCache
+	signingKeyCache SigningKeyCache
 }
 
 func NewKeyService(
 	db *DB,
 	masterKeys domain.MasterKeys,
-	encryptionKeyCache EncryptionKeyCache,
+	crypterCache CrypterCache,
 	signingKeyCache SigningKeyCache,
 ) KeyService {
 	return &keyService{
-		db:                 db,
-		masterKeys:         masterKeys,
-		encryptionKeyCache: encryptionKeyCache,
-		signingKeyCache:    signingKeyCache,
+		db:              db,
+		masterKeys:      masterKeys,
+		crypterCache:    crypterCache,
+		signingKeyCache: signingKeyCache,
 	}
 }
 
@@ -84,10 +98,6 @@ func (s *keyService) SaveEncryptionKey(ctx context.Context, stmts AllStatements,
 }
 
 func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error) {
-	if key, ok := s.encryptionKeyCache.Get(keyID); ok && key.Algorithm == algorithm {
-		return new(key), nil
-	}
-
 	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldID), keyID),
 		database.Equal(database.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
@@ -98,17 +108,19 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get encryption key from the database")
 	}
-
-	s.encryptionKeyCache.Add(*key)
 	return key, nil
 }
 
-// GetCrypter fetches the encryption key for the given ID from the database,
-// decrypts it and creates an op.Crypto from it.
+// GetCrypter returns the crypter for the given key id, reading the key and
+// unwrapping it only on a cache miss.
 //
-// If the encryption key to decrypt the requested key exists in the database,
-// it is recursively fetched.
+// This is the per-request path: every authenticated request decrypts its bearer
+// credential through here, so a hit has to cost neither a read nor an unwrap.
 func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error) {
+	if crypter, ok := s.crypterCache.Get(keyID, algorithm); ok {
+		return crypter, nil
+	}
+
 	key, err := s.GetEncryptionKey(ctx, keyID, algorithm)
 	if err != nil {
 		return nil, err
@@ -140,6 +152,15 @@ func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, pu
 }
 
 func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.EncryptionKey) (op.Crypto, error) {
+	if crypter, ok := s.crypterCache.Get(key.ID, key.Algorithm); ok {
+		return crypter, nil
+	}
+
+	crypter, err := s.getCrypterOfKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
 	jweHeader, err := domain.DecodeJWEHeader(key.Key)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
@@ -158,7 +179,14 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	if err != nil {
 		return nil, err
 	}
-	return key.Crypter(kek)
+
+	crypter, err = key.Crypter(kek)
+	if err != nil {
+		return nil, err
+	}
+
+	s.crypterCache.Add(key.ID, key.Algorithm, crypter)
+	return crypter, nil
 }
 
 // ------------------------------------------------------
@@ -290,23 +318,29 @@ func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
 	return nil
 }
 
-type LRUEncryptionKeyCache struct {
-	cache *lru.Cache[string, domain.EncryptionKey]
+type crypterCacheKey struct {
+	keyID     string
+	algorithm jose.ContentEncryption
 }
 
-func NewLRUEncryptionKeyCache(size int) (*LRUEncryptionKeyCache, error) {
-	cache, err := lru.New[string, domain.EncryptionKey](size)
+type LRUCrypterCache struct {
+	cache *lru.Cache[crypterCacheKey, op.Crypto]
+}
+
+func NewLRUCrypterCache(size int) (*LRUCrypterCache, error) {
+	cache, err := lru.New[crypterCacheKey, op.Crypto](size)
 	if err != nil {
 		return nil, err
 	}
-	return new(LRUEncryptionKeyCache{cache: cache}), nil
+	return new(LRUCrypterCache{cache: cache}), nil
 }
 
-func (c LRUEncryptionKeyCache) Add(key domain.EncryptionKey) (evicted bool) {
-	return c.cache.Add(key.ID, key)
+func (c LRUCrypterCache) Add(keyID string, algorithm jose.ContentEncryption, crypter op.Crypto) (evicted bool) {
+	return c.cache.Add(crypterCacheKey{keyID: keyID, algorithm: algorithm}, crypter)
 }
-func (c LRUEncryptionKeyCache) Get(keyID string) (key domain.EncryptionKey, ok bool) {
-	return c.cache.Get(keyID)
+
+func (c LRUCrypterCache) Get(keyID string, algorithm jose.ContentEncryption) (crypter op.Crypto, ok bool) {
+	return c.cache.Get(crypterCacheKey{keyID: keyID, algorithm: algorithm})
 }
 
 type signingKeyCacheKey struct {

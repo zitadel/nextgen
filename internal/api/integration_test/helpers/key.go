@@ -18,7 +18,7 @@ func (h *Harness) EnsureKeyService(t *testing.T) service.KeyService {
 	defer h.keyService.mutex.Unlock()
 
 	if h.keyService.value == nil {
-		encryptionKeys, err := service.NewLRUEncryptionKeyCache(keyCacheSize)
+		crypters, err := service.NewLRUCrypterCache(keyCacheSize)
 		require.NoError(t, err)
 		signingKeys, err := service.NewLRUSigningKeyCache(keyCacheSize)
 		require.NoError(t, err)
@@ -26,7 +26,7 @@ func (h *Harness) EnsureKeyService(t *testing.T) service.KeyService {
 		h.keyService.value = service.NewKeyService(
 			h.EnsureServiceDB(t),
 			*(h.EnsureMasterKey(t)),
-			encryptionKeys,
+			crypters,
 			signingKeys,
 		)
 	}

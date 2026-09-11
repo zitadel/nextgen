@@ -20,7 +20,20 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-func newMockedKeyService(t *testing.T) (
+func newMockedKeyService(t testing.TB) (
+	svc service.KeyService,
+	statements *servicemocks.MockAllStatements,
+	masterKeys domain.MasterKeys,
+) {
+	t.Helper()
+	crypters, _ := newKeyCaches(t)
+	return newMockedKeyServiceWithCrypterCache(t, crypters)
+}
+
+// newMockedKeyServiceWithCrypterCache is newMockedKeyService with the crypter
+// cache chosen by the caller, which is how the benchmark measures a service
+// that caches nothing against one that does.
+func newMockedKeyServiceWithCrypterCache(t testing.TB, crypters service.CrypterCache) (
 	svc service.KeyService,
 	statements *servicemocks.MockAllStatements,
 	masterKeys domain.MasterKeys,
@@ -44,8 +57,8 @@ func newMockedKeyService(t *testing.T) (
 	})
 	require.NoError(t, err)
 
-	encryptionKeys, signingKeys := newKeyCaches(t)
-	svc = service.NewKeyService(service.NewPool(pool), *pmasterKeys, encryptionKeys, signingKeys)
+	_, signingKeys := newKeyCaches(t)
+	svc = service.NewKeyService(service.NewPool(pool), *pmasterKeys, crypters, signingKeys)
 	return svc, statements, *pmasterKeys
 }
 
@@ -276,24 +289,32 @@ func newMigrationKeyService(t *testing.T, masterKeys ...domain.MasterKey) (servi
 	allMasterKeys, err := domain.NewMasterKeys(masterKeys)
 	require.NoError(t, err)
 
-	encryptionKeys, signingKeys := newKeyCaches(t)
-	return service.NewKeyService(service.NewPool(pool), *allMasterKeys, encryptionKeys, signingKeys), statements
+	crypters, signingKeys := newKeyCaches(t)
+	return service.NewKeyService(service.NewPool(pool), *allMasterKeys, crypters, signingKeys), statements
 }
 
 // newKeyCaches gives each service its own caches, so a hit in one test can
 // never answer a read in another.
-func newKeyCaches(t *testing.T) (service.EncryptionKeyCache, service.SigningKeyCache) {
+func newKeyCaches(t testing.TB) (service.CrypterCache, service.SigningKeyCache) {
 	t.Helper()
-	encryptionKeys, err := service.NewLRUEncryptionKeyCache(testKeyCacheSize)
+	crypters, err := service.NewLRUCrypterCache(testKeyCacheSize)
 	require.NoError(t, err)
 	signingKeys, err := service.NewLRUSigningKeyCache(testKeyCacheSize)
 	require.NoError(t, err)
-	return encryptionKeys, signingKeys
+	return crypters, signingKeys
 }
 
 // testKeyCacheSize is large enough that nothing a test writes is evicted before
 // it is read back.
 const testKeyCacheSize = 64
+
+// nullCrypterCache stores nothing, so every lookup misses. It stands in for the
+// behaviour before the cache existed.
+type nullCrypterCache struct{}
+
+func (nullCrypterCache) Add(string, jose.ContentEncryption, op.Crypto) bool { return false }
+
+func (nullCrypterCache) Get(string, jose.ContentEncryption) (op.Crypto, bool) { return nil, false }
 
 // newWrappedKEK returns a project KEK whose material is wrapped by the given
 // crypter, together with the raw material for later verification.
@@ -318,6 +339,131 @@ func newWrappedKEK(t *testing.T, id string, masterKey nextgencrypto.Encrypter) (
 
 func listResult(keys ...*domain.EncryptionKey) *database.ListResult[*domain.EncryptionKey] {
 	return &database.ListResult[*domain.EncryptionKey]{Items: keys}
+}
+
+// The point of the cache (#1100): the second resolution of the same key costs
+// neither a read nor an unwrap. The read is asserted with Times(1); the unwrap
+// is asserted by identity, because a re-resolved key would build a new crypter.
+func TestKeyService_GetCrypter_CachesResolvedCrypter(t *testing.T) {
+	t.Parallel()
+
+	svc, statements, masterKey := newMockedKeyService(t)
+
+	kek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
+	require.NoError(t, err)
+	kek.ID = "encryption_key_cached"
+
+	statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil).Times(1)
+
+	first, err := svc.GetCrypter(t.Context(), kek.ID, kek.Algorithm)
+	require.NoError(t, err)
+	second, err := svc.GetCrypter(t.Context(), kek.ID, kek.Algorithm)
+	require.NoError(t, err)
+
+	assert.Same(t, first, second, "the second call must return the crypter the first one resolved")
+}
+
+// A crypter cached for one algorithm must not answer for another: the entry is
+// keyed by both, and the key row is read with both in the filter.
+func TestKeyService_GetCrypter_KeyedByAlgorithmToo(t *testing.T) {
+	t.Parallel()
+
+	svc, statements, masterKey := newMockedKeyService(t)
+
+	kek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
+	require.NoError(t, err)
+	kek.ID = "encryption_key_alg"
+
+	statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil).Times(1)
+	_, err = svc.GetCrypter(t.Context(), kek.ID, jose.A256GCM)
+	require.NoError(t, err)
+
+	// A miss, so it reads again -- here reporting that no such row exists.
+	statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).
+		Return(nil, database.NewNoRowFoundError(nil)).Times(1)
+	_, err = svc.GetCrypter(t.Context(), kek.ID, jose.A128GCM)
+	assert.ErrorIs(t, err, domain.ErrEncryptionKeyNotFound())
+}
+
+// #1100 requires that a rotated key is not served from cache. It is the active
+// lookup that has to notice, not the crypter entry: a retired key still has to
+// resolve by id, or everything it encrypted becomes unreadable. So rotation is
+// observed where "which key is current" is answered -- GetProjectCrypter.
+func TestKeyService_GetProjectCrypter_FollowsRotation(t *testing.T) {
+	t.Parallel()
+
+	svc, statements, masterKey := newMockedKeyService(t)
+
+	retired, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeToken, jose.A256GCM, masterKey)
+	require.NoError(t, err)
+	retired.ID = "encryption_key_retired"
+
+	rotated, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeToken, jose.A256GCM, masterKey)
+	require.NoError(t, err)
+	rotated.ID = "encryption_key_rotated"
+
+	// Both resolve through the same service; only which one is active changes.
+	gomock.InOrder(
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(retired, nil),
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(rotated, nil),
+	)
+
+	before, err := svc.GetProjectCrypter(t.Context(), "project-1", domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	after, err := svc.GetProjectCrypter(t.Context(), "project-1", domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+
+	assert.NotSame(t, before, after,
+		"the active key is read every time, so a rotation has to reach the caller")
+
+	// And the retired key still resolves by id, which is what keeps everything
+	// it encrypted readable.
+	cached, err := svc.GetCrypter(t.Context(), retired.ID, retired.Algorithm)
+	require.NoError(t, err)
+	assert.Same(t, before, cached)
+}
+
+// BenchmarkGetCrypter is the before-and-after #1100 asks for: Cached is the
+// per-request path with the cache in place, Uncached is what it cost before,
+// with the database read mocked out of both so the difference is the unwrap.
+func BenchmarkGetCrypter(b *testing.B) {
+	// Same service, same key, same mocked read in both arms: only the cache
+	// differs, so the difference is the unwrap the cache removes.
+	setup := func(b *testing.B, crypters service.CrypterCache) (service.KeyService, *domain.EncryptionKey) {
+		svc, statements, masterKey := newMockedKeyServiceWithCrypterCache(b, crypters)
+		kek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
+		require.NoError(b, err)
+		kek.ID = "encryption_key_bench"
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil).AnyTimes()
+		return svc, kek
+	}
+
+	b.Run("Uncached", func(b *testing.B) {
+		svc, kek := setup(b, nullCrypterCache{})
+
+		b.ResetTimer()
+		for b.Loop() {
+			if _, err := svc.GetCrypter(b.Context(), kek.ID, kek.Algorithm); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("Cached", func(b *testing.B) {
+		crypters, err := service.NewLRUCrypterCache(testKeyCacheSize)
+		require.NoError(b, err)
+		svc, kek := setup(b, crypters)
+
+		_, err = svc.GetCrypter(b.Context(), kek.ID, kek.Algorithm)
+		require.NoError(b, err)
+
+		b.ResetTimer()
+		for b.Loop() {
+			if _, err := svc.GetCrypter(b.Context(), kek.ID, kek.Algorithm); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 func TestKeyService_MigrateToLatestMasterKey(t *testing.T) {
