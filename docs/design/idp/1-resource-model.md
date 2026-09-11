@@ -140,7 +140,7 @@ How to read the schema:
   guarantees `sub`, though overrides exist for pairwise IDs like Entra) but
   strictly required for OAuth2.
 - **Strict Secrets:** Literal secrets cannot be committed.
-  Because the schema objects are strict and no `client_secret` property exists,
+  Because `client_secret` accepts only a whole-value `${{ NAME }}` reference,
   pasting a raw secret triggers an immediate validation error.
 - **Editor and UI Affordances:** The `format: "uri"` rule is just an annotation
   for editor linting (per Draft 2020-12).
@@ -506,11 +506,12 @@ Everything else forms the mutable revision body.
 | :--- | :--- |
 | `slug` | **Fixed.** A rename requires creating a new connection ([Slug Modification](#validator-rules)). |
 | `protocol`, `subject_claim`, and the authority: `issuer` for `oidc`, `token_endpoint` and `userinfo_endpoint` for `oauth2` | **Fixed.** These define *who* a subject is; altering them requires a new connection ([Identity-Critical Revision](#validator-rules)). |
-| `client_id`, `client_secret_env`, `scopes`, `static_authorize_parameters`, `token_endpoint_auth_method`, `pkce_enabled`, `id_token_mapping`, `authorization_endpoint`, the OIDC overrides `jwks_uri`, `token_endpoint`, and `userinfo_endpoint`, `supplementary_fetch`, `claim_mapping`, `verified_claims`, `provisioning`, `display_name`, `template` | **New revision.** Safely mutates the configuration. <br><br>*(Note: Generating a new OAuth app/`client_id` at the same authority safely retains the subjects because Google's `sub` and GitHub's `id` are global to the user account. Providers issuing pairwise subjects, computed per sector, so a new app under a different redirect host gets new subjects, turn this into orphaned links and duplicate users; that is a custom-provider question).* |
+| `client_id`, `client_secret`, `scopes`, `static_authorize_parameters`, `token_endpoint_auth_method`, `pkce_enabled`, `id_token_mapping`, `authorization_endpoint`, the OIDC overrides `jwks_uri`, `token_endpoint`, and `userinfo_endpoint`, `supplementary_fetch`, `claim_mapping`, `verified_claims`, `provisioning`, `display_name`, `template` | **New revision.** Safely mutates the configuration. <br><br>*(Note: Generating a new OAuth app/`client_id` at the same authority safely retains the subjects because Google's `sub` and GitHub's `id` are global to the user account. Providers issuing pairwise subjects, computed per sector, so a new app under a different redirect host gets new subjects, turn this into orphaned links and duplicate users; that is a custom-provider question).* |
 ## Secrets and Environments
 
 **What is currently implemented:** The file convention.
-Files store variable names (e.g., `client_secret_env`), scaffolding
+Files store `${{ NAME }}` references (e.g.,
+`"client_secret": "${{ GOOGLE_CLIENT_SECRET }}"`), scaffolding
 automatically gitignores `.env*` files, and file bodies are uploaded verbatim.
 Rejecting a literal secret is new in this design
 ([Literal Secret](#validator-rules)).

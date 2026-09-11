@@ -6,13 +6,13 @@ import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
 // Verification receipt for the IdP design docs (docs/design/idp/): loads the
-// draft connection schema, its example files, the sso-auth-method schema, and
-// the scaffolded flow from docs/design/idp/schemas/ and runs the accept/reject
-// matrix the docs claim was "mechanically verified". Nothing here ships, the
-// schema is a design draft, but the docs lean on these results for
-// security-relevant rules (verified_claims value classes, protocol arms,
-// scope requirements), so the receipt must be checkable from the repo.
-// When the schema lands as a real meta-schema file, point this test at it.
+// shipped connection and sso-auth-method schemas from
+// api/openapi/endpoints/schemas/, the example connection files and the
+// scaffolded flow from docs/design/idp/schemas/, and runs the accept/reject
+// matrix the docs claim was "mechanically verified". The docs lean on these
+// results for security-relevant rules (verified_claims value classes,
+// protocol arms, scope requirements), so the receipt must be checkable from
+// the repo.
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const readme = readFileSync(
@@ -37,15 +37,13 @@ const socialLoginFlow = readFileSync(
 );
 
 const schemasDir = join(repoRoot, "docs/design/idp/schemas");
-const loadJson = (name: string) =>
-  JSON.parse(readFileSync(join(schemasDir, name), "utf8")) as Record<
-    string,
-    unknown
-  >;
-const connectionSchema = loadJson("idp-connection.json");
-const googleExample = loadJson("google.json");
-const githubExample = loadJson("github.json");
-const ssoAuthMethodSchema = loadJson("sso-auth-method.json");
+const metaSchemaDir = join(repoRoot, "api/openapi/endpoints/schemas");
+const loadJson = (dir: string, name: string) =>
+  JSON.parse(readFileSync(join(dir, name), "utf8")) as Record<string, unknown>;
+const connectionSchema = loadJson(metaSchemaDir, "idp-connection.json");
+const googleExample = loadJson(schemasDir, "google.json");
+const githubExample = loadJson(schemasDir, "github.json");
+const ssoAuthMethodSchema = loadJson(metaSchemaDir, "sso-auth-method.json");
 
 const ajv = () => new Ajv2020({ strict: false, validateFormats: false });
 const validateConnection = ajv().compile(connectionSchema);
@@ -55,7 +53,7 @@ const root = { slug: "g", display_name: "G" };
 const oidcBlock = {
   issuer: "https://a",
   client_id: "c",
-  client_secret_env: "S",
+  client_secret: "${{ S }}",
   scopes: ["openid"],
 };
 const oauth2Block = {
@@ -63,7 +61,7 @@ const oauth2Block = {
   token_endpoint: "https://t",
   userinfo_endpoint: "https://u",
   client_id: "c",
-  client_secret_env: "S",
+  client_secret: "${{ S }}",
 };
 const oidc = { ...root, protocol: "oidc", oidc: oidcBlock };
 const oauth2 = { ...root, protocol: "oauth2", subject_claim: "id", oauth2: oauth2Block };
@@ -100,8 +98,11 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["oauth2 without subject_claim", { ...root, protocol: "oauth2", oauth2: oauth2Block }, false],
   // credentials
   ["oidc missing client_id", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined } }, false],
-  ["oidc missing client_secret_env", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret_env: undefined } }, false],
+  ["oidc missing client_secret", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined } }, false],
   ["literal client_secret in block", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "leak" } }, false],
+  ["client_secret reference with text around it", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "a8f3c1-${{ TAIL }}" } }, false],
+  ["client_secret_env twin (ADR 061)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" } }, false],
+  ["client_id as a variable reference", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: "${{ ID }}" } }, true],
   ["camelCase leftover (clientId)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined, clientId: "c" } }, false],
   ["secret_strategy not shipped", { ...root, protocol: "oidc", oidc: { ...oidcBlock, secret_strategy: "static" } }, false],
   ["token_endpoint_auth_method post", { ...root, protocol: "oidc", oidc: { ...oidcBlock, token_endpoint_auth_method: "client_secret_post" } }, true],
@@ -117,6 +118,13 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   // TLS on endpoint URLs (pattern; localhost carve-out for dev)
   ["http issuer rejected", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://accounts.google.com" } }, false],
   ["http localhost issuer allowed (dev)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://localhost:8080" } }, true],
+  ["issuer without a host", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://" } }, false],
+  ["issuer with trailing text", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://issuer.example trailing-junk" } }, false],
+  ["issuer with a query in place of the host", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://?query" } }, false],
+  ["issuer with a query rejected (OIDC Discovery)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://login.example/tenant?x=1" } }, false],
+  ["issuer with port and path", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://login.example:8443/tenant" } }, true],
+  ["authorization_endpoint with a query", { ...root, protocol: "oidc", oidc: { ...oidcBlock, authorization_endpoint: "https://login.example/authorize?prompt=select_account" } }, true],
+  ["authorization_endpoint with a fragment rejected (RFC 6749)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, authorization_endpoint: "https://login.example/authorize#x" } }, false],
   ["http token_endpoint rejected", { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: "http://t.example" } }, false],
   // scopes
   ["oidc scopes absent", { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: undefined } }, false],
@@ -214,16 +222,12 @@ describe("sso-auth-method schema (docs/design/idp/2-auth-method-selection.md)", 
 });
 
 describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () => {
-  // The two most copy-able snippets in the doc, validated against the exact
-  // proposed meta-schema change: shipped auth-methods.json with only the sso
-  // slot repointed at the doc's sso-auth-method schema.
-  const metaSchemaDir = join(repoRoot, "api/openapi/endpoints/schemas");
-  const shippedAuthMethod = JSON.parse(
-    readFileSync(join(metaSchemaDir, "auth-method.json"), "utf8"),
-  ) as object;
-  const shippedAuthMethods = JSON.parse(
-    readFileSync(join(metaSchemaDir, "auth-methods.json"), "utf8"),
-  ) as { properties: Record<string, { $ref: string }> };
+  // The two most copy-able snippets in the doc, validated against the
+  // shipped auth-methods.json, whose sso slot points at sso-auth-method.json.
+  const shippedAuthMethod = loadJson(metaSchemaDir, "auth-method.json") as object;
+  const shippedAuthMethods = loadJson(metaSchemaDir, "auth-methods.json") as {
+    properties: Record<string, { $ref: string }>;
+  };
 
   const snippets = [...authMethodSelection.matchAll(/"x-auth-methods": (\{[\s\S]*?\n\})/g)].map(
     (m) => JSON.parse(`{"x-auth-methods": ${m[1]!}}`) as Record<string, unknown>,
@@ -233,23 +237,18 @@ describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () 
     expect(snippets).toHaveLength(2);
   });
 
-  it("both validate against the proposed composite (sso slot repointed)", () => {
-    const proposed = JSON.parse(JSON.stringify(shippedAuthMethods)) as typeof shippedAuthMethods;
-    proposed.properties["sso"] = { $ref: "sso-auth-method.json" };
+  it("the sso slot is the sso-auth-method schema", () => {
+    expect(shippedAuthMethods.properties["sso"]).toEqual({ $ref: "sso-auth-method.json" });
+  });
+
+  it("both validate against the shipped composite", () => {
     const composite = ajv()
       .addSchema(shippedAuthMethod, "auth-method.json")
       .addSchema(ssoAuthMethodSchema as object, "sso-auth-method.json")
-      .compile(proposed);
+      .compile(shippedAuthMethods);
     for (const snippet of snippets) {
       expect(composite(snippet["x-auth-methods"])).toBe(true);
     }
-  });
-
-  it("today's shipped auth-methods.json rejects sso.providers — the change is required", () => {
-    const shipped = ajv()
-      .addSchema(shippedAuthMethod, "auth-method.json")
-      .compile(shippedAuthMethods);
-    expect(shipped(snippets[0]!["x-auth-methods"])).toBe(false);
   });
 });
 
@@ -262,40 +261,19 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     sso_providers?: string[];
     transitions?: Record<string, { target: string; action?: string; purpose?: string }>;
   };
-  const flow = loadJson("default-login.scaffold.json") as unknown as {
+  const flow = loadJson(schemasDir, "default-login.scaffold.json") as unknown as {
     purposes: Record<string, string>;
     steps: ScaffoldStep[];
   };
-  const flowMeta = () =>
-    JSON.parse(
-      readFileSync(join(repoRoot, "api/openapi/endpoints/schemas/flow-definition.json"), "utf8"),
-    ) as {
-      $defs: {
-        Step: {
-          properties: { on_success: { enum: string[] }; sso_providers: { items: object } };
-        };
-      };
-    };
+  const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("fails against the shipped meta-schema only on the two documented deltas", () => {
-    // The on_success enum gains create_user_with_sso, and sso_providers
-    // becomes a slug list (area 2, Rendering from the Connection).
+  it("validates against the shipped meta-schema", () => {
+    // on_success carries create_user_with_sso and sso_providers is a slug
+    // list (area 2, Rendering from the Connection).
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
-      flowMeta(),
+      flowMeta,
     );
-    expect(validate(flow)).toBe(false);
-    for (const err of validate.errors!) {
-      const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
-      const slugList = err.keyword === "type" && err.instancePath.includes("/sso_providers/");
-      expect(onSuccess || slugList, `${err.instancePath} ${err.keyword}`).toBe(true);
-    }
-  });
-
-  it("validates once both deltas land in the meta-schema", () => {
-    const patched = flowMeta();
-    patched.$defs.Step.properties.on_success.enum.push("create_user_with_sso");
-    patched.$defs.Step.properties.sso_providers.items = { type: "string", minLength: 1 };
-    expect(ajv().compile(patched)(flow)).toBe(true);
+    expect(validate(flow), JSON.stringify(validate.errors)).toBe(true);
   });
 
   it("every step carrying sso_providers routes all three outcomes", () => {
@@ -367,7 +345,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
 
 describe("forward compatibility (1-resource-model.md · Forward compatibility)", () => {
   // The documented extension paths: secret_strategy returns as a closed enum
-  // with secret_params, client_secret_env relaxes from unconditional to
+  // with secret_params, client_secret relaxes from unconditional to
   // conditional, and is_auto_update returns with per-property verification
   // state. Every file valid today must stay valid.
   it("today's examples survive the post-Apple extension", () => {
@@ -376,7 +354,7 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
     };
     for (const block of ["oidc", "oauth2"]) {
       const b = extended.properties[block]!;
-      b.required = b.required.filter((r) => r !== "client_secret_env");
+      b.required = b.required.filter((r) => r !== "client_secret");
       b.properties["secret_strategy"] = { type: "string", enum: ["static", "apple_jwt"], default: "static" };
       b.properties["response_mode"] = { type: "string", enum: ["query", "form_post"], default: "query" };
       b.properties["secret_params"] = {
@@ -396,7 +374,7 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
             required: ["secret_params"],
             properties: { secret_params: { required: ["team_id", "key_id", "private_key_env"] } },
           },
-          else: { required: ["client_secret_env"] },
+          else: { required: ["client_secret"] },
         },
       ];
     }
@@ -430,7 +408,7 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
       validateExtended({
         ...root,
         protocol: "oidc",
-        oidc: { ...oidcBlock, client_secret_env: undefined, secret_strategy: "apple_jwt" },
+        oidc: { ...oidcBlock, client_secret: undefined, secret_strategy: "apple_jwt" },
       }),
     ).toBe(false);
   });
@@ -511,7 +489,7 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
 describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", () => {
   // catalog.json restates the vendor facts of the example connections; this
   // pins the two files together so an edit to one fails until the other moves.
-  const catalog = loadJson("catalog.json") as Record<
+  const catalog = loadJson(schemasDir, "catalog.json") as Record<
     string,
     {
       display_name: string;
@@ -525,9 +503,9 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
     }
   >;
 
-  // The derivation the doc states: slug = entry key, client_secret_env =
-  // upper-cased key + _CLIENT_SECRET, client_id prompted (taken from the
-  // example), provisioning = scaffold default.
+  // The derivation the doc states: slug = entry key, client_secret references
+  // the variable upper-cased key + _CLIENT_SECRET, client_id prompted (taken
+  // from the example), provisioning = scaffold default.
   const scaffold = (key: string, clientId: string) => {
     const entry = catalog[key]!;
     const { protocol, subject_claim, verified_claims, ...blocks } =
@@ -544,7 +522,7 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
       [protocol]: {
         ...(blocks[protocol] as Record<string, unknown>),
         client_id: clientId,
-        client_secret_env: `${key.toUpperCase()}_CLIENT_SECRET`,
+        client_secret: `\${{ ${key.toUpperCase()}_CLIENT_SECRET }}`,
       },
     };
   };
