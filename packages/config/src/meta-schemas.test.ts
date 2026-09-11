@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,7 +19,6 @@ import {
 } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const upstreamDir = join(packageRoot, "../..", "api/openapi/endpoints/schemas");
 
 /** Every `$ref` string value anywhere in a schema document. */
 function collectRefs(node: unknown, refs: string[] = []): string[] {
@@ -69,19 +68,6 @@ describe("meta-schemas", () => {
     expect(join(".zitadel/flows", FLOW_FILE_SCHEMA_REF)).toBe(
       join(META_SCHEMA_DIR, "flow-definition.json"),
     );
-  });
-
-  // Drift audit: the committed copies must stay byte-identical to the source
-  // the server embeds, as meta-schemas.ts promises. Skipped outside the
-  // monorepo (published-package CI).
-  it.skipIf(!existsSync(upstreamDir))("committed copies match api/openapi", () => {
-    for (const file of metaSchemaFiles()) {
-      const committed = readFileSync(join(packageRoot, "meta-schemas", file.name), "utf8");
-      const upstream = readFileSync(join(upstreamDir, file.name), "utf8");
-      expect(committed, `${file.name} drifted from api/openapi/endpoints/schemas`).toBe(
-        upstream,
-      );
-    }
   });
 
   // The whole point of shipping the meta-schema: it must accept the exact

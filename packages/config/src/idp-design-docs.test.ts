@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 // Verification receipt for the IdP design docs (docs/design/idp/): loads the
 // shipped connection and sso-auth-method schemas from
-// packages/config/meta-schemas/, the example connection files and the
+// api/openapi/endpoints/schemas/, the example connection files and the
 // scaffolded flow from docs/design/idp/schemas/, and runs the accept/reject
 // matrix the docs claim was "mechanically verified". The docs lean on these
 // results for security-relevant rules (verified_claims value classes,
@@ -37,7 +37,7 @@ const socialLoginFlow = readFileSync(
 );
 
 const schemasDir = join(repoRoot, "docs/design/idp/schemas");
-const metaSchemaDir = join(repoRoot, "packages/config/meta-schemas");
+const metaSchemaDir = join(repoRoot, "api/openapi/endpoints/schemas");
 const loadJson = (dir: string, name: string) =>
   JSON.parse(readFileSync(join(dir, name), "utf8")) as Record<string, unknown>;
 const connectionSchema = loadJson(metaSchemaDir, "idp-connection.json");
@@ -423,7 +423,7 @@ describe("dialect dependency (x-verify removed in #901)", () => {
 
   it("the dialect's x-* vocabulary matches the note in area 1", () => {
     const dialect = JSON.parse(
-      readFileSync(join(repoRoot, "packages/config/meta-schemas/user-property.json"), "utf8"),
+      readFileSync(join(repoRoot, "api/openapi/endpoints/schemas/user-property.json"), "utf8"),
     ) as { properties: Record<string, unknown> };
     const annotations = Object.keys(dialect.properties)
       .filter((k) => k.startsWith("x-"))

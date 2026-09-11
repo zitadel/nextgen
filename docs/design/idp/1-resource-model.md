@@ -361,7 +361,7 @@ Broader property gating and persistent on-user verification state come back with
 the dialect in [PR #901](https://github.com/zitadel/nextgen/pull/901) due to
 lack of use, this design acts as its first future consumer, so all references
 here describe its planned return shape rather than the shipped dialect.
-[`user-property.json`](../../../packages/config/meta-schemas/user-property.json)
+[`user-property.json`](../../../api/openapi/endpoints/schemas/user-property.json)
 today carries only `x-unique`, `x-claim`, and `x-audit`.
 While basic gating at the callback's verification evaluation
 ([area 3](3-social-login-flow.md#callback-processing)) requires only the
