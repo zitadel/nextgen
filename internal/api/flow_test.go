@@ -122,7 +122,7 @@ func newTestServer(t *testing.T) *testServer {
 	// release endpoint fails on an unexpected call instead of panicking on a
 	// nil interface.
 	releaseService := mocks.NewMockReleaseService(mock)
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil, releaseService, nil, tokenService, keyService, nil, nil, nil, "")
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil, releaseService, nil, nil, tokenService, keyService, nil, nil, nil, "")
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),
