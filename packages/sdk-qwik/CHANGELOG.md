@@ -1,5 +1,14 @@
 # @zitadel/sdk-qwik
 
+## 1.0.0-alpha.23
+
+### Patch Changes
+
+- Updated dependencies [[`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2), [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad)]:
+  - @zitadel/api@1.0.0-alpha.23
+  - @zitadel/components@1.0.0-alpha.23
+  - @zitadel/sdk-core@1.0.0-alpha.23
+
 ## 1.0.0-alpha.22
 
 ### Patch Changes
