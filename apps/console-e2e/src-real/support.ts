@@ -26,6 +26,16 @@ export async function signIn(
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  // The URL leaving /login is not the end of signing in. The widget's terminal
+  // step is a full-document navigation to postSignInUrl, and the `_authed`
+  // guard resolves the session again on the way into the layout. Returning at
+  // the URL change leaves those in flight, and they interrupt whatever the
+  // caller navigates to next ("Navigation to /x is interrupted by another
+  // navigation to /"). The shell's own navigation renders only once the guard
+  // has let the layout through, so waiting for it waits for the sign-in to
+  // have finished landing.
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 }
 
 /** Copy the route error boundaries render; none of it should appear on a pass. */
