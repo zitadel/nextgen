@@ -15,7 +15,7 @@ for the agent contract):
 | Local runtime | `start`, `stop`, `status`, `logs`, `reset`, `doctor` |
 | Scaffolding | `setup` (8 frameworks: next, nuxt, react, vue, angular, solid, svelte, qwik; wizard asks for the login `--design`), `eject` |
 | Config reconciliation | `plan`, `apply` (terraform-shaped: diff → plan → apply) |
-| Resources | `schemas list`, `branding eject` |
+| Resources | `schemas list`, `branding eject`; `users` and `teams` (list, get, create, update, delete), `grants` (no update), `projects` (list, get, update), `sessions` (list, get, revoke), `events` (read-only) — each resource exposes what its API supports ([resource-commands.md](resource-commands.md)) |
 | Ownership | `claim` ([ADR 046](../../adrs/046-claim-lifecycle-v2.md)) — init/status/complete against the server's claim endpoints, team attachment reported in `setup`/`status`/`doctor` |
 
 Three resource kinds reconcile through `plan`/`apply`: **user schemas**
