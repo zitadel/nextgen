@@ -10184,14 +10184,15 @@ type CreateIdpOK IdpResponse
 
 func (*CreateIdpOK) createIdpRes() {}
 
-// Creates an identity provider connection document.
+// Creates or revises an identity provider connection document.
 // Ref: #
 type CreateIdpRequest struct {
 	// The connection document, in the shape of a `.zitadel/idps/<slug>.json`
-	// file. Its `slug` decides whether it creates a connection or becomes a
-	// new revision of one the project already has. It is validated against
-	// the `idp-connection.json` meta-schema before anything is stored and
-	// echoed back as stored under `definition`.
+	// file. If its slug does not already exist, a new connection is created.
+	// If a connection with that slug already exists, this becomes a new
+	// revision of it. The document is validated against the
+	// `idp-connection.json` schema before anything is stored, and echoed back
+	// as stored under `definition`.
 	Idp IdpConnection `json:"idp"`
 }
 

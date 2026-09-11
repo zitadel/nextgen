@@ -123,10 +123,10 @@ type Invoker interface {
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
 	// CreateIdp invokes createIdp operation.
 	//
-	// Publishes a connection document. The `slug` in the document decides what
-	// happens: a slug the project has not used creates a connection, and a slug
-	// it already has appends a revision to that connection.
-	// A revise allocates a new `revision_id` and leaves `id` alone, so identity
+	// Creates or revises a connection document. If the slug does not already
+	// exist, a new connection is created. If a connection with that slug already
+	// exists, a revision is created.
+	// A revision gets a new `revision_id` and leaves `id` alone, so identity
 	// links that reference the connection keep resolving while releases and auth
 	// attempts stay pinned to the revision they captured.
 	// Identity fields are fixed for the life of the connection and a revision
@@ -1839,10 +1839,10 @@ func (c *Client) sendCreateHandoff(ctx context.Context, params CreateHandoffPara
 
 // CreateIdp invokes createIdp operation.
 //
-// Publishes a connection document. The `slug` in the document decides what
-// happens: a slug the project has not used creates a connection, and a slug
-// it already has appends a revision to that connection.
-// A revise allocates a new `revision_id` and leaves `id` alone, so identity
+// Creates or revises a connection document. If the slug does not already
+// exist, a new connection is created. If a connection with that slug already
+// exists, a revision is created.
+// A revision gets a new `revision_id` and leaves `id` alone, so identity
 // links that reference the connection keep resolving while releases and auth
 // attempts stay pinned to the revision they captured.
 // Identity fields are fixed for the life of the connection and a revision
