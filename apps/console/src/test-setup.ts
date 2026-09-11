@@ -1,4 +1,12 @@
+import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
+
+// configureZitadel is write-once on globalThis so duplicate module copies
+// share one slot. That slot also survives Vitest's per-file isolate, so
+// whichever spec first calls configureZitadel keeps its proxyPath for every
+// later file in the worker. CI then fetches `http://localhost:3000/api`
+// (the DEV relative default) while handlers wait on `http://localhost/api`.
+_resetConfigForTesting();
 
 // @ts-expect-error Needed for tests
 global.IS_REACT_ACT_ENVIRONMENT = true;

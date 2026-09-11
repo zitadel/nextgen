@@ -9,6 +9,8 @@ content:
         - $ref: '../../../components/schemas/errors/grant-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/user-permission_denied.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -17,6 +19,8 @@ content:
           grant.permission_denied: '../../../components/schemas/errors/grant-permission_denied.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
+          user.permission_denied: '../../../components/schemas/errors/user-permission_denied.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -43,3 +47,13 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      team.permission_denied:
+        summary: team.permission_denied
+        value:
+          code: team.permission_denied
+          message: 'the team management API requires the project secret'
+      user.permission_denied:
+        summary: user.permission_denied
+        value:
+          code: user.permission_denied
+          message: 'the user management API requires the project secret'

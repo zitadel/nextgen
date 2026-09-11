@@ -104,10 +104,12 @@ func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *Creat
 //
 // Bind a user or team to `project.viewer`, `project.editor`, or
 // `project.admin` on the project identified by the `project-id` header.
-// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-// created here — claim owns that path. An unrevoked grant with the same
-// principal and relation occupies the unique key even after `expires_at`;
-// DELETE it before re-creating.
+// Name the principal with `user` (`user_id` or `identifier`) or `team`
+// (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+// (`project.team`) grants are not created here — claim owns that path. An
+// unrevoked grant with the same principal and relation occupies the unique
+// key even after `expires_at`; DELETE it before re-creating.
+// Create does not accept `expand`; the 201 `user` / `team` are refs only.
 //
 // POST /grants
 func (UnimplementedHandler) CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (r CreateGrantRes, _ error) {
@@ -405,6 +407,8 @@ func (UnimplementedHandler) GetFlowStep(ctx context.Context, params GetFlowStepP
 // `resource_scope_index`; project scope is required on the query (same as
 // events). Misses, revoked rows, project-secret setup (`sk_proj`),
 // owning-team (`relation=team`) rows, and cross-project ids return 404.
+// `expand=principal` adds envelope fields on `user` or `team` and requires
+// `user.read` and `team.read` in addition to `project.read`.
 //
 // GET /grants/{id}
 func (UnimplementedHandler) GetGrant(ctx context.Context, params GetGrantParams) (r GetGrantRes, _ error) {
@@ -687,10 +691,10 @@ func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserReq
 // DELETE before re-granting. Project-secret setup (`sk_proj`) and
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
-// get). Requires `project.read`. `expand: ["principal"]` additionally
-// requires `user.read` and `team.read` (documented on the expand enum;
-// those scopes cannot be ANDed onto this security block because they are
-// body-conditional).
+// get). Requires `project.read`. `expand: ["principal"]` adds envelope
+// fields on `user` / `team` and additionally requires `user.read` and
+// `team.read` (documented on the expand enum; those scopes cannot be ANDed
+// onto this security block because they are body-conditional).
 //
 // POST /grants/query
 func (UnimplementedHandler) QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (r QueryGrantsRes, _ error) {

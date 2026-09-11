@@ -14,18 +14,9 @@ func (h *Handler) CreateGrant(ctx context.Context, req *api.CreateGrantRequest, 
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), grantAccess, opWrite); err != nil {
 		return nil, err
 	}
-	principalType, err := grantPrincipalType(req.PrincipalType)
+	input, err := createGrantInput(string(params.ProjectID), req)
 	if err != nil {
 		return nil, err
-	}
-	input := service.CreateGrantInput{
-		ProjectID:     string(params.ProjectID),
-		PrincipalType: principalType,
-		PrincipalID:   req.PrincipalID,
-		Relation:      string(req.Relation),
-	}
-	if v, ok := req.ExpiresAt.Get(); ok {
-		input.ExpiresAt = &v
 	}
 	grant, err := h.grantService.Create(ctx, input)
 	if err != nil {
@@ -38,7 +29,20 @@ func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), grantAccess, opRead); err != nil {
 		return nil, err
 	}
-	grant, err := h.grantService.Get(ctx, string(params.ProjectID), params.ID)
+	includePrincipal := slices.Contains(params.Expand, api.GrantExpandPrincipal)
+	if includePrincipal {
+		// Constructors stay in this function so gen_openapi_errors can see
+		// user.permission_denied / team.permission_denied on the operation.
+		if !hasGranularOrOperator(ctx, "user.read") {
+			return nil, domain.ErrUserPermissionDenied().
+				WithMessage("expanding a grant principal requires user.read")
+		}
+		if !hasGranularOrOperator(ctx, "team.read") {
+			return nil, domain.ErrTeamPermissionDenied().
+				WithMessage("expanding a grant principal requires team.read")
+		}
+	}
+	grant, err := h.grantService.Get(ctx, string(params.ProjectID), params.ID, includePrincipal)
 	if err != nil {
 		return nil, err
 	}
@@ -107,66 +111,130 @@ func (h *Handler) DeleteGrant(ctx context.Context, params api.DeleteGrantParams)
 	return &api.DeleteGrantNoContent{}, nil
 }
 
+func createGrantInput(projectID string, req *api.CreateGrantRequest) (service.CreateGrantInput, error) {
+	input := service.CreateGrantInput{
+		ProjectID: projectID,
+		Relation:  string(req.Relation),
+	}
+	if v, ok := req.ExpiresAt.Get(); ok {
+		input.ExpiresAt = &v
+	}
+	user, hasUser := req.User.Get()
+	team, hasTeam := req.Team.Get()
+	if hasUser == hasTeam {
+		return input, domain.ErrGrantInvalid().WithDetails("exactly one of user or team is required")
+	}
+	if hasUser {
+		userID, hasID := user.UserID.Get()
+		identifier, hasIdentifier := user.Identifier.Get()
+		if hasID == hasIdentifier {
+			return input, domain.ErrGrantInvalid().WithDetails("user requires exactly one of user_id or identifier")
+		}
+		if hasID {
+			input.UserID = string(userID)
+		} else {
+			input.Identifier = identifier
+		}
+		return input, nil
+	}
+	teamID, hasID := team.TeamID.Get()
+	name, hasName := team.Name.Get()
+	if hasID == hasName {
+		return input, domain.ErrGrantInvalid().WithDetails("team requires exactly one of team_id or name")
+	}
+	if hasID {
+		input.TeamID = string(teamID)
+	} else {
+		input.TeamName = name
+	}
+	return input, nil
+}
+
 func grantResponse(g *service.Grant) (*api.Grant, error) {
 	if g == nil || g.Assignment == nil {
 		return nil, domain.ErrGrantNotFound()
 	}
 	asgn := g.Assignment
 	resp := &api.Grant{
-		ID:            asgn.ID,
-		ProjectID:     asgn.ProjectID,
-		PrincipalType: api.GrantPrincipalType(asgn.PrincipalType.String()),
-		PrincipalID:   asgn.PrincipalID,
-		ObjectType:    api.GrantObjectTypeProject,
-		Relation:      api.GrantRelation(asgn.Relation),
-		CreatedAt:     asgn.CreatedAt,
+		ID:         asgn.ID,
+		ProjectID:  asgn.ProjectID,
+		ObjectType: api.GrantObjectTypeProject,
+		Relation:   api.GrantRelation(asgn.Relation),
+		CreatedAt:  asgn.CreatedAt,
 	}
 	if asgn.ExpiresAt != nil {
 		resp.ExpiresAt = api.NewOptNilDateTime(*asgn.ExpiresAt)
 	}
-	if g.User != nil {
-		resp.User = api.NewOptUserRef(userRefToAPI(*g.User))
-	}
-	if g.Team != nil {
-		ref := api.TeamRef{TeamID: g.Team.TeamID}
-		if g.Team.Name != "" {
-			ref.Name = api.NewOptString(g.Team.Name)
-		}
-		resp.Team = api.NewOptTeamRef(ref)
-	}
-	if g.Principal != nil {
-		if err := setGrantPrincipal(resp, g.Principal); err != nil {
+	switch asgn.PrincipalType {
+	case domain.AuthzPrincipalTypeUser:
+		user, err := grantUserResponse(g)
+		if err != nil {
 			return nil, err
 		}
+		resp.User.SetTo(user)
+	case domain.AuthzPrincipalTypeTeam:
+		resp.Team.SetTo(grantTeamResponse(g))
 	}
 	return resp, nil
 }
 
-func setGrantPrincipal(resp *api.Grant, principal *service.GrantPrincipal) error {
-	switch {
-	case principal.User != nil:
-		u, err := domainUserToApiUser(principal.User)
-		if err != nil {
-			return err
-		}
-		resp.Principal.SetTo(api.NewUserGrantExpandedPrincipal(*u))
-	case principal.Team != nil:
-		resp.Principal.SetTo(api.NewTeamResponseGrantExpandedPrincipal(*teamResponse(principal.Team)))
-	default:
-		resp.Principal.SetToNull()
+func grantUserResponse(g *service.Grant) (api.GrantUser, error) {
+	ref := domain.UserRef{UserID: g.Assignment.PrincipalID}
+	if g.User != nil {
+		ref = *g.User
 	}
-	return nil
+	out := api.GrantUser{UserID: api.UserID(ref.UserID)}
+	if ref.Identifier != "" {
+		out.Identifier = api.NewOptString(ref.Identifier)
+		out.IdentifierProperty = api.NewOptString(ref.IdentifierProperty)
+	}
+	if ref.Display != "" {
+		out.Display = api.NewOptString(ref.Display)
+	}
+	if g.Principal == nil || g.Principal.User == nil {
+		return out, nil
+	}
+	u := g.Principal.User
+	out.Schema.SetTo(u.SchemaURL)
+	userData, err := u.Attributes.ToMap()
+	if err != nil {
+		return out, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
+	}
+	attributes, err := convertUsingJson[api.GrantUserAttributes](userData)
+	if err != nil {
+		return out, err
+	}
+	out.Attributes.SetTo(*attributes)
+	var lifecycleOwnerTeamID api.OptNilString
+	if teamID, ok := u.OwningTeamID(); ok {
+		lifecycleOwnerTeamID.SetTo(teamID)
+	} else {
+		lifecycleOwnerTeamID.SetToNull()
+	}
+	out.Metadata.SetTo(api.UserMetadata{
+		CreatedAt:            u.Metadata.CreatedAt,
+		UpdatedAt:            u.Metadata.UpdatedAt,
+		Status:               api.UserMetadataStatus(u.Metadata.Status),
+		LifecycleOwnerTeamID: lifecycleOwnerTeamID,
+	})
+	return out, nil
 }
 
-func grantPrincipalType(t api.CreateGrantRequestPrincipalType) (domain.AuthzPrincipalType, error) {
-	switch t {
-	case api.CreateGrantRequestPrincipalTypeUser:
-		return domain.AuthzPrincipalTypeUser, nil
-	case api.CreateGrantRequestPrincipalTypeTeam:
-		return domain.AuthzPrincipalTypeTeam, nil
-	default:
-		return "", domain.ErrGrantInvalid().WithDetails("principal_type must be user or team")
+func grantTeamResponse(g *service.Grant) api.GrantTeam {
+	out := api.GrantTeam{TeamID: g.Assignment.PrincipalID}
+	if g.Team != nil {
+		out.TeamID = g.Team.TeamID
+		if g.Team.Name != "" {
+			out.Name = api.NewOptString(g.Team.Name)
+		}
 	}
+	if g.Principal != nil && g.Principal.Team != nil {
+		t := g.Principal.Team
+		out.Status.SetTo(teamStatus(t.Status))
+		out.CreatedAt.SetTo(t.CreatedAt)
+		out.UpdatedAt.SetTo(t.UpdatedAt)
+	}
+	return out
 }
 
 func grantErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {

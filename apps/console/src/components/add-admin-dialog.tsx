@@ -30,7 +30,7 @@ import { getConsoleProjectId } from "../runtime/runtime";
 /**
  * Give an existing person admin access to this project (#769).
  *
- * **The colleague must already have signed up.** A grant binds a `principal_id`,
+ * **The colleague must already have signed up.** A grant binds a `user_id`,
  * so there is nobody to bind until the account exists — which is why this picks
  * from people rather than taking an email like the design's `Invite admin`
  * frame. #769 scopes it the same way: the signup link is shared separately, and
@@ -143,7 +143,7 @@ function AddAdminForm({
     setError(undefined);
     try {
       await api.createGrant(
-        { principal_type: "user", principal_id: selected.id, relation: "admin" },
+        { user: { user_id: selected.id }, relation: "admin" },
         { project_id: getConsoleProjectId() },
       );
       toast.success(`${selected.label} added`, {

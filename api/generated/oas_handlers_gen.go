@@ -1193,10 +1193,12 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 //
 // Bind a user or team to `project.viewer`, `project.editor`, or
 // `project.admin` on the project identified by the `project-id` header.
-// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-// created here — claim owns that path. An unrevoked grant with the same
-// principal and relation occupies the unique key even after `expires_at`;
-// DELETE it before re-creating.
+// Name the principal with `user` (`user_id` or `identifier`) or `team`
+// (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+// (`project.team`) grants are not created here — claim owns that path. An
+// unrevoked grant with the same principal and relation occupies the unique
+// key even after `expires_at`; DELETE it before re-creating.
+// Create does not accept `expand`; the 201 `user` / `team` are refs only.
 //
 // POST /grants
 func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5427,6 +5429,8 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // `resource_scope_index`; project scope is required on the query (same as
 // events). Misses, revoked rows, project-secret setup (`sk_proj`),
 // owning-team (`relation=team`) rows, and cross-project ids return 404.
+// `expand=principal` adds envelope fields on `user` or `team` and requires
+// `user.read` and `team.read` in addition to `project.read`.
 //
 // GET /grants/{id}
 func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5575,6 +5579,10 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "expand",
+					In:   "query",
+				}: params.Expand,
 			},
 			Raw: r,
 		}
@@ -10137,10 +10145,10 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 // DELETE before re-granting. Project-secret setup (`sk_proj`) and
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
-// get). Requires `project.read`. `expand: ["principal"]` additionally
-// requires `user.read` and `team.read` (documented on the expand enum;
-// those scopes cannot be ANDed onto this security block because they are
-// body-conditional).
+// get). Requires `project.read`. `expand: ["principal"]` adds envelope
+// fields on `user` / `team` and additionally requires `user.read` and
+// `team.read` (documented on the expand enum; those scopes cannot be ANDed
+// onto this security block because they are body-conditional).
 //
 // POST /grants/query
 func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

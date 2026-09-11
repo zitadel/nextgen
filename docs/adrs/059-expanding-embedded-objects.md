@@ -137,6 +137,33 @@ present on every user of the page today, and #420 is what decides the answer
 for a row whose owner the caller may not read. The wire description says as
 much, so the pair is not read as exhaustive.
 
+## Grant expansion
+
+`POST /grants/query` and `GET /grants/{id}` accept `expand: ["principal"]`.
+That flag does **not** add a sibling `principal` property. Extra fields are
+copied onto the existing `user` or `team` ref so the discriminator stays which
+of those keys is present (`user_id` / `team_id`, never `id`). Create does
+not take expand; a 201 response is ref-only.
+
+This is an exception to rules 3 and 4:
+
+- There is no omitted-vs-`null` expand property. Clients that need “I asked
+  and it was gone” cannot see that on the wire.
+- The extras are not `$ref` GET `/users/{id}` (that schema uses `id`). User
+  extras are `schema` / `attributes` / `metadata`; team extras are `status` /
+  `created_at` / `updated_at`. User-list expands (`teams`,
+  `lifecycle_owner_team`) are not copied onto a grant.
+
+When expand was asked and the person cannot be loaded, `user` / `team`
+stay the degraded ref (`user_id` / `team_id` only) — the same shape as not
+expanding a missing principal.
+
+GET-by-id takes the same `expand` query param as the list. The dual
+`user.read` **and** `team.read` gate stays: both are checked on the whole
+request before the assignment is loaded (operator `project.write` still
+satisfies both). A mixed page of user and team grants is the common case, so
+the two permissions are not split per row.
+
 ## Open questions
 
 - **Sparse fieldsets.** Selecting a subset of the embedded object's properties

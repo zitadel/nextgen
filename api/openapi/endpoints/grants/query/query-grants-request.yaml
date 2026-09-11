@@ -14,8 +14,9 @@ properties:
   expand:
     type: array
     description: |
-      Related objects to embed on each grant (ADR 059). Omit it and no
-      embedded object is returned. An unrecognised value is rejected.
+      Extra principal fields to add onto each grant's `user` or `team`
+      (ADR 059 grant exception). Omit it and those objects stay refs. An
+      unrecognised value is rejected.
     uniqueItems: true
     items:
       $ref: grant-expand.yaml
