@@ -206,6 +206,15 @@ type Handler interface {
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
+	// DeleteVariable implements deleteVariable operation.
+	//
+	// Removes the variable this owner entered under this name.
+	// A variable is deletable only by the owner that entered it. Deleting a name
+	// another owner of the same project holds answers `var.not_found` and leaves
+	// that owner's value standing.
+	//
+	// DELETE /variables/{variable_name}
+	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
 	// ExchangeHandoff implements exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -402,6 +411,30 @@ type Handler interface {
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
+	// GetVariable implements getVariable operation.
+	//
+	// Reads one variable by name from the owner this request addresses — one
+	// environment of the project with `environment_name`, the project level
+	// itself without it.
+	// A name that owner has not entered answers `var.not_found`, even when
+	// another owner of the same project holds it: nothing is inherited. A secret
+	// is found but not disclosed: the response is `{"secret": true}`.
+	//
+	// GET /variables/{variable_name}
+	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
+	// GetVariables implements getVariables operation.
+	//
+	// Returns the variables entered at the owner this request addresses, keyed by
+	// name — one environment of the project with `environment_name`, the project
+	// level itself without it.
+	// Owners are separate, not a ladder: an environment does not inherit the
+	// project's variables and the project does not see its environments'. Reading
+	// everything a project holds therefore means reading each owner in turn.
+	// Secret values are not returned. A secret appears as `{"secret": true}`,
+	// which says a value is held without disclosing it.
+	//
+	// GET /variables
+	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
 	// InitClaim implements initClaim operation.
 	//
 	// Starts a claim challenge for an unclaimed project. Authenticated by the
@@ -626,6 +659,25 @@ type Handler interface {
 	//
 	// PATCH /teams/{team_id}
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
+	// UpdateVariables implements updateVariables operation.
+	//
+	// Enters, replaces and removes variables at the owner this request
+	// addresses.
+	// Every name in the body is applied at exactly that owner — the project, or
+	// the environment named by `environment_name` — and reaches no other. Names
+	// not in the body are untouched.
+	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
+	// stores the value encrypted under the project's active `secret` key, after
+	// which it can be referenced but not read back. `null` removes the name from
+	// this owner (RFC 7386), which is how several variables are removed in one
+	// request; removing a name this owner does not hold is a no-op rather than an
+	// error.
+	// The body is applied whole or not at all, so a rejected request leaves the
+	// owner exactly as it was. Writing the same name and owner twice replaces the
+	// value rather than duplicating it, which makes a retry safe.
+	//
+	// PATCH /variables
+	UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

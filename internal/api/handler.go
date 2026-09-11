@@ -29,6 +29,7 @@ type Handler struct {
 	keyService            service.KeyService
 	claimService          service.ClaimService
 	grantService          *service.GrantService
+	variableService       service.VariableService
 	pool                  *service.DB
 
 	// platformProjectID is the configured platform.project_id pin (ADR 046 §2).
@@ -57,6 +58,7 @@ func NewHandler(
 	keyService service.KeyService,
 	claimService service.ClaimService,
 	grantService *service.GrantService,
+	variableService service.VariableService,
 	pool *service.DB,
 	platformProjectID string,
 ) *Handler {
@@ -77,6 +79,7 @@ func NewHandler(
 		keyService:            keyService,
 		claimService:          claimService,
 		grantService:          grantService,
+		variableService:       variableService,
 		pool:                  pool,
 		platformProjectID:     platformProjectID,
 	}

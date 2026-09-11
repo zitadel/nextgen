@@ -27,6 +27,8 @@ flows:
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
       events.read: Permission to list and get project audit events
+      variable.read: Permission to read project variables (a secret's value is never returned)
+      variable.write: Permission to create and manage project variables and secrets
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
@@ -70,6 +72,8 @@ flows:
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
       events.read: Permission to list and get project audit events
+      variable.read: Permission to read project variables (a secret's value is never returned)
+      variable.write: Permission to create and manage project variables and secrets
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)

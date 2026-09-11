@@ -112,7 +112,7 @@
       "required": [
         "issuer",
         "client_id",
-        "client_secret_env",
+        "client_secret",
         "scopes"
       ],
       "properties": {
@@ -154,12 +154,13 @@
         "client_id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 512,
+          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 061). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
         },
-        "client_secret_env": {
+        "client_secret": {
           "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-          "description": "Name of the environment variable holding the client secret. The value itself never appears in configuration."
+          "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
+          "description": "A reference to the variable holding the client secret (ADR 061), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
         },
         "token_endpoint_auth_method": {
           "type": "string",
@@ -231,7 +232,7 @@
         "token_endpoint",
         "userinfo_endpoint",
         "client_id",
-        "client_secret_env"
+        "client_secret"
       ],
       "properties": {
         "authorization_endpoint": {
@@ -255,12 +256,13 @@
         "client_id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 512,
+          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 061). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
         },
-        "client_secret_env": {
+        "client_secret": {
           "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-          "description": "Name of the environment variable holding the client secret. The value itself never appears in configuration."
+          "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
+          "description": "A reference to the variable holding the client secret (ADR 061), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
         },
         "token_endpoint_auth_method": {
           "type": "string",

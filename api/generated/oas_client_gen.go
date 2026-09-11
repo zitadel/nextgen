@@ -226,6 +226,15 @@ type Invoker interface {
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
+	// DeleteVariable invokes deleteVariable operation.
+	//
+	// Removes the variable this owner entered under this name.
+	// A variable is deletable only by the owner that entered it. Deleting a name
+	// another owner of the same project holds answers `var.not_found` and leaves
+	// that owner's value standing.
+	//
+	// DELETE /variables/{variable_name}
+	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
 	// ExchangeHandoff invokes exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -422,6 +431,30 @@ type Invoker interface {
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
+	// GetVariable invokes getVariable operation.
+	//
+	// Reads one variable by name from the owner this request addresses — one
+	// environment of the project with `environment_name`, the project level
+	// itself without it.
+	// A name that owner has not entered answers `var.not_found`, even when
+	// another owner of the same project holds it: nothing is inherited. A secret
+	// is found but not disclosed: the response is `{"secret": true}`.
+	//
+	// GET /variables/{variable_name}
+	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
+	// GetVariables invokes getVariables operation.
+	//
+	// Returns the variables entered at the owner this request addresses, keyed by
+	// name — one environment of the project with `environment_name`, the project
+	// level itself without it.
+	// Owners are separate, not a ladder: an environment does not inherit the
+	// project's variables and the project does not see its environments'. Reading
+	// everything a project holds therefore means reading each owner in turn.
+	// Secret values are not returned. A secret appears as `{"secret": true}`,
+	// which says a value is held without disclosing it.
+	//
+	// GET /variables
+	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
 	// InitClaim invokes initClaim operation.
 	//
 	// Starts a claim challenge for an unclaimed project. Authenticated by the
@@ -646,6 +679,25 @@ type Invoker interface {
 	//
 	// PATCH /teams/{team_id}
 	UpdateTeam(ctx context.Context, request *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
+	// UpdateVariables invokes updateVariables operation.
+	//
+	// Enters, replaces and removes variables at the owner this request
+	// addresses.
+	// Every name in the body is applied at exactly that owner — the project, or
+	// the environment named by `environment_name` — and reaches no other. Names
+	// not in the body are untouched.
+	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
+	// stores the value encrypted under the project's active `secret` key, after
+	// which it can be referenced but not read back. `null` removes the name from
+	// this owner (RFC 7386), which is how several variables are removed in one
+	// request; removing a name this owner does not hold is a no-op rather than an
+	// error.
+	// The body is applied whole or not at all, so a rejected request leaves the
+	// owner exactly as it was. Writing the same name and owner twice replaces the
+	// value rather than duplicating it, which makes a retry safe.
+	//
+	// PATCH /variables
+	UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
 	// VerifyChallengeProof invokes verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.
@@ -3140,6 +3192,178 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 
 	stage = "DecodeResponse"
 	result, err := decodeDeleteUserByIDResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// DeleteVariable invokes deleteVariable operation.
+//
+// Removes the variable this owner entered under this name.
+// A variable is deletable only by the owner that entered it. Deleting a name
+// another owner of the same project holds answers `var.not_found` and leaves
+// that owner's value standing.
+//
+// DELETE /variables/{variable_name}
+func (c *Client) DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error) {
+	res, err := c.sendDeleteVariable(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariableParams) (res DeleteVariableRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("deleteVariable"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.URLTemplateKey.String("/variables/{variable_name}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, DeleteVariableOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/variables/"
+	{
+		// Encode "variable_name" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "variable_name",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.VariableName); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "DELETE", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, DeleteVariableOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeDeleteVariableResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -5966,6 +6190,335 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 
 	stage = "DecodeResponse"
 	result, err := decodeGetUserByIDResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetVariable invokes getVariable operation.
+//
+// Reads one variable by name from the owner this request addresses — one
+// environment of the project with `environment_name`, the project level
+// itself without it.
+// A name that owner has not entered answers `var.not_found`, even when
+// another owner of the same project holds it: nothing is inherited. A secret
+// is found but not disclosed: the response is `{"secret": true}`.
+//
+// GET /variables/{variable_name}
+func (c *Client) GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error) {
+	res, err := c.sendGetVariable(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) (res GetVariableRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getVariable"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/variables/{variable_name}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetVariableOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/variables/"
+	{
+		// Encode "variable_name" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "variable_name",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.VariableName); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetVariableOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetVariableResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetVariables invokes getVariables operation.
+//
+// Returns the variables entered at the owner this request addresses, keyed by
+// name — one environment of the project with `environment_name`, the project
+// level itself without it.
+// Owners are separate, not a ladder: an environment does not inherit the
+// project's variables and the project does not see its environments'. Reading
+// everything a project holds therefore means reading each owner in turn.
+// Secret values are not returned. A secret appears as `{"secret": true}`,
+// which says a value is held without disclosing it.
+//
+// GET /variables
+func (c *Client) GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error) {
+	res, err := c.sendGetVariables(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams) (res GetVariablesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getVariables"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/variables"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/variables"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetVariablesResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -9818,6 +10371,179 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 
 	stage = "DecodeResponse"
 	result, err := decodeUpdateTeamResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// UpdateVariables invokes updateVariables operation.
+//
+// Enters, replaces and removes variables at the owner this request
+// addresses.
+// Every name in the body is applied at exactly that owner — the project, or
+// the environment named by `environment_name` — and reaches no other. Names
+// not in the body are untouched.
+// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
+// stores the value encrypted under the project's active `secret` key, after
+// which it can be referenced but not read back. `null` removes the name from
+// this owner (RFC 7386), which is how several variables are removed in one
+// request; removing a name this owner does not hold is a no-op rather than an
+// error.
+// The body is applied whole or not at all, so a rejected request leaves the
+// owner exactly as it was. Writing the same name and owner twice replaces the
+// value rather than duplicating it, which makes a retry safe.
+//
+// PATCH /variables
+func (c *Client) UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error) {
+	res, err := c.sendUpdateVariables(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (res UpdateVariablesRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("updateVariables"),
+		semconv.HTTPRequestMethodKey.String("PATCH"),
+		semconv.URLTemplateKey.String("/variables"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, UpdateVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/variables"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "environment_name" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "environment_name",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.EnvironmentName.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "PATCH", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeUpdateVariablesRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, UpdateVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeUpdateVariablesResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

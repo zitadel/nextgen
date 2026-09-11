@@ -64,6 +64,20 @@ tags:
       identity, session, admin, and entity events; filter by `category` /
       `event_type`. Response items are a discriminated Event union on
       `event_type` with typed payloads per docs/design/api/events-catalog.md.
+  - name: Variables
+    description: |
+      Named values a project enters and references from configuration documents
+      as `${{ NAME }}` (ADR 061). A variable belongs to the project or to one of
+      its environments, which is how a value that must differ per environment
+      reaches a release that is promoted between them unchanged.
+
+      Those owners are separate rather than a hierarchy: a variable is read,
+      written and deleted at exactly the owner a request addresses, and nothing
+      is inherited in either direction.
+
+      Secrets are the same resource with the value stored encrypted: same
+      names, same references, same endpoints. They are write-only — a read says
+      that a secret is held, never what it is.
 
 paths:
   /healthz:
@@ -166,6 +180,10 @@ paths:
     $ref: endpoints/events/methods.yaml
   /events/{id}:
     $ref: endpoints/events/by_id/methods.yaml
+  /variables:
+    $ref: endpoints/variables/methods.yaml
+  /variables/{variable_name}:
+    $ref: endpoints/variables/by_name/methods.yaml
 
 components:
   securitySchemes:

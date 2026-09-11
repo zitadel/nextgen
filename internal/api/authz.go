@@ -128,6 +128,16 @@ var environmentAccess = resourceAccess{
 	denied:    domain.ErrEnvironmentPermissionDenied,
 }
 
+// variableAccess gates the project's variables and secrets (ADR 061). Like
+// grants and events, a variable has no minted id and no resource_scope_index
+// row — it is addressed by name under the project_id the request carries — so
+// every op is project-scoped and there is no kind to check.
+var variableAccess = resourceAccess{
+	readMiss:  domain.ErrVariableNotFound,
+	writeMiss: domain.ErrVariableNotFound,
+	denied:    domain.ErrVariablePermissionDenied,
+}
+
 // releaseAccess gates the project's release snapshots (ADR 035, #531).
 // Create and get are project-scoped: both carry a project_id and the get
 // filters its lookup by it, so no route resolves a path id through RSI and the
