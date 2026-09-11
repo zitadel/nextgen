@@ -28,3 +28,18 @@ func ListOptions(projectID string, limit uint32) *database.ListOptions[domain.Re
 		},
 	}
 }
+
+// ByIDs matches the named releases of one project. An OR of equals rather
+// than an IN clause, because IN is not in the shared filter vocabulary and
+// the id sets here are small — the distinct releases of one page of
+// deployments.
+func ByIDs(projectID string, ids []string) database.Filter[domain.ReleaseField] {
+	matches := make([]database.Filter[domain.ReleaseField], len(ids))
+	for i, id := range ids {
+		matches[i] = database.Equal(database.Col(domain.ReleaseFieldID), id)
+	}
+	return database.And(
+		database.Equal(database.Col(domain.ReleaseFieldProjectID), projectID),
+		database.Or(matches...),
+	)
+}

@@ -22,6 +22,7 @@ type statements struct {
 	jsonSchemaStatements
 	environmentStatements
 	releaseStatements
+	deploymentStatements
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
@@ -57,6 +58,7 @@ func newStatements(client queryExecutor) statements {
 		jsonSchemaStatements:          newJSONSchemaStatements(client),
 		environmentStatements:         newEnvironmentStatements(client),
 		releaseStatements:             newReleaseStatements(client),
+		deploymentStatements:          newDeploymentStatements(client),
 		teamStatements:                newTeamStatements(client),
 		teamMembershipStatements:      newTeamMembershipStatements(client),
 		tokenStatements:               newTokenStatements(client),
