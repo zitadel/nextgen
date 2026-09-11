@@ -24,9 +24,14 @@ func (h *Handler) ListEnvironments(ctx context.Context, params api.ListEnvironme
 		return nil, err
 	}
 
+	deployments, err := h.currentDeployments(ctx, string(params.ProjectID), result.Items)
+	if err != nil {
+		return nil, err
+	}
+
 	resp := api.ListEnvironmentsResponse{Environments: make([]api.Environment, len(result.Items))}
 	for i, env := range result.Items {
-		resp.Environments[i] = toAPIEnvironment(env)
+		resp.Environments[i] = toAPIEnvironment(env, deployments)
 	}
 	if result.NextPageToken != "" {
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
@@ -49,24 +54,50 @@ func (h *Handler) GetEnvironmentByName(ctx context.Context, params api.GetEnviro
 	if err != nil {
 		return nil, err
 	}
-	apiEnv := toAPIEnvironment(env)
+	deployments, err := h.currentDeployments(ctx, string(params.ProjectID), []*domain.Environment{env})
+	if err != nil {
+		return nil, err
+	}
+	apiEnv := toAPIEnvironment(env, deployments)
 	return &apiEnv, nil
+}
+
+// currentDeployments hydrates the rows the environments point at, batched:
+// one read for the whole page rather than one per environment, and no join —
+// the list query stays single-table and keyset-safe (ADR 059).
+func (h *Handler) currentDeployments(ctx context.Context, projectID string, envs []*domain.Environment) (map[string]*domain.Deployment, error) {
+	ids := make([]string, 0, len(envs))
+	for _, env := range envs {
+		if env.CurrentDeploymentID != nil {
+			ids = append(ids, *env.CurrentDeploymentID)
+		}
+	}
+	return h.deploymentService.GetByIDs(ctx, projectID, ids)
 }
 
 /* ---------------- CONVERTERS ---------------- */
 
-func toAPIEnvironment(env *domain.Environment) api.Environment {
-	return api.Environment{
+func toAPIEnvironment(env *domain.Environment, deployments map[string]*domain.Deployment) api.Environment {
+	apiEnv := api.Environment{
 		ID:        env.ID,
 		ProjectID: api.ProjectID(env.ProjectID),
 		Name:      api.EnvironmentName(env.Name),
 		CreatedAt: env.CreatedAt,
-		// Explicitly null, not the zero value, which would encode as an
-		// empty object. Hydration arrives with the deployments service
-		// (#532); until a deployment can be created, no environment runs
-		// anything.
-		CurrentDeployment: api.NilCurrentDeployment{Null: true},
 	}
+	// Explicitly null when nothing runs here, not the zero value, which
+	// would encode as an empty object.
+	apiEnv.CurrentDeployment.SetToNull()
+	if env.CurrentDeploymentID != nil {
+		if dep, ok := deployments[*env.CurrentDeploymentID]; ok {
+			apiEnv.CurrentDeployment.SetTo(api.CurrentDeployment{
+				ID:         api.DeploymentID(dep.ID),
+				ReleaseID:  api.ReleaseID(dep.ReleaseID),
+				Reason:     api.DeploymentReason(dep.Metadata.Reason.String()),
+				DeployedAt: dep.DeployedAt,
+			})
+		}
+	}
+	return apiEnv
 }
 
 // environmentErrorResponse maps the environment error codes onto statuses.

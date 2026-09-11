@@ -283,6 +283,36 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
+// DeploymentPayload records what went live where. It carries ids, not names:
+// the ids survive environment renames and, unlike the deployments table, this
+// event has no foreign key — so the audit trail of a deleted environment
+// lives on here (ADR 061).
+type DeploymentPayload struct {
+	EnvironmentID       string `json:"environment_id,omitempty"`
+	ReleaseID           string `json:"release_id,omitempty"`
+	Reason              string `json:"reason,omitempty"`
+	SourceEnvironmentID string `json:"source_environment_id,omitempty"`
+}
+
+type DeploymentCreatedPayload = DeploymentPayload
+
+// DeploymentPayloadSnapshot is the allowlisted create snapshot for deployment
+// events.
+func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
+	if dep == nil {
+		return DeploymentPayload{}
+	}
+	payload := DeploymentPayload{
+		EnvironmentID: dep.EnvironmentID,
+		ReleaseID:     dep.ReleaseID,
+		Reason:        dep.Metadata.Reason.String(),
+	}
+	if dep.Metadata.SourceEnvironmentID != nil {
+		payload.SourceEnvironmentID = *dep.Metadata.SourceEnvironmentID
+	}
+	return payload
+}
+
 type AuthzGrantedPayload struct {
 	PrincipalType string `json:"principal_type,omitempty"`
 	PrincipalID   string `json:"principal_id,omitempty"`
