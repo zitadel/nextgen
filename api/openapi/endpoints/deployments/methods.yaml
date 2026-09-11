@@ -1,0 +1,263 @@
+post:
+  operationId: createDeployment
+  summary: Create a deployment
+  description: |
+    Makes a release live on an environment by recording a deployment. The two
+    happen atomically: when the call returns, the environment runs the named
+    release and the record exists; on any failure the environment keeps
+    running what it ran and no record is written.
+
+    Deploying, promoting and rolling back are all this call — `reason` says
+    which. None of them assembles a release: the release must already exist,
+    and rolling back means deploying a release the environment ran earlier,
+    chosen from its deployment history.
+
+    Idempotent on the running release: deploying the release the environment
+    already runs changes nothing and answers `200` with the deployment that
+    made it live, so a re-run of `zitadel deploy` on unchanged content is a
+    no-op end to end — matching `POST /releases`, which resolves the same
+    content to the same release first. Anything else writes a new record,
+    including the same release returning after something else ran in between:
+    the log is append-only, and each row is one act of making a release live.
+
+    `expected_current_deployment_id` guards against racing another deploy:
+    when present, the swap only happens if the environment's current
+    deployment still is the one named, and a mismatch answers `409` with the
+    actual `current_deployment_id` and `current_release_id` in the details.
+  tags:
+    - Deployments
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - deployment.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-deployment-request.yaml
+        examples:
+          deploy:
+            summary: Deploy a release
+            value:
+              environment: dev
+              release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+              reason: deploy
+          promote:
+            summary: Promote what dev runs to prod
+            description: |
+              The release id is still explicit: the caller promotes the
+              release it inspected on `dev`, not whatever `dev` happens to run
+              by the time the request lands.
+            value:
+              environment: prod
+              release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+              reason: promote
+              source_environment: dev
+          rollback:
+            summary: Roll prod back to the previous release
+            description: |
+              Guarded: the rollback only applies if the deployment being
+              rolled back is still the current one.
+            value:
+              environment: prod
+              release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+              reason: rollback
+              expected_current_deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+  responses:
+    '200':
+      description: |
+        The environment already runs this release; nothing changed. The
+        answer is the existing deployment that made it live — note its
+        original `reason` and `deployed_at`, not this request's.
+      content:
+        application/json:
+          schema:
+            $ref: deployment.yaml
+          examples:
+            alreadyLive:
+              summary: The release dev already runs was deployed again
+              value:
+                id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+                release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                deployed_at: '2026-07-14T09:11:00Z'
+                metadata:
+                  reason: deploy
+                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  deployed_by_type: human
+    '201':
+      description: |
+        The deployment was created and the environment now runs the release.
+      content:
+        application/json:
+          schema:
+            $ref: deployment.yaml
+          examples:
+            deployed:
+              summary: A release deployed to dev
+              value:
+                id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+                release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                deployed_at: '2026-07-14T09:11:00Z'
+                metadata:
+                  reason: deploy
+                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  deployed_by_type: human
+            promoted:
+              summary: The same release promoted to prod
+              description: |
+                The release id is unchanged — promotion moves a release, it
+                does not copy it — and the metadata records where it came
+                from.
+              value:
+                id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
+                release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                deployed_at: '2026-07-14T10:02:00Z'
+                metadata:
+                  reason: promote
+                  source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+                  deployed_by: null
+                  deployed_by_type: null
+    default:
+      $ref: createDeployment-error-response.yaml
+get:
+  operationId: listDeployments
+  summary: List deployments
+  description: |
+    Lists deployments newest first: what ran where, and when.
+
+    With `environment_name`, the list is that environment's history and its
+    first row is the environment's current deployment. Without it, the list
+    interleaves every environment of the project — a project-wide audit view
+    in which the first row is only the most recent deployment anywhere.
+
+    `expand: ["release"]` embeds the release each deployment made live, so a
+    history renders with each entry's content without resolving `release_id`
+    one by one. Expanding requires `release.read` and does not affect the
+    ordering or the page tokens.
+  tags:
+    - Deployments
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/environment-name-filter.yaml
+    - name: expand
+      in: query
+      required: false
+      description: Related objects to embed on each returned deployment.
+      style: form
+      explode: true
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: deployment-expand.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - deployment.read
+  responses:
+    '200':
+      description: The deployments were listed successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-deployments-response.yaml
+          examples:
+            environmentHistory:
+              summary: One environment's history, current deployment first
+              description: |
+                Filtered to `prod`. The first row is the rollback that is
+                current; the promotion it rolled back from follows it.
+              value:
+                deployments:
+                  - id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
+                    release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                    deployed_at: '2026-07-15T08:30:00Z'
+                    metadata:
+                      reason: rollback
+                      deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      deployed_by_type: human
+                  - id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
+                    release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    deployed_at: '2026-07-14T10:02:00Z'
+                    metadata:
+                      reason: promote
+                      source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+                      deployed_by: null
+                      deployed_by_type: null
+                next_page_token: null
+            expandedRelease:
+              summary: The same history with each release embedded
+              description: |
+                Asked for with `expand: ["release"]`: each entry carries the
+                release it made live — the same representation
+                `GET /releases/{release_id}` serves — so the history renders
+                without resolving `release_id` one by one.
+              value:
+                deployments:
+                  - id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
+                    release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                    deployed_at: '2026-07-15T08:30:00Z'
+                    metadata:
+                      reason: rollback
+                      deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      deployed_by_type: human
+                    release:
+                      id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                      project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                      metadata:
+                        message: soften the sign-in page contrast
+                        git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
+                        git_dirty: false
+                        created_at: '2026-07-13T16:40:00Z'
+                        created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                        created_by_type: human
+                      pointers:
+                        - kind: schema
+                          handle: human-user
+                          revision_id: https://example.com/schemas/default-human-user.json
+                        - kind: branding
+                          handle: default
+                          revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                  - id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
+                    release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    deployed_at: '2026-07-14T10:02:00Z'
+                    metadata:
+                      reason: promote
+                      source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    release:
+                      id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                      project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                      metadata:
+                        message: add phone_number to human-user
+                        git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                        git_dirty: false
+                        created_at: '2026-07-14T09:11:00Z'
+                        created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                        created_by_type: human
+                      pointers:
+                        - kind: schema
+                          handle: human-user
+                          revision_id: https://example.com/schemas/default-human-user.json
+                        - kind: branding
+                          handle: default
+                          revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
+                next_page_token: null
+    default:
+      $ref: listDeployments-error-response.yaml

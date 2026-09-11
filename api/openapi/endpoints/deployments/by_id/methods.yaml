@@ -1,0 +1,41 @@
+get:
+  operationId: getDeploymentById
+  summary: Get a deployment by id
+  description: |
+    Reads one deployment record.
+
+    The lookup is scoped to the project in `project_id`: a deployment id
+    belonging to another project answers not found exactly as an unknown id
+    does, so the endpoint cannot be used to probe for deployments in projects
+    the caller cannot read.
+  tags:
+    - Deployments
+  security:
+    - oauth2:
+        - deployment.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/deployment-id.yaml
+  responses:
+    '200':
+      description: The deployment was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../deployment.yaml
+          examples:
+            promoted:
+              summary: A promotion record
+              value:
+                id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
+                release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                deployed_at: '2026-07-14T10:02:00Z'
+                metadata:
+                  reason: promote
+                  source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  deployed_by_type: human
+    default:
+      $ref: getDeploymentById-error-response.yaml

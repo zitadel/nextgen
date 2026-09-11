@@ -66,6 +66,33 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 	return r, ht.ErrNotImplemented
 }
 
+// CreateDeployment implements createDeployment operation.
+//
+// Makes a release live on an environment by recording a deployment. The two
+// happen atomically: when the call returns, the environment runs the named
+// release and the record exists; on any failure the environment keeps
+// running what it ran and no record is written.
+// Deploying, promoting and rolling back are all this call — `reason` says
+// which. None of them assembles a release: the release must already exist,
+// and rolling back means deploying a release the environment ran earlier,
+// chosen from its deployment history.
+// Idempotent on the running release: deploying the release the environment
+// already runs changes nothing and answers `200` with the deployment that
+// made it live, so a re-run of `zitadel deploy` on unchanged content is a
+// no-op end to end — matching `POST /releases`, which resolves the same
+// content to the same release first. Anything else writes a new record,
+// including the same release returning after something else ran in between:
+// the log is append-only, and each row is one act of making a release live.
+// `expected_current_deployment_id` guards against racing another deploy:
+// when present, the swap only happens if the environment's current
+// deployment still is the one named, and a mismatch answers `409` with the
+// actual `current_deployment_id` and `current_release_id` in the details.
+//
+// POST /deployments
+func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (r CreateDeploymentRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateFlow implements createFlow operation.
 //
 // Resolves a flow definition based on purpose + audience context and returns
@@ -353,6 +380,19 @@ func (UnimplementedHandler) GetClaimWindow(ctx context.Context, params GetClaimW
 	return r, ht.ErrNotImplemented
 }
 
+// GetDeploymentById implements getDeploymentById operation.
+//
+// Reads one deployment record.
+// The lookup is scoped to the project in `project_id`: a deployment id
+// belonging to another project answers not found exactly as an unknown id
+// does, so the endpoint cannot be used to probe for deployments in projects
+// the caller cannot read.
+//
+// GET /deployments/{deployment_id}
+func (UnimplementedHandler) GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (r GetDeploymentByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetEnvironmentByName implements getEnvironmentByName operation.
 //
 // Reads one environment of the project by its name.
@@ -563,6 +603,23 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 //
 // GET /branding
 func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandingParams) (r ListBrandingRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListDeployments implements listDeployments operation.
+//
+// Lists deployments newest first: what ran where, and when.
+// With `environment_name`, the list is that environment's history and its
+// first row is the environment's current deployment. Without it, the list
+// interleaves every environment of the project — a project-wide audit view
+// in which the first row is only the most recent deployment anywhere.
+// `expand: ["release"]` embeds the release each deployment made live, so a
+// history renders with each entry's content without resolving `release_id`
+// one by one. Expanding requires `release.read` and does not affect the
+// ordering or the page tokens.
+//
+// GET /deployments
+func (UnimplementedHandler) ListDeployments(ctx context.Context, params ListDeploymentsParams) (r ListDeploymentsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

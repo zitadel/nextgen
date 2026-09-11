@@ -1,0 +1,22 @@
+type: object
+description: |
+  Deployments, newest first.
+
+  Filtered to one environment, the first row is that environment's current
+  deployment and the rest is its history. Unfiltered, the list interleaves
+  every environment of the project, so the first row is only the most recent
+  deployment anywhere, not any particular environment's current one.
+required:
+  - deployments
+properties:
+  deployments:
+    type: array
+    items:
+      $ref: deployment.yaml
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following page.
+      Absent when there are no more results.
+    oneOf:
+      - $ref: ../../components/schemas/page-token.yaml
+      - type: 'null'

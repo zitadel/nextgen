@@ -1,0 +1,12 @@
+name: environment_name
+in: query
+required: false
+description: |
+  Narrows the list to one environment of the project, addressed by name.
+
+  A name nothing answers to is `env.not_found` rather than an empty list: with
+  the filter present the caller is asking about a specific environment, so a
+  typo reports the environment as missing instead of reporting its history as
+  empty.
+schema:
+  $ref: '../schemas/environment-name.yaml'

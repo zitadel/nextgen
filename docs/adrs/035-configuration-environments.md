@@ -553,3 +553,31 @@ above already shows. Handle resolution is per kind, not a shared column read.
 
 The illustrative table is otherwise unchanged; this fixes the name the wire
 uses, not the model.
+
+## Amendment (2026-09-11): deployments are a root-level resource
+
+The endpoint tables above nest deployments under their environment:
+`POST /environments/{env}/deployments`, `GET /environments/{env}/deployments`,
+`GET /environments/{env}/deployments/{id}`.
+
+The shipped surface is flat instead:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /deployments` | Create a deployment. The target environment is named in the body (`environment`), alongside `release_id`, `reason`, `source_environment?` and `expected_current_deployment_id?`. |
+| `GET /deployments` | List deployments newest first, optionally filtered to one environment via `environment_name`. Filtered, the first row is that environment's current deployment. |
+| `GET /deployments/{deployment_id}` | Read one deployment by its opaque id, scoped to `project_id` like every other flat read. |
+
+A deployment carries a globally-unique `dep_…` id, so under the locked
+flat-by-ID rule in
+[`url-architecture.md`](../design/api/url-architecture.md) it is a top-level
+resource, not a nested one. This also matches the shipped shape of its
+neighbors — `/releases`, `/branding` and `/variables` are all root-level and
+project-scoped — where nothing nests under `/environments/{name}` at all.
+
+Environment names remain the wire address (in the body and the list filter)
+and are resolved to ids once, at creation; the stored record carries
+`environment_id` and `source_environment_id`. The semantics in the tables
+above — payload fields, `409` on a failed `expected_current_deployment_id`
+check, newest-first ordering — are unchanged; this amendment moves the paths,
+not the model. `rolled_back_from` was dropped from the payload by #532.

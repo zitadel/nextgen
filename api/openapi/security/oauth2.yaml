@@ -26,6 +26,8 @@ flows:
       release.read: Permission to read project configuration releases
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
+      deployment.read: Permission to read deployments
+      deployment.write: Permission to create deployments (deploy, promote, roll back)
       events.read: Permission to list and get project audit events
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
@@ -69,6 +71,8 @@ flows:
       release.read: Permission to read project configuration releases
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
+      deployment.read: Permission to read deployments
+      deployment.write: Permission to create deployments (deploy, promote, roll back)
       events.read: Permission to list and get project audit events
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
