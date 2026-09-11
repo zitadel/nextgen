@@ -42,14 +42,17 @@ export {
   type BrandingValidationContext,
   type BrandingValidationResult,
 } from "./branding-validator.js";
+export { publishedSides, resolveLogoUrl } from "./branding.js";
 export type {
   Branding,
-  BrandingAssets,
   BrandingAttribution,
   BrandingPalette,
   BrandingShape,
   BrandingTheme,
+  BrandingThemeSide,
   BrandingTypography,
   FlowLayout,
+  PublishedSides,
+  ResolvableSide,
 } from "./branding.js";
 export type { FlowError, FlowIdentity, FlowMessage, LiquidContext } from "./template-context.js";

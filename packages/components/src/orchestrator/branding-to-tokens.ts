@@ -6,9 +6,10 @@
  * the `Branding` JSON into a CSSStyleSheet of `:host { --zl-* }` declarations
  * and applies it via `shadowRoot.adoptedStyleSheets`.
  *
- * Dark-mode overrides are emitted as `:host([data-theme="dark"]) { ... }`
- * (matching `docs/design/branding/tokens.md`). Resolution between
- * `light | dark | auto` happens in `<zitadel-login>`.
+ * Light and dark are independent surfaces: each side's palette is emitted under
+ * its own `data-theme` selector only, so a key the revision left unset on one
+ * side takes the maintained default for that side rather than the other side's
+ * colour. Resolution between `light | dark | auto` happens in `<zitadel-login>`.
  *
  * Base layer: the design-tokens package ships the full `--zl-*` set as both a
  * `.css` file (for host pages) and a `tokensCss` string (for shadow roots and
@@ -16,20 +17,39 @@
  * paint correctly even when the host page didn't `@import` tokens.css — the
  * orchestrator is meant to drop into any page.
  */
-import { THEME_SELECTORS, tokensCss } from "@zitadel/design-tokens";
+import { THEME_SELECTORS, tokens, tokensCss } from "@zitadel/design-tokens";
 
-import type { ResolvedTheme } from "./theme-controller.js";
+import { publishedSides } from "./branding.js";
 import type { Branding, BrandingPalette, BrandingShape, BrandingTypography } from "./branding.js";
+import type { ResolvedTheme } from "./theme-controller.js";
 
-// Radius tokens (Figma corner-radius scale). Branding lets a tenant pick
-// one of five shapes; we override all three corner sizes in proportion.
-const RADIUS_MAP: Record<NonNullable<BrandingShape["radius"]>, string> = {
-  none: "0",
-  sm: "0.25rem",
-  md: "0.5rem",
-  lg: "0.75rem",
-  full: "9999px",
-};
+// The corner ramp a brand's single radius value scales. Ratios come from the
+// design system's own steps rather than being spelled out, so a change to the
+// ramp in Figma moves the branded corners with it.
+const RADIUS_STEPS = ["xs", "sm", "md", "lg", "xl"] as const;
+
+const RADIUS_RATIOS: Record<(typeof RADIUS_STEPS)[number], number> = (() => {
+  const base = remToNumber(tokens.radius.md);
+  const ratios = {} as Record<(typeof RADIUS_STEPS)[number], number>;
+  for (const step of RADIUS_STEPS) {
+    ratios[step] = remToNumber(tokens.radius[step]) / base;
+  }
+  return ratios;
+})();
+
+// Preset names, as rem values for the control step (`md`). The pill is its own
+// case: every step goes fully round, so it has no control value to scale from.
+const RADIUS_PRESETS = {
+  none: 0,
+  sm: 0.25,
+  md: 0.5,
+  lg: 0.75,
+} as const;
+
+// The text steps the login surface draws with. `typography.scale` multiplies
+// both the size and its leading, so a brand that asks for larger text gets the
+// line box that goes with it rather than crowded lines.
+const TEXT_STEPS = ["xs", "sm", "base", "lg", "xl"] as const;
 
 // Branding lets tenants tune perceived density. Padding bands are the
 // most visible knob; height tweaks come from the Figma button/field heights.
@@ -101,7 +121,8 @@ const PALETTE_MAP: Record<keyof BrandingPalette, string[]> = {
  */
 const BRANDING_SELECTOR = ':host, :host([data-theme="light"]), :host([data-theme="dark"])';
 
-/** Dark-only overrides. Emitted after {@link BRANDING_SELECTOR}, so it wins on order. */
+/** Per-side palettes. Emitted after {@link BRANDING_SELECTOR}, so they win on order. */
+const LIGHT_SELECTOR = ':host([data-theme="light"])';
 const DARK_SELECTOR = ':host([data-theme="dark"])';
 
 export type BrandingToTokensOptions = {
@@ -110,32 +131,35 @@ export type BrandingToTokensOptions = {
 
 /**
  * Build a CSS string of `:host { --zl-* }` declarations from a Branding
- * payload. Light values land on `:host`; dark overrides land on
- * `:host([data-theme="dark"])`.
+ * payload. Shape and typography are shared across the sides; each side's
+ * palette lands only under its own `data-theme` selector, plus a copy of the
+ * resolved side on the shared selector so the surface is already branded in the
+ * frame before `data-theme` is stamped.
  */
 export function buildBrandingStylesheet(
   branding: Branding | undefined,
   options: BrandingToTokensOptions = {},
 ): string {
-  const lightDecls = collectDeclarations(branding);
-  const darkPalette = branding?.theme?.dark?.palette;
-  const darkDecls = darkPalette ? mapPalette(darkPalette) : {};
+  const shared = collectDeclarations(branding);
+  const light = mapPalette(branding?.theme?.light?.palette);
+  const dark = mapPalette(branding?.theme?.dark?.palette);
+  // Without a resolved theme, a revision that publishes one side is already
+  // unambiguous; only a two-sided one has to guess, and the design system's
+  // primary surface is dark.
+  const [only, second] = publishedSides(branding);
+  const side = options.resolvedTheme ?? (only && !second ? only : "dark");
+  const resolved = side === "light" ? light : dark;
 
   const blocks: string[] = [];
-  if (Object.keys(lightDecls).length > 0) {
-    blocks.push(formatBlock(BRANDING_SELECTOR, lightDecls));
+  const upfront = { ...shared, ...resolved };
+  if (Object.keys(upfront).length > 0) {
+    blocks.push(formatBlock(BRANDING_SELECTOR, upfront));
   }
-  if (Object.keys(darkDecls).length > 0) {
-    blocks.push(formatBlock(DARK_SELECTOR, darkDecls));
+  if (Object.keys(light).length > 0) {
+    blocks.push(formatBlock(LIGHT_SELECTOR, light));
   }
-
-  // When the orchestrator forces dark mode (mode: "dark" or auto + prefers-dark),
-  // treat the dark overrides as primary so the element reflects dark even
-  // before a `data-theme` attribute is set. Cheap and avoids a flash.
-  if (options.resolvedTheme === "dark" && darkPalette) {
-    const merged = { ...lightDecls, ...darkDecls };
-    blocks.length = 0;
-    blocks.push(formatBlock(BRANDING_SELECTOR, merged));
+  if (Object.keys(dark).length > 0) {
+    blocks.push(formatBlock(DARK_SELECTOR, dark));
   }
 
   return blocks.join("\n");
@@ -146,7 +170,6 @@ function collectDeclarations(branding: Branding | undefined): Record<string, str
     return {};
   }
   const decls: Record<string, string> = {};
-  Object.assign(decls, mapPalette(branding.palette));
   Object.assign(decls, mapTypography(branding.typography));
   Object.assign(decls, mapShape(branding.shape));
   return decls;
@@ -169,25 +192,19 @@ function mapPalette(palette: BrandingPalette | undefined): Record<string, string
 function mapTypography(typography: BrandingTypography | undefined): Record<string, string> {
   if (!typography) return {};
   const out: Record<string, string> = {};
-  // `font_family` sets both faces, which is the single-font look most brands
-  // want. `font_family_heading` peels the display face back off — name it and
-  // the body font stops dictating what titles render in.
+  // One face covers body and headings. A separate display face is not part of
+  // a branding revision: a host page that has licensed one declares the
+  // `@font-face` and points `--zl-font-family-heading` at it.
   if (typography.font_family) {
     out["--zl-font-family-sans"] = typography.font_family;
     out["--zl-font-family-heading"] = typography.font_family;
   }
-  if (typography.font_family_heading) {
-    out["--zl-font-family-heading"] = typography.font_family_heading;
-  }
-  if (typography.font_family_mono) {
-    out["--zl-font-family-mono"] = typography.font_family_mono;
-  }
-  // Typography scale tunes the *base* font sizes embedded in atoms.
-  // The Figma scale isn't published as variables, so we map to the
-  // implicit sizes the atoms use directly.
   const scale = clamp(typography.scale ?? 1, 0.75, 1.25);
   if (scale !== 1) {
-    out["--zl-font-scale"] = `${scale}`;
+    for (const step of TEXT_STEPS) {
+      out[`--zl-text-${step}-size`] = scaleRem(tokens.text[step].size, scale);
+      out[`--zl-text-${step}-leading`] = scaleRem(tokens.text[step].leading, scale);
+    }
   }
   return out;
 }
@@ -195,20 +212,62 @@ function mapTypography(typography: BrandingTypography | undefined): Record<strin
 function mapShape(shape: BrandingShape | undefined): Record<string, string> {
   if (!shape) return {};
   const out: Record<string, string> = {};
-  if (typeof shape.radius === "string" && RADIUS_MAP[shape.radius]) {
-    const radius = RADIUS_MAP[shape.radius];
-    // The three steps the atoms actually draw with: `md` for controls (inputs,
-    // buttons), `lg` for the alert, `xl` for the card. Scaling them off one
-    // tenant value keeps their relative proportions when a brand asks for
-    // sharper or rounder corners. Smaller and larger steps stay untouched.
-    out["--zl-radius-md"] = radius;
-    out["--zl-radius-lg"] = radius === "0" ? "0" : `calc(${radius} * 1.25)`;
-    out["--zl-radius-xl"] = radius === "0" ? "0" : `calc(${radius} * 1.75)`;
-  }
+  Object.assign(out, mapRadius(shape.radius));
   if (shape.density) {
     Object.assign(out, DENSITY_MAP[shape.density]);
   }
+  // The caps themselves stay in the CSS that draws the mark; branding supplies
+  // the multiplier so a host override of a cap keeps working underneath it.
+  const logoScale = shape.logo_scale;
+  if (typeof logoScale === "number" && Number.isFinite(logoScale)) {
+    out["--zl-logo-scale"] = `${clamp(logoScale, 0.5, 2)}`;
+  }
   return out;
+}
+
+/**
+ * A brand picks one corner value and the whole ramp follows it in proportion,
+ * which is what keeps the card rounder than the controls inside it. Both forms
+ * the revision accepts land here: a preset name, or an integer number of pixels
+ * for the brand that has a specific value.
+ */
+function mapRadius(radius: BrandingShape["radius"]): Record<string, string> {
+  if (radius == null) return {};
+  const out: Record<string, string> = {};
+  if (radius === "full") {
+    // A pill has no ramp: every corner is fully round, and scaling 9999px would
+    // only produce a larger number that draws the same shape.
+    for (const step of RADIUS_STEPS) {
+      out[`--zl-radius-${step}`] = tokens.radius.full;
+    }
+    return out;
+  }
+  const [base, unit] =
+    typeof radius === "number"
+      ? [radius, "px"]
+      : radius in RADIUS_PRESETS
+        ? [RADIUS_PRESETS[radius as keyof typeof RADIUS_PRESETS], "rem"]
+        : [Number.NaN, ""];
+  if (Number.isNaN(base)) return {};
+  for (const step of RADIUS_STEPS) {
+    const value = base * RADIUS_RATIOS[step];
+    out[`--zl-radius-${step}`] = value === 0 ? "0" : `${round(value)}${unit}`;
+  }
+  return out;
+}
+
+function scaleRem(value: string, scale: number): string {
+  return `${round(remToNumber(value) * scale)}rem`;
+}
+
+function remToNumber(value: string): number {
+  return Number.parseFloat(value);
+}
+
+// Four decimals keeps a scaled step exact enough to be indistinguishable at any
+// realistic text size while staying a readable value in devtools.
+function round(value: number): number {
+  return Math.round(value * 10000) / 10000;
 }
 
 function formatBlock(selector: string, decls: Record<string, string>): string {
@@ -295,9 +354,14 @@ export function applyBrandingTokens(
  * and a variant-derived fallback on top of the same branding input.
  *
  * Defaults to dark: the design system's primary surface, and the mode a
- * hosted login page renders when a tenant states no preference.
+ * hosted login page renders when a revision states no preference.
  */
 export function resolveTheme(branding: Branding | undefined): ResolvedTheme {
+  const [only, second] = publishedSides(branding);
+  // One published side is the whole surface: `auto` has nothing to choose
+  // between, and an operating-system preference for the other side cannot
+  // conjure colours the revision never published.
+  if (only && !second) return only;
   const mode = branding?.theme?.mode ?? "dark";
   if (mode === "light") return "light";
   if (mode === "dark") return "dark";

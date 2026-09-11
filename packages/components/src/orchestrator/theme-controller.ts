@@ -10,6 +10,7 @@
  */
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
+import { publishedSides } from "./branding.js";
 import type { Branding } from "./branding.js";
 
 export type ResolvedTheme = "light" | "dark";
@@ -55,7 +56,8 @@ export class ThemeController implements ReactiveController {
    * element nor the branding payload names a mode. Precedence, strongest
    * first: element `theme` property → `branding.theme.mode` → fallback. The
    * element wins because the page embedding the widget knows its own surface
-   * better than the tenant's stored branding does.
+   * better than the tenant's stored branding does — but it selects among the
+   * sides the revision published, and cannot reach one it did not.
    */
   setModePreference(explicit: ThemeMode | undefined, fallback: ThemeMode): void {
     if (this.explicitMode === explicit && this.fallbackMode === fallback) return;
@@ -73,6 +75,15 @@ export class ThemeController implements ReactiveController {
   }
 
   private refresh(): void {
+    // A revision that publishes one side has no other surface to offer: the
+    // embedding page's `theme` and the visitor's operating-system preference
+    // can both ask for the other one, and there are no colours behind it.
+    const [only, second] = publishedSides(this.branding);
+    if (only && !second) {
+      this.detach();
+      this.update(only);
+      return;
+    }
     const mode = this.explicitMode ?? this.branding?.theme?.mode ?? this.fallbackMode;
     if (mode === "auto") {
       this.attach();

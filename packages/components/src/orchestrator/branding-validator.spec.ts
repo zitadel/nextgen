@@ -48,21 +48,19 @@ describe("validateBranding", () => {
     expect(result.issues[0]).toMatch(/loopback development pages/);
   });
 
-  it("does not extend the carve-out to font, proposed assets, or noncanonical hosts", () => {
+  it("does not extend the carve-out to fonts or noncanonical hosts", () => {
     const result = validateBranding(
       {
         logo_url: "http://127.1/logo.svg",
         hero_url: "http://localhost:3000@evil.example/hero.png",
         typography: { font_url: "http://[::1]:3000/font.css" },
-        assets: { logo_dark: "http://localhost:3000/dark.svg" },
       },
       { renderingOrigin: "http://127.0.0.1:4173" },
     );
     expect(result.branding?.logo_url).toBeUndefined();
     expect(result.branding?.hero_url).toBeUndefined();
     expect(result.branding?.typography?.font_url).toBeUndefined();
-    expect(result.branding?.assets?.logo_dark).toBeUndefined();
-    expect(result.issues).toHaveLength(4);
+    expect(result.issues).toHaveLength(3);
   });
 
   it("rejects malformed URLs", () => {
@@ -71,15 +69,20 @@ describe("validateBranding", () => {
     expect(result.issues[0]).toMatch(/font_url/);
   });
 
-  it("validates assets sub-object URLs", () => {
+  it("validates each side's logo without touching the other side", () => {
     const result = validateBranding({
-      assets: {
-        logo_dark: "http://insecure.example.com/dark.svg",
-        favicon: "https://cdn.example.com/favicon.ico",
+      theme: {
+        light: { logo_url: "http://insecure.example.com/on-light.svg" },
+        dark: {
+          logo_url: "https://cdn.example.com/on-dark.svg",
+          palette: { primary: "#A5B4FC" },
+        },
       },
     });
-    expect(result.branding?.assets?.logo_dark).toBeUndefined();
-    expect(result.branding?.assets?.favicon).toBe("https://cdn.example.com/favicon.ico");
+    expect(result.branding?.theme?.light?.logo_url).toBeUndefined();
+    expect(result.branding?.theme?.dark?.logo_url).toBe("https://cdn.example.com/on-dark.svg");
+    expect(result.branding?.theme?.dark?.palette?.primary).toBe("#A5B4FC");
+    expect(result.issues[0]).toMatch(/theme\.light\.logo_url/);
   });
 
   it("returns undefined for empty input", () => {

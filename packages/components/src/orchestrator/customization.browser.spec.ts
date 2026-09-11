@@ -43,7 +43,7 @@ const identifierStep: CreateFlow201 = {
 /** The same step, but with a tenant that has its own brand colour set. */
 const brandedStep: CreateFlow201 = {
   ...identifierStep,
-  branding: { theme: { mode: "dark" }, palette: { primary: "#00ff00" } },
+  branding: { theme: { mode: "dark", dark: { palette: { primary: "#00ff00" } } } },
 } as unknown as CreateFlow201;
 
 /** A tenant that publishes a font stylesheet alongside the family it loads. */
@@ -209,12 +209,48 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
           { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
         ],
       },
-      branding: { palette: { link: "#ff0000" } },
+      branding: { theme: { dark: { palette: { link: "#ff0000" } } } },
     } as unknown as CreateFlow201;
     const element = await mount(linkedStep);
     const link = element.shadowRoot?.querySelector(".zl-card-nav__link") as HTMLElement;
     expect(link).toBeTruthy();
     expect(getComputedStyle(link).color).toBe(HOST_RED);
+  });
+
+  it("takes the mark from the side the widget resolved", async () => {
+    // The two files are the same lockup in different ink. Painting the light
+    // one on a dark card is invisible, so the side owns its own mark.
+    const ON_DARK = "https://cdn.example.com/on-dark.svg";
+    const logoStep = {
+      ...identifierStep,
+      branding: {
+        theme: {
+          mode: "dark",
+          light: { logo_url: "https://cdn.example.com/on-light.svg" },
+          dark: { logo_url: ON_DARK },
+        },
+      },
+    } as unknown as CreateFlow201;
+    const element = await mount(logoStep);
+    const logo = element.shadowRoot?.querySelector(".zl-card-logo") as HTMLImageElement;
+    expect(logo?.getAttribute("src")).toBe(ON_DARK);
+  });
+
+  it("does not paint a light key onto the dark surface", async () => {
+    const isolatedStep = {
+      ...identifierStep,
+      branding: {
+        theme: {
+          mode: "dark",
+          light: { palette: { primary: HOST_RED } },
+          dark: { palette: { link: "#00ff00" } },
+        },
+      },
+    } as unknown as CreateFlow201;
+    const element = await mount(isolatedStep);
+    const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
+    const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
+    expect(getComputedStyle(button).backgroundColor).not.toBe(HOST_RED);
   });
 
   it("suppress-header hides the card heading visually but keeps it accessible", async () => {
