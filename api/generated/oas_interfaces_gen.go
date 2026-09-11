@@ -17,6 +17,10 @@ type CreateBrandingRes interface {
 	createBrandingRes()
 }
 
+type CreateDeploymentRes interface {
+	createDeploymentRes()
+}
+
 type CreateFlowDefinitionRes interface {
 	createFlowDefinitionRes()
 }
@@ -99,6 +103,10 @@ type GetClaimStatusRes interface {
 
 type GetClaimWindowRes interface {
 	getClaimWindowRes()
+}
+
+type GetDeploymentByIdRes interface {
+	getDeploymentByIdRes()
 }
 
 type GetEnvironmentByNameRes interface {
@@ -191,6 +199,10 @@ type IssueChallengeRes interface {
 
 type ListBrandingRes interface {
 	listBrandingRes()
+}
+
+type ListDeploymentsRes interface {
+	listDeploymentsRes()
 }
 
 type ListEnvironmentsRes interface {

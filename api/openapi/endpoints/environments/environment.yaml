@@ -2,17 +2,18 @@ title: Environment
 description: |
   A runtime slot on a project (ADR 035).
 
-  This is identity only. The release an environment currently runs, and its
-  deployment history, arrive with the deployments endpoints; environment
-  lifecycle (create, rename, retire) arrives with its own ADR. Until then
-  every project is seeded with a fixed set of environments at creation and
-  the set cannot be changed.
+  Identity plus what runs there: `current_deployment` names the release the
+  environment currently runs. The deployment history lives at
+  `GET /deployments`; environment lifecycle (create, rename, retire) arrives
+  with its own ADR. Until then every project is seeded with a fixed set of
+  environments at creation and the set cannot be changed.
 type: object
 required:
   - id
   - project_id
   - name
   - created_at
+  - current_deployment
 properties:
   id:
     readOnly: true
@@ -32,3 +33,11 @@ properties:
     format: date-time
     description: When the environment was created.
     example: '2026-07-01T00:00:00Z'
+  current_deployment:
+    readOnly: true
+    description: |
+      The deployment this environment currently runs, or `null` while nothing
+      has been deployed to it yet.
+    oneOf:
+      - $ref: current-deployment.yaml
+      - type: 'null'

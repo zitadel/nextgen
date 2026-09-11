@@ -1,0 +1,63 @@
+type: object
+description: |
+  The release to make live and the environment to make it live on.
+
+  Environments are addressed by name here — the name is the environment's
+  wire address — and resolved to ids once, when the deployment is created.
+  The stored record carries the ids, so it survives renames.
+
+  `deployed_at` and `deployed_by` are derived server-side from the caller's
+  authentication context and are not accepted here.
+required:
+  - environment
+  - release_id
+properties:
+  environment:
+    description: The name of the environment to deploy to.
+    $ref: ../../components/schemas/environment-name.yaml
+  release_id:
+    description: |
+      The release to make live. Must already exist in the project — deploying
+      never assembles a release.
+
+      Always explicit, for `promote` too: a promotion names the release it
+      moves rather than asking the server to read the source environment's
+      current one, so the caller promotes the release it inspected, not
+      whatever is current by the time the request lands.
+    $ref: ../../components/schemas/release-id.yaml
+  reason:
+    description: |
+      Why this deployment happens. Omitted, the server records `deploy` —
+      the plain case needs no annotation. Applied server-side rather than as
+      a schema `default`: a default declared next to the shared reason
+      schema would leak into every other use of it.
+    $ref: ../../components/schemas/deployment-reason.yaml
+  source_environment:
+    description: |
+      The name of the environment the release is promoted from. Required when
+      `reason` is `promote`, rejected otherwise — before the name is
+      resolved, so a source on a non-promotion answers `400` whether or not
+      the name exists.
+    oneOf:
+      - $ref: ../../components/schemas/environment-name.yaml
+      - type: 'null'
+  message:
+    type: string
+    maxLength: 1024
+    description: |
+      A short free-form summary of why this deployment happened, analogous to
+      a git commit message. Recorded on the deployment's metadata and shown
+      when listing the history.
+    example: hotfix for the login outage
+  expected_current_deployment_id:
+    description: |
+      An optimistic-concurrency guard. When present, the deployment is only
+      created if the environment's current deployment is exactly this one;
+      otherwise the request answers `409` carrying the actual
+      `current_deployment_id` and `current_release_id` in its details, and
+      nothing changes.
+
+      Not persisted — it guards the swap, it is not part of the record.
+    oneOf:
+      - $ref: ../../components/schemas/deployment-id.yaml
+      - type: 'null'
