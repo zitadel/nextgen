@@ -1,0 +1,13 @@
+type: string
+description: |
+  A related object to embed on each returned deployment.
+
+  - `release`: the release this deployment made live, as `release` on each
+    deployment — the same representation `GET /releases/{release_id}` serves.
+    The property is omitted entirely when not requested, so "did not ask" is
+    distinguishable from asked-for content. One release per deployment, so no
+    cap and no truncation flag.
+
+    Requires `release.read` in addition to `deployment.read`.
+enum:
+  - release

@@ -1,0 +1,29 @@
+title: CurrentDeployment
+type: object
+description: |
+  The deployment an environment currently runs: enough to say which release
+  is live, since when, and why. The full record — who deployed, and where a
+  promotion came from — is at `GET /deployments/{deployment_id}`.
+required:
+  - id
+  - release_id
+  - reason
+  - deployed_at
+properties:
+  id:
+    readOnly: true
+    description: The deployment's id.
+    $ref: ../../components/schemas/deployment-id.yaml
+  release_id:
+    readOnly: true
+    description: The release this environment currently runs.
+    $ref: ../../components/schemas/release-id.yaml
+  reason:
+    readOnly: true
+    $ref: ../../components/schemas/deployment-reason.yaml
+  deployed_at:
+    readOnly: true
+    type: string
+    format: date-time
+    description: When the release went live here.
+    example: '2026-07-14T09:11:00Z'

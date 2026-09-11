@@ -166,6 +166,10 @@ paths:
     $ref: endpoints/events/methods.yaml
   /events/{id}:
     $ref: endpoints/events/by_id/methods.yaml
+  /deployments:
+    $ref: endpoints/deployments/methods.yaml
+  /deployments/{deployment_id}:
+    $ref: endpoints/deployments/by_id/methods.yaml
 
 components:
   securitySchemes:
