@@ -1,0 +1,16 @@
+title: DeploymentCreatedPayload
+type: object
+description: |
+  Allowlisted fields for `deployment.created`. The deployment id is already
+  the event's `entity_id`; the ids here say what went live where. Ids, not
+  names: they survive environment renames, and because events carry no
+  foreign key, the audit trail of a deleted environment lives on here.
+properties:
+  environment_id:
+    type: string
+  release_id:
+    type: string
+  reason:
+    type: string
+  source_environment_id:
+    type: string

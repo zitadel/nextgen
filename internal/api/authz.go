@@ -139,6 +139,18 @@ var releaseAccess = resourceAccess{
 	denied:    domain.ErrReleasePermissionDenied,
 }
 
+// deploymentAccess gates the record of what runs where (ADR 035, #532).
+// Same shape as releaseAccess: create and get are project-scoped — both carry
+// a project_id and the get filters its lookup by it — so no route resolves a
+// path id through RSI and the kind is only used to narrow a partial-access
+// list.
+var deploymentAccess = resourceAccess{
+	kind:      domain.ResourceKindDeployment,
+	readMiss:  domain.ErrDeploymentNotFound,
+	writeMiss: domain.ErrEnvironmentProjectNotFound,
+	denied:    domain.ErrDeploymentPermissionDenied,
+}
+
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
 // project-scoped (no RSI kind); credential ceiling is project.write like other
 // management resources until #420 mints a fine-grained events relation.
@@ -368,6 +380,11 @@ func requireMembershipRead(ctx context.Context) error {
 func requireTeamRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "team.read", domain.ErrUserPermissionDenied,
 		"expanding a user's lifecycle owner team requires team.read")
+}
+
+func requireReleaseRead(ctx context.Context) error {
+	return requireExpandScope(ctx, "release.read", domain.ErrDeploymentPermissionDenied,
+		"expanding a deployment's release requires release.read")
 }
 
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {

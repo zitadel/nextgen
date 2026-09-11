@@ -127,6 +127,7 @@ tracked below.
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | Project create seed `CreateEnvironment` (one per default environment) | `environment.created` | `admin` | `environment` | `name` |
 | ReleaseService create | `release.created` | `admin` | `release` | `content_hash`, `message`, `git_sha`, `git_dirty`, `pointers` |
+| DeploymentService create (deploy, promote and rollback alike; ids not names, so the audit trail survives environment renames and hard deletes — ADR 061) | `deployment.created` | `admin` | `deployment` | `environment_id`, `release_id`, `reason`, `source_environment_id` |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
