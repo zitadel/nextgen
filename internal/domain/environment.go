@@ -44,6 +44,10 @@ type Environment struct {
 	ID        string
 	Name      string
 	CreatedAt time.Time
+	// CurrentDeploymentID points at the deployment this environment runs,
+	// nil until something is deployed. Written only by CreateDeployment, in
+	// the same transaction as the deployment row it points at.
+	CurrentDeploymentID *string
 }
 
 func NewEnvironment(projectID, name string) (*Environment, error) {
@@ -75,4 +79,5 @@ const (
 	EnvironmentFieldID
 	EnvironmentFieldName
 	EnvironmentFieldCreatedAt
+	EnvironmentFieldCurrentDeploymentID
 )

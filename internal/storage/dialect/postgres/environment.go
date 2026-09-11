@@ -14,7 +14,7 @@ import (
 
 const (
 	createEnvironmentStmt = `INSERT INTO zitadel_nextgen.environments (project_id, id, name) VALUES ($1, $2, $3) RETURNING created_at`
-	environmentQuery      = `SELECT project_id, id, name, created_at FROM zitadel_nextgen.environments`
+	environmentQuery      = `SELECT project_id, id, name, created_at, current_deployment_id FROM zitadel_nextgen.environments`
 )
 
 type environmentStatements struct{ statement }
@@ -90,7 +90,7 @@ func (es environmentStatements) ListEnvironments(ctx context.Context, filter *da
 
 func (es environmentStatements) scanEnvironment(row pgx.CollectableRow) (*domain.Environment, error) {
 	entity := new(domain.Environment)
-	if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Name, &entity.CreatedAt); err != nil {
+	if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Name, &entity.CreatedAt, &entity.CurrentDeploymentID); err != nil {
 		return nil, err
 	}
 	return entity, nil

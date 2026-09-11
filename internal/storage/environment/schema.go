@@ -26,4 +26,10 @@ var Schema = database.NewSchema(map[domain.EnvironmentField]database.FieldBindin
 		Accessor: func(e *domain.Environment) any { return e.CreatedAt },
 		Coerce:   database.CoerceTime,
 	},
+	domain.EnvironmentFieldCurrentDeploymentID: {
+		SQLName:  "current_deployment_id",
+		Accessor: func(e *domain.Environment) any { return database.NullableValue(e.CurrentDeploymentID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
 })
