@@ -1,0 +1,216 @@
+post:
+  operationId: createIdp
+  summary: Create or revise an identity provider connection
+  description: |
+    Creates or revises a connection document. If the slug does not already
+    exist, a new connection is created. If a connection with that slug already
+    exists, a revision is created.
+
+    A revision gets a new `revision_id` and does not modify the connection
+    `id`, so identity links that reference the connection keep resolving while
+    releases and auth attempts stay pinned to the revision they captured.
+
+    Identity fields are fixed for the life of the connection and a revision
+    that changes one is rejected: `slug`, `protocol`, `subject_claim`, and the
+    endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
+    and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+    account a stored subject belongs to, so changing one would silently
+    repoint existing identities at a different provider.
+
+    The document is validated against the `idp-connection.json` schema before
+    anything is stored.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.write
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-idp-request.yaml
+        examples:
+          google:
+            summary: An OIDC connection for Google
+            description: |
+              Google connection document.
+            value:
+              idp:
+                slug: google
+                protocol: oidc
+                template: google
+                display_name: Google
+                subject_claim: sub
+                claim_mapping:
+                  email: email
+                  givenName: given_name
+                  familyName: family_name
+                verified_claims:
+                  email: email_verified
+                provisioning:
+                  creation: auto
+                oidc:
+                  issuer: https://accounts.google.com
+                  client_id: '${{ GOOGLE_CLIENT_ID }}'
+                  client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                  scopes:
+                    - openid
+                    - profile
+                    - email
+                  static_authorize_parameters:
+                    prompt: select_account
+          github:
+            summary: An OAuth 2.0 connection for GitHub
+            description: |
+              GitHub connection document.
+            value:
+              idp:
+                slug: github
+                protocol: oauth2
+                template: github
+                display_name: GitHub
+                subject_claim: id
+                claim_mapping:
+                  email: email
+                  givenName: name
+                verified_claims:
+                  email: $supplementary_fetch
+                provisioning:
+                  creation: auto
+                oauth2:
+                  authorization_endpoint: https://github.com/login/oauth/authorize
+                  token_endpoint: https://github.com/login/oauth/access_token
+                  userinfo_endpoint: https://api.github.com/user
+                  client_id: '${{ GITHUB_CLIENT_ID }}'
+                  client_secret: '${{ GITHUB_CLIENT_SECRET }}'
+                  token_endpoint_auth_method: client_secret_post
+                  scopes:
+                    - read:user
+                    - user:email
+                  supplementary_fetch: github_primary_email
+  responses:
+    '200':
+      description: |
+        The IdP connection document after revision.
+      content:
+        application/json:
+          schema:
+            $ref: idp-response.yaml
+          examples:
+            revised:
+              summary: The Google connection after a revision
+              description: |
+                The scope list grew. `id` is the one allocated when the
+                connection was created, `revision_id` is new, and `updated_at`
+                has moved past `created_at`.
+              value:
+                id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                slug: google
+                created_at: '2026-07-14T09:11:00Z'
+                updated_at: '2026-07-16T14:20:00Z'
+                definition:
+                  slug: google
+                  protocol: oidc
+                  template: google
+                  display_name: Google
+                  subject_claim: sub
+                  claim_mapping:
+                    email: email
+                    givenName: given_name
+                    familyName: family_name
+                  verified_claims:
+                    email: email_verified
+                  provisioning:
+                    creation: auto
+                  oidc:
+                    issuer: https://accounts.google.com
+                    id_token_mapping: false
+                    client_id: '${{ GOOGLE_CLIENT_ID }}'
+                    client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                    token_endpoint_auth_method: client_secret_basic
+                    scopes:
+                      - openid
+                      - profile
+                      - email
+                      - https://www.googleapis.com/auth/user.phonenumbers.read
+                    pkce_enabled: true
+                    static_authorize_parameters:
+                      prompt: select_account
+    '201':
+      description: |
+        The IdP connection document after creation.
+      content:
+        application/json:
+          schema:
+            $ref: idp-response.yaml
+          examples:
+            created:
+              summary: A newly created connection
+              description: |
+                The slug was new to the project, so `id` and `revision_id` were
+                both allocated and `updated_at` equals `created_at`.
+              value:
+                id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
+                slug: google
+                created_at: '2026-07-14T09:11:00Z'
+                updated_at: '2026-07-14T09:11:00Z'
+                definition:
+                  slug: google
+                  protocol: oidc
+                  template: google
+                  display_name: Google
+                  subject_claim: sub
+                  claim_mapping:
+                    email: email
+                    givenName: given_name
+                    familyName: family_name
+                  verified_claims:
+                    email: email_verified
+                  provisioning:
+                    creation: auto
+                  oidc:
+                    issuer: https://accounts.google.com
+                    id_token_mapping: false
+                    client_id: '${{ GOOGLE_CLIENT_ID }}'
+                    client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                    token_endpoint_auth_method: client_secret_basic
+                    scopes:
+                      - openid
+                      - profile
+                      - email
+                    pkce_enabled: true
+                    static_authorize_parameters:
+                      prompt: select_account
+    '400':
+      description: |
+        The document failed schema validation, or it revises an existing
+        connection and changes a field that is fixed for its life.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createIdp-error-response.yaml
