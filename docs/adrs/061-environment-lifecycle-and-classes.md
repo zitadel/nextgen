@@ -127,6 +127,10 @@ One important difference: the contents of `.zitadel/environments/` are not bundl
 
 **One file per environment, validated by a meta-schema shipped into `.zitadel/meta/` like every other kind.**
 
+The schema is authored at `api/openapi/endpoints/schemas/environment.json`, the
+directory the server embeds and `@zitadel/config` copies from (#1195), so there
+is one source and `setup` materializes it with the rest.
+
 ```json
 {
   "$schema": "../meta/environment.json",
