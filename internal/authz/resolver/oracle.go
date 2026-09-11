@@ -18,7 +18,7 @@ type Graph struct {
 
 // OracleCheck applies MVP rules: direct+closure, team membership expand, bounded TTU.
 func (g *Graph) OracleCheck(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID, objectType, relation string) bool {
-	home := principalHomeOrProject(principalHomeProjectID, projectID)
+	home := domain.AuthzHomeProjectID(principalHomeProjectID, projectID)
 	now := time.Now()
 	if g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) {
 		return true
@@ -46,7 +46,7 @@ func (g *Graph) OracleCheckParams(p domain.AuthzCheckParams) bool {
 
 // OracleList returns resource ids of kind authorized under project / team / resource scopes.
 func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID string, kind domain.ResourceKind, objectType, relation string) []string {
-	home := principalHomeOrProject(principalHomeProjectID, projectID)
+	home := domain.AuthzHomeProjectID(principalHomeProjectID, projectID)
 	now := time.Now()
 	projectWide := g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) ||
 		g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
@@ -116,13 +116,15 @@ func (g *Graph) listedObjectInConstraintTeam(p domain.AuthzListObjectsParams, id
 }
 
 // OracleFoothold mirrors HasAuthzProjectFoothold.
-func (g *Graph) OracleFoothold(projectID string, principalType domain.AuthzPrincipalType, principalID string) bool {
+// homeProjectID is the membership-edge project (empty falls back to projectID).
+func (g *Graph) OracleFoothold(projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) bool {
+	home := domain.AuthzHomeProjectID(homeProjectID, projectID)
 	now := time.Now()
 	for _, a := range g.Assignments {
 		if a.ProjectID != projectID || !assignmentActive(a, now) {
 			continue
 		}
-		if g.principalMatches(projectID, principalType, principalID, a) {
+		if g.principalMatches(home, principalType, principalID, a) {
 			return true
 		}
 	}
@@ -245,13 +247,6 @@ func assignmentActive(a *domain.AuthzAssignment, now time.Time) bool {
 		return false
 	}
 	return true
-}
-
-func principalHomeOrProject(home, projectID string) string {
-	if home != "" {
-		return home
-	}
-	return projectID
 }
 
 // GraphFromPersisted builds an oracle graph catalog fragment from compiler output.
