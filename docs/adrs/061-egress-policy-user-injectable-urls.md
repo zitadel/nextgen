@@ -35,10 +35,15 @@ once and owned centrally, before the second consumer exists.
    blocks, and forcing them through it would break correct deployments to
    defend operators against themselves. The day such a target becomes
    user-configurable, it adopts the hardened path.
-3. **Deny by default.** The default deny list blocks loopback, private,
-   link-local (cloud metadata), carrier-grade NAT, benchmark, and
-   unspecified ranges, IPv4 and IPv6, plus the localhost name, aligned
-   with Zitadel's default list.
+3. **Secure by default: the internal address space is unreachable out of
+   the box.** The policy itself allows anything the deny list does not
+   match, so the public internet is reachable with no configuration.
+   What makes the default posture safe is the shipped list: loopback,
+   private, link-local (cloud metadata), carrier-grade NAT, benchmark,
+   and unspecified ranges, IPv4 and IPv6, plus the localhost name,
+   aligned with Zitadel's default list. "Denied by default" describes
+   the internal address space (protected with zero operator action), not
+   fetching in general.
 4. **Enforce on the address actually connected to.** The authoritative
    check runs at connection time, on the resolved address, because any
    check that runs earlier can be defeated by the name re-resolving
@@ -84,7 +89,10 @@ once and owned centrally, before the second consumer exists.
    and the limits are operator configuration, validated at startup (a
    malformed entry fails the boot rather than silently weakening the
    list). The policy is never configurable per tenant or per connection
-   (#928 constraint).
+   (#928 constraint). That constraint exists to keep a tenant from
+   widening the policy; a future tenant-scoped list that can only narrow
+   it further is compatible with this decision, stays out of scope here,
+   and is tracked on #928.
 11. **Extraction-ready.** The mechanism stays free of repo-specific
     dependencies so it can be promoted into a shared library that both
     Zitadel products consume. The extraction is proposed on #928 and waits
