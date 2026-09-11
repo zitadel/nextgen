@@ -11,6 +11,14 @@ func (s *Branding) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *CreateDeploymentRequest) setDefaults() {
+	{
+		val := DeploymentReason("deploy")
+		s.Reason.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *CreateFlowRequest) setDefaults() {
 	{
 		val := bool(false)
@@ -31,6 +39,22 @@ func (s *CreateReleaseRequest) setDefaults() {
 	{
 		val := bool(false)
 		s.GitDirty.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *CurrentDeployment) setDefaults() {
+	{
+		val := DeploymentReason("deploy")
+		s.Reason = val
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *DeploymentMetadata) setDefaults() {
+	{
+		val := DeploymentReason("deploy")
+		s.Reason.SetTo(val)
 	}
 }
 

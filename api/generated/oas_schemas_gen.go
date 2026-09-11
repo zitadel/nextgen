@@ -8360,6 +8360,220 @@ func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
 
+type CreateDeploymentCreated Deployment
+
+func (*CreateDeploymentCreated) createDeploymentRes() {}
+
+// CreateDeploymentErrorResponse represents sum type.
+type CreateDeploymentErrorResponse struct {
+	Type             CreateDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
+type CreateDeploymentErrorResponseType string
+
+// Possible values for CreateDeploymentErrorResponseType.
+const (
+	AuthUnauthorizedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "auth.unauthorized"
+	InternalCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "internal"
+	ReqInvalidCreateDeploymentErrorResponse       CreateDeploymentErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
+func (s CreateDeploymentErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateDeploymentErrorResponse
+}
+
+// IsInternal reports whether CreateDeploymentErrorResponse is Internal.
+func (s CreateDeploymentErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateDeploymentErrorResponse
+}
+
+// IsReqInvalid reports whether CreateDeploymentErrorResponse is ReqInvalid.
+func (s CreateDeploymentErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateDeploymentErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateDeploymentErrorResponse to AuthUnauthorized.
+func (s *CreateDeploymentErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateDeploymentErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateDeploymentErrorResponse is AuthUnauthorized.
+func (s CreateDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateDeploymentErrorResponse(v AuthUnauthorized) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateDeploymentErrorResponse to Internal.
+func (s *CreateDeploymentErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateDeploymentErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateDeploymentErrorResponse is Internal.
+func (s CreateDeploymentErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from Internal.
+func NewInternalCreateDeploymentErrorResponse(v Internal) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets CreateDeploymentErrorResponse to ReqInvalid.
+func (s *CreateDeploymentErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateDeploymentErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateDeploymentErrorResponse is ReqInvalid.
+func (s CreateDeploymentErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from ReqInvalid.
+func NewReqInvalidCreateDeploymentErrorResponse(v ReqInvalid) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateDeploymentErrorResponseStatusCode wraps CreateDeploymentErrorResponse with StatusCode.
+type CreateDeploymentErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateDeploymentErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateDeploymentErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateDeploymentErrorResponseStatusCode) GetResponse() CreateDeploymentErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateDeploymentErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateDeploymentErrorResponseStatusCode) SetResponse(val CreateDeploymentErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateDeploymentErrorResponseStatusCode) createDeploymentRes() {}
+
+type CreateDeploymentOK Deployment
+
+func (*CreateDeploymentOK) createDeploymentRes() {}
+
+// The release to make live and the environment to make it live on.
+// Environments are addressed by name here — the name is the environment's
+// wire address — and resolved to ids once, when the deployment is created.
+// The stored record carries the ids, so it survives renames.
+// `deployed_at` and `deployed_by` are derived server-side from the caller's
+// authentication context and are not accepted here.
+// Ref: #
+type CreateDeploymentRequest struct {
+	// The name of the environment to deploy to.
+	Environment EnvironmentName `json:"environment"`
+	// The release to make live. Must already exist in the project — deploying
+	// never assembles a release.
+	// Always explicit, for `promote` too: a promotion names the release it
+	// moves rather than asking the server to read the source environment's
+	// current one, so the caller promotes the release it inspected, not
+	// whatever is current by the time the request lands.
+	ReleaseID ReleaseID `json:"release_id"`
+	// Why this deployment happens. Defaults to `deploy` — the plain case
+	// needs no annotation.
+	Reason OptDeploymentReason `json:"reason"`
+	// The name of the environment the release is promoted from. Required when
+	// `reason` is `promote`, rejected otherwise.
+	SourceEnvironment OptNilEnvironmentName `json:"source_environment"`
+	// An optimistic-concurrency guard. When present, the deployment is only
+	// created if the environment's current deployment is exactly this one;
+	// otherwise the request answers `409` carrying the actual
+	// `current_deployment_id` and `current_release_id` in its details, and
+	// nothing changes.
+	// Not persisted — it guards the swap, it is not part of the record.
+	ExpectedCurrentDeploymentID OptNilDeploymentID `json:"expected_current_deployment_id"`
+}
+
+// GetEnvironment returns the value of Environment.
+func (s *CreateDeploymentRequest) GetEnvironment() EnvironmentName {
+	return s.Environment
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *CreateDeploymentRequest) GetReleaseID() ReleaseID {
+	return s.ReleaseID
+}
+
+// GetReason returns the value of Reason.
+func (s *CreateDeploymentRequest) GetReason() OptDeploymentReason {
+	return s.Reason
+}
+
+// GetSourceEnvironment returns the value of SourceEnvironment.
+func (s *CreateDeploymentRequest) GetSourceEnvironment() OptNilEnvironmentName {
+	return s.SourceEnvironment
+}
+
+// GetExpectedCurrentDeploymentID returns the value of ExpectedCurrentDeploymentID.
+func (s *CreateDeploymentRequest) GetExpectedCurrentDeploymentID() OptNilDeploymentID {
+	return s.ExpectedCurrentDeploymentID
+}
+
+// SetEnvironment sets the value of Environment.
+func (s *CreateDeploymentRequest) SetEnvironment(val EnvironmentName) {
+	s.Environment = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *CreateDeploymentRequest) SetReleaseID(val ReleaseID) {
+	s.ReleaseID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *CreateDeploymentRequest) SetReason(val OptDeploymentReason) {
+	s.Reason = val
+}
+
+// SetSourceEnvironment sets the value of SourceEnvironment.
+func (s *CreateDeploymentRequest) SetSourceEnvironment(val OptNilEnvironmentName) {
+	s.SourceEnvironment = val
+}
+
+// SetExpectedCurrentDeploymentID sets the value of ExpectedCurrentDeploymentID.
+func (s *CreateDeploymentRequest) SetExpectedCurrentDeploymentID(val OptNilDeploymentID) {
+	s.ExpectedCurrentDeploymentID = val
+}
+
 // CreateFlowDefinitionErrorResponse represents sum type.
 type CreateFlowDefinitionErrorResponse struct {
 	Type                     CreateFlowDefinitionErrorResponseType // switch on this field
@@ -11836,6 +12050,60 @@ type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
 
+// The deployment an environment currently runs: enough to say which release
+// is live, since when, and why. The full record — who deployed, and where a
+// promotion came from — is at `GET /deployments/{deployment_id}`.
+// Ref: #
+type CurrentDeployment struct {
+	// The deployment's id.
+	ID DeploymentID `json:"id"`
+	// The release this environment currently runs.
+	ReleaseID ReleaseID        `json:"release_id"`
+	Reason    DeploymentReason `json:"reason"`
+	// When the release went live here.
+	DeployedAt time.Time `json:"deployed_at"`
+}
+
+// GetID returns the value of ID.
+func (s *CurrentDeployment) GetID() DeploymentID {
+	return s.ID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *CurrentDeployment) GetReleaseID() ReleaseID {
+	return s.ReleaseID
+}
+
+// GetReason returns the value of Reason.
+func (s *CurrentDeployment) GetReason() DeploymentReason {
+	return s.Reason
+}
+
+// GetDeployedAt returns the value of DeployedAt.
+func (s *CurrentDeployment) GetDeployedAt() time.Time {
+	return s.DeployedAt
+}
+
+// SetID sets the value of ID.
+func (s *CurrentDeployment) SetID(val DeploymentID) {
+	s.ID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *CurrentDeployment) SetReleaseID(val ReleaseID) {
+	s.ReleaseID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *CurrentDeployment) SetReason(val DeploymentReason) {
+	s.Reason = val
+}
+
+// SetDeployedAt sets the value of DeployedAt.
+func (s *CurrentDeployment) SetDeployedAt(val time.Time) {
+	s.DeployedAt = val
+}
+
 // DeleteFlowDefinitionErrorResponse represents sum type.
 type DeleteFlowDefinitionErrorResponse struct {
 	Type                    DeleteFlowDefinitionErrorResponseType // switch on this field
@@ -12568,6 +12836,322 @@ type DeleteUserByIDUnauthorized ErrorDetails
 
 func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 
+// An immutable record of a release being made live on an environment.
+// Deploying, promoting and rolling back all create a deployment. The record
+// is what ran where and when — the ids and the timestamp — plus metadata
+// saying why and who. It is append-only: written once when the environment
+// starts running the release and never changed afterwards, so the deployment
+// log is the audit trail of what ran where.
+// Environments are referenced by id, not name. Names are resolved when the
+// deployment is created, so renaming an environment later does not reattach
+// its history.
+// Ref: #
+type Deployment struct {
+	// The opaque, immutable resource id, assigned at creation.
+	ID DeploymentID `json:"id"`
+	// The project this deployment belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// The environment this deployment made the release live on.
+	EnvironmentID string `json:"environment_id"`
+	// The release this deployment made live.
+	ReleaseID ReleaseID `json:"release_id"`
+	// When the deployment was created.
+	DeployedAt time.Time          `json:"deployed_at"`
+	Metadata   DeploymentMetadata `json:"metadata"`
+	// The release named by `release_id`, present only when the request asked
+	// for it with `expand: ["release"]` — the same representation
+	// `GET /releases/{release_id}` serves. Absent means it was not requested.
+	Release OptRelease `json:"release"`
+}
+
+// GetID returns the value of ID.
+func (s *Deployment) GetID() DeploymentID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *Deployment) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetEnvironmentID returns the value of EnvironmentID.
+func (s *Deployment) GetEnvironmentID() string {
+	return s.EnvironmentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *Deployment) GetReleaseID() ReleaseID {
+	return s.ReleaseID
+}
+
+// GetDeployedAt returns the value of DeployedAt.
+func (s *Deployment) GetDeployedAt() time.Time {
+	return s.DeployedAt
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *Deployment) GetMetadata() DeploymentMetadata {
+	return s.Metadata
+}
+
+// GetRelease returns the value of Release.
+func (s *Deployment) GetRelease() OptRelease {
+	return s.Release
+}
+
+// SetID sets the value of ID.
+func (s *Deployment) SetID(val DeploymentID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *Deployment) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetEnvironmentID sets the value of EnvironmentID.
+func (s *Deployment) SetEnvironmentID(val string) {
+	s.EnvironmentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *Deployment) SetReleaseID(val ReleaseID) {
+	s.ReleaseID = val
+}
+
+// SetDeployedAt sets the value of DeployedAt.
+func (s *Deployment) SetDeployedAt(val time.Time) {
+	s.DeployedAt = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *Deployment) SetMetadata(val DeploymentMetadata) {
+	s.Metadata = val
+}
+
+// SetRelease sets the value of Release.
+func (s *Deployment) SetRelease(val OptRelease) {
+	s.Release = val
+}
+
+func (*Deployment) getDeploymentByIdRes() {}
+
+// A related object to embed on each returned deployment.
+// - `release`: the release this deployment made live, as `release` on each
+// deployment — the same representation `GET /releases/{release_id}` serves.
+// The property is omitted entirely when not requested, so "did not ask" is
+// distinguishable from asked-for content. One release per deployment, so no
+// cap and no truncation flag.
+// Requires `release.read` in addition to `deployment.read`.
+// Ref: #
+type DeploymentExpand string
+
+const (
+	DeploymentExpandRelease DeploymentExpand = "release"
+)
+
+// AllValues returns all DeploymentExpand values.
+func (DeploymentExpand) AllValues() []DeploymentExpand {
+	return []DeploymentExpand{
+		DeploymentExpandRelease,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentExpandRelease:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentExpand) UnmarshalText(data []byte) error {
+	switch DeploymentExpand(data) {
+	case DeploymentExpandRelease:
+		*s = DeploymentExpandRelease
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type DeploymentID string
+
+// Why the release went live here and who made it happen. Set when the
+// deployment is created and never mutated afterwards — enrichment of the
+// record, while the ids and timestamp on the deployment itself say what ran
+// where and when. Every field is optional; a sparse object is a deployment
+// that simply was not annotated further.
+// Ref: #
+type DeploymentMetadata struct {
+	Reason OptDeploymentReason `json:"reason"`
+	// The environment the release was promoted from. Set exactly when
+	// `reason` is `promote`.
+	// Recorded as it stood at deployment time: it is not re-resolved later,
+	// so it may name an environment that has since been deleted.
+	SourceEnvironmentID OptNilString `json:"source_environment_id"`
+	// The identity that created the deployment. Absent when the caller is a
+	// machine principal carrying no user identity, which is the common case
+	// for deployments made from CI.
+	DeployedBy OptNilString `json:"deployed_by"`
+	// What kind of principal `deployed_by` names.
+	DeployedByType OptNilDeploymentMetadataDeployedByType `json:"deployed_by_type"`
+}
+
+// GetReason returns the value of Reason.
+func (s *DeploymentMetadata) GetReason() OptDeploymentReason {
+	return s.Reason
+}
+
+// GetSourceEnvironmentID returns the value of SourceEnvironmentID.
+func (s *DeploymentMetadata) GetSourceEnvironmentID() OptNilString {
+	return s.SourceEnvironmentID
+}
+
+// GetDeployedBy returns the value of DeployedBy.
+func (s *DeploymentMetadata) GetDeployedBy() OptNilString {
+	return s.DeployedBy
+}
+
+// GetDeployedByType returns the value of DeployedByType.
+func (s *DeploymentMetadata) GetDeployedByType() OptNilDeploymentMetadataDeployedByType {
+	return s.DeployedByType
+}
+
+// SetReason sets the value of Reason.
+func (s *DeploymentMetadata) SetReason(val OptDeploymentReason) {
+	s.Reason = val
+}
+
+// SetSourceEnvironmentID sets the value of SourceEnvironmentID.
+func (s *DeploymentMetadata) SetSourceEnvironmentID(val OptNilString) {
+	s.SourceEnvironmentID = val
+}
+
+// SetDeployedBy sets the value of DeployedBy.
+func (s *DeploymentMetadata) SetDeployedBy(val OptNilString) {
+	s.DeployedBy = val
+}
+
+// SetDeployedByType sets the value of DeployedByType.
+func (s *DeploymentMetadata) SetDeployedByType(val OptNilDeploymentMetadataDeployedByType) {
+	s.DeployedByType = val
+}
+
+type DeploymentMetadataDeployedByType string
+
+const (
+	DeploymentMetadataDeployedByTypeHuman   DeploymentMetadataDeployedByType = "human"
+	DeploymentMetadataDeployedByTypeService DeploymentMetadataDeployedByType = "service"
+	DeploymentMetadataDeployedByTypeSystem  DeploymentMetadataDeployedByType = "system"
+	DeploymentMetadataDeployedByTypeAgent   DeploymentMetadataDeployedByType = "agent"
+)
+
+// AllValues returns all DeploymentMetadataDeployedByType values.
+func (DeploymentMetadataDeployedByType) AllValues() []DeploymentMetadataDeployedByType {
+	return []DeploymentMetadataDeployedByType{
+		DeploymentMetadataDeployedByTypeHuman,
+		DeploymentMetadataDeployedByTypeService,
+		DeploymentMetadataDeployedByTypeSystem,
+		DeploymentMetadataDeployedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentMetadataDeployedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentMetadataDeployedByTypeHuman:
+		return []byte(s), nil
+	case DeploymentMetadataDeployedByTypeService:
+		return []byte(s), nil
+	case DeploymentMetadataDeployedByTypeSystem:
+		return []byte(s), nil
+	case DeploymentMetadataDeployedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
+	switch DeploymentMetadataDeployedByType(data) {
+	case DeploymentMetadataDeployedByTypeHuman:
+		*s = DeploymentMetadataDeployedByTypeHuman
+		return nil
+	case DeploymentMetadataDeployedByTypeService:
+		*s = DeploymentMetadataDeployedByTypeService
+		return nil
+	case DeploymentMetadataDeployedByTypeSystem:
+		*s = DeploymentMetadataDeployedByTypeSystem
+		return nil
+	case DeploymentMetadataDeployedByTypeAgent:
+		*s = DeploymentMetadataDeployedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Why the deployment was created. All three are the same operation — a new
+// deployment pointing the environment at a release — and the reason records
+// the caller's intent:
+// - `deploy` — a release goes live on the environment.
+// - `promote` — a release that already runs on another environment goes live
+// here; `source_environment_id` records where it came from.
+// - `rollback` — a release the environment ran earlier goes live again.
+// Ref: #
+type DeploymentReason string
+
+const (
+	DeploymentReasonDeploy   DeploymentReason = "deploy"
+	DeploymentReasonPromote  DeploymentReason = "promote"
+	DeploymentReasonRollback DeploymentReason = "rollback"
+)
+
+// AllValues returns all DeploymentReason values.
+func (DeploymentReason) AllValues() []DeploymentReason {
+	return []DeploymentReason{
+		DeploymentReasonDeploy,
+		DeploymentReasonPromote,
+		DeploymentReasonRollback,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentReason) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentReasonDeploy:
+		return []byte(s), nil
+	case DeploymentReasonPromote:
+		return []byte(s), nil
+	case DeploymentReasonRollback:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentReason) UnmarshalText(data []byte) error {
+	switch DeploymentReason(data) {
+	case DeploymentReasonDeploy:
+		*s = DeploymentReasonDeploy
+		return nil
+	case DeploymentReasonPromote:
+		*s = DeploymentReasonPromote
+		return nil
+	case DeploymentReasonRollback:
+		*s = DeploymentReasonRollback
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Empty payload for event types with no typed fields
 // (e.g. `project.deleted`, `user.deleted`, `session.expired`).
 // Ref: #
@@ -12892,11 +13476,11 @@ func (s *EnvPermissionDeniedDetails) init() EnvPermissionDeniedDetails {
 }
 
 // A runtime slot on a project (ADR 035).
-// This is identity only. The release an environment currently runs, and its
-// deployment history, arrive with the deployments endpoints; environment
-// lifecycle (create, rename, retire) arrives with its own ADR. Until then
-// every project is seeded with a fixed set of environments at creation and
-// the set cannot be changed.
+// Identity plus what runs there: `current_deployment` names the release the
+// environment currently runs. The deployment history lives at
+// `GET /deployments`; environment lifecycle (create, rename, retire) arrives
+// with its own ADR. Until then every project is seeded with a fixed set of
+// environments at creation and the set cannot be changed.
 // Ref: #
 type Environment struct {
 	// The opaque, immutable resource id.
@@ -12906,6 +13490,9 @@ type Environment struct {
 	Name      EnvironmentName `json:"name"`
 	// When the environment was created.
 	CreatedAt time.Time `json:"created_at"`
+	// The deployment this environment currently runs, or `null` while nothing
+	// has been deployed to it yet.
+	CurrentDeployment NilCurrentDeployment `json:"current_deployment"`
 }
 
 // GetID returns the value of ID.
@@ -12928,6 +13515,11 @@ func (s *Environment) GetCreatedAt() time.Time {
 	return s.CreatedAt
 }
 
+// GetCurrentDeployment returns the value of CurrentDeployment.
+func (s *Environment) GetCurrentDeployment() NilCurrentDeployment {
+	return s.CurrentDeployment
+}
+
 // SetID sets the value of ID.
 func (s *Environment) SetID(val string) {
 	s.ID = val
@@ -12946,6 +13538,11 @@ func (s *Environment) SetName(val EnvironmentName) {
 // SetCreatedAt sets the value of CreatedAt.
 func (s *Environment) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
+}
+
+// SetCurrentDeployment sets the value of CurrentDeployment.
+func (s *Environment) SetCurrentDeployment(val NilCurrentDeployment) {
+	s.CurrentDeployment = val
 }
 
 func (*Environment) getEnvironmentByNameRes() {}
@@ -20140,6 +20737,130 @@ type GetClaimWindowTooManyRequests ErrorDetails
 
 func (*GetClaimWindowTooManyRequests) getClaimWindowRes() {}
 
+// GetDeploymentByIdErrorResponse represents sum type.
+type GetDeploymentByIdErrorResponse struct {
+	Type             GetDeploymentByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// GetDeploymentByIdErrorResponseType is oneOf type of GetDeploymentByIdErrorResponse.
+type GetDeploymentByIdErrorResponseType string
+
+// Possible values for GetDeploymentByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetDeploymentByIdErrorResponse GetDeploymentByIdErrorResponseType = "auth.unauthorized"
+	InternalGetDeploymentByIdErrorResponse         GetDeploymentByIdErrorResponseType = "internal"
+	ReqInvalidGetDeploymentByIdErrorResponse       GetDeploymentByIdErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetDeploymentByIdErrorResponse is AuthUnauthorized.
+func (s GetDeploymentByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetDeploymentByIdErrorResponse
+}
+
+// IsInternal reports whether GetDeploymentByIdErrorResponse is Internal.
+func (s GetDeploymentByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetDeploymentByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetDeploymentByIdErrorResponse is ReqInvalid.
+func (s GetDeploymentByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetDeploymentByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetDeploymentByIdErrorResponse to AuthUnauthorized.
+func (s *GetDeploymentByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetDeploymentByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetDeploymentByIdErrorResponse is AuthUnauthorized.
+func (s GetDeploymentByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetDeploymentByIdErrorResponse(v AuthUnauthorized) GetDeploymentByIdErrorResponse {
+	var s GetDeploymentByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetDeploymentByIdErrorResponse to Internal.
+func (s *GetDeploymentByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetDeploymentByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetDeploymentByIdErrorResponse is Internal.
+func (s GetDeploymentByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from Internal.
+func NewInternalGetDeploymentByIdErrorResponse(v Internal) GetDeploymentByIdErrorResponse {
+	var s GetDeploymentByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetDeploymentByIdErrorResponse to ReqInvalid.
+func (s *GetDeploymentByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetDeploymentByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetDeploymentByIdErrorResponse is ReqInvalid.
+func (s GetDeploymentByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetDeploymentByIdErrorResponse(v ReqInvalid) GetDeploymentByIdErrorResponse {
+	var s GetDeploymentByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetDeploymentByIdErrorResponseStatusCode wraps GetDeploymentByIdErrorResponse with StatusCode.
+type GetDeploymentByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetDeploymentByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetDeploymentByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetDeploymentByIdErrorResponseStatusCode) GetResponse() GetDeploymentByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetDeploymentByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetDeploymentByIdErrorResponseStatusCode) SetResponse(val GetDeploymentByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetDeploymentByIdErrorResponseStatusCode) getDeploymentByIdRes() {}
+
 // GetEnvironmentByNameErrorResponse represents sum type.
 type GetEnvironmentByNameErrorResponse struct {
 	Type                GetEnvironmentByNameErrorResponseType // switch on this field
@@ -23654,6 +24375,165 @@ func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
+// ListDeploymentsErrorResponse represents sum type.
+type ListDeploymentsErrorResponse struct {
+	Type             ListDeploymentsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// ListDeploymentsErrorResponseType is oneOf type of ListDeploymentsErrorResponse.
+type ListDeploymentsErrorResponseType string
+
+// Possible values for ListDeploymentsErrorResponseType.
+const (
+	AuthUnauthorizedListDeploymentsErrorResponse ListDeploymentsErrorResponseType = "auth.unauthorized"
+	InternalListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "internal"
+	ReqInvalidListDeploymentsErrorResponse       ListDeploymentsErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListDeploymentsErrorResponse is AuthUnauthorized.
+func (s ListDeploymentsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListDeploymentsErrorResponse
+}
+
+// IsInternal reports whether ListDeploymentsErrorResponse is Internal.
+func (s ListDeploymentsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListDeploymentsErrorResponse
+}
+
+// IsReqInvalid reports whether ListDeploymentsErrorResponse is ReqInvalid.
+func (s ListDeploymentsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListDeploymentsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListDeploymentsErrorResponse to AuthUnauthorized.
+func (s *ListDeploymentsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListDeploymentsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListDeploymentsErrorResponse is AuthUnauthorized.
+func (s ListDeploymentsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListDeploymentsErrorResponse(v AuthUnauthorized) ListDeploymentsErrorResponse {
+	var s ListDeploymentsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListDeploymentsErrorResponse to Internal.
+func (s *ListDeploymentsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListDeploymentsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListDeploymentsErrorResponse is Internal.
+func (s ListDeploymentsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from Internal.
+func NewInternalListDeploymentsErrorResponse(v Internal) ListDeploymentsErrorResponse {
+	var s ListDeploymentsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListDeploymentsErrorResponse to ReqInvalid.
+func (s *ListDeploymentsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListDeploymentsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListDeploymentsErrorResponse is ReqInvalid.
+func (s ListDeploymentsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from ReqInvalid.
+func NewReqInvalidListDeploymentsErrorResponse(v ReqInvalid) ListDeploymentsErrorResponse {
+	var s ListDeploymentsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListDeploymentsErrorResponseStatusCode wraps ListDeploymentsErrorResponse with StatusCode.
+type ListDeploymentsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListDeploymentsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListDeploymentsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListDeploymentsErrorResponseStatusCode) GetResponse() ListDeploymentsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListDeploymentsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListDeploymentsErrorResponseStatusCode) SetResponse(val ListDeploymentsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListDeploymentsErrorResponseStatusCode) listDeploymentsRes() {}
+
+// Deployments, newest first.
+// Filtered to one environment, the first row is that environment's current
+// deployment and the rest is its history. Unfiltered, the list interleaves
+// every environment of the project, so the first row is only the most recent
+// deployment anywhere, not any particular environment's current one.
+// Ref: #
+type ListDeploymentsResponse struct {
+	Deployments []Deployment `json:"deployments"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetDeployments returns the value of Deployments.
+func (s *ListDeploymentsResponse) GetDeployments() []Deployment {
+	return s.Deployments
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListDeploymentsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetDeployments sets the value of Deployments.
+func (s *ListDeploymentsResponse) SetDeployments(val []Deployment) {
+	s.Deployments = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListDeploymentsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListDeploymentsResponse) listDeploymentsRes() {}
+
 // ListEnvironmentsErrorResponse represents sum type.
 type ListEnvironmentsErrorResponse struct {
 	Type                ListEnvironmentsErrorResponseType // switch on this field
@@ -25220,6 +26100,51 @@ func (s *NextgenSession) SetAPIKey(val string) {
 // SetRoles sets the value of Roles.
 func (s *NextgenSession) SetRoles(val []string) {
 	s.Roles = val
+}
+
+// NewNilCurrentDeployment returns new NilCurrentDeployment with value set to v.
+func NewNilCurrentDeployment(v CurrentDeployment) NilCurrentDeployment {
+	return NilCurrentDeployment{
+		Value: v,
+	}
+}
+
+// NilCurrentDeployment is nullable CurrentDeployment.
+type NilCurrentDeployment struct {
+	Value CurrentDeployment
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilCurrentDeployment) SetTo(v CurrentDeployment) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilCurrentDeployment) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilCurrentDeployment) SetToNull() {
+	o.Null = true
+	var v CurrentDeployment
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilCurrentDeployment) Get() (v CurrentDeployment, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilCurrentDeployment) Or(d CurrentDeployment) CurrentDeployment {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
 }
 
 // Merged schema.
@@ -27140,6 +28065,52 @@ func (o OptDateTime) Or(d time.Time) time.Time {
 	return d
 }
 
+// NewOptDeploymentReason returns new OptDeploymentReason with value set to v.
+func NewOptDeploymentReason(v DeploymentReason) OptDeploymentReason {
+	return OptDeploymentReason{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeploymentReason is optional DeploymentReason.
+type OptDeploymentReason struct {
+	Value DeploymentReason
+	Set   bool
+}
+
+// IsSet returns true if OptDeploymentReason was set.
+func (o OptDeploymentReason) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeploymentReason) Reset() {
+	var v DeploymentReason
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeploymentReason) SetTo(v DeploymentReason) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeploymentReason) Get() (v DeploymentReason, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeploymentReason) Or(d DeploymentReason) DeploymentReason {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptDuration returns new OptDuration with value set to v.
 func NewOptDuration(v ogenx.ISODuration) OptDuration {
 	return OptDuration{
@@ -27502,6 +28473,52 @@ func (o OptEnvironmentCreatedEventDelegationType) Get() (v EnvironmentCreatedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvironmentCreatedEventDelegationType) Or(d EnvironmentCreatedEventDelegationType) EnvironmentCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvironmentName returns new OptEnvironmentName with value set to v.
+func NewOptEnvironmentName(v EnvironmentName) OptEnvironmentName {
+	return OptEnvironmentName{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvironmentName is optional EnvironmentName.
+type OptEnvironmentName struct {
+	Value EnvironmentName
+	Set   bool
+}
+
+// IsSet returns true if OptEnvironmentName was set.
+func (o OptEnvironmentName) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvironmentName) Reset() {
+	var v EnvironmentName
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvironmentName) SetTo(v EnvironmentName) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvironmentName) Get() (v EnvironmentName, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvironmentName) Or(d EnvironmentName) EnvironmentName {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -30932,6 +31949,132 @@ func (o OptNilDateTime) Or(d time.Time) time.Time {
 	return d
 }
 
+// NewOptNilDeploymentID returns new OptNilDeploymentID with value set to v.
+func NewOptNilDeploymentID(v DeploymentID) OptNilDeploymentID {
+	return OptNilDeploymentID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilDeploymentID is optional nullable DeploymentID.
+type OptNilDeploymentID struct {
+	Value DeploymentID
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilDeploymentID was set.
+func (o OptNilDeploymentID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilDeploymentID) Reset() {
+	var v DeploymentID
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilDeploymentID) SetTo(v DeploymentID) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilDeploymentID) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilDeploymentID) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v DeploymentID
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilDeploymentID) Get() (v DeploymentID, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilDeploymentID) Or(d DeploymentID) DeploymentID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilDeploymentMetadataDeployedByType returns new OptNilDeploymentMetadataDeployedByType with value set to v.
+func NewOptNilDeploymentMetadataDeployedByType(v DeploymentMetadataDeployedByType) OptNilDeploymentMetadataDeployedByType {
+	return OptNilDeploymentMetadataDeployedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilDeploymentMetadataDeployedByType is optional nullable DeploymentMetadataDeployedByType.
+type OptNilDeploymentMetadataDeployedByType struct {
+	Value DeploymentMetadataDeployedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilDeploymentMetadataDeployedByType was set.
+func (o OptNilDeploymentMetadataDeployedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilDeploymentMetadataDeployedByType) Reset() {
+	var v DeploymentMetadataDeployedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilDeploymentMetadataDeployedByType) SetTo(v DeploymentMetadataDeployedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilDeploymentMetadataDeployedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilDeploymentMetadataDeployedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v DeploymentMetadataDeployedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilDeploymentMetadataDeployedByType) Get() (v DeploymentMetadataDeployedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilDeploymentMetadataDeployedByType) Or(d DeploymentMetadataDeployedByType) DeploymentMetadataDeployedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilEnvironmentCreatedEventActorType returns new OptNilEnvironmentCreatedEventActorType with value set to v.
 func NewOptNilEnvironmentCreatedEventActorType(v EnvironmentCreatedEventActorType) OptNilEnvironmentCreatedEventActorType {
 	return OptNilEnvironmentCreatedEventActorType{
@@ -30989,6 +32132,69 @@ func (o OptNilEnvironmentCreatedEventActorType) Get() (v EnvironmentCreatedEvent
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilEnvironmentCreatedEventActorType) Or(d EnvironmentCreatedEventActorType) EnvironmentCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilEnvironmentName returns new OptNilEnvironmentName with value set to v.
+func NewOptNilEnvironmentName(v EnvironmentName) OptNilEnvironmentName {
+	return OptNilEnvironmentName{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilEnvironmentName is optional nullable EnvironmentName.
+type OptNilEnvironmentName struct {
+	Value EnvironmentName
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilEnvironmentName was set.
+func (o OptNilEnvironmentName) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilEnvironmentName) Reset() {
+	var v EnvironmentName
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilEnvironmentName) SetTo(v EnvironmentName) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilEnvironmentName) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilEnvironmentName) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v EnvironmentName
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilEnvironmentName) Get() (v EnvironmentName, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilEnvironmentName) Or(d EnvironmentName) EnvironmentName {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -34029,6 +35235,52 @@ func (o OptRelRevisionUnpinnableDetails) Get() (v RelRevisionUnpinnableDetails, 
 
 // Or returns value if set, or given parameter if does not.
 func (o OptRelRevisionUnpinnableDetails) Or(d RelRevisionUnpinnableDetails) RelRevisionUnpinnableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelease returns new OptRelease with value set to v.
+func NewOptRelease(v Release) OptRelease {
+	return OptRelease{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelease is optional Release.
+type OptRelease struct {
+	Value Release
+	Set   bool
+}
+
+// IsSet returns true if OptRelease was set.
+func (o OptRelease) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelease) Reset() {
+	var v Release
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelease) SetTo(v Release) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelease) Get() (v Release, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelease) Or(d Release) Release {
 	if v, ok := o.Get(); ok {
 		return v
 	}

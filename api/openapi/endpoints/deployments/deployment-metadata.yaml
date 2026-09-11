@@ -1,0 +1,42 @@
+title: DeploymentMetadata
+type: object
+description: |
+  Why the release went live here and who made it happen. Set when the
+  deployment is created and never mutated afterwards — enrichment of the
+  record, while the ids and timestamp on the deployment itself say what ran
+  where and when. Every field is optional; a sparse object is a deployment
+  that simply was not annotated further.
+properties:
+  reason:
+    $ref: ../../components/schemas/deployment-reason.yaml
+  source_environment_id:
+    description: |
+      The environment the release was promoted from. Set exactly when
+      `reason` is `promote`.
+
+      Recorded as it stood at deployment time: it is not re-resolved later,
+      so it may name an environment that has since been deleted.
+    oneOf:
+      - type: string
+      - type: 'null'
+    example: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
+  deployed_by:
+    description: |
+      The identity that created the deployment. Absent when the caller is a
+      machine principal carrying no user identity, which is the common case
+      for deployments made from CI.
+    oneOf:
+      - type: string
+      - type: 'null'
+    example: user_01KX3RG8A7F0N9WD3P2E4YM5C1
+  deployed_by_type:
+    description: What kind of principal `deployed_by` names.
+    oneOf:
+      - type: string
+        enum:
+          - human
+          - service
+          - system
+          - agent
+      - type: 'null'
+    example: human
