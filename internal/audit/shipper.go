@@ -75,8 +75,9 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 		cfg.Interval = DefaultExportConfig().Interval
 	}
 	return &Shipper{
-		cfg:    cfg,
-		src:    src,
+		cfg: cfg,
+		src: src,
+		// Operator-configured URL, not user-injectable: stdlib client by design (ADR 061).
 		client: &http.Client{Timeout: 10 * time.Second},
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),

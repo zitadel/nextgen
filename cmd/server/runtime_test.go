@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/httputil"
 )
 
 // clearDefaultDataDir removes the data dir beside the test binary so an earlier
@@ -409,4 +411,53 @@ func TestEnsureServerMasterKeyIgnoresStrayDotfile(t *testing.T) {
 	require.Contains(t, cfg.MasterKeys, masterKeyFileName)
 	assert.NotContains(t, cfg.MasterKeys, ".DS_Store")
 	assert.FileExists(t, filepath.Join(masterKeyDir, masterKeyFileName))
+}
+
+func TestLoadConfigHTTPClientDefaultsAndEnvOverride(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("NEXTGEN_HTTPCLIENT_ALLOW_LIST", "localhost,127.0.0.0/8")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, httputil.DefaultDenyList, cfg.HTTPClient.DenyList)
+	assert.Equal(t, 10*time.Second, cfg.HTTPClient.Timeout)
+	assert.Equal(t, int64(1<<20), cfg.HTTPClient.MaxBodySize)
+	assert.Equal(t, 5, cfg.HTTPClient.MaxRedirects)
+	assert.False(t, cfg.HTTPClient.AllowHTTPSDowngrade)
+	assert.Equal(t, []string{"localhost", "127.0.0.0/8"}, cfg.HTTPClient.AllowList,
+		"comma-separated env override must split into entries")
+	assert.Equal(t, 30*time.Second, cfg.Schema.ResolveTimeout)
+
+	client, err := cfg.HTTPClient.NewClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+}
+
+func TestLoadConfigRejectsMalformedDenyListEntry(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("NEXTGEN_HTTPCLIENT_DENY_LIST", "10.0.0.0/99")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	_, err := loadConfig(configPath)
+	require.ErrorContains(t, err, "invalid CIDR entry")
+}
+
+func TestLoadConfigRejectsNegativeResolveTimeout(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("NEXTGEN_SCHEMA_RESOLVE_TIMEOUT", "-5s")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	_, err := loadConfig(configPath)
+	require.ErrorContains(t, err, "schema.resolve_timeout must not be negative")
 }
