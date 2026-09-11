@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   CONTAINER_DATA_DIR,
+  LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
   localContainerName,
   localRuntimePaths,
@@ -277,7 +278,12 @@ describe("local runtime commands", () => {
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
       data: {
-        checks: Array<{ details?: { scope?: string }; message: string; name: string; status: string }>;
+        checks: Array<{
+          details?: { scope?: string };
+          message: string;
+          name: string;
+          status: string;
+        }>;
         next_commands?: string[];
       };
       warnings: string[];
@@ -324,6 +330,99 @@ describe("local runtime commands", () => {
 
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls).toEqual([["version", "--format", "{{.Server.Version}}"]]);
+  });
+
+  it("start hands ZITADEL_* variables from .env.local and .env to the runtime, names only on disk", async () => {
+    const cwd = await tempProject("zitadel-start-env-");
+    const fake = await fakeServerBinary();
+    const port = await freePort();
+    const serverUrl = `http://localhost:${String(port)}`;
+    await writeFile(
+      join(cwd, ".env.local"),
+      "ZITADEL_GOOGLE_SECRET=canary-local\nUNDECLARED_SECRET=canary-undeclared\n",
+      "utf8",
+    );
+    await writeFile(
+      join(cwd, ".env"),
+      "ZITADEL_GOOGLE_SECRET=canary-base\nZITADEL_GITHUB_SECRET=canary-github\n",
+      "utf8",
+    );
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { runtime: { pid: number; env: { injected: string[] } } };
+    };
+    expect(envelope.status).toBe("ok");
+    binaryPids.push(envelope.data.runtime.pid);
+
+    // The child received the ZITADEL_* variables, .env.local first, and
+    // nothing else from the files.
+    await expect(childEnv(serverUrl, "ZITADEL_GOOGLE_SECRET")).resolves.toBe("canary-local");
+    await expect(childEnv(serverUrl, "ZITADEL_GITHUB_SECRET")).resolves.toBe("canary-github");
+    await expect(childEnv(serverUrl, "UNDECLARED_SECRET")).resolves.toBeUndefined();
+
+    // Names only, in the envelope and on disk.
+    expect(envelope.data.runtime.env).toEqual({
+      injected: ["ZITADEL_GITHUB_SECRET", "ZITADEL_GOOGLE_SECRET"],
+    });
+    expect(result.stdout).not.toContain("canary");
+    expect(result.stderr).not.toContain("canary");
+    const runtimeFile = await readFile(join(cwd, LOCAL_RUNTIME_FILE), "utf8");
+    expect(runtimeFile).not.toContain("canary");
+    expect((await readRuntimeMetadata(cwd))?.env).toEqual(envelope.data.runtime.env);
+
+    const status = await runCliForTest(["status", "--cwd", cwd, "--json"]);
+    expect(status.exitCode).toBe(0);
+    expect(status.stdout).not.toContain("canary");
+    expect(parseJson(status.stdout)).toMatchObject({
+      data: { server: { runtime: { env: envelope.data.runtime.env } } },
+    });
+
+    // A second start reuses the healthy runtime and keeps the recorded names.
+    const again = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+    expect(again.exitCode).toBe(0);
+    expect(parseJson(again.stdout)).toMatchObject({
+      data: {
+        title: "Local Zitadel server is already running.",
+        runtime: { env: envelope.data.runtime.env },
+      },
+    });
+
+    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+    expect(stop.exitCode).toBe(0);
+  });
+
+  it("start reuses a healthy container and keeps the variable names recorded for it", async () => {
+    const cwd = await tempProject("zitadel-start-docker-reuse-env-");
+    const image = await expectedDefaultImage();
+    const fake = await fakeDocker({ existingContainerImage: image });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+    const recorded = { injected: ["ZITADEL_GOOGLE_SECRET"] };
+    await writeRuntimeMetadata(cwd, { ...runtimeFor(cwd, serverUrl), image, env: recorded });
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(parseJson(result.stdout)).toMatchObject({
+      data: { title: "Local Zitadel server is already running.", runtime: { env: recorded } },
+    });
+    expect((await readRuntimeMetadata(cwd))?.env).toEqual(recorded);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.some((args) => args[0] === "run")).toBe(false);
   });
 
   it("start --json defaults to the npm binary runtime and writes metadata", async () => {
@@ -831,6 +930,16 @@ const server = http.createServer((req, res) => {
     res.writeHead(200).end("ok");
     return;
   }
+  const env = req.url.match(/^\\/env\\/([A-Za-z_][A-Za-z0-9_]*)$/);
+  if (env) {
+    const value = process.env[env[1]];
+    if (value === undefined) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200).end(value);
+    return;
+  }
   res.writeHead(404).end();
 });
 server.listen(port, "localhost", () => {
@@ -978,3 +1087,9 @@ async function expectedDefaultImage(): Promise<string> {
   ) as { version: string };
   return defaultLocalServerImageForCliVersion(pkg.version);
 }
+
+async function childEnv(serverUrl: string, name: string): Promise<string | undefined> {
+  const response = await fetch(`${serverUrl}/env/${name}`);
+  return response.status === 200 ? response.text() : undefined;
+}
+
