@@ -13,27 +13,15 @@ const telemetryChannel = (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL || "develo
   .toLowerCase();
 
 /**
- * Unbundled, multi-entry build for oclif: each command compiles to its own
- * `dist/commands/<name>.mjs` so oclif can discover and lazy-load them at
- * runtime. `@oclif/*` (core + plugins) stays external — resolved from
- * node_modules at runtime, never bundled — which is what lets the plugin
- * system work.
+ * Single-entry build for oclif's explicit command strategy: `src/index.ts`
+ * exports the `COMMANDS` table (hand-written commands plus the ones built
+ * from the resource registry) and oclif loads `dist/index.mjs` at runtime.
+ * `@oclif/*` (core + plugins) stays external — resolved from node_modules at
+ * runtime, never bundled — which is what lets the plugin system work.
  */
 export default defineConfig({
   entry: {
-    "commands/setup": "src/commands/setup/index.ts",
-    "commands/apply": "src/commands/apply.ts",
-    "commands/claim": "src/commands/claim.ts",
-    "commands/plan": "src/commands/plan.ts",
-    "commands/doctor": "src/commands/doctor/index.ts",
-    "commands/logs": "src/commands/logs.ts",
-    "commands/reset": "src/commands/reset.ts",
-    "commands/start": "src/commands/start.ts",
-    "commands/stop": "src/commands/stop.ts",
-    "commands/eject": "src/commands/eject.ts",
-    "commands/status": "src/commands/status.ts",
-    "commands/schemas/list": "src/commands/schemas/list.ts",
-    "commands/branding/eject": "src/commands/branding/eject.ts",
+    index: "src/index.ts",
   },
   outDir: "dist",
   format: ["esm"],
