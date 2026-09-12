@@ -64,5 +64,6 @@ The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Or
 - [Flow Engine — Step Response Shape](../flowengine/flow-engine-nodes.md) — capability dicts + Liquid templates + `text_key` localization
 - [Template Security](../flowengine/template-security.md) — invariants the CLI validates on `apply`
 - [User Schema Integration](../flowengine/user-schema.md)
+- [Resource Commands](resource-commands.md) — the imperative `users` / `teams` / `sessions` / `events` / `grants` / `projects` surface and its conventions
 - [CLI source](../../../apps/cli)
 - [CLI agent guidance](../../../apps/cli/SKILLS.md)

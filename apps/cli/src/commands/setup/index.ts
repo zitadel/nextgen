@@ -113,6 +113,7 @@ export default class Setup extends BaseCommand {
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
   static override flags = {
+    force: Flags.boolean({ char: "f", description: "Overwrite managed files that already exist." }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
       description: RENDERER_FLAG_DESCRIPTION,
@@ -601,6 +602,7 @@ export async function localServerHostsPlatform(
 function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
+    name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
     preview_origins: [issuer],
