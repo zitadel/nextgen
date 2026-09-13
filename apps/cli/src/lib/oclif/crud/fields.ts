@@ -4,6 +4,7 @@ import { ZitadelError } from "../../errors";
 import { isObject } from "../../json";
 import { isSecretKey, refuseSecret } from "./secrets";
 import type { Json, Schema } from "./types";
+import { unwrap, type ZodLike } from "./zod";
 
 /**
  * Body fields as CLI flags. A registry entry already carries the generated
@@ -54,25 +55,7 @@ const summarize = (description: string | undefined): string => {
   return `${clipped.slice(0, clipped.lastIndexOf(" "))}…`;
 };
 
-type ZodLike = {
-  def?: { type?: string; innerType?: ZodLike };
-  options?: readonly string[];
-  description?: string;
-};
-
-/** Peel `optional` / `default` / `nullable` wrappers off a field. */
-const unwrap = (field: ZodLike): ZodLike => {
-  let type = field;
-  while (
-    type?.def?.innerType &&
-    ["optional", "default", "nullable"].includes(type.def.type ?? "")
-  ) {
-    type = type.def.innerType;
-  }
-  return type;
-};
-
-const kindOf = (type: ZodLike): FieldKind | undefined => {
+const kindOf = (type: ZodLike | undefined): FieldKind | undefined => {
   switch (type?.def?.type) {
     case "string":
       return "string";
@@ -107,11 +90,12 @@ export const describeBody = (schema: Schema): readonly BodyField[] => {
     if (RESERVED.has(flag)) {
       return [];
     }
-    const kind = kindOf(unwrap(field));
+    const inner = unwrap(field);
+    const kind = kindOf(inner);
     if (!kind) {
       return [];
     }
-    const options = kind === "enum" ? unwrap(field).options : undefined;
+    const options = kind === "enum" ? inner?.options : undefined;
     return [
       {
         name,
@@ -119,7 +103,7 @@ export const describeBody = (schema: Schema): readonly BodyField[] => {
         kind,
         required: !schemaAccepts(schema, name),
         ...(options ? { options } : {}),
-        summary: summarize(field.description ?? unwrap(field).description),
+        summary: summarize(field.description ?? inner?.description),
       },
     ];
   });
