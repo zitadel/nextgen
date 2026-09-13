@@ -108,6 +108,62 @@ export const brandingPresets = {
     },
     shape: { radius: "md", density: "regular" },
   } satisfies Branding,
+  /**
+   * Both sides authored independently, with the numeric knobs at values you can
+   * see: a 2px corner, text a fifth larger, a mark half again as tall. Toggle
+   * the story's theme control to check that each side keeps its own colours and
+   * its own ink.
+   */
+  "two-sided": {
+    layout: "centered",
+    theme: {
+      mode: "auto",
+      light: {
+        logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
+        palette: {
+          primary: "#B45309",
+          on_primary: "#FFFFFF",
+          background: "#FFFBEB",
+          surface: "#FFFFFF",
+          muted: "#FEF3C7",
+          border: "#FCD34D",
+          text: "#451A03",
+          text_muted: "#92400E",
+          link: "#B45309",
+        },
+      },
+      dark: {
+        logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
+        palette: {
+          primary: "#34D399",
+          on_primary: "#022C22",
+          background: "#022C22",
+          surface: "#064E3B",
+          muted: "#065F46",
+          border: "#047857",
+          text: "#ECFDF5",
+          text_muted: "#6EE7B7",
+          link: "#6EE7B7",
+        },
+      },
+    },
+    typography: { font_family: "'Inter', ui-sans-serif, system-ui, sans-serif", scale: 1.2 },
+    shape: { radius: 2, density: "regular", logo_scale: 1.5 },
+  } satisfies Branding,
+  /**
+   * One side only. The widget must render light whatever the story's theme
+   * control or the operating system asks for — there are no dark colours behind
+   * the request.
+   */
+  "light-only": {
+    layout: "centered",
+    theme: {
+      light: {
+        logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
+        palette: { primary: "#4A90D9", background: "#F8FAFC", surface: "#FFFFFF", text: "#0F172A" },
+      },
+    },
+  } satisfies Branding,
   // The ejected designs, exactly as scaffolded — no palette overrides, so
   // what renders here is the out-of-the-box look a fresh `setup --design`
   // user sees.
