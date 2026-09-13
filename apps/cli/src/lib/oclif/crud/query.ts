@@ -55,7 +55,7 @@ const within = (a: string, b: string, max: number): boolean => {
   if (a === b || Math.abs(a.length - b.length) > max) {
     return a === b;
   }
-  let previous = [...Array.from({ length: b.length + 1 }, (_, i) => i)];
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i += 1) {
     const current = [i];
     for (let j = 1; j <= b.length; j += 1) {

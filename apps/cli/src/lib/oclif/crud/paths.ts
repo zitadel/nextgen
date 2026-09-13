@@ -1,5 +1,6 @@
 import { isObject } from "../../json";
 import type { Schema } from "./types";
+import { unwrap, type ZodLike } from "./zod";
 
 /**
  * The dot-paths a record can carry, read from the generated response schema
@@ -19,29 +20,6 @@ export type FieldPaths = Readonly<{
   open: readonly string[];
 }>;
 
-type ZodLike = {
-  def?: {
-    type?: string;
-    innerType?: ZodLike;
-    element?: ZodLike;
-    options?: ZodLike[];
-    left?: ZodLike;
-    right?: ZodLike;
-  };
-  shape?: Record<string, ZodLike>;
-};
-
-/** Peel the wrappers a generated schema puts around a field. */
-const unwrap = (schema: ZodLike | undefined): ZodLike | undefined => {
-  let type = schema;
-  let guard = 0;
-  while (type?.def?.innerType && guard < 10) {
-    type = type.def.innerType;
-    guard += 1;
-  }
-  return type;
-};
-
 const shapeOf = (schema: ZodLike | undefined): Record<string, ZodLike> | undefined => {
   const type = unwrap(schema);
   if (type?.shape) {
@@ -59,10 +37,10 @@ const shapeOf = (schema: ZodLike | undefined): Record<string, ZodLike> | undefin
   if (!options) {
     return undefined;
   }
-  const merged: Record<string, ZodLike> = {};
-  for (const option of options) {
-    Object.assign(merged, shapeOf(option) ?? {});
-  }
+  const merged = Object.assign({}, ...options.map((option) => shapeOf(option) ?? {})) as Record<
+    string,
+    ZodLike
+  >;
   return Object.keys(merged).length > 0 ? merged : undefined;
 };
 
