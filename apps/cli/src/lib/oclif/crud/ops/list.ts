@@ -225,26 +225,20 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  * caller asked for. Values are re-emitted exactly as they were typed.
  */
 const repeatedFlags = <Ctx>(spec: ListSpec<Ctx>, flags: Json): readonly string[] => {
-  const parts: string[] = [];
-  if (typeof flags.limit === "number") {
-    parts.push(`--limit ${flags.limit}`);
-  }
+  const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
   if (spec.kind === "query") {
-    if (typeof flags.sort === "string") {
-      parts.push(`--sort ${shellArg(flags.sort)}`);
-    }
-    for (const filter of Array.isArray(flags.filter) ? flags.filter : []) {
-      parts.push(`--filter ${shellArg(String(filter))}`);
-    }
-    return parts;
+    const sort = typeof flags.sort === "string" ? [`--sort ${shellArg(flags.sort)}`] : [];
+    const filters = (Array.isArray(flags.filter) ? flags.filter : []).map(
+      (filter) => `--filter ${shellArg(String(filter))}`,
+    );
+    return [...limit, ...sort, ...filters];
   }
-  for (const param of spec.params) {
+  const params = spec.params.flatMap((param) => {
     const value = flags[param.flag];
-    for (const one of Array.isArray(value) ? value : value === undefined ? [] : [value]) {
-      parts.push(`--${param.flag} ${shellArg(String(one))}`);
-    }
-  }
-  return parts;
+    const values = Array.isArray(value) ? value : value === undefined ? [] : [value];
+    return values.map((one) => `--${param.flag} ${shellArg(String(one))}`);
+  });
+  return [...limit, ...params];
 };
 
 /** Quote a value that a shell would otherwise split or interpret. */

@@ -200,14 +200,30 @@ read from `.zitadel/secret` ([ADR 036](036-api-credential-planes.md)). Shell
 history and process listings are readable by other users, so this is enforced
 in code rather than documented as advice.
 
-The refusal matches on the *name* — a record key that reads like a credential
-(`password`, `client_secret`, `userToken`) is rejected, pointing the user at
-`--data`, `--file`, or stdin. A name heuristic is a weak test, and it is
-deliberately the weaker half of a pair: credentials are not user attributes at
-all ([ADR 020](020-credentials-out-of-user-schema.md)), so anything it catches
-was already a mistake. Detecting this from the schema instead is not possible
-today — the meta-schema has no way to mark a property sensitive — and adding
-one is a backend decision, not a CLI one.
+The refusal matches on the *name*, against a wordlist hardcoded in the CLI:
+`password`, `secret`, `token`, `credential`, and compounds like `apiKey`, split
+across `snake_case`, `kebab-case` and `camelCase` so `client_secret` and
+`userToken` match while `passwordless` does not.
+
+**This is a stopgap and should be replaced by a schema-derived signal.** A
+hardcoded list is wrong in both directions: it cannot know that a customer's
+`recovery_phrase` is sensitive, and it will refuse an innocent field that
+happens to contain the word `token`. The CLI is guessing at something the
+schema is supposed to state.
+
+The signal already half-exists. `writeOnly: true` is accepted on a user
+property and reserved for a value that may be written but never read back, and
+the OpenAPI documents use `format: password` in at least one place. Neither
+reaches the CLI: nothing enforces `writeOnly` server-side today, and the
+generated Zod schemas the commands introspect drop both keywords, so there is
+nothing to read even where an author set them. Making this real means enforcing
+`writeOnly` and carrying it (and `format`) through code generation — backend and
+generator work, not a CLI change.
+
+Until then the wordlist earns its place only as the weaker half of a pair:
+credentials are not user attributes at all
+([ADR 020](020-credentials-out-of-user-schema.md)), so anything it catches was
+already a mistake.
 
 ### 13. The command surface follows the API, not the reverse
 
@@ -259,8 +275,11 @@ Recorded here because §12 makes them the API's problem, not the CLI's:
   has in hand.
 - Grants have no update endpoint, so a grant is changed by deleting and
   recreating it.
-- The meta-schema cannot mark a property sensitive, which is what keeps the
-  credential guard a name heuristic (§11).
+- Sensitivity is not carried end to end. `writeOnly` is accepted and reserved
+  on a user property but unenforced, `format: password` appears in the OpenAPI
+  documents, and code generation drops both — so the CLI cannot derive what is
+  secret and falls back to a hardcoded wordlist (§12). Enforcing `writeOnly`
+  and preserving it through generation would let the guard be exact.
 
 ## Consequences
 
