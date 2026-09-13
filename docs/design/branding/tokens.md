@@ -193,8 +193,8 @@ Asset URLs live on branding; the host loads them (img, link, background). They a
 | ------------------------------------ | ---------------------------------------------------------------------------------- |
 | `logo_url` (baseline)                | Single-mark fallback, used only when neither side names one                        |
 | `hero_url` (baseline)                | `background-image` on `:host` when the `split` layout is active                    |
-| design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
-| `font_url` (baseline)                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font |
+| design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `typography.font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
+| `typography.font_url`                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font. Page mode only — an embedded widget applies the family and leaves loading to the page that owns the document |
 | `theme.light.logo_url` / `theme.dark.logo_url` | The mark for that side. The orchestrator resolves one from the active theme and hands it to the template as `logo_url`; a side without a mark shows none, because a logo is pixels and is never recoloured |
 | `shape.logo_scale`                   | `--zl-logo-scale`, a multiplier on the logo height caps                            |
 

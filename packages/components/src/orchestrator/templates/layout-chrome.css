@@ -310,7 +310,7 @@ img[data-zl-asset-broken] {
       calc(
         100vh - 104px - var(--zl-spacing-8) - var(--zl-spacing-8) -
           2.5rem - var(--zl-spacing-6) - var(--zl-spacing-6) -
-          var(--zl-split-logo-max-height, 8rem)
+          calc(var(--zl-split-logo-max-height, 8rem) * var(--zl-logo-scale, 1))
       )
     )
   );
@@ -383,7 +383,7 @@ img[data-zl-asset-broken] {
    Both rules are `img`-qualified so source order (not specificity) decides
    between the logo cap and the hero banner cap. */
 img.zl-split__compact {
-  max-height: 2.5rem;
+  max-height: calc(2.5rem * var(--zl-logo-scale, 1));
 }
 /* hero_url-only tenants: the compact fallback renders the hero image as a
    modest banner instead of vanishing with the brand pane. Same pinned-width +
@@ -485,7 +485,7 @@ zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) 
   letter-spacing: -0.01em;
 }
 .zl-hero__brand-logo {
-  max-height: 1.75rem;
+  max-height: calc(1.75rem * var(--zl-logo-scale, 1));
 }
 .zl-hero__brand-mark {
   display: inline-flex;

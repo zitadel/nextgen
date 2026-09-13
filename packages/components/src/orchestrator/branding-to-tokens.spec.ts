@@ -130,6 +130,17 @@ describe("buildBrandingStylesheet", () => {
       }
     });
 
+    it("emits real lengths, not NaN, from the resolved token ramp", () => {
+      // The ratios are parsed from `tokens`, the resolved tree. Reading them
+      // from `cssVars` instead would parse `var(--zl-radius-md)` and emit
+      // `NaNrem`, which a browser drops silently.
+      const css = buildBrandingStylesheet({
+        shape: { radius: 10 },
+        typography: { scale: 1.2 },
+      });
+      expect(css).not.toContain("NaN");
+    });
+
     it("rounds every step fully at radius full", () => {
       const css = buildBrandingStylesheet({ shape: { radius: "full" } });
       expect(css).toContain("--zl-radius-md: 9999px;");
