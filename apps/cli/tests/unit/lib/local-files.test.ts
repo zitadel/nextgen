@@ -12,15 +12,15 @@ import {
   restoreFileReferences,
 } from "../../../src/lib/local-files";
 
+const baseDir = ".zitadel/branding";
+
 /** A throwaway project with `.zitadel/branding/login.liquid` seeded. */
 async function makeProject(template = "<p>local</p>"): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-local-files-"));
-  await mkdir(join(cwd, ".zitadel/branding"), { recursive: true });
-  await writeFile(join(cwd, ".zitadel/branding/login.liquid"), template);
+  await mkdir(join(cwd, baseDir), { recursive: true });
+  await writeFile(join(cwd, baseDir, "login.liquid"), template);
   return cwd;
 }
-
-const baseDir = ".zitadel/branding";
 
 describe("isFileReference", () => {
   it("matches only an object whose single key is a string $file", () => {
@@ -37,19 +37,22 @@ describe("resolveFileReference", () => {
   it("resolves relative to the base directory", async () => {
     const cwd = await makeProject();
     expect(resolveFileReference({ cwd, baseDir }, "./login.liquid")).toBe(
-      join(cwd, ".zitadel/branding/login.liquid"),
+      join(cwd, baseDir, "login.liquid"),
     );
   });
 
   it("refuses paths that leave the project", async () => {
     const cwd = await makeProject();
-    expect(() => resolveFileReference({ cwd, baseDir }, "../../../outside.liquid")).toThrow(ZitadelError);
-    expect(() => resolveFileReference({ cwd, baseDir }, "/etc/passwd")).toThrow(ZitadelError);
+    const context = { cwd, baseDir };
+    expect(() => resolveFileReference(context, "../../../outside.liquid")).toThrow(ZitadelError);
+    expect(() => resolveFileReference(context, "/etc/passwd")).toThrow(ZitadelError);
   });
 
-  it("allows a sibling whose name only starts with two dots", async () => {
+  it("allows a file whose name only starts with two dots", async () => {
     const cwd = await makeProject();
-    expect(resolveFileReference({ cwd, baseDir: "." }, "..hidden.liquid")).toBe(join(cwd, "..hidden.liquid"));
+    expect(resolveFileReference({ cwd, baseDir: "." }, "..hidden.liquid")).toBe(
+      join(cwd, "..hidden.liquid"),
+    );
   });
 });
 
@@ -81,27 +84,31 @@ describe("inlineFileReferences", () => {
 
   it("throws E_VALIDATION on an unreadable file when asked to", async () => {
     const cwd = await makeProject();
-    expect(() =>
-      inlineFileReferences({ t: { $file: "./missing.liquid" } }, { cwd, baseDir }, { onMissing: "throw" }),
-    ).toThrow(/cannot be read/);
+    const document = { t: { $file: "./missing.liquid" } };
+    expect(() => inlineFileReferences(document, { cwd, baseDir }, { onMissing: "throw" })).toThrow(
+      /cannot be read/,
+    );
   });
 
-  it("drops the field on an unreadable file when asked to omit", async () => {
-    const cwd = await makeProject();
-    expect(
-      inlineFileReferences(
-        { layout: "split", t: { $file: "./missing.liquid" } },
-        { cwd, baseDir },
-        { onMissing: "omit" },
-      ),
-    ).toEqual({ layout: "split" });
+  it("drops the key or array element of an unreadable file when asked to omit", async () => {
+    const cwd = await makeProject("<p>template</p>");
+    const document = {
+      layout: "split",
+      t: { $file: "./missing.liquid" },
+      list: [{ $file: "./missing.liquid" }, { $file: "./login.liquid" }],
+    };
+    expect(inlineFileReferences(document, { cwd, baseDir }, { onMissing: "omit" })).toEqual({
+      layout: "split",
+      list: ["<p>template</p>"],
+    });
   });
 
-  it("still refuses escaping paths when omitting", async () => {
+  it("still refuses paths that leave the project when omitting", async () => {
     const cwd = await makeProject();
-    expect(() =>
-      inlineFileReferences({ t: { $file: "../../../x" } }, { cwd, baseDir }, { onMissing: "omit" }),
-    ).toThrow(ZitadelError);
+    const document = { t: { $file: "../../../x" } };
+    expect(() => inlineFileReferences(document, { cwd, baseDir }, { onMissing: "omit" })).toThrow(
+      ZitadelError,
+    );
   });
 });
 
@@ -115,7 +122,8 @@ describe("restoreFileReferences", () => {
 
     expect(document).toEqual(local);
     expect(written).toEqual(["./login.liquid"]);
-    expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe("<p>server</p>");
+    const onDisk = await readFile(join(cwd, baseDir, "login.liquid"), "utf8");
+    expect(onDisk).toBe("<p>server</p>");
     expect(canonical.liquid_template).toBe("<p>server</p>");
   });
 
@@ -129,7 +137,7 @@ describe("restoreFileReferences", () => {
     expect(written).toEqual([]);
   });
 
-  it("leaves the canonical value alone when the local document has no reference there", async () => {
+  it("leaves the canonical value alone where the local document has no reference", async () => {
     const cwd = await makeProject();
     const canonical = { liquid_template: "<p>inline</p>" };
     const { document, written } = restoreFileReferences(

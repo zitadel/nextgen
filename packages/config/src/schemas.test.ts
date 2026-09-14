@@ -12,12 +12,12 @@ describe("brandingConfigSchema", () => {
   const base = { layout: "split", liquid_template: { $file: "./login.liquid" } };
 
   it("accepts the template inline or as a $file reference, and rejects the old key", () => {
-    expect(brandingConfigSchema.safeParse({ layout: "split", liquid_template: "<p></p>" }).success).toBe(true);
-    expect(brandingConfigSchema.safeParse(base).success).toBe(true);
-    expect(brandingConfigSchema.safeParse({ layout: "split", liquid_template: { $file: "" } }).success).toBe(false);
-    expect(
-      brandingConfigSchema.safeParse({ layout: "split", liquid_template_file: "./login.liquid" }).success,
-    ).toBe(false);
+    const parses = (descriptor: object): boolean =>
+      brandingConfigSchema.safeParse(descriptor).success;
+    expect(parses({ layout: "split", liquid_template: "<p></p>" })).toBe(true);
+    expect(parses(base)).toBe(true);
+    expect(parses({ layout: "split", liquid_template: { $file: "" } })).toBe(false);
+    expect(parses({ layout: "split", liquid_template_file: "./login.liquid" })).toBe(false);
   });
 
   it("accepts a descriptor with https asset URLs", () => {

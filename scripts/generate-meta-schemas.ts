@@ -69,7 +69,8 @@ const LOCAL_FILE_REFERENCE: Schema = {
       type: "string",
       minLength: 1,
       description:
-        "Path to the file whose content is this value, relative to the file holding the reference. The CLI inlines it before upload.",
+        "Path to the file whose content is this value, relative to the file holding the " +
+        "reference. The CLI inlines it before upload.",
     },
   },
 };

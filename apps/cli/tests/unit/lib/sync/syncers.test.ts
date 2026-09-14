@@ -340,7 +340,9 @@ describe("BrandingSyncer", () => {
     const cwd = await makeBrandingProject();
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
-    expect(() => branding.validate({ ...descriptor, liquid_template: VALID_TEMPLATE })).not.toThrow();
+    expect(() =>
+      branding.validate({ ...descriptor, liquid_template: VALID_TEMPLATE }),
+    ).not.toThrow();
   });
 
   it("validate rejects the old liquid_template_file key with a migration hint", async () => {

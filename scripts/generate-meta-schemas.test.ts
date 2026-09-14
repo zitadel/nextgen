@@ -115,7 +115,7 @@ test("keeps a $ref to another emitted file as a sibling .json reference", () => 
   assert.equal("$defs" in schema, false);
 });
 
-test("inlines a non-emitted $ref once under $defs, converting it the same way, and survives self-reference", () => {
+test("inlines a non-emitted $ref once under $defs and survives self-reference", () => {
   const { schema } = generate(
     {
       "flow.yaml": [

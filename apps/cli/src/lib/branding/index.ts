@@ -1,5 +1,9 @@
 import { ZitadelError } from "../errors";
-import { type FileReferenceContext, inlineFileReferences, restoreFileReferences } from "../local-files";
+import {
+  type FileReferenceContext,
+  inlineFileReferences,
+  restoreFileReferences,
+} from "../local-files";
 
 /**
  * Relative directory (from the project root) where local branding files live:
@@ -10,10 +14,16 @@ import { type FileReferenceContext, inlineFileReferences, restoreFileReferences 
  */
 export const BRANDING_DIR = ".zitadel/branding";
 
-/** The key descriptors used before `$file` references, still recognised so plan can say how to migrate. */
+/**
+ * The key descriptors used before `$file` references. It is still recognised
+ * so plan can say how to migrate instead of reporting an unknown key.
+ */
 const LEGACY_TEMPLATE_FILE_KEY = "liquid_template_file";
 
-/** References in a descriptor resolve against its directory; all descriptors live flat in {@link BRANDING_DIR}. */
+/**
+ * References in a descriptor resolve against its directory; all descriptors
+ * live flat in {@link BRANDING_DIR}.
+ */
 const referenceContext = (cwd: string): FileReferenceContext => ({ cwd, baseDir: BRANDING_DIR });
 
 /** E_VALIDATION with a migration hint when a descriptor still carries `liquid_template_file`. */

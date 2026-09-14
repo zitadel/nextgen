@@ -283,15 +283,16 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   });
 
   it("validates once both deltas land in the meta-schema", () => {
-    const patched = structuredClone(flowMeta) as unknown as {
+    const patched = structuredClone(flowMeta) as {
       $defs: {
         FlowDefinitionStep: {
           properties: { on_success: { enum: string[] }; sso_providers: { items: object } };
         };
       };
     };
-    patched.$defs.FlowDefinitionStep.properties.on_success.enum.push("create_user_with_sso");
-    patched.$defs.FlowDefinitionStep.properties.sso_providers.items = { type: "string", minLength: 1 };
+    const step = patched.$defs.FlowDefinitionStep.properties;
+    step.on_success.enum.push("create_user_with_sso");
+    step.sso_providers.items = { type: "string", minLength: 1 };
     expect(ajv().compile(patched)(flow)).toBe(true);
   });
 

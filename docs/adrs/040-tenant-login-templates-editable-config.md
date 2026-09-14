@@ -1,6 +1,6 @@
 # ADR 040: Tenant Login Templates as Editable Config
 
-> **Status:** Proposed (amended 2026-08-27 by [ADR 057](057-login-customization-categories.md))
+> **Status:** Proposed (amended 2026-08-27 by [ADR 057](057-login-customization-categories.md); amended 2026-09-15: `$file` references)
 > **Date:** 2026-07-20
 > **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
 

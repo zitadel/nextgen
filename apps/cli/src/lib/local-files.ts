@@ -24,13 +24,50 @@ export const FILE_REFERENCE_KEY = "$file";
 
 export type FileReference = { readonly [FILE_REFERENCE_KEY]: string };
 
-/** Where references resolve: the project root, and the directory (relative to it) of the file holding them. */
+/**
+ * Where references resolve: the project root, and the directory (relative to
+ * it) of the resource file holding them.
+ */
 export type FileReferenceContext = { readonly cwd: string; readonly baseDir: string };
 
+/** The keys and indexes that lead from a document's root to one value. */
 type Path = ReadonlyArray<string | number>;
+
+type Container = Record<string, unknown> | unknown[];
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isContainer = (value: unknown): value is Container =>
+  Array.isArray(value) || isPlainObject(value);
+
+/** The value under `key` in an object or array; undefined when there is none. */
+function childOf(node: unknown, key: string | number): unknown {
+  if (Array.isArray(node)) {
+    return typeof key === "number" ? node[key] : undefined;
+  }
+  return isPlainObject(node) && typeof key === "string" ? node[key] : undefined;
+}
+
+/** Replaces the value under `key` in an object or array. */
+function setChild(node: Container, key: string | number, value: unknown): void {
+  if (Array.isArray(node)) {
+    if (typeof key === "number") {
+      node[key] = value;
+    }
+  } else if (typeof key === "string") {
+    node[key] = value;
+  }
+}
+
+/** A file's content, or undefined when it cannot be read. */
+function readIfPresent(path: string): string | undefined {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return undefined;
+  }
+}
 
 /** A `{ "$file": "<path>" }` object and nothing else. */
 export function isFileReference(value: unknown): value is FileReference {
@@ -46,14 +83,18 @@ export function resolveFileReference(context: FileReferenceContext, ref: string)
   const absolute = resolve(context.cwd, context.baseDir, ref);
   const rel = relative(context.cwd, absolute);
   if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
-    throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} points outside the project`, {
-      hint: "Keep referenced files inside the project, next to the file that references them.",
-    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `$file ${JSON.stringify(ref)} points outside the project`,
+      {
+        hint: "Keep referenced files inside the project, next to the file that references them.",
+      },
+    );
   }
   return absolute;
 }
 
-/** Every reference in `document`, with the keys and indexes that lead to it. */
+/** Every reference in `document`, with the path that leads to it. */
 export function findFileReferences(document: unknown): Array<{ path: Path; ref: string }> {
   const found: Array<{ path: Path; ref: string }> = [];
   const walk = (node: unknown, path: Path): void => {
@@ -74,8 +115,10 @@ export function findFileReferences(document: unknown): Array<{ path: Path; ref: 
 /**
  * Returns a copy of `document` with every reference replaced by the content
  * of the file it points at. With `onMissing: "throw"` an unreadable file is
- * E_VALIDATION, which is what plan's gate wants; with `"omit"` the field is
- * dropped instead, so normalizing and hashing stay total.
+ * E_VALIDATION, which is what plan's gate wants; with `"omit"` the value is
+ * dropped instead (the key from an object, the element from an array), so
+ * normalizing and hashing stay total. A path leaving the project is always
+ * E_VALIDATION.
  */
 export function inlineFileReferences<T>(
   document: T,
@@ -85,21 +128,16 @@ export function inlineFileReferences<T>(
   const inline = (node: unknown): unknown => {
     if (isFileReference(node)) {
       const ref = node[FILE_REFERENCE_KEY];
-      const path = resolveFileReference(context, ref);
-      try {
-        return readFileSync(path, "utf8");
-      } catch (error) {
-        if (options.onMissing === "omit") {
-          return undefined;
-        }
+      const content = readIfPresent(resolveFileReference(context, ref));
+      if (content === undefined && options.onMissing === "throw") {
         throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
           hint: "Create the referenced file or fix the path.",
-          details: { cause: error instanceof Error ? error.message : String(error) },
         });
       }
+      return content;
     }
     if (Array.isArray(node)) {
-      return node.map(inline);
+      return node.map(inline).filter((item) => item !== undefined);
     }
     if (isPlainObject(node)) {
       const out: Record<string, unknown> = {};
@@ -128,33 +166,24 @@ export function restoreFileReferences<T>(
   local: unknown,
   context: FileReferenceContext,
 ): { document: T; written: string[] } {
-  const document = structuredClone(canonical) as unknown;
+  const document = structuredClone(canonical);
   const written: string[] = [];
   for (const { path, ref } of findFileReferences(local)) {
-    const parent = path.slice(0, -1).reduce<unknown>(
-      (node, key) => (isPlainObject(node) || Array.isArray(node) ? (node as never)[key] : undefined),
-      document,
-    );
     const key = path.at(-1);
-    if (key === undefined || !(isPlainObject(parent) || Array.isArray(parent))) {
+    const parent = path.slice(0, -1).reduce<unknown>(childOf, document);
+    if (key === undefined || !isContainer(parent)) {
       continue;
     }
-    const value = (parent as Record<string | number, unknown>)[key];
+    const value = childOf(parent, key);
     if (typeof value !== "string") {
       continue;
     }
     const file = resolveFileReference(context, ref);
-    let current: string | undefined;
-    try {
-      current = readFileSync(file, "utf8");
-    } catch {
-      current = undefined;
-    }
-    if (current !== value) {
+    if (readIfPresent(file) !== value) {
       writeFileSync(file, value);
       written.push(ref);
     }
-    (parent as Record<string | number, unknown>)[key] = { [FILE_REFERENCE_KEY]: ref };
+    setChild(parent, key, { [FILE_REFERENCE_KEY]: ref });
   }
-  return { document: document as T, written };
+  return { document, written };
 }
