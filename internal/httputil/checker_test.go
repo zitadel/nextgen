@@ -112,6 +112,22 @@ func TestPolicy_Check(t *testing.T) {
 			name: "empty deny list enforces nothing", deny: nil, allow: []string{"127.0.0.1"},
 			ips: []net.IP{net.ParseIP("10.0.0.1")}, address: "10.0.0.1", denied: false,
 		},
+		{
+			// 64:ff9b::a9fe:a9fe embeds 169.254.169.254: a NAT64 gateway
+			// delivers it to the metadata endpoint, so the IPv4 rule must fire.
+			name: "NAT64-embedded metadata address is denied by the IPv4 rule", deny: []string{"169.254.0.0/16"},
+			ips: []net.IP{net.ParseIP("64:ff9b::a9fe:a9fe")}, address: "64:ff9b::a9fe:a9fe", denied: true,
+		},
+		{
+			// 8.8.8.8 embedded: on DNS64/NAT64 networks every public IPv4
+			// destination appears inside the well-known prefix, so it must pass.
+			name: "NAT64-embedded public address passes", deny: []string{"169.254.0.0/16", "10.0.0.0/8", "127.0.0.0/8"},
+			ips: []net.IP{net.ParseIP("64:ff9b::808:808")}, address: "64:ff9b::808:808", denied: false,
+		},
+		{
+			name: "allow entry covers its NAT64 embedding too", deny: []string{"10.0.0.0/8"}, allow: []string{"10.0.0.5"},
+			ips: []net.IP{net.ParseIP("64:ff9b::a00:5")}, address: "64:ff9b::a00:5", denied: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -158,5 +174,13 @@ func TestPolicy_CheckAddress(t *testing.T) {
 	t.Run("allow hostname counters deny hostname", func(t *testing.T) {
 		policy := mustPolicy(t, []string{"localhost", "127.0.0.0/8"}, []string{"localhost"})
 		require.NoError(t, policy.CheckAddress("localhost"))
+	})
+
+	t.Run("deprecated transition prefixes are denied by default", func(t *testing.T) {
+		policy := mustPolicy(t, httputil.DefaultDenyList, nil)
+		var denied *httputil.AddressDeniedError
+		for _, host := range []string{"2002:a9fe:a9fe::1", "2001:0:503:236::1", "64:ff9b:1::a9fe:a9fe"} {
+			require.ErrorAs(t, policy.CheckAddress(host), &denied, "host %s must be denied", host)
+		}
 	})
 }

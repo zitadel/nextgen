@@ -94,6 +94,16 @@ func TestNewClient_DeniedHostnameBlockedBeforeAnyConnection(t *testing.T) {
 	require.ErrorAs(t, err, &denied)
 }
 
+func TestNewClient_NAT64LiteralBlockedBeforeAnyConnection(t *testing.T) {
+	// 64:ff9b::7f00:1 embeds 127.0.0.1; the request-level check must deny it
+	// via the loopback rule before DNS or dialing (no server exists).
+	client := newClient(t, httputil.ClientConfig{DenyList: httputil.DefaultDenyList})
+	_, err := client.Get("http://[64:ff9b::7f00:1]/schema.json")
+	var denied *httputil.AddressDeniedError
+	require.ErrorAs(t, err, &denied)
+	require.ErrorContains(t, err, "127.0.0.0/8", "the denial must be attributed to the embedded IPv4 rule")
+}
+
 func TestNewClient_EmptyDenyListAllowsEverything(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

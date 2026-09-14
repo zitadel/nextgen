@@ -21,11 +21,15 @@ import (
 
 // DefaultDenyList blocks loopback, private, link-local (cloud metadata),
 // carrier-grade NAT, benchmark, and unspecified ranges, IPv4 and IPv6, plus
-// the "localhost" hostname. Aligned with zitadel/zitadel's
-// HTTPClient.DenyList (GHSA-29jh-8cfq-rr8x). The hostname entry is
-// belt-and-braces for the URL layer; the CIDRs are what block at dial time,
-// where every name is already resolved — do not remove one because the other
-// looks equivalent.
+// the "localhost" hostname and the deprecated IPv4-embedding transition
+// prefixes (6to4, Teredo, local-use NAT64). A superset of zitadel/zitadel's
+// HTTPClient.DenyList (GHSA-29jh-8cfq-rr8x). The well-known NAT64 prefix
+// 64:ff9b::/96 is deliberately absent: on DNS64/NAT64 networks every public
+// IPv4 destination appears inside it, so instead the checker evaluates the
+// embedded IPv4 address against these rules (see expandEmbeddedIPv4). The
+// hostname entry is belt-and-braces for the URL layer; the CIDRs are what
+// block at dial time, where every name is already resolved — do not remove
+// one because the other looks equivalent.
 var DefaultDenyList = []string{
 	"localhost",
 	"0.0.0.0/8",      // unspecified IPv4 range / local network routing trick protection
@@ -40,6 +44,9 @@ var DefaultDenyList = []string{
 	"::1/128",        // IPv6 loopback
 	"fc00::/7",       // unique local addresses, IPv6 private equivalent
 	"fe80::/10",      // IPv6 link-local, metadata equivalent
+	"64:ff9b:1::/48", // local-use NAT64 (RFC 8215), operator-internal translation
+	"2002::/16",      // 6to4 transition (deprecated), embeds an IPv4 target
+	"2001::/32",      // Teredo transition (deprecated), embeds an IPv4 target
 }
 
 var (

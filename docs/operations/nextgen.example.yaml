@@ -88,7 +88,12 @@ httpclient:
   # Entries are hostnames (exact match), IPs, or CIDR ranges. Setting this
   # key REPLACES the built-in default list (localhost, loopback, private,
   # link-local/cloud-metadata, carrier-grade NAT, benchmark and unspecified
-  # ranges, IPv4 and IPv6) — prefer allow_list for exceptions.
+  # ranges, IPv4 and IPv6, plus the deprecated 6to4/Teredo and local-use
+  # NAT64 transition prefixes) — prefer allow_list for exceptions.
+  # An address in the well-known NAT64 prefix (64:ff9b::/96) is also checked
+  # as the IPv4 address it embeds, so NAT64 networks keep working while
+  # embedded internal targets stay blocked. A custom (network-specific) NAT64
+  # prefix is invisible to that check: add your own entries for it.
   # deny_list: [...]
   # Exceptions carved out of the deny list: a matching target is allowed even
   # when a deny entry covers it. A hostname entry only counters a hostname

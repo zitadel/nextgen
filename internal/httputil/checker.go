@@ -130,6 +130,7 @@ func (p *Policy) Check(ips []net.IP, address string) error {
 	if !p.Enforces() {
 		return nil
 	}
+	ips = expandEmbeddedIPv4(ips)
 	for _, allowed := range p.allow {
 		if _, ok := allowed.Matches(ips, address); ok {
 			return nil
@@ -160,4 +161,33 @@ func (p *Policy) CheckAddress(hostname string) error {
 		ips = []net.IP{ip}
 	}
 	return p.Check(ips, hostname)
+}
+
+// nat64WellKnownPrefix is RFC 6052's 64:ff9b::/96. An IPv6 address inside it
+// carries an IPv4 address in its last four bytes, and a NAT64 gateway
+// connects to that IPv4 target.
+var nat64WellKnownPrefix = func() *net.IPNet {
+	_, n, err := net.ParseCIDR("64:ff9b::/96")
+	if err != nil {
+		panic(err)
+	}
+	return n
+}()
+
+// expandEmbeddedIPv4 appends, for every candidate in the NAT64 well-known
+// prefix, the IPv4 address embedded in its last four bytes, so rules written
+// for IPv4 ranges see the real target, deny and allow alike: without this,
+// 64:ff9b::a9fe:a9fe looks like a public IPv6 address while a NAT64 gateway
+// delivers it to the 169.254.169.254 metadata endpoint. Operator-chosen
+// (network-specific) NAT64 prefixes cannot be recognized statically; they
+// are the operator's own list entries.
+func expandEmbeddedIPv4(ips []net.IP) []net.IP {
+	out := ips
+	for _, ip := range ips {
+		if ip.To4() == nil && nat64WellKnownPrefix.Contains(ip) {
+			ip16 := ip.To16()
+			out = append(out, net.IPv4(ip16[12], ip16[13], ip16[14], ip16[15]))
+		}
+	}
+	return out
 }
