@@ -108,6 +108,20 @@ func encodeCreateGrantRequest(
 	return nil
 }
 
+func encodeCreateIdpRequest(
+	req *CreateIdpRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateProjectRequest(
 	req *CreateProjectRequest,
 	r *http.Request,
@@ -278,6 +292,20 @@ func encodePatchUserByIDRequest(
 
 func encodeQueryGrantsRequest(
 	req *QueryGrantsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryIdpsRequest(
+	req *QueryIdpsRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

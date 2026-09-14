@@ -1,0 +1,169 @@
+post:
+  operationId: queryIdps
+  summary: Query identity provider connections
+  description: |
+    Returns the identity provider connections of a project, paginated with a
+    cursor.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  requestBody:
+    description: Request to query the identity provider connections of a project.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-idps-request.yaml
+        examples:
+          firstPage:
+            summary: The first page, newest connection first
+            value:
+              limit: 2
+              sorting:
+                field: created_at
+                direction: desc
+          bySlug:
+            summary: Resolve a single slug
+            description: |
+              A slug is unique within the project, so `equals` on it matches
+              at most one row.
+            value:
+              filter:
+                - field: slug
+                  operation: equals
+                  value: google
+  responses:
+    '200':
+      description: The list of identity provider connections was returned successfully.
+      content:
+        application/json:
+          schema:
+            $ref: query-idps-response.yaml
+          examples:
+            firstPage:
+              summary: A page with more results behind it
+              value:
+                idps:
+                  - id: idp_01KWHG09JXA7F0N9WD3P2E4YM5
+                    revision_id: idprev_01KWHG3B72K7M7F0N9WD3P2E4
+                    slug: github
+                    created_at: '2026-07-15T11:02:00Z'
+                    updated_at: '2026-07-15T11:02:00Z'
+                    definition:
+                      slug: github
+                      protocol: oauth2
+                      template: github
+                      display_name: GitHub
+                      subject_claim: id
+                      claim_mapping:
+                        email: email
+                        givenName: name
+                      verified_claims:
+                        email: $supplementary_fetch
+                      provisioning:
+                        creation: auto
+                      oauth2:
+                        authorization_endpoint: https://github.com/login/oauth/authorize
+                        token_endpoint: https://github.com/login/oauth/access_token
+                        userinfo_endpoint: https://api.github.com/user
+                        client_id: '${{ GITHUB_CLIENT_ID }}'
+                        client_secret: '${{ GITHUB_CLIENT_SECRET }}'
+                        token_endpoint_auth_method: client_secret_post
+                        scopes:
+                          - read:user
+                          - user:email
+                        pkce_enabled: true
+                        supplementary_fetch: github_primary_email
+                  - id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                    revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    slug: google
+                    created_at: '2026-07-14T09:11:00Z'
+                    updated_at: '2026-07-16T14:20:00Z'
+                    definition:
+                      slug: google
+                      protocol: oidc
+                      template: google
+                      display_name: Google
+                      subject_claim: sub
+                      claim_mapping:
+                        email: email
+                        givenName: given_name
+                        familyName: family_name
+                      verified_claims:
+                        email: email_verified
+                      provisioning:
+                        creation: auto
+                      oidc:
+                        issuer: https://accounts.google.com
+                        id_token_mapping: false
+                        client_id: '${{ GOOGLE_CLIENT_ID }}'
+                        client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                        token_endpoint_auth_method: client_secret_basic
+                        scopes:
+                          - openid
+                          - profile
+                          - email
+                          - https://www.googleapis.com/auth/user.phonenumbers.read
+                        pkce_enabled: true
+                        static_authorize_parameters:
+                          prompt: select_account
+                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+            lastPage:
+              summary: The final page
+              description: |
+                `next_page_token` is absent when there are no further results.
+              value:
+                idps:
+                  - id: idp_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    revision_id: idprev_01KWH8Q5NZT7F0N9WD3P2E4YM
+                    slug: corp_idp
+                    created_at: '2026-07-13T08:00:00Z'
+                    updated_at: '2026-07-13T08:00:00Z'
+                    definition:
+                      slug: corp_idp
+                      protocol: oidc
+                      display_name: Corporate SSO
+                      subject_claim: sub
+                      claim_mapping:
+                        email: email
+                      oidc:
+                        issuer: https://login.corp.example.com
+                        id_token_mapping: false
+                        client_id: '${{ CORP_IDP_CLIENT_ID }}'
+                        client_secret: '${{ CORP_IDP_CLIENT_SECRET }}'
+                        token_endpoint_auth_method: client_secret_basic
+                        scopes:
+                          - openid
+                          - profile
+                          - email
+                        pkce_enabled: true
+    '400':
+      description: Invalid request (e.g., invalid query parameters).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: queryIdps-error-response.yaml

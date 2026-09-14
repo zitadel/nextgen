@@ -243,13 +243,13 @@ grant them via `team.write`.
 
 ### Identity providers
 
-> **Verb model:** manage — `write` = create + update (no `idp.create`); `delete` separate. No `idp.manage` permission.
+> **Verb model:** manage — `write` = create + update (no `idp.create`); `delete` separate. No `idp.manage` permission. Update is a revise: a connection is a chain of immutable revisions, so `write` publishes one rather than editing in place.
 
-| Permission | Endpoints | Notes |
-|---|---|---|
-| `idp.read` | `GET /idps/{id}` | |
-| `idp.write` | `POST /idps`, `PATCH /idps/{id}` | Create + manage. |
-| `idp.delete` | `DELETE /idps/{id}` | |
+| Permission | Endpoints | Notes                                                                                                                                                         |
+|---|---|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `idp.read` | `POST /idps/query`, `GET /idps/{id}`, `GET /idps/slug/{slug}` | Get + list; list is project-scoped. Two read paths resolve the same connection — config files reference a connection by `slug`, everything else by id.        |
+| `idp.write` | `POST /idps` | Create + revise: the `slug` in the submitted document decides whether it creates a connection or appends a revision to an existing connection in the project. |
+| `idp.delete` | `DELETE /idps/{id}` | **Not yet exposed** — target shape.                                                                                                                           |
 
 ### App groups
 

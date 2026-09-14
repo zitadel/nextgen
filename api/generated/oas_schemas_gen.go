@@ -10042,6 +10042,174 @@ func (s *CreateHandoffErrorResponseStatusCode) SetResponse(val CreateHandoffErro
 
 func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 
+type CreateIdpBadRequest ErrorDetails
+
+func (*CreateIdpBadRequest) createIdpRes() {}
+
+type CreateIdpCreated IdpResponse
+
+func (*CreateIdpCreated) createIdpRes() {}
+
+// CreateIdpErrorResponse represents sum type.
+type CreateIdpErrorResponse struct {
+	Type             CreateIdpErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// CreateIdpErrorResponseType is oneOf type of CreateIdpErrorResponse.
+type CreateIdpErrorResponseType string
+
+// Possible values for CreateIdpErrorResponseType.
+const (
+	AuthUnauthorizedCreateIdpErrorResponse CreateIdpErrorResponseType = "auth.unauthorized"
+	InternalCreateIdpErrorResponse         CreateIdpErrorResponseType = "internal"
+	ReqInvalidCreateIdpErrorResponse       CreateIdpErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether CreateIdpErrorResponse is AuthUnauthorized.
+func (s CreateIdpErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateIdpErrorResponse
+}
+
+// IsInternal reports whether CreateIdpErrorResponse is Internal.
+func (s CreateIdpErrorResponse) IsInternal() bool { return s.Type == InternalCreateIdpErrorResponse }
+
+// IsReqInvalid reports whether CreateIdpErrorResponse is ReqInvalid.
+func (s CreateIdpErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateIdpErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateIdpErrorResponse to AuthUnauthorized.
+func (s *CreateIdpErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateIdpErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateIdpErrorResponse is AuthUnauthorized.
+func (s CreateIdpErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateIdpErrorResponse returns new CreateIdpErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateIdpErrorResponse(v AuthUnauthorized) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateIdpErrorResponse to Internal.
+func (s *CreateIdpErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateIdpErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateIdpErrorResponse is Internal.
+func (s CreateIdpErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateIdpErrorResponse returns new CreateIdpErrorResponse from Internal.
+func NewInternalCreateIdpErrorResponse(v Internal) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets CreateIdpErrorResponse to ReqInvalid.
+func (s *CreateIdpErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateIdpErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateIdpErrorResponse is ReqInvalid.
+func (s CreateIdpErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateIdpErrorResponse returns new CreateIdpErrorResponse from ReqInvalid.
+func NewReqInvalidCreateIdpErrorResponse(v ReqInvalid) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateIdpErrorResponseStatusCode wraps CreateIdpErrorResponse with StatusCode.
+type CreateIdpErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateIdpErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateIdpErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateIdpErrorResponseStatusCode) GetResponse() CreateIdpErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateIdpErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateIdpErrorResponseStatusCode) SetResponse(val CreateIdpErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateIdpErrorResponseStatusCode) createIdpRes() {}
+
+type CreateIdpForbidden ErrorDetails
+
+func (*CreateIdpForbidden) createIdpRes() {}
+
+type CreateIdpNotFound ErrorDetails
+
+func (*CreateIdpNotFound) createIdpRes() {}
+
+type CreateIdpOK IdpResponse
+
+func (*CreateIdpOK) createIdpRes() {}
+
+// Creates or revises an identity provider connection document.
+// Ref: #
+type CreateIdpRequest struct {
+	// The connection document, in the shape of a `.zitadel/idps/<slug>.json`
+	// file. If its slug does not already exist, a new connection is created.
+	// If a connection with that slug already exists, this becomes a new
+	// revision of it. The document is validated against the
+	// `idp-connection.json` schema before anything is stored, and returned
+	// as `definition`.
+	Idp IdpConnection `json:"idp"`
+}
+
+// GetIdp returns the value of Idp.
+func (s *CreateIdpRequest) GetIdp() IdpConnection {
+	return s.Idp
+}
+
+// SetIdp sets the value of Idp.
+func (s *CreateIdpRequest) SetIdp(val IdpConnection) {
+	s.Idp = val
+}
+
+type CreateIdpUnauthorized ErrorDetails
+
+func (*CreateIdpUnauthorized) createIdpRes() {}
+
 // CreateProjectErrorResponse represents sum type.
 type CreateProjectErrorResponse struct {
 	Type                CreateProjectErrorResponseType // switch on this field
@@ -21128,6 +21296,276 @@ func (s GetHealthOK) Read(p []byte) (n int, err error) {
 
 func (*GetHealthOK) getHealthRes() {}
 
+// GetIdpByIdErrorResponse represents sum type.
+type GetIdpByIdErrorResponse struct {
+	Type             GetIdpByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// GetIdpByIdErrorResponseType is oneOf type of GetIdpByIdErrorResponse.
+type GetIdpByIdErrorResponseType string
+
+// Possible values for GetIdpByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetIdpByIdErrorResponse GetIdpByIdErrorResponseType = "auth.unauthorized"
+	InternalGetIdpByIdErrorResponse         GetIdpByIdErrorResponseType = "internal"
+	ReqInvalidGetIdpByIdErrorResponse       GetIdpByIdErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetIdpByIdErrorResponse is AuthUnauthorized.
+func (s GetIdpByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetIdpByIdErrorResponse
+}
+
+// IsInternal reports whether GetIdpByIdErrorResponse is Internal.
+func (s GetIdpByIdErrorResponse) IsInternal() bool { return s.Type == InternalGetIdpByIdErrorResponse }
+
+// IsReqInvalid reports whether GetIdpByIdErrorResponse is ReqInvalid.
+func (s GetIdpByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetIdpByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetIdpByIdErrorResponse to AuthUnauthorized.
+func (s *GetIdpByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetIdpByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetIdpByIdErrorResponse is AuthUnauthorized.
+func (s GetIdpByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetIdpByIdErrorResponse(v AuthUnauthorized) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetIdpByIdErrorResponse to Internal.
+func (s *GetIdpByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetIdpByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetIdpByIdErrorResponse is Internal.
+func (s GetIdpByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from Internal.
+func NewInternalGetIdpByIdErrorResponse(v Internal) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetIdpByIdErrorResponse to ReqInvalid.
+func (s *GetIdpByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetIdpByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetIdpByIdErrorResponse is ReqInvalid.
+func (s GetIdpByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetIdpByIdErrorResponse(v ReqInvalid) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetIdpByIdErrorResponseStatusCode wraps GetIdpByIdErrorResponse with StatusCode.
+type GetIdpByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetIdpByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetIdpByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetIdpByIdErrorResponseStatusCode) GetResponse() GetIdpByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetIdpByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetIdpByIdErrorResponseStatusCode) SetResponse(val GetIdpByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetIdpByIdErrorResponseStatusCode) getIdpByIdRes() {}
+
+type GetIdpByIdForbidden ErrorDetails
+
+func (*GetIdpByIdForbidden) getIdpByIdRes() {}
+
+type GetIdpByIdNotFound ErrorDetails
+
+func (*GetIdpByIdNotFound) getIdpByIdRes() {}
+
+type GetIdpByIdUnauthorized ErrorDetails
+
+func (*GetIdpByIdUnauthorized) getIdpByIdRes() {}
+
+// GetIdpBySlugErrorResponse represents sum type.
+type GetIdpBySlugErrorResponse struct {
+	Type             GetIdpBySlugErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// GetIdpBySlugErrorResponseType is oneOf type of GetIdpBySlugErrorResponse.
+type GetIdpBySlugErrorResponseType string
+
+// Possible values for GetIdpBySlugErrorResponseType.
+const (
+	AuthUnauthorizedGetIdpBySlugErrorResponse GetIdpBySlugErrorResponseType = "auth.unauthorized"
+	InternalGetIdpBySlugErrorResponse         GetIdpBySlugErrorResponseType = "internal"
+	ReqInvalidGetIdpBySlugErrorResponse       GetIdpBySlugErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetIdpBySlugErrorResponse is AuthUnauthorized.
+func (s GetIdpBySlugErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetIdpBySlugErrorResponse
+}
+
+// IsInternal reports whether GetIdpBySlugErrorResponse is Internal.
+func (s GetIdpBySlugErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetIdpBySlugErrorResponse
+}
+
+// IsReqInvalid reports whether GetIdpBySlugErrorResponse is ReqInvalid.
+func (s GetIdpBySlugErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetIdpBySlugErrorResponse
+}
+
+// SetAuthUnauthorized sets GetIdpBySlugErrorResponse to AuthUnauthorized.
+func (s *GetIdpBySlugErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetIdpBySlugErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetIdpBySlugErrorResponse is AuthUnauthorized.
+func (s GetIdpBySlugErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetIdpBySlugErrorResponse returns new GetIdpBySlugErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetIdpBySlugErrorResponse(v AuthUnauthorized) GetIdpBySlugErrorResponse {
+	var s GetIdpBySlugErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetIdpBySlugErrorResponse to Internal.
+func (s *GetIdpBySlugErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetIdpBySlugErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetIdpBySlugErrorResponse is Internal.
+func (s GetIdpBySlugErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetIdpBySlugErrorResponse returns new GetIdpBySlugErrorResponse from Internal.
+func NewInternalGetIdpBySlugErrorResponse(v Internal) GetIdpBySlugErrorResponse {
+	var s GetIdpBySlugErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetIdpBySlugErrorResponse to ReqInvalid.
+func (s *GetIdpBySlugErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetIdpBySlugErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetIdpBySlugErrorResponse is ReqInvalid.
+func (s GetIdpBySlugErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetIdpBySlugErrorResponse returns new GetIdpBySlugErrorResponse from ReqInvalid.
+func NewReqInvalidGetIdpBySlugErrorResponse(v ReqInvalid) GetIdpBySlugErrorResponse {
+	var s GetIdpBySlugErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetIdpBySlugErrorResponseStatusCode wraps GetIdpBySlugErrorResponse with StatusCode.
+type GetIdpBySlugErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetIdpBySlugErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetIdpBySlugErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetIdpBySlugErrorResponseStatusCode) GetResponse() GetIdpBySlugErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetIdpBySlugErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetIdpBySlugErrorResponseStatusCode) SetResponse(val GetIdpBySlugErrorResponse) {
+	s.Response = val
+}
+
+func (*GetIdpBySlugErrorResponseStatusCode) getIdpBySlugRes() {}
+
+type GetIdpBySlugForbidden ErrorDetails
+
+func (*GetIdpBySlugForbidden) getIdpBySlugRes() {}
+
+type GetIdpBySlugNotFound ErrorDetails
+
+func (*GetIdpBySlugNotFound) getIdpBySlugRes() {}
+
+type GetIdpBySlugUnauthorized ErrorDetails
+
+func (*GetIdpBySlugUnauthorized) getIdpBySlugRes() {}
+
 type GetLiveOK struct {
 	Data io.Reader
 }
@@ -23166,6 +23604,944 @@ func (s *IdentifierProof) GetLoginName() string {
 func (s *IdentifierProof) SetLoginName(val string) {
 	s.LoginName = val
 }
+
+// Ref: #
+type IdpConnection struct {
+	// Editor affordance: path or URL of this schema so editors validate and autocomplete the file
+	// (scaffolded connection files point at `.zitadel/meta/idp-connection.json`). Ignored by the
+	// platform.
+	Schema OptString `json:"$schema"`
+	// Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps
+	// (sso_providers). Unique within the Project.
+	Slug     string      `json:"slug"`
+	Protocol IdpProtocol `json:"protocol"`
+	// Template hint for rendering the provider (logo, colors). Carries no protocol behavior: conduct
+	// comes only from the protocol blocks.
+	Template OptString `json:"template"`
+	// Shown to the user on the sign-in button.
+	DisplayName string `json:"display_name"`
+	// Claim carrying the provider's stable subject identifier. Optional for OIDC (the engine uses `sub`
+	// per spec; override where `sub` is pairwise, e.g. Entra `oid`). Required for OAuth2 — no `sub`
+	// guarantee.
+	SubjectClaim OptString `json:"subject_claim"`
+	// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
+	// top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
+	// `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
+	// reserved for future mapping forms. May name only properties defined in user schemas; unmatched
+	// entries are ignored.
+	ClaimMapping OptIdpConnectionClaimMapping `json:"claim_mapping"`
+	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim),
+	// the literal `true` (trust this provider unconditionally), or the `$`-pointer
+	// `"$supplementary_fetch"` (verified by the selected supplementary_fetch strategy per its contract -
+	// e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are
+	// reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries
+	// values, not verification state.
+	VerifiedClaims OptIdpConnectionVerifiedClaims `json:"verified_claims"`
+	// How far this provider's data is trusted. `creation` defines what happens to a subject that has no
+	// account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
+	// collection step when the mapped claims fill every required property of the schema. A required
+	// property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a
+	// required property is missing or such a property is unverified, the collection step is shown
+	// instead, prefilled with the claims. Gating on other properties will be added when `x-verify`
+	// returns to the dialect. The following are deferred and will be added as additive changes. The
+	// `auto_only` value creates the user from complete claims or fails without collecting. The linking
+	// policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey.
+	// `is_auto_update`, together with per-property verification state.
+	Provisioning OptIdpConnectionProvisioning `json:"provisioning"`
+	// OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or
+	// to serve a provider that exposes no .well-known document.
+	Oidc OptIdpConnectionOidc `json:"oidc"`
+	// OAuth 2.0 connection details.
+	OAuth2 OptIdpConnectionOAuth2 `json:"oauth2"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *IdpConnection) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetSlug returns the value of Slug.
+func (s *IdpConnection) GetSlug() string {
+	return s.Slug
+}
+
+// GetProtocol returns the value of Protocol.
+func (s *IdpConnection) GetProtocol() IdpProtocol {
+	return s.Protocol
+}
+
+// GetTemplate returns the value of Template.
+func (s *IdpConnection) GetTemplate() OptString {
+	return s.Template
+}
+
+// GetDisplayName returns the value of DisplayName.
+func (s *IdpConnection) GetDisplayName() string {
+	return s.DisplayName
+}
+
+// GetSubjectClaim returns the value of SubjectClaim.
+func (s *IdpConnection) GetSubjectClaim() OptString {
+	return s.SubjectClaim
+}
+
+// GetClaimMapping returns the value of ClaimMapping.
+func (s *IdpConnection) GetClaimMapping() OptIdpConnectionClaimMapping {
+	return s.ClaimMapping
+}
+
+// GetVerifiedClaims returns the value of VerifiedClaims.
+func (s *IdpConnection) GetVerifiedClaims() OptIdpConnectionVerifiedClaims {
+	return s.VerifiedClaims
+}
+
+// GetProvisioning returns the value of Provisioning.
+func (s *IdpConnection) GetProvisioning() OptIdpConnectionProvisioning {
+	return s.Provisioning
+}
+
+// GetOidc returns the value of Oidc.
+func (s *IdpConnection) GetOidc() OptIdpConnectionOidc {
+	return s.Oidc
+}
+
+// GetOAuth2 returns the value of OAuth2.
+func (s *IdpConnection) GetOAuth2() OptIdpConnectionOAuth2 {
+	return s.OAuth2
+}
+
+// SetSchema sets the value of Schema.
+func (s *IdpConnection) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *IdpConnection) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetProtocol sets the value of Protocol.
+func (s *IdpConnection) SetProtocol(val IdpProtocol) {
+	s.Protocol = val
+}
+
+// SetTemplate sets the value of Template.
+func (s *IdpConnection) SetTemplate(val OptString) {
+	s.Template = val
+}
+
+// SetDisplayName sets the value of DisplayName.
+func (s *IdpConnection) SetDisplayName(val string) {
+	s.DisplayName = val
+}
+
+// SetSubjectClaim sets the value of SubjectClaim.
+func (s *IdpConnection) SetSubjectClaim(val OptString) {
+	s.SubjectClaim = val
+}
+
+// SetClaimMapping sets the value of ClaimMapping.
+func (s *IdpConnection) SetClaimMapping(val OptIdpConnectionClaimMapping) {
+	s.ClaimMapping = val
+}
+
+// SetVerifiedClaims sets the value of VerifiedClaims.
+func (s *IdpConnection) SetVerifiedClaims(val OptIdpConnectionVerifiedClaims) {
+	s.VerifiedClaims = val
+}
+
+// SetProvisioning sets the value of Provisioning.
+func (s *IdpConnection) SetProvisioning(val OptIdpConnectionProvisioning) {
+	s.Provisioning = val
+}
+
+// SetOidc sets the value of Oidc.
+func (s *IdpConnection) SetOidc(val OptIdpConnectionOidc) {
+	s.Oidc = val
+}
+
+// SetOAuth2 sets the value of OAuth2.
+func (s *IdpConnection) SetOAuth2(val OptIdpConnectionOAuth2) {
+	s.OAuth2 = val
+}
+
+// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
+// top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
+// `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
+// reserved for future mapping forms. May name only properties defined in user schemas; unmatched
+// entries are ignored.
+type IdpConnectionClaimMapping map[string]string
+
+func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+// OAuth 2.0 connection details.
+type IdpConnectionOAuth2 struct {
+	// Where the user is sent to authorize.
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	// Where the authorization code is exchanged.
+	TokenEndpoint string `json:"token_endpoint"`
+	// Where the authenticated user's profile is fetched.
+	UserinfoEndpoint string `json:"userinfo_endpoint"`
+	// Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference
+	// to a variable in case of separate clients per environment.
+	ClientID string `json:"client_id"`
+	// A reference to the variable holding the client secret, never the secret itself. A secret may only
+	// be referenced as the entire value: text around the placeholder would be rendered into the resolved
+	// credential, so it is rejected. The engine resolves it against the environment serving the request.
+	ClientSecret string `json:"client_secret"`
+	// How the client authenticates at the token endpoint.
+	TokenEndpointAuthMethod OptIdpConnectionOAuth2TokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
+	// Provider-specific; OAuth 2.0 defines no universal scope.
+	Scopes []string `json:"scopes"`
+	// Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the
+	// parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token
+	// endpoint rejects them.
+	PkceEnabled OptBool `json:"pkce_enabled"`
+	// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
+	// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
+	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
+	// `client_assertion` are rejected as they could be appended to the public authorize URL.
+	StaticAuthorizeParameters OptIdpConnectionOAuth2StaticAuthorizeParameters `json:"static_authorize_parameters"`
+	// Provider-specific follow-up call after userinfo. New values are non-breaking.
+	SupplementaryFetch OptIdpConnectionOAuth2SupplementaryFetch `json:"supplementary_fetch"`
+}
+
+// GetAuthorizationEndpoint returns the value of AuthorizationEndpoint.
+func (s *IdpConnectionOAuth2) GetAuthorizationEndpoint() string {
+	return s.AuthorizationEndpoint
+}
+
+// GetTokenEndpoint returns the value of TokenEndpoint.
+func (s *IdpConnectionOAuth2) GetTokenEndpoint() string {
+	return s.TokenEndpoint
+}
+
+// GetUserinfoEndpoint returns the value of UserinfoEndpoint.
+func (s *IdpConnectionOAuth2) GetUserinfoEndpoint() string {
+	return s.UserinfoEndpoint
+}
+
+// GetClientID returns the value of ClientID.
+func (s *IdpConnectionOAuth2) GetClientID() string {
+	return s.ClientID
+}
+
+// GetClientSecret returns the value of ClientSecret.
+func (s *IdpConnectionOAuth2) GetClientSecret() string {
+	return s.ClientSecret
+}
+
+// GetTokenEndpointAuthMethod returns the value of TokenEndpointAuthMethod.
+func (s *IdpConnectionOAuth2) GetTokenEndpointAuthMethod() OptIdpConnectionOAuth2TokenEndpointAuthMethod {
+	return s.TokenEndpointAuthMethod
+}
+
+// GetScopes returns the value of Scopes.
+func (s *IdpConnectionOAuth2) GetScopes() []string {
+	return s.Scopes
+}
+
+// GetPkceEnabled returns the value of PkceEnabled.
+func (s *IdpConnectionOAuth2) GetPkceEnabled() OptBool {
+	return s.PkceEnabled
+}
+
+// GetStaticAuthorizeParameters returns the value of StaticAuthorizeParameters.
+func (s *IdpConnectionOAuth2) GetStaticAuthorizeParameters() OptIdpConnectionOAuth2StaticAuthorizeParameters {
+	return s.StaticAuthorizeParameters
+}
+
+// GetSupplementaryFetch returns the value of SupplementaryFetch.
+func (s *IdpConnectionOAuth2) GetSupplementaryFetch() OptIdpConnectionOAuth2SupplementaryFetch {
+	return s.SupplementaryFetch
+}
+
+// SetAuthorizationEndpoint sets the value of AuthorizationEndpoint.
+func (s *IdpConnectionOAuth2) SetAuthorizationEndpoint(val string) {
+	s.AuthorizationEndpoint = val
+}
+
+// SetTokenEndpoint sets the value of TokenEndpoint.
+func (s *IdpConnectionOAuth2) SetTokenEndpoint(val string) {
+	s.TokenEndpoint = val
+}
+
+// SetUserinfoEndpoint sets the value of UserinfoEndpoint.
+func (s *IdpConnectionOAuth2) SetUserinfoEndpoint(val string) {
+	s.UserinfoEndpoint = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *IdpConnectionOAuth2) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetClientSecret sets the value of ClientSecret.
+func (s *IdpConnectionOAuth2) SetClientSecret(val string) {
+	s.ClientSecret = val
+}
+
+// SetTokenEndpointAuthMethod sets the value of TokenEndpointAuthMethod.
+func (s *IdpConnectionOAuth2) SetTokenEndpointAuthMethod(val OptIdpConnectionOAuth2TokenEndpointAuthMethod) {
+	s.TokenEndpointAuthMethod = val
+}
+
+// SetScopes sets the value of Scopes.
+func (s *IdpConnectionOAuth2) SetScopes(val []string) {
+	s.Scopes = val
+}
+
+// SetPkceEnabled sets the value of PkceEnabled.
+func (s *IdpConnectionOAuth2) SetPkceEnabled(val OptBool) {
+	s.PkceEnabled = val
+}
+
+// SetStaticAuthorizeParameters sets the value of StaticAuthorizeParameters.
+func (s *IdpConnectionOAuth2) SetStaticAuthorizeParameters(val OptIdpConnectionOAuth2StaticAuthorizeParameters) {
+	s.StaticAuthorizeParameters = val
+}
+
+// SetSupplementaryFetch sets the value of SupplementaryFetch.
+func (s *IdpConnectionOAuth2) SetSupplementaryFetch(val OptIdpConnectionOAuth2SupplementaryFetch) {
+	s.SupplementaryFetch = val
+}
+
+// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
+// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
+// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
+// `client_assertion` are rejected as they could be appended to the public authorize URL.
+type IdpConnectionOAuth2StaticAuthorizeParameters map[string]string
+
+func (s *IdpConnectionOAuth2StaticAuthorizeParameters) init() IdpConnectionOAuth2StaticAuthorizeParameters {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+// Provider-specific follow-up call after userinfo. New values are non-breaking.
+type IdpConnectionOAuth2SupplementaryFetch string
+
+const (
+	IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail IdpConnectionOAuth2SupplementaryFetch = "github_primary_email"
+)
+
+// AllValues returns all IdpConnectionOAuth2SupplementaryFetch values.
+func (IdpConnectionOAuth2SupplementaryFetch) AllValues() []IdpConnectionOAuth2SupplementaryFetch {
+	return []IdpConnectionOAuth2SupplementaryFetch{
+		IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpConnectionOAuth2SupplementaryFetch) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpConnectionOAuth2SupplementaryFetch) UnmarshalText(data []byte) error {
+	switch IdpConnectionOAuth2SupplementaryFetch(data) {
+	case IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail:
+		*s = IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// How the client authenticates at the token endpoint.
+type IdpConnectionOAuth2TokenEndpointAuthMethod string
+
+const (
+	IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic IdpConnectionOAuth2TokenEndpointAuthMethod = "client_secret_basic"
+	IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost  IdpConnectionOAuth2TokenEndpointAuthMethod = "client_secret_post"
+)
+
+// AllValues returns all IdpConnectionOAuth2TokenEndpointAuthMethod values.
+func (IdpConnectionOAuth2TokenEndpointAuthMethod) AllValues() []IdpConnectionOAuth2TokenEndpointAuthMethod {
+	return []IdpConnectionOAuth2TokenEndpointAuthMethod{
+		IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic,
+		IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpConnectionOAuth2TokenEndpointAuthMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic:
+		return []byte(s), nil
+	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpConnectionOAuth2TokenEndpointAuthMethod) UnmarshalText(data []byte) error {
+	switch IdpConnectionOAuth2TokenEndpointAuthMethod(data) {
+	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic:
+		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic
+		return nil
+	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost:
+		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or
+// to serve a provider that exposes no .well-known document.
+type IdpConnectionOidc struct {
+	// Discovery base. Endpoints are resolved from its .well-known document unless overridden below.
+	Issuer string `json:"issuer"`
+	// Overrides the JWKS endpoint from discovery. Required in practice when the provider exposes no .
+	// well-known document, since ID tokens cannot otherwise be validated.
+	JwksURI OptString `json:"jwks_uri"`
+	// Read user claims from the id_token instead of the userinfo endpoint, for providers that populate
+	// only the former.
+	IDTokenMapping OptBool `json:"id_token_mapping"`
+	// Overrides discovery.
+	AuthorizationEndpoint OptString `json:"authorization_endpoint"`
+	// Overrides discovery.
+	TokenEndpoint OptString `json:"token_endpoint"`
+	// Overrides discovery.
+	UserinfoEndpoint OptString `json:"userinfo_endpoint"`
+	// Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference
+	// to a variable in case of separate clients per environment.
+	ClientID string `json:"client_id"`
+	// A reference to the variable holding the client secret, never the secret itself. A secret may only
+	// be referenced as the entire value: text around the placeholder would be rendered into the resolved
+	// credential, so it is rejected. The engine resolves it against the environment serving the request.
+	ClientSecret string `json:"client_secret"`
+	// How the client authenticates at the token endpoint.
+	TokenEndpointAuthMethod OptIdpConnectionOidcTokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
+	// Must contain `openid` - without it the provider returns no id_token and the connection is not OIDC.
+	//  Enforced by `required` + `contains`; the `default` is a UI-prefill hint only - validators never
+	// inject it, so an omitted `scopes` is rejected regardless.
+	Scopes []string `json:"scopes"`
+	// Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the
+	// parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token
+	// endpoint rejects them.
+	PkceEnabled OptBool `json:"pkce_enabled"`
+	// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
+	// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
+	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
+	// `client_assertion` are rejected as they could be appended to the public authorize URL.
+	StaticAuthorizeParameters OptIdpConnectionOidcStaticAuthorizeParameters `json:"static_authorize_parameters"`
+}
+
+// GetIssuer returns the value of Issuer.
+func (s *IdpConnectionOidc) GetIssuer() string {
+	return s.Issuer
+}
+
+// GetJwksURI returns the value of JwksURI.
+func (s *IdpConnectionOidc) GetJwksURI() OptString {
+	return s.JwksURI
+}
+
+// GetIDTokenMapping returns the value of IDTokenMapping.
+func (s *IdpConnectionOidc) GetIDTokenMapping() OptBool {
+	return s.IDTokenMapping
+}
+
+// GetAuthorizationEndpoint returns the value of AuthorizationEndpoint.
+func (s *IdpConnectionOidc) GetAuthorizationEndpoint() OptString {
+	return s.AuthorizationEndpoint
+}
+
+// GetTokenEndpoint returns the value of TokenEndpoint.
+func (s *IdpConnectionOidc) GetTokenEndpoint() OptString {
+	return s.TokenEndpoint
+}
+
+// GetUserinfoEndpoint returns the value of UserinfoEndpoint.
+func (s *IdpConnectionOidc) GetUserinfoEndpoint() OptString {
+	return s.UserinfoEndpoint
+}
+
+// GetClientID returns the value of ClientID.
+func (s *IdpConnectionOidc) GetClientID() string {
+	return s.ClientID
+}
+
+// GetClientSecret returns the value of ClientSecret.
+func (s *IdpConnectionOidc) GetClientSecret() string {
+	return s.ClientSecret
+}
+
+// GetTokenEndpointAuthMethod returns the value of TokenEndpointAuthMethod.
+func (s *IdpConnectionOidc) GetTokenEndpointAuthMethod() OptIdpConnectionOidcTokenEndpointAuthMethod {
+	return s.TokenEndpointAuthMethod
+}
+
+// GetScopes returns the value of Scopes.
+func (s *IdpConnectionOidc) GetScopes() []string {
+	return s.Scopes
+}
+
+// GetPkceEnabled returns the value of PkceEnabled.
+func (s *IdpConnectionOidc) GetPkceEnabled() OptBool {
+	return s.PkceEnabled
+}
+
+// GetStaticAuthorizeParameters returns the value of StaticAuthorizeParameters.
+func (s *IdpConnectionOidc) GetStaticAuthorizeParameters() OptIdpConnectionOidcStaticAuthorizeParameters {
+	return s.StaticAuthorizeParameters
+}
+
+// SetIssuer sets the value of Issuer.
+func (s *IdpConnectionOidc) SetIssuer(val string) {
+	s.Issuer = val
+}
+
+// SetJwksURI sets the value of JwksURI.
+func (s *IdpConnectionOidc) SetJwksURI(val OptString) {
+	s.JwksURI = val
+}
+
+// SetIDTokenMapping sets the value of IDTokenMapping.
+func (s *IdpConnectionOidc) SetIDTokenMapping(val OptBool) {
+	s.IDTokenMapping = val
+}
+
+// SetAuthorizationEndpoint sets the value of AuthorizationEndpoint.
+func (s *IdpConnectionOidc) SetAuthorizationEndpoint(val OptString) {
+	s.AuthorizationEndpoint = val
+}
+
+// SetTokenEndpoint sets the value of TokenEndpoint.
+func (s *IdpConnectionOidc) SetTokenEndpoint(val OptString) {
+	s.TokenEndpoint = val
+}
+
+// SetUserinfoEndpoint sets the value of UserinfoEndpoint.
+func (s *IdpConnectionOidc) SetUserinfoEndpoint(val OptString) {
+	s.UserinfoEndpoint = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *IdpConnectionOidc) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetClientSecret sets the value of ClientSecret.
+func (s *IdpConnectionOidc) SetClientSecret(val string) {
+	s.ClientSecret = val
+}
+
+// SetTokenEndpointAuthMethod sets the value of TokenEndpointAuthMethod.
+func (s *IdpConnectionOidc) SetTokenEndpointAuthMethod(val OptIdpConnectionOidcTokenEndpointAuthMethod) {
+	s.TokenEndpointAuthMethod = val
+}
+
+// SetScopes sets the value of Scopes.
+func (s *IdpConnectionOidc) SetScopes(val []string) {
+	s.Scopes = val
+}
+
+// SetPkceEnabled sets the value of PkceEnabled.
+func (s *IdpConnectionOidc) SetPkceEnabled(val OptBool) {
+	s.PkceEnabled = val
+}
+
+// SetStaticAuthorizeParameters sets the value of StaticAuthorizeParameters.
+func (s *IdpConnectionOidc) SetStaticAuthorizeParameters(val OptIdpConnectionOidcStaticAuthorizeParameters) {
+	s.StaticAuthorizeParameters = val
+}
+
+// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
+// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
+// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
+// `client_assertion` are rejected as they could be appended to the public authorize URL.
+type IdpConnectionOidcStaticAuthorizeParameters map[string]string
+
+func (s *IdpConnectionOidcStaticAuthorizeParameters) init() IdpConnectionOidcStaticAuthorizeParameters {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+// How the client authenticates at the token endpoint.
+type IdpConnectionOidcTokenEndpointAuthMethod string
+
+const (
+	IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic IdpConnectionOidcTokenEndpointAuthMethod = "client_secret_basic"
+	IdpConnectionOidcTokenEndpointAuthMethodClientSecretPost  IdpConnectionOidcTokenEndpointAuthMethod = "client_secret_post"
+)
+
+// AllValues returns all IdpConnectionOidcTokenEndpointAuthMethod values.
+func (IdpConnectionOidcTokenEndpointAuthMethod) AllValues() []IdpConnectionOidcTokenEndpointAuthMethod {
+	return []IdpConnectionOidcTokenEndpointAuthMethod{
+		IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic,
+		IdpConnectionOidcTokenEndpointAuthMethodClientSecretPost,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpConnectionOidcTokenEndpointAuthMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic:
+		return []byte(s), nil
+	case IdpConnectionOidcTokenEndpointAuthMethodClientSecretPost:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpConnectionOidcTokenEndpointAuthMethod) UnmarshalText(data []byte) error {
+	switch IdpConnectionOidcTokenEndpointAuthMethod(data) {
+	case IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic:
+		*s = IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic
+		return nil
+	case IdpConnectionOidcTokenEndpointAuthMethodClientSecretPost:
+		*s = IdpConnectionOidcTokenEndpointAuthMethodClientSecretPost
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// How far this provider's data is trusted. `creation` defines what happens to a subject that has no
+// account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
+// collection step when the mapped claims fill every required property of the schema. A required
+// property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a
+// required property is missing or such a property is unverified, the collection step is shown
+// instead, prefilled with the claims. Gating on other properties will be added when `x-verify`
+// returns to the dialect. The following are deferred and will be added as additive changes. The
+// `auto_only` value creates the user from complete claims or fails without collecting. The linking
+// policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey.
+// `is_auto_update`, together with per-property verification state.
+type IdpConnectionProvisioning struct {
+	Creation OptIdpConnectionProvisioningCreation `json:"creation"`
+}
+
+// GetCreation returns the value of Creation.
+func (s *IdpConnectionProvisioning) GetCreation() OptIdpConnectionProvisioningCreation {
+	return s.Creation
+}
+
+// SetCreation sets the value of Creation.
+func (s *IdpConnectionProvisioning) SetCreation(val OptIdpConnectionProvisioningCreation) {
+	s.Creation = val
+}
+
+type IdpConnectionProvisioningCreation string
+
+const (
+	IdpConnectionProvisioningCreationDisabled IdpConnectionProvisioningCreation = "disabled"
+	IdpConnectionProvisioningCreationAuto     IdpConnectionProvisioningCreation = "auto"
+)
+
+// AllValues returns all IdpConnectionProvisioningCreation values.
+func (IdpConnectionProvisioningCreation) AllValues() []IdpConnectionProvisioningCreation {
+	return []IdpConnectionProvisioningCreation{
+		IdpConnectionProvisioningCreationDisabled,
+		IdpConnectionProvisioningCreationAuto,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpConnectionProvisioningCreation) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpConnectionProvisioningCreationDisabled:
+		return []byte(s), nil
+	case IdpConnectionProvisioningCreationAuto:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpConnectionProvisioningCreation) UnmarshalText(data []byte) error {
+	switch IdpConnectionProvisioningCreation(data) {
+	case IdpConnectionProvisioningCreationDisabled:
+		*s = IdpConnectionProvisioningCreationDisabled
+		return nil
+	case IdpConnectionProvisioningCreationAuto:
+		*s = IdpConnectionProvisioningCreationAuto
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Maps a verifiable user-schema property to its verification source: a claim name (read the claim),
+// the literal `true` (trust this provider unconditionally), or the `$`-pointer
+// `"$supplementary_fetch"` (verified by the selected supplementary_fetch strategy per its contract -
+// e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are
+// reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries
+// values, not verification state.
+type IdpConnectionVerifiedClaims map[string]IdpConnectionVerifiedClaimsItem
+
+func (s *IdpConnectionVerifiedClaims) init() IdpConnectionVerifiedClaims {
+	m := *s
+	if m == nil {
+		m = map[string]IdpConnectionVerifiedClaimsItem{}
+		*s = m
+	}
+	return m
+}
+
+// IdpConnectionVerifiedClaimsItem represents sum type.
+type IdpConnectionVerifiedClaimsItem struct {
+	Type   IdpConnectionVerifiedClaimsItemType // switch on this field
+	Bool   bool
+	String string
+}
+
+// IdpConnectionVerifiedClaimsItemType is oneOf type of IdpConnectionVerifiedClaimsItem.
+type IdpConnectionVerifiedClaimsItemType string
+
+// Possible values for IdpConnectionVerifiedClaimsItemType.
+const (
+	BoolIdpConnectionVerifiedClaimsItem   IdpConnectionVerifiedClaimsItemType = "bool"
+	StringIdpConnectionVerifiedClaimsItem IdpConnectionVerifiedClaimsItemType = "string"
+)
+
+// IsBool reports whether IdpConnectionVerifiedClaimsItem is bool.
+func (s IdpConnectionVerifiedClaimsItem) IsBool() bool {
+	return s.Type == BoolIdpConnectionVerifiedClaimsItem
+}
+
+// IsString reports whether IdpConnectionVerifiedClaimsItem is string.
+func (s IdpConnectionVerifiedClaimsItem) IsString() bool {
+	return s.Type == StringIdpConnectionVerifiedClaimsItem
+}
+
+// SetBool sets IdpConnectionVerifiedClaimsItem to bool.
+func (s *IdpConnectionVerifiedClaimsItem) SetBool(v bool) {
+	s.Type = BoolIdpConnectionVerifiedClaimsItem
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if IdpConnectionVerifiedClaimsItem is bool.
+func (s IdpConnectionVerifiedClaimsItem) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolIdpConnectionVerifiedClaimsItem returns new IdpConnectionVerifiedClaimsItem from bool.
+func NewBoolIdpConnectionVerifiedClaimsItem(v bool) IdpConnectionVerifiedClaimsItem {
+	var s IdpConnectionVerifiedClaimsItem
+	s.SetBool(v)
+	return s
+}
+
+// SetString sets IdpConnectionVerifiedClaimsItem to string.
+func (s *IdpConnectionVerifiedClaimsItem) SetString(v string) {
+	s.Type = StringIdpConnectionVerifiedClaimsItem
+	s.String = v
+}
+
+// GetString returns string and true boolean if IdpConnectionVerifiedClaimsItem is string.
+func (s IdpConnectionVerifiedClaimsItem) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringIdpConnectionVerifiedClaimsItem returns new IdpConnectionVerifiedClaimsItem from string.
+func NewStringIdpConnectionVerifiedClaimsItem(v string) IdpConnectionVerifiedClaimsItem {
+	var s IdpConnectionVerifiedClaimsItem
+	s.SetString(v)
+	return s
+}
+
+// Field to filter or sort identity provider connections by:
+// - `slug`: unique within the project, so `equals` matches at most one row
+// - `created_at`: RFC3339 timestamp.
+// Ref: #
+type IdpFilterField string
+
+const (
+	IdpFilterFieldSlug      IdpFilterField = "slug"
+	IdpFilterFieldCreatedAt IdpFilterField = "created_at"
+)
+
+// AllValues returns all IdpFilterField values.
+func (IdpFilterField) AllValues() []IdpFilterField {
+	return []IdpFilterField{
+		IdpFilterFieldSlug,
+		IdpFilterFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpFilterFieldSlug:
+		return []byte(s), nil
+	case IdpFilterFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpFilterField) UnmarshalText(data []byte) error {
+	switch IdpFilterField(data) {
+	case IdpFilterFieldSlug:
+		*s = IdpFilterFieldSlug
+		return nil
+	case IdpFilterFieldCreatedAt:
+		*s = IdpFilterFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The protocol used by the identity provider.
+// Ref: #
+type IdpProtocol string
+
+const (
+	IdpProtocolOidc   IdpProtocol = "oidc"
+	IdpProtocolOAuth2 IdpProtocol = "oauth2"
+)
+
+// AllValues returns all IdpProtocol values.
+func (IdpProtocol) AllValues() []IdpProtocol {
+	return []IdpProtocol{
+		IdpProtocolOidc,
+		IdpProtocolOAuth2,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpProtocol) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpProtocolOidc:
+		return []byte(s), nil
+	case IdpProtocolOAuth2:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpProtocol) UnmarshalText(data []byte) error {
+	switch IdpProtocol(data) {
+	case IdpProtocolOidc:
+		*s = IdpProtocolOidc
+		return nil
+	case IdpProtocolOAuth2:
+		*s = IdpProtocolOAuth2
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// An identity provider connection with the revision it currently serves.
+// Ref: #
+type IdpResponse struct {
+	// A unique connection id, generated when the connection is created, and shared by
+	// every revision. This id is referenced by the identity links.
+	ID string `json:"id"`
+	// The latest revision id, pinned by auth attempts and releases.
+	RevisionID string `json:"revision_id"`
+	// The identifier by which user schemas and flow definitions reference the
+	// connection. Fixed for the life of the connection.
+	Slug string `json:"slug"`
+	// When the connection was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When the connection was last revised.
+	UpdatedAt time.Time `json:"updated_at"`
+	// The stored connection document.
+	Definition IdpConnection `json:"definition"`
+}
+
+// GetID returns the value of ID.
+func (s *IdpResponse) GetID() string {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *IdpResponse) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetSlug returns the value of Slug.
+func (s *IdpResponse) GetSlug() string {
+	return s.Slug
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *IdpResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *IdpResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetDefinition returns the value of Definition.
+func (s *IdpResponse) GetDefinition() IdpConnection {
+	return s.Definition
+}
+
+// SetID sets the value of ID.
+func (s *IdpResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *IdpResponse) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *IdpResponse) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *IdpResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *IdpResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetDefinition sets the value of Definition.
+func (s *IdpResponse) SetDefinition(val IdpConnection) {
+	s.Definition = val
+}
+
+func (*IdpResponse) getIdpByIdRes()   {}
+func (*IdpResponse) getIdpBySlugRes() {}
 
 // The claim challenge minted for a project.
 // Ref: #
@@ -29762,6 +31138,512 @@ func (o OptGrantPrincipalNotFoundDetails) Or(d GrantPrincipalNotFoundDetails) Gr
 	return d
 }
 
+// NewOptIdpConnectionClaimMapping returns new OptIdpConnectionClaimMapping with value set to v.
+func NewOptIdpConnectionClaimMapping(v IdpConnectionClaimMapping) OptIdpConnectionClaimMapping {
+	return OptIdpConnectionClaimMapping{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionClaimMapping is optional IdpConnectionClaimMapping.
+type OptIdpConnectionClaimMapping struct {
+	Value IdpConnectionClaimMapping
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionClaimMapping was set.
+func (o OptIdpConnectionClaimMapping) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionClaimMapping) Reset() {
+	var v IdpConnectionClaimMapping
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionClaimMapping) SetTo(v IdpConnectionClaimMapping) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionClaimMapping) Get() (v IdpConnectionClaimMapping, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionClaimMapping) Or(d IdpConnectionClaimMapping) IdpConnectionClaimMapping {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionOAuth2 returns new OptIdpConnectionOAuth2 with value set to v.
+func NewOptIdpConnectionOAuth2(v IdpConnectionOAuth2) OptIdpConnectionOAuth2 {
+	return OptIdpConnectionOAuth2{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionOAuth2 is optional IdpConnectionOAuth2.
+type OptIdpConnectionOAuth2 struct {
+	Value IdpConnectionOAuth2
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionOAuth2 was set.
+func (o OptIdpConnectionOAuth2) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionOAuth2) Reset() {
+	var v IdpConnectionOAuth2
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionOAuth2) SetTo(v IdpConnectionOAuth2) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionOAuth2) Get() (v IdpConnectionOAuth2, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionOAuth2) Or(d IdpConnectionOAuth2) IdpConnectionOAuth2 {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionOAuth2StaticAuthorizeParameters returns new OptIdpConnectionOAuth2StaticAuthorizeParameters with value set to v.
+func NewOptIdpConnectionOAuth2StaticAuthorizeParameters(v IdpConnectionOAuth2StaticAuthorizeParameters) OptIdpConnectionOAuth2StaticAuthorizeParameters {
+	return OptIdpConnectionOAuth2StaticAuthorizeParameters{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionOAuth2StaticAuthorizeParameters is optional IdpConnectionOAuth2StaticAuthorizeParameters.
+type OptIdpConnectionOAuth2StaticAuthorizeParameters struct {
+	Value IdpConnectionOAuth2StaticAuthorizeParameters
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionOAuth2StaticAuthorizeParameters was set.
+func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionOAuth2StaticAuthorizeParameters) Reset() {
+	var v IdpConnectionOAuth2StaticAuthorizeParameters
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionOAuth2StaticAuthorizeParameters) SetTo(v IdpConnectionOAuth2StaticAuthorizeParameters) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) Get() (v IdpConnectionOAuth2StaticAuthorizeParameters, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) Or(d IdpConnectionOAuth2StaticAuthorizeParameters) IdpConnectionOAuth2StaticAuthorizeParameters {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionOAuth2SupplementaryFetch returns new OptIdpConnectionOAuth2SupplementaryFetch with value set to v.
+func NewOptIdpConnectionOAuth2SupplementaryFetch(v IdpConnectionOAuth2SupplementaryFetch) OptIdpConnectionOAuth2SupplementaryFetch {
+	return OptIdpConnectionOAuth2SupplementaryFetch{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionOAuth2SupplementaryFetch is optional IdpConnectionOAuth2SupplementaryFetch.
+type OptIdpConnectionOAuth2SupplementaryFetch struct {
+	Value IdpConnectionOAuth2SupplementaryFetch
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionOAuth2SupplementaryFetch was set.
+func (o OptIdpConnectionOAuth2SupplementaryFetch) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionOAuth2SupplementaryFetch) Reset() {
+	var v IdpConnectionOAuth2SupplementaryFetch
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionOAuth2SupplementaryFetch) SetTo(v IdpConnectionOAuth2SupplementaryFetch) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionOAuth2SupplementaryFetch) Get() (v IdpConnectionOAuth2SupplementaryFetch, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionOAuth2SupplementaryFetch) Or(d IdpConnectionOAuth2SupplementaryFetch) IdpConnectionOAuth2SupplementaryFetch {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionOAuth2TokenEndpointAuthMethod returns new OptIdpConnectionOAuth2TokenEndpointAuthMethod with value set to v.
+func NewOptIdpConnectionOAuth2TokenEndpointAuthMethod(v IdpConnectionOAuth2TokenEndpointAuthMethod) OptIdpConnectionOAuth2TokenEndpointAuthMethod {
+	return OptIdpConnectionOAuth2TokenEndpointAuthMethod{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionOAuth2TokenEndpointAuthMethod is optional IdpConnectionOAuth2TokenEndpointAuthMethod.
+type OptIdpConnectionOAuth2TokenEndpointAuthMethod struct {
+	Value IdpConnectionOAuth2TokenEndpointAuthMethod
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionOAuth2TokenEndpointAuthMethod was set.
+func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionOAuth2TokenEndpointAuthMethod) Reset() {
+	var v IdpConnectionOAuth2TokenEndpointAuthMethod
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionOAuth2TokenEndpointAuthMethod) SetTo(v IdpConnectionOAuth2TokenEndpointAuthMethod) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) Get() (v IdpConnectionOAuth2TokenEndpointAuthMethod, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) Or(d IdpConnectionOAuth2TokenEndpointAuthMethod) IdpConnectionOAuth2TokenEndpointAuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionOidc returns new OptIdpConnectionOidc with value set to v.
+func NewOptIdpConnectionOidc(v IdpConnectionOidc) OptIdpConnectionOidc {
+	return OptIdpConnectionOidc{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionOidc is optional IdpConnectionOidc.
+type OptIdpConnectionOidc struct {
+	Value IdpConnectionOidc
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionOidc was set.
+func (o OptIdpConnectionOidc) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionOidc) Reset() {
+	var v IdpConnectionOidc
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionOidc) SetTo(v IdpConnectionOidc) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionOidc) Get() (v IdpConnectionOidc, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionOidc) Or(d IdpConnectionOidc) IdpConnectionOidc {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionOidcStaticAuthorizeParameters returns new OptIdpConnectionOidcStaticAuthorizeParameters with value set to v.
+func NewOptIdpConnectionOidcStaticAuthorizeParameters(v IdpConnectionOidcStaticAuthorizeParameters) OptIdpConnectionOidcStaticAuthorizeParameters {
+	return OptIdpConnectionOidcStaticAuthorizeParameters{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionOidcStaticAuthorizeParameters is optional IdpConnectionOidcStaticAuthorizeParameters.
+type OptIdpConnectionOidcStaticAuthorizeParameters struct {
+	Value IdpConnectionOidcStaticAuthorizeParameters
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionOidcStaticAuthorizeParameters was set.
+func (o OptIdpConnectionOidcStaticAuthorizeParameters) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionOidcStaticAuthorizeParameters) Reset() {
+	var v IdpConnectionOidcStaticAuthorizeParameters
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionOidcStaticAuthorizeParameters) SetTo(v IdpConnectionOidcStaticAuthorizeParameters) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionOidcStaticAuthorizeParameters) Get() (v IdpConnectionOidcStaticAuthorizeParameters, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionOidcStaticAuthorizeParameters) Or(d IdpConnectionOidcStaticAuthorizeParameters) IdpConnectionOidcStaticAuthorizeParameters {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionOidcTokenEndpointAuthMethod returns new OptIdpConnectionOidcTokenEndpointAuthMethod with value set to v.
+func NewOptIdpConnectionOidcTokenEndpointAuthMethod(v IdpConnectionOidcTokenEndpointAuthMethod) OptIdpConnectionOidcTokenEndpointAuthMethod {
+	return OptIdpConnectionOidcTokenEndpointAuthMethod{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionOidcTokenEndpointAuthMethod is optional IdpConnectionOidcTokenEndpointAuthMethod.
+type OptIdpConnectionOidcTokenEndpointAuthMethod struct {
+	Value IdpConnectionOidcTokenEndpointAuthMethod
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionOidcTokenEndpointAuthMethod was set.
+func (o OptIdpConnectionOidcTokenEndpointAuthMethod) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionOidcTokenEndpointAuthMethod) Reset() {
+	var v IdpConnectionOidcTokenEndpointAuthMethod
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionOidcTokenEndpointAuthMethod) SetTo(v IdpConnectionOidcTokenEndpointAuthMethod) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionOidcTokenEndpointAuthMethod) Get() (v IdpConnectionOidcTokenEndpointAuthMethod, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionOidcTokenEndpointAuthMethod) Or(d IdpConnectionOidcTokenEndpointAuthMethod) IdpConnectionOidcTokenEndpointAuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionProvisioning returns new OptIdpConnectionProvisioning with value set to v.
+func NewOptIdpConnectionProvisioning(v IdpConnectionProvisioning) OptIdpConnectionProvisioning {
+	return OptIdpConnectionProvisioning{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionProvisioning is optional IdpConnectionProvisioning.
+type OptIdpConnectionProvisioning struct {
+	Value IdpConnectionProvisioning
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionProvisioning was set.
+func (o OptIdpConnectionProvisioning) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionProvisioning) Reset() {
+	var v IdpConnectionProvisioning
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionProvisioning) SetTo(v IdpConnectionProvisioning) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionProvisioning) Get() (v IdpConnectionProvisioning, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionProvisioning) Or(d IdpConnectionProvisioning) IdpConnectionProvisioning {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionProvisioningCreation returns new OptIdpConnectionProvisioningCreation with value set to v.
+func NewOptIdpConnectionProvisioningCreation(v IdpConnectionProvisioningCreation) OptIdpConnectionProvisioningCreation {
+	return OptIdpConnectionProvisioningCreation{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionProvisioningCreation is optional IdpConnectionProvisioningCreation.
+type OptIdpConnectionProvisioningCreation struct {
+	Value IdpConnectionProvisioningCreation
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionProvisioningCreation was set.
+func (o OptIdpConnectionProvisioningCreation) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionProvisioningCreation) Reset() {
+	var v IdpConnectionProvisioningCreation
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionProvisioningCreation) SetTo(v IdpConnectionProvisioningCreation) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionProvisioningCreation) Get() (v IdpConnectionProvisioningCreation, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionProvisioningCreation) Or(d IdpConnectionProvisioningCreation) IdpConnectionProvisioningCreation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpConnectionVerifiedClaims returns new OptIdpConnectionVerifiedClaims with value set to v.
+func NewOptIdpConnectionVerifiedClaims(v IdpConnectionVerifiedClaims) OptIdpConnectionVerifiedClaims {
+	return OptIdpConnectionVerifiedClaims{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpConnectionVerifiedClaims is optional IdpConnectionVerifiedClaims.
+type OptIdpConnectionVerifiedClaims struct {
+	Value IdpConnectionVerifiedClaims
+	Set   bool
+}
+
+// IsSet returns true if OptIdpConnectionVerifiedClaims was set.
+func (o OptIdpConnectionVerifiedClaims) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpConnectionVerifiedClaims) Reset() {
+	var v IdpConnectionVerifiedClaims
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpConnectionVerifiedClaims) SetTo(v IdpConnectionVerifiedClaims) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpConnectionVerifiedClaims) Get() (v IdpConnectionVerifiedClaims, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpConnectionVerifiedClaims) Or(d IdpConnectionVerifiedClaims) IdpConnectionVerifiedClaims {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInt returns new OptInt with value set to v.
 func NewOptInt(v int) OptInt {
 	return OptInt{
@@ -33569,6 +35451,52 @@ func (o OptQueryGrantsRequestSorting) Get() (v QueryGrantsRequestSorting, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptQueryGrantsRequestSorting) Or(d QueryGrantsRequestSorting) QueryGrantsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptQueryIdpsRequestSorting returns new OptQueryIdpsRequestSorting with value set to v.
+func NewOptQueryIdpsRequestSorting(v QueryIdpsRequestSorting) OptQueryIdpsRequestSorting {
+	return OptQueryIdpsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryIdpsRequestSorting is optional QueryIdpsRequestSorting.
+type OptQueryIdpsRequestSorting struct {
+	Value QueryIdpsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryIdpsRequestSorting was set.
+func (o OptQueryIdpsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryIdpsRequestSorting) Reset() {
+	var v QueryIdpsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryIdpsRequestSorting) SetTo(v QueryIdpsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryIdpsRequestSorting) Get() (v QueryIdpsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryIdpsRequestSorting) Or(d QueryIdpsRequestSorting) QueryIdpsRequestSorting {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -39491,6 +41419,295 @@ func (*QueryGrantsResponse) queryGrantsRes() {}
 type QueryGrantsUnauthorized ErrorDetails
 
 func (*QueryGrantsUnauthorized) queryGrantsRes() {}
+
+type QueryIdpsBadRequest ErrorDetails
+
+func (*QueryIdpsBadRequest) queryIdpsRes() {}
+
+// QueryIdpsErrorResponse represents sum type.
+type QueryIdpsErrorResponse struct {
+	Type             QueryIdpsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// QueryIdpsErrorResponseType is oneOf type of QueryIdpsErrorResponse.
+type QueryIdpsErrorResponseType string
+
+// Possible values for QueryIdpsErrorResponseType.
+const (
+	AuthUnauthorizedQueryIdpsErrorResponse QueryIdpsErrorResponseType = "auth.unauthorized"
+	InternalQueryIdpsErrorResponse         QueryIdpsErrorResponseType = "internal"
+	ReqInvalidQueryIdpsErrorResponse       QueryIdpsErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether QueryIdpsErrorResponse is AuthUnauthorized.
+func (s QueryIdpsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedQueryIdpsErrorResponse
+}
+
+// IsInternal reports whether QueryIdpsErrorResponse is Internal.
+func (s QueryIdpsErrorResponse) IsInternal() bool { return s.Type == InternalQueryIdpsErrorResponse }
+
+// IsReqInvalid reports whether QueryIdpsErrorResponse is ReqInvalid.
+func (s QueryIdpsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryIdpsErrorResponse
+}
+
+// SetAuthUnauthorized sets QueryIdpsErrorResponse to AuthUnauthorized.
+func (s *QueryIdpsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedQueryIdpsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if QueryIdpsErrorResponse is AuthUnauthorized.
+func (s QueryIdpsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedQueryIdpsErrorResponse(v AuthUnauthorized) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets QueryIdpsErrorResponse to Internal.
+func (s *QueryIdpsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryIdpsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryIdpsErrorResponse is Internal.
+func (s QueryIdpsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from Internal.
+func NewInternalQueryIdpsErrorResponse(v Internal) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets QueryIdpsErrorResponse to ReqInvalid.
+func (s *QueryIdpsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryIdpsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryIdpsErrorResponse is ReqInvalid.
+func (s QueryIdpsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from ReqInvalid.
+func NewReqInvalidQueryIdpsErrorResponse(v ReqInvalid) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// QueryIdpsErrorResponseStatusCode wraps QueryIdpsErrorResponse with StatusCode.
+type QueryIdpsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryIdpsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryIdpsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryIdpsErrorResponseStatusCode) GetResponse() QueryIdpsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryIdpsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryIdpsErrorResponseStatusCode) SetResponse(val QueryIdpsErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryIdpsErrorResponseStatusCode) queryIdpsRes() {}
+
+type QueryIdpsForbidden ErrorDetails
+
+func (*QueryIdpsForbidden) queryIdpsRes() {}
+
+type QueryIdpsNotFound ErrorDetails
+
+func (*QueryIdpsNotFound) queryIdpsRes() {}
+
+// Request to query the identity provider connections of a project.
+// Ref: #
+type QueryIdpsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results. Must be sent with the same
+	// `sorting` as the request that issued the token. Omitting `sorting` reuses
+	// the default sort and only succeeds when that default matches the token.
+	PageToken OptNilPageToken `json:"page_token"`
+	// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
+	Sorting OptQueryIdpsRequestSorting `json:"sorting"`
+	// Filter criteria for querying connections. Combined with AND.
+	Filter []QueryIdpsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryIdpsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryIdpsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryIdpsRequest) GetSorting() OptQueryIdpsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryIdpsRequest) GetFilter() []QueryIdpsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryIdpsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryIdpsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryIdpsRequest) SetSorting(val OptQueryIdpsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryIdpsRequest) SetFilter(val []QueryIdpsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryIdpsRequestFilterItem struct {
+	// The field to filter by.
+	Field     IdpFilterField  `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryIdpsRequestFilterItem) GetField() IdpFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryIdpsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryIdpsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryIdpsRequestFilterItem) SetField(val IdpFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryIdpsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryIdpsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
+type QueryIdpsRequestSorting struct {
+	// The field to sort by.
+	Field IdpFilterField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryIdpsRequestSorting) GetField() IdpFilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryIdpsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryIdpsRequestSorting) SetField(val IdpFilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryIdpsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of identity provider connections.
+// Ref: #
+type QueryIdpsResponse struct {
+	Idps []IdpResponse `json:"idps"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results. The follow-up request must repeat the
+	// same `sorting` that produced this token (omit only when both pages use the default).
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetIdps returns the value of Idps.
+func (s *QueryIdpsResponse) GetIdps() []IdpResponse {
+	return s.Idps
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryIdpsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetIdps sets the value of Idps.
+func (s *QueryIdpsResponse) SetIdps(val []IdpResponse) {
+	s.Idps = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryIdpsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryIdpsResponse) queryIdpsRes() {}
+
+type QueryIdpsUnauthorized ErrorDetails
+
+func (*QueryIdpsUnauthorized) queryIdpsRes() {}
 
 type QueryProjectsBadRequest ErrorDetails
 

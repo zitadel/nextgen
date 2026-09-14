@@ -33,6 +33,10 @@ type CreateHandoffRes interface {
 	createHandoffRes()
 }
 
+type CreateIdpRes interface {
+	createIdpRes()
+}
+
 type CreateProjectRes interface {
 	createProjectRes()
 }
@@ -119,6 +123,14 @@ type GetGrantRes interface {
 
 type GetHealthRes interface {
 	getHealthRes()
+}
+
+type GetIdpByIdRes interface {
+	getIdpByIdRes()
+}
+
+type GetIdpBySlugRes interface {
+	getIdpBySlugRes()
 }
 
 type GetLiveRes interface {
@@ -215,6 +227,10 @@ type PatchUserByIDRes interface {
 
 type QueryGrantsRes interface {
 	queryGrantsRes()
+}
+
+type QueryIdpsRes interface {
+	queryIdpsRes()
 }
 
 type QueryProjectsRes interface {

@@ -87,6 +87,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateHandoffOperation: []string{
 		"auth_attempt.write",
 	},
+	CreateIdpOperation: []string{
+		"idp.write",
+	},
 	CreateReleaseOperation: []string{
 		"release.write",
 	},
@@ -140,6 +143,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetGrantOperation: []string{
 		"project.read",
+	},
+	GetIdpByIdOperation: []string{
+		"idp.read",
+	},
+	GetIdpBySlugOperation: []string{
+		"idp.read",
 	},
 	GetProjectOperation: []string{
 		"project.write",
@@ -198,6 +207,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	QueryGrantsOperation: []string{
 		"project.read",
+	},
+	QueryIdpsOperation: []string{
+		"idp.read",
 	},
 	QueryProjectsOperation: []string{
 		"project.write",
