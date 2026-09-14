@@ -26,7 +26,7 @@ describe("zitadel resources", () => {
     ).data.resources;
     const byTopic = Object.fromEntries(resources.map((resource) => [resource.topic, resource]));
     expect(byTopic.users?.verbs).toEqual(["list", "get", "create", "update", "delete"]);
-    expect(byTopic.sessions?.verbs).toEqual(["list", "get", "revoke"]);
+    expect(byTopic.sessions?.verbs).toEqual(["list", "get", "delete"]);
     expect(byTopic.events?.verbs).toEqual(["list", "get"]);
     expect(byTopic.projects?.verbs).toEqual(["list", "get", "update"]);
   });

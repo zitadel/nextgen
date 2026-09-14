@@ -21,7 +21,7 @@ zitadel <resource> list    [--filter …] [--sort …] [--limit N] [--page-token
 zitadel <resource> get     <id>
 zitadel <resource> create  --data '<json>' | --file <path|->
 zitadel <resource> update  <id> --data '<json>' | --file <path|->
-zitadel <resource> delete  <id> [--force]        # `revoke` for sessions
+zitadel <resource> delete  <id> [--force]
 ```
 
 The verbs are generated from one registry
@@ -38,7 +38,7 @@ Runtime resources:
 | ---------- | --------------------------------- | --------------------------------------------------- |
 | `users`    | list, get, create, update, delete | `POST /users/query`, `/users/{id}`                  |
 | `teams`    | list, get, create, update, delete | `POST /teams/query`, `/teams/{id}`                  |
-| `sessions` | list, get, revoke                 | `POST /sessions/query`, `DELETE /sessions/{id}`     |
+| `sessions` | list, get, delete                 | `POST /sessions/query`, `DELETE /sessions/{id}`     |
 | `events`   | list, get                         | `GET /events`, `GET /events/{id}`                   |
 | `grants`   | list, get, create, delete         | `POST /grants/query`, `/grants/{id}`                |
 | `projects` | list, get, update                 | `POST /projects/query`, `/projects/{id}`            |
@@ -91,7 +91,7 @@ resource  verbs                              filter on
 --------  ---------------------------------  ---------------------------------------------
 users     list, get, create, update, delete  created_at, id, schema, status, team_id, …
 teams     list, get, create, update, delete  created_at, name, status
-sessions  list, get, revoke                  created_at, user_id, state, …
+sessions  list, get, delete                  created_at, user_id, state, …
 ```
 
 `--json` also carries `delete_outcome`, the property a delete's envelope puts
@@ -291,7 +291,9 @@ request.
 
 ## Deleting
 
-- The verb is `delete` unless the API's own vocabulary differs (`sessions revoke`).
+- The verb is always `delete`, whatever the endpoint does to the resource. A
+  session's DELETE revokes and a team's deactivates; neither renames the
+  command, because removal should be spelled one way across the surface.
 - Interactive runs confirm first. Non-interactive runs require `--force`, the
   same guard as `reset`; without it the command fails with `E_VALIDATION` and a
   `next_commands` entry carrying the exact retry. `--force` is declared per

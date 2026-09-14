@@ -36,7 +36,7 @@ const list: ListSpec<Ctx> = {
 const get: GetSpec<Ctx> = { call: async () => ({}) };
 const create: CreateSpec<Ctx> = { schema, call: async () => ({}) };
 const update: UpdateSpec<Ctx> = { schema, call: async () => ({}) };
-const remove: DeleteSpec<Ctx> = { verb: "revoke", call: async () => undefined };
+const remove: DeleteSpec<Ctx> = { outcome: "revoked", call: async () => undefined };
 const resource: ResourceDescriptor<Ctx> = {
   singular: "team",
   idField: "id",
@@ -140,10 +140,12 @@ describe("operation statics", () => {
     );
   });
 
-  it("delete uses the registry's verb in its description and example", () => {
+  it("delete is spelled the same way whatever the server does to the resource", () => {
+    // An endpoint that revokes rather than removes does not get its own verb:
+    // the command is `delete` everywhere, and the outcome is in the result.
     const statics = DeleteOperation.describe(definition(remove));
-    expect(statics.description).toBe("Revoke a team by id.");
-    expect(statics.examples).toEqual(["<%= config.bin %> teams revoke <id> --force --json"]);
+    expect(statics.description).toBe("Delete a team by id.");
+    expect(statics.examples).toEqual(["<%= config.bin %> teams delete <id> --force --json"]);
   });
 });
 

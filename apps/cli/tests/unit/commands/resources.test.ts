@@ -1025,12 +1025,12 @@ describe("page tokens are opaque", () => {
 });
 
 describe("other resources", () => {
-  it("sessions revoke uses the revoke verb", async () => {
+  it("sessions delete reports that the server revoked rather than removed", async () => {
     const cwd = await makeProject();
     server.use(
       http.delete(`${SERVER}/sessions/sess_1`, () => new HttpResponse(null, { status: 204 })),
     );
-    const res = await run(cwd, ["sessions", "revoke", "sess_1", "--force"]);
+    const res = await run(cwd, ["sessions", "delete", "sess_1", "--force"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       id: "sess_1",

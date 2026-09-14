@@ -8,7 +8,7 @@ import type { GlobalOptions } from "../types";
  * verb calls through; the factory itself never sees a client.
  */
 
-export type Verb = "list" | "get" | "create" | "update" | "delete" | "revoke";
+export type Verb = "list" | "get" | "create" | "update" | "delete";
 export type ResourceCommandId = `${string}:${Verb}`;
 export type Json = Readonly<Record<string, unknown>>;
 export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
@@ -116,13 +116,15 @@ export type UpdateSpec<Ctx> = Readonly<{
   call: (ctx: Ctx, id: string, body: Json) => Promise<unknown>;
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
-  /** Command verb; defaults to `delete`. */
-  verb?: "delete" | "revoke";
   /**
-   * What the API actually does, when that is not removal — a team's DELETE
-   * deactivates it and leaves it readable (ADR 024). Reported to the caller
-   * instead of claiming the resource is gone. Defaults to the verb's own past
-   * tense (`deleted`, `revoked`).
+   * What the API actually does, when that is not plain removal — a team's
+   * DELETE deactivates it and leaves it readable (ADR 024), a session's
+   * revokes it. Reported to the caller beside the id instead of claiming the
+   * resource is gone. Defaults to `deleted`.
+   *
+   * The *verb* is always `delete`: a resource is removed the same way
+   * everywhere, and what the server did to it is a property of the answer,
+   * not a different command to learn.
    */
   outcome?: string;
   call: (ctx: Ctx, id: string) => Promise<void>;
