@@ -54,10 +54,13 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
 const NOT_CALLED: Readonly<Record<string, string>> = {
   // Bootstrap and the claim flow belong to their own commands.
   createProject: "unauthenticated bootstrap minting secrets into .zitadel/secret; `zitadel setup` owns it",
-  initClaim: "the browser claim flow; `zitadel claim` owns it",
-  completeClaim: "the browser claim flow; `zitadel claim` owns it",
-  getClaimStatus: "the browser claim flow; `zitadel claim` owns it",
-  getClaimWindow: "the browser claim flow; `zitadel claim` owns it",
+  initClaim: "the browser claim flow; `zitadel claim` calls it",
+  getClaimStatus: "the browser claim flow; `zitadel claim` calls it",
+  // These two are reached by nothing in the CLI at all — not the registry, not
+  // `zitadel claim`. Either the claim flow is incomplete or they are dead
+  // generated surface; recorded as a question rather than implied to be owned.
+  completeClaim: "part of the claim flow, but currently called by no command — unresolved",
+  getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
 
   // Configuration is written declaratively (ADR 035), never imperatively here.
   createSchema: "configuration is written by plan/apply from .zitadel/",
