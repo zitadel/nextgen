@@ -127,8 +127,17 @@ tasks:
   # outbound HTTP or TCP clients may only be built in internal/httputil, and
   # any other site needs an //egress:allow <reason> directive. Further
   # analyzers join the same binary (tools/analyzers/cmd/analyzers).
+  #
+  # Runs once per build configuration: the default set, then each integration
+  # tag on its own, because the tagged files are invisible to the default run
+  # and the tags cannot be combined (each lane defines its own TestMain).
   lint:
-    command: "go run ./tools/analyzers/cmd/analyzers ./..."
+    script: |
+      set -e
+      go run ./tools/analyzers/cmd/analyzers ./...
+      for tag in postgres_integration spanner_integration sqlite_integration; do
+        GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
+      done
     deps:
       - "check-generate"
       - "console:build"
