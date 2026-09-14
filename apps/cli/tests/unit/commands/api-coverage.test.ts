@@ -20,6 +20,23 @@ import { RESOURCES } from "../../../src/commands/resources";
  * client offers must be either called or listed below with a reason.
  */
 
+/**
+ * Collections the API itself declares to be resources, by giving them a
+ * structured query endpoint: ADR 031 introduces `POST /<collection>/query`
+ * precisely "to indicate a customer wants to query a resource". These are
+ * therefore not a judgement call and accept no exclusion — see the test below.
+ *
+ * The converse does not hold. Several resources here still list through `GET`
+ * (recorded as an open question in ADR 061), so a collection without a query
+ * endpoint may or may not be a resource, and that is where a person decides.
+ */
+const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
+  new Set(
+    [...operations].flatMap(([operation, collection]) =>
+      urlOf(operation).endsWith("/query") ? collection : [],
+    ),
+  );
+
 /** Collections with no resource commands at all, and why. */
 const NOT_RESOURCES: Readonly<Record<string, string>> = {
   healthz: "liveness probe, not a resource",
@@ -80,6 +97,14 @@ type ClientOperations = ReadonlyMap<string, string>;
  * arguments and taking the first path segment, so a sub-resource
  * (`/users/{id}/passkeys`) counts against its parent.
  */
+/** The path an operation addresses, with placeholder path parameters. */
+const urlOf = (operation: string): string => {
+  const module = endpoints as unknown as Record<string, unknown>;
+  const build = module[`get${capitalize(operation)}Url`];
+  expect(typeof build, `no URL builder paired with ${operation}`).toBe("function");
+  return String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+};
+
 const clientOperations = (): ClientOperations => {
   const module = endpoints as unknown as Record<string, unknown>;
   const isUrlBuilder = (name: string) => /^get[A-Z].*Url$/.test(name);
@@ -89,16 +114,9 @@ const clientOperations = (): ClientOperations => {
   expect(operations.length, "no operations found in the generated client").toBeGreaterThan(20);
 
   return new Map(
-    operations.map((operation) => {
-      const build = module[`get${capitalize(operation)}Url`];
-      // orval pairs every operation with a URL builder. If that ever stops
-      // being true this test is measuring less than it claims, so it fails
-      // rather than silently skipping the operation.
-      expect(typeof build, `no URL builder paired with ${operation}`).toBe("function");
-      const url = (build as (...args: unknown[]) => string)("ID", "NAME");
-      const collection = String(url).replace(/\?.*$/, "").split("/")[1] ?? "";
-      return [operation, collection];
-    }),
+    // orval pairs every operation with a URL builder; `urlOf` fails if that
+    // ever stops being true, rather than silently skipping the operation.
+    operations.map((operation) => [operation, urlOf(operation).split("/")[1] ?? ""]),
   );
 };
 
@@ -155,6 +173,33 @@ describe("the CLI covers the API client", () => {
       `The API client reaches collections the CLI neither exposes nor explains: ${unaccounted.join(", ")}. ` +
         "Add a registry entry, or add the collection to NOT_RESOURCES with the reason it has no commands.",
     ).toEqual([]);
+  });
+
+  it("exposes every collection the API itself calls a resource", () => {
+    // A query endpoint is the API declaring this to be a resource (ADR 031),
+    // so unlike the checks above this one accepts no reason: the answer is not
+    // a judgement, and a new resource that follows the convention is detected
+    // without anyone having to classify it.
+    const operations = clientOperations();
+    const topics = new Set(Object.keys(RESOURCES).map((topic) => topic.replaceAll("-", "_")));
+    const missing = [...queryCollections(operations)].filter(
+      (collection) => !topics.has(collection),
+    );
+
+    expect(
+      missing,
+      `These collections have POST /<collection>/query, which ADR 031 defines as a resource, ` +
+        `but the CLI has no registry entry for them: ${missing.join(", ")}. They need commands, not an exclusion.`,
+    ).toEqual([]);
+
+    // The same fact, guarded from the other side: none of them may be waved
+    // through as "not a resource".
+    for (const collection of queryCollections(operations)) {
+      expect(
+        collection in NOT_RESOURCES,
+        `"${collection}" has a query endpoint, so it cannot be listed in NOT_RESOURCES`,
+      ).toBe(false);
+    }
   });
 
   it("calls nothing the client does not offer", async () => {
