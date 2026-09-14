@@ -57,7 +57,7 @@ During the setup commands, the CLI writes a `zitadel.json` file which contains a
 
 The only real usage of the `zitadel.json environments` is to print an `open <url>` hint in `status` and as the first of three fallbacks in `doctor`.
 
-The `--environment` flag is declared in three commands: `apply`, `plan`, `schemas list`. It is passed to `resolveServer`, used to pick a server URL, and **discarded**. No API call carries it.
+The `--environment` flag is declared in three commands: `zitadel apply`, `zitadel plan`, `zitadel schemas list`. It is passed to `resolveServer`, used to pick a server URL, and **discarded**. No API call carries it.
 
 ## Decisions
 
@@ -163,7 +163,7 @@ ENVIRONMENTS
 { "$schema": "../meta/environment.json", "name": "prod" }
 ```
 
-When the prod domain is known, the environment JSON file is edit and applied:
+When the prod domain is known, the environment file is edited and applied:
 
 ```diff
   {
@@ -374,13 +374,15 @@ exclusive with `issuer_pattern`, and a production environment declaring an
 
 The lifecycle is managed via `zitadel environments list` and `zitadel environments apply` commands, which operate over create/update/delete APIs.
 
+`zitadel environments apply` is its own command, not the `zitadel apply` that [ADR 035](035-configuration-environments.md) removes. The word is reused because the act is the same shape — reconcile local files to the server — but it reconciles only `.zitadel/environments/` and touches no release. Every bare "apply" in this ADR means the environments one.
+
 | Command | Direction | Purpose |
 |---|---|---|
 | `zitadel environments list` | read | Lists the project's environments as the server holds them, with each one's current deployment. |
 | `zitadel environments apply` | local → server | Synchronizes environments from local to the server: create, update and delete. |
 
 The CLI is the writing surface. The console reads environments and does not
-write them, so `apply` is one-way: local to server. Pulling a change made
+write them, so `zitadel environments apply` is one-way: local to server. Pulling a change made
 outside the repo back into `.zitadel/` is a problem every configuration
 resource has equally, and it is not solved here.
 
@@ -408,11 +410,14 @@ The moment a second environment exists, `--env` is required again.
 
 ### 6. An environment can be renamed
 
-**Renaming is editing `name` in the file and running `apply`.**
+**Renaming is editing `name` in the file and running `zitadel environments apply`.**
 
 `staging` becomes `qa`, `prod` becomes `live`, and it is the same environment afterwards.
 
+The developer edits one field, and the file keeps its name:
+
 ```diff
+  # .zitadel/environments/staging.json — still called staging.json
   {
     "$schema": "../meta/environment.json",
 -   "name": "staging",
@@ -424,12 +429,15 @@ The moment a second environment exists, `--env` is required again.
 ```
 $ zitadel environments apply
   ~ staging → qa   env_01KX…
+
+  The file is still named staging.json. Rename it to qa.json?  (Y/n)
+› ↵
   renamed .zitadel/environments/staging.json → qa.json
 ```
 
-#### Why the field, and not the filename
+After `zitadel environments apply` succeeds, if the CLI detects that an environment's name changed, it offers to rename the file as well (interactive mode only). Declining changes nothing: a `staging.json` holding an environment named `qa` still works.
 
-`.zitadel/state.json` keys resources by **file path**, and the resource's handle lives in the file body — that is how flows and schemas already work. Environments follow the same pattern, so a file at a stable path whose `name` changed is an update, not a delete and a create.
+The filename has no meaning to the server. It is a reference for humans, and the key the CLI maps to the environment id in `state.json`.
 
 ### 7. An environment can be deleted
 
@@ -549,14 +557,16 @@ enforces on everyone, not a second permission tier.
 
 Environments join `resources` in `.zitadel/state.json`, the map the sync engine already keys by file path — `".zitadel/environments/dev.json": { "id": "env_01KX…", "hash": "…" }`.
 
-Because the key is the path, a rename has to move it. `apply` renames the file
-and rewrites the state key under the same id, and does so after the server has
-confirmed the rename. Leaving the key on the old path would make the next run
-read a missing path as a delete and the new path as a create — destroying the
-identity the rename exists to preserve. A run interrupted between the two
-recovers on the next `apply`: the id is on the server, so a state entry whose
-path no longer exists is re-keyed to the file holding that id rather than
-treated as a removal.
+That map is what connects a file to an environment, so `zitadel environments apply` maintains it
+whenever either side moves — when it renames a file after a rename the developer
+accepted, and when the developer moves a file themselves. Leaving a stale key
+behind would make the next run read the missing path as a delete and the new
+path as a create, destroying the identity the rename exists to preserve.
+
+Recovery needs no extra bookkeeping. The id lives on the server, so a state
+entry whose path no longer exists is re-keyed to the file carrying that id
+rather than treated as a removal — which is also what makes an interrupted run,
+or a `git mv` done outside the CLI, harmless.
 
 ## Alternatives considered
 
