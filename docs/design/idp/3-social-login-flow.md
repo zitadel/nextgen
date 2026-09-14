@@ -180,7 +180,11 @@ Every URL the engine fetches for a connection is tenant-authored (discovery,
 server-side request forgery surface.
 Webhooks and actions need the same guard, so egress policy is its own epic
 ([#928](https://github.com/zitadel/nextgen/issues/928)).
-#928 owns the deny mechanics and an operator allowlist mode.
+The deny mechanics are decided in
+[ADR 061](../../adrs/061-egress-policy-user-injectable-urls.md), which also
+rejects the operator allowlist *mode* this document previously deferred to
+the epic: operator exceptions are an allow list carved out of the deny
+list, not a "only listed hosts" lockdown.
 This area consumes the policy and carries two constraints into it:
 
 - **Blocking for 851.**

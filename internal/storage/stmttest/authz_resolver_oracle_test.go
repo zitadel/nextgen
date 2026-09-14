@@ -100,7 +100,7 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			assert.Equalf(t, wantAllow, gotAllow, "check viewer user=%s decision=%s", u, dec)
 
 			if !gotAllow {
-				wantFoot := g.OracleFoothold(projectID, domain.AuthzPrincipalTypeUser, u)
+				wantFoot := g.OracleFoothold(projectID, "", domain.AuthzPrincipalTypeUser, u)
 				if wantFoot {
 					assert.Equal(t, resolver.DecisionForbidden, dec, "user=%s", u)
 				} else {
@@ -122,5 +122,67 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			require.NoError(t, err)
 			assert.ElementsMatchf(t, wantList, gotList, "list user=%s", u)
 		}
+	})
+}
+
+// TestAuthzResolver_OracleAgreementForeignTeamGrant pins SQL Check/List to the
+// in-memory oracle when membership lives in a different project than the grant
+// (the #1117 foothold-home contract). Platform home only: empty-home miss is
+// owned by TestAuthzResolver_Home.
+func TestAuthzResolver_OracleAgreementForeignTeamGrant(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		grant := seedForeignTeamGrant(t, d.stmts, true)
+		res := "usr_ora_ft_" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(grant.customer, res)))
+
+		persisted, err := d.stmts.LoadCatalogMutations(t.Context(), domain.SystemCatalogID)
+		require.NoError(t, err)
+		g := resolver.GraphFromPersisted(persisted)
+		asgns, err := d.stmts.ListAuthzAssignments(t.Context(), grant.customer, domain.AuthzPrincipalTypeTeam, grant.teamID, false)
+		require.NoError(t, err)
+		g.Assignments = asgns
+		memberships, err := d.stmts.ListAuthzMembershipEdgesByMember(t.Context(), grant.platform, domain.AuthzMemberTypeUser, grant.userID)
+		require.NoError(t, err)
+		g.Memberships = memberships
+		g.Resources = []*domain.ResourceScope{domain.NewUserResourceScope(grant.customer, res)}
+
+		r := resolver.New()
+		viewer := resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   grant.userID,
+			ProjectID:     grant.customer,
+			HomeProjectID: grant.platform,
+			ObjectType:    "project",
+			Relation:      "viewer",
+		}
+
+		wantAllow := g.OracleCheck(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID, "project", "viewer")
+		dec, err := r.Check(t.Context(), d.stmts, viewer)
+		require.NoError(t, err)
+		assert.Equal(t, wantAllow, dec == resolver.DecisionAllow)
+
+		member := viewer
+		member.ObjectType = "team"
+		member.Relation = "member"
+		wantMember := g.OracleCheck(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID, "team", "member")
+		memberDec, err := r.Check(t.Context(), d.stmts, member)
+		require.NoError(t, err)
+		assert.Equal(t, wantMember, memberDec == resolver.DecisionAllow)
+		wantFoot := g.OracleFoothold(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID)
+		if !wantMember {
+			if wantFoot {
+				assert.Equal(t, resolver.DecisionForbidden, memberDec)
+			} else {
+				assert.Equal(t, resolver.DecisionNotFound, memberDec)
+			}
+		}
+
+		wantList := g.OracleList(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID, domain.ResourceKindUser, "project", "viewer")
+		gotList, err := r.ListObjects(t.Context(), d.stmts, resolver.ListRequest{
+			Request:      viewer,
+			ResourceKind: domain.ResourceKindUser,
+		})
+		require.NoError(t, err)
+		assert.ElementsMatch(t, wantList, gotList)
 	})
 }
