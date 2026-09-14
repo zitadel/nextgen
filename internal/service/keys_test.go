@@ -11,10 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/oidc/v3/pkg/op"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/mock/gomock"
 
 	nextgencrypto "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	zmetrics "github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -291,6 +294,53 @@ func newMigrationKeyService(t *testing.T, masterKeys ...domain.MasterKey) (servi
 
 	crypters, signingKeys := newKeyCaches(t)
 	return service.NewKeyService(service.NewPool(pool), *allMasterKeys, crypters, signingKeys), statements
+}
+
+// lookupsByCache sums the lookup counter per cache name, which is the only
+// thing that tells the two key caches apart in the shared series.
+func lookupsByCache(t *testing.T, reader sdkmetric.Reader) map[string]int64 {
+	t.Helper()
+
+	var collected metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(t.Context(), &collected))
+
+	byCache := map[string]int64{}
+	for _, scope := range collected.ScopeMetrics {
+		for _, m := range scope.Metrics {
+			if m.Name != zmetrics.CacheLookups {
+				continue
+			}
+			for _, point := range m.Data.(metricdata.Sum[int64]).DataPoints {
+				name, ok := point.Attributes.Value("cache")
+				require.True(t, ok)
+				byCache[name.Emit()] += point.Value
+			}
+		}
+	}
+	return byCache
+}
+
+// The wiring, not the instruments: that both key caches report, and that they
+// report under the names an operator will filter on. What a cache records is
+// the metrics package's own test; which name it records under is only knowable
+// here.
+func TestKeyCaches_ReportUnderTheirOwnNames(t *testing.T) {
+	t.Parallel()
+
+	reader := sdkmetric.NewManualReader()
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	meter := zmetrics.WithMeterProvider(provider)
+
+	crypters, err := service.NewLRUCrypterCache(8, meter)
+	require.NoError(t, err)
+	signingKeys, err := service.NewLRUSigningKeyCache(8, meter)
+	require.NoError(t, err)
+
+	// One miss on each, so an undifferentiated counter would read as two on one.
+	_, _ = crypters.Get("absent", jose.A256GCM)
+	_, _ = signingKeys.Get("absent", domain.SigningKeyPurposeToken)
+
+	assert.Equal(t, map[string]int64{"crypter": 1, "signing_key": 1}, lookupsByCache(t, reader))
 }
 
 // newKeyCaches gives each service its own caches, so a hit in one test can

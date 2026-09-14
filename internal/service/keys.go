@@ -8,6 +8,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -320,29 +321,45 @@ func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
 	return nil
 }
 
+// The names these caches report under; see the metrics package for the series.
+const (
+	cacheNameCrypter    = "crypter"
+	cacheNameSigningKey = "signing_key"
+)
+
 type crypterCacheKey struct {
 	keyID     string
 	algorithm jose.ContentEncryption
 }
 
 type LRUCrypterCache struct {
-	cache *lru.Cache[crypterCacheKey, op.Crypto]
+	cache   *lru.Cache[crypterCacheKey, op.Crypto]
+	metrics *metrics.Cache
 }
 
-func NewLRUCrypterCache(size int) (*LRUCrypterCache, error) {
+func NewLRUCrypterCache(size int, opts ...metrics.Option) (*LRUCrypterCache, error) {
 	cache, err := lru.New[crypterCacheKey, op.Crypto](size)
 	if err != nil {
 		return nil, err
 	}
-	return new(LRUCrypterCache{cache: cache}), nil
+
+	instruments, err := metrics.NewCache(cacheNameCrypter, cache.Len, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return new(LRUCrypterCache{cache: cache, metrics: instruments}), nil
 }
 
 func (c LRUCrypterCache) Add(keyID string, algorithm jose.ContentEncryption, crypter op.Crypto) (evicted bool) {
-	return c.cache.Add(crypterCacheKey{keyID: keyID, algorithm: algorithm}, crypter)
+	evicted = c.cache.Add(crypterCacheKey{keyID: keyID, algorithm: algorithm}, crypter)
+	c.metrics.RecordAdd(evicted)
+	return evicted
 }
 
 func (c LRUCrypterCache) Get(keyID string, algorithm jose.ContentEncryption) (crypter op.Crypto, ok bool) {
-	return c.cache.Get(crypterCacheKey{keyID: keyID, algorithm: algorithm})
+	crypter, ok = c.cache.Get(crypterCacheKey{keyID: keyID, algorithm: algorithm})
+	c.metrics.RecordLookup(ok)
+	return crypter, ok
 }
 
 type signingKeyCacheKey struct {
@@ -350,26 +367,37 @@ type signingKeyCacheKey struct {
 	purpose   domain.SigningKeyPurpose
 }
 type LRUSigningKeyCache struct {
-	cache *lru.Cache[signingKeyCacheKey, domain.SigningKey]
+	cache   *lru.Cache[signingKeyCacheKey, domain.SigningKey]
+	metrics *metrics.Cache
 }
 
-func NewLRUSigningKeyCache(size int) (*LRUSigningKeyCache, error) {
+func NewLRUSigningKeyCache(size int, opts ...metrics.Option) (*LRUSigningKeyCache, error) {
 	cache, err := lru.New[signingKeyCacheKey, domain.SigningKey](size)
 	if err != nil {
 		return nil, err
 	}
-	return new(LRUSigningKeyCache{cache: cache}), nil
+
+	instruments, err := metrics.NewCache(cacheNameSigningKey, cache.Len, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return new(LRUSigningKeyCache{cache: cache, metrics: instruments}), nil
 }
 
 func (c LRUSigningKeyCache) Add(key domain.SigningKey) (evicted bool) {
-	return c.cache.Add(signingKeyCacheKey{
+	evicted = c.cache.Add(signingKeyCacheKey{
 		projectID: key.ProjectID,
 		purpose:   key.Purpose,
 	}, key)
+	c.metrics.RecordAdd(evicted)
+	return evicted
 }
+
 func (c LRUSigningKeyCache) Get(projectID string, purpose domain.SigningKeyPurpose) (key domain.SigningKey, ok bool) {
-	return c.cache.Get(signingKeyCacheKey{
+	key, ok = c.cache.Get(signingKeyCacheKey{
 		projectID: projectID,
 		purpose:   purpose,
 	})
+	c.metrics.RecordLookup(ok)
+	return key, ok
 }

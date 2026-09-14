@@ -35,6 +35,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/service"
@@ -138,7 +139,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	slog.Info("building server")
 
-	metrics, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
+	telemetry, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
 		ServiceName:     cfg.Instrumentation.ServiceName,
 		TraceIdFraction: cfg.Instrumentation.Trace.Fraction,
 		TraceExporter:   cfg.Instrumentation.Trace.Exporter,
@@ -148,9 +149,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return fmt.Errorf("failed to create otel metrics: %w", err)
 	}
-	sfs.Add(metrics.Shutdown)
+	sfs.Add(telemetry.Shutdown)
 
-	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
+	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
 
 	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
@@ -204,11 +205,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
-	crypterCache, err := service.NewLRUCrypterCache(cfg.Keys.CrypterLRUCacheSize)
+	// Whether anything is exported stays the existing instrumentation.metric
+	// config's decision: with no exporter the provider is a no-op and the
+	// instruments cost nothing.
+	cacheMeter := metrics.WithMeterProvider(telemetry.MeterProvider())
+	crypterCache, err := service.NewLRUCrypterCache(cfg.Keys.CrypterLRUCacheSize, cacheMeter)
 	if err != nil {
 		return fmt.Errorf("failed to build crypter cache: %w", err)
 	}
-	signingKeyCache, err := service.NewLRUSigningKeyCache(cfg.Keys.SigningKeyLRUCacheSize)
+	signingKeyCache, err := service.NewLRUSigningKeyCache(cfg.Keys.SigningKeyLRUCacheSize, cacheMeter)
 	if err != nil {
 		return fmt.Errorf("failed to build signing key cache: %w", err)
 	}
@@ -371,8 +376,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level
 		),
-		oasapi.WithMeterProvider(metrics.MeterProvider()),
-		oasapi.WithTracerProvider(metrics.TracerProvider()),
+		oasapi.WithMeterProvider(telemetry.MeterProvider()),
+		oasapi.WithTracerProvider(telemetry.TracerProvider()),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
