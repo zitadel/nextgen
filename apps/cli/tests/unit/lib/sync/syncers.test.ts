@@ -289,7 +289,7 @@ describe("BrandingSyncer", () => {
   const descriptor = {
     $schema: "../meta/branding.json",
     layout: "split",
-    liquid_template_file: "./login.liquid",
+    liquid_template: { $file: "./login.liquid" },
     logo_url: "https://cdn.example.com/logo.svg",
   };
 
@@ -316,7 +316,7 @@ describe("BrandingSyncer", () => {
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
     expect(() =>
-      branding.validate({ ...descriptor, liquid_template_file: "./missing.liquid" }),
+      branding.validate({ ...descriptor, liquid_template: { $file: "./missing.liquid" } }),
     ).toThrow(ZitadelError);
   });
 
@@ -325,7 +325,7 @@ describe("BrandingSyncer", () => {
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
     expect(() =>
-      branding.validate({ ...descriptor, liquid_template_file: "../../../../etc/passwd" }),
+      branding.validate({ ...descriptor, liquid_template: { $file: "../../../../etc/passwd" } }),
     ).toThrow(ZitadelError);
   });
 
@@ -336,13 +336,22 @@ describe("BrandingSyncer", () => {
     expect(() => branding.validate(descriptor)).toThrow(ZitadelError);
   });
 
-  it("validate throws E_VALIDATION when both template carriers are present", async () => {
+  it("validate accepts an inline template string", async () => {
     const cwd = await makeBrandingProject();
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
+    expect(() => branding.validate({ ...descriptor, liquid_template: VALID_TEMPLATE })).not.toThrow();
+  });
+
+  it("validate rejects the old liquid_template_file key with a migration hint", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+    const { liquid_template: _reference, ...legacy } = descriptor;
+    void _reference;
+
     expect(() =>
-      branding.validate({ ...descriptor, liquid_template: VALID_TEMPLATE }),
-    ).toThrow(ZitadelError);
+      branding.validate({ ...legacy, liquid_template_file: "./login.liquid" }),
+    ).toThrow(/liquid_template_file is no longer supported/);
   });
 
   it("validate throws E_VALIDATION on non-https asset URLs (server parity)", async () => {
@@ -457,7 +466,7 @@ describe("BrandingSyncer", () => {
     expect(result.id).toBe("brnd-1");
     expect(result.canonical).toEqual({
       layout: "split",
-      liquid_template_file: "./login.liquid",
+      liquid_template: { $file: "./login.liquid" },
       logo_url: "https://cdn.example.com/logo.svg",
     });
   });

@@ -234,3 +234,13 @@ strict scope, later). It amends §5's catalog: `split` / `split-right` /
 `hero` are page chrome. Setup must not publish those files as
 `login.liquid`. Zitadel-served page chrome is unset; `page.liquid` is a
 proposal, not a requirement.
+
+## Amendment (2026-09-15): `$file` references
+
+§4's `liquid_template_file` key is replaced by a general reference form. A
+descriptor now writes `"liquid_template": { "$file": "./login.liquid" }`. The
+OpenAPI YAML marks the field `x-local: file`, the generated editor
+meta-schema accepts either the string or the reference, and the CLI replaces
+any `$file` reference with the file's content before upload and writes the
+published value back to the file. The on-disk layout and the round-trip are
+unchanged; only the key is.

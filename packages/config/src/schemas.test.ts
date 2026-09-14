@@ -9,7 +9,16 @@ import { brandingConfigSchema } from "./schemas.js";
  * sanitiser — a descriptor plan accepts must never be one apply rejects.
  */
 describe("brandingConfigSchema", () => {
-  const base = { layout: "split", liquid_template_file: "./login.liquid" };
+  const base = { layout: "split", liquid_template: { $file: "./login.liquid" } };
+
+  it("accepts the template inline or as a $file reference, and rejects the old key", () => {
+    expect(brandingConfigSchema.safeParse({ layout: "split", liquid_template: "<p></p>" }).success).toBe(true);
+    expect(brandingConfigSchema.safeParse(base).success).toBe(true);
+    expect(brandingConfigSchema.safeParse({ layout: "split", liquid_template: { $file: "" } }).success).toBe(false);
+    expect(
+      brandingConfigSchema.safeParse({ layout: "split", liquid_template_file: "./login.liquid" }).success,
+    ).toBe(false);
+  });
 
   it("accepts a descriptor with https asset URLs", () => {
     const result = brandingConfigSchema.safeParse({
@@ -161,10 +170,13 @@ describe("brandingConfigSchema", () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
-  it("rejects unknown keys and double template carriers", () => {
+  it("rejects unknown keys, including inside a $file reference", () => {
     expect(brandingConfigSchema.safeParse({ ...base, hero_urll: "x" }).success).toBe(false);
     expect(
-      brandingConfigSchema.safeParse({ ...base, liquid_template: "<zl-card></zl-card>" }).success,
+      brandingConfigSchema.safeParse({
+        ...base,
+        liquid_template: { $file: "./login.liquid", extra: 1 },
+      }).success,
     ).toBe(false);
   });
 });

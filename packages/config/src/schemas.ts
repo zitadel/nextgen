@@ -20,10 +20,16 @@ export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
 export const brandingWireSchema = CreateBrandingBody;
 
 /**
- * The local `.zitadel/branding/*.json` dialect: the wire shape plus
- * `liquid_template_file`, a descriptor-relative path the CLI inlines into
- * `liquid_template` when publishing. Exactly one of the two template carriers
- * may be present (the meta-schema `branding.json` mirrors this).
+ * `{ "$file": "<path>" }`, which a `.zitadel/` file may hold in place of a
+ * string field the OpenAPI YAML marks `x-local: file`. The path is relative to
+ * the file holding it; the CLI inlines the content before publishing.
+ */
+export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1) });
+
+/**
+ * The local `.zitadel/branding/*.json` dialect: the wire shape, where
+ * `liquid_template` may also be a `$file` reference to the sibling `.liquid`
+ * template (the meta-schema `branding.json` mirrors this).
  */
 export const brandingConfigSchema = z
   .strictObject({
@@ -38,15 +44,11 @@ export const brandingConfigSchema = z
     logo_url: z.string().optional(),
     hero_url: z.string().optional(),
     $schema: z.string().optional(),
-    liquid_template_file: z.string().min(1).optional(),
+    liquid_template: z
+      .union([CreateBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
+      .optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.liquid_template !== undefined && value.liquid_template_file !== undefined) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Use either liquid_template_file or an inline liquid_template, not both.",
-      });
-    }
     // A stylesheet alone names no face to render in, so the server rejects the
     // pair as a pair (validateBrandingFontURL in
     // internal/domain/branding_validator.go). plan has to agree, or apply

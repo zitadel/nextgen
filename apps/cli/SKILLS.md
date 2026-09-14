@@ -333,7 +333,7 @@ then re-run `plan` and `apply`. Schema and flow files are synced from
 `.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
-template referenced via `liquid_template_file`. Scaffold them with the
+template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaffold them with the
 `branding eject` command (`--design centered|split|split-right|hero|minimal`,
 interactive picker on a TTY) or at project creation with
 `setup --design <name>`, which also publishes revision 1. Branding is

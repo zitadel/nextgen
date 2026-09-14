@@ -190,8 +190,12 @@ describe("meta-schemas", () => {
       const file = { $schema: BRANDING_FILE_SCHEMA_REF, ...branding };
       expect(check(file), `${design}: ${JSON.stringify(check.errors)}`).toBe(true);
     }
-    // The two template carriers are mutually exclusive.
-    expect(check({ liquid_template: "x", liquid_template_file: "./login.liquid" })).toBe(false);
+    // The template is inline or a `$file` reference; the old key is unknown.
+    expect(check({ liquid_template: "<p></p>" })).toBe(true);
+    expect(check({ liquid_template: { $file: "./login.liquid" } })).toBe(true);
+    expect(check({ liquid_template: { $file: "" } })).toBe(false);
+    expect(check({ liquid_template: { $file: "./login.liquid", extra: 1 } })).toBe(false);
+    expect(check({ liquid_template_file: "./login.liquid" })).toBe(false);
     // Unknown keys are dialect errors, like the flow dialect.
     expect(check({ not_a_branding_key: true })).toBe(false);
     // Asset URLs are https by default at the dialect level too — editors flag

@@ -11,21 +11,6 @@ description: |
   so a revision carrying one colour is as valid as one carrying the whole
   object.
 additionalProperties: false
-# The only place the file on disk differs from the wire: the descriptor may
-# name a template file, which the CLI inlines into `liquid_template` before
-# publishing. The generated editor schema carries it; the API never sees it.
-x-dialect:
-  not:
-    required: [liquid_template, liquid_template_file]
-  properties:
-    liquid_template_file:
-      type: string
-      example: ./login.liquid
-      description: |
-        Path to the LiquidJS template file, relative to this descriptor. The
-        CLI inlines the file content into `liquid_template` when publishing,
-        and writes server state back to the file. Mutually exclusive with
-        `liquid_template`.
 properties:
   "$schema":
     type: string
@@ -48,6 +33,9 @@ properties:
     default: centered
   liquid_template:
     type: string
+    # A `.zitadel/branding/branding.json` file may hold `{ "$file": "./login.liquid" }`
+    # here instead; the CLI inlines the file before publishing.
+    x-local: file
     maxLength: 131072
     description: |
       The LiquidJS template for rendering this step. The orchestrator renders

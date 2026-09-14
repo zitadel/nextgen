@@ -4,7 +4,7 @@
  * The generated-output check proves the committed JSON matches what the
  * generator produces today; it cannot tell a correct conversion from one that
  * is consistently wrong. These pin each rule on small YAML fixtures, so a
- * change to `$ref`, `x-dialect`, `example` or `allOf` handling fails here
+ * change to `$ref`, `x-local`, `example` or `allOf` handling fails here
  * instead of shipping a quietly different contract.
  */
 import assert from "node:assert/strict";
@@ -67,30 +67,40 @@ test("renames OpenAPI example to examples without clobbering an explicit list", 
   assert.deepEqual(properties.listed, { type: "string", examples: ["x", "y"] });
 });
 
-test("folds x-dialect into its parent, merging objects and replacing other values", () => {
+test("lets an x-local: file field hold its value or a $file reference, annotations outside", () => {
   const { schema } = generate(
     {
       "a.yaml": [
         "x-meta-schema: true",
         "type: object",
-        "x-dialect:",
-        "  properties:",
-        "    extra:",
-        "      type: string",
         "properties:",
-        "  kind:",
+        "  template:",
         "    type: string",
-        "    enum: [submit, back]",
-        "    x-dialect:",
-        "      enum: [submit]",
+        "    maxLength: 10",
+        "    description: The template.",
+        "    example: <p/>",
+        "    x-local: file",
       ].join("\n"),
     },
     "a.yaml",
   );
-  const properties = schema.properties as Record<string, Record<string, unknown>>;
-  assert.deepEqual(properties.kind, { type: "string", enum: ["submit"] });
-  assert.deepEqual(properties.extra, { type: "string" });
-  assert.equal(JSON.stringify(schema).includes("x-dialect"), false);
+  const properties = schema.properties as Record<string, unknown>;
+  assert.deepEqual(properties.template, {
+    description: "The template.",
+    examples: ["<p/>"],
+    "x-local": "file",
+    anyOf: [{ type: "string", maxLength: 10 }, { $ref: "#/$defs/LocalFileReference" }],
+  });
+  const reference = (schema.$defs as Record<string, Record<string, unknown>>).LocalFileReference;
+  assert.deepEqual(reference?.required, ["$file"]);
+  assert.equal(reference?.additionalProperties, false);
+});
+
+test("rejects an x-local kind it does not know", () => {
+  assert.throws(
+    () => generate({ "a.yaml": "x-meta-schema: true\ntype: string\nx-local: url\n" }, "a.yaml"),
+    /unsupported x-local value "url"/,
+  );
 });
 
 test("keeps a $ref to another emitted file as a sibling .json reference", () => {
@@ -105,7 +115,7 @@ test("keeps a $ref to another emitted file as a sibling .json reference", () => 
   assert.equal("$defs" in schema, false);
 });
 
-test("inlines a non-emitted $ref once under $defs, applying its own x-dialect, and survives self-reference", () => {
+test("inlines a non-emitted $ref once under $defs, converting it the same way, and survives self-reference", () => {
   const { schema } = generate(
     {
       "flow.yaml": [
@@ -119,8 +129,7 @@ test("inlines a non-emitted $ref once under $defs, applying its own x-dialect, a
       ].join("\n"),
       "step-node.yaml": [
         "type: object",
-        "x-dialect:",
-        "  additionalProperties: false",
+        "additionalProperties: false",
         "properties:",
         "  next:",
         "    $ref: step-node.yaml",

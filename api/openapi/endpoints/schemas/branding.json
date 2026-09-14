@@ -20,9 +20,17 @@
       "default": "centered"
     },
     "liquid_template": {
-      "type": "string",
-      "maxLength": 131072,
-      "description": "The LiquidJS template for rendering this step. The orchestrator renders\nit into its Shadow DOM with the capability dictionaries as context.\n"
+      "description": "The LiquidJS template for rendering this step. The orchestrator renders\nit into its Shadow DOM with the capability dictionaries as context.\n",
+      "x-local": "file",
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 131072
+        },
+        {
+          "$ref": "#/$defs/LocalFileReference"
+        }
+      ]
     },
     "logo_url": {
       "type": "string",
@@ -46,22 +54,23 @@
     },
     "shape": {
       "$ref": "#/$defs/BrandingShape"
-    },
-    "liquid_template_file": {
-      "type": "string",
-      "description": "Path to the LiquidJS template file, relative to this descriptor. The\nCLI inlines the file content into `liquid_template` when publishing,\nand writes server state back to the file. Mutually exclusive with\n`liquid_template`.\n",
-      "examples": [
-        "./login.liquid"
-      ]
     }
   },
-  "not": {
-    "required": [
-      "liquid_template",
-      "liquid_template_file"
-    ]
-  },
   "$defs": {
+    "LocalFileReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$file"
+      ],
+      "properties": {
+        "$file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the file whose content is this value, relative to the file holding the reference. The CLI inlines it before upload."
+        }
+      }
+    },
     "BrandingTheme": {
       "type": "object",
       "additionalProperties": false,
