@@ -10191,8 +10191,8 @@ type CreateIdpRequest struct {
 	// file. If its slug does not already exist, a new connection is created.
 	// If a connection with that slug already exists, this becomes a new
 	// revision of it. The document is validated against the
-	// `idp-connection.json` schema before anything is stored, and returned
-	// as `definition`.
+	// `idp-connection.json` schema, and returned as the `definition` in the
+	// response.
 	Idp IdpConnection `json:"idp"`
 }
 

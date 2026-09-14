@@ -377,16 +377,12 @@ type Invoker interface {
 	GetIdpById(ctx context.Context, params GetIdpByIdParams) (GetIdpByIdRes, error)
 	// GetIdpBySlug invokes getIdpBySlug operation.
 	//
-	// Reads one connection by the slug user schemas and flow definitions
-	// reference it by, together with the revision it currently serves.
+	// Returns a connection by slug.
 	// A slug is unique within a project and fixed for the life of the
 	// connection, so this resolves the same connection as `GET /idps/{id}` and
 	// returns the same body. It exists because the CLI and the console hold
 	// slugs from configuration files, not ids.
-	// The lookup is scoped to the project in `project_id`: a slug used by
-	// another project answers not found exactly as an unused slug does, so the
-	// endpoint cannot be used to probe for connections in projects the caller
-	// cannot read.
+	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /idps/slug/{slug}
 	GetIdpBySlug(ctx context.Context, params GetIdpBySlugParams) (GetIdpBySlugRes, error)
@@ -5118,16 +5114,12 @@ func (c *Client) sendGetIdpById(ctx context.Context, params GetIdpByIdParams) (r
 
 // GetIdpBySlug invokes getIdpBySlug operation.
 //
-// Reads one connection by the slug user schemas and flow definitions
-// reference it by, together with the revision it currently serves.
+// Returns a connection by slug.
 // A slug is unique within a project and fixed for the life of the
 // connection, so this resolves the same connection as `GET /idps/{id}` and
 // returns the same body. It exists because the CLI and the console hold
 // slugs from configuration files, not ids.
-// The lookup is scoped to the project in `project_id`: a slug used by
-// another project answers not found exactly as an unused slug does, so the
-// endpoint cannot be used to probe for connections in projects the caller
-// cannot read.
+// The lookup is scoped to the project in `project_id`.
 //
 // GET /idps/slug/{slug}
 func (c *Client) GetIdpBySlug(ctx context.Context, params GetIdpBySlugParams) (GetIdpBySlugRes, error) {
