@@ -8,7 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-resty/resty/v2" // want `imports third-party HTTP client "github.com/go-resty/resty/v2"`
+	"github.com/go-resty/resty/v2" // want `imports third-party dialing library "github.com/go-resty/resty/v2"`
+	"google.golang.org/grpc"       // want `imports third-party dialing library "google.golang.org/grpc"`
+	"google.golang.org/grpc/codes" // subpackage: inspecting status codes does not dial
 )
 
 type wrapper struct {
@@ -47,8 +49,31 @@ func literals() {
 }
 
 func viaNew() {
-	_ = new(http.Client)    // want `constructs an http.Client via new\(\)`
-	_ = new(http.Transport) // want `constructs an http.Transport via new\(\)`
+	_ = new(http.Client)                 // want `constructs an http.Client via new\(\)`
+	_ = new(http.Transport)              // want `constructs an http.Transport via new\(\)`
+	_ = make([]http.Client, 1)           // want `constructs an http.Client via make\(\)`
+	_ = make(map[string]http.Client)     // want `constructs an http.Client via make\(\)`
+	_ = make(chan net.Dialer, 1)         // want `constructs a net.Dialer via make\(\)`
+	_ = make([]*http.Client, 1)          // pointer elements: nothing constructed
+	_ = make(map[string]*http.Client, 1) // pointer elements: nothing constructed
+	_ = resty.New()
+	_ = codes.OK
+	_ = grpc.Version
+}
+
+func containers() {
+	var a [2]http.Client // want `constructs an http.Client as a zero-value declaration`
+	_ = a
+	var m map[string]http.Client // want `constructs an http.Client as a zero-value declaration`
+	_ = m
+	var ps []*http.Client // pointer elements: nothing constructed
+	_ = ps
+}
+
+type holdsMany struct {
+	pool  []http.Client  // want `constructs an http.Client as a by-value struct field`
+	ptrs  []*http.Client // pointer elements: fine
+	byKey map[string]*net.Dialer
 }
 
 func zeroValue() {
@@ -70,11 +95,10 @@ func defaults(url string) {
 }
 
 func dials(ctx context.Context, addr string) {
-	_, _ = net.Dial("tcp", addr)                               // want `calls net.Dial outside the hardened egress package`
-	_, _ = net.DialTimeout("tcp", addr, time.Second)           // want `calls net.DialTimeout outside the hardened egress package`
-	_, _ = tls.Dial("tcp", addr, nil)                          // want `calls tls.Dial outside the hardened egress package`
-	_, _ = tls.DialWithDialer(&net.Dialer{}, "tcp", addr, nil) // want `calls tls.DialWithDialer` `constructs a net.Dialer`
-	_ = resty.New()
+	_, _ = net.Dial("tcp", addr)                                     // want `calls net.Dial outside the hardened egress package`
+	_, _ = net.DialTimeout("tcp", addr, time.Second)                 // want `calls net.DialTimeout outside the hardened egress package`
+	_, _ = tls.Dial("tcp", addr, nil)                                // want `calls tls.Dial outside the hardened egress package`
+	_, _ = tls.DialWithDialer(&net.Dialer{}, "tcp", addr, nil)       // want `calls tls.DialWithDialer` `constructs a net.Dialer`
 	fd, _ := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0) // want `calls syscall.Socket`
 	_ = syscall.Connect(fd, &syscall.SockaddrInet4{})                // want `calls syscall.Connect`
 }
@@ -89,6 +113,14 @@ func notEgress() {
 	// A method named Get on an unrelated type is not http.Get.
 	var w wrapper
 	_ = w.client
+}
+
+// notADirective: a longer word sharing the prefix is not the directive and
+// must not exempt anything.
+func notADirective() {
+	//egress:allowed because reasons
+	_ = &http.Client{} // want `constructs an http.Client outside the hardened egress package`
+	_ = &http.Client{} //egress:allow-ish // want `constructs an http.Client outside the hardened egress package`
 }
 
 // missingReason is reported because the directive carries no justification.

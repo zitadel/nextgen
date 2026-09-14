@@ -59,9 +59,14 @@ const (
 	defaultSanctioned = "github.com/zitadel/nextgen/internal/httputil"
 )
 
-// defaultThirdPartyClients lists import paths of HTTP client libraries that
-// build their own transports and therefore bypass the hardened client. The
-// list is matched by prefix so versioned module paths (/v2) are covered.
+// defaultThirdPartyClients lists module paths of libraries that dial on their
+// own and therefore bypass the hardened client: HTTP client wrappers,
+// websocket clients, and gRPC. An entry matches the module root and its
+// major-version variants (/v2, /v3), not arbitrary subpackages, so importing
+// google.golang.org/grpc/codes to inspect an error stays allowed while
+// google.golang.org/grpc itself, which dials, is reported. When gRPC egress
+// becomes a sanctioned path that is a visible decision: a directive here or
+// a change to this list, not a silent arrival.
 var defaultThirdPartyClients = []string{
 	"github.com/go-resty/resty",
 	"github.com/hashicorp/go-retryablehttp",
@@ -75,6 +80,11 @@ var defaultThirdPartyClients = []string{
 	"gopkg.in/h2non/gentleman",
 	"github.com/dghubble/sling",
 	"github.com/parnurzeal/gorequest",
+	"github.com/gorilla/websocket",
+	"github.com/coder/websocket",
+	"nhooyr.io/websocket",
+	"golang.org/x/net/websocket",
+	"google.golang.org/grpc",
 }
 
 // forbiddenTypes are types whose construction outside the sanctioned package
@@ -125,7 +135,7 @@ var forbiddenFuncs = map[string]map[string]string{
 var Analyzer = &analysis.Analyzer{
 	Name:     "egresslint",
 	Doc:      "reports outbound HTTP or TCP clients constructed outside the hardened egress package (ADR 061)",
-	URL:      "https://github.com/zitadel/nextgen/blob/main/docs/adrs/061-egress-policy.md",
+	URL:      "https://github.com/zitadel/nextgen/blob/main/docs/adrs/061-egress-policy-user-injectable-urls.md",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
 }
@@ -141,7 +151,7 @@ func init() {
 	Analyzer.Flags.StringVar(&flagSanctioned, "sanctioned", defaultSanctioned,
 		"comma-separated import paths allowed to construct raw clients and dialers")
 	Analyzer.Flags.StringVar(&flagThirdParty, "third-party", strings.Join(defaultThirdPartyClients, ","),
-		"comma-separated import path prefixes of third-party HTTP clients to forbid")
+		"comma-separated module paths of third-party dialing libraries to forbid (matched with their /vN variants)")
 	Analyzer.Flags.BoolVar(&flagCheckTests, "check-tests", false,
 		"also check _test.go files")
 	Analyzer.Flags.BoolVar(&flagCheckGenerated, "check-generated", false,
@@ -192,10 +202,10 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 		for _, cg := range f.Comments {
 			for _, c := range cg.List {
-				if !strings.HasPrefix(c.Text, Directive) {
+				reason, isDirective := directiveReason(c.Text)
+				if !isDirective {
 					continue
 				}
-				reason := strings.TrimSpace(strings.TrimPrefix(c.Text, Directive))
 				line := pass.Fset.Position(c.Pos()).Line
 				// Covers a trailing directive on the same line and a
 				// directive on the line directly above the construction.
@@ -211,8 +221,8 @@ func run(pass *analysis.Pass) (any, error) {
 		for _, imp := range f.Imports {
 			path := strings.Trim(imp.Path.Value, `"`)
 			for _, tp := range thirdParty {
-				if path == tp || strings.HasPrefix(path, tp+"/") {
-					report(pass, st.allowLines, imp.Pos(), "imports third-party HTTP client %q", path)
+				if matchesModule(path, tp) {
+					report(pass, st.allowLines, imp.Pos(), "imports third-party dialing library %q", path)
 				}
 			}
 		}
@@ -245,11 +255,12 @@ func run(pass *analysis.Pass) (any, error) {
 				report(pass, current.allowLines, n.Pos(), "%s outside the hardened egress package", what)
 			}
 		case *ast.CallExpr:
-			// new(http.Client) and friends.
-			if id, ok := n.Fun.(*ast.Ident); ok && id.Name == "new" && len(n.Args) == 1 {
-				if obj, isBuiltin := pass.TypesInfo.Uses[id].(*types.Builtin); isBuiltin && obj.Name() == "new" {
+			// new(http.Client), make([]http.Client, n), make(map[K]http.Client):
+			// every builtin allocation of a usable zero value.
+			if id, ok := n.Fun.(*ast.Ident); ok && len(n.Args) >= 1 {
+				if obj, isBuiltin := pass.TypesInfo.Uses[id].(*types.Builtin); isBuiltin && (obj.Name() == "new" || obj.Name() == "make") {
 					if what, ok := forbiddenTypeOf(pass.TypesInfo.TypeOf(n.Args[0])); ok {
-						report(pass, current.allowLines, n.Pos(), "%s via new() outside the hardened egress package", what)
+						report(pass, current.allowLines, n.Pos(), "%s via %s() outside the hardened egress package", what, obj.Name())
 					}
 				}
 			}
@@ -313,6 +324,38 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
+// directiveReason recognises exactly "//egress:allow" followed by a space or
+// the end of the comment, and returns the trimmed text after it. A comment
+// such as "//egress:allowed ..." is not a directive: prefix matching would
+// read it as one with reason "ed" and silently exempt the line.
+// matchesModule reports whether path is module or one of its major-version
+// variants (module/v2, module/v3, ...). Other subpackages do not match.
+func matchesModule(path, module string) bool {
+	if path == module {
+		return true
+	}
+	rest, found := strings.CutPrefix(path, module+"/")
+	if !found || len(rest) < 2 || rest[0] != 'v' {
+		return false
+	}
+	for _, r := range rest[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func directiveReason(comment string) (reason string, ok bool) {
+	if comment == Directive {
+		return "", true
+	}
+	if rest, found := strings.CutPrefix(comment, Directive+" "); found {
+		return strings.TrimSpace(rest), true
+	}
+	return "", false
+}
+
 func checkTypeArgs(pass *analysis.Pass, allowLines map[int]string, args []ast.Expr) {
 	for _, a := range args {
 		tv, ok := pass.TypesInfo.Types[a]
@@ -336,7 +379,11 @@ func identOf(e ast.Expr) *ast.Ident {
 }
 
 // forbiddenTypeOf reports whether t (after resolving aliases and stripping
-// pointers) is one of the types whose construction the analyzer forbids.
+// top-level pointers) is one of the types whose construction the analyzer
+// forbids, or a container whose elements are: []http.Client,
+// [2]http.Client, map[K]http.Client and chan http.Client all hand out
+// usable zero-value clients. Pointer elements ([]*http.Client) do not, so
+// only the top-level pointer is stripped.
 func forbiddenTypeOf(t types.Type) (string, bool) {
 	if t == nil {
 		return "", false
@@ -349,12 +396,27 @@ func forbiddenTypeOf(t types.Type) (string, bool) {
 		}
 		t = p.Elem()
 	}
-	named, ok := t.(*types.Named)
-	if !ok || named.Obj().Pkg() == nil {
-		return "", false
+	return forbiddenValueType(t)
+}
+
+func forbiddenValueType(t types.Type) (string, bool) {
+	switch t := types.Unalias(t).(type) {
+	case *types.Slice:
+		return forbiddenValueType(t.Elem())
+	case *types.Array:
+		return forbiddenValueType(t.Elem())
+	case *types.Map:
+		return forbiddenValueType(t.Elem())
+	case *types.Chan:
+		return forbiddenValueType(t.Elem())
+	case *types.Named:
+		if t.Obj().Pkg() == nil {
+			return "", false
+		}
+		what, ok := forbiddenTypes[t.Obj().Pkg().Path()][t.Obj().Name()]
+		return what, ok
 	}
-	what, ok := forbiddenTypes[named.Obj().Pkg().Path()][named.Obj().Name()]
-	return what, ok
+	return "", false
 }
 
 func report(pass *analysis.Pass, allowLines map[int]string, pos token.Pos, format string, args ...any) {
