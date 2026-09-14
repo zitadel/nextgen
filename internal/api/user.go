@@ -239,6 +239,57 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	return domainUserToApiUser(user)
 }
 
+func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, params api.PatchUserByIDParams) (api.PatchUserByIDRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
+	if err != nil {
+		return nil, err
+	}
+
+	input := service.PatchUserInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+	}
+	if req.Schema.IsSet() {
+		input.SchemaURL = new(req.Schema.Value)
+	}
+	if req.Attributes.IsSet() {
+		attributes, err := convertUsingJson[map[string]any](req.Attributes.Value)
+		if err != nil {
+			return nil, err
+		}
+		input.Attributes = *attributes
+	}
+
+	user, err := h.userService.PatchUser(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainUserToApiUser(user)
+}
+
+func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	if !ok {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+
+	attributes, err := convertUsingJson[map[string]any](req.Attributes)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := h.userService.PatchMyUser(ctx, service.PatchMyUserInput{
+		SessionToken: sessionToken,
+		Attributes:   *attributes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return domainUserToApiUser(user)
+}
+
 func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
 	if err != nil {
@@ -381,6 +432,8 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrUserAlreadyExists().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrUserConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

@@ -37,7 +37,11 @@ direction for the console build-out (issue
   explicit testkit or future server-file seed fully provisions it, its initial
   user, membership, separate owner assignment, and optional customer project.
   **Today:** the Console signs into the pinned or first-created project — an
-  ordinary customer project — under §2's cutover rule. Do not remove that
+  ordinary customer project — under §2's cutover rule, unless
+  `platform.bootstrap_project` is set, which provisions the reserved platform
+  project itself (keys, default schema, default login flow — but not the
+  initial user/membership/owner assignment the target seed transport adds)
+  and is what makes claiming and self-registration work. Do not remove that
   fallback (or the `platform.project_id` pin) until the seed transport ships;
   doing so strands self-hosters. Standalone optimizes for one project but does
   not forbid more. The runtime document carries only public sign-in metadata;

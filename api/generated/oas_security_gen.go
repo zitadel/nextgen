@@ -45,6 +45,7 @@ var operationRolesNextgenSession = map[string][]string{
 	GetGrantOperation:        []string{},
 	GetMySessionOperation:    []string{},
 	GetMyUserOperation:       []string{},
+	PatchMyUserOperation:     []string{},
 	QueryGrantsOperation:     []string{},
 	QueryUsersOperation:      []string{},
 	RevokeMySessionOperation: []string{},
@@ -196,6 +197,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PatchProjectOperation: []string{
 		"project.write",
+	},
+	PatchUserByIDOperation: []string{
+		"user.write",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",

@@ -32,8 +32,10 @@ properties:
     readOnly: true
     type: array
     minItems: 1
+    maxItems: 50
     description: |
       The revisions this release pins, one entry per `(kind, handle)`. Never
-      empty: a release must contain at least one resource.
+      empty: a release must contain at least one resource, and never longer
+      than the set `POST /releases` accepts.
     items:
       $ref: release-pointer.yaml

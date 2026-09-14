@@ -370,8 +370,8 @@ Easier:
 
 Harder / to do:
 
-- Meta-schema changes land in both copies (`packages/config/meta-schemas/` and
-  `api/openapi/endpoints/schemas/`), plus validator, flow resolver
+- Meta-schema changes land in `api/openapi/endpoints/schemas/` (the
+  `@zitadel/config` copy is generated from it), plus validator, flow resolver
   (identifier fields restricted to designated properties), and the shipped
   defaults.
 - The designation rules exceed what the user meta JSON Schema can express —

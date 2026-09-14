@@ -29,6 +29,7 @@ The template exposes:
 
 - `NEXTGEN_IMAGE` — server image tag, defaulting to `ghcr.io/zitadel/nextgen:latest`
 - `NEXTGEN_PORT` — local HTTP port, defaulting to `8080`
+- `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT` / `NEXTGEN_SERVER_PUBLIC_BASE` — optional, enables claiming projects on this deployment; see [Configuration → Platform](./configuration.md#platform)
 
 The compose file sets `NEXTGEN_DATABASE_POSTGRES` for the bundled Postgres
 container and persists server data under the `nextgen-server-data` volume. When
