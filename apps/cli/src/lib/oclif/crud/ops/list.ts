@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { collectPages } from "../paging";
-import { parseFilter, parseSort } from "../query";
+import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { fieldPaths, itemSchemaOf } from "../paths";
@@ -28,6 +28,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     spec,
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
+    const paged = spec.paged !== false;
     const paging = {
       limit: Flags.integer({
         description: "Page size (server default 20, max 100).",
@@ -42,6 +43,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         description: "Fetch every page instead of one.",
         exclusive: ["page-token"],
       }),
+    };
+    const presentation = {
       fields: Flags.string({
         description:
           "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
@@ -51,44 +54,47 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
           "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
       }),
     };
-    const specific =
-      spec.kind === "query"
+    const filters = spec.filters ?? [];
+    const sorts = spec.sorts ?? [];
+    // One `--filter` for every list. The help names each field with the
+    // operations that field accepts, so a grammar the endpoint cannot honour
+    // is visible before it is typed rather than after it fails.
+    const specific = {
+      ...(filters.length > 0
         ? {
             filter: Flags.string({
               multiple: true,
-              description: `Filter as field=operation:value (operation defaults to equals). Fields: ${spec.filterFields.join(", ")}. Operations: ${options.operations.join(", ")}.`,
-            }),
-            sort: Flags.string({
-              description: `Sort as field:direction (asc|desc). Fields: ${spec.sortFields.join(", ")}.`,
+              description: `Filter as field=operation:value (operation defaults to equals). Fields: ${filters
+                .map(
+                  (field) =>
+                    `${field.field} (${field.operations.join("|")}${field.values ? `; values ${field.values.join("|")}` : ""}${field.combine === "or" ? "; repeats widen" : ""})`,
+                )
+                .join(", ")}.`,
             }),
           }
-        : Object.fromEntries(
-            spec.params.map((p) => [
-              p.flag,
-              p.multiple
-                ? Flags.string({
-                    description: p.description,
-                    multiple: true,
-                    options: p.options && [...p.options],
-                  })
-                : Flags.string({
-                    description: p.description,
-                    options: p.options && [...p.options],
-                  }),
-            ]),
-          );
-    const example =
-      spec.kind === "query"
-        ? `--filter ${spec.filterFields[0]}=${options.operations[0]}:<value> --sort ${spec.sortFields[0]}:desc`
-        : `--${spec.params[0]?.flag} ${spec.params[0]?.options?.[0] ?? "<value>"} --limit 50`;
+        : {}),
+      ...(sorts.length > 0
+        ? {
+            sort: Flags.string({
+              description: `Sort as field:direction (asc|desc). Fields: ${sorts.join(", ")}.`,
+            }),
+          }
+        : {}),
+    };
     return {
-      description: `List ${topic}.`,
+      description: `List ${topic}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
       examples: [
         `<%= config.bin %> ${topic} list --json`,
-        `<%= config.bin %> ${topic} list --all --json`,
-        `<%= config.bin %> ${topic} list ${example}`,
+        ...(paged && spec.drains !== true
+          ? [`<%= config.bin %> ${topic} list --all --json`]
+          : []),
+        ...(filters[0]
+          ? [
+              `<%= config.bin %> ${topic} list --filter ${filters[0].field}=${filters[0].operations[0]}:<value>${sorts[0] ? ` --sort ${sorts[0]}:desc` : ""}`,
+            ]
+          : []),
       ],
-      flags: { ...paging, ...specific, ...options.flags },
+      flags: { ...(paged ? paging : {}), ...presentation, ...specific, ...options.flags },
       args: {},
     };
   }
@@ -97,52 +103,66 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     { flags }: OperationInput,
     meta: GlobalOptions,
   ): Promise<CommandResult> {
-    const { topic, resource, spec, options } = this.definition;
+    const { topic, resource, spec } = this.definition;
     // With a schema in hand the columns are known before any request, so a
     // typo fails without contacting the server at all.
     const shape = fieldPaths(itemSchemaOf(spec.response, spec.items));
     const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
     const ctx = await this.connect(meta);
-    const paging = (token?: string): Json => ({
-      ...(typeof flags.limit === "number" && { limit: flags.limit }),
-      ...(token && { page_token: token }),
-    });
+    // An unpaged endpoint has no cursor flags to read and would reject the
+    // parameters anyway, so nothing is sent and one request is the whole list.
+    const paged = spec.paged !== false;
+    const paging = (token?: string): Json =>
+      paged
+        ? {
+            ...(typeof flags.limit === "number" && { limit: flags.limit }),
+            ...(token && { page_token: token }),
+          }
+        : {};
 
-    // One request per page. A query body is validated against the schema
-    // first, so an unknown filter field fails locally with the accepted
-    // values rather than as a server 400.
+    // One request per page. Filters are parsed and checked against each
+    // field's own declaration first, so an operation the endpoint does not
+    // offer fails locally with what that field accepts.
+    const parsed = (Array.isArray(flags.filter) ? flags.filter : []).map((raw) =>
+      parseFilter(String(raw), spec.filters ?? []),
+    );
+    const sorting =
+      typeof flags.sort === "string" ? parseSort(flags.sort, spec.sorts ?? []) : undefined;
+
+    // Transport is the only thing that differs: a structured query endpoint
+    // takes a validated body, a GET list takes flat parameters. The caller
+    // typed the same thing either way.
     const request = (token?: string): Promise<unknown> =>
-      spec.kind === "query"
+      spec.body
         ? spec.call(
             ctx,
             parseOrThrow(
               spec.body,
               {
                 ...paging(token),
-                ...(typeof flags.sort === "string" && {
-                  sorting: parseSort(flags.sort, spec.sortFields),
+                ...(sorting && { sorting }),
+                ...(parsed.length > 0 && {
+                  filter: parsed.map(({ field, operation, value }) => ({
+                    field: field.field,
+                    operation,
+                    value,
+                  })),
                 }),
-                ...(Array.isArray(flags.filter) &&
-                  flags.filter.length > 0 && {
-                    filter: flags.filter.map((raw) =>
-                      parseFilter(String(raw), spec.filterFields, options.operations),
-                    ),
-                  }),
               },
               "Invalid list query",
-              `Filter fields: ${spec.filterFields.join(", ")}. Sort fields: ${spec.sortFields.join(", ")}.`,
+              `Filter fields: ${(spec.filters ?? []).map((f) => f.field).join(", ")}. Sort fields: ${(spec.sorts ?? []).join(", ")}.`,
             ),
           )
         : spec.call(ctx, {
             ...paging(token),
-            ...Object.fromEntries(
-              spec.params
-                .filter((p) => flags[p.flag] !== undefined)
-                .map((p) => [p.param, flags[p.flag]]),
-            ),
+            ...queryParams(parsed),
+            ...(sorting && spec.sortParam ? { [spec.sortParam]: sorting.direction } : {}),
           });
 
-    const all = flags.all === true;
+    // A resource that drains by default does so only when the caller named no
+    // page: asking for one with --limit or --page-token is asking for one.
+    const asked = flags.limit !== undefined || flags["page-token"] !== undefined;
+    const all = paged && (flags.all === true || (spec.drains === true && !asked));
     // `--all` is one request per page, so a wide drain would otherwise sit
     // silent. The spinner is terminal-only: no animation reaches a pipe, and
     // `--json` has already silenced everything.
@@ -163,7 +183,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       {
         items: spec.items,
         all,
-        token: typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
+        token:
+          paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
       },
     )
       .then((page) => {
@@ -190,7 +211,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       next && !all
         ? [
             publicCliCommand(
-              [`${topic} list`, ...repeatedFlags(spec, flags), `--page-token ${shellArg(next)}`, "--json"].join(
+              [`${topic} list`, ...repeatedFlags(flags), `--page-token ${shellArg(next)}`, "--json"].join(
                 " ",
               ),
               meta.cliVersion,
@@ -224,21 +245,13 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  * sorting and filters that produced it, and the page size is part of what the
  * caller asked for. Values are re-emitted exactly as they were typed.
  */
-const repeatedFlags = <Ctx>(spec: ListSpec<Ctx>, flags: Json): readonly string[] => {
+const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  if (spec.kind === "query") {
-    const sort = typeof flags.sort === "string" ? [`--sort ${shellArg(flags.sort)}`] : [];
-    const filters = (Array.isArray(flags.filter) ? flags.filter : []).map(
-      (filter) => `--filter ${shellArg(String(filter))}`,
-    );
-    return [...limit, ...sort, ...filters];
-  }
-  const params = spec.params.flatMap((param) => {
-    const value = flags[param.flag];
-    const values = Array.isArray(value) ? value : value === undefined ? [] : [value];
-    return values.map((one) => `--${param.flag} ${shellArg(String(one))}`);
-  });
-  return [...limit, ...params];
+  const sort = typeof flags.sort === "string" ? [`--sort ${shellArg(flags.sort)}`] : [];
+  const filters = (Array.isArray(flags.filter) ? flags.filter : []).map(
+    (filter) => `--filter ${shellArg(String(filter))}`,
+  );
+  return [...limit, ...sort, ...filters];
 };
 
 /** Quote a value that a shell would otherwise split or interpret. */
@@ -246,3 +259,21 @@ const shellArg = (value: string): string =>
   /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 
 
+
+/**
+ * Parsed filters as the flat query parameters a GET list expects. A field
+ * names the parameter each of its operations travels as, and a field whose
+ * repeats widen collects its values into an array rather than overwriting.
+ */
+const queryParams = (parsed: readonly ParsedFilter[]): Json =>
+  parsed.reduce<Record<string, unknown>>((params, { field, operation, value }) => {
+    const key = field.params?.[operation] ?? field.field;
+    const existing = params[key];
+    if (field.combine !== "or") {
+      return { ...params, [key]: value };
+    }
+    return {
+      ...params,
+      [key]: Array.isArray(existing) ? [...existing, value] : existing === undefined ? [value] : [existing, value],
+    };
+  }, {});

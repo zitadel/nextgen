@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { ZitadelError } from "../../../errors";
 import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
-import { capitalize, dryRunResult, idArg } from "../shared";
+import { capitalize, dryRunResult, idArg, idValue } from "../shared";
 import type { DeleteSpec } from "../types";
 import {
   type OperationDefinition,
@@ -48,7 +48,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
     const { topic, resource, spec } = this.definition;
     const verb = spec.verb ?? "delete";
     const past = spec.outcome ?? (verb === "revoke" ? "revoked" : "deleted");
-    const id = String(args.id);
+    const id = idValue(resource, args);
 
     // A dry run makes no request, so it answers before the guard — the order
     // `reset` uses, and it keeps `--dry-run --non-interactive` usable.

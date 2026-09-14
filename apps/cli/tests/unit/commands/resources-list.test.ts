@@ -72,16 +72,34 @@ describe("zitadel resources", () => {
     expect(teams?.update_fields?.find((field) => field.flag === "--name")?.required).toBe(false);
   });
 
-  it("lists filter fields for query lists and flags for parameter lists", async () => {
+  it("reports one filter vocabulary for every list, with each field's operations", async () => {
     const res = await runCliForTest(["resources", "--json", "--non-interactive", "--no-telemetry"]);
     const resources = (
       parseJson(res.stdout) as {
-        data: { resources: Array<{ topic: string; filter_fields?: string[]; params?: string[] }> };
+        data: {
+          resources: Array<{
+            topic: string;
+            paged?: boolean;
+            drains?: boolean;
+            filters?: Array<{ field: string; operations: string[]; values?: string[]; combine?: string }>;
+          }>;
+        };
       }
     ).data.resources;
-    expect(resources.find((r) => r.topic === "teams")?.filter_fields).toContain("name");
-    expect(resources.find((r) => r.topic === "events")?.params).toContain("category");
-    expect(resources.find((r) => r.topic === "events")?.filter_fields).toBeUndefined();
+    const find = (topic: string, field: string) =>
+      resources.find((r) => r.topic === topic)?.filters?.find((f) => f.field === field);
+
+    // A structured query endpoint offers the full operation set...
+    expect(find("teams", "name")?.operations).toContain("contains");
+    // ...and a GET list is described in the same vocabulary, narrowed to what
+    // it actually accepts, so an agent never has to guess per transport.
+    expect(find("events", "category")?.operations).toEqual(["equals"]);
+    expect(find("events", "category")?.combine).toBe("or");
+    expect(find("schemas", "revisions")?.values).toEqual(["all", "latest"]);
+
+    // Paging is part of the same contract.
+    expect(resources.find((r) => r.topic === "branding")?.paged).toBe(false);
+    expect(resources.find((r) => r.topic === "schemas")?.drains).toBe(true);
   });
 
   it("names the property a delete's envelope carries, which is not always `deleted`", async () => {
@@ -105,6 +123,6 @@ describe("zitadel resources", () => {
     expect(res.stdout).toContain("resource");
     expect(res.stdout).toContain("users");
     expect(res.stdout).toContain("list, get, create, update, delete");
-    expect(res.stdout).toContain("6 resources");
+    expect(res.stdout).toContain(`${Object.keys(RESOURCES).length} resources`);
   });
 });

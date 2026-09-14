@@ -22,12 +22,15 @@ import {
 type Ctx = { token: string };
 
 const schema = z.object({ name: z.string() });
+const OPERATIONS = ["equals", "contains"] as const;
 const list: ListSpec<Ctx> = {
-  kind: "query",
   items: "teams",
   body: schema,
-  filterFields: ["name", "status"],
-  sortFields: ["created_at"],
+  filters: [
+    { field: "name", operations: OPERATIONS },
+    { field: "status", operations: OPERATIONS },
+  ],
+  sorts: ["created_at"],
   call: async () => ({ teams: [] }),
 };
 const get: GetSpec<Ctx> = { call: async () => ({}) };
@@ -76,20 +79,15 @@ describe("operation statics", () => {
     );
   });
 
-  it("list (params) exposes one flag per parameter", () => {
+  it("list (GET transport) shares the same filter grammar", () => {
+    // No `body`, so the request goes out as query parameters — but the caller
+    // sees the one `--filter` grammar, not a flag per parameter.
     const statics = ListOperation.describe(
       definition({
-        kind: "params" as const,
         items: "data",
-        params: [
-          {
-            flag: "category",
-            param: "category",
-            description: "c",
-            multiple: true,
-            options: ["a", "b"],
-          },
-          { flag: "actor-id", param: "actor_id", description: "a" },
+        filters: [
+          { field: "category", operations: ["equals"], values: ["a", "b"], combine: "or" as const },
+          { field: "actor_id", operations: ["equals"] },
         ],
         call: async () => ({ data: [] }),
       }),
@@ -100,11 +98,21 @@ describe("operation statics", () => {
       "all",
       "fields",
       "plain",
-      "category",
-      "actor-id",
+      "filter",
       "extra",
     ]);
-    expect(statics.examples[2]).toBe("<%= config.bin %> teams list --category a --limit 50");
+    const filter = statics.flags.filter as { description?: string };
+    expect(filter.description).toContain("category (equals; values a|b; repeats widen)");
+    expect(statics.examples[2]).toBe(
+      "<%= config.bin %> teams list --filter category=equals:<value>",
+    );
+  });
+
+  it("omits the paging flags for an unpaginated list", () => {
+    const statics = ListOperation.describe(
+      definition({ items: "data", paged: false, call: async () => ({ data: [] }) }),
+    );
+    expect(Object.keys(statics.flags)).toEqual(["fields", "plain", "extra"]);
   });
 
   it("get, update, and delete take an id argument; create does not", () => {

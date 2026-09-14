@@ -42,7 +42,7 @@ Resource first, plural, then the verb. `zitadel users create`, not
   `--debug`, so `--data` has no short form. A short flag that means one thing
   here and another elsewhere is worse than no short flag.
 
-### 3. Six resources, and verbs only where an endpoint already exists
+### 3. Eleven resources, and verbs only where an endpoint already exists
 
 | Resource | Verbs |
 |---|---|
@@ -52,9 +52,20 @@ Resource first, plural, then the verb. `zitadel users create`, not
 | `projects` | `list` `get` `update` |
 | `sessions` | `list` `get` `revoke` |
 | `events` | `list` `get` |
+| `schemas`, `environments`, `releases`, `flow-definitions`, `branding` | `list` `get` |
 
-Gaps are the API's gaps. The CLI does not synthesise a missing verb out of
-other calls, and it does not hide one that exists. A verb is named after what
+Configuration resources are readable but never writable here. They are authored
+as files and shipped through a release (§1), so a write verb would be a second
+writer over the same state — but reading what the server currently holds is how
+you check that a deploy landed, and refusing that would be dogma rather than
+design.
+
+Elsewhere the verb set follows the endpoints. The CLI does not synthesise a
+missing verb out of other calls, and it does not hide one that exists — with
+two deliberate exceptions: `POST /projects` is unauthenticated bootstrap that
+mints secrets into `.zitadel/secret`, which is `setup`'s job, and `POST
+/sessions` mints an end-user session, which belongs to the SDKs and the login
+flow rather than to a terminal. A verb is named after what
 the endpoint does: sessions are `revoke`d because that is the operation, and
 `teams delete` reports `deactivated` because [ADR 024](024-user-team-lifecycle-ownership.md)
 makes deletion a deactivation.
@@ -179,19 +190,39 @@ with no body, so success echoes the id beside an outcome property —
 `deleted`, `revoked`, or `deactivated` — rather than inventing a resource the
 server did not return.
 
-### 11. Paging, filtering, and sorting follow the API's own model
+### 11. One filter grammar, whatever the transport
 
-`--limit` / `--page-token` / `--all` expose cursor pagination directly
-([ADR 027](027-cursor-based-pagination.md)) rather than inventing page numbers
-the server does not have; `--all` drains pages client-side and is the only
-place the CLI loops, so it stops with an error if a cursor repeats — an
-unbounded follow of a server-supplied token is a hang wearing a progress
-spinner. `--filter field=operation:value` is repeatable and
-combines with AND, matching the structured query endpoints
-([ADR 031](031-openapi-querying.md)); the operation defaults to `equals` so the
-common case stays short. `--sort field:direction` takes one key, because the
-endpoints accept one. Unknown fields are rejected locally with a near-miss
-suggestion.
+Every list takes `--filter field=operation:value`, repeatable, and `--sort
+field:direction` where the endpoint can sort. The caller writes the same thing
+for `users` as for `events`, and the registry decides how it reaches the wire:
+a structured query endpoint receives a validated filter body
+([ADR 031](031-openapi-querying.md)), a `GET` list receives query parameters —
+including an endpoint that spells one field's range as two parameters
+(`created_after`, `created_before`) while the caller still writes
+`created_at=greater_than_or_equal:…`.
+
+**This abstracts the transport, not the capability.** Each field declares the
+operations it actually accepts, so `--help` and `zitadel resources --json` name
+them per field, and an operation the endpoint cannot honour is refused locally,
+saying which field is the limitation. The CLI never advertises a filter that
+would fail at the server, and never silently drops one. What it refuses to do
+is make the caller learn a second grammar because the endpoint behind one
+resource was written differently from the endpoint behind another.
+
+Repeated uses of a field combine with AND, except where a field declares
+otherwise — a repeated `GET` parameter widens rather than narrows, so that
+field says so, and both the flag help and the discovery output repeat it.
+Hiding that difference would change what a query means.
+
+Paging is declared the same way: `--limit` / `--page-token` / `--all` expose
+cursor pagination directly ([ADR 027](027-cursor-based-pagination.md)); a list
+whose endpoint has no cursor declares itself unpaged and has no paging flags
+rather than advertising ones the server ignores; and a list whose partial
+answer would read as a complete one — a revision history — declares that a bare
+invocation drains, with `--limit` or `--page-token` still returning one page.
+`--all` is the only place the CLI loops, and it stops with an error if a cursor
+repeats, since an unbounded follow of a server-supplied token is a hang wearing
+a progress spinner.
 
 ### 12. Credentials never reach a command line
 
@@ -227,10 +258,18 @@ already a mistake.
 
 ### 13. The command surface follows the API, not the reverse
 
-Where the CLI looks inconsistent because an endpoint is inconsistent — `events`
-reads through `GET` while every other list uses `POST /<resource>/query` — the
-CLI mirrors the deviation and the API is what gets fixed. A CLI that papers
-over the shape teaches a shape that is not real.
+The line is between transport and meaning. How a filter travels — a query body
+or a query parameter, one parameter or two — is plumbing, and §11 hides it so
+the surface stays learnable. What a filter *can do* is meaning, and that is
+never invented: an operation the endpoint lacks is refused, a verb it lacks is
+absent, a field it cannot sort by gets no `--sort`.
+
+So `events`, `schemas` and `flow-definitions` reading through `GET` while every
+other list uses `POST /<resource>/query` is smoothed over in the spelling and
+recorded as an open question for the API — three resources, not one, so it is a
+pattern rather than an exception. A CLI that papers over a *capability* teaches
+a shape that is not real; one that papers over a *calling convention* spares
+its users someone else's history.
 
 ### 14. Four facts are frozen for agents
 
@@ -266,15 +305,24 @@ not own.
 These are the places where the CLI surfaced something the API should decide.
 Recorded here because §12 makes them the API's problem, not the CLI's:
 
-- `events` reads through `GET` with query parameters while every other list uses
-  `POST /<resource>/query`. Either the deviation is intended and should be
-  written down, or events should move.
+- `events`, `schemas` and `flow-definitions` read through `GET` with query
+  parameters while every other list uses `POST /<resource>/query`. The CLI
+  hides the difference (§11), but these endpoints accept only `equals`, sort by
+  at most one implicit field, and spell a range as two parameters — so the
+  capability gap is real even where the spelling is not. Either the deviation
+  is intended and should be written down, or these should move.
+- `GET /releases` answered 500 on a project with no releases, on the prebuilt
+  server this branch was tested against. It may already be fixed; it is
+  recorded because the CLI is how it was noticed.
 - Three filter operations are advertised by the query contract but answer 501.
   The CLI offers them because the contract does; today they fail at runtime.
 - `users` cannot be filtered by email, which is the field a human most often
   has in hand.
 - Grants have no update endpoint, so a grant is changed by deleting and
   recreating it.
+- `GET /branding` is the only list with no cursor at all, and answers with a
+  bare array rather than the `{ items, next_page_token }` envelope every other
+  list uses.
 - Sensitivity is not carried end to end. `writeOnly` is accepted and reserved
   on a user property but unenforced, `format: password` appears in the OpenAPI
   documents, and code generation drops both — so the CLI cannot derive what is
