@@ -78,21 +78,150 @@ Which environments does this project need?
 
 `dev` is preselected; at least one selection is required.
 
-Each selected environment then gets an issuer, because a production environment
-is invalid without one. `dev` is prefilled with the detected local development
-origin — the dev-server port the wizard already asks for — and the rest are
-asked for, blank for a non-production environment and required for `prod`:
+Each selected environment is then asked where it is served (its `issuer`). Because developers might not know where each environment is served, they can leave it blank. `dev` is pre-filled with the local development origin the wizard already derived from the dev-server port.
+
+An `issuer` is what makes the class answerable, so `production` follows from it: given one on `prod`, the CLI marks the environment production without asking, because it offered that name and defined what it means; given one on a name the developer typed, it asks. A blank answer skips the question entirely — an environment with no origin cannot be production.
+
+The answers are written as one file per environment under `.zitadel/environments/`, and `setup` applies them. Nothing it writes can be rejected: an environment is only marked production when an origin was given for it, so the wizard never produces a file its own schema refuses.
+
+<details>
+<summary>setup command environments question examples</summary>
+
+`›` marks what the developer types or ticks.
+
+**1. One environment.** Nothing else to decide, and `zitadel deploy` never
+needs `--env`.
+
+```
+Which environments does this project need?
+
+› [X] dev
+  [ ] staging
+  [ ] prod
+  [ ] Other — enter a name
+
+Where is dev served?
+› http://localhost:3000            ← pre-filled, enter to accept
+
+ENVIRONMENTS
+✓ dev    http://localhost:3000
+```
+
+```json
+{ "$schema": "../meta/environment.json", "name": "dev", "issuer": "http://localhost:3000" }
+```
+
+**2. `prod`, domain known.**
+
+```
+Which environments does this project need?
+
+› [X] dev
+  [ ] staging
+› [X] prod
+  [ ] Other — enter a name
+
+Where is dev served?
+› http://localhost:3000
+
+Where is prod served?
+  Leave blank if you do not know yet — add it to
+  .zitadel/environments/prod.json before deploying.
+› https://acme.com
+
+ENVIRONMENTS
+✓ dev     http://localhost:3000
+✓ prod    https://acme.com         production
+```
+
+```json
+{ "$schema": "../meta/environment.json", "name": "prod", "issuer": "https://acme.com", "production": true }
+```
+
+Note there was no class question. This is the one place the CLI decides
+something for you: pick `prod` from the list, give it an origin, and it is
+marked `production: true` without being asked. `prod` is an option the wizard
+wrote and defined the meaning of, so it is not reading intent from a name — any
+other name, including one the developer types, is asked about. That is the only
+implicit rule in the flow; everything else here is a question with an answer.
+
+**3. `prod`, domain not known yet.** No origin, so no class, and nothing to
+ask. The environment exists and is inert.
 
 ```
 Where is prod served?
+  Leave blank if you do not know yet — add it to
+  .zitadel/environments/prod.json before deploying.
+› ↵
 
-  https://acme.com
+ENVIRONMENTS
+✓ dev     http://localhost:3000
+✓ prod    — no origin declared
 ```
 
-The answers are written as one file per environment under
-`.zitadel/environments/`. A developer who does not know their production origin
-yet leaves `prod` out of the set and adds it later; selecting it and declining
-to name an origin is not an option the wizard offers.
+```json
+{ "$schema": "../meta/environment.json", "name": "prod" }
+```
+
+When the prod domain is known, the environment JSON file is edit and applied:
+
+```diff
+  {
+    "$schema": "../meta/environment.json",
+    "name": "prod",
++   "issuer": "https://acme.com",
++   "production": true
+  }
+```
+
+```
+$ zitadel environments apply
+  ~ prod   + issuer https://acme.com, promoted to production
+```
+
+**4. Typed names.** `qa` is skipped by the class question because it has no
+origin; `production-eu` is asked because the developer typed that name.
+
+```
+Which environments does this project need?
+
+› [X] dev
+  [ ] staging
+  [ ] prod
+› [X] Other — enter a name
+
+Name?
+› qa
+Add another? (y/N)
+› y
+Name?
+› production-eu
+Add another? (y/N)
+› ↵
+
+Where is dev served?
+› http://localhost:3000
+
+Where is qa served?
+› ↵                                ← blank: no class question follows
+
+Where is production-eu served?
+› https://eu.acme.com
+Is production-eu a production environment?  (y/N)
+› y
+
+ENVIRONMENTS
+✓ dev             http://localhost:3000
+✓ qa              — no origin declared
+✓ production-eu   https://eu.acme.com     production
+```
+
+```json
+{ "$schema": "../meta/environment.json", "name": "qa" }
+{ "$schema": "../meta/environment.json", "name": "production-eu", "issuer": "https://eu.acme.com", "production": true }
+```
+
+</details>
 
 The project itself is created with exactly one environment named `dev`, seeded server-side inside the creation transaction. That is what guarantees the at-least-one invariant for every caller.
 
