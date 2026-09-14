@@ -292,6 +292,21 @@ func userRefToAPI(ref domain.UserRef) api.UserRef {
 	return out
 }
 
+func userMetadataToAPI(user *domain.User) api.UserMetadata {
+	var lifecycleOwnerTeamID api.OptNilString
+	if teamID, ok := user.OwningTeamID(); ok {
+		lifecycleOwnerTeamID.SetTo(teamID)
+	} else {
+		lifecycleOwnerTeamID.SetToNull()
+	}
+	return api.UserMetadata{
+		CreatedAt:            user.Metadata.CreatedAt,
+		UpdatedAt:            user.Metadata.UpdatedAt,
+		Status:               api.UserMetadataStatus(user.Metadata.Status),
+		LifecycleOwnerTeamID: lifecycleOwnerTeamID,
+	}
+}
+
 func domainUserToApiUser(user *domain.User) (*api.User, error) {
 	userData, err := user.Attributes.ToMap()
 	if err != nil {
@@ -303,23 +318,11 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 		return nil, err
 	}
 
-	var lifecycleOwnerTeamID api.OptNilString
-	if teamID, ok := user.OwningTeamID(); ok {
-		lifecycleOwnerTeamID.SetTo(teamID)
-	} else {
-		lifecycleOwnerTeamID.SetToNull()
-	}
-
 	out := &api.User{
 		ID:         api.UserID(user.ID),
 		Schema:     user.SchemaURL,
 		Attributes: *attributes,
-		Metadata: api.UserMetadata{
-			CreatedAt:            user.Metadata.CreatedAt,
-			UpdatedAt:            user.Metadata.UpdatedAt,
-			Status:               api.UserMetadataStatus(user.Metadata.Status),
-			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
-		},
+		Metadata:   userMetadataToAPI(user),
 	}
 
 	// The derived identity of ADR 058 §3a: identifier and identifier_property

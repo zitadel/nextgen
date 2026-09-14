@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/table";
 
 import { api } from "../../../api/zitadel";
-import { field } from "../../../lib/record";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 /**
@@ -168,9 +167,9 @@ function AdminsScreen() {
  * always exists — and which is what the operator needs to know which grant
  * they are revoking.
  *
- * Discriminate on which of `user` or `team` is present. They are separate
- * objects and the type ties neither to a kind field, so the values are read
- * the way the console reads every other open record: defensively, by name.
+ * Discriminate on which of `user` or `team` is present. Label from the
+ * team's name or the user's `display` / `identifier`; the id is always
+ * the last fallback in `toAdminRow`.
  */
 function toAdminRow(grant: Grant): AdminRow {
   return {
@@ -181,12 +180,7 @@ function toAdminRow(grant: Grant): AdminRow {
 }
 
 function principalName(grant: Grant): string | undefined {
-  if (grant.team) {
-    return grant.team.name;
-  }
-  if (!grant.user) return undefined;
-  const user = grant.user as unknown as Record<string, unknown>;
-  return field(user, "display") ?? field(user, "identifier");
+  return grant.team?.name ?? grant.user?.display ?? grant.user?.identifier;
 }
 
 /**

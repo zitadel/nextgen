@@ -28,11 +28,7 @@ properties:
       created using the `/schemas` endpoint. A default schema is provided.
       This schema can be retrieved using the same endpoint.
   attributes:
-    type: object
-    additionalProperties: true
-    description: |
-      The user's content, satisfying the schema named by `schema`. Property
-      names and types are determined entirely by that schema.
+    $ref: ../../components/schemas/user-attributes.yaml
   metadata:
     readOnly: true
     $ref: user-metadata.yaml

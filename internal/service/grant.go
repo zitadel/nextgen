@@ -68,6 +68,10 @@ type CreateGrantInput struct {
 }
 
 func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Grant, error) {
+	input.UserID = strings.TrimSpace(input.UserID)
+	input.Identifier = strings.TrimSpace(input.Identifier)
+	input.TeamID = strings.TrimSpace(input.TeamID)
+	input.TeamName = strings.TrimSpace(input.TeamName)
 	if err := validateCreateGrant(input); err != nil {
 		return nil, err
 	}
@@ -168,30 +172,26 @@ func (s *GrantService) Revoke(ctx context.Context, projectID, id string) error {
 }
 
 func validateCreateGrant(input CreateGrantInput) error {
-	userID := strings.TrimSpace(input.UserID)
-	identifier := strings.TrimSpace(input.Identifier)
-	teamID := strings.TrimSpace(input.TeamID)
-	teamName := strings.TrimSpace(input.TeamName)
 	n := 0
-	if userID != "" {
+	if input.UserID != "" {
 		n++
 	}
-	if identifier != "" {
+	if input.Identifier != "" {
 		n++
 	}
-	if teamID != "" {
+	if input.TeamID != "" {
 		n++
 	}
-	if teamName != "" {
+	if input.TeamName != "" {
 		n++
 	}
 	if n != 1 {
 		return domain.ErrGrantInvalid().WithDetails("exactly one of user.user_id, user.identifier, team.team_id, or team.name is required")
 	}
-	if userID != "" && !domain.PrefixUser.Matches(userID) {
+	if input.UserID != "" && !domain.PrefixUser.Matches(input.UserID) {
 		return domain.ErrGrantInvalid().WithDetails("user_id must use the user_ prefix")
 	}
-	if teamID != "" && !domain.PrefixTeam.Matches(teamID) {
+	if input.TeamID != "" && !domain.PrefixTeam.Matches(input.TeamID) {
 		return domain.ErrGrantInvalid().WithDetails("team_id must use the team_ prefix")
 	}
 	if _, ok := allowedGrantRelations[input.Relation]; !ok {
@@ -212,34 +212,18 @@ func (s *GrantService) locatorHome(grantProjectID string) string {
 
 func (s *GrantService) resolveLocator(ctx context.Context, stmts AllStatements, input CreateGrantInput) (domain.AuthzPrincipalType, string, error) {
 	switch {
-	case strings.TrimSpace(input.UserID) != "":
-		userID := strings.TrimSpace(input.UserID)
-		home, err := s.resolvePrincipalHome(ctx, stmts, domain.AuthzPrincipalTypeUser, userID)
-		if err != nil {
-			return "", "", err
-		}
-		if err := s.loadPrincipal(ctx, stmts, home, domain.AuthzPrincipalTypeUser, userID); err != nil {
-			return "", "", err
-		}
-		return domain.AuthzPrincipalTypeUser, userID, nil
-	case strings.TrimSpace(input.Identifier) != "":
-		id, err := s.resolveUserByIdentifier(ctx, stmts, s.locatorHome(input.ProjectID), strings.TrimSpace(input.Identifier))
+	case input.UserID != "":
+		return s.resolveByID(ctx, stmts, domain.AuthzPrincipalTypeUser, input.UserID)
+	case input.Identifier != "":
+		id, err := s.resolveUserByIdentifier(ctx, stmts, s.locatorHome(input.ProjectID), input.Identifier)
 		if err != nil {
 			return "", "", err
 		}
 		return domain.AuthzPrincipalTypeUser, id, nil
-	case strings.TrimSpace(input.TeamID) != "":
-		teamID := strings.TrimSpace(input.TeamID)
-		home, err := s.resolvePrincipalHome(ctx, stmts, domain.AuthzPrincipalTypeTeam, teamID)
-		if err != nil {
-			return "", "", err
-		}
-		if err := s.loadPrincipal(ctx, stmts, home, domain.AuthzPrincipalTypeTeam, teamID); err != nil {
-			return "", "", err
-		}
-		return domain.AuthzPrincipalTypeTeam, teamID, nil
-	case strings.TrimSpace(input.TeamName) != "":
-		id, err := s.resolveTeamByName(ctx, stmts, s.locatorHome(input.ProjectID), strings.TrimSpace(input.TeamName))
+	case input.TeamID != "":
+		return s.resolveByID(ctx, stmts, domain.AuthzPrincipalTypeTeam, input.TeamID)
+	case input.TeamName != "":
+		id, err := s.resolveTeamByName(ctx, stmts, s.locatorHome(input.ProjectID), input.TeamName)
 		if err != nil {
 			return "", "", err
 		}
@@ -249,16 +233,25 @@ func (s *GrantService) resolveLocator(ctx context.Context, stmts AllStatements, 
 	}
 }
 
+func (s *GrantService) resolveByID(ctx context.Context, stmts AllStatements, principalType domain.AuthzPrincipalType, id string) (domain.AuthzPrincipalType, string, error) {
+	home, err := s.resolvePrincipalHome(ctx, stmts, principalType, id)
+	if err != nil {
+		return "", "", err
+	}
+	if err := s.loadPrincipal(ctx, stmts, home, principalType, id); err != nil {
+		return "", "", err
+	}
+	return principalType, id, nil
+}
+
 func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllStatements, home, identifier string) (string, error) {
 	urlsByKey, err := s.designatedIdentifierKeys(ctx, stmts, home)
 	if err != nil {
 		return "", err
 	}
 	found := map[string]struct{}{}
+	var matchID string
 	for key, urls := range urlsByKey {
-		if len(urls) == 0 {
-			continue
-		}
 		user, err := stmts.GetUser(ctx, database.And(
 			database.Equal(database.Col(domain.UserFieldProjectID), home),
 			database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
@@ -281,6 +274,7 @@ func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllSta
 			return "", err
 		}
 		found[user.ID] = struct{}{}
+		matchID = user.ID
 	}
 	if len(found) != 1 {
 		if len(found) > 1 {
@@ -291,10 +285,7 @@ func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllSta
 		}
 		return "", domain.ErrGrantPrincipalNotFound()
 	}
-	for id := range found {
-		return id, nil
-	}
-	return "", domain.ErrGrantPrincipalNotFound()
+	return matchID, nil
 }
 
 // designatedIdentifierKeys maps each x-identifier property to the schema URLs
@@ -303,22 +294,7 @@ func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllSta
 // for example) cannot be selected.
 func (s *GrantService) designatedIdentifierKeys(ctx context.Context, stmts AllStatements, projectID string) (map[string][]string, error) {
 	ctx = WithAuthzListUnrestricted(ctx)
-	list := func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
-		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
-			Filter: database.And(
-				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
-			),
-			Pagination: database.Page[domain.JSONSchemaField]{
-				Limit:  refSchemaPageSize,
-				Cursor: cursor,
-				OrderBy: database.OrderBy[domain.JSONSchemaField]{
-					Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldURL)},
-					Direction: database.OrderAsc,
-				},
-			},
-		}, JSONSchemaQueryOptions{})
-	}
+	list := listUserSchemas(ctx, stmts, projectID)
 	first, err := list(nil)
 	if err != nil {
 		return nil, err

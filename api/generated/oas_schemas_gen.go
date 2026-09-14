@@ -22231,17 +22231,16 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 	return m
 }
 
-// Expand the bound user or team on each returned grant (ADR 059, grant
-// exception: extras are inlined onto `user` / `team`, not a sibling).
-// - `principal`: add User envelope fields (`schema`, `attributes`,
-// `metadata`) on `user`, or Team `status` / `created_at` / `updated_at`
-// on `team`. The ref (`user_id` / `team_id`) is always present. When the
-// principal cannot be loaded, the object stays a degraded ref — the same
-// shape as not expanding.
-// Requires `user.read` and `team.read` in addition to `project.read`.
-// Both are checked on the whole request before the list, because a mixed
-// page is the common case. A caller who may not read either resource
-// receives 403 rather than silently omitting extras.
+// Ask for extra fields on the bound user or team. Those extras land on
+// `user` or `team` themselves; there is no sibling `principal` object.
+// `principal` adds `schema`, `attributes`, and `metadata` on `user`, or
+// `status`, `created_at`, and `updated_at` on `team`. The id (`user_id` /
+// `team_id`) is always present. If the user or team cannot be loaded, the
+// object stays id-only — the same shape as not expanding.
+// Expanding requires `user.read` and `team.read` in addition to
+// `project.read`. Both are checked once for the whole request. If the
+// caller lacks either, the request is 403; extras are not omitted
+// silently.
 // Ref: #
 type GrantExpand string
 
@@ -22781,11 +22780,9 @@ type GrantUser struct {
 	// The schema that defines `attributes`. Present only when the request
 	// asked for `expand: ["principal"]` and the user could be loaded.
 	Schema OptString `json:"schema"`
-	// The user's content, satisfying the schema named by `schema`. Property
-	// names and types are determined entirely by that schema. Present only
-	// when the request asked for `expand: ["principal"]` and the user
-	// could be loaded.
-	Attributes OptGrantUserAttributes `json:"attributes"`
+	// Present only when the request asked for `expand: ["principal"]` and
+	// the user could be loaded.
+	Attributes OptUserAttributes `json:"attributes"`
 	// Server-owned user envelope. Present only when the request asked
 	// for `expand: ["principal"]` and the user could be loaded. Grant
 	// expand does not populate `lifecycle_owner_team`.
@@ -22818,7 +22815,7 @@ func (s *GrantUser) GetSchema() OptString {
 }
 
 // GetAttributes returns the value of Attributes.
-func (s *GrantUser) GetAttributes() OptGrantUserAttributes {
+func (s *GrantUser) GetAttributes() OptUserAttributes {
 	return s.Attributes
 }
 
@@ -22853,28 +22850,13 @@ func (s *GrantUser) SetSchema(val OptString) {
 }
 
 // SetAttributes sets the value of Attributes.
-func (s *GrantUser) SetAttributes(val OptGrantUserAttributes) {
+func (s *GrantUser) SetAttributes(val OptUserAttributes) {
 	s.Attributes = val
 }
 
 // SetMetadata sets the value of Metadata.
 func (s *GrantUser) SetMetadata(val OptUserMetadata) {
 	s.Metadata = val
-}
-
-// The user's content, satisfying the schema named by `schema`. Property
-// names and types are determined entirely by that schema. Present only
-// when the request asked for `expand: ["principal"]` and the user
-// could be loaded.
-type GrantUserAttributes map[string]jx.Raw
-
-func (s *GrantUserAttributes) init() GrantUserAttributes {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // The handoff token and metadata for session exchange.
@@ -29586,52 +29568,6 @@ func (o OptGrantUser) Or(d GrantUser) GrantUser {
 	return d
 }
 
-// NewOptGrantUserAttributes returns new OptGrantUserAttributes with value set to v.
-func NewOptGrantUserAttributes(v GrantUserAttributes) OptGrantUserAttributes {
-	return OptGrantUserAttributes{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptGrantUserAttributes is optional GrantUserAttributes.
-type OptGrantUserAttributes struct {
-	Value GrantUserAttributes
-	Set   bool
-}
-
-// IsSet returns true if OptGrantUserAttributes was set.
-func (o OptGrantUserAttributes) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptGrantUserAttributes) Reset() {
-	var v GrantUserAttributes
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptGrantUserAttributes) SetTo(v GrantUserAttributes) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptGrantUserAttributes) Get() (v GrantUserAttributes, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptGrantUserAttributes) Or(d GrantUserAttributes) GrantUserAttributes {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptInt returns new OptInt with value set to v.
 func NewOptInt(v int) OptInt {
 	return OptInt{
@@ -34940,6 +34876,52 @@ func (o OptUserAlreadyExistsDetails) Get() (v UserAlreadyExistsDetails, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserAlreadyExistsDetails) Or(d UserAlreadyExistsDetails) UserAlreadyExistsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserAttributes returns new OptUserAttributes with value set to v.
+func NewOptUserAttributes(v UserAttributes) OptUserAttributes {
+	return OptUserAttributes{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserAttributes is optional UserAttributes.
+type OptUserAttributes struct {
+	Value UserAttributes
+	Set   bool
+}
+
+// IsSet returns true if OptUserAttributes was set.
+func (o OptUserAttributes) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserAttributes) Reset() {
+	var v UserAttributes
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserAttributes) SetTo(v UserAttributes) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserAttributes) Get() (v UserAttributes, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserAttributes) Or(d UserAttributes) UserAttributes {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -47800,9 +47782,7 @@ type User struct {
 	// The schema that defines the content of `attributes`. These schemas can be
 	// created using the `/schemas` endpoint. A default schema is provided.
 	// This schema can be retrieved using the same endpoint.
-	Schema string `json:"schema"`
-	// The user's content, satisfying the schema named by `schema`. Property
-	// names and types are determined entirely by that schema.
+	Schema     string         `json:"schema"`
 	Attributes UserAttributes `json:"attributes"`
 	Metadata   UserMetadata   `json:"metadata"`
 	// The current value of the user schema's designated identifier
@@ -47982,6 +47962,7 @@ func (s *UserAlreadyExistsDetails) init() UserAlreadyExistsDetails {
 
 // The user's content, satisfying the schema named by `schema`. Property
 // names and types are determined entirely by that schema.
+// Ref: #
 type UserAttributes map[string]jx.Raw
 
 func (s *UserAttributes) init() UserAttributes {

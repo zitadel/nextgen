@@ -200,23 +200,12 @@ func grantUserResponse(g *service.Grant) (api.GrantUser, error) {
 	if err != nil {
 		return out, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
 	}
-	attributes, err := convertUsingJson[api.GrantUserAttributes](userData)
+	attributes, err := convertUsingJson[api.UserAttributes](userData)
 	if err != nil {
 		return out, err
 	}
 	out.Attributes.SetTo(*attributes)
-	var lifecycleOwnerTeamID api.OptNilString
-	if teamID, ok := u.OwningTeamID(); ok {
-		lifecycleOwnerTeamID.SetTo(teamID)
-	} else {
-		lifecycleOwnerTeamID.SetToNull()
-	}
-	out.Metadata.SetTo(api.UserMetadata{
-		CreatedAt:            u.Metadata.CreatedAt,
-		UpdatedAt:            u.Metadata.UpdatedAt,
-		Status:               api.UserMetadataStatus(u.Metadata.Status),
-		LifecycleOwnerTeamID: lifecycleOwnerTeamID,
-	})
+	out.Metadata.SetTo(userMetadataToAPI(u))
 	return out, nil
 }
 

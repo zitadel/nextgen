@@ -14,13 +14,10 @@ allOf:
           The schema that defines `attributes`. Present only when the request
           asked for `expand: ["principal"]` and the user could be loaded.
       attributes:
-        type: object
-        additionalProperties: true
         description: |
-          The user's content, satisfying the schema named by `schema`. Property
-          names and types are determined entirely by that schema. Present only
-          when the request asked for `expand: ["principal"]` and the user
-          could be loaded.
+          Present only when the request asked for `expand: ["principal"]` and
+          the user could be loaded.
+        $ref: ../../components/schemas/user-attributes.yaml
       metadata:
         description: |
           Server-owned user envelope. Present only when the request asked
