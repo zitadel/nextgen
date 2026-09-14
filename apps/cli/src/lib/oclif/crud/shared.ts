@@ -7,8 +7,18 @@ import type { Json, ResourceDescriptor, Schema } from "./types";
 
 /** Helpers shared by more than one verb builder. */
 
-export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) =>
-  ({ id: Args.string({ required: true, description: `${resource.singular} id` }) }) as const;
+/** The name of a resource's positional argument. */
+export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resource.idArg ?? "id";
+
+/** The single positional argument the id-taking verbs share. */
+export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
+  const name = idName(resource);
+  return { [name]: Args.string({ required: true, description: `${resource.singular} ${name}` }) };
+};
+
+/** The value the caller passed for that argument. */
+export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string =>
+  String(args[idName(resource)]);
 
 export const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 

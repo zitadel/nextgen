@@ -6,9 +6,13 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { RESOURCES } from "../../../src/commands/resources";
+import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
-import { parseFilter, parseSort } from "../../../src/lib/oclif/crud";
+import {
+  parseFilter,
+  parseSort,
+  type ResourceDescriptor,
+} from "../../../src/lib/oclif/crud";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
@@ -52,9 +56,13 @@ async function run(cwd: string, argv: string[]) {
   return runCliForTest([...argv, "--cwd", cwd, "--server", SERVER, "--json", "--non-interactive"]);
 }
 
+/** The registry as the factory sees it, so a heterogeneous table still types. */
+const entries = (): Array<[string, ResourceDescriptor<Platform>]> =>
+  Object.entries(RESOURCES) as Array<[string, ResourceDescriptor<Platform>]>;
+
 describe("resource registry", () => {
   it("registers list/get/create/update/delete commands for every entry", () => {
-    for (const [topic, resource] of Object.entries(RESOURCES)) {
+    for (const [topic, resource] of entries()) {
       expect(COMMANDS[`${topic}:list`], `${topic}:list`).toBeDefined();
       expect(COMMANDS[`${topic}:get`], `${topic}:get`).toBeDefined();
       expect(Boolean(COMMANDS[`${topic}:create`])).toBe(Boolean(resource.create));
@@ -65,18 +73,23 @@ describe("resource registry", () => {
   });
 
   it("advertises only filter and sort fields the generated query schemas accept", () => {
-    for (const [topic, resource] of Object.entries(RESOURCES)) {
+    // Only a spec carrying `body` is sent as a structured query, and that body
+    // is the authority on which fields exist. A GET list has no such schema,
+    // so its fields are pinned by the live tests below instead.
+    let checked = 0;
+    for (const [topic, resource] of entries()) {
       const list = resource.list;
-      if (!list || list.kind !== "query") {
+      if (!list?.body) {
         continue;
       }
-      for (const field of list.filterFields) {
+      checked += 1;
+      for (const { field } of list.filters ?? []) {
         const result = list.body.safeParse({
           filter: [{ field, operation: "equals", value: "x" }],
         });
         expect(result.success, `${topic} filter field ${field}`).toBe(true);
       }
-      for (const field of list.sortFields) {
+      for (const field of list.sorts ?? []) {
         const result = list.body.safeParse({ sorting: { field, direction: "asc" } });
         expect(result.success, `${topic} sort field ${field}`).toBe(true);
       }
@@ -85,29 +98,32 @@ describe("resource registry", () => {
           .success,
       ).toBe(false);
     }
+    // Guard against this check quietly covering nothing, which is what it did
+    // when the registry shape changed underneath it.
+    expect(checked).toBe(5);
   });
 });
 
 describe("filter grammar", () => {
   it("parses field=op:value and defaults the operation to equals", () => {
-    expect(parseFilter("status=active", ["status"], OPERATIONS)).toEqual({
-      field: "status",
+    const fields = [
+      { field: "status", operations: OPERATIONS },
+      { field: "created_at", operations: OPERATIONS },
+      { field: "id", operations: OPERATIONS },
+    ];
+    expect(parseFilter("status=active", fields)).toMatchObject({
       operation: "equals",
       value: "active",
     });
-    expect(
-      parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", ["created_at"], OPERATIONS),
-    ).toEqual({
-      field: "created_at",
+    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", fields)).toMatchObject({
       operation: "greater_than",
       value: "2026-01-01T00:00:00Z",
     });
-    expect(parseFilter("id=equals:a:b", ["id"], OPERATIONS)).toEqual({
-      field: "id",
+    expect(parseFilter("id=equals:a:b", fields)).toMatchObject({
       operation: "equals",
       value: "a:b",
     });
-    expect(() => parseFilter("nonsense", ["id"], OPERATIONS)).toThrow(/Invalid --filter/);
+    expect(() => parseFilter("nonsense", fields)).toThrow(/Invalid --filter/);
   });
 
   it("parses field:direction and defaults to asc", () => {
@@ -199,7 +215,7 @@ describe("users list", () => {
     const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.hint).toContain("Filter fields");
+    expect(json.hint).toContain("Filterable fields");
   });
 
   it("emits tab-separated rows when stdout is not a terminal", async () => {
@@ -690,10 +706,10 @@ describe("next page suggestion", () => {
     const res = await run(cwd, [
       "events",
       "list",
-      "--category",
-      "entity",
-      "--category",
-      "auth",
+      "--filter",
+      "category=entity",
+      "--filter",
+      "category=auth",
       "--limit",
       "1",
     ]);
@@ -701,7 +717,7 @@ describe("next page suggestion", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { next_commands: string[] } };
     expect(json.data.next_commands[0]).toContain(
-      "events list --limit 1 --category entity --category auth --page-token p2 --json",
+      "events list --limit 1 --filter category=entity --filter category=auth --page-token p2 --json",
     );
   });
 
@@ -1036,7 +1052,7 @@ describe("other resources", () => {
     expect(new URL(url).searchParams.get("project_id")).toBe("proj_test");
   });
 
-  it("events list lifts flags to query parameters", async () => {
+  it("events list sends the shared filter grammar as query parameters", async () => {
     const cwd = await makeProject();
     let url = "";
     server.use(
@@ -1047,15 +1063,17 @@ describe("other resources", () => {
         });
       }),
     );
+    // The caller writes the same grammar as every other list; the registry
+    // maps each operation onto the query parameter the endpoint spells it as.
     const res = await run(cwd, [
       "events",
       "list",
-      "--category",
-      "entity",
-      "--category",
-      "auth",
-      "--created-after",
-      "2026-01-01T00:00:00Z",
+      "--filter",
+      "category=entity",
+      "--filter",
+      "category=auth",
+      "--filter",
+      "created_at=greater_than_or_equal:2026-01-01T00:00:00Z",
       "--limit",
       "5",
     ]);
@@ -1066,6 +1084,165 @@ describe("other resources", () => {
     expect(params.get("created_after")).toBe("2026-01-01T00:00:00Z");
     expect(params.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
-    expect(json.data.items[0].id).toBe("evt_1");
+    expect(json.data.items[0]?.id).toBe("evt_1");
+  });
+});
+
+describe("configuration resources are read-only", () => {
+  it("exposes only list and get for every configuration topic", () => {
+    for (const topic of ["schemas", "environments", "releases", "flow-definitions", "branding"]) {
+      const resource = RESOURCES[topic as keyof typeof RESOURCES];
+      expect(resource, topic).toBeDefined();
+      expect(Object.keys(resource!), topic).toEqual(
+        expect.not.arrayContaining(["create", "update", "delete"]),
+      );
+      expect(COMMANDS[`${topic}:list` as keyof typeof COMMANDS], topic).toBeDefined();
+      expect(COMMANDS[`${topic}:get` as keyof typeof COMMANDS], topic).toBeDefined();
+    }
+  });
+
+  it("lists schemas through the shared filter grammar", async () => {
+    const cwd = await makeProject();
+    let url: URL | undefined;
+    server.use(
+      http.get(`${SERVER}/schemas`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json({
+          schemas: [
+            { id: "sch_1", schema: { objectType: "human-user", kind: "user-schema" }, metadata: { created_at: "2026-01-01T00:00:00Z" } },
+          ],
+        });
+      }),
+    );
+
+    const res = await run(cwd, [
+      "schemas",
+      "list",
+      "--filter",
+      "object_type=human-user",
+      "--limit",
+      "5",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(url?.searchParams.get("object_type")).toBe("human-user");
+    expect(url?.searchParams.get("project_id")).toBe("proj_test");
+    expect(url?.searchParams.get("limit")).toBe("5");
+    const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
+    expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
+  });
+
+  it("addresses an environment by name rather than by id", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/environments/staging`, () =>
+        HttpResponse.json({
+          id: "env_1",
+          project_id: "proj_test",
+          name: "staging",
+          created_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+
+    const res = await run(cwd, ["environments", "get", "staging"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { data: { name: string } };
+    expect(json.data.name).toBe("staging");
+  });
+
+  it("offers no paging flags for an unpaginated collection and reads the bare array", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/branding`, () =>
+        HttpResponse.json([{ id: "brand_1", created_at: "2026-01-01T00:00:00Z" }]),
+      ),
+    );
+
+    const res = await run(cwd, ["branding", "list"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { items: Array<{ id: string }>; count: number; next_page_token: string | null };
+    };
+    expect(json.data.items.map((b) => b.id)).toEqual(["brand_1"]);
+    expect(json.data.next_page_token).toBeNull();
+
+    const rejected = await run(cwd, ["branding", "list", "--limit", "5"]);
+    expect(rejected.exitCode).not.toBe(0);
+  });
+});
+
+describe("schemas list drains its revision history", () => {
+  // `GET /schemas` pages by cursor (#924) and the command showed the full
+  // history before it was generated (#947). A history truncated at one page
+  // reads as a complete one, so a bare invocation still walks every page.
+  it("walks next_page_token without being asked", async () => {
+    const cwd = await makeProject();
+    const askedTokens: Array<string | null> = [];
+    server.use(
+      http.get(`${SERVER}/schemas`, ({ request }) => {
+        const url = new URL(request.url);
+        const token = url.searchParams.get("page_token");
+        askedTokens.push(token);
+        return token
+          ? HttpResponse.json({
+              schemas: [{ id: "sch_01", schema: { kind: "user-schema" }, metadata: { created_at: "2026-06-01T00:00:00Z" } }],
+            })
+          : HttpResponse.json({
+              schemas: [{ id: "sch_02", schema: { kind: "user-schema" }, metadata: { created_at: "2026-07-02T00:00:00Z" } }],
+              next_page_token: "tok_2",
+            });
+      }),
+    );
+
+    const res = await run(cwd, ["schemas", "list"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(askedTokens).toEqual([null, "tok_2"]);
+    const json = parseJson(res.stdout) as {
+      data: { items: Array<{ id: string }>; count: number; next_page_token: string | null };
+    };
+    expect(json.data.items.map((s) => s.id)).toEqual(["sch_02", "sch_01"]);
+    expect(json.data.count).toBe(2);
+    expect(json.data.next_page_token).toBeNull();
+  });
+
+  it("returns a single page when one is explicitly asked for", async () => {
+    const cwd = await makeProject();
+    let calls = 0;
+    server.use(
+      http.get(`${SERVER}/schemas`, () => {
+        calls += 1;
+        return HttpResponse.json({
+          schemas: [{ id: "sch_02", schema: { kind: "user-schema" }, metadata: { created_at: "2026-07-02T00:00:00Z" } }],
+          next_page_token: "tok_2",
+        });
+      }),
+    );
+
+    const res = await run(cwd, ["schemas", "list", "--limit", "1"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(calls).toBe(1);
+    const json = parseJson(res.stdout) as { data: { next_page_token: string | null } };
+    expect(json.data.next_page_token).toBe("tok_2");
+  });
+
+  it("pages every other resource by default", async () => {
+    const cwd = await makeProject();
+    let calls = 0;
+    server.use(
+      http.post(`${SERVER}/teams/query`, () => {
+        calls += 1;
+        return HttpResponse.json({ teams: [{ id: "team_1", name: "a" }], next_page_token: "t2" });
+      }),
+    );
+
+    const res = await run(cwd, ["teams", "list"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(calls).toBe(1);
   });
 });

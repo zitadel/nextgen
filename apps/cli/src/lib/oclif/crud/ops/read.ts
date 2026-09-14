@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { chosenColumns } from "../columns";
 import { fieldPaths } from "../paths";
-import { idArg } from "../shared";
+import { idArg, idValue } from "../shared";
 import { renderDetail } from "../table";
 import type { GetSpec } from "../types";
 import type { CommandResult, GlobalOptions } from "../../types";
@@ -51,7 +51,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     const early = shape
       ? chosenColumns(flags.fields, resource.detail ?? resource.columns, [], shape)
       : undefined;
-    const item = await spec.call(await this.connect(meta), String(args.id));
+    const item = await spec.call(await this.connect(meta), idValue(resource, args));
     // Validated before the output branch, so the same arguments are valid (or
     // not) whether the result goes to a terminal or a pipe.
     const fields = early ?? chosenColumns(flags.fields, resource.detail ?? resource.columns, [item]);

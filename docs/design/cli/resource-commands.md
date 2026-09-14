@@ -1,11 +1,13 @@
 # CLI Resource Commands
 
-> **Status:** Shipped — `users`, `teams`, `sessions`, `events`, `grants`, `projects`.
+> **Status:** Shipped — eleven resources; see the table below.
 > **Context:** The imperative surface for runtime resources that
 > [README.md](README.md#what-lives-in-zitadel-and-what-doesnt) reserves for
-> data the developer does not own in git. Config resources (schemas, flows,
-> branding, releases) stay on `plan` / `apply` ([ADR 007](../../adrs/007-gitops-configuration-surface.md),
-> [ADR 035](../../adrs/035-configuration-environments.md)).
+> data the developer does not own in git. Configuration resources are readable
+> here but are written only through `plan` / `apply`
+> ([ADR 007](../../adrs/007-gitops-configuration-surface.md),
+> [ADR 035](../../adrs/035-configuration-environments.md)). The decisions behind
+> this surface are [ADR 061](../../adrs/061-cli-resource-commands.md).
 
 ## Shape
 
@@ -30,6 +32,8 @@ The registry names the client call per verb, the id field, the table columns,
 and the filterable and sortable fields. The factory owns everything below.
 Adding a backend resource is adding a registry entry.
 
+Runtime resources:
+
 | Resource   | Verbs                             | Backing endpoints                                   |
 | ---------- | --------------------------------- | --------------------------------------------------- |
 | `users`    | list, get, create, update, delete | `POST /users/query`, `/users/{id}`                  |
@@ -38,6 +42,25 @@ Adding a backend resource is adding a registry entry.
 | `events`   | list, get                         | `GET /events`, `GET /events/{id}`                   |
 | `grants`   | list, get, create, delete         | `POST /grants/query`, `/grants/{id}`                |
 | `projects` | list, get, update                 | `POST /projects/query`, `/projects/{id}`            |
+
+Configuration resources, read-only — they are authored as files and shipped
+through a release, so the CLI reads them to show what the server currently
+holds and never writes them here:
+
+| Resource            | Verbs     | Backing endpoints                                    |
+| ------------------- | --------- | ---------------------------------------------------- |
+| `schemas`           | list, get | `GET /schemas`, `GET /schemas/{id}`                  |
+| `environments`      | list, get | `GET /environments`, `GET /environments/{name}`      |
+| `releases`          | list, get | `GET /releases`, `GET /releases/{id}`                |
+| `flow-definitions`  | list, get | `GET /flow_definitions`, `GET /flow_definitions/{id}` |
+| `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
+
+Three of these behave differently underneath, and the registry says so rather
+than the caller having to learn it: `schemas list` drains every page because a
+truncated revision history reads as a complete one; `environments get` takes a
+name, because that is what the endpoint addresses; and `branding list` has no
+paging flags at all, because its endpoint has no cursor and answers with a bare
+array.
 
 ## Anatomy
 
@@ -88,7 +111,11 @@ The server is resolved exactly as for `apply` (`--server`, `ZITADEL_API_BASE`,
 ## Listing and pagination
 
 - `list` returns **one page**. The server's default page size applies unless
-  `--limit N` (1–100) is given.
+  `--limit N` (1–100) is given. Two resources declare otherwise: `schemas`
+  drains on a bare invocation, because a truncated revision history reads as a
+  complete one, and still returns a single page when `--limit` or
+  `--page-token` asks for one; `branding` has no paging flags at all, because
+  its endpoint has no cursor.
 - `--page-token T` continues from a previous response; the token is opaque and
   is passed back verbatim.
 - `--all` drains every page in order. It is exclusive with `--page-token`.
@@ -151,20 +178,42 @@ created_at           2026-09-12T03:22:07Z
 
 ## Filtering and sorting
 
-Query-backed lists (`POST /<resource>/query`, [ADR 031](../../adrs/031-openapi-querying.md)):
+One grammar, every list:
 
-- `--filter field=operation:value`, repeatable, AND-combined. The operation is
-  optional and defaults to `equals`. Values are sent as strings; timestamps are
-  RFC 3339.
-- `--sort field:direction`; the direction defaults to `asc`.
-- The assembled body is validated against the generated Zod request schema
-  **before** any request, so an unknown field or operation fails with
-  `E_VALIDATION` and the accepted values in `hint`. A unit test pins the fields
-  advertised in `--help` to the schema's enums.
+- `--filter field=operation:value`, repeatable. The operation is optional and
+  defaults to `equals`. Values are sent as strings; timestamps are RFC 3339.
+- `--sort field:direction`, where the endpoint can sort; the direction defaults
+  to `asc`.
 
-Parameter-backed lists (`GET /events`) expose one named flag per query
-parameter instead (`--category`, `--actor-id`, `--created-after`, …).
-Repeatable flags become array parameters.
+What differs per resource is not the spelling but what each field accepts, and
+that is declared in the registry so `--help` and `zitadel resources --json` can
+state it per field:
+
+```ts
+filters: [
+  { field: "status",     operations: ALL_OPERATIONS },              // POST /query
+  { field: "object_type", operations: ["equals"] },                 // GET parameter
+  { field: "revisions",  operations: ["equals"], values: ["all", "latest"] },
+  { field: "category",   operations: ["equals"], combine: "or" },   // repeats widen
+  {
+    field: "created_at",                                            // one field,
+    operations: ["greater_than_or_equal", "less_than"],             // two parameters
+    params: { greater_than_or_equal: "created_after", less_than: "created_before" },
+  },
+]
+```
+
+Transport follows from the entry: a spec carrying `body` is assembled into a
+filter body and validated against the generated Zod request schema
+([ADR 031](../../adrs/031-openapi-querying.md)); one without it becomes query
+parameters, each field naming the parameter its operation travels as. Either
+way validation happens **before** the request, so an unknown field, an
+unsupported operation, or a value outside a closed set fails with
+`E_VALIDATION` naming what that field accepts — never as a server 400.
+
+Repeated uses of a field combine with AND unless the field says `combine: "or"`,
+which is what a repeated `GET` parameter does. The flag help and the discovery
+output both say which, since it changes what the query means.
 
 ## Bodies
 

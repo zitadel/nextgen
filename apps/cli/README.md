@@ -115,12 +115,18 @@ which ships in this package.
 * [`zitadel apply`](#zitadel-apply)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel branding eject`](#zitadel-branding-eject)
+* [`zitadel branding get ID`](#zitadel-branding-get-id)
+* [`zitadel branding list`](#zitadel-branding-list)
 * [`zitadel claim`](#zitadel-claim)
 * [`zitadel commands`](#zitadel-commands)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
+* [`zitadel environments get NAME`](#zitadel-environments-get-name)
+* [`zitadel environments list`](#zitadel-environments-list)
 * [`zitadel events get ID`](#zitadel-events-get-id)
 * [`zitadel events list`](#zitadel-events-list)
+* [`zitadel flow-definitions get ID`](#zitadel-flow-definitions-get-id)
+* [`zitadel flow-definitions list`](#zitadel-flow-definitions-list)
 * [`zitadel grants create`](#zitadel-grants-create)
 * [`zitadel grants delete ID`](#zitadel-grants-delete-id)
 * [`zitadel grants get ID`](#zitadel-grants-get-id)
@@ -131,8 +137,11 @@ which ships in this package.
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
+* [`zitadel releases get ID`](#zitadel-releases-get-id)
+* [`zitadel releases list`](#zitadel-releases-list)
 * [`zitadel reset`](#zitadel-reset)
 * [`zitadel resources`](#zitadel-resources)
+* [`zitadel schemas get ID`](#zitadel-schemas-get-id)
 * [`zitadel schemas list`](#zitadel-schemas-list)
 * [`zitadel search`](#zitadel-search)
 * [`zitadel sessions get ID`](#zitadel-sessions-get-id)
@@ -247,6 +256,85 @@ GLOBAL FLAGS
 DESCRIPTION
   Take ownership of the login template: scaffold .zitadel/branding/ from a
   shipped design.
+```
+
+## `zitadel branding get ID`
+
+Get one branding revision by id.
+
+```
+USAGE
+  $ zitadel branding get ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
+    development|preview|production]
+
+ARGUMENTS
+  ID  branding revision id
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Fields to show, comma-separated dot-paths.
+                              Defaults to the resource's own; `--json` is
+                              unaffected.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one branding revision by id.
+
+EXAMPLES
+  $ zitadel branding get <id>
+
+  $ zitadel branding get <id> --json
+```
+
+## `zitadel branding list`
+
+List branding.
+
+```
+USAGE
+  $ zitadel branding list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [--plain]
+    [-e development|preview|production]
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
+                              id,attributes.email). Defaults to the resource's
+                              own columns; `--json` is unaffected.
+      --plain                 Tab-separated rows with no header, for piping.
+                              Implied when stdout is not a terminal.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List branding.
+
+EXAMPLES
+  $ zitadel branding list --json
 ```
 
 ## `zitadel claim`
@@ -383,6 +471,91 @@ ALIASES
   $ zitadel uninstall
 ```
 
+## `zitadel environments get NAME`
+
+Get one environment by id.
+
+```
+USAGE
+  $ zitadel environments get NAME [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
+    development|preview|production]
+
+ARGUMENTS
+  NAME  environment name
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Fields to show, comma-separated dot-paths.
+                              Defaults to the resource's own; `--json` is
+                              unaffected.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one environment by id.
+
+EXAMPLES
+  $ zitadel environments get <id>
+
+  $ zitadel environments get <id> --json
+```
+
+## `zitadel environments list`
+
+List environments.
+
+```
+USAGE
+  $ zitadel environments list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
+    --page-token <value>] [--fields <value>] [--plain] [-e
+    development|preview|production]
+
+FLAGS
+  -a, --all                   Fetch every page instead of one.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
+                              id,attributes.email). Defaults to the resource's
+                              own columns; `--json` is unaffected.
+      --limit=<value>         Page size (server default 20, max 100).
+      --page-token=<value>    Continue from a previous page's next_page_token.
+      --plain                 Tab-separated rows with no header, for piping.
+                              Implied when stdout is not a terminal.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List environments.
+
+EXAMPLES
+  $ zitadel environments list --json
+
+  $ zitadel environments list --all --json
+```
+
 ## `zitadel events get ID`
 
 Get one event by id.
@@ -432,50 +605,62 @@ List events.
 USAGE
   $ zitadel events list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
-    --page-token <value>] [--fields <value>] [--plain] [--category
-    request|auth|session|admin|entity|signal...] [--event-type <value>...]
-    [--actor-id <value>] [--session-id <value>] [--flow-id <value>]
-    [--request-id <value>] [--entity-type <value>] [--entity-id <value>]
-    [--team-id <value>] [--created-after <value>] [--created-before <value>]
-    [--order asc|desc] [-e development|preview|production]
+    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
+    [--sort <value>] [-e development|preview|production]
 
 FLAGS
-  -a, --all                     Fetch every page instead of one.
-  -c, --cwd=<value>             Project directory to operate on.
-  -e, --environment=<option>    Target environment (default: development).
-                                <options: development|preview|production>
-  -n, --non-interactive         Disable prompts. Required when scripting or
-                                running as an agent.
-  -s, --server=<value>          Override the resolved server URL.
-      --actor-id=<value>        Filter by the acting principal.
-      --category=<option>...    Wide-event category (repeatable, OR within the
-                                flag).
-                                <options:
-                                request|auth|session|admin|entity|signal>
-      --created-after=<value>   Inclusive lower bound on created_at (RFC 3339).
-      --created-before=<value>  Exclusive upper bound on created_at (RFC 3339).
-      --debug                   Debug logging.
-      --dry-run                 Preview without mutating files or the platform.
-      --entity-id=<value>       Filter by entity id.
-      --entity-type=<value>     Filter by entity type.
-      --event-type=<value>...   Exact event_type match (repeatable, OR within
-                                the flag).
-      --fields=<value>          Columns to show, comma-separated dot-paths (e.g.
-                                id,attributes.email). Defaults to the resource's
-                                own columns; `--json` is unaffected.
-      --flow-id=<value>         Filter by login flow id.
-      --limit=<value>           Page size (server default 20, max 100).
-      --order=<option>          Sort direction on created_at (default: desc).
-                                <options: asc|desc>
-      --page-token=<value>      Continue from a previous page's next_page_token.
-      --plain                   Tab-separated rows with no header, for piping.
-                                Implied when stdout is not a terminal.
-      --request-id=<value>      Filter by request id.
-      --session-id=<value>      Filter by session id.
-      --team-id=<value>         Filter by emit-time team scope.
-      --[no-]telemetry          Send anonymous usage analytics. Disable with
-                                --no-telemetry.
-      --verbose                 Verbose logging.
+  -a, --all
+      Fetch every page instead of one.
+
+  -c, --cwd=<value>
+      Project directory to operate on.
+
+  -e, --environment=<option>
+      Target environment (default: development).
+      <options: development|preview|production>
+
+  -n, --non-interactive
+      Disable prompts. Required when scripting or running as an agent.
+
+  -s, --server=<value>
+      Override the resolved server URL.
+
+  --debug
+      Debug logging.
+
+  --dry-run
+      Preview without mutating files or the platform.
+
+  --fields=<value>
+      Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
+      Defaults to the resource's own columns; `--json` is unaffected.
+
+  --filter=<value>...
+      Filter as field=operation:value (operation defaults to equals). Fields:
+      category (equals; values request|auth|session|admin|entity|signal; repeats
+      widen), event_type (equals; repeats widen), actor_id (equals), session_id
+      (equals), flow_id (equals), request_id (equals), entity_type (equals),
+      entity_id (equals), team_id (equals), created_at
+      (greater_than_or_equal|less_than).
+
+  --limit=<value>
+      Page size (server default 20, max 100).
+
+  --page-token=<value>
+      Continue from a previous page's next_page_token.
+
+  --plain
+      Tab-separated rows with no header, for piping. Implied when stdout is not a
+      terminal.
+
+  --sort=<value>
+      Sort as field:direction (asc|desc). Fields: occurred_at.
+
+  --[no-]telemetry
+      Send anonymous usage analytics. Disable with --no-telemetry.
+
+  --verbose
+      Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -488,7 +673,97 @@ EXAMPLES
 
   $ zitadel events list --all --json
 
-  $ zitadel events list --category request --limit 50
+  $ zitadel events list --filter category=equals:<value> --sort occurred_at:desc
+```
+
+## `zitadel flow-definitions get ID`
+
+Get one flow definition by id.
+
+```
+USAGE
+  $ zitadel flow-definitions get ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
+    development|preview|production]
+
+ARGUMENTS
+  ID  flow definition id
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Fields to show, comma-separated dot-paths.
+                              Defaults to the resource's own; `--json` is
+                              unaffected.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one flow definition by id.
+
+EXAMPLES
+  $ zitadel flow-definitions get <id>
+
+  $ zitadel flow-definitions get <id> --json
+```
+
+## `zitadel flow-definitions list`
+
+List flow-definitions.
+
+```
+USAGE
+  $ zitadel flow-definitions list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
+    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...] [-e
+    development|preview|production]
+
+FLAGS
+  -a, --all                   Fetch every page instead of one.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
+                              id,attributes.email). Defaults to the resource's
+                              own columns; `--json` is unaffected.
+      --filter=<value>...     Filter as field=operation:value (operation
+                              defaults to equals). Fields: name (equals),
+                              purpose (equals).
+      --limit=<value>         Page size (server default 20, max 100).
+      --page-token=<value>    Continue from a previous page's next_page_token.
+      --plain                 Tab-separated rows with no header, for piping.
+                              Implied when stdout is not a terminal.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List flow-definitions.
+
+EXAMPLES
+  $ zitadel flow-definitions list --json
+
+  $ zitadel flow-definitions list --all --json
+
+  $ zitadel flow-definitions list --filter name=equals:<value>
 ```
 
 ## `zitadel grants create`
@@ -665,9 +940,15 @@ FLAGS
 
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields:
-      created_at, principal_type, principal_id, relation, expires_at. Operations:
-      equals, not_equals, contains, not_contains, less_than, less_than_or_equal,
-      greater_than, greater_than_or_equal.
+      created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
+      qual|greater_than|greater_than_or_equal), principal_type
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), principal_id (equals|not_equals|contains|not_
+      contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      relation (equals|not_equals|contains|not_contains|less_than|less_than_or_equ
+      al|greater_than|greater_than_or_equal), expires_at
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal).
 
   --limit=<value>
       Page size (server default 20, max 100).
@@ -847,10 +1128,9 @@ FLAGS
                               id,attributes.email). Defaults to the resource's
                               own columns; `--json` is unaffected.
       --filter=<value>...     Filter as field=operation:value (operation
-                              defaults to equals). Fields: created_at.
-                              Operations: equals, not_equals, contains,
-                              not_contains, less_than, less_than_or_equal,
-                              greater_than, greater_than_or_equal.
+                              defaults to equals). Fields: created_at (equals|no
+                              t_equals|contains|not_contains|less_than|less_than
+                              _or_equal|greater_than|greater_than_or_equal).
       --limit=<value>         Page size (server default 20, max 100).
       --page-token=<value>    Continue from a previous page's next_page_token.
       --plain                 Tab-separated rows with no header, for piping.
@@ -920,6 +1200,91 @@ EXAMPLES
   $ zitadel projects update <id> --file ./project.json
 ```
 
+## `zitadel releases get ID`
+
+Get one release by id.
+
+```
+USAGE
+  $ zitadel releases get ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
+    development|preview|production]
+
+ARGUMENTS
+  ID  release id
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Fields to show, comma-separated dot-paths.
+                              Defaults to the resource's own; `--json` is
+                              unaffected.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one release by id.
+
+EXAMPLES
+  $ zitadel releases get <id>
+
+  $ zitadel releases get <id> --json
+```
+
+## `zitadel releases list`
+
+List releases.
+
+```
+USAGE
+  $ zitadel releases list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
+    --page-token <value>] [--fields <value>] [--plain] [-e
+    development|preview|production]
+
+FLAGS
+  -a, --all                   Fetch every page instead of one.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
+                              id,attributes.email). Defaults to the resource's
+                              own columns; `--json` is unaffected.
+      --limit=<value>         Page size (server default 20, max 100).
+      --page-token=<value>    Continue from a previous page's next_page_token.
+      --plain                 Tab-separated rows with no header, for piping.
+                              Implied when stdout is not a terminal.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List releases.
+
+EXAMPLES
+  $ zitadel releases list --json
+
+  $ zitadel releases list --all --json
+```
+
 ## `zitadel reset`
 
 Delete the local Zitadel server runtime and data.
@@ -983,15 +1348,18 @@ EXAMPLES
   $ zitadel resources --json | jq -r '.data.resources[] | "\(.topic): \(.verbs | join(", "))"'
 ```
 
-## `zitadel schemas list`
+## `zitadel schemas get ID`
 
-List revisions of a user-schema by objectType.
+Get one schema by id.
 
 ```
 USAGE
-  $ zitadel schemas list -t <value> [--json] [-c <value>] [-s <value>]
-    [-n] [--dry-run] [--verbose] [--debug] [--telemetry] [-e
+  $ zitadel schemas get ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
     development|preview|production]
+
+ARGUMENTS
+  ID  schema id
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -1000,10 +1368,11 @@ FLAGS
   -n, --non-interactive       Disable prompts. Required when scripting or
                               running as an agent.
   -s, --server=<value>        Override the resolved server URL.
-  -t, --object-type=<value>   (required) Filter revisions by objectType (e.g.
-                              human-user).
       --debug                 Debug logging.
       --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Fields to show, comma-separated dot-paths.
+                              Defaults to the resource's own; `--json` is
+                              unaffected.
       --[no-]telemetry        Send anonymous usage analytics. Disable with
                               --no-telemetry.
       --verbose               Verbose logging.
@@ -1012,7 +1381,60 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List revisions of a user-schema by objectType.
+  Get one schema by id.
+
+EXAMPLES
+  $ zitadel schemas get <id>
+
+  $ zitadel schemas get <id> --json
+```
+
+## `zitadel schemas list`
+
+List schemas. Fetches every page unless --limit or --page-token asks for one.
+
+```
+USAGE
+  $ zitadel schemas list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
+    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...] [-e
+    development|preview|production]
+
+FLAGS
+  -a, --all                   Fetch every page instead of one.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
+                              id,attributes.email). Defaults to the resource's
+                              own columns; `--json` is unaffected.
+      --filter=<value>...     Filter as field=operation:value (operation
+                              defaults to equals). Fields: object_type (equals),
+                              kind (equals), revisions (equals; values
+                              all|latest).
+      --limit=<value>         Page size (server default 20, max 100).
+      --page-token=<value>    Continue from a previous page's next_page_token.
+      --plain                 Tab-separated rows with no header, for piping.
+                              Implied when stdout is not a terminal.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List schemas. Fetches every page unless --limit or --page-token asks for one.
+
+EXAMPLES
+  $ zitadel schemas list --json
+
+  $ zitadel schemas list --filter object_type=equals:<value>
 ```
 
 ## `zitadel search`
@@ -1113,9 +1535,13 @@ FLAGS
 
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields:
-      created_at, user_id, state, lifecycle_owner_team_id. Operations: equals,
-      not_equals, contains, not_contains, less_than, less_than_or_equal,
-      greater_than, greater_than_or_equal.
+      created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
+      qual|greater_than|greater_than_or_equal), user_id
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), state (equals|not_equals|contains|not_contain
+      s|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|l
+      ess_than_or_equal|greater_than|greater_than_or_equal).
 
   --limit=<value>
       Page size (server default 20, max 100).
@@ -1498,32 +1924,58 @@ USAGE
     [--sort <value>] [-e development|preview|production]
 
 FLAGS
-  -a, --all                   Fetch every page instead of one.
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
-                              id,attributes.email). Defaults to the resource's
-                              own columns; `--json` is unaffected.
-      --filter=<value>...     Filter as field=operation:value (operation
-                              defaults to equals). Fields: created_at, name,
-                              status. Operations: equals, not_equals, contains,
-                              not_contains, less_than, less_than_or_equal,
-                              greater_than, greater_than_or_equal.
-      --limit=<value>         Page size (server default 20, max 100).
-      --page-token=<value>    Continue from a previous page's next_page_token.
-      --plain                 Tab-separated rows with no header, for piping.
-                              Implied when stdout is not a terminal.
-      --sort=<value>          Sort as field:direction (asc|desc). Fields:
-                              created_at, name, status.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -a, --all
+      Fetch every page instead of one.
+
+  -c, --cwd=<value>
+      Project directory to operate on.
+
+  -e, --environment=<option>
+      Target environment (default: development).
+      <options: development|preview|production>
+
+  -n, --non-interactive
+      Disable prompts. Required when scripting or running as an agent.
+
+  -s, --server=<value>
+      Override the resolved server URL.
+
+  --debug
+      Debug logging.
+
+  --dry-run
+      Preview without mutating files or the platform.
+
+  --fields=<value>
+      Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
+      Defaults to the resource's own columns; `--json` is unaffected.
+
+  --filter=<value>...
+      Filter as field=operation:value (operation defaults to equals). Fields:
+      created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
+      qual|greater_than|greater_than_or_equal), name
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), status (equals|not_equals|contains|not_contai
+      ns|less_than|less_than_or_equal|greater_than|greater_than_or_equal).
+
+  --limit=<value>
+      Page size (server default 20, max 100).
+
+  --page-token=<value>
+      Continue from a previous page's next_page_token.
+
+  --plain
+      Tab-separated rows with no header, for piping. Implied when stdout is not a
+      terminal.
+
+  --sort=<value>
+      Sort as field:direction (asc|desc). Fields: created_at, name, status.
+
+  --[no-]telemetry
+      Send anonymous usage analytics. Disable with --no-telemetry.
+
+  --verbose
+      Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1784,9 +2236,16 @@ FLAGS
 
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields:
-      created_at, id, schema, status, team_id, lifecycle_owner_team_id.
-      Operations: equals, not_equals, contains, not_contains, less_than,
-      less_than_or_equal, greater_than, greater_than_or_equal.
+      created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
+      qual|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not
+      _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal
+      |greater_than|greater_than_or_equal), status (equals|not_equals|contains|not
+      _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equa
+      l|greater_than|greater_than_or_equal), lifecycle_owner_team_id
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal).
 
   --limit=<value>
       Page size (server default 20, max 100).

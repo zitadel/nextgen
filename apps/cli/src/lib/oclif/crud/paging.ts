@@ -10,7 +10,7 @@ import type { Page } from "./types";
  */
 export const collectPages = async (
   request: (token?: string) => Promise<unknown>,
-  { items, all, token }: Readonly<{ items: string; all: boolean; token?: string }>,
+  { items, all, token }: Readonly<{ items?: string; all: boolean; token?: string }>,
 ): Promise<Page> => {
   // Accumulated in one array rather than by concatenating each page onto the
   // last: these resources are unbounded, and a wide `--all` would otherwise
@@ -23,14 +23,23 @@ export const collectPages = async (
   let cursor = token;
   for (;;) {
     const response = await request(cursor);
-    if (!isObject(response) || !Array.isArray(response[items])) {
-      throw new ZitadelError("E_VALIDATION", `Unexpected list response: missing "${items}" array`, {
-        details: { response },
-      });
+    // A wrapped page names the array; an endpoint that answers with the
+    // collection itself has nothing to name, and the body is the array.
+    const page = items === undefined ? response : isObject(response) ? response[items] : undefined;
+    if (!Array.isArray(page)) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        items === undefined
+          ? "Unexpected list response: expected an array"
+          : `Unexpected list response: missing "${items}" array`,
+        { details: { response } },
+      );
     }
-    collected.push(...(response[items] as readonly unknown[]));
+    collected.push(...(page as readonly unknown[]));
     const next =
-      typeof response.next_page_token === "string" ? response.next_page_token || null : null;
+      isObject(response) && typeof response.next_page_token === "string"
+        ? response.next_page_token || null
+        : null;
     if (!all) {
       return { items: collected, next };
     }

@@ -6,7 +6,7 @@ import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { readRawBody } from "../body";
 import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample } from "../fields";
-import { dryRunResult, idArg, parseOrThrow } from "../shared";
+import { dryRunResult, idArg, idName, parseOrThrow } from "../shared";
 import type {
   CreateSpec,
   Json,
@@ -77,7 +77,8 @@ abstract class WriteOperation<
     meta: GlobalOptions,
   ): Promise<CommandResult> {
     const { topic, resource, spec } = this.definition;
-    const id = typeof args.id === "string" ? args.id : undefined;
+    const idKey = idName(resource);
+    const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
 
     const raw = await readRawBody(flags, `${topic} ${this.verb}`);
     // A field flag wins over the same key in --data / --file.

@@ -15,6 +15,9 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
       topic,
       singular: resource.singular,
       id_field: resource.idField,
+      // The positional the id-taking verbs read, which is not always "id":
+      // an environment is addressed by name.
+      id_arg: resource.idArg ?? "id",
       verbs: [
         ...(resource.list ? ["list"] : []),
         ...(resource.get ? ["get"] : []),
@@ -23,6 +26,12 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
         ...(resource.delete ? [resource.delete.verb ?? "delete"] : []),
       ],
       columns: [...resource.columns],
+      // Whether `list` is cursor-paginated. An agent that loops on
+      // `next_page_token` needs to know which collections arrive whole.
+      ...(resource.list ? { paged: resource.list.paged !== false } : {}),
+      // Whether a bare `list` returns the whole collection. An agent that must
+      // not miss a row needs to know which resources it has to drain itself.
+      ...(resource.list?.drains === true ? { drains: true } : {}),
       // The property a delete's envelope carries beside `id`. It is not always
       // `deleted` — a team's DELETE deactivates it (ADR 024) — and an agent
       // reading this surface should not have to guess which.
@@ -33,15 +42,20 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
               (resource.delete.verb === "revoke" ? "revoked" : "deleted"),
           }
         : {}),
-      ...(resource.list?.kind === "query"
+      // Every list shares one filter grammar, so the surface reports each
+      // field with the operations that field accepts rather than a single set
+      // the resource may not honour everywhere.
+      ...(resource.list?.filters?.length
         ? {
-            filter_fields: [...resource.list.filterFields],
-            sort_fields: [...resource.list.sortFields],
+            filters: resource.list.filters.map((field) => ({
+              field: field.field,
+              operations: [...field.operations],
+              ...(field.values ? { values: [...field.values] } : {}),
+              ...(field.combine === "or" ? { combine: "or" } : {}),
+            })),
           }
         : {}),
-      ...(resource.list?.kind === "params"
-        ? { params: resource.list.params.map((param) => param.flag) }
-        : {}),
+      ...(resource.list?.sorts?.length ? { sort_fields: [...resource.list.sorts] } : {}),
       // Per verb, not per resource: a create's required field is often optional
       // on the update of the same resource, so one list would misdescribe one
       // of them.
