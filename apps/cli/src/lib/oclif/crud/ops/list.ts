@@ -4,6 +4,7 @@ import { Flags } from "@oclif/core";
 import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { collectPages } from "../paging";
+import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
@@ -103,7 +104,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     { flags }: OperationInput,
     meta: GlobalOptions,
   ): Promise<CommandResult> {
-    const { topic, resource, spec } = this.definition;
+    const { topic, resource, spec, options } = this.definition;
+    const wire = wireOf(options.wire);
     // With a schema in hand the columns are known before any request, so a
     // typo fails without contacting the server at all.
     const shape = fieldPaths(itemSchemaOf(spec.response, spec.items));
@@ -115,8 +117,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const paging = (token?: string): Json =>
       paged
         ? {
-            ...(typeof flags.limit === "number" && { limit: flags.limit }),
-            ...(token && { page_token: token }),
+            ...(typeof flags.limit === "number" && { [wire.limit]: flags.limit }),
+            ...(token && { [wire.pageToken]: token }),
           }
         : {};
 
@@ -138,17 +140,15 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ctx,
             parseOrThrow(
               spec.body,
-              {
-                ...paging(token),
-                ...(sorting && { sorting }),
-                ...(parsed.length > 0 && {
-                  filter: parsed.map(({ field, operation, value }) => ({
-                    field: field.field,
-                    operation,
-                    value,
-                  })),
-                }),
-              },
+              wire.query({
+                paging: paging(token),
+                sorting,
+                filters: parsed.map(({ field, operation, value }) => ({
+                  field: field.field,
+                  operation,
+                  value,
+                })),
+              }),
               "Invalid list query",
               `Filter fields: ${(spec.filters ?? []).map((f) => f.field).join(", ")}. Sort fields: ${(spec.sorts ?? []).join(", ")}.`,
             ),
@@ -183,6 +183,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       {
         items: spec.items,
         all,
+        nextPageToken: wire.nextPageToken,
         token:
           paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
       },
@@ -223,7 +224,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       data: {
         items,
         count: items.length,
-        next_page_token: next,
+        [wire.nextPageToken]: next,
         ...(nextCommands.length > 0 ? { next_commands: nextCommands } : {}),
       },
       pretty: plain
