@@ -50,7 +50,7 @@ Resource first, plural, then the verb. `zitadel users create`, not
 | `teams` | `list` `get` `create` `update` `delete` |
 | `grants` | `list` `get` `create` `delete` |
 | `projects` | `list` `get` `update` |
-| `sessions` | `list` `get` `revoke` |
+| `sessions` | `list` `get` `delete` |
 | `events` | `list` `get` |
 | `schemas`, `environments`, `releases`, `flow-definitions`, `branding` | `list` `get` |
 
@@ -65,10 +65,13 @@ missing verb out of other calls, and it does not hide one that exists — with
 two deliberate exceptions: `POST /projects` is unauthenticated bootstrap that
 mints secrets into `.zitadel/secret`, which is `setup`'s job, and `POST
 /sessions` mints an end-user session, which belongs to the SDKs and the login
-flow rather than to a terminal. A verb is named after what
-the endpoint does: sessions are `revoke`d because that is the operation, and
-`teams delete` reports `deactivated` because [ADR 024](024-user-team-lifecycle-ownership.md)
-makes deletion a deactivation.
+flow rather than to a terminal. A verb is never renamed to describe what the
+endpoint does with the resource. `DELETE /sessions/{id}` revokes and
+`DELETE /teams/{id}` deactivates ([ADR 024](024-user-team-lifecycle-ownership.md)),
+and both are `delete` on the command line: removal is spelled one way
+everywhere, and what the server did is a property of the answer
+(`deleted`, `revoked`, `deactivated`) rather than a different command to
+learn.
 
 ### 4. One registry, one generic factory
 
@@ -179,7 +182,7 @@ file is noise either way.
 
 ### 10. Destructive verbs confirm; `--force` is per command, never global
 
-On a terminal, `delete` and `revoke` prompt. Non-interactively they require
+On a terminal, `delete` prompts. Non-interactively they require
 `--force`, and refusing without it is an error carrying the exact command to
 re-run. `--force` is declared by each command that honours it rather than
 inherited globally, because what it permits differs — overwrite a managed file,

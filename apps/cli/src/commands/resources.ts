@@ -190,7 +190,10 @@ export const RESOURCES = {
         client.querySessions(body as QuerySessionsBodyT, { project_id: projectId }),
     },
     get: { call: ({ client }, id) => client.getSession(id), response: GetSessionResponse },
-    delete: { verb: "revoke", call: ({ client }, id) => client.revokeSession(id) },
+    // The endpoint revokes rather than removes, so the result says so; the
+    // verb stays `delete`, because a resource is removed the same way
+    // everywhere and what the server did is a property of the answer.
+    delete: { outcome: "revoked", call: ({ client }, id) => client.revokeSession(id) },
   },
 
   events: {

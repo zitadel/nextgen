@@ -103,7 +103,7 @@ branding) stay on `plan` / `apply`; the resource commands never write them.
 | ---------- | -------------------------------------- |
 | `users`    | list, get, create, update, delete      |
 | `teams`    | list, get, create, update, delete      |
-| `sessions` | list, get, revoke                      |
+| `sessions` | list, get, delete                      |
 | `events`   | list, get                              |
 | `grants`   | list, get, create, delete              |
 | `projects` | list, get, update                      |
@@ -152,7 +152,7 @@ over reading `--help` per command. It contacts no server.
   the API schema locally, and the server's resource is emitted as `data`. A create adds
   `data.next_commands` pointing at the matching `get`. `--dry-run` emits
   `{ dry_run: true, verb, topic, body }` without calling the platform.
-- `delete <id>` / `revoke <id>` require `--force` in non-interactive mode (declared per command, so its help says what it permits)
+- `delete <id>` requires `--force` in non-interactive mode (declared per command, so its help says what it permits)
   (the error's `next_commands` carries the exact retry) and report what the API
   did: `{ id, deleted: true }` for users and grants, `{ id, revoked: true }` for
   sessions, and `{ id, deactivated: true }` for teams, whose DELETE deactivates
@@ -162,7 +162,7 @@ over reading `--help` per command. It contacts no server.
 ```sh
 npx @zitadel/cli@alpha users list --filter status=active --sort created_at:desc --non-interactive --json
 npx @zitadel/cli@alpha users create --schema sch_… --attributes email=a@b.c --non-interactive --json
-npx @zitadel/cli@alpha sessions revoke sess_… --force --non-interactive --json
+npx @zitadel/cli@alpha sessions delete sess_… --force --non-interactive --json
 ```
 
 ## Commands
