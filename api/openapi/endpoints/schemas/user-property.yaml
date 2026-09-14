@@ -1,15 +1,28 @@
+x-meta-schema: json-schema
 "$schema": https://json-schema.org/draft/2020-12/schema
 title: UserProperty
 type: object
 description: |
-  This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
-  This is done because a lot of code generators cannot handle that.
+  The meta-schema one property of a customer's user schema is validated
+  against. The generated `user-property.json` adds
+  `allOf: [{$ref: draft-2020-12}]`, which cannot live here because code
+  generators choke on it.
 
   Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
   are accepted without being listed below. `writeOnly: true` is reserved for a
   value that may be written but is never returned by the read API; nothing
   enforces it today, so responses still include write-only properties.
 additionalProperties: true
+# Editor-only: a customer's property document may carry the draft pointer, but
+# on the wire the key is customer-authored JSON and must round-trip untouched.
+# A `const` wire property would make the generated encoder emit it on every
+# nested property, so it lives in the generated meta-schema alone.
+x-dialect:
+  properties:
+    "$schema":
+      type: string
+      const: https://json-schema.org/draft/2020-12/schema
+      description: The JSON Schema version used for this property schema.
 properties:
   x-unique:
     oneOf:
@@ -38,6 +51,6 @@ properties:
       A map of additional properties for the user definition, where the key is
       the property name and the value is the property schema.
     propertyNames:
-      "$ref": property-name.json
+      "$ref": property-name.yaml
     additionalProperties:
       "$ref": user-property.yaml
