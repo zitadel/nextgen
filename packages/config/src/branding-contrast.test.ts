@@ -69,6 +69,35 @@ describe("checkPaletteContrast", () => {
     expect(findings).not.toHaveLength(0);
   });
 
+  it("measures the roles painted on muted, not only those on the card", () => {
+    // The secondary button fills with `muted` and labels with `text`; the alert
+    // puts `text_muted` on the same fill. A palette can read on the card and be
+    // unreadable in both of those.
+    const findings = checkPaletteContrast({
+      text: "#6B7280",
+      text_muted: "#9CA3AF",
+      muted: "#4B5563",
+      surface: "#FFFFFF",
+    });
+    const onMuted = findings.filter((f) => f.background === "muted");
+    expect(onMuted).toHaveLength(2);
+    expect(onMuted.every((f) => f.status === "fail")).toBe(true);
+  });
+
+  it("composites a fill over the card it sits on, not over the page", () => {
+    // A half-opaque primary inside a white card reads light; measured against
+    // a black page it would look like a pass.
+    const findings = checkPaletteContrast({
+      on_primary: "#FFFFFF",
+      primary: "#FFFFFF80",
+      surface: "#FFFFFF",
+      background: "#000000",
+    });
+    const button = findings.find((f) => f.background === "primary");
+    expect(button?.status).toBe("fail");
+    expect(button?.ratio).toBeCloseTo(1, 2);
+  });
+
   it("skips a pair whose colours are not both set", () => {
     // An omitted key takes the maintained default for that side, which already
     // meets the bar — reporting it would be noise about a colour nobody chose.

@@ -132,6 +132,32 @@ describe("color-mix", () => {
     expect(rgb("color-mix(in srgb, color-mix(in srgb, white, black), black)")).toBe("64,64,64,1");
   });
 
+  it("mixes in the predefined RGB spaces too", () => {
+    expect(rgb("color-mix(in display-p3, white, black)")).toBeDefined();
+    expect(rgb("color-mix(in rec2020, red, blue)")).toBeDefined();
+    expect(rgb("color-mix(in a98-rgb, red, blue)")).toBeDefined();
+  });
+
+  it("keeps a mixed-in colour's hue when the other side is transparent", () => {
+    // CSS mixes in premultiplied alpha, so this loses opacity rather than
+    // sliding towards transparent black.
+    expect(rgb("color-mix(in srgb, red, transparent)")).toBe("255,0,0,0.5");
+  });
+
+  it("does not read a percentage inside a nested colour as the mix stop", () => {
+    expect(rgb("color-mix(in srgb, hsl(0 100% 50%), black)")).toBe("128,0,0,1");
+  });
+
+  it("rejects a stop outside 0-100%", () => {
+    expect(rgb("color-mix(in srgb, red 150%, blue)")).toBeUndefined();
+    expect(rgb("color-mix(in srgb, red -10%, blue)")).toBeUndefined();
+  });
+
+  it("rejects a hue strategy in a space with no hue", () => {
+    expect(rgb("color-mix(in srgb longer hue, red, blue)")).toBeUndefined();
+    expect(rgb("color-mix(in lab shorter hue, red, blue)")).toBeUndefined();
+  });
+
   it("rejects an unknown space or a malformed strategy", () => {
     expect(rgb("color-mix(in nonsense, white, black)")).toBeUndefined();
     expect(rgb("color-mix(in oklch sideways hue, red, blue)")).toBeUndefined();

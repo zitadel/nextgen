@@ -22,7 +22,7 @@ import {
   fixupHueIncreasing,
   fixupHueLonger,
   fixupHueShorter,
-  interpolate,
+  interpolateWithPremultipliedAlpha,
   parse,
   type Color,
 } from "culori";
@@ -53,7 +53,14 @@ const MIX_SPACES: Record<string, string> = {
   xyz: "xyz65",
   "xyz-d50": "xyz50",
   "xyz-d65": "xyz65",
+  "display-p3": "p3",
+  "a98-rgb": "a98",
+  "prophoto-rgb": "prophoto",
+  rec2020: "rec2020",
 };
+
+/** Only a polar space has a hue to interpolate, so only these take a strategy. */
+const POLAR_SPACES = new Set(["hsl", "hwb", "lch", "oklch"]);
 
 const HUE_FIXUPS: Record<string, (hues: number[]) => number[]> = {
   shorter: fixupHueShorter,
@@ -112,13 +119,16 @@ function resolveMix(body: string, context: ResolveContext, depth: number): Rgba 
 
   const specTokens = spec.trim().toLowerCase().split(/\s+/);
   if (specTokens[0] !== "in") return undefined;
-  const mode = MIX_SPACES[specTokens[1] ?? ""];
+  const space = specTokens[1] ?? "";
+  const mode = MIX_SPACES[space];
   if (!mode) return undefined;
 
   let fixup = fixupHueShorter;
   if (specTokens.length > 2) {
     // `in oklch longer hue` — the trailing `hue` keyword is required with a
-    // method, and nothing else may follow the space.
+    // method, and a rectangular space has no hue to interpolate, so CSS
+    // rejects the method there and so do we.
+    if (!POLAR_SPACES.has(space)) return undefined;
     if (specTokens.length !== 4 || specTokens[3] !== "hue") return undefined;
     const named = HUE_FIXUPS[specTokens[2] as string];
     if (!named) return undefined;
@@ -139,7 +149,9 @@ function resolveMix(body: string, context: ResolveContext, depth: number): Rgba 
   const c2 = resolve(b.color, context, depth + 1);
   if (!c1 || !c2) return undefined;
 
-  const mixed = interpolate([toCulori(c1), toCulori(c2)], mode as never, {
+  // CSS mixes in premultiplied alpha: mixing red with transparent has to keep
+  // red's hue and lose opacity, not slide towards transparent black.
+  const mixed = interpolateWithPremultipliedAlpha([toCulori(c1), toCulori(c2)], mode as never, {
     h: { fixup },
   } as never)(weight);
   const rgba = fromCulori(mixed);
@@ -172,17 +184,46 @@ function splitTopLevel(input: string): string[] {
   return parts;
 }
 
-/** `#fff 30%` or `30% #fff` — CSS allows the percentage on either side. */
+/**
+ * `#fff 30%` or `30% #fff` — CSS allows the percentage on either side of the
+ * colour. Only a percentage outside any parentheses is the mix stop: the `100%`
+ * in `hsl(0 100% 50%)` belongs to the colour, not to the mix.
+ */
 function splitColorAndPercent(input: string): { color: string; percent?: number } | undefined {
   const trimmed = input.trim();
   if (trimmed === "") return undefined;
-  const match = /(^|\s)(-?\d*\.?\d+)%(\s|$)/.exec(trimmed);
-  if (!match) return { color: trimmed };
-  const percent = Number.parseFloat(match[2] as string);
-  if (!Number.isFinite(percent) || percent < 0) return undefined;
-  const color = (trimmed.slice(0, match.index) + trimmed.slice(match.index + match[0].length)).trim();
-  if (color === "") return undefined;
-  return { color, percent };
+
+  let depth = 0;
+  for (let i = 0; i < trimmed.length; i += 1) {
+    const char = trimmed[i];
+    if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
+    else if (char === "%" && depth === 0) {
+      const start = startOfNumber(trimmed, i);
+      if (start === undefined) return undefined;
+      const percent = Number.parseFloat(trimmed.slice(start, i));
+      // CSS Color 5 bounds a mix stop to 0-100%: beyond that a mix would be an
+      // extrapolation, which culori would happily compute and a browser refuses.
+      if (!Number.isFinite(percent) || percent < 0 || percent > 100) return undefined;
+      const color = (trimmed.slice(0, start) + trimmed.slice(i + 1)).trim();
+      if (color === "") return undefined;
+      return { color, percent };
+    }
+  }
+  return { color: trimmed };
+}
+
+/** Walk back over the number preceding a `%`, returning where it starts. */
+function startOfNumber(input: string, percentIndex: number): number | undefined {
+  let i = percentIndex - 1;
+  while (i >= 0 && /[\d.]/.test(input[i] as string)) i -= 1;
+  if (i >= 0 && input[i] === "-") i -= 1;
+  const start = i + 1;
+  if (start === percentIndex) return undefined;
+  // A stop is its own token: `50%` is one, the `0%` of `hsl(0 0% 50%)` is not
+  // reachable here because that sits inside parentheses.
+  if (start > 0 && !/\s/.test(input[start - 1] as string)) return undefined;
+  return start;
 }
 
 function fromCulori(color: Color): Rgba | undefined {

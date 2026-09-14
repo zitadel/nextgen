@@ -15,10 +15,10 @@
  *
  * Translucent values are composited before measuring: what a reader sees is
  * the blend, so a ratio against the raw value would describe a colour nobody
- * sees. A foreground composites over its own pair's surface; a translucent
- * surface composites over the side's `background`, which is what sits behind
- * the card. A translucent `background` has the host page behind it, which is
- * not ours to know — that pair stays unresolved.
+ * sees. Each role composites over what is actually behind it — a button fill
+ * over the card, the card over the page — rather than over the page in every
+ * case. A translucent page has the host application behind it, which is not
+ * ours to know, so that pair stays unresolved.
  */
 
 /** WCAG 2.2 AA: body text. */
@@ -51,6 +51,10 @@ export const BRANDING_CONTRAST_PAIRS: readonly ContrastPair[] = [
   { foreground: "text", background: "background", minimum: CONTRAST_AA_TEXT, describes: "body text on the page" },
   { foreground: "text", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "body text on the card" },
   { foreground: "text_muted", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "secondary text on the card" },
+  // `muted` fills the secondary button and the alert, both of which draw text
+  // on it — a palette can read perfectly on the card and be unreadable here.
+  { foreground: "text", background: "muted", minimum: CONTRAST_AA_TEXT, describes: "the secondary button's label" },
+  { foreground: "text_muted", background: "muted", minimum: CONTRAST_AA_TEXT, describes: "supporting text in an alert" },
   { foreground: "on_primary", background: "primary", minimum: CONTRAST_AA_TEXT, describes: "the primary button's label" },
   { foreground: "link", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "links on the card" },
   { foreground: "error", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "error text on the card" },
@@ -106,7 +110,7 @@ export function checkPaletteContrast(palette: BrandingPaletteColors | undefined)
     const foreground = palette[pair.foreground];
     const background = palette[pair.background];
     if (!foreground || !background) continue;
-    const resolved = resolvePair(foreground, background, palette, context);
+    const resolved = resolvePair(foreground, pair.background, palette, context);
     if (!resolved) {
       findings.push({ ...pair, status: "unresolved" });
       continue;
@@ -117,23 +121,48 @@ export function checkPaletteContrast(palette: BrandingPaletteColors | undefined)
   return findings;
 }
 
+/**
+ * What sits behind each painted role. The card sits on the page; the button
+ * and alert fills sit on the card. A role absent from this map is the page
+ * itself, which has the host application behind it.
+ */
+const BACKDROP: Record<string, string> = {
+  surface: "background",
+  primary: "surface",
+  muted: "surface",
+};
+
 function resolvePair(
-  foreground: string,
-  background: string,
+  foregroundValue: string,
+  backgroundRole: string,
   palette: BrandingPaletteColors,
   context: ContrastContext,
 ): { foreground: Rgba; background: Rgba } | undefined {
-  const fg = parseCssColor(foreground, context);
-  let bg = parseCssColor(background, context);
+  const fg = parseCssColor(foregroundValue, context);
+  const bg = resolveSurface(backgroundRole, palette, context, new Set());
   if (!fg || !bg) return undefined;
-  if (bg.a < 1) {
-    const behind = palette["background"];
-    const page = behind ? parseCssColor(behind, context) : undefined;
-    // The host page is behind the page background, and it is not ours to know.
-    if (!page || page.a < 1) return undefined;
-    bg = compositeOver(bg, page);
-  }
   return { foreground: compositeOver(fg, bg), background: bg };
+}
+
+/** Resolve a role to an opaque colour, compositing it down its own stack. */
+function resolveSurface(
+  role: string,
+  palette: BrandingPaletteColors,
+  context: ContrastContext,
+  seen: Set<string>,
+): Rgba | undefined {
+  if (seen.has(role)) return undefined;
+  seen.add(role);
+  const value = palette[role];
+  if (!value) return undefined;
+  const color = parseCssColor(value, context);
+  if (!color) return undefined;
+  if (color.a >= 1) return color;
+  const behind = BACKDROP[role];
+  if (!behind) return undefined;
+  const backdrop = resolveSurface(behind, palette, context, seen);
+  if (!backdrop) return undefined;
+  return compositeOver(color, backdrop);
 }
 
 /** Both sides of a revision, keyed by the side each finding belongs to. */
