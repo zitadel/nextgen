@@ -340,6 +340,13 @@ Recorded here because §12 makes them the API's problem, not the CLI's:
   invoke, and fails unless every operation the client offers is either called
   or listed with a written reason. Deciding not to expose something stays
   allowed; leaving it unnoticed does not.
+- Whether something is a resource at all is mostly a judgement, but not
+  entirely: a collection with `POST /<collection>/query` is one by the API's
+  own definition ([ADR 031](031-openapi-querying.md)), so the test requires
+  commands for it and accepts no exclusion. That covers five of the eleven
+  today. The other six list through `GET` — the deviation recorded below — so
+  until that is resolved, a new collection without a query endpoint still needs
+  a person to classify it.
 - Column choices are product decisions sitting in a table with nothing
   asserting they are sensible. That is how `users` shipped a table keyed on a
   schema URL identical on every row instead of the person's email, and the same
