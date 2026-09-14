@@ -49,14 +49,16 @@ import { isDirectRun, mapWithConcurrency, run, runCapture } from "./dev-process.
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 // Never hold Go sources, and walking them dwarfs the rest of discovery.
-// `.claude` holds agent worktrees and `.go` a local module cache; both are
-// gitignored, local-only, and full of directives that are not this module's.
+// `.claude` holds agent worktrees, `.go` a local module cache and `vendor` a
+// local `go mod vendor` copy; all are local-only and full of directives that
+// are not this module's.
 const SKIP_DIRS = new Set([
   "node_modules",
   ".git",
   ".moon",
   ".claude",
   ".go",
+  "vendor",
   "dist",
   "target",
   ".next",

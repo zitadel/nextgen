@@ -49,16 +49,16 @@ const REPLACE_KEY = "x-replace";
 export type Schema = { [key: string]: unknown };
 
 const isSchema = (value: unknown): value is Schema =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const loadYaml = (path: string): Schema => parse(readFileSync(path, "utf8")) as Schema;
 
 /** `flow-definition-step.yaml` → `FlowDefinitionStep`; also the default `title`. */
 export const defName = (file: string): string =>
-	basename(file, ".yaml")
-		.split("-")
-		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-		.join("");
+  basename(file, ".yaml")
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
 
 /**
  * Recursive merge where objects combine and anything else on the right
@@ -68,17 +68,17 @@ export const defName = (file: string): string =>
  * to resolve even under an `x-` key.
  */
 export function deepMerge(base: Schema, patch: Schema): Schema {
-	const out: Schema = { ...base };
-	for (const [key, value] of Object.entries(patch)) {
-		const current = out[key];
-		if (isSchema(value) && value[REPLACE_KEY] === true) {
-			const { [REPLACE_KEY]: _replace, ...replacement } = value;
-			out[key] = replacement;
-		} else {
-			out[key] = isSchema(current) && isSchema(value) ? deepMerge(current, value) : value;
-		}
-	}
-	return out;
+  const out: Schema = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    const current = out[key];
+    if (isSchema(value) && value[REPLACE_KEY] === true) {
+      const { [REPLACE_KEY]: _replace, ...replacement } = value;
+      out[key] = replacement;
+    } else {
+      out[key] = isSchema(current) && isSchema(value) ? deepMerge(current, value) : value;
+    }
+  }
+  return out;
 }
 
 /**
@@ -88,78 +88,78 @@ export function deepMerge(base: Schema, patch: Schema): Schema {
  * through the same conversion.
  */
 function convert(
-	node: unknown,
-	dir: string,
-	emitted: ReadonlySet<string>,
-	defs: Map<string, Schema>,
+  node: unknown,
+  dir: string,
+  emitted: ReadonlySet<string>,
+  defs: Map<string, Schema>,
 ): unknown {
-	if (Array.isArray(node)) {
-		return node.map((item) => convert(item, dir, emitted, defs));
-	}
-	if (!isSchema(node)) {
-		return node;
-	}
+  if (Array.isArray(node)) {
+    return node.map((item) => convert(item, dir, emitted, defs));
+  }
+  if (!isSchema(node)) {
+    return node;
+  }
 
-	const { example, [EMIT_KEY]: _emit, [DIALECT_KEY]: dialect, ...wire } = node;
-	const out: Schema = {};
-	for (const [key, value] of Object.entries(deepMerge(wire, isSchema(dialect) ? dialect : {}))) {
-		out[key] = convert(value, dir, emitted, defs);
-	}
-	if (example !== undefined && out.examples === undefined) {
-		out.examples = [example];
-	}
+  const { example, [EMIT_KEY]: _emit, [DIALECT_KEY]: dialect, ...wire } = node;
+  const out: Schema = {};
+  for (const [key, value] of Object.entries(deepMerge(wire, isSchema(dialect) ? dialect : {}))) {
+    out[key] = convert(value, dir, emitted, defs);
+  }
+  if (example !== undefined && out.examples === undefined) {
+    out.examples = [example];
+  }
 
-	const ref = out.$ref;
-	if (typeof ref === "string" && ref.endsWith(".yaml")) {
-		const target = join(dir, ref);
-		if (emitted.has(target)) {
-			out.$ref = `${basename(ref, ".yaml")}.json`;
-		} else {
-			const name = defName(ref);
-			if (!defs.has(name)) {
-				defs.set(name, {}); // reserve before recursing so a self-reference terminates
-				defs.set(name, convert(loadYaml(target), dirname(target), emitted, defs) as Schema);
-			}
-			out.$ref = `#/$defs/${name}`;
-		}
-	}
-	return out;
+  const ref = out.$ref;
+  if (typeof ref === "string" && ref.endsWith(".yaml")) {
+    const target = join(dir, ref);
+    if (emitted.has(target)) {
+      out.$ref = `${basename(ref, ".yaml")}.json`;
+    } else {
+      const name = defName(ref);
+      if (!defs.has(name)) {
+        defs.set(name, {}); // reserve before recursing so a self-reference terminates
+        defs.set(name, convert(loadYaml(target), dirname(target), emitted, defs) as Schema);
+      }
+      out.$ref = `#/$defs/${name}`;
+    }
+  }
+  return out;
 }
 
 /** Every YAML file under `dir` that declares `x-meta-schema`, as absolute paths. */
 export function findSources(dir: string): string[] {
-	return readdirSync(dir, { recursive: true, encoding: "utf8" })
-		.filter((file) => file.endsWith(".yaml"))
-		.map((file) => join(dir, file))
-		.filter((file) => EMIT_KEY in loadYaml(file))
-		.sort();
+  return readdirSync(dir, { recursive: true, encoding: "utf8" })
+    .filter((file) => file.endsWith(".yaml"))
+    .map((file) => join(dir, file))
+    .filter((file) => EMIT_KEY in loadYaml(file))
+    .sort();
 }
 
 /** The JSON Schema one source file generates, given the full set of emitted sources. */
 export function generateSchema(source: string, emitted: ReadonlySet<string>): Schema {
-	const defs = new Map<string, Schema>();
-	const yaml = loadYaml(source);
-	const body = convert(yaml, dirname(source), emitted, defs) as Schema;
-	return deepMerge(
-		{ $comment: MARKER, $schema: DRAFT, title: defName(source) },
-		{
-			...body,
-			...(yaml[EMIT_KEY] === "json-schema" ? { allOf: [{ $ref: DRAFT }] } : {}),
-			...(defs.size > 0 ? { $defs: Object.fromEntries(defs) } : {}),
-		},
-	);
+  const defs = new Map<string, Schema>();
+  const yaml = loadYaml(source);
+  const body = convert(yaml, dirname(source), emitted, defs) as Schema;
+  return deepMerge(
+    { $comment: MARKER, $schema: DRAFT, title: defName(source) },
+    {
+      ...body,
+      ...(yaml[EMIT_KEY] === "json-schema" ? { allOf: [{ $ref: DRAFT }] } : {}),
+      ...(defs.size > 0 ? { $defs: Object.fromEntries(defs) } : {}),
+    },
+  );
 }
 
 const isDirectRun =
-	process.argv[1] !== undefined &&
-	import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isDirectRun) {
-	const sources = findSources(join(ROOT, "api/openapi"));
-	const emitted = new Set(sources);
-	for (const source of sources) {
-		const outPath = join(OUT_DIR, `${basename(source, ".yaml")}.json`);
-		writeFileSync(outPath, `${JSON.stringify(generateSchema(source, emitted), null, 2)}\n`);
-		console.log(`${relative(ROOT, source)} → ${relative(ROOT, outPath)}`);
-	}
+  const sources = findSources(join(ROOT, "api/openapi"));
+  const emitted = new Set(sources);
+  for (const source of sources) {
+    const outPath = join(OUT_DIR, `${basename(source, ".yaml")}.json`);
+    writeFileSync(outPath, `${JSON.stringify(generateSchema(source, emitted), null, 2)}\n`);
+    console.log(`${relative(ROOT, source)} → ${relative(ROOT, outPath)}`);
+  }
 }
