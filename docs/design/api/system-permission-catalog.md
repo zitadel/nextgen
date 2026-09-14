@@ -18,10 +18,10 @@
   users. A later split (e.g. directory / non-PII roster vs full PII detail) is
   explicitly deferred — see [§ Open questions](#open-questions).
 - **Project-scoped configuration resources are separate permissions.** Branding,
-  domains, features, allowed origins, signing keys, and webhooks use
-  `branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`,
-  and `webhook.*`. Their project grant supplies scope; `project.read` /
-  `project.write` do not imply them.
+  domains, environments, features, allowed origins, signing keys, and webhooks
+  use `branding.*`, `domain.*`, `environment.*`, `feature.*`,
+  `allowed_origin.*`, `signing_key.*`, and `webhook.*`. Their project grant
+  supplies scope; `project.read` / `project.write` do not imply them.
 - **Compound resource types use `_`.** Multi-word types match the API/FGA name
   (`team_membership`, `flow_definition`). No dot nesting (`team.membership.*`) —
   that would imply `team.write` covers child ops.
@@ -88,7 +88,7 @@ see [§ Drift notes](#drift-notes).
 | `signing_key` | action-verbs | `create`, `read`, `delete` — **no `signing_key.rotate`.** Rotation is create-a-successor ([ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md)), not in-place secret replacement. Emergency replacement creates the successor before deleting the compromised key. |
 | `billing` | read-write-only | Tier/subscription/payment — no `billing.create`. |
 | `branding` | manage | Immutable revisions: `write` publishes a revision; no update or delete. Already matches OpenAPI. |
-| `domain`, `allowed_origin`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. |
+| `domain`, `allowed_origin`, `environment`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. `environment.write` also covers renaming and the `production` toggle; `environment.delete` is additionally bounded by server invariants no grant lifts — never the last environment, never a production one ([ADR 061](../../adrs/061-environment-lifecycle-and-classes.md)). |
 | `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
 | `events` | read-only | Unified audit stream (`GET /events`); replaces retired `event` / `audit_event` split (ADR 049). |
