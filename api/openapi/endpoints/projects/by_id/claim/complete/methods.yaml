@@ -88,11 +88,26 @@ post:
           schema:
             $ref: ../init/already-claimed-response.yaml
     '410':
-      description: The claim challenge has expired.
+      description: |
+        Gone, for one of two reasons told apart by `code`.
+        `proj.claim_expired` means this challenge lapsed and a fresh claim
+        init recovers. `proj.claim_window_expired` means the project itself is
+        past its 14-day claim window; that refusal is final and no new
+        challenge can help.
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+            # The explicit discriminator is required, not decorative: the two
+            # schemas differ only by a `const` code, so without it ogen cannot
+            # infer one and silently skips the whole operation.
+            oneOf:
+              - $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+              - $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+            discriminator:
+              propertyName: code
+              mapping:
+                proj.claim_expired: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+                proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
     '429':
       description: |
         Too many requests. Completion is rate-limited so a guessed

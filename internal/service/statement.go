@@ -288,6 +288,17 @@ const DefaultUserTeamsLimit = 10
 type UserStatements interface {
 	Statements
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
+	// PatchUser reconciles the stored user to the given post-merge state:
+	// header (schema_url, updated_at), attribute rows, and unique-attribute
+	// registry rows are all rewritten. It writes nothing and returns a
+	// NoRowFoundError when the row's updated_at no longer matches
+	// [domain.PatchUser.ExpectedUpdatedAt] (concurrent write) or the user is
+	// gone.
+	PatchUser(ctx context.Context, user *domain.PatchUser) error
+	// GetUserUniqueAttributeScopes reads the stored registry team scope per
+	// attribute key, so a patch keeps the scope an existing claim was created
+	// under. An unknown user reads as an empty map, not an error.
+	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
@@ -425,6 +436,11 @@ type AuthzAssignmentStatements interface {
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
 	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	// ListManagedGrants lists unrevoked collaboration grants (user/team
+	// viewer|editor|admin) with cursor pagination. Setup and owning-team
+	// rows are excluded in SQL. projectID is required and always ANDed
+	// into the SELECT so a caller cannot list across projects.
+	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is

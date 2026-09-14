@@ -1,5 +1,19 @@
 # @zitadel/server-linux-x64
 
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- [#1150](https://github.com/zitadel/nextgen/pull/1150) [`fce5a75`](https://github.com/zitadel/nextgen/commit/fce5a755fee3dab0d1e013b4ab198755d2dda4c5) Thanks [@vitorbari](https://github.com/vitorbari)! - Fix three sign-in dead ends. Choosing "sign in with a passkey" on a password
+  step no longer treats the password box the browser posts alongside it as a
+  submission, so the WebAuthn prompt appears instead of a required-field or
+  invalid-credentials error. Going back to the identifier step now releases the
+  user resolved by the abandoned attempt, so re-entering an address signs in
+  normally instead of failing with "The user was already authenticated". And
+  signing up with an address that already has an account now completes: that
+  sign-in reached the final step without a handoff token, leaving the user
+  unable to exchange it for a session.
+
 ## 1.0.0-alpha.21
 
 ## 1.0.0-alpha.20

@@ -109,19 +109,25 @@ func listOrderBy[F ~uint8](sorting *Sorting, defaultField F, defaultDirection da
 	return database.OrderBy[F]{Columns: columns, Direction: direction}, nil
 }
 
-// createdAtFilter maps an operation to a comparison filter on a timestamp
+// createdAtFilter maps an operation to a comparison filter on created_at.
+func createdAtFilter[F ~uint8](op string, col database.Column[F], value any) (database.Filter[F], error) {
+	return timestampFilter("created_at", op, col, value)
+}
+
+// timestampFilter maps an operation to a comparison filter on a timestamp
 // column. The value arrives as an untyped string (the filter-value union in
 // the openapi contract does not specify a format for a timestamp); parse it
-// into the time.Time needed for the comparison.
-func createdAtFilter[F ~uint8](op string, col database.Column[F], value any) (database.Filter[F], error) {
+// into the time.Time needed for the comparison. field is the wire name used
+// in invalid-value details.
+func timestampFilter[F ~uint8](field, op string, col database.Column[F], value any) (database.Filter[F], error) {
 	raw, ok := value.(string)
 	if !ok {
-		return nil, domain.ErrRequestInvalid().WithDetails("created_at filter value must be an RFC3339 string")
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must be an RFC3339 string", field))
 	}
 	t, err := database.CoerceTimeValue(raw)
 	if err != nil {
 		return nil, domain.ErrRequestInvalid().WithDetails(
-			fmt.Sprintf("created_at filter value %q is not a valid RFC3339 timestamp", raw))
+			fmt.Sprintf("%s filter value %q is not a valid RFC3339 timestamp", field, raw))
 	}
 	return compareFilter(op, col, t)
 }

@@ -1,0 +1,17 @@
+type: string
+description: |
+  A related object to embed on each returned grant (ADR 059).
+
+  - `principal`: the principal named by `principal_id`, as `principal` on
+    each grant. The property is omitted entirely when not requested. When
+    requested, it is the same body `GET /users/{id}` serves for
+    `principal_type=user`, or `GET /teams/{id}` for `principal_type=team`,
+    and `null` when that principal cannot be loaded. Discriminate with the
+    grant's existing `principal_type`.
+
+    Requires `user.read` and `team.read` in addition to `project.read`.
+    Both are checked on the whole request before the list, because a mixed
+    page is the common case. A caller who may not read either resource
+    receives 403 rather than a silently missing `principal`.
+enum:
+  - principal

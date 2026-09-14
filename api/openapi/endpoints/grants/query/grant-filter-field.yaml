@@ -1,0 +1,14 @@
+type: string
+description: |
+  Field to filter grants by:
+  - `created_at`: RFC3339 timestamp
+  - `principal_type`: `user` or `team`
+  - `principal_id`: principal id (`user_<opaque>` or `team_<opaque>`)
+  - `relation`: `viewer`, `editor`, or `admin`
+  - `expires_at`: RFC3339 timestamp (null when the grant does not expire)
+enum:
+  - created_at
+  - principal_type
+  - principal_id
+  - relation
+  - expires_at

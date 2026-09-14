@@ -37,6 +37,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("releases", release.Schema)...)
 	cols = append(cols, schematest.Columns("flow_definitions", flowdefinition.Schema)...)
 	cols = append(cols, schematest.Columns("authz_membership_edges", authz.MembershipEdgeSchema)...)
+	cols = append(cols, schematest.Columns("authz_assignments", authz.AuthzAssignmentSchema)...)
 	joined, err := schematest.JoinColumns(map[string]string{"m": "team_memberships", "t": "teams"}, userteam.Schema)
 	require.NoError(t, err)
 	return append(cols, joined...)

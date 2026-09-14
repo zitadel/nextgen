@@ -38,11 +38,13 @@ type EventsConfig struct {
 type PlatformConfig struct {
 	// ProjectID pins a standalone deployment's default project to an existing
 	// project (an id of the form "proj_<...>"). When empty (the default), the
-	// deployment tracks its first-created project — the one the customer's
-	// `zitadel setup` creates. The server never creates that project itself; a
-	// configured id that does not exist is a startup error. Leave empty when
-	// BootstrapProject is set — the platform project's id is server-owned
-	// (domain.PlatformProjectID), not operator-authored. (#605)
+	// deployment tracks its first-created project other than the built-in
+	// platform row — the one the customer's `zitadel setup` creates; the
+	// platform project is infrastructure and only becomes the default through
+	// this pin or BootstrapProject. The server never creates that project
+	// itself; a configured id that does not exist is a startup error. Leave
+	// empty when BootstrapProject is set — the platform project's id is
+	// server-owned (domain.PlatformProjectID), not operator-authored. (#605)
 	ProjectID string `mapstructure:"project_id"`
 
 	// BootstrapProject, when true, ensures the well-known platform project
@@ -127,6 +129,17 @@ type ServerConfig struct {
 	// files exist in the master key directory, the newest file is used for
 	// encryption.
 	MasterKeys map[string]*MasterKeyConfig `mapstructure:"master_keys"`
+	// GenerateMasterKey allows the server to mint a master key when it starts
+	// with none configured and none in the master key directory. It defaults to
+	// true, which is what makes a first local start work with no configuration
+	// at all.
+	//
+	// Turn it off wherever a generated key would be the wrong answer rather
+	// than a convenience: on ephemeral storage every instance would mint its
+	// own key, and project KEKs wrapped by one of them cannot be unwrapped by
+	// the next. With it off, a missing key fails the start instead, which is
+	// the failure that can still be recovered from.
+	GenerateMasterKey bool `mapstructure:"generate_master_key"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`

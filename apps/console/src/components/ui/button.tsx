@@ -11,7 +11,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         // Tinted, not solid. The registry default is `bg-destructive text-white`,
-        // but the design system's `Variant=Destructive` (`786:5825`) is a
+        // but the design system's `Variant=Destructive` is a
         // destructive/10 fill with destructive text — dark mode lifts the fill to
         // /20 so it reads against the darker surface. Fixed here rather than at
         // the call site so the next destructive button inherits it.

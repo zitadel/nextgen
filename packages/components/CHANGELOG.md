@@ -1,5 +1,12 @@
 # @zitadel/components
 
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- Updated dependencies [[`c7c737a`](https://github.com/zitadel/nextgen/commit/c7c737a32dd62368161db2ab90d93af800c07198)]:
+  - @zitadel/config@1.0.0-alpha.22
+
 ## 1.0.0-alpha.21
 
 ### Minor Changes

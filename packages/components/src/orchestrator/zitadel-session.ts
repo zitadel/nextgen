@@ -13,7 +13,7 @@ import "../atoms/index.js";
 /**
  * `<zitadel-session>` — the "signed in" card.
  *
- * Renders the post-sign-in confirmation surface (Figma `7355:8959`): a
+ * Renders the post-sign-in confirmation surface: a
  * centred auth card reading "Signed in as {identity}" with a **Sign out**
  * action. Composed from the same `<zl-page-shell>` / `<zl-card>` /
  * `<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits

@@ -167,22 +167,20 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, "identifier", flowDef.Purposes[domain.FlowDefinitionPurposeLogin])
 	assert.Equal(t, "register", flowDef.Purposes[domain.FlowDefinitionPurposeRegister])
 
+	// The shipped default offers no passkey: the preset does.
 	identifierStep, ok := flowDef.FindStep("identifier")
 	require.True(t, ok)
-	assert.Contains(t, actionNames(identifierStep.Actions), domain.FlowActionPasskey)
-	assert.Equal(t, "done", identifierStep.Transitions[domain.FlowActionPasskey].Target)
+	assert.NotContains(t, actionNames(identifierStep.Actions), domain.FlowActionPasskey)
 
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
 	assert.Equal(t, []domain.Field{"x-auth-methods#password"}, passwordStep.Fields)
-	assert.Contains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
-	assert.Equal(t, "done", passwordStep.Transitions[domain.FlowActionPasskey].Target)
+	assert.NotContains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
 	assert.Equal(t, []domain.Field{"email"}, registerStep.Fields)
-	assert.Contains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
-	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
+	assert.NotContains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
 
 	registerPasswordStep, ok := flowDef.FindStep("register-password")
 	require.True(t, ok)

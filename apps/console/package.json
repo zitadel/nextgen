@@ -8,7 +8,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "dev:real": "tsx --conditions=@zitadel/source scripts/dev-real.mts"
+    "dev:real": "tsx --conditions=@zitadel/source scripts/dev-real.mts",
+    "dev:claim": "tsx --conditions=@zitadel/source scripts/dev-real.mts --claim"
   },
   "dependencies": {
     "@fontsource/arimo": "catalog:",

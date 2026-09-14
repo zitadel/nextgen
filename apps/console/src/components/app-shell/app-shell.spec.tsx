@@ -30,7 +30,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // The top-level surfaces with a design hand-off, in the order the design puts
 // them. `User schemas` nests beneath `Users` (`Schema directory` frame) rather
 // than adding a second top-level row.
-const NAV_ORDER = ["Projects", "Teams", "Users"];
+const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
@@ -133,6 +133,20 @@ describe("settings view", () => {
     // ...and the portal list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
+  });
+
+  it("drops the context bar in the settings view", async () => {
+    // The settings frames draw no bar. Its project switcher and theme toggle
+    // are portal chrome; the sidebar keeps a trigger of its own, so the
+    // collapse is not lost with them.
+    renderShell("/settings");
+    await screen.findByRole("link", { name: "Back to app" });
+
+    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Dark" })).not.toBeInTheDocument();
+    // The sidebar keeps its own triggers (header row and rail), so the
+    // collapse survives the bar going away.
+    expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
   });
 });
 

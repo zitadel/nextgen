@@ -300,7 +300,12 @@ func TestClaimExpiredChallenge(t *testing.T) {
 		ChallengeID: api.ChallengeID(plain),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.ProjClaimExpired{}, statusResp, helpers.MustMarshal(t, statusResp))
+	// The 410 is a discriminated union since the claim window landed; a lapsed
+	// challenge must decode as the retryable proj.claim_expired variant, not
+	// the final closed-window refusal.
+	statusGone, ok := statusResp.(*api.GetClaimStatusGone)
+	require.True(t, ok, helpers.MustMarshal(t, statusResp))
+	assert.True(t, statusGone.IsProjClaimExpired(), helpers.MustMarshal(t, statusResp))
 
 	userID := harness.CreateUserWithTeam(t, harness.EnsurePlatformProject(t).ID)
 	client.SetSessionToken(platformSessionCookie(t, userID).Value)
@@ -308,7 +313,9 @@ func TestClaimExpiredChallenge(t *testing.T) {
 		&api.CompleteClaimRequest{ChallengeID: api.ChallengeID(plain)},
 		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	require.IsType(t, &api.ProjClaimExpired{}, completeResp, helpers.MustMarshal(t, completeResp))
+	completeGone, ok := completeResp.(*api.CompleteClaimGone)
+	require.True(t, ok, helpers.MustMarshal(t, completeResp))
+	assert.True(t, completeGone.IsProjClaimExpired(), helpers.MustMarshal(t, completeResp))
 }
 
 // TestCompleteClaimNoPersonalTeam: the session user is authenticated but has
@@ -493,7 +500,7 @@ func TestCompleteClaimConcurrent(t *testing.T) {
 		switch results[i].(type) {
 		case *api.CompleteClaimResponse:
 			winners++
-		case *api.ProjClaimExpired, *api.AlreadyClaimedResponse:
+		case *api.CompleteClaimGone, *api.AlreadyClaimedResponse:
 			losers++
 		default:
 			t.Fatalf("unexpected complete result: %T %s", results[i], helpers.MustMarshal(t, results[i]))
@@ -613,4 +620,44 @@ func TestClaimAuthNegatives(t *testing.T) {
 		// message (OgenErrorHandler + sessionCookieOperations).
 		assert.Equal(t, "Missing or invalid session token.", details.Message)
 	})
+}
+
+// TestGetClaimWindow: the claim page's countdown read. Unauthenticated —
+// no project secret, no session cookie — and authorized by the challenge from
+// the claim URL alone, so it must answer for a fresh claim and refuse a
+// challenge it does not know.
+func TestGetClaimWindow(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	secret := harness.ProjectSecret(t, project)
+
+	initClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	initClient.SetToken(secret)
+	init := mustInitClaim(t, initClient, project.ID)
+
+	// A second client with no credentials at all: the browser leg's posture.
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+
+	resp, err := client.GetClaimWindow(t.Context(), api.GetClaimWindowParams{
+		ProjectID:   api.ProjectID(project.ID),
+		ChallengeID: init.ChallengeID,
+	})
+	require.NoError(t, err)
+	window, ok := resp.(*api.ClaimWindowResponse)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	assert.False(t, window.Expired)
+	// The project was created moments ago, so its window closes a full
+	// domain.ClaimWindow from now.
+	assert.WithinDuration(t, time.Now().Add(domain.ClaimWindow), window.ExpiresAt, time.Minute)
+
+	unknown, err := client.GetClaimWindow(t.Context(), api.GetClaimWindowParams{
+		ProjectID:   api.ProjectID(project.ID),
+		ChallengeID: api.ChallengeID("ch_" + helpers.RandString(16)),
+	})
+	require.NoError(t, err)
+	assert.IsType(t, &api.GetClaimWindowNotFound{}, unknown, helpers.MustMarshal(t, unknown))
 }

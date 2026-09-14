@@ -85,6 +85,7 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionOperation:    true,
 	api.RevokeMySessionOperation: true,
 	api.GetMyUserOperation:       true,
+	api.PatchMyUserOperation:     true,
 	api.CompleteClaimOperation:   true,
 }
 

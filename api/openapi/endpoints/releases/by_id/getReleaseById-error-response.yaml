@@ -6,12 +6,16 @@ content:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/rel-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
+          rel.permission_denied: '../../../components/schemas/errors/rel-permission_denied.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -24,6 +28,16 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.permission_denied:
+        summary: rel.permission_denied
+        value:
+          code: rel.permission_denied
+          message: 'release: requires an operator-grade token bound to the project (project.write or a release.* scope)'
       req.invalid:
         summary: req.invalid
         value:

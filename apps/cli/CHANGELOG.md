@@ -1,5 +1,18 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.22
+
+### Minor Changes
+
+- [#1147](https://github.com/zitadel/nextgen/pull/1147) [`893364c`](https://github.com/zitadel/nextgen/commit/893364c538f8468114510bfbdaac5cc2966d6395) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Clearer claim journey output: commands now sit on their own styled line in the setup box, separated from the prose so they can be copied without surrounding words, the end-of-setup notice states the concrete deadline (date, time, and zone) until which the temporary project can be claimed, terminal boxes wrap to the window width instead of breaking their frame below 80 columns, and `zitadel claim` explains a closed 14-day claim window instead of suggesting a futile retry. `zitadel setup` now also nudges against a local server when that server hosts the platform plane (probed via its runtime document), where the claim can actually complete; the offline surfaces (`status`, `doctor`) keep their cloud-only nudges.
+
+### Patch Changes
+
+- Updated dependencies [[`c7c737a`](https://github.com/zitadel/nextgen/commit/c7c737a32dd62368161db2ab90d93af800c07198), [`c0bef04`](https://github.com/zitadel/nextgen/commit/c0bef048c305cd4fdac5d44bd1219a3fc08e550a), [`fce5a75`](https://github.com/zitadel/nextgen/commit/fce5a755fee3dab0d1e013b4ab198755d2dda4c5), [`1f5e7b9`](https://github.com/zitadel/nextgen/commit/1f5e7b9d8ccd1282a81f8541f359376ddd0947bc), [`4a637a3`](https://github.com/zitadel/nextgen/commit/4a637a3fed02f969cae61a427d293ca226bd6a4a), [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea), [`c3fbdee`](https://github.com/zitadel/nextgen/commit/c3fbdee479ed94ab6cf511ec8441db68bd9821b5), [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab), [`472a182`](https://github.com/zitadel/nextgen/commit/472a18216b472cdcd76620b1f11f37ce997fcdcb), [`e04e3ce`](https://github.com/zitadel/nextgen/commit/e04e3ceba65ac35329c2cde99f9fea1b1530ef32)]:
+  - @zitadel/server@1.0.0-alpha.22
+  - @zitadel/config@1.0.0-alpha.22
+  - @zitadel/api@1.0.0-alpha.22
+
 ## 1.0.0-alpha.21
 
 ### Patch Changes

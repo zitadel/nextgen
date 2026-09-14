@@ -93,6 +93,19 @@ func (h *Handler) CompleteClaim(ctx context.Context, req *api.CompleteClaimReque
 	}, nil
 }
 
+// GetClaimWindow answers the claim page's countdown read. Unauthenticated by
+// contract (`security: []`): the page runs it before the developer signs in,
+// and the challenge from the claim URL is the capability. A challenge that
+// does not resolve answers 404 through claimErrorResponse, the same verdict a
+// wrong project id gets, so nothing about project existence leaks.
+func (h *Handler) GetClaimWindow(ctx context.Context, params api.GetClaimWindowParams) (api.GetClaimWindowRes, error) {
+	res, err := h.claimService.Window(ctx, string(params.ProjectID), string(params.ChallengeID))
+	if err != nil {
+		return nil, err
+	}
+	return &api.ClaimWindowResponse{ExpiresAt: res.ExpiresAt, Expired: res.Expired}, nil
+}
+
 // verifyClaimSession authenticates the human behind claim/complete (ADR 046 §2,
 // Claim C2). It returns the session's user id. Every rejection is pre-wrapped
 // as the public 401 verdict (auth.unauthorized) with the distinct sentinel kept

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   completeClaimChallenge,
   expireClaimChallenge,
+  expireClaimWindow,
   resetPlatformStore,
   setupPlatformHandlers,
   snapshotPlatformStore,
@@ -134,12 +135,26 @@ describe("claim", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { project_id: string; team_id: string; claimed_at: string; dashboard_url: string };
+      data: {
+        title: string;
+        project_id: string;
+        team_id: string;
+        claimed_at: string;
+        dashboard_url: string;
+        next_actions: string[];
+      };
     };
     expect(json.status).toBe("ok");
     expect(json.data.project_id).toBe(project.id);
     expect(json.data.team_id).toMatch(/^team-/);
     expect(json.data.dashboard_url).toContain(json.data.team_id);
+    // The human output speaks permanence and points at the Console; the team
+    // id stays available here in the envelope.
+    expect(json.data.title).toBe("Your Project is now permanent.");
+    expect(json.data.next_actions).toEqual([
+      "Manage your Project and collaborate in the Console:",
+      json.data.dashboard_url,
+    ]);
 
     const secret = await readSecret(cwd);
     expect(secret.team_id).toBe(json.data.team_id);
@@ -150,18 +165,27 @@ describe("claim", () => {
     expect(secret.preview_secret).toBe("sk_preview_test");
   });
 
-  it("prints the link so a user can open it themselves", async () => {
+  it("prints the link and the permanence outcome, without team wording", async () => {
     const { cwd, project } = await makeProject();
 
     // No `--json`: the envelope silences consola, and the point here is the
-    // human-facing narration that carries the link.
+    // human-facing narration — the link on its own line, then the success
+    // block in claim/permanence terms.
     const [res] = await Promise.all([
       runCliForTest(["claim", "--cwd", cwd, "--server", SERVER, "--no-open"]),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(`${res.stdout}${res.stderr}`).toContain("/claim/ch_");
+    const output = `${res.stdout}${res.stderr}`;
+    expect(output).toContain("/claim/ch_");
+    expect(output).toContain("Project claimed");
+    expect(output).toContain("Your Project is now permanent.");
+    expect(output).toContain("Manage your Project and collaborate in the Console:");
+    // The team stays in the envelope and the secret, not in the prose. The
+    // mock's dashboard_url embeds the team id in its path, so assert on the
+    // retired sentence rather than on the raw id.
+    expect(output).not.toContain("attached to team");
   });
 
   it("skips without a network call when the secret already records a team", async () => {
@@ -237,6 +261,61 @@ describe("claim", () => {
     expect(json.next_commands.some((command) => command.includes("claim"))).toBe(true);
 
     // A failed claim must leave the secret exactly as it was.
+    const secret = await readSecret(cwd);
+    expect(secret.claimed_at).toBeUndefined();
+    expect(secret.team_id).toBeUndefined();
+  });
+
+  it("explains a closed claim window without suggesting a retry", async () => {
+    const { cwd, project } = await makeProject();
+    expireClaimWindow(project.id);
+
+    const res = await claim(cwd);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      message: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("14 days");
+    expect(json.message).toContain("no longer be claimed");
+    // The retryable expiry suggests `claim` again; a closed window must not,
+    // because a fresh link cannot reopen it.
+    expect((json.next_commands ?? []).some((command) => command.includes("claim"))).toBe(false);
+
+    const secret = await readSecret(cwd);
+    expect(secret.claimed_at).toBeUndefined();
+    expect(secret.team_id).toBeUndefined();
+  });
+
+  // A challenge minted in the window's last minutes outlives it: the poll
+  // must then surface the same non-retryable refusal as init, not the
+  // "start a new link" advice a fresh challenge cannot honor.
+  it("maps a window that closes mid-poll to the non-retryable explanation", async () => {
+    const { cwd, project } = await makeProject();
+
+    const [res] = await Promise.all([
+      claim(cwd),
+      onChallengeMinted(() => expireClaimWindow(project.id)),
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      message: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("14 days");
+    expect(json.message).toContain("no longer be claimed");
+    expect((json.next_commands ?? []).some((command) => command.includes("claim"))).toBe(false);
+
     const secret = await readSecret(cwd);
     expect(secret.claimed_at).toBeUndefined();
     expect(secret.team_id).toBeUndefined();
