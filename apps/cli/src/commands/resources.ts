@@ -14,12 +14,22 @@ import {
   UpdateTeamBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
+  GetBrandingByIdResponse,
+  GetEnvironmentByNameResponse,
+  GetFlowDefinitionResponse,
   GetGrantResponse,
   GetProjectResponse,
   GetSessionResponse,
+  GetReleaseByIdResponse,
+  GetSchemaByIdResponse,
   GetTeamResponse,
   GetUserByIDResponse,
+  ListBrandingResponse,
+  ListEnvironmentsResponse,
   ListEventsResponse,
+  ListFlowDefinitionsResponse,
+  ListReleasesResponse,
+  ListSchemasResponse,
   QueryGrantsResponse,
   QueryProjectsResponse,
   QuerySessionsResponse,
@@ -30,7 +40,11 @@ import type {
   CreateGrantBody as CreateGrantBodyT,
   CreateTeamBody as CreateTeamBodyT,
   CreateUserBody as CreateUserBodyT,
+  ListEnvironmentsParams,
   ListEventsParams,
+  ListFlowDefinitionsParams,
+  ListReleasesParams,
+  ListSchemasParams,
   PatchProjectBody as PatchProjectBodyT,
   PatchUserByIDBody as PatchUserByIDBodyT,
   QueryGrantsBody as QueryGrantsBodyT,
@@ -52,7 +66,7 @@ import { readZitadelSecret } from "../lib/project";
  * `.zitadel/secret` belongs to. Endpoints that scope by `project_id` read it
  * from here; the flag surface never exposes it.
  */
-type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
+export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
 const FILTER_OPERATIONS = [
@@ -93,12 +107,18 @@ export const RESOURCES = {
       "metadata.updated_at",
     ],
     list: {
-      kind: "query",
       items: "users",
       body: QueryUsersBody,
       response: QueryUsersResponse,
-      filterFields: ["created_at", "id", "schema", "status", "team_id", "lifecycle_owner_team_id"],
-      sortFields: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
+      filters: [
+        { field: "created_at", operations: FILTER_OPERATIONS },
+        { field: "id", operations: FILTER_OPERATIONS },
+        { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "status", operations: FILTER_OPERATIONS },
+        { field: "team_id", operations: FILTER_OPERATIONS },
+        { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
       // The users query binds to the token's project; no project_id param.
       call: ({ client }, body) => client.queryUsers(body as QueryUsersBodyT),
     },
@@ -122,12 +142,15 @@ export const RESOURCES = {
     heading: "name",
     detail: ["id", "status", "created_at", "updated_at"],
     list: {
-      kind: "query",
       items: "teams",
       body: QueryTeamsBody,
       response: QueryTeamsResponse,
-      filterFields: ["created_at", "name", "status"],
-      sortFields: ["created_at", "name", "status"],
+      filters: [
+        { field: "created_at", operations: FILTER_OPERATIONS },
+        { field: "name", operations: FILTER_OPERATIONS },
+        { field: "status", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["created_at", "name", "status"],
       call: ({ client, projectId }, body) =>
         client.queryTeams(body as QueryTeamsBodyT, { project_id: projectId }),
     },
@@ -153,12 +176,16 @@ export const RESOURCES = {
     heading: "session_id",
     detail: ["project_id", "state", "user_id", "created_at", "expires_at"],
     list: {
-      kind: "query",
       items: "sessions",
       body: QuerySessionsBody,
       response: QuerySessionsResponse,
-      filterFields: ["created_at", "user_id", "state", "lifecycle_owner_team_id"],
-      sortFields: ["created_at", "user_id"],
+      filters: [
+        { field: "created_at", operations: FILTER_OPERATIONS },
+        { field: "user_id", operations: FILTER_OPERATIONS },
+        { field: "state", operations: FILTER_OPERATIONS },
+        { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["created_at", "user_id"],
       call: ({ client, projectId }, body) =>
         client.querySessions(body as QuerySessionsBodyT, { project_id: projectId }),
     },
@@ -182,47 +209,40 @@ export const RESOURCES = {
       "occurred_at",
     ],
     list: {
-      kind: "params",
       items: "data",
       response: ListEventsResponse,
-      params: [
+      // `GET /events` spells its filters as flat query parameters, and a range
+      // as two of them. Declaring the parameter each operation travels as lets
+      // the caller write the same `field=operation:value` they write for every
+      // other resource, with no grammar invented that the endpoint cannot
+      // honour.
+      filters: [
         {
-          flag: "category",
-          param: "category",
-          description: "Wide-event category (repeatable, OR within the flag).",
-          multiple: true,
-          options: EVENT_CATEGORIES,
+          field: "category",
+          operations: ["equals"],
+          values: EVENT_CATEGORIES,
+          combine: "or",
         },
+        { field: "event_type", operations: ["equals"], combine: "or" },
+        { field: "actor_id", operations: ["equals"] },
+        { field: "session_id", operations: ["equals"] },
+        { field: "flow_id", operations: ["equals"] },
+        { field: "request_id", operations: ["equals"] },
+        { field: "entity_type", operations: ["equals"] },
+        { field: "entity_id", operations: ["equals"] },
+        { field: "team_id", operations: ["equals"] },
         {
-          flag: "event-type",
-          param: "event_type",
-          description: "Exact event_type match (repeatable, OR within the flag).",
-          multiple: true,
-        },
-        { flag: "actor-id", param: "actor_id", description: "Filter by the acting principal." },
-        { flag: "session-id", param: "session_id", description: "Filter by session id." },
-        { flag: "flow-id", param: "flow_id", description: "Filter by login flow id." },
-        { flag: "request-id", param: "request_id", description: "Filter by request id." },
-        { flag: "entity-type", param: "entity_type", description: "Filter by entity type." },
-        { flag: "entity-id", param: "entity_id", description: "Filter by entity id." },
-        { flag: "team-id", param: "team_id", description: "Filter by emit-time team scope." },
-        {
-          flag: "created-after",
-          param: "created_after",
-          description: "Inclusive lower bound on created_at (RFC 3339).",
-        },
-        {
-          flag: "created-before",
-          param: "created_before",
-          description: "Exclusive upper bound on created_at (RFC 3339).",
-        },
-        {
-          flag: "order",
-          param: "order",
-          description: "Sort direction on created_at (default: desc).",
-          options: ["asc", "desc"],
+          field: "created_at",
+          operations: ["greater_than_or_equal", "less_than"],
+          params: {
+            greater_than_or_equal: "created_after",
+            less_than: "created_before",
+          },
         },
       ],
+      // The endpoint orders by `occurred_at` and takes only the direction.
+      sorts: ["occurred_at"],
+      sortParam: "order",
       call: ({ client, projectId }, params) =>
         client.listEvents({ project_id: projectId, ...params } as ListEventsParams),
     },
@@ -243,12 +263,17 @@ export const RESOURCES = {
       "expires_at",
     ],
     list: {
-      kind: "query",
       items: "grants",
       body: QueryGrantsBody,
       response: QueryGrantsResponse,
-      filterFields: ["created_at", "principal_type", "principal_id", "relation", "expires_at"],
-      sortFields: ["created_at", "expires_at", "id"],
+      filters: [
+        { field: "created_at", operations: FILTER_OPERATIONS },
+        { field: "principal_type", operations: FILTER_OPERATIONS },
+        { field: "principal_id", operations: FILTER_OPERATIONS },
+        { field: "relation", operations: FILTER_OPERATIONS },
+        { field: "expires_at", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["created_at", "expires_at", "id"],
       call: ({ client, projectId }, body) =>
         client.queryGrants(body as QueryGrantsBodyT, { project_id: projectId }),
     },
@@ -273,18 +298,134 @@ export const RESOURCES = {
     heading: "name",
     detail: ["id", "preview_origins", "created_at", "updated_at"],
     list: {
-      kind: "query",
       items: "projects",
       body: QueryProjectsBody,
       response: QueryProjectsResponse,
-      filterFields: ["created_at"],
-      sortFields: ["created_at"],
+      filters: [
+        { field: "created_at", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body as QueryProjectsBodyT),
     },
     get: { call: ({ client }, id) => client.getProject(id), response: GetProjectResponse },
     update: {
       schema: PatchProjectBody,
       call: ({ client }, id, body) => client.patchProject(id, body as PatchProjectBodyT),
+    },
+  },
+
+  // Configuration resources (ADR 035) are read-only here. They are authored as
+  // files under `.zitadel/` and shipped through a release, so a write verb
+  // would be a second writer over the same state; reading what the server
+  // currently holds is how you check that a deploy landed.
+  schemas: {
+    singular: "schema",
+    idField: "id",
+    columns: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
+    heading: "schema.objectType",
+    detail: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
+    list: {
+      items: "schemas",
+      // A schema list is a revision history, and a history truncated at one
+      // page reads as a complete one. Draining keeps `schemas list` answering
+      // the question it is asked (#947).
+      drains: true,
+      response: ListSchemasResponse,
+      filters: [
+        { field: "object_type", operations: ["equals"] },
+        { field: "kind", operations: ["equals"] },
+        { field: "revisions", operations: ["equals"], values: ["all", "latest"] },
+      ],
+      call: ({ client, projectId }, params) =>
+        client.listSchemas({ ...params, project_id: projectId } as ListSchemasParams),
+    },
+    get: {
+      call: ({ client }, id) => client.getSchemaById(id),
+      response: GetSchemaByIdResponse,
+    },
+  },
+
+  environments: {
+    singular: "environment",
+    idField: "id",
+    // Addressed by its public handle: `GET /environments/{name}`, and the name
+    // is what a deploy target is called everywhere else in the CLI.
+    idArg: "name",
+    columns: ["name", "id", "created_at"],
+    heading: "name",
+    detail: ["name", "id", "project_id", "created_at"],
+    list: {
+      items: "environments",
+      response: ListEnvironmentsResponse,
+      call: ({ client, projectId }, params) =>
+        client.listEnvironments({ ...params, project_id: projectId } as ListEnvironmentsParams),
+    },
+    get: {
+      call: ({ client, projectId }, name) =>
+        client.getEnvironmentByName(name, { project_id: projectId }),
+      response: GetEnvironmentByNameResponse,
+    },
+  },
+
+  releases: {
+    singular: "release",
+    idField: "id",
+    columns: ["id", "metadata.message", "metadata.git_sha"],
+    heading: "id",
+    detail: ["id", "project_id", "metadata.message", "metadata.git_sha", "metadata.git_dirty"],
+    list: {
+      items: "releases",
+      response: ListReleasesResponse,
+      call: ({ client, projectId }, params) =>
+        client.listReleases({ ...params, project_id: projectId } as ListReleasesParams),
+    },
+    get: {
+      call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
+      response: GetReleaseByIdResponse,
+    },
+  },
+
+  "flow-definitions": {
+    singular: "flow definition",
+    idField: "id",
+    columns: ["id", "flow_definition.name", "flow_definition.status", "created_at"],
+    heading: "flow_definition.name",
+    detail: ["id", "flow_definition.name", "flow_definition.status", "created_at", "updated_at"],
+    list: {
+      items: "flow_definitions",
+      response: ListFlowDefinitionsResponse,
+      filters: [
+        { field: "name", operations: ["equals"] },
+        { field: "purpose", operations: ["equals"] },
+      ],
+      call: ({ client, projectId }, params) =>
+        client.listFlowDefinitions({
+          ...params,
+          project_id: projectId,
+        } as ListFlowDefinitionsParams),
+    },
+    get: {
+      call: ({ client }, id) => client.getFlowDefinition(id),
+      response: GetFlowDefinitionResponse,
+    },
+  },
+
+  branding: {
+    singular: "branding revision",
+    idField: "id",
+    columns: ["id", "created_at"],
+    heading: "id",
+    detail: ["id", "created_at"],
+    list: {
+      // `GET /branding` answers with the array itself and takes no cursor, so
+      // the paging flags are not generated for it.
+      paged: false,
+      response: ListBrandingResponse,
+      call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
+    },
+    get: {
+      call: ({ client }, id) => client.getBrandingById(id),
+      response: GetBrandingByIdResponse,
     },
   },
 } satisfies ResourceRegistry<Platform>;

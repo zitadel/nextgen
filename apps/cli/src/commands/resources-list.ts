@@ -29,10 +29,13 @@ export default class ResourcesList extends BaseCommand {
     const rows = resources.map((resource) => ({
       topic: String(resource.topic),
       verbs: (resource.verbs as string[]).join(", "),
-      filters: [
-        ...((resource.filter_fields as string[] | undefined) ?? []),
-        ...((resource.params as string[] | undefined) ?? []),
-      ].join(", "),
+      // Every list shares one filter grammar now, so the column is simply the
+      // fields `--filter` accepts. What each field accepts beyond that — its
+      // operations, its closed values — is in `--json` and in `--help`, which
+      // is where a reader goes once they know the field exists.
+      filters: ((resource.filters as Array<{ field: string }> | undefined) ?? [])
+        .map((filter) => filter.field)
+        .join(", "),
     }));
     const width = (key: keyof (typeof rows)[number]) =>
       Math.max(key.length, ...rows.map((row) => row[key].length));

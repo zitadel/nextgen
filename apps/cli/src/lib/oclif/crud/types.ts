@@ -19,51 +19,89 @@ export type Schema = {
 };
 
 /**
- * A `list` verb backed by a structured query endpoint (`POST /<resource>/query`).
- * The factory assembles `{limit, page_token, sorting, filter}` from flags,
- * validates it against `body`, and hands it to `call`. `filterFields` /
- * `sortFields` feed `--help`; pin them to the schema with a test.
+ * One filterable field of a list, and what the endpoint will actually accept
+ * for it. Declaring this per field is what lets every list share a single
+ * `--filter field=operation:value` grammar: a structured query endpoint
+ * (`POST /<resource>/query`) usually accepts every operation, while a `GET`
+ * list accepts `equals` on a handful of query parameters. The CLI offers the
+ * same spelling for both and refuses — locally, naming the field — anything
+ * the endpoint cannot honour, rather than presenting one grammar per
+ * transport.
  */
-export type QueryListSpec<Ctx> = Readonly<{
-  kind: "query";
-  /** Response property holding the page of items. */
-  items: string;
+export type FilterField = Readonly<{
+  /** Name as typed in `--filter` — the field as the API names it. */
+  field: string;
+  /** Operations this field accepts. */
+  operations: readonly string[];
+  /**
+   * `GET` transport only: the query parameter each operation is sent as, when
+   * it is not the field's own name. An endpoint that spells a range as two
+   * parameters (`created_after`, `created_before`) maps them here, so the
+   * caller still writes `created_at=greater_than:…`.
+   */
+  params?: Readonly<Record<string, string>>;
+  /** Closed value set, enforced before any request. */
+  values?: readonly string[];
+  /**
+   * How repeated uses of this field combine. `and` (the default) narrows;
+   * `or` widens, which is what a `GET` list does with a repeated parameter.
+   * Stated per field because it is not inferable and changes what a query
+   * means.
+   */
+  combine?: "and" | "or";
+  /** Extra help beyond the generated line. */
+  description?: string;
+}>;
+
+/**
+ * A `list` verb. Transport is an implementation detail of `call`: a spec
+ * carrying `body` is validated and sent as a structured query, and one
+ * without it is sent as flat query parameters. Everything the caller sees —
+ * the flags, the grammar, the envelope — is the same either way.
+ */
+export type ListSpec<Ctx> = Readonly<{
+  /**
+   * Response property holding the page of items; omit when the response body
+   * is itself the array.
+   */
+  items?: string;
   /**
    * Generated response schema. `--fields` is checked against the record shape
-   * it describes, so the same arguments are valid whether a page came back full
-   * or empty.
+   * it describes, so the same arguments are valid whether a page came back
+   * full or empty.
    */
   response?: Schema;
-  body: Schema;
-  filterFields: readonly string[];
-  sortFields: readonly string[];
-  call: (ctx: Ctx, body: Json) => Promise<unknown>;
+  /**
+   * Whether the endpoint is cursor-paginated (ADR 027). Defaults to `true`.
+   * A `false` endpoint returns its whole collection in one response, so the
+   * paging flags are not generated and no cursor is sent.
+   */
+  paged?: boolean;
+  /**
+   * Whether a bare invocation drains every page. Off by default: a page is the
+   * honest answer for an unbounded collection. A resource turns it on when a
+   * partial answer would read as a complete one — a revision history shown
+   * twenty rows deep looks finished rather than truncated. `--limit` and
+   * `--page-token` still fetch a single page.
+   */
+  drains?: boolean;
+  /**
+   * Generated request-body schema of a structured query endpoint. Its presence
+   * selects that transport; a `GET` list omits it.
+   */
+  body?: Schema;
+  /** Filterable fields; omit for a list that accepts none. */
+  filters?: readonly FilterField[];
+  /** Sortable fields; omit for a list that cannot be sorted. */
+  sorts?: readonly string[];
+  /**
+   * `GET` transport only: the query parameter carrying the sort direction,
+   * for an endpoint that orders by one implicit field.
+   */
+  sortParam?: string;
+  call: (ctx: Ctx, request: Json) => Promise<unknown>;
 }>;
 
-/** One query-string parameter of a GET-style list, lifted to a CLI flag. */
-export type ParamFlag = Readonly<{
-  /** Flag name as typed on the command line (kebab-case). */
-  flag: string;
-  /** Parameter name on the wire. */
-  param: string;
-  description: string;
-  /** Repeatable flag → array parameter. */
-  multiple?: boolean;
-  /** Closed set of accepted values, enforced by oclif at parse time. */
-  options?: readonly string[];
-}>;
-
-/** A `list` verb backed by a GET endpoint whose filters are query parameters. */
-export type ParamsListSpec<Ctx> = Readonly<{
-  kind: "params";
-  items: string;
-  /** Generated response schema; see {@link QueryListSpec.response}. */
-  response?: Schema;
-  params: readonly ParamFlag[];
-  call: (ctx: Ctx, params: Json) => Promise<unknown>;
-}>;
-
-export type ListSpec<Ctx> = QueryListSpec<Ctx> | ParamsListSpec<Ctx>;
 export type GetSpec<Ctx> = Readonly<{
   call: (ctx: Ctx, id: string) => Promise<unknown>;
   /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
@@ -96,6 +134,13 @@ export type ResourceDescriptor<Ctx> = Readonly<{
   singular: string;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
+  /**
+   * Name of the positional argument the verbs take, and the word `--help`
+   * shows. Defaults to `id`; a resource addressed by something else names it
+   * (an environment is fetched by `name`), so the usage line reads as the API
+   * does rather than calling everything an id.
+   */
+  idArg?: string;
   /** Dot-paths projected into the human-readable table; `--json` carries the full resource. */
   columns: readonly string[];
   /**

@@ -10,7 +10,6 @@ import Plan from "./commands/plan";
 import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
-import SchemasList from "./commands/schemas/list";
 import Setup from "./commands/setup/index";
 import Start from "./commands/start";
 import Status from "./commands/status";
@@ -38,7 +37,6 @@ export const COMMANDS: Record<string, typeof Command> = {
   start: Start,
   status: Status,
   stop: Stop,
-  "schemas:list": SchemasList,
   "branding:eject": BrandingEject,
   ...RESOURCE_COMMANDS,
 };
