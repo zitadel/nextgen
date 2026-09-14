@@ -31,6 +31,7 @@ type AllStatements interface {
 	JSONSchemaStatements
 	EnvironmentStatements
 	ReleaseStatements
+	IDPConnectionStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -151,6 +152,33 @@ type ReleaseStatements interface {
 	// already holds it rather than writing a second one.
 	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+}
+
+// IDPConnectionStatements persists identity provider connections and their
+// revisions. Connections are strictly revisioned: an edit never rewrites a
+// revision, so an auth attempt or a release can pin one and keep reading the
+// configuration it started with.
+type IDPConnectionStatements interface {
+	Statements
+	// CreateIDPConnection mints the connection and first revision ids, and
+	// writes the connection row, that revision, and the resource-scope index
+	// row in one transaction. CreatedAt equals UpdatedAt on a fresh connection.
+	// A slug already taken in the project surfaces as *database.UniqueError.
+	CreateIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	// ReviseIDPConnection appends a revision holding entity.Document and moves
+	// the connection's head pointer to it, in one transaction. The revision id
+	// is always freshly minted, so passing back an entity read from a get does
+	// not overwrite the revision it was read from. Concurrent revisions are
+	// last-write-wins on the head; both revisions stay readable by id.
+	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	GetIDPConnectionByID(ctx context.Context, projectID, id string) (*domain.IDPConnection, error)
+	GetIDPConnectionBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error)
+	// GetIDPConnectionRevision serves the pinned revision rather than the head:
+	// RevisionID is the revision asked for and Document is its document. The
+	// revision id is unique within the project, so the connection it belongs to
+	// is not part of the lookup.
+	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
+	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
