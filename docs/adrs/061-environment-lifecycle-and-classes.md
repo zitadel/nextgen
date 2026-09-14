@@ -217,7 +217,12 @@ ENVIRONMENTS
 ```
 
 ```json
+// qa.json
 { "$schema": "../meta/environment.json", "name": "qa" }
+```
+
+```json
+// production-eu.json
 { "$schema": "../meta/environment.json", "name": "production-eu", "issuer": "https://eu.acme.com", "production": true }
 ```
 
@@ -318,8 +323,8 @@ either, or neither — with neither it is inert until an origin is added.
     "issuer_pattern": {
       "type": "string",
       "pattern": "^https://\\*\\.[a-z0-9-]+(\\.[a-z0-9-]+)+$",
-      "examples": ["https://*.vercel.app", "https://*.preview.acme.com"],
-      "description": "A single-label wildcard for environments whose origin is dynamic, preview deployments being the case it exists for. Mutually exclusive with `issuer`."
+      "examples": ["https://*.preview.acme.com"],
+      "description": "A single-label wildcard for environments whose origin is dynamic, preview deployments being the case it exists for. Mutually exclusive with `issuer`. Which patterns a production environment accepts is decided by the origin rules, not by this schema."
     },
     "production": {
       "type": "boolean",
@@ -465,7 +470,7 @@ it.
 
 ### 8. Environments can be marked as `production`
 
-**`production: true` rejects localhost issuers and shared-hosting wildcards. The toggle belongs to the environment, not the project.**
+**`production: true` narrows which origins the environment will accept. The toggle belongs to the environment, not the project.**
 
 `production` is a boolean on the environment, and it decides which origin
 declarations the server will accept.
@@ -481,24 +486,20 @@ it becomes its own field, not a third class value.
 A **non-production** environment accepts:
 
 - `https://` origins — `https://acme.com`, `https://app.acme.com`.
-- Loopback origins over plain HTTP — `http://localhost:3000`, `http://127.0.0.1:3000`,
-  `http://[::1]:3000`.
-- Shared-hosting wildcards — `https://*.vercel.app`, `https://*.netlify.app`,
-  `https://*.pages.dev`, and the rest of the server's known-safe suffix list.
-- Custom-domain wildcards — `https://*.preview.acme.com`.
-- No declaration at all: the environment is inert until one is added, and the CLI may infer one from the local dev server.
+- Loopback origins over plain HTTP — `http://localhost:3000`,
+  `http://127.0.0.1:3000`, `http://[::1]:3000`.
+- No declaration at all: the environment is inert until one is added, and the
+  CLI may infer one from the local dev server.
 
-A **production** environment accepts:
+A **production** environment accepts `https://` origins, and rejects loopback,
+any other plain-HTTP origin, and having no declaration at all.
 
-- `https://` origins — the same explicit form, and the one production is expected to use.
-- Custom-domain wildcards — `https://*.acme.com`. Accepted as declared; proving
-  ownership of the domain is out of scope.
-
-and rejects:
-
-- Loopback and any other plain-HTTP origin.
-- Shared-hosting wildcards.
-- Having no declaration at all.
+> **Out of scope.** Which wildcard forms either class accepts, and how the
+> server tells a wildcard over a suffix anyone can register under from one over
+> a domain the customer registered, is the origin design's question, not this
+> one. [`security-and-origins.md`](../design/api/security-and-origins.md) owns
+> those rules; this ADR decides only which entity the class hangs off, and that
+> production is the strict side of it.
 
 ## Overlapping decisions
 
