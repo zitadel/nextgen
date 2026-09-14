@@ -162,8 +162,6 @@ paths:
     $ref: endpoints/idps/methods.yaml
   /idps/query:
     $ref: endpoints/idps/query/methods.yaml
-  /idps/slug/{slug}:
-    $ref: endpoints/idps/slug/methods.yaml
   /idps/{id}:
     $ref: endpoints/idps/by_id/methods.yaml
   /releases:

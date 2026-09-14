@@ -355,17 +355,6 @@ type Handler interface {
 	//
 	// GET /idps/{id}
 	GetIdpById(ctx context.Context, params GetIdpByIdParams) (GetIdpByIdRes, error)
-	// GetIdpBySlug implements getIdpBySlug operation.
-	//
-	// Returns a connection by slug.
-	// A slug is unique within a project and fixed for the life of the
-	// connection, so this resolves the same connection as `GET /idps/{id}` and
-	// returns the same body. It exists because configuration files reference a
-	// connection by slug, so the CLI holds a slug rather than an id.
-	// The lookup is scoped to the project in `project_id`.
-	//
-	// GET /idps/slug/{slug}
-	GetIdpBySlug(ctx context.Context, params GetIdpBySlugParams) (GetIdpBySlugRes, error)
 	// GetLive implements getLive operation.
 	//
 	// Check whether the server is started.

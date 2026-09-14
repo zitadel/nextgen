@@ -147,9 +147,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpByIdOperation: []string{
 		"idp.read",
 	},
-	GetIdpBySlugOperation: []string{
-		"idp.read",
-	},
 	GetProjectOperation: []string{
 		"project.write",
 	},

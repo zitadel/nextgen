@@ -129,10 +129,6 @@ type GetIdpByIdRes interface {
 	getIdpByIdRes()
 }
 
-type GetIdpBySlugRes interface {
-	getIdpBySlugRes()
-}
-
 type GetLiveRes interface {
 	getLiveRes()
 }

@@ -38,7 +38,6 @@ const (
 	GetGrantOperation                      OperationName = "GetGrant"
 	GetHealthOperation                     OperationName = "GetHealth"
 	GetIdpByIdOperation                    OperationName = "GetIdpById"
-	GetIdpBySlugOperation                  OperationName = "GetIdpBySlug"
 	GetLiveOperation                       OperationName = "GetLive"
 	GetMySessionOperation                  OperationName = "GetMySession"
 	GetMyUserOperation                     OperationName = "GetMyUser"
