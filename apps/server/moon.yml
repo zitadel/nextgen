@@ -121,6 +121,23 @@ tasks:
     options:
       runFromWorkspaceRoot: true
 
+  # Custom go/analysis checks, run directly rather than through go vet so the
+  # built-in vet analyzers (task "vet") keep running alongside. Today this is
+  # egresslint, which enforces the single egress-client invariant (ADR 061):
+  # outbound HTTP or TCP clients may only be built in internal/httputil, and
+  # any other site needs an //egress:allow <reason> directive. Further
+  # analyzers join the same binary (tools/analyzers/cmd/analyzers).
+  lint:
+    command: "go run ./tools/analyzers/cmd/analyzers ./..."
+    deps:
+      - "check-generate"
+      - "console:build"
+      - "login-ui:build"
+    inputs:
+      - "@group(serverInputs)"
+    options:
+      runFromWorkspaceRoot: true
+
   test:
     command: "go"
     args:
@@ -134,6 +151,7 @@ tasks:
       - "format"
       - "check-generate"
       - "vet"
+      - "lint"
       # Order UI builds before go test so a batched moon graph cannot compile
       # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
       # Intentionally deps-only (not inputs): UI-only changes must not invalidate

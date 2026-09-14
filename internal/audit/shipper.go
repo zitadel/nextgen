@@ -78,6 +78,7 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 		cfg: cfg,
 		src: src,
 		// Operator-configured URL, not user-injectable: stdlib client by design (ADR 061).
+		//egress:allow operator-configured export sink, not user-injectable (ADR 061)
 		client: &http.Client{Timeout: 10 * time.Second},
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),
