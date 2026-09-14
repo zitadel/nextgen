@@ -11,6 +11,7 @@ properties:
   pointers:
     type: array
     minItems: 1
+    maxItems: 50
     description: |
       The revisions to pin. Must not be empty.
 
@@ -20,6 +21,13 @@ properties:
       pin two revisions of the *same* resource — a second revision of the
       `human-user` schema is rejected rather than ordered, since a release
       describes one state of the project.
+
+      The upper bound counts *resources*, not revisions — one release pins at
+      most one revision of each — so it is a limit on how much a project
+      configures, not on how often it changes. It keeps the server's
+      per-pointer revision lookups bounded by the contract rather than by the
+      request, and is set conservatively: raising it is a spec change, and
+      widening a bound breaks no client that was already inside it.
     items:
       $ref: create-release-pointer.yaml
   message:

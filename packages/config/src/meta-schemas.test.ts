@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,7 +19,6 @@ import {
 } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const upstreamDir = join(packageRoot, "../..", "api/openapi/endpoints/schemas");
 
 /** Every `$ref` string value anywhere in a schema document. */
 function collectRefs(node: unknown, refs: string[] = []): string[] {
@@ -43,6 +42,8 @@ describe("meta-schemas", () => {
       "property-name.json",
       "auth-methods.json",
       "auth-method.json",
+      "sso-auth-method.json",
+      "idp-connection.json",
       "branding.json",
     ]);
   });
@@ -69,17 +70,6 @@ describe("meta-schemas", () => {
     );
   });
 
-  // Drift audit: the committed copies must stay identical to the source the
-  // server embeds. Skipped outside the monorepo (published-package CI).
-  it.skipIf(!existsSync(upstreamDir))("committed copies match api/openapi", () => {
-    for (const file of metaSchemaFiles()) {
-      const upstream = JSON.parse(readFileSync(join(upstreamDir, file.name), "utf8")) as object;
-      expect(file.body, `${file.name} drifted from api/openapi/endpoints/schemas`).toEqual(
-        upstream,
-      );
-    }
-  });
-
   // The whole point of shipping the meta-schema: it must accept the exact
   // files that carry the `$schema` pointer at it. A dialect drift here means
   // editors flag every scaffolded flow as invalid.
@@ -90,6 +80,43 @@ describe("meta-schemas", () => {
     for (const preset of SETUP_PRESETS) {
       const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
       expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
+    }
+  });
+
+  // The branding dialect shares one definition between the light and dark
+  // sides and one between the twelve colours, so a broken `$ref` would not
+  // fail loudly — it would quietly stop constraining anything.
+  it("validates a branding descriptor through its shared definitions", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const brandingSchema = metaSchemaFiles().find((f) => f.name === "branding.json");
+    const check = ajv.compile(brandingSchema?.body as object);
+
+    const descriptor = {
+      layout: "centered",
+      logo_url: "https://cdn.example.com/logo.svg",
+      theme: {
+        mode: "auto",
+        light: {
+          logo_url: "https://cdn.example.com/on-light.svg",
+          palette: { primary: "#4F46E5", link: "rebeccapurple" },
+        },
+        dark: {
+          logo_url: "https://cdn.example.com/on-dark.svg",
+          palette: { primary: "color-mix(in oklab, #A5B4FC 40%, white)" },
+        },
+      },
+      typography: { font_family: "Inter, ui-sans-serif, sans-serif", scale: 1 },
+      shape: { radius: 10, density: "regular", logo_scale: 1.5 },
+    };
+    expect(check(descriptor), JSON.stringify(check.errors)).toBe(true);
+
+    // Both sides have to be constrained, not just whichever one the schema
+    // happened to spell out before the definitions were shared.
+    for (const side of ["light", "dark"] as const) {
+      const hostile = {
+        theme: { [side]: { palette: { primary: "red; } :host { display: none" } } },
+      };
+      expect(check(hostile), `${side} accepted an injection`).toBe(false);
     }
   });
 

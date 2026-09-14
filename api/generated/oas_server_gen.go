@@ -41,8 +41,7 @@ type Handler interface {
 	//
 	// Publishes a new immutable branding revision for the project. Branding
 	// revisions cannot be updated or deleted; every edit publishes a new
-	// revision, and flow responses resolve the latest revision per project
-	// (see ADR 040).
+	// revision, and flow responses resolve the latest revision per project.
 	// The `liquid_template` is validated lexically on save (size, encoding,
 	// banned patterns such as `<script>` tags, inline event handlers, and the
 	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
@@ -427,9 +426,9 @@ type Handler interface {
 	//
 	// Lists branding revisions for the project, newest first, capped at the
 	// 100 most recent. The first entry is the revision flow responses
-	// currently resolve. Deliberately unpaginated in v1 — list endpoints
-	// gain a real query mechanism together (ADR 031); advertising pagination
-	// parameters the server ignores would be worse than none.
+	// currently resolve. Deliberately unpaginated in v1 — list endpoints gain a
+	// real query mechanism together; advertising pagination parameters the
+	// server ignores would be worse than none.
 	//
 	// GET /branding
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
@@ -493,12 +492,29 @@ type Handler interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
+	// PatchMyUser implements patchMyUser operation.
+	//
+	// Partially updates the caller's own schema-defined attributes. The merged
+	// result is validated against the user's schema before commit. Concurrent
+	// writes are last-write-wins.
+	//
+	// PATCH /users/me
+	PatchMyUser(ctx context.Context, req *PatchMyUserRequest) (PatchMyUserRes, error)
 	// PatchProject implements patchProject operation.
 	//
 	// Updates the state of a project.
 	//
 	// PATCH /projects/{project_id}
 	PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (PatchProjectRes, error)
+	// PatchUserByID implements PatchUserByID operation.
+	//
+	// Partially updates a user's schema-defined attributes, and optionally
+	// moves the user to another registered schema. The merged result is
+	// validated against the schema before commit. Concurrent writes are
+	// last-write-wins.
+	//
+	// PATCH /users/{user_id}
+	PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.

@@ -19,6 +19,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	slogctx "github.com/veqryn/slog-context"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
@@ -45,29 +46,81 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
 )
 
+// flagDisableMasterKeyGeneration is the command-line half of
+// server.generate_master_key. It is spelled as the negative because that is
+// what an operator reaches for: generation is on by default, and this turns a
+// silent "a key was minted for you" into a startup failure.
+const flagDisableMasterKeyGeneration = "disable-master-key-generation"
+
 func NewCommand() *cobra.Command {
 	var configPath string
 	var userFiles []string
+	var applyMigrations bool
 
-	cmd := &cobra.Command{
-		Use:   "server",
-		Short: "Run the server",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(configPath)
-			if err != nil {
-				return err
-			}
-			return run(cmd.Context(), cfg, userFiles)
-		},
+	runServer := func(cmd *cobra.Command, _ []string) error {
+		overrides, err := flagOverrides(cmd.Flags())
+		if err != nil {
+			return err
+		}
+		cfg, err := loadConfig(configPath, overrides...)
+		if err != nil {
+			return err
+		}
+		return run(cmd.Context(), cfg, userFiles, applyMigrations)
 	}
 
-	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
-	cmd.Flags().StringArrayVar(&userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
+	root := &cobra.Command{
+		Use:           "nextgen",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	root.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
+	addServerFlags(root, &applyMigrations, &userFiles)
 
-	return cmd
+	serverCmd := &cobra.Command{
+		Use:           "server",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	addServerFlags(serverCmd, &applyMigrations, &userFiles)
+
+	root.AddCommand(serverCmd)
+	root.AddCommand(newMigrateCommand(&configPath))
+	return root
 }
 
-func run(ctx context.Context, cfg Config, userFiles []string) error {
+// flagOverrides turns the flags that shadow a configuration key into config
+// overrides. Only a flag the operator actually passed becomes one, so an
+// untouched flag leaves the config file and the environment in charge of the
+// key it shadows.
+func flagOverrides(flags *pflag.FlagSet) ([]configOverride, error) {
+	var overrides []configOverride
+
+	if flags.Changed(flagDisableMasterKeyGeneration) {
+		disabled, err := flags.GetBool(flagDisableMasterKeyGeneration)
+		if err != nil {
+			return nil, fmt.Errorf("read --%s: %w", flagDisableMasterKeyGeneration, err)
+		}
+		overrides = append(overrides, func(v *viper.Viper) {
+			v.Set("server.generate_master_key", !disabled)
+		})
+	}
+
+	return overrides, nil
+}
+
+func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]string) {
+	cmd.Flags().BoolVar(applyMigrations, "migrate", false, "Apply database migrations before serving")
+	cmd.Flags().StringArrayVar(userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
+	cmd.Flags().Bool(flagDisableMasterKeyGeneration, false,
+		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
+}
+
+func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) error {
 	var err error
 	sfs := &ShutdownFuncs{}
 	defer func() {
@@ -99,7 +152,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
 
-	pool, err := startDatabase(ctx, cfg)
+	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
 		return err
 	}
@@ -203,6 +256,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	environmentService := service.NewEnvironmentService(serviceDBPool)
+	releaseService := service.NewReleaseService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
@@ -293,6 +347,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			teamService,
 			brandingService,
 			environmentService,
+			releaseService,
 			eventService,
 			tokenService,
 			keyService,
@@ -393,7 +448,11 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 
 // ----------------------------- CONFIG --------------------------------------
 
-func loadConfig(configPath string) (Config, error) {
+// configOverride sets a value that outranks the config file and the
+// environment, which is what a command-line flag has to do.
+type configOverride func(*viper.Viper)
+
+func loadConfig(configPath string, overrides ...configOverride) (Config, error) {
 	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -410,6 +469,9 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
+	// Generation on by default: a first local start has to work with no
+	// configuration at all. Production turns it off, per ADR 029.
+	v.SetDefault("server.generate_master_key", true)
 	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
 	// recommended option (t=3, m=64 MiB, p=4), a good balance for servers.
 	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameArgon2id)
@@ -490,6 +552,13 @@ func loadConfig(configPath string) (Config, error) {
 			return Config{}, fmt.Errorf("read config: %w", err)
 		}
 	}
+
+	// Last, so a flag outranks both the file and the environment.
+	for _, override := range overrides {
+		override(v)
+	}
+
+	warnIgnoredMasterKeyEnv(os.Environ())
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
@@ -606,16 +675,24 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 
 // ----------------------------- STORAGE --------------------------------------
 
-func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
+func connectDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
 	dialect, err := buildDatabaseDialect(cfg)
 	if err != nil {
 		return nil, err
 	}
-	pool, err := database.Connect(ctx, dialect)
+	return database.Connect(ctx, dialect)
+}
+
+func startDatabase(ctx context.Context, cfg Config, applyMigrations bool) (database.Pool, error) {
+	pool, err := connectDatabase(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	if !applyMigrations {
+		return pool, nil
+	}
 	if err := pool.Migrate(ctx); err != nil {
+		_ = pool.Close(ctx)
 		return nil, err
 	}
 	return pool, nil

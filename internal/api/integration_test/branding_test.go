@@ -3,7 +3,11 @@
 package integration_test
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -147,16 +151,148 @@ func TestBranding(t *testing.T) {
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
 	})
 
-	t.Run("font_url is read-only in v1", func(t *testing.T) {
+	t.Run("font_url without a font family is rejected", func(t *testing.T) {
 		fontURL, err := url.Parse("https://fonts.example.com/css2?family=Arimo")
 		require.NoError(t, err)
 		resp, err := client.CreateBranding(t.Context(), &api.Branding{
-			FontURL: api.NewOptURI(*fontURL),
+			Typography: api.NewOptBrandingTypography(api.BrandingTypography{
+				FontURL: api.NewOptURI(*fontURL),
+			}),
 		}, params)
 		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, resp, "create branding: %s", helpers.MustMarshal(t, resp))
 		errResp := resp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
+	})
+
+	// Two gates sit in front of an appearance value, and a caller can tell them
+	// apart by the code it gets back. The contract pattern runs at decode and
+	// pins the shape, so anything that could leave its CSS declaration is
+	// `req.invalid`. The allowlist runs in the domain and decides whether that
+	// shape names a colour, so a well-formed value that is not one is
+	// `brnd.invalid`.
+	//
+	// Both are checked against the raw wire rather than the generated client:
+	// the client refuses to send the first group at all (which
+	// TestBrandingColorPatternRejectsInjection covers), and an attacker sends
+	// the bytes itself.
+	postBranding := func(t *testing.T, body string) (int, string) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+			harness.EnsureTestServer(t).URL+"/branding?project_id="+project.ID,
+			strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
+
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+		raw, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		var got struct {
+			Code string `json:"code"`
+		}
+		require.NoError(t, json.Unmarshal(raw, &got), string(raw))
+		return resp.StatusCode, got.Code
+	}
+
+	t.Run("values that could inject CSS fail the contract", func(t *testing.T) {
+		for name, body := range map[string]string{
+			"palette colour closes its declaration": `{"theme":{"light":{"palette":{"primary":"red; } :host { display: none"}}}}`,
+			"palette colour fetches a url":          `{"theme":{"dark":{"palette":{"background":"url(https://evil.example/beacon.png)"}}}}`,
+			"palette colour escapes a comment":      `{"theme":{"light":{"palette":{"primary":"red /* } */"}}}}`,
+			"font family closes its declaration":    `{"typography":{"font_family":"Inter; } :host { display: none"}}`,
+		} {
+			t.Run(name, func(t *testing.T) {
+				status, code := postBranding(t, body)
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Equal(t, "req.invalid", code)
+			})
+		}
+	})
+
+	t.Run("well-formed values that name no colour fail the save gate", func(t *testing.T) {
+		for name, body := range map[string]string{
+			// Shaped like a colour function; `var` is not one of them.
+			"var indirection": `{"theme":{"light":{"palette":{"primary":"var(--zl-primary)"}}}}`,
+			// Likewise `local`, which the pattern admits and the allowlist does not.
+			"unknown function": `{"theme":{"dark":{"palette":{"primary":"local(red)"}}}}`,
+		} {
+			t.Run(name, func(t *testing.T) {
+				status, code := postBranding(t, body)
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Equal(t, "brnd.invalid", code)
+			})
+		}
+	})
+
+	t.Run("appearance survives a publish and read back", func(t *testing.T) {
+		// Its own project: this publishes a revision carrying no layout, which
+		// would otherwise become the latest revision the flow-response case
+		// below asserts against.
+		ownProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, ownClient, ownProject)
+		ownParams := api.CreateBrandingParams{ProjectID: api.ProjectID(ownProject.ID)}
+
+		fontURL, err := url.Parse("https://fonts.example.com/css2?family=Inter")
+		require.NoError(t, err)
+		lightLogo, err := url.Parse("https://cdn.example.com/on-light.svg")
+		require.NoError(t, err)
+		darkLogo, err := url.Parse("https://cdn.example.com/on-dark.svg")
+		require.NoError(t, err)
+
+		published := &api.Branding{
+			Theme: api.NewOptBrandingTheme(api.BrandingTheme{
+				Mode: api.NewOptBrandingThemeMode(api.BrandingThemeModeAuto),
+				Light: api.NewOptBrandingThemeSide(api.BrandingThemeSide{
+					LogoURL: api.NewOptURI(*lightLogo),
+					Palette: api.NewOptBrandingPalette(api.BrandingPalette{
+						Primary: api.NewOptBrandingColor("#4F46E5"),
+					}),
+				}),
+				Dark: api.NewOptBrandingThemeSide(api.BrandingThemeSide{
+					LogoURL: api.NewOptURI(*darkLogo),
+					Palette: api.NewOptBrandingPalette(api.BrandingPalette{
+						Primary: api.NewOptBrandingColor("#A5B4FC"),
+					}),
+				}),
+			}),
+			Typography: api.NewOptBrandingTypography(api.BrandingTypography{
+				FontFamily: api.NewOptString("Inter, ui-sans-serif, sans-serif"),
+				FontURL:    api.NewOptURI(*fontURL),
+				Scale:      api.NewOptFloat64(1.1),
+			}),
+			Shape: api.NewOptBrandingShape(api.BrandingShape{
+				Radius:    api.NewOptBrandingShapeRadius(api.NewIntBrandingShapeRadius(10)),
+				Density:   api.NewOptBrandingShapeDensity(api.BrandingShapeDensityRegular),
+				LogoScale: api.NewOptFloat64(1.5),
+			}),
+		}
+
+		resp, err := ownClient.CreateBranding(t.Context(), published, ownParams)
+		require.NoError(t, err)
+		require.IsType(t, &api.BrandingRevisionResponse{}, resp, "create branding: %s", helpers.MustMarshal(t, resp))
+		created := resp.(*api.BrandingRevisionResponse)
+
+		getResp, err := ownClient.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: created.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.BrandingRevisionResponse{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
+		got := getResp.(*api.BrandingRevisionResponse).Branding
+
+		assert.Equal(t, api.BrandingColor("#4F46E5"), got.Theme.Value.Light.Value.Palette.Value.Primary.Value)
+		assert.Equal(t, api.BrandingColor("#A5B4FC"), got.Theme.Value.Dark.Value.Palette.Value.Primary.Value)
+		assert.Equal(t, darkLogo.String(), got.Theme.Value.Dark.Value.LogoURL.Value.String())
+		assert.Equal(t, "Inter, ui-sans-serif, sans-serif", got.Typography.Value.FontFamily.Value)
+		assert.Equal(t, 1.1, got.Typography.Value.Scale.Value)
+		radius, ok := got.Shape.Value.Radius.Value.GetInt()
+		assert.True(t, ok, "radius should read back as pixels")
+		assert.Equal(t, 10, radius)
+		assert.Equal(t, fontURL.String(), got.Typography.Value.FontURL.Value.String())
 	})
 
 	t.Run("flow responses carry the latest revision", func(t *testing.T) {

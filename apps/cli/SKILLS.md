@@ -200,7 +200,7 @@ the CLI's help layer, not the envelope.
   and are not compared. The repair — an exact-pin install command for the
   project's detected package manager — is emitted in `data.next_commands`
   and quoted in the warning message.
-- `claim` — attach the project to a team so it becomes permanent. Mints a
+- `claim` — claim the project for a team to make it permanent. Mints a
   short-lived link, opens it in a browser, and blocks until the developer
   finishes signing in there, then records `claimed_at` and `team_id` in
   `.zitadel/secret`. Nothing about the project changes: the issuer, users,
@@ -214,7 +214,8 @@ the CLI's help layer, not the envelope.
   possible within 14 days of project creation: past that the platform answers
   `410 proj.claim_window_expired`, the command exits `E_VALIDATION`, and a
   fresh link does **not** help — only a fresh `setup` yields a claimable
-  project (the old one keeps working, it just can't be attached anymore).
+  project (the old one can no longer be claimed; it stays temporary and its
+  data may be lost).
   `--dry-run` stops before
   anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
   there is nothing to preview, because a claim is decided in a browser.

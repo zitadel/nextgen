@@ -5,7 +5,6 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { InlineCode } from "@/components/ui/inline-code";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
-import type { UserSchema } from "@/lib/schema";
 
 /**
  * The command the footer tells an operator to run (decisions log D0b).
@@ -23,23 +22,27 @@ const CLI_COMMAND = "npx @zitadel/cli@alpha apply";
 const YAML_OPTIONS = { indent: 2, lineWidth: 0 } as const;
 
 /**
- * The schema document, rendered read-only in JSON or YAML with a copy button
- * and the CLI hint beneath it.
+ * A configuration document, rendered read-only in JSON or YAML with a copy
+ * button and the CLI hint beneath it.
  *
  * Read-only is the whole point of the panel rather than a limitation of it:
- * schemas are configuration edited through the CLI, never in the portal
- * (decisions log D0b), so the screen's job is to show the document an operator
- * would edit and name the command that applies it.
+ * schemas and flow definitions are configuration edited through the CLI, never
+ * in the portal (decisions log D0b), so the screen's job is to show the
+ * document an operator would edit and name the command that applies it.
+ *
+ * `noun` is what the footer calls the document ("schema", "definition") and
+ * what the copy button announces. The two screens draw the same panel around
+ * different documents, so the noun is the only thing that varies.
  */
-export function SchemaDocumentViewer({ schema }: { schema: UserSchema }) {
+export function DocumentViewer({ document, noun }: { document: unknown; noun: string }) {
   const [format, setFormat] = useState<CodeLanguage>("json");
 
   const source = useMemo(
     () =>
       format === "yaml"
-        ? stringifyYaml(schema, YAML_OPTIONS)
-        : JSON.stringify(schema, null, 2),
-    [schema, format],
+        ? stringifyYaml(document, YAML_OPTIONS)
+        : JSON.stringify(document, null, 2),
+    [document, format],
   );
   const lines = useHighlighted(source, format);
 
@@ -63,7 +66,7 @@ export function SchemaDocumentViewer({ schema }: { schema: UserSchema }) {
         </Tabs>
         <CopyButton
           value={source}
-          label={`Copy the schema document as ${format.toUpperCase()}`}
+          label={`Copy the ${noun} document as ${format.toUpperCase()}`}
           size="sm"
         />
       </div>
@@ -98,7 +101,7 @@ export function SchemaDocumentViewer({ schema }: { schema: UserSchema }) {
           of the full stop. Normal inline text wraps the same way and lets the
           punctuation hug the command. */}
       <p className="border-t border-border py-3 pr-3 pl-4 text-xs leading-4 text-muted-foreground">
-        Edit the schema locally, then apply your changes with{" "}
+        Edit the {noun} locally, then apply your changes with{" "}
         <InlineCode className="text-[10px]">{CLI_COMMAND}</InlineCode>. Applying creates a new
         revision.
       </p>

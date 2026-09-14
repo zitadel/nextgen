@@ -28,8 +28,8 @@ import { surfaceStyles } from "../styles/index.js";
 /**
  * Atom: `<zl-icon>` — renders a curated glyph from the Lucide icon library.
  *
- * The Figma design system (file `8UjCXw8yemgljmbkWGrSfE`, Icons set
- * `4103:10466`, sizes `16 | 24`) is explicitly built on Lucide. Rather than redrawing every glyph as an
+ * The design system's icon set is explicitly built on Lucide, at 16 and 24px.
+ * Rather than redrawing every glyph as an
  * inline `<path>` (which inevitably drifts), we curate the auth surface's
  * subset by importing each canonical Lucide node and exposing a stable
  * kebab-case `name` API. To add a glyph: import it from `lucide`, add an

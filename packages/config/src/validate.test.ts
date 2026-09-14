@@ -24,7 +24,7 @@ type TestStep = {
   fields: string[];
   actions: Array<{ name: string; kind: string; primary?: boolean; text_key?: string }>;
   transitions: Record<string, { target: string; action?: string; purpose?: string }>;
-  sso_providers?: Array<Record<string, string>>;
+  sso_providers?: string[];
   on_success?: string;
   complete?: string;
 };
@@ -243,7 +243,7 @@ describe("steps", () => {
   it("rejects sso_providers without transitions.callback", () => {
     const def = flow();
     const s = step(def, "identifier");
-    s.sso_providers = [{ id: "idp", name: "IdP", template: "generic" }];
+    s.sso_providers = ["idp"];
     expect(messages(validateFlowDefinition(def))).toContain(
       'step "identifier": has sso_providers but is missing transitions.callback',
     );
@@ -261,7 +261,7 @@ describe("steps", () => {
     const def = flow();
     step(def, "identifier").transitions.jump = { target: "done" };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, callback)',
+      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)',
     );
   });
 

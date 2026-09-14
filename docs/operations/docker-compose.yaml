@@ -36,6 +36,7 @@ services:
     # Optional: mount bootstrap users (see examples/bootstrap-users/)
     # command:
     #   - server
+    #   - --migrate
     #   - --user-file
     #   - /bootstrap/demo-admin.json
 

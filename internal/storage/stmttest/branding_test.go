@@ -37,7 +37,7 @@ func sampleBranding(projectID, id string) *domain.Branding {
 		Layout:         domain.BrandingLayoutSplit,
 		LiquidTemplate: `<zl-page-shell>{% mandatory_gates %}</zl-page-shell>`,
 		LogoURL:        "https://cdn.example.com/logo.svg",
-		FontURL:        "https://fonts.example.com/css2",
+		Typography:     domain.BrandingTypography{FontFamily: "Inter, sans-serif", FontURL: "https://fonts.example.com/css2"},
 		HeroURL:        "https://cdn.example.com/hero.png",
 	}
 }
@@ -60,7 +60,7 @@ func TestBrandingStatements_CreateAndGet(t *testing.T) {
 		assert.Equal(t, entity.Layout, got.Layout)
 		assert.Equal(t, entity.LiquidTemplate, got.LiquidTemplate)
 		assert.Equal(t, entity.LogoURL, got.LogoURL)
-		assert.Equal(t, entity.FontURL, got.FontURL)
+		assert.Equal(t, entity.Typography, got.Typography)
 		assert.Equal(t, entity.HeroURL, got.HeroURL)
 		assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
 	})
