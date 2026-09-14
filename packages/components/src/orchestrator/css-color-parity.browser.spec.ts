@@ -29,6 +29,11 @@ const VALUES = [
   "color-mix(in oklch longer hue, red, blue)",
   "color-mix(in hsl, red 30%, blue)",
   "color-mix(in srgb, white 25%, black)",
+  "color-mix(in display-p3, red, blue)",
+  "color-mix(in rec2020, red, blue)",
+  "color-mix(in srgb, hsl(0 100% 50%), black)",
+  "color-mix(in srgb, red, transparent)",
+  "color-mix(in oklab, rgb(255 0 0 / 50%), blue)",
 ];
 
 function painted(value: string): string {
@@ -39,20 +44,27 @@ function painted(value: string): string {
   if (!ctx) throw new Error("no 2d context");
   ctx.fillStyle = value;
   ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-  return `${r},${g},${b}`;
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+  return `${r},${g},${b},${Math.round((a / 255) * 100) / 100}`;
 }
 
 function resolved(value: string): string {
   const c = parseCssColor(value);
   if (!c) throw new Error(`unresolved: ${value}`);
-  return `${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)}`;
+  return `${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${Math.round(c.a * 100) / 100}`;
 }
 
 describe("css colour resolution matches the browser", () => {
   for (const value of VALUES) {
     it(`resolves ${value} the way Chrome paints it`, () => {
-      expect(resolved(value)).toBe(painted(value));
+      // Canvas stores premultiplied alpha, so a translucent value rounds a
+      // channel by one; compare within that rather than exactly.
+      const [pr, pg, pb, pa] = painted(value).split(",").map(Number) as number[];
+      const [rr, rg, rb, ra] = resolved(value).split(",").map(Number) as number[];
+      expect(Math.abs((rr as number) - (pr as number))).toBeLessThanOrEqual(1);
+      expect(Math.abs((rg as number) - (pg as number))).toBeLessThanOrEqual(1);
+      expect(Math.abs((rb as number) - (pb as number))).toBeLessThanOrEqual(1);
+      expect(Math.abs((ra as number) - (pa as number))).toBeLessThanOrEqual(0.01);
     });
   }
 });
