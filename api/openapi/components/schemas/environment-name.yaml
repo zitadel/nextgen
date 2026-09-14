@@ -3,8 +3,12 @@ maxLength: 63
 pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
 example: prod
 description: |
-  An environment's public handle, unique within its project and immutable.
+  An environment's public handle, unique within its project.
 
   It addresses the environment on the wire and names a deploy target in the
   CLI, so it is a lowercase DNS-style label: letters, digits, and hyphens
   between them.
+
+  It is the address, not the identity: the environment's opaque id is what
+  deployments, class and running release hang off, so the handle can be
+  changed and the environment stays the same one.

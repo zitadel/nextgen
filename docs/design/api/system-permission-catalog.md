@@ -129,6 +129,9 @@ the target catalog for the planned paths in
 | `domain.read` | Read/list `/projects/{id}/domains` | Domain context known to Zitadel; does not imply DNS/TLS infrastructure management. |
 | `domain.write` | Add/update a domain | Create + manage. |
 | `domain.delete` | Remove a domain | |
+| `environment.read` | `GET /environments`, `GET /environments/{name}` | Read/list a project's environments. |
+| `environment.write` | `POST /environments`, `PATCH /environments/{name}` | Create + manage, including renaming and toggling the `production` class ([ADR 061](../../adrs/061-environment-lifecycle-and-classes.md)). |
+| `environment.delete` | `DELETE /environments/{name}` | Server refuses the last environment and a production one regardless of the grant. |
 | `feature.read` | Read `/projects/{id}/features` | |
 | `feature.write` | Change project feature configuration | No create/delete lifecycle. |
 | `allowed_origin.read` | Read/list `/projects/{id}/allowed_origins` | |

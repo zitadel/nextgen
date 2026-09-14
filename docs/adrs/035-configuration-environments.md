@@ -553,3 +553,31 @@ above already shows. Handle resolution is per kind, not a shared column read.
 
 The illustrative table is otherwise unchanged; this fixes the name the wire
 uses, not the model.
+
+## Amendment (2026-09-10): the CLI resolves a sole environment
+
+The scope note above defers environment lifecycle to a follow-up ADR, and
+[ADR 061](061-environment-lifecycle-and-classes.md) is it. One of its rules
+narrows a statement made here.
+
+This ADR states, under `releases create` and `deploy`, that "there is no
+implicit default environment — every deploy explicitly names its target".
+ADR 061 guarantees that a project holds at least one environment and lets a
+developer choose to hold exactly one. In that case `zitadel deploy` with no
+`--env` resolves to that environment, in interactive and non-interactive mode
+alike.
+
+The amendment is only about who types the name. `POST /environments/{name}/deployments`
+still takes its target in the path, no request omits it, and a project holds no
+"current environment" — the CLI resolves the target before it calls anything and
+sends the name like any other run.
+
+The rule stands wherever a choice exists: as soon as a project has two
+environments, `--env` is required again, and there is no remembered,
+configured, or per-project default to fall back on. Resolving a set of one
+cannot pick the wrong target, because there is no other target.
+
+ADR 061 also places environment definitions outside the release boundary. A
+release never pins an environment, `POST /configuration-releases` ignores
+`.zitadel/environments/`, and `deploy` neither creates nor modifies an
+environment — it fails when the named one does not exist.
