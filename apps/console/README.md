@@ -95,6 +95,14 @@ and manages. `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` pins a
 specific existing project instead. The fallback stays until a human-usable
 seed transport ships the reserved platform project end to end.
 
+A deployment can opt out of the fallback today by setting
+`platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`), which
+provisions the reserved platform project itself at startup — keys, default
+schema, default login flow — and is what makes `zitadel claim` and
+self-registration work; it still lacks §2's fuller seed transport (an initial
+user, membership, owner assignment), so it is a manual opt-in, not the
+default.
+
 While no project exists yet, the login screen shows a "run `zitadel setup`"
 hint; refresh after setup and the console picks the new project up. Only
 `standalone` mode exists today; `platform` (cloud portal) mode is future

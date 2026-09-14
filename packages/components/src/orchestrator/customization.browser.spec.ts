@@ -46,6 +46,15 @@ const brandedStep: CreateFlow201 = {
   branding: { theme: { mode: "dark" }, palette: { primary: "#00ff00" } },
 } as unknown as CreateFlow201;
 
+/** A tenant that publishes a font stylesheet alongside the family it loads. */
+const TENANT_FONT_HREF = "https://fonts.example.com/css2?family=Inter";
+const fontStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    typography: { font_family: "Inter, sans-serif", font_url: TENANT_FONT_HREF },
+  },
+} as unknown as CreateFlow201;
+
 const HOST_RED = "rgb(255, 0, 0)";
 
 function installFlowFetchStub(response: CreateFlow201): { restore: () => void } {
@@ -249,6 +258,26 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     });
     const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(title.textContent?.trim()).toBe("Welcome back to Acme");
+  });
+
+  // A font stylesheet has to be linked at document level — `@font-face` inside
+  // a shadow tree never registers — so injecting one is a page-wide grant over
+  // a document we do not own. `branding.write` must not carry that into an
+  // embedding app, which is why the widget applies the family and leaves the
+  // loading to the page around it.
+  it("widget mode does not inject the tenant font into the embedding document", async () => {
+    const element = await mount(fontStep);
+    expect(element.variant).not.toBe("page");
+    expect(document.getElementById("zl-font-link")).toBeNull();
+    expect(document.getElementById("zl-default-font-link")).toBeNull();
+  });
+
+  it("page mode does inject it, because the document is ours", async () => {
+    await mount(fontStep, (el) => {
+      el.variant = "page";
+    });
+    const link = document.getElementById("zl-font-link") as HTMLLinkElement | null;
+    expect(link?.href).toBe(TENANT_FONT_HREF);
   });
 
   it("emits flow events the host app can drive its own UI from", async () => {

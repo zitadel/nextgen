@@ -301,6 +301,69 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			},
 		},
 		{
+			name: "sso enabled with providers",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": true, "providers": ["google"] }
+				}
+			}`),
+		},
+		{
+			name: "sso disabled without providers",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": false }
+				}
+			}`),
+		},
+		{
+			name: "sso enabled without providers rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": true }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			name: "sso disabled with providers rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": false, "providers": ["google"] }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			name: "sso providers must be slugs",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": true, "providers": ["Google"] }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
 			name:                 "invalid JSON",
 			input:                []byte(`{invalid`),
 			wantErr:              domain.ErrSchemaParseFailed,

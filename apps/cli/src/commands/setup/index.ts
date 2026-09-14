@@ -457,6 +457,7 @@ export default class Setup extends BaseCommand {
       const sections = buildSummary({
         projectFacts,
         writtenRel,
+        depsAdded: result.depsAdded,
         project,
         server: answers.server,
         issuer,
@@ -825,14 +826,23 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
 function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
+  depsAdded: ReadonlyArray<string>;
   project: CreateProject201;
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
   design?: BrandingDesign;
 }): Section[] {
-  const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework, design } = opts;
-  const sdkPackage = "@zitadel/sdk-next";
+  const {
+    projectFacts,
+    writtenRel,
+    depsAdded,
+    project,
+    server,
+    issuer,
+    scaffoldedFramework,
+    design,
+  } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
@@ -841,13 +851,17 @@ function buildSummary(opts: {
   }
 
   const installedRows: Row[] = [];
-  if (packageJsonHit) {
+  if (packageJsonHit && depsAdded.length > 0) {
     installedRows.push({
       label: "Package",
-      value: sdkPackage,
+      value: depsAdded.join(", "),
       secondary: stylePath(fileNameOf(packageJsonHit)),
     });
   }
+  // A union over every framework's scaffold artifacts: rows only render when
+  // the patcher actually wrote the file, so entries for other frameworks are
+  // inert. Suffixes are matched case-sensitively (src/App.tsx is React/Solid,
+  // src/app.tsx is Qwik, app.vue is the Nuxt shell, src/App.vue is Vue).
   for (const [label, suffix] of [
     ["Home redirect", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
@@ -855,10 +869,28 @@ function buildSummary(opts: {
     ["Profile page", "app/profile/page.tsx"],
     ["Request proxy", "proxy.ts"],
     ["Middleware", "middleware.ts"],
+    ["App entry", "src/App.tsx"],
+    ["App entry", "src/app.tsx"],
+    ["App entry", "src/App.vue"],
+    ["App entry", "src/App.svelte"],
+    ["App entry", "src/app/app.ts"],
+    ["Routes", "src/app/app.routes.ts"],
+    ["Request proxy", "proxy.conf.cjs"],
+    ["App shell", "app.vue"],
+    ["Home redirect", "pages/index.vue"],
+    ["Login page", "pages/login.vue"],
+    ["Register page", "pages/register.vue"],
+    ["Profile page", "pages/profile.vue"],
     ["Env vars", ".env.local"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) installedRows.push({ label, value: stylePath(hit) });
+  }
+  // The Vite config merge carries the /__nextgen dev proxy; the file name
+  // varies (ts/js/mts/mjs), so it can't ride the suffix table above.
+  const viteConfigHit = writtenRel.find((file) => /(^|\/)vite\.config\.[cm]?[jt]s$/.test(file));
+  if (viteConfigHit) {
+    installedRows.push({ label: "Dev proxy", value: stylePath(viteConfigHit) });
   }
 
   // The login-customization entry points. These are what a user edits to

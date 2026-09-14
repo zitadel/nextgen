@@ -19,11 +19,7 @@ export type ZlCheckboxChangeDetail = { name: string; checked: boolean; value: st
 /**
  * Atom: `<zl-checkbox>` — labelled checkbox bound to a boolean choice.
  *
- * Spec lineage (file `8UjCXw8yemgljmbkWGrSfE`, "Zitadel - Design System - External"):
- *   - bare master variant set:        node `4387:460` (Checkbox)
- *   - labelled master variant set:    node `6634:1868` (Checkbox / With Label)
- *
- * Figma models the checked state as the `style` variant (Outline = unchecked,
+ * The design system models the checked state as the `style` variant (Outline = unchecked,
  * Filled = checked) and Hovered / Focused / Pressed as a 32px circular halo
  * behind the 16px box. Those map to real CSS pseudo-classes; only the optional
  * `data-state` preview hook forces a state for the design matrix.
