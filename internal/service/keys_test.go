@@ -343,6 +343,60 @@ func TestKeyCaches_ReportUnderTheirOwnNames(t *testing.T) {
 	assert.Equal(t, map[string]int64{"crypter": 1, "signing_key": 1}, lookupsByCache(t, reader))
 }
 
+// lookupsByResult splits the lookup counter into hits and misses, which is the
+// shape the advertised hit rate is computed from.
+func lookupsByResult(t *testing.T, reader sdkmetric.Reader) map[string]int64 {
+	t.Helper()
+
+	var collected metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(t.Context(), &collected))
+
+	byResult := map[string]int64{}
+	for _, scope := range collected.ScopeMetrics {
+		for _, m := range scope.Metrics {
+			if m.Name != zmetrics.CacheLookups {
+				continue
+			}
+			for _, point := range m.Data.(metricdata.Sum[int64]).DataPoints {
+				result, ok := point.Attributes.Value("result")
+				require.True(t, ok)
+				byResult[result.Emit()] += point.Value
+			}
+		}
+	}
+	return byResult
+}
+
+// One cache request is one lookup. The resolve path used to consult the cache
+// again after its caller had already missed, so a cold read recorded two misses
+// for one request, and four for a key wrapped by a project KEK. That does not
+// break a lookup, it quietly halves the hit rate the cache is there to report.
+func TestKeyCaches_RecordOneLookupPerRequest(t *testing.T) {
+	t.Parallel()
+
+	reader := sdkmetric.NewManualReader()
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	crypters, err := service.NewLRUCrypterCache(8, zmetrics.WithMeterProvider(provider))
+	require.NoError(t, err)
+
+	svc, statements, masterKey := newMockedKeyServiceWithCrypterCache(t, crypters)
+	kek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
+	require.NoError(t, err)
+	kek.ID = "encryption_key_counted"
+
+	// Read once, so the row is fetched exactly once however many lookups happen.
+	statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil).Times(1)
+
+	_, err = svc.GetCrypter(t.Context(), kek.ID, kek.Algorithm)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int64{"miss": 1}, lookupsByResult(t, reader),
+		"a cold request is one miss, not one per layer that resolves it")
+
+	_, err = svc.GetCrypter(t.Context(), kek.ID, kek.Algorithm)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int64{"miss": 1, "hit": 1}, lookupsByResult(t, reader))
+}
+
 // newKeyCaches gives each service its own caches, so a hit in one test can
 // never answer a read in another.
 func newKeyCaches(t testing.TB) (service.CrypterCache, service.SigningKeyCache) {

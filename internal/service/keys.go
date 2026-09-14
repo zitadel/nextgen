@@ -150,14 +150,18 @@ func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, pu
 	if err != nil {
 		return nil, err
 	}
-	return s.getCrypterOfKey(ctx, key)
-}
-
-func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.EncryptionKey) (op.Crypto, error) {
 	if crypter, ok := s.crypterCache.Get(key.ID, key.Algorithm); ok {
 		return crypter, nil
 	}
+	return s.getCrypterOfKey(ctx, key)
+}
 
+// getCrypterOfKey unwraps key and caches the result. It deliberately does not
+// consult the cache: every caller has already looked this key up and missed, so
+// a second lookup here would record a second miss for one request -- and a
+// fourth for a key wrapped by a project KEK, which resolves through here twice.
+// The hit rate this cache exists to report would understate itself.
+func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.EncryptionKey) (op.Crypto, error) {
 	jweHeader, err := domain.DecodeJWEHeader(key.Key)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
