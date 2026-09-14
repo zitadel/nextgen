@@ -334,6 +334,12 @@ Recorded here because §12 makes them the API's problem, not the CLI's:
 - The API's shape is now visible. A missing verb, an unimplemented filter, or
   an endpoint that deviates shows up as a CLI gap a user can see, which is a
   feature: it turns backend debt into something reported rather than absorbed.
+- The registry is hand-maintained, so an endpoint the API gains reaches nobody
+  until someone adds an entry. A coverage test closes that: it reads the
+  generated client, records which operations the registry's verbs actually
+  invoke, and fails unless every operation the client offers is either called
+  or listed with a written reason. Deciding not to expose something stays
+  allowed; leaving it unnoticed does not.
 - Column choices are product decisions sitting in a table with nothing
   asserting they are sensible. That is how `users` shipped a table keyed on a
   schema URL identical on every row instead of the person's email, and the same
