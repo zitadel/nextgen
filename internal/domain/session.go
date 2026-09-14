@@ -128,6 +128,9 @@ func (s *Session) State() SessionState {
 }
 
 func (s *Session) Token(encrypter op.Encrypter) (string, error) {
+	// Scope stays unset: session authority is the user principal, not
+	// credential scopes. Management APIs skip the project.write ceiling for
+	// PrincipalType=user (credentialCeiling) and authorize via Check.
 	token, err := (&Token{
 		ProjectID: s.ProjectID,
 		TokenID:   s.TokenID,

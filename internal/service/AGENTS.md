@@ -10,19 +10,22 @@ Service mutate paths (create, update, delete, state flips, factor and authz
 writes) own Path B emitters: `audit.Emit` in the same transaction as the
 write. Adding, changing, or removing a mutation **must** keep events current
 — including **adding** a type when a new semantic mutation appears, and
-**removing** a type that no longer has a producer.
+**removing** a type that no longer has a producer, unless rows were ever
+stored under it, in which case it moves to the catalog's Retired table.
 
 A change is incomplete if it:
 
 - adds a mutate without an emit,
 - changes a payload so it no longer matches the catalog, or
-- removes a mutate but leaves a live catalog type, `EventType` constant, or
-  OpenAPI event member.
+- removes a mutate but leaves the type in the live Path B table. A type
+  that has stored rows moves to Retired and keeps its `EventType` constant
+  and OpenAPI member so those rows still decode, until its rows have aged
+  out of retention, when the type is removed.
 
 Authority (do not duplicate payload rules or the catalog table here):
 
 - Catalog: [`docs/design/api/events-catalog.md`](../../docs/design/api/events-catalog.md)
-  (payload rules, live Path B table, deferred list). Context:
+  (payload rules, live Path B table, Retired table, deferred list). Context:
   [ADR 048](../../docs/adrs/048-wide-events-internal-audit-primitive.md),
   [ADR 049](../../docs/adrs/049-events-api-retention-export.md).
 - Types: [`internal/domain/event.go`](../domain/event.go) `EventType`

@@ -152,3 +152,52 @@ func userProp(t *testing.T, user api.User, key string) string {
 	require.NoError(t, json.Unmarshal(raw, &value))
 	return value
 }
+
+func TestQueryUsersSessionCaller(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	operatorID := harness.CreateUserWithTeam(t, project.ID)
+	harness.SeedProjectViewer(t, project.ID, operatorID)
+
+	subjectID := harness.CreateUserWithTeam(t, project.ID)
+
+	session := harness.CreateActiveSession(t, project.ID, operatorID)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	sessionToken, err := session.Token(tokenCrypter)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(sessionToken)
+
+	resp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+	require.NoError(t, err)
+	listed, ok := resp.(*api.QueryUsersResponse)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	ids := make([]string, 0, len(listed.Users))
+	for _, item := range listed.Users {
+		ids = append(ids, userID(t, item))
+	}
+	assert.Contains(t, ids, operatorID)
+	assert.Contains(t, ids, subjectID)
+
+	t.Run("no foothold is an empty page", func(t *testing.T) {
+		t.Parallel()
+		strangerID := harness.CreateUserWithTeam(t, project.ID)
+		strangerSession := harness.CreateActiveSession(t, project.ID, strangerID)
+		strangerToken, err := strangerSession.Token(tokenCrypter)
+		require.NoError(t, err)
+		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		stranger.SetSessionToken(strangerToken)
+		resp, err := stranger.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+		require.NoError(t, err)
+		page, ok := resp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Empty(t, page.Users)
+	})
+}

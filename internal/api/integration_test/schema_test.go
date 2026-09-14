@@ -5,6 +5,7 @@ package integration_test
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -117,7 +118,8 @@ func TestCreateSchema(t *testing.T) {
 
 			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
@@ -163,7 +165,8 @@ func TestCreateSchema(t *testing.T) {
 			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusConflict, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
 		})
 
 		t.Run("password without a designated identifier is rejected with the rule named", func(t *testing.T) {
@@ -192,7 +195,8 @@ func TestCreateSchema(t *testing.T) {
 				UserSchema: apiSchema,
 			}, api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)})
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
 			// The rule text must reach the client, not vanish into an
 			// unserialized Parent.
 			assert.Contains(t, helpers.MustMarshal(t, resp), "x-identifier")
@@ -256,7 +260,8 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaByIdErrorResponseStatusCode).StatusCode)
 		})
 	})
 }
