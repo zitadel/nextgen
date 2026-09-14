@@ -16,8 +16,8 @@ Validation runs in two layers:
 
 | Field | Required | Notes |
 |---|:-:|---|
-| `name` | ✓ | Shared by every revision of a flow; publishing under an existing `name` adds a revision. Used as the slug for direct resolution. |
-| `schema_version` | ✓ | Monotonic per `(project_id, name)`. The repository picks the highest active version. |
+| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. Resolution by name prefers the highest active `schema_version`, then the newest revision of it. |
+| `schema_version` | ✓ | Monotonic per `(project_id, name)`. First key of resolution by name (see `name`); the server hard-codes it today, so the newest revision decides. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
 | `user_schema` | ✓ | URL of the user schema this flow's `fields` resolve against. Captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
@@ -65,7 +65,6 @@ Transition values:
 
 ### Definition
 
-- `name` is not unique. Revisions of a flow coexist under one `name`, and `POST /flow_definitions` never conflicts on it.
 - Every key in `purposes` is a supported `FlowDefinitionPurpose`.
 - Every value in `purposes` matches a step `name`.
 - `user_schema` URL resolves to a user-type schema. May be deferred until promotion to runtime use.
