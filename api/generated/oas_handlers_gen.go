@@ -1197,6 +1197,10 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 // created here — claim owns that path. An unrevoked grant with the same
 // principal and relation occupies the unique key even after `expires_at`;
 // DELETE it before re-creating.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). Session callers are authorized as
+// the human against the target project (home may differ). CSRF/Origin
+// for cookie mutations is a follow-up (#1140).
 //
 // POST /grants
 func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1290,11 +1294,29 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, CreateGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2780,6 +2802,9 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 // Already-revoked, missing, project-secret setup, and owning-team grants
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // DELETE /grants/{id}
 func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2873,11 +2898,29 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, DeleteGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -5237,6 +5280,9 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // `resource_scope_index`; project scope is required on the query (same as
 // events). Misses, revoked rows, project-secret setup (`sk_proj`),
 // owning-team (`relation=team`) rows, and cross-project ids return 404.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // GET /grants/{id}
 func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5330,11 +5376,29 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, GetGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9948,9 +10012,13 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 // owning-team (`relation=team`) rows are not returned. Grants are not in
 // `resource_scope_index`; project scope is required on the query (same as
 // get). Requires `project.read`. `expand: ["principal"]` additionally
-// requires `user.read` and `team.read` (documented on the expand enum;
-// those scopes cannot be ANDed onto this security block because they are
-// body-conditional).
+// requires `user.read` and `team.read` for project secrets (documented on
+// the expand enum; those scopes cannot be ANDed onto this security block
+// because they are body-conditional). A user-bound Console session that
+// already passed the project Check may expand without those scopes.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /grants/query
 func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -10044,11 +10112,29 @@ func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w ht
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, QueryGrantsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10746,9 +10832,13 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 // handleQueryUsersRequest handles queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// The project comes from the credential, not from a parameter: the operation
-// is bound to the token's own project by construction. This is why it takes
-// no `project_id`, unlike the other query endpoints.
+// The project comes from the credential, not from a parameter: the
+// operation is bound to the credential's home project by construction
+// (oauth2 secret or user-bound session). This is why it takes no
+// `project_id`, unlike the other query endpoints.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+// is a follow-up (#1140).
 //
 // POST /users/query
 func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -10842,11 +10932,29 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, QueryUsersOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

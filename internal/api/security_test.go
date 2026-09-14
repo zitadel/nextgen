@@ -7,6 +7,7 @@ import (
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"go.uber.org/mock/gomock"
@@ -149,6 +150,118 @@ func TestHandleNextgenSession(t *testing.T) {
 		got, ok := sessionTokenFromContext(ctx)
 		require.True(t, ok)
 		require.Equal(t, token, got)
+		_, ok = GetScopeContext(ctx)
+		require.False(t, ok, "anonymous session must not mint ScopeContext")
+	})
+
+	t.Run("user-bound session mints user ScopeContext", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			name  string
+			scope []string
+		}{
+			{"empty scope", nil},
+			{"write scopes still user", []string{"project.write", "project.read"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				token := &domain.Token{
+					ProjectID: "project-1",
+					TokenID:   "token-1",
+					UserID:    "user-1",
+					Type:      domain.TokenTypeSessionToken,
+					Scope:     tc.scope,
+					SessionID: new("session-1"),
+				}
+
+				mock := gomock.NewController(t)
+				tokenService := mocks.NewMockTokenService(mock)
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
+
+				handler := NewSecurityHandler(tokenService)
+				ctx, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+				require.NoError(t, err)
+
+				scope, ok := GetScopeContext(ctx)
+				require.True(t, ok)
+				require.Equal(t, "project-1", scope.ProjectID)
+				require.Equal(t, domain.AuthzPrincipalTypeUser, scope.PrincipalType)
+				require.Equal(t, "user-1", scope.PrincipalID)
+				if len(tc.scope) == 0 {
+					require.Empty(t, scope.Scope, "session tokens mint an empty Scope; the user skip must not depend on project.write")
+				} else {
+					require.Equal(t, tc.scope, scope.Scope)
+				}
+
+				actor, ok := audit.ActorFromContext(ctx)
+				require.True(t, ok)
+				require.Equal(t, "token-1", actor.TokenID)
+				require.NotNil(t, actor.ActorType)
+				require.Equal(t, domain.EventActorTypeHuman, *actor.ActorType)
+				require.NotNil(t, actor.ActorID)
+				require.Equal(t, "user-1", *actor.ActorID)
+			})
+		}
+	})
+
+	t.Run("user-bound session mints user ScopeContext on dual-scheme ops", func(t *testing.T) {
+		t.Parallel()
+
+		token := &domain.Token{
+			ProjectID: "project-1",
+			TokenID:   "token-1",
+			UserID:    "user-1",
+			Type:      domain.TokenTypeSessionToken,
+			SessionID: new("session-1"),
+		}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
+
+		handler := NewSecurityHandler(tokenService)
+		ctx, err := handler.HandleNextgenSession(t.Context(), api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		require.NoError(t, err)
+
+		scope, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, domain.AuthzPrincipalTypeUser, scope.PrincipalType)
+		require.Equal(t, "user-1", scope.PrincipalID)
+	})
+
+	t.Run("anonymous session skips grant and user-query ops", func(t *testing.T) {
+		t.Parallel()
+
+		for _, op := range []api.OperationName{
+			api.CreateGrantOperation,
+			api.GetGrantOperation,
+			api.DeleteGrantOperation,
+			api.QueryGrantsOperation,
+			api.QueryUsersOperation,
+		} {
+			t.Run(string(op), func(t *testing.T) {
+				t.Parallel()
+
+				token := &domain.Token{
+					ProjectID: "project-1",
+					TokenID:   "token-1",
+					Type:      domain.TokenTypeSessionToken,
+					SessionID: new("session-1"),
+				}
+
+				mock := gomock.NewController(t)
+				tokenService := mocks.NewMockTokenService(mock)
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
+
+				handler := NewSecurityHandler(tokenService)
+				ctx, err := handler.HandleNextgenSession(t.Context(), op, api.NextgenSession{APIKey: "raw-cookie"})
+				require.ErrorIs(t, err, ogenerrors.ErrSkipServerSecurity)
+				_, ok := GetScopeContext(ctx)
+				require.False(t, ok)
+			})
+		}
 	})
 
 	t.Run("invalid token is an unsatisfied requirement", func(t *testing.T) {
@@ -161,6 +274,92 @@ func TestHandleNextgenSession(t *testing.T) {
 		handler := NewSecurityHandler(tokenService)
 		_, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
+	})
+
+	t.Run("does not replace oauth2 ScopeContext", func(t *testing.T) {
+		t.Parallel()
+
+		project := &domain.Token{
+			ProjectID: "proj_operator",
+			TokenID:   "token-secret",
+			Type:      domain.TokenTypeProjectToken,
+			Scope:     []string{"project.write", "project.read", "user.read"},
+		}
+		session := &domain.Token{
+			ProjectID: "proj_operator",
+			TokenID:   "token-session",
+			UserID:    "user_alice",
+			Type:      domain.TokenTypeSessionToken,
+			SessionID: new("session-1"),
+		}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(project, nil)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(session, nil)
+
+		handler := NewSecurityHandler(tokenService)
+		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryUsersOperation, api.OAuth2{Token: "raw-bearer"})
+		require.NoError(t, err)
+		ctx, err = handler.HandleNextgenSession(ctx, api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		require.NoError(t, err)
+
+		scope, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, domain.AuthzPrincipalTypeSKProj, scope.PrincipalType)
+		require.Equal(t, "proj_operator", scope.PrincipalID)
+		require.Equal(t, project.Scope, scope.Scope)
+
+		got, ok := sessionTokenFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, session, got)
+
+		actor, ok := audit.ActorFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, "token-secret", actor.TokenID)
+		require.NotNil(t, actor.ActorType)
+		require.Equal(t, domain.EventActorTypeService, *actor.ActorType)
+		require.Nil(t, actor.ActorID)
+	})
+
+	t.Run("does not replace oauth2 ActorContext for anonymous session", func(t *testing.T) {
+		t.Parallel()
+
+		project := &domain.Token{
+			ProjectID: "proj_operator",
+			TokenID:   "token-secret",
+			Type:      domain.TokenTypeProjectToken,
+			Scope:     []string{"project.write", "project.read"},
+		}
+		session := &domain.Token{
+			ProjectID: "proj_operator",
+			TokenID:   "token-session",
+			Type:      domain.TokenTypeSessionToken,
+			SessionID: new("session-1"),
+		}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(project, nil)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(session, nil)
+
+		handler := NewSecurityHandler(tokenService)
+		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryUsersOperation, api.OAuth2{Token: "raw-bearer"})
+		require.NoError(t, err)
+		ctx, err = handler.HandleNextgenSession(ctx, api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		require.NoError(t, err)
+
+		scope, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, domain.AuthzPrincipalTypeSKProj, scope.PrincipalType)
+		require.Equal(t, "proj_operator", scope.PrincipalID)
+
+		actor, ok := audit.ActorFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, "token-secret", actor.TokenID)
+		require.NotNil(t, actor.ActorType)
+		require.Equal(t, domain.EventActorTypeService, *actor.ActorType)
+		require.Nil(t, actor.ActorID)
 	})
 
 	t.Run("non-session token type is rejected", func(t *testing.T) {

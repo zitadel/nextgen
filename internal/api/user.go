@@ -59,8 +59,8 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 }
 
 // QueryUsers is the users list (ADR 031). It carries no project parameter: the
-// oauth2 principal (the project secret the CLI's status probe sends) is the
-// only authority for which project's users are served, so the scope check is
+// credential's home project (oauth2 secret or user-bound session) is the
+// only authority for which project's users are served. The scope check is
 // what keeps a browser-plane preview secret out. Results are newest-first
 // unless the request sorts otherwise.
 func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
