@@ -27,6 +27,7 @@ export { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample } from "./fie
 export type { BodyField, FieldKind } from "./fields";
 export { describeRegistry } from "./describe";
 export { collectPages } from "./paging";
+export { DEFAULT_WIRE, wireOf } from "./wire";
 export { parseFilter, parseSort } from "./query";
 export { chosenColumns } from "./columns";
 export { allows, fieldPaths, itemSchemaOf, observedPaths, suggestable } from "./paths";

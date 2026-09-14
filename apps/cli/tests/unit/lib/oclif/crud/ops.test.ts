@@ -168,3 +168,44 @@ describe("bindOperation", () => {
     expect(a.examples).not.toEqual(b.examples);
   });
 });
+
+describe("wire conventions", () => {
+  it("sends and reads the vocabulary the caller declared, not this API's", async () => {
+    // The factory must not carry one platform's cursor names as though they
+    // were universal: a list is driven here with `cursor`/`next_cursor` and a
+    // query body that nests its filters, and nothing in the factory objects.
+    let sent: unknown;
+    const spec: ListSpec<Ctx> = {
+      items: "rows",
+      body: z.object({}).passthrough(),
+      filters: [{ field: "state", operations: ["equals"] }],
+      call: async (_ctx, request) => {
+        sent = request;
+        return { rows: [{ id: "r1" }], next_cursor: "c2" };
+      },
+    };
+    const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
+      topic: "rows",
+      resource: { singular: "row", idField: "id", columns: ["id"], list: spec },
+      spec,
+      options: {
+        connect: async () => ({ token: "t" }),
+        operations: ["equals"],
+        wire: {
+          limit: "size",
+          pageToken: "cursor",
+          nextPageToken: "next_cursor",
+          query: ({ paging, filters }) => ({ ...paging, where: filters }),
+        },
+      },
+    };
+
+    const command = bindOperation(ListOperation, definition);
+    const result = await command.run(["--filter", "state=active", "--limit", "5", "--json"]);
+
+    expect(sent).toEqual({ size: 5, where: [{ field: "state", operation: "equals", value: "active" }] });
+    const data = (result as { data: Record<string, unknown> }).data;
+    expect(data.next_cursor).toBe("c2");
+    expect(data.next_page_token).toBeUndefined();
+  });
+});
