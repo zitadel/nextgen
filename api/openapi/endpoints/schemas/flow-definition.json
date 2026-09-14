@@ -239,18 +239,11 @@
         },
         "sso_providers": {
           "type": "array",
-          "description": "List of connection slugs offered on this step. Each entry must match\nthe `slug` of a connection in the project; the connection supplies the\ndisplay name and template at render time. When non-empty, the step\nmust define a `transitions.callback` entry — the engine handles the\nreserved `sso` action transparently and fires `callback` on this step\nwhen the IdP returns.\n",
+          "description": "Available SSO identity providers for this step.",
           "items": {
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9_-]*$",
-            "maxLength": 64
+            "$ref": "#/$defs/SsoProvider"
           },
           "default": [],
-          "uniqueItems": true,
-          "example": [
-            "google",
-            "github"
-          ],
           "examples": [
             [
               {
@@ -264,8 +257,7 @@
         "on_success": {
           "type": "string",
           "enum": [
-            "create_user",
-            "create_user_with_sso"
+            "create_user"
           ],
           "description": "Server-side mutation to execute when this step completes successfully.\nRuns after field validation passes, before the transition fires.\n\n- create_user: creates the user record (registration flows)\n",
           "examples": [
@@ -435,6 +427,39 @@
             {
               "site_key": "0x4AAAAAAA-example-site-key"
             }
+          ]
+        }
+      }
+    },
+    "SsoProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "template"
+      ],
+      "description": "An available SSO identity provider.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Provider instance identifier.",
+          "examples": [
+            "google"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the provider.",
+          "examples": [
+            "Google"
+          ]
+        },
+        "template": {
+          "type": "string",
+          "description": "Template hint for rendering (logo, colors).",
+          "examples": [
+            "google"
           ]
         }
       }

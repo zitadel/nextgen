@@ -67,36 +67,30 @@ test("renames OpenAPI example to examples without clobbering an explicit list", 
   assert.deepEqual(properties.listed, { type: "string", examples: ["x", "y"] });
 });
 
-test("folds x-dialect into its parent, merging objects and swapping those marked x-replace", () => {
+test("folds x-dialect into its parent, merging objects and replacing other values", () => {
   const { schema } = generate(
     {
       "a.yaml": [
         "x-meta-schema: true",
         "type: object",
+        "x-dialect:",
+        "  properties:",
+        "    extra:",
+        "      type: string",
         "properties:",
         "  kind:",
         "    type: string",
         "    enum: [submit, back]",
         "    x-dialect:",
         "      enum: [submit]",
-        "  providers:",
-        "    type: array",
-        "    items:",
-        "      $ref: provider.yaml",
-        "    x-dialect:",
-        "      items:",
-        "        x-replace: true",
-        "        type: string",
       ].join("\n"),
-      "provider.yaml": "type: object\n",
     },
     "a.yaml",
   );
   const properties = schema.properties as Record<string, Record<string, unknown>>;
   assert.deepEqual(properties.kind, { type: "string", enum: ["submit"] });
-  assert.deepEqual(properties.providers, { type: "array", items: { type: "string" } });
+  assert.deepEqual(properties.extra, { type: "string" });
   assert.equal(JSON.stringify(schema).includes("x-dialect"), false);
-  assert.equal("$defs" in schema, false, "a $ref removed by the override must not be inlined");
 });
 
 test("keeps a $ref to another emitted file as a sibling .json reference", () => {
