@@ -48,8 +48,9 @@ epic-wide, not in this document alone.
    match, so the public internet is reachable with no configuration.
    What makes the default posture safe is the shipped list: loopback,
    private, link-local (cloud metadata), carrier-grade NAT, benchmark,
-   and unspecified ranges, IPv4 and IPv6, plus the localhost name,
-   aligned with Zitadel's default list. "Denied by default" describes
+   and unspecified ranges, IPv4 and IPv6, plus the localhost name and the
+   deprecated IPv4-embedding transition ranges (6to4, Teredo, local-use
+   NAT64), a superset of Zitadel's default list. "Denied by default" describes
    the internal address space (protected with zero operator action), not
    fetching in general.
 4. **Enforce on the address actually connected to.** The authoritative
@@ -62,7 +63,13 @@ epic-wide, not in this document alone.
    the only defense. For the same integrity reason the hardened path
    connects directly and ignores environment proxy settings: a proxied
    fetch would move the connection to the proxy and the real target out of
-   the policy's sight.
+   the policy's sight. An address in the well-known NAT64 prefix embeds an
+   IPv4 target that a translation gateway will connect to; the embedded
+   address is evaluated against the same rules, deny and allow alike,
+   rather than denying the whole prefix, because on DNS64 networks every
+   public IPv4 destination appears inside it. Operator-chosen
+   (network-specific) NAT64 prefixes cannot be recognized statically and
+   remain the operator's own list entries.
 5. **The allow list is an exception list, not a mode.** An allow entry
    re-permits something the deny list blocks; everything not denied stays
    allowed. The operator-lockdown "only listed hosts may be fetched" mode
