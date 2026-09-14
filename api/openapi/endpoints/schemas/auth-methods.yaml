@@ -11,6 +11,6 @@ properties:
   magic_link:
     $ref: auth-method.yaml
   sso:
-    $ref: auth-method.yaml
+    $ref: sso-auth-method.yaml
   otp:
     $ref: auth-method.yaml

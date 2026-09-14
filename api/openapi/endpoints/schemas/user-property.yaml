@@ -13,11 +13,17 @@ description: |
   value that may be written but is never returned by the read API; nothing
   enforces it today, so responses still include write-only properties.
 additionalProperties: true
+# Editor-only: a customer's property document may carry the draft pointer, but
+# on the wire the key is customer-authored JSON and must round-trip untouched.
+# A `const` wire property would make the generated encoder emit it on every
+# nested property, so it lives in the generated meta-schema alone.
+x-dialect:
+  properties:
+    "$schema":
+      type: string
+      const: https://json-schema.org/draft/2020-12/schema
+      description: The JSON Schema version used for this property schema.
 properties:
-  "$schema":
-    type: string
-    const: https://json-schema.org/draft/2020-12/schema
-    description: The JSON Schema version used for this property schema.
   x-unique:
     oneOf:
       - type: string

@@ -6,11 +6,6 @@
   "description": "The meta-schema one property of a customer's user schema is validated\nagainst. The generated `user-property.json` adds\n`allOf: [{$ref: draft-2020-12}]`, which cannot live here because code\ngenerators choke on it.\n\nNative JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`\nare accepted without being listed below. `writeOnly: true` is reserved for a\nvalue that may be written but is never returned by the read API; nothing\nenforces it today, so responses still include write-only properties.\n",
   "additionalProperties": true,
   "properties": {
-    "$schema": {
-      "type": "string",
-      "const": "https://json-schema.org/draft/2020-12/schema",
-      "description": "The JSON Schema version used for this property schema."
-    },
     "x-unique": {
       "oneOf": [
         {
@@ -52,6 +47,11 @@
       "additionalProperties": {
         "$ref": "user-property.json"
       }
+    },
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The JSON Schema version used for this property schema."
     }
   },
   "allOf": [
