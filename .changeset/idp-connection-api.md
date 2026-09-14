@@ -1,4 +1,5 @@
 ---
+"@zitadel/server": minor
 "@zitadel/api": minor
 ---
 

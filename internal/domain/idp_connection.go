@@ -1,8 +1,8 @@
 package domain
 
-// PrefixIDPConnection namespaces connection ids ("idp_01KWH3B..."), the id a
-// release pins and an identity link references. Revisions carry their own
-// prefix, registered with the storage layer that allocates them.
+// PrefixIDPConnection namespaces connection ids ("idp_01KWH3B..."), the id an
+// identity link references. Revisions carry their own prefix, registered with
+// the storage layer that allocates them, and are what attempts and releases pin.
 const PrefixIDPConnection ResourcePrefix = "idp"
 
 func ErrIDPConnectionNotFound() Error {

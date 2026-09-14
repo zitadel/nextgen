@@ -361,8 +361,7 @@ type Handler interface {
 	// A slug is unique within a project and fixed for the life of the
 	// connection, so this resolves the same connection as `GET /idps/{id}` and
 	// returns the same body. It exists because configuration files reference a
-	// connection by slug, so the CLI holds a slug rather than an id. Everything
-	// else, the console included, has the id from the query response.
+	// connection by slug, so the CLI holds a slug rather than an id.
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /idps/slug/{slug}
