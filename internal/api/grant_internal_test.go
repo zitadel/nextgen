@@ -1,8 +1,10 @@
 package api
 
 import (
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -21,9 +23,7 @@ func TestMapQueryGrantsToService_Expand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			input := mapQueryGrantsToService("proj_a", &api.QueryGrantsRequest{Expand: tt.expand})
-			if input.IncludePrincipal != tt.wantIncl {
-				t.Fatalf("IncludePrincipal = %v, want %v", input.IncludePrincipal, tt.wantIncl)
-			}
+			assert.Equal(t, tt.wantIncl, input.IncludePrincipal)
 		})
 	}
 }
@@ -36,12 +36,10 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 				UserID: api.NewOptUserID("user_1"),
 			}),
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.UserID != "user_1" || got.Identifier != "" || got.TeamID != "" {
-			t.Fatalf("got %+v", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "user_1", got.UserID)
+		assert.Empty(t, got.Identifier)
+		assert.Empty(t, got.TeamID)
 	})
 	t.Run("user identifier", func(t *testing.T) {
 		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
@@ -50,12 +48,9 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 				Identifier: api.NewOptString("alice@acme.com"),
 			}),
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.Identifier != "alice@acme.com" || got.UserID != "" {
-			t.Fatalf("got %+v", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "alice@acme.com", got.Identifier)
+		assert.Empty(t, got.UserID)
 	})
 	t.Run("team id", func(t *testing.T) {
 		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
@@ -64,12 +59,9 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 				TeamID: api.NewOptTeamID("team_1"),
 			}),
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.TeamID != "team_1" || got.TeamName != "" {
-			t.Fatalf("got %+v", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "team_1", got.TeamID)
+		assert.Empty(t, got.TeamName)
 	})
 	t.Run("team name", func(t *testing.T) {
 		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
@@ -78,18 +70,13 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 				Name: api.NewOptString("Acme AI Admins"),
 			}),
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.TeamName != "Acme AI Admins" || got.TeamID != "" {
-			t.Fatalf("got %+v", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "Acme AI Admins", got.TeamName)
+		assert.Empty(t, got.TeamID)
 	})
 	t.Run("neither user nor team", func(t *testing.T) {
 		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{Relation: api.CreateGrantRequestRelationViewer})
-		if !errors.Is(err, domain.ErrGrantInvalid()) {
-			t.Fatalf("error = %v, want grant.invalid", err)
-		}
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
 	})
 	t.Run("both user and team", func(t *testing.T) {
 		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
@@ -97,9 +84,7 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 			User:     api.NewOptUserLocator(api.UserLocator{UserID: api.NewOptUserID("user_1")}),
 			Team:     api.NewOptTeamLocator(api.TeamLocator{TeamID: api.NewOptTeamID("team_1")}),
 		})
-		if !errors.Is(err, domain.ErrGrantInvalid()) {
-			t.Fatalf("error = %v, want grant.invalid", err)
-		}
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
 	})
 	t.Run("user both fields", func(t *testing.T) {
 		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
@@ -109,9 +94,7 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 				Identifier: api.NewOptString("alice@acme.com"),
 			}),
 		})
-		if !errors.Is(err, domain.ErrGrantInvalid()) {
-			t.Fatalf("error = %v, want grant.invalid", err)
-		}
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
 	})
 	t.Run("team both fields", func(t *testing.T) {
 		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
@@ -121,18 +104,14 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 				Name:   api.NewOptString("Acme AI Admins"),
 			}),
 		})
-		if !errors.Is(err, domain.ErrGrantInvalid()) {
-			t.Fatalf("error = %v, want grant.invalid", err)
-		}
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
 	})
 	t.Run("empty user locator", func(t *testing.T) {
 		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
 			Relation: api.CreateGrantRequestRelationViewer,
 			User:     api.NewOptUserLocator(api.UserLocator{}),
 		})
-		if !errors.Is(err, domain.ErrGrantInvalid()) {
-			t.Fatalf("error = %v, want grant.invalid", err)
-		}
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
 	})
 }
 
@@ -149,21 +128,11 @@ func TestGrantResponse_UserAndTeam(t *testing.T) {
 
 	t.Run("ref only when Principal is nil", func(t *testing.T) {
 		resp, err := grantResponse(&service.Grant{Assignment: asgn, User: userRef})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !resp.User.IsSet() {
-			t.Fatal("user should be set")
-		}
-		if resp.User.Value.UserID != "user_1" {
-			t.Fatalf("user_id = %s", resp.User.Value.UserID)
-		}
-		if resp.User.Value.Schema.IsSet() {
-			t.Fatal("schema should be omitted without expand")
-		}
-		if resp.Team.IsSet() {
-			t.Fatal("team should be omitted on a user grant")
-		}
+		require.NoError(t, err)
+		require.True(t, resp.User.IsSet())
+		assert.Equal(t, api.UserID("user_1"), resp.User.Value.UserID)
+		assert.False(t, resp.User.Value.Schema.IsSet())
+		assert.False(t, resp.Team.IsSet())
 	})
 	t.Run("expand extras on user when Principal is loaded", func(t *testing.T) {
 		resp, err := grantResponse(&service.Grant{
@@ -177,12 +146,9 @@ func TestGrantResponse_UserAndTeam(t *testing.T) {
 				},
 			},
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !resp.User.Value.Schema.IsSet() || resp.User.Value.Schema.Value != "sch_1" {
-			t.Fatalf("schema = %+v", resp.User.Value.Schema)
-		}
+		require.NoError(t, err)
+		require.True(t, resp.User.Value.Schema.IsSet())
+		assert.Equal(t, "sch_1", resp.User.Value.Schema.Value)
 	})
 	t.Run("degraded ref when expand asked but user missing", func(t *testing.T) {
 		resp, err := grantResponse(&service.Grant{
@@ -190,20 +156,12 @@ func TestGrantResponse_UserAndTeam(t *testing.T) {
 			User:       &domain.UserRef{UserID: "user_1"},
 			Principal:  &service.GrantPrincipal{},
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if resp.User.Value.UserID != "user_1" {
-			t.Fatalf("user_id = %s", resp.User.Value.UserID)
-		}
-		if resp.User.Value.Schema.IsSet() {
-			t.Fatal("schema should stay off a degraded ref")
-		}
+		require.NoError(t, err)
+		assert.Equal(t, api.UserID("user_1"), resp.User.Value.UserID)
+		assert.False(t, resp.User.Value.Schema.IsSet())
 	})
 	t.Run("nil grant", func(t *testing.T) {
 		_, err := grantResponse(nil)
-		if !errors.Is(err, domain.ErrGrantNotFound()) {
-			t.Fatalf("error = %v, want grant not found", err)
-		}
+		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 	})
 }

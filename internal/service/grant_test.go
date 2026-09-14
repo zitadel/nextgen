@@ -220,7 +220,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier locates active user", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{{
 					ProjectID: grantPlatformProjID,
 					URL:       "https://s/human",
@@ -228,7 +228,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 					Schema:    []byte(schemaDoc),
 				}},
 			}, nil)
-			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
 				ProjectID: grantPlatformProjID,
 				ID:        userID,
 				Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
@@ -257,7 +257,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier miss is not found", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{{
 					ProjectID: grantPlatformProjID,
 					URL:       "https://s/human",
@@ -265,7 +265,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 					Schema:    []byte(schemaDoc),
 				}},
 			}, nil)
-			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).
 				Return(nil, database.NewNoRowFoundError(nil))
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
@@ -280,7 +280,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("ambiguous identifier is not found", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{
 					{
 						ProjectID: grantPlatformProjID,
@@ -296,10 +296,10 @@ func TestGrantService_CreateLocators(t *testing.T) {
 					},
 				},
 			}, nil)
-			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
 				ID: "user_email_match", Metadata: domain.UserMetadata{Status: domain.UserStatusActive},
 			}, nil)
-			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
 				ID: "user_username_match", Metadata: domain.UserMetadata{Status: domain.UserStatusActive},
 			}, nil)
 		})
@@ -315,7 +315,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier skips unique value on undesignated schema", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{
 					{
 						ProjectID: grantPlatformProjID,
@@ -331,7 +331,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 					},
 				},
 			}, nil)
-			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).DoAndReturn(
 				func(_ context.Context, filter database.Filter[domain.UserField], opts service.UserQueryOptions) (*domain.User, error) {
 					assert.True(t, filter.Restricts(database.Col(domain.UserFieldSchemaURL)))
 					assert.Equal(t, []string{"https://s/human"}, schemaURLEquals(t, filter))
@@ -367,7 +367,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier matches among schemas that share a designation", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{
 					{
 						ProjectID: grantPlatformProjID,
@@ -383,7 +383,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 					},
 				},
 			}, nil)
-			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).DoAndReturn(
 				func(_ context.Context, filter database.Filter[domain.UserField], opts service.UserQueryOptions) (*domain.User, error) {
 					assert.True(t, filter.Restricts(database.Col(domain.UserFieldSchemaURL)))
 					assert.ElementsMatch(t, []string{"https://s/human", "https://s/admin"}, schemaURLEquals(t, filter))
@@ -419,7 +419,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("team name locates active team", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).Return(&domain.Team{
+			s.EXPECT().GetTeam(gomock.Any(), teamLocatorFilter(true)).Return(&domain.Team{
 				ProjectID: grantPlatformProjID,
 				ID:        teamID,
 				Name:      "Acme AI Admins",
@@ -450,7 +450,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("team name miss is not found", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
+			s.EXPECT().GetTeam(gomock.Any(), teamLocatorFilter(true)).
 				Return(nil, database.NewNoRowFoundError(nil))
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
@@ -734,6 +734,40 @@ func expectActiveTeamPrincipal(s *servicemocks.MockAllStatements, teamID string)
 		ID:        teamID,
 		Status:    domain.TeamStatusActive,
 	}, nil)
+}
+
+func userLocatorFilter(schemaURL bool) gomock.Matcher {
+	return gomock.Cond(func(filter database.Filter[domain.UserField]) bool {
+		if filter == nil {
+			return false
+		}
+		if !filter.Restricts(database.Col(domain.UserFieldProjectID)) ||
+			!filter.Restricts(database.Col(domain.UserFieldStatus)) {
+			return false
+		}
+		return !schemaURL || filter.Restricts(database.Col(domain.UserFieldSchemaURL))
+	})
+}
+
+func teamLocatorFilter(name bool) gomock.Matcher {
+	return gomock.Cond(func(filter database.Filter[domain.TeamField]) bool {
+		if filter == nil {
+			return false
+		}
+		if !filter.Restricts(database.Col(domain.TeamFieldProjectID)) ||
+			!filter.Restricts(database.Col(domain.TeamFieldStatus)) {
+			return false
+		}
+		return !name || filter.Restricts(database.Col(domain.TeamFieldName))
+	})
+}
+
+func userSchemaListFilter() gomock.Matcher {
+	return gomock.Cond(func(opts *database.ListOptions[domain.JSONSchemaField]) bool {
+		return opts != nil && opts.Filter != nil &&
+			opts.Filter.Restricts(database.Col(domain.JSONSchemaFieldProjectID)) &&
+			opts.Filter.Restricts(database.Col(domain.JSONSchemaFieldKind))
+	})
 }
 
 func schemaURLEquals(t *testing.T, filter database.Filter[domain.UserField]) []string {
