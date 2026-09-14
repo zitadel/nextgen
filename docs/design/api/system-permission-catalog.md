@@ -296,13 +296,13 @@ not yet exposed.
 
 ### Flow definitions
 
-> **Verb model:** manage — `write` = create + update; `delete` separate (already in OpenAPI). No `flow_definition.manage` permission.
+> **Verb model:** manage — `write` = create, and every create publishes a new revision; `delete` has no endpoint. No `flow_definition.manage` permission.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `flow_definition.read` | `GET /flow_definitions`, `GET /flow_definitions/{id}` | Get + list. Validate / simulate read-only probes are **planned**, not yet exposed. |
-| `flow_definition.write` | `POST /flow_definitions`, `PUT /flow_definitions/{id}`, `POST /flow_definitions/{id}/activate`, `POST /flow_definitions/{id}/deactivate` | Create + manage + lifecycle. |
-| `flow_definition.delete` | `DELETE /flow_definitions/{id}` | |
+| `flow_definition.write` | `POST /flow_definitions` | Publishes a new revision. A revision's status is fixed at creation, so there are no lifecycle verbs. |
+| `flow_definition.delete` | — | `DELETE /flow_definitions/{id}` was removed in [#530](https://github.com/zitadel/nextgen/issues/530); the scope stays until retirement is decided ([#536](https://github.com/zitadel/nextgen/issues/536)). |
 
 ### Sessions
 
