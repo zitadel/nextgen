@@ -5,6 +5,7 @@ package stmttest
 import (
 	"cmp"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -171,6 +172,74 @@ func TestIDPConnectionStatements_ReviseAppendsAndMovesHead(t *testing.T) {
 		assert.Equal(t, firstRevisionID, pinned.RevisionID)
 		assert.JSONEq(t, string(v1Document), string(pinned.Document), "an appended revision must not rewrite the one before it")
 		assert.Equal(t, slug, pinned.Slug)
+	})
+}
+
+// Two revisions racing on the same connection are last-write-wins on the head:
+// both revision rows survive and stay readable by id, and the head settles on
+// whichever transaction committed last.
+func TestIDPConnectionStatements_ConcurrentReviseLastWriteWins(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		v1Document := idpConnectionDocument("https://v1.example.com")
+		documents := [2][]byte{
+			idpConnectionDocument("https://v2.example.com"),
+			idpConnectionDocument("https://v3.example.com"),
+		}
+
+		entity := createIDPConnection(t, d.stmts, projectID, "race-"+uniqueSuffix(t), v1Document)
+		firstRevisionID := entity.RevisionID
+
+		// Each writer revises its own copy of the entity: the statement writes
+		// RevisionID, CreatedAt and UpdatedAt back onto the entity from inside
+		// the transaction callback, and Spanner replays that callback on an
+		// ABORTED retry, so a shared struct would be a data race rather than a
+		// test of the storage layer.
+		var (
+			wg       sync.WaitGroup
+			entities [2]domain.IDPConnection
+			errs     [2]error
+		)
+		for i := range entities {
+			entities[i] = *entity
+			entities[i].Document = documents[i]
+			wg.Go(func() {
+				errs[i] = d.stmts.ReviseIDPConnection(t.Context(), &entities[i])
+			})
+		}
+		wg.Wait()
+
+		for i := range entities {
+			// A dialect that surfaces a retryable busy or serialization error
+			// here rather than handling it internally breaks the last-write-wins
+			// contract for its callers.
+			require.NoError(t, errs[i], "writer %d", i)
+		}
+		assert.NotEqual(t, entities[0].RevisionID, entities[1].RevisionID, "each revise mints its own revision id")
+		assert.NotEqual(t, firstRevisionID, entities[0].RevisionID)
+		assert.NotEqual(t, firstRevisionID, entities[1].RevisionID)
+
+		// All three revisions stay readable and keep their own document, which
+		// is what lets an in-flight auth attempt hold a pin through a race.
+		for revisionID, want := range map[string][]byte{
+			firstRevisionID:        v1Document,
+			entities[0].RevisionID: documents[0],
+			entities[1].RevisionID: documents[1],
+		} {
+			pinned, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, revisionID)
+			require.NoError(t, err, "revision %q", revisionID)
+			assert.Equal(t, entity.ID, pinned.ID)
+			assert.JSONEq(t, string(want), string(pinned.Document), "revision %q", revisionID)
+		}
+
+		byID, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		// Which writer wins is commit order, so the head only has to name one of
+		// the two and serve that one's document.
+		winner := slices.IndexFunc(entities[:], func(e domain.IDPConnection) bool { return e.RevisionID == byID.RevisionID })
+		require.NotEqual(t, -1, winner, "head %q is neither concurrent revision", byID.RevisionID)
+		assert.JSONEq(t, string(documents[winner]), string(byID.Document))
+		assert.False(t, byID.UpdatedAt.Before(byID.CreatedAt), "revising must not move updated_at behind created_at")
 	})
 }
 
