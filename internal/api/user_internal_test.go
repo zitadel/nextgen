@@ -199,5 +199,11 @@ func (s *stubQueryUsersService) SetPassword(context.Context, service.SetPassword
 func (s *stubQueryUsersService) GetMyUser(context.Context, service.GetMyUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected GetMyUser")
 }
+func (s *stubQueryUsersService) PatchUser(context.Context, service.PatchUserInput) (*domain.User, error) {
+	return nil, errors.New("unexpected PatchUser")
+}
+func (s *stubQueryUsersService) PatchMyUser(context.Context, service.PatchMyUserInput) (*domain.User, error) {
+	return nil, errors.New("unexpected PatchMyUser")
+}
 
 var _ service.UserService = (*stubQueryUsersService)(nil)
