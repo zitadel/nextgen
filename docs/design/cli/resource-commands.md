@@ -71,6 +71,7 @@ Every verb is a class with the same two members, so the operations read alike:
 | `crud/ops/command.ts`                     | `ResourceCommand` — parse, resolve meta, `execute`, emit; `bindOperation`, which holds each command's definition in a `WeakMap` beside the class rather than as a static, since oclif copies a command's own statics into `commands --json` and the published manifest |
 | `crud/ops/list.ts`, `read.ts`, `write.ts`, `delete.ts` | One `*Operation` class each: static `describe()` → oclif statics, `execute()` → `CommandResult` |
 | `crud/paging.ts`, `table.ts`, `body.ts`, `query.ts`, `fields.ts` | Pure helpers: cursor draining, table rendering, body loading, filter grammar, schema-to-flag generation |
+| `crud/wire.ts`                            | The platform's cursor property names and structured-query body shape, defaulted to this API's and overridable by the caller |
 | `crud/types.ts`                           | The registry contract, generic over the platform connection `Ctx`  |
 
 `buildResourceCommands` binds each registry entry to its operation classes and

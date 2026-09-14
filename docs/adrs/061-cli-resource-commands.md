@@ -73,7 +73,11 @@ makes deletion a deactivation.
 ### 4. One registry, one generic factory
 
 Every command is generated from a single descriptor table by a factory that
-knows nothing about Zitadel. Adding a resource is a table entry; changing a
+knows nothing about Zitadel — including its wire vocabulary. The cursor
+property names and the structured-query body shape are declared by the caller
+and default to this API's (ADRs 027 and 031) rather than being written into the
+factory, so "platform-agnostic" is a property a test can demonstrate rather
+than a label. Adding a resource is a table entry; changing a
 convention changes it everywhere at once. Hand-authoring a command file per
 verb is not allowed — that is how surfaces drift, and it is the failure this
 ADR exists to prevent.

@@ -162,6 +162,31 @@ export type ResourceDescriptor<Ctx> = Readonly<{
 
 export type ResourceRegistry<Ctx> = Readonly<Record<string, ResourceDescriptor<Ctx>>>;
 
+/**
+ * How the platform spells cursor pagination and structured queries on the
+ * wire. The defaults are this API's ({@link DEFAULT_WIRE}); a platform that
+ * spells its cursor differently overrides them rather than the factory
+ * carrying one API's vocabulary as though it were universal.
+ */
+export type WireConventions = Readonly<{
+  /** Request property carrying the page size. */
+  limit: string;
+  /** Request property carrying the cursor. */
+  pageToken: string;
+  /** Response property carrying the cursor for the next page. */
+  nextPageToken: string;
+  /** Assembles the structured-query body from the parts the flags produced. */
+  query: (parts: QueryParts) => Json;
+}>;
+
+/** The pieces of a structured query, before the platform decides their shape. */
+export type QueryParts = Readonly<{
+  /** Already spelled with this platform's paging property names. */
+  paging: Json;
+  filters: readonly Readonly<{ field: string; operation: string; value: string }>[];
+  sorting?: Readonly<{ field: string; direction: string }>;
+}>;
+
 export type ResourceCommandOptions<Ctx> = Readonly<{
   /** Opens the platform connection every verb calls through; runs after flag parsing. */
   connect: (meta: GlobalOptions) => Promise<Ctx>;
@@ -169,4 +194,6 @@ export type ResourceCommandOptions<Ctx> = Readonly<{
   operations: readonly string[];
   /** Extra flags added to every generated command (e.g. an environment selector). */
   flags?: Interfaces.FlagInput;
+  /** Wire vocabulary; each property falls back to {@link DEFAULT_WIRE}. */
+  wire?: Partial<WireConventions>;
 }>;
