@@ -24,13 +24,10 @@
  *                            password   --SUBMIT(submit)--> done
  *                                       --SUBMIT(back)----> identifier
  *                                       --SUBMIT(passkey)--> passkey-login
- *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
+ *      \--START(register)--> register --SUBMIT--> register-password
  *                                     --SUBMIT(sign_in)--> identifier
+ *                            register-password --SUBMIT--> passkey-upsell
  *
- *   passkey-upsell / passkey-setup -- legacy upsell pair; the default flow no
- *               longer routes through them (passkey registration is offered
- *               up front instead). Kept so tests can target them directly
- *               via actor injection.
  *   passkey-upsell --SUBMIT(skip)--> done
  *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
  *   passkey-login --SUBMIT--> done
@@ -200,7 +197,7 @@ export const flowMachine = createMachine({
             target: "register",
             actions: [rotateToken],
           },
-          { target: "done", actions: [captureFields, rotateToken] },
+          { target: "passkey-upsell", actions: [captureFields, rotateToken] },
         ],
       },
     },
