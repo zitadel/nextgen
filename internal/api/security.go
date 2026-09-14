@@ -81,6 +81,8 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	}
 	ctx = withActorFromToken(ctx, token)
 	if token.UserID != "" {
+		// Session.Token() never mints Scope (always empty). Users skip the
+		// project.write ceiling in credentialCeiling; Check uses PrincipalType/ID.
 		ctx = WithScopeContext(ctx, ScopeContext{
 			ProjectID:     token.ProjectID,
 			Scope:         token.Scope,
