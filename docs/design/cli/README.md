@@ -1,68 +1,242 @@
 # CLI Design
 
-> **Status:** Draft — plan + two concept docs for team feedback before implementation.
-> **Date:** 2026-04-23
-> **Context:** The [POC CLI](../../../apps/cli) (`client-cli` branch) has strong foundations — JSON envelope, capabilities registry — but needs to align with the [flow engine](../flowengine/README.md) design and gain the identity-management surface that the product vision requires.
+> **Status:** Draft
+> **Purpose:** Define the overall structure, discovery and interaction model for the ZITADEL CLI. Detailed conventions for individual command areas live in linked documents.
 
-## What needs feedback
+## Principles
 
-Two conceptual commitments before we write more code:
+The CLI is the common execution surface for developers, agents and automation.
 
-- **[Identity Surface](identity-surface.md)** — how the CLI exposes IdPs, external auth factors, and apps (Zitadel-as-IdP/OIDC/SAML server) as separately-managed, GitOps-reconciled resources. Biggest open shape question: what lives in `.zitadel/` vs. what is purely server-side state.
-- **[BDUI Renderer](bdui-renderer.md)** — how the Lit-based login UI integrates with framework adapters. Biggest open shape question: is the renderer a single `<zitadel-flow>` web component that consumes the flow engine directly, or does the adapter-scaffolded page wrap it per-framework?
+It is:
 
-## What lives in `.zitadel/` (and what doesn't)
+- **Command-driven:** users can run a specific operation without completing a guided workflow.
+- **Consistent:** similar resources and actions follow the same structure and vocabulary.
+- **Discoverable:** commands are grouped clearly and each level provides useful help.
+- **Automation-friendly:** commands can be executed through explicit arguments with predictable structured output.
+- **Helpful where it matters:** defaults, validation, optional prompts and next steps reduce unnecessary work.
+- **Safe:** destructive and security-sensitive actions clearly communicate their impact.
 
-**Ownership decides the surface.** The CLI is for resources the dev owns — bounded, deliberate, reproducible across environments. The runtime API is for resources someone else owns: end users, B2B customer-org admins, registration / SSO / SCIM, and any unbounded set the deployment produces over time. The split isn't architectural — every CLI `apply` ultimately hits the same API a runtime caller would — but ownership and cardinality decide which surface is the right entry point.
+Higher-level experiences such as SDKs, embedded interfaces, agents and customer-facing administration UIs can use the same underlying capabilities.
 
-A quick test: *"Would I want a PR for each one of these?"* If yes, it's a CLI resource. If no — if the count grows with traffic, with customer organizations, or with anyone-but-the-dev — it belongs on the runtime API.
+## Command structure
 
-**Subordinate config follows its parent.** Claim mappings, redirect URIs, role bindings, and similar attached config live wherever the resource they belong to lives. A default Google IdP defined in `.zitadel/idps/google.json` carries its claim mapping in that file. A B2B customer's runtime-created Okta IdP carries its claim mapping in the API call that creates it. There is no separate "claim-mapping registry" per surface — the child config rides with the parent.
+The CLI supports three command shapes.
 
-The resource kinds the CLI manages (shipped: schemas, flows, branding; the
-rest are target design), each with a runtime-API counterpart where one exists:
+### Workflows
 
-| Resource | `.zitadel/<dir>/` | Status | Runtime-API counterpart |
-|---|---|---|---|
-| User schema | `schemas/` — what a user looks like on your platform | shipped | dev-owned only |
-| Flow | `flows/` — login / register / recovery definitions | shipped | dev-owned only |
-| Branding | `branding/` — design, tokens, Liquid template, copy overlays | shipped | tenant-editable after eject; see [template-security.md](../flowengine/template-security.md) |
-| IdP | `idps/` — your default sign-in sources | design | per-customer-org SSO from your B2B admin UI |
-| App | `apps/` — your first-party apps and machine clients | design | customer-managed apps, dynamic client registration |
-| Locale | `locales/` — translation dictionaries | design (copy overlays shipped instead, [ADR 045](../../adrs/045-copy-overlays-as-branding-revisions.md)) | dev-owned only |
+A workflow completes a broader user goal and may coordinate several resources:
 
-The canonical directory handling lives in the sync engine
-([`apps/cli/src/lib/sync/syncers.ts`](../../../apps/cli/src/lib/sync/syncers.ts));
-Liquid templates are loaded as `.liquid` files referenced from branding, not as
-`.json` resources.
+```text
+zitadel <workflow>
+```
 
-**Things that intentionally have no `.zitadel/` directory** — users, sessions, audit events, per-customer-org IdPs and apps. They're unbounded or owned by someone other than the dev. Bootstrapping a small set (e.g. a first admin user in staging) is the job of a *planned* one-shot imperative CLI surface that hits the API but doesn't get tracked in git. Concrete command names are deliberately absent here until the surface ships in the registry.
+Examples:
 
-**Worked examples** matching the recurring B2B questions:
+```bash
+zitadel setup
+zitadel claim
+zitadel deploy
+zitadel promote
+```
 
-- *"Default Google SSO for my login page."* → `.zitadel/idps/google.json`, applied via `zitadel apply`.
-- *"My B2B customers each wire up their own Okta."* → Your B2B admin UI calls the runtime IdP API per customer-org. Not the CLI.
-- *"Bootstrap a couple of admin users in staging."* → Planned imperative bootstrap surface (not yet in the registry), not a file in `.zitadel/`.
-- *"Map `groups` from my customer's runtime-created IdP into a role claim."* → Subordinate config follows the parent: the IdP was created via API, so its claim mapping lives in that API call. Dev-side flow actions can transform claims after the fact, but they don't live in `.zitadel/idps/`.
+### Resource commands
 
-The per-resource sections in [identity-surface.md](identity-surface.md) carry a *Scope* callout restating this for each kind. AI agents reading [apps/cli/SKILLS.md](../../../apps/cli/SKILLS.md) see the current invocation rules.
+A resource command performs a direct operation on a resource:
 
-## Plan
+```text
+zitadel <resource> <verb> [id] [flags]
+```
 
-The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Ordering rationale:
+Resource names are plural:
 
-1. Lock the two concept docs (this batch).
-2. Align the local resource shapes with the shipped spec under [`api/openapi/components/flows/`](../../../api/openapi/components/flows/) so `zitadel apply` corresponds 1:1 with server resources.
-3. Build the identity surface commands.
-4. Introduce the renderer abstraction and the Lit plug-in point.
-5. Add the diff/plan/apply reconciliation loop.
+```bash
+zitadel users create
+zitadel teams list
+zitadel projects get <id>
+```
 
-## Related
+Resource commands use a consistent set of CRUD verbs where their meaning matches:
 
-- [Flow Engine](../flowengine/flow-engine.md)
-- [Flow Engine — Developer Guide](../flowengine/flow-engine-guide.md)
-- [Flow Engine — Step Response Shape](../flowengine/flow-engine-nodes.md) — capability dicts + Liquid templates + `text_key` localization
-- [Template Security](../flowengine/template-security.md) — invariants the CLI validates on `apply`
-- [User Schema Integration](../flowengine/user-schema.md)
+```text
+create
+list
+get
+update
+delete
+```
+
+Meaningful IAM lifecycle actions can use explicit verbs when they communicate something different from standard CRUD:
+
+```bash
+zitadel sessions revoke <id>
+zitadel sso connections activate <id>
+```
+
+Which resources and operations are available is defined by their relevant product and resource ADRs.
+
+The detailed resource-command conventions are defined in [CLI Resource Commands](resource-commands.md) and [ADR 062](../../adrs/062-cli-resource-commands.md).
+
+### Capability commands
+
+A capability may contain its own actions or child resources:
+
+```text
+zitadel <capability> <action>
+zitadel <capability> <resource> <verb>
+```
+
+For example:
+
+```bash
+zitadel sso enable
+zitadel sso connections create
+zitadel sso connections test <id>
+```
+
+Commands should not exceed three levels after `zitadel`.
+
+Context and configuration values should be expressed as flags rather than additional command levels:
+
+```bash
+zitadel sso connections create --type saml
+zitadel deploy --env production
+```
+
+## Top-level discovery
+
+Running `zitadel` displays the available commands grouped by product area.
+
+The headings are visual navigation only. They do not form part of the command syntax.
+
+The example below shows how the commands currently available can be organised. It describes the grouping structure rather than fixing the CLI to this exact set of commands. As new commands are introduced, they should be added to the relevant product area—or a new product area where necessary—without changing their command syntax.
+
+```console
+$ zitadel
+
+ZITADEL CLI
+Build and manage authentication and identity.
+
+Getting started
+  setup              Set up a Project
+  doctor             Check the local setup
+  claim              Claim a Project
+
+Local development
+  start              Start ZITADEL locally
+  stop               Stop local ZITADEL
+  logs               Show local logs
+  reset              Reset the local runtime
+  eject              Remove generated files and local state
+
+Configuration
+  plan               Preview configuration changes
+  apply              Apply configuration changes
+  status             Show local and Project status
+  schemas            Inspect user schemas
+  branding           Customise login branding
+
+Utilities
+  autocomplete       Configure shell completion
+  commands           List available commands
+  help               Show command help
+  search             Search for a command
+  version            Show the CLI version
+  which              Show where a command comes from
+```
+
+`plan` and `apply` are included because they are currently available, but they are transitional and will be replaced by the environment and release workflow.
+
+Each level provides help for the commands available beneath it:
+
+```bash
+zitadel --help
+zitadel schemas --help
+zitadel schemas list --help
+```
+
+## Interaction model
+
+The CLI uses three levels of interaction.
+
+### Guided workflows
+
+Guided interaction is reserved for infrequent workflows that require human authentication, consent or several important initial choices.
+
+The currently identified guided workflows are:
+
+```text
+setup
+claim
+```
+
+`setup` may guide the user through creating a Project and establishing its initial local configuration.
+
+`claim` requires a person to authenticate and confirm ownership of a Project.
+
+These are deliberate exceptions rather than the default CLI experience.
+
+### Command-driven with optional interaction
+
+Most commands run immediately when sufficient input is provided. In an interactive terminal, they may ask for a missing required choice, destructive confirmation or a browser-based action.
+
+Examples include:
+
+```text
+deploy
+promote
+rollback
+reset
+eject
+<resource> delete
+sso connections create
+sso connections test
+```
+
+For example, `deploy` may ask the user to select an environment if none was provided:
+
+```bash
+zitadel deploy
+```
+
+The same command can run non-interactively by providing the environment explicitly:
+
+```bash
+zitadel deploy --env production
+```
+
+Optional interaction should only help complete the requested command. It should not turn a flexible, non-linear IAM workflow into a terminal wizard.
+
+### Non-interactive commands
+
+Read-only and diagnostic commands return their result directly without prompting:
+
+```text
+list
+get
+status
+doctor
+events
+resources
+```
+
+All commands must support automation. When required input is missing in non-interactive mode, the CLI returns a clear validation error rather than prompting.
+
+Structured output such as `--json` never opens an interactive prompt.
+
+## Guidance and feedback
+
+Commands should:
+
+- use sensible defaults, communicate the context being used and validate input before acting;
+- show progress where useful and clearly communicate the outcome;
+- provide actionable next steps, including how to recover from errors, and warn before destructive changes.
+
+Guidance is shown only when it helps the user complete or recover from the current command. It must not interfere with structured output or require agents and automation to parse human-readable text.
+
+## Detailed designs
+
+- [CLI Resource Commands](resource-commands.md) — CRUD structure, filtering, pagination, output and agent contracts
+- [ADR 062: CLI Resource Commands](../../adrs/062-cli-resource-commands.md) — decisions behind the resource-command surface
+- [ADR 035: Environment Releases for Configuration Resources](../../adrs/035-configuration-environments.md) — environments, releases, deployments, promotion and rollback
 - [CLI source](../../../apps/cli)
 - [CLI agent guidance](../../../apps/cli/SKILLS.md)
