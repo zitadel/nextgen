@@ -125,35 +125,27 @@ const BRANDING_SELECTOR = ':host, :host([data-theme="light"]), :host([data-theme
 const LIGHT_SELECTOR = ':host([data-theme="light"])';
 const DARK_SELECTOR = ':host([data-theme="dark"])';
 
-export type BrandingToTokensOptions = {
-  resolvedTheme?: ResolvedTheme;
-};
-
 /**
  * Build a CSS string of `:host { --zl-* }` declarations from a Branding
- * payload. Shape and typography are shared across the sides; each side's
- * palette lands only under its own `data-theme` selector, plus a copy of the
- * resolved side on the shared selector so the surface is already branded in the
- * frame before `data-theme` is stamped.
+ * payload. Shape and typography are shared across the sides and land on the
+ * shared selector; each side's palette lands only under its own `data-theme`
+ * selector, and nowhere else.
+ *
+ * No copy of the resolved side goes on the shared selector. That copy would
+ * reach `[data-theme="light"]` as well, so a key set on the dark side and not
+ * the light one would paint on both, with nothing in the light block to
+ * override it. Callers stamp `data-theme` on the host — `applySurfaceTheme`
+ * does it in the same update that adopts this sheet — so the per-side block is
+ * already matching by the time anything paints.
  */
-export function buildBrandingStylesheet(
-  branding: Branding | undefined,
-  options: BrandingToTokensOptions = {},
-): string {
+export function buildBrandingStylesheet(branding: Branding | undefined): string {
   const shared = collectDeclarations(branding);
   const light = mapPalette(branding?.theme?.light?.palette);
   const dark = mapPalette(branding?.theme?.dark?.palette);
-  // Without a resolved theme, a revision that publishes one side is already
-  // unambiguous; only a two-sided one has to guess, and the design system's
-  // primary surface is dark.
-  const [only, second] = publishedSides(branding);
-  const side = options.resolvedTheme ?? (only && !second ? only : "dark");
-  const resolved = side === "light" ? light : dark;
 
   const blocks: string[] = [];
-  const upfront = { ...shared, ...resolved };
-  if (Object.keys(upfront).length > 0) {
-    blocks.push(formatBlock(BRANDING_SELECTOR, upfront));
+  if (Object.keys(shared).length > 0) {
+    blocks.push(formatBlock(BRANDING_SELECTOR, shared));
   }
   if (Object.keys(light).length > 0) {
     blocks.push(formatBlock(LIGHT_SELECTOR, light));
@@ -328,12 +320,8 @@ export function applyBaseTokens(shadowRoot: ShadowRoot): void {
  * Callers should run `applyBaseTokens(shadowRoot)` first (once per shadow
  * root) so the base values exist before branding patches them.
  */
-export function applyBrandingTokens(
-  shadowRoot: ShadowRoot,
-  branding: Branding | undefined,
-  resolvedTheme: ResolvedTheme,
-): void {
-  const css = buildBrandingStylesheet(branding, { resolvedTheme });
+export function applyBrandingTokens(shadowRoot: ShadowRoot, branding: Branding | undefined): void {
+  const css = buildBrandingStylesheet(branding);
   if (typeof CSSStyleSheet === "undefined") {
     return;
   }

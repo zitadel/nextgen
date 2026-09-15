@@ -57,7 +57,9 @@ export class ThemeController implements ReactiveController {
    * first: element `theme` property → `branding.theme.mode` → fallback. The
    * element wins because the page embedding the widget knows its own surface
    * better than the tenant's stored branding does — but it selects among the
-   * sides the revision published, and cannot reach one it did not.
+   * sides the revision published, and cannot reach one it did not. A revision
+   * with a single published side therefore ignores this property: an embedder
+   * pinning `theme="light"` against a dark-only revision gets dark.
    */
   setModePreference(explicit: ThemeMode | undefined, fallback: ThemeMode): void {
     if (this.explicitMode === explicit && this.fallbackMode === fallback) return;

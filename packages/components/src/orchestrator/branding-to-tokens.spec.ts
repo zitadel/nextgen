@@ -13,11 +13,11 @@ describe("buildBrandingStylesheet", () => {
   it("maps palette keys onto the semantic role variables", () => {
     const css = buildBrandingStylesheet(
       light({ primary: "#FF6600", on_primary: "#000000", background: "#FAFAFA" }),
-      { resolvedTheme: "light" },
     );
-    // The block names the theme attributes so it reaches the same specificity
-    // as the adopted base token layer — a plain `:host` loses to it.
-    expect(css).toContain(':host, :host([data-theme="light"]), :host([data-theme="dark"]) {');
+    // A side's palette is emitted under its own theme attribute, which reaches
+    // the same specificity as the adopted base token layer — a plain `:host`
+    // would lose to it.
+    expect(css).toContain(':host([data-theme="light"]) {');
     expect(css).toContain("--zl-primary: #FF6600;");
     expect(css).toContain("--zl-primary-foreground: #000000;");
     expect(css).toContain("--zl-background: #FAFAFA;");
@@ -83,18 +83,33 @@ describe("buildBrandingStylesheet", () => {
       expect(darkBlock).not.toContain("--zl-background");
     });
 
-    it("paints the resolved side up front so the surface is branded before data-theme lands", () => {
-      const css = buildBrandingStylesheet(
-        {
-          theme: {
-            light: { palette: { background: "#FFFFFF" } },
-            dark: { palette: { background: "#0A0A0A" } },
-          },
+    it("keeps a key set on one side out of the other side's block", () => {
+      // A key the dark side sets and the light side does not has nothing in the
+      // light block to override it, so it must not be emitted anywhere a light
+      // surface matches.
+      const css = buildBrandingStylesheet({
+        theme: {
+          light: { palette: { background: "#FFFFFF" } },
+          dark: { palette: { background: "#0A0A0A", link: "#A5B4FC" } },
         },
-        { resolvedTheme: "light" },
+      });
+      const shared = css.slice(0, css.indexOf(':host([data-theme="light"]) {'));
+      expect(shared).not.toContain("--zl-link");
+      const lightBlock = css.slice(
+        css.indexOf(':host([data-theme="light"]) {'),
+        css.lastIndexOf(':host([data-theme="dark"]) {'),
       );
-      const upfront = css.slice(0, css.indexOf(':host([data-theme="light"]) {'));
-      expect(upfront).toContain("--zl-background: #FFFFFF;");
+      expect(lightBlock).not.toContain("--zl-link");
+    });
+
+    it("emits no palette on the shared selector at all", () => {
+      const css = buildBrandingStylesheet({
+        typography: { font_family: "Inter, sans-serif" },
+        theme: { dark: { palette: { background: "#0A0A0A" } } },
+      });
+      const shared = css.slice(0, css.lastIndexOf(':host([data-theme="dark"]) {'));
+      expect(shared).toContain("--zl-font-family-sans");
+      expect(shared).not.toContain("--zl-background");
     });
 
     it("emits shape and typography once, outside either side", () => {
