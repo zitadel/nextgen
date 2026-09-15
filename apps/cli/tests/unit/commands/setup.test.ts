@@ -10,7 +10,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { localServerHostsPlatform } from "../../../src/commands/setup";
+import { serverHostsPlatform } from "../../../src/lib/claim-state";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const tempDirs: string[] = [];
@@ -208,7 +208,7 @@ describe("setup command", () => {
 
   // A bootstrapped local server hosts its own platform project and claim
   // page. A real run probes the server's runtime document before nudging
-  // (localServerHostsPlatform, covered below); dry run contacts no platform,
+  // (serverHostsPlatform, covered below); dry run contacts no platform,
   // so its preview shows the nudge optimistically.
   it("nudges claim when setting up against the local server (dry run previews it)", async () => {
     const cwd = await makeNextProject();
@@ -250,10 +250,10 @@ describe("setup command", () => {
       http.get("http://localhost:9934/console/runtime.json", () => HttpResponse.error()),
     );
 
-    await expect(localServerHostsPlatform("http://localhost:9931")).resolves.toBe(true);
-    await expect(localServerHostsPlatform("http://localhost:9932")).resolves.toBe(false);
-    await expect(localServerHostsPlatform("http://localhost:9933")).resolves.toBe(false);
-    await expect(localServerHostsPlatform("http://localhost:9934")).resolves.toBe(false);
+    await expect(serverHostsPlatform("http://localhost:9931")).resolves.toBe(true);
+    await expect(serverHostsPlatform("http://localhost:9932")).resolves.toBe(false);
+    await expect(serverHostsPlatform("http://localhost:9933")).resolves.toBe(false);
+    await expect(serverHostsPlatform("http://localhost:9934")).resolves.toBe(false);
   });
 
   it("says nothing about teams when setting up against a self-hosted server", async () => {

@@ -7,7 +7,7 @@ import consola from "consola";
 
 import { wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
-import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
+import { CLAIM_WINDOW_DAYS, isAttached, serverHostsPlatform } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
@@ -127,6 +127,16 @@ export default class Claim extends BaseCommand {
         },
         nextCommands: ["zitadel claim"],
       });
+    }
+
+    // Claiming attaches the project to a team on the platform that hosts it
+    // (ADR 046). A server without that plane still answers claim/init, so
+    // without this check the command would open a claim page that cannot
+    // complete and poll until the link expires. Asked after the dry-run
+    // return, matching setup: a dry run contacts no platform at all.
+    if (!(await serverHostsPlatform(this.meta.source))) {
+      this.recordTelemetry({ claim_outcome: "not_applicable" });
+      throw noPlatformError(this.meta.source);
     }
 
     const client = createZitadelClient({
@@ -362,6 +372,21 @@ function claimWindowExpiredError(): ZitadelError {
     `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
     {
       hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
+    },
+  );
+}
+
+/**
+ * Not retryable either: no new link can complete against a server with no
+ * platform plane, so the hint names what would make a claim possible rather
+ * than suggesting `claim` again.
+ */
+function noPlatformError(source: string): ZitadelError {
+  return new ZitadelError(
+    "E_VALIDATION",
+    `The server at ${source} cannot complete a claim: it does not host the platform project.`,
+    {
+      hint: "Claiming attaches a project to a team on Zitadel Cloud. A local or self-hosted server supports it only when started with NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true.",
     },
   );
 }
