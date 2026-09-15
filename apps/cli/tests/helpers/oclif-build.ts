@@ -6,20 +6,6 @@ import { run } from "@oclif/core";
 
 export const cliPackageRoot = fileURLToPath(new URL("../../", import.meta.url));
 
-const commandIds = [
-  "apply",
-  "claim",
-  "doctor",
-  "eject",
-  "logs",
-  "plan",
-  "reset",
-  "setup",
-  "start",
-  "status",
-  "stop",
-] as const;
-
 export async function waitForBuiltCli(): Promise<void> {
   const startedAt = Date.now();
   let lastError: unknown;
@@ -56,11 +42,8 @@ async function waitForCommandFilesReady(): Promise<void> {
 }
 
 async function assertCommandFilesReady(): Promise<void> {
-  await Promise.all(
-    commandIds.map((id) =>
-      access(fileURLToPath(new URL(`../../dist/commands/${id}.mjs`, import.meta.url))),
-    ),
-  );
+  // The explicit command strategy loads one module: the COMMANDS table.
+  await access(fileURLToPath(new URL("../../dist/index.mjs", import.meta.url)));
 }
 
 async function assertOclifDiscoversStatus(): Promise<void> {

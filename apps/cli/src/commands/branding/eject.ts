@@ -42,6 +42,7 @@ export default class BrandingEject extends BaseCommand {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override flags = {
+    force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
     design: Flags.string({
       description: `Design to start from (default: ${DEFAULT_BRANDING_DESIGN}).`,
       options: [...BRANDING_DESIGNS],

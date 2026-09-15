@@ -30,7 +30,11 @@
   "oclif": {
     "bin": "zitadel",
     "dirname": "zitadel",
-    "commands": "./dist/commands",
+    "commands": {
+      "strategy": "explicit",
+      "target": "./dist/index.mjs",
+      "identifier": "COMMANDS"
+    },
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",
@@ -40,7 +44,33 @@
       "@oclif/plugin-autocomplete",
       "@oclif/plugin-search",
       "@oclif/plugin-version"
-    ]
+    ],
+    "topics": {
+      "users": {
+        "description": "Manage the users of the project."
+      },
+      "teams": {
+        "description": "Manage the teams of the project."
+      },
+      "sessions": {
+        "description": "Inspect and revoke the sessions of the project."
+      },
+      "events": {
+        "description": "Read the audit event stream of the project."
+      },
+      "grants": {
+        "description": "Manage collaboration grants on the project."
+      },
+      "projects": {
+        "description": "Inspect and update the projects visible to this credential."
+      },
+      "schemas": {
+        "description": "Inspect user-schema revisions."
+      },
+      "branding": {
+        "description": "Work with login branding revisions."
+      }
+    }
   },
   "type": "module",
   "scripts": {
