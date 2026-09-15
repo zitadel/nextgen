@@ -13,10 +13,12 @@
  * reference; the Zod gate and the editor schema decide that.
  *
  * Paths are relative to the directory of the resource file that holds them
- * and must stay inside the project, because write-back writes to them.
+ * and must stay inside the project, because upload reads them and write-back
+ * writes to them. The check applies to the real target: a symlink, or a
+ * symlinked directory on the way, that leads outside the project is refused.
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { ZitadelError } from "./errors";
 
@@ -40,6 +42,10 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 
 const isContainer = (value: unknown): value is Container =>
   Array.isArray(value) || isPlainObject(value);
+
+function isErrno(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
 
 /** The value under `key` in an object or array; undefined when there is none. */
 function childOf(node: unknown, key: string | number): unknown {
@@ -69,6 +75,50 @@ function readIfPresent(path: string): string | undefined {
   }
 }
 
+/** Whether `path` is `root` itself or lies beneath it. */
+function isWithin(root: string, path: string): boolean {
+  const rel = relative(root, path);
+  return !(rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel));
+}
+
+/** Whether `path` itself is a symlink, without following it. */
+function isSymlink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `path` with every symlink resolved, symlinked parent directories included,
+ * even when its last segments do not exist yet (write-back may create the
+ * file). Undefined when a segment is a symlink that resolves nowhere, since a
+ * write through it would land wherever the link names.
+ */
+function realTarget(path: string): string | undefined {
+  const missing: string[] = [];
+  let current = path;
+  for (;;) {
+    try {
+      return join(realpathSync(current), ...missing);
+    } catch (error) {
+      if (!isErrno(error, "ENOENT") && !isErrno(error, "ENOTDIR")) {
+        throw error;
+      }
+      if (isSymlink(current)) {
+        return undefined;
+      }
+      const parent = dirname(current);
+      if (parent === current) {
+        return path;
+      }
+      missing.unshift(basename(current));
+      current = parent;
+    }
+  }
+}
+
 /** A `{ "$file": "<path>" }` object and nothing else. */
 export function isFileReference(value: unknown): value is FileReference {
   return (
@@ -78,16 +128,27 @@ export function isFileReference(value: unknown): value is FileReference {
   );
 }
 
-/** The absolute path a reference points at; E_VALIDATION when it leaves the project. */
+/**
+ * The absolute path a reference points at. E_VALIDATION when the path, or the
+ * real target behind any symlink on the way, leaves the project.
+ */
 export function resolveFileReference(context: FileReferenceContext, ref: string): string {
   const absolute = resolve(context.cwd, context.baseDir, ref);
-  const rel = relative(context.cwd, absolute);
-  if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+  const root = realTarget(resolve(context.cwd));
+  const target = realTarget(absolute);
+  const inside =
+    isWithin(resolve(context.cwd), absolute) &&
+    root !== undefined &&
+    target !== undefined &&
+    isWithin(root, target);
+  if (!inside) {
     throw new ZitadelError(
       "E_VALIDATION",
       `$file ${JSON.stringify(ref)} points outside the project`,
       {
-        hint: "Keep referenced files inside the project, next to the file that references them.",
+        hint:
+          "Keep referenced files inside the project, next to the file that references them; " +
+          "a symlink on the way must resolve inside the project too.",
       },
     );
   }

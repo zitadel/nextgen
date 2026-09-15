@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -20,6 +20,13 @@ async function makeProject(template = "<p>local</p>"): Promise<string> {
   await mkdir(join(cwd, baseDir), { recursive: true });
   await writeFile(join(cwd, baseDir, "login.liquid"), template);
   return cwd;
+}
+
+/** A directory outside any project, holding `secret.txt`. */
+async function makeOutside(): Promise<string> {
+  const outside = await mkdtemp(join(tmpdir(), "zitadel-outside-"));
+  await writeFile(join(outside, "secret.txt"), "outside");
+  return outside;
 }
 
 describe("isFileReference", () => {
@@ -46,6 +53,39 @@ describe("resolveFileReference", () => {
     const context = { cwd, baseDir };
     expect(() => resolveFileReference(context, "../../../outside.liquid")).toThrow(ZitadelError);
     expect(() => resolveFileReference(context, "/etc/passwd")).toThrow(ZitadelError);
+  });
+
+  it("refuses a symlink inside the project that points outside", async () => {
+    const cwd = await makeProject();
+    const outside = await makeOutside();
+    await symlink(join(outside, "secret.txt"), join(cwd, baseDir, "link.liquid"));
+    expect(() => resolveFileReference({ cwd, baseDir }, "./link.liquid")).toThrow(ZitadelError);
+  });
+
+  it("refuses a path through a symlinked directory that points outside", async () => {
+    const cwd = await makeProject();
+    const outside = await makeOutside();
+    await symlink(outside, join(cwd, baseDir, "shared"));
+    const context = { cwd, baseDir };
+    expect(() => resolveFileReference(context, "./shared/secret.txt")).toThrow(ZitadelError);
+    expect(() => resolveFileReference(context, "./shared/new.txt")).toThrow(ZitadelError);
+  });
+
+  it("refuses a symlink that resolves nowhere", async () => {
+    const cwd = await makeProject();
+    const outside = await makeOutside();
+    await symlink(join(outside, "missing.txt"), join(cwd, baseDir, "dangling.liquid"));
+    expect(() => resolveFileReference({ cwd, baseDir }, "./dangling.liquid")).toThrow(
+      ZitadelError,
+    );
+  });
+
+  it("allows a symlink that stays inside the project", async () => {
+    const cwd = await makeProject();
+    await symlink(join(cwd, baseDir, "login.liquid"), join(cwd, baseDir, "alias.liquid"));
+    expect(resolveFileReference({ cwd, baseDir }, "./alias.liquid")).toBe(
+      join(cwd, baseDir, "alias.liquid"),
+    );
   });
 
   it("allows a file whose name only starts with two dots", async () => {
@@ -125,6 +165,20 @@ describe("restoreFileReferences", () => {
     const onDisk = await readFile(join(cwd, baseDir, "login.liquid"), "utf8");
     expect(onDisk).toBe("<p>server</p>");
     expect(canonical.liquid_template).toBe("<p>server</p>");
+  });
+
+  it("never reads or writes through a symlink that points outside", async () => {
+    const cwd = await makeProject();
+    const outside = await makeOutside();
+    await symlink(join(outside, "secret.txt"), join(cwd, baseDir, "link.liquid"));
+    const context = { cwd, baseDir };
+    const local = { liquid_template: { $file: "./link.liquid" } };
+
+    expect(() => inlineFileReferences(local, context, { onMissing: "omit" })).toThrow(ZitadelError);
+    expect(() =>
+      restoreFileReferences({ liquid_template: "<p>server</p>" }, local, context),
+    ).toThrow(ZitadelError);
+    expect(await readFile(join(outside, "secret.txt"), "utf8")).toBe("outside");
   });
 
   it("does not rewrite a file whose content already matches", async () => {
