@@ -11,7 +11,7 @@ import (
 //
 // Equality, not the "unset means inherited" form: an owner is an address, not a
 // position in a ladder, so a name at an owner is one row rather than a set to
-// rank (ADR 061 §4).
+// rank (ADR 062 §4).
 //
 // Filtering here rather than after the scan is what keeps another environment's
 // variable out of a read. The domain predicate is not applied a second time, so

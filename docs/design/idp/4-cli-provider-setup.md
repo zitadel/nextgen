@@ -201,11 +201,11 @@ the tenant can add rows or accept that the collection step asks for them.
 
 ## Credential Capture
 
-> **Pending reconciliation with [ADR 061](../../adrs/061-per-environment-variables-and-secrets.md).**
+> **Pending reconciliation with [ADR 062](../../adrs/062-per-environment-variables-and-secrets.md).**
 > The reference half of this section is current: the connection file carries
 > `${{ NAME }}` references and never a value. The *storage* half below is not.
 > It writes captured values into `.env.local` and stubs names into
-> `.env.example`, and ADR 061 is explicit that variables are **not**
+> `.env.example`, and ADR 062 is explicit that variables are **not**
 > operating-system environment variables — they are project data, written
 > through `PATCH /variables` against the environment being configured and
 > resolved by the engine when it serves the connection. Moving the capture step
@@ -218,7 +218,7 @@ Credentials are per environment; the connection is not.
 The connection file carries references.
 `client_secret` is always a `${{ NAME }}` reference, and `client_id` becomes
 one when it differs per environment
-([ADR 061](../../adrs/061-per-environment-variables-and-secrets.md)).
+([ADR 062](../../adrs/062-per-environment-variables-and-secrets.md)).
 The same revision is promoted to every environment unchanged; each environment
 fills the references with its own values.
 Vendor policy decides which values differ.

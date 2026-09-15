@@ -1,4 +1,4 @@
-# ADR 061: Per-Environment Variables and Secrets
+# ADR 062: Per-Environment Variables and Secrets
 
 > **Status:** Proposed
 > **Date:** 2026-09-04

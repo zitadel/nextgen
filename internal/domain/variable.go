@@ -168,7 +168,7 @@ type VariableOwner struct {
 
 // HasAccessTo reports whether variable belongs to owner. An owner reaches
 // exactly what it entered itself: nothing is inherited from a broader owner,
-// and nothing is visible from a narrower one (ADR 061 §4).
+// and nothing is visible from a narrower one (ADR 062 §4).
 //
 // The owner is an address, not a position in a ladder, which is what keeps one
 // name at one owner to one variable -- a read never has two rows to choose

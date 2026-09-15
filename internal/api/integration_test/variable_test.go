@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// TestVariables covers the variables surface (ADR 061): that an owner reads and
+// TestVariables covers the variables surface (ADR 062): that an owner reads and
 // writes only what it entered itself, that a secret is held but never handed
 // back, and that an owner can only delete its own.
 func TestVariables(t *testing.T) {

@@ -31,7 +31,7 @@
         "oidc",
         "oauth2"
       ],
-      "description": "Selects which protocol block is required and which engine handles the connection. Closed: every value has a server implementation."
+      "description": "Selects which protocol block must be present."
     },
     "template": {
       "type": "string",
@@ -119,13 +119,13 @@
         "issuer": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$",
           "description": "Discovery base. Endpoints are resolved from its .well-known document unless overridden below."
         },
         "jwks_uri": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides the JWKS endpoint from discovery. Required in practice when the provider exposes no .well-known document, since ID tokens cannot otherwise be validated."
         },
         "id_token_mapping": {
@@ -136,31 +136,31 @@
         "authorization_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides discovery."
         },
         "token_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides discovery."
         },
         "userinfo_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Overrides discovery."
         },
         "client_id": {
           "type": "string",
           "minLength": 1,
           "maxLength": 512,
-          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 061). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
+          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 062). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
         },
         "client_secret": {
           "type": "string",
           "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
-          "description": "A reference to the variable holding the client secret (ADR 061), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
+          "description": "A reference to the variable holding the client secret (ADR 062), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
         },
         "token_endpoint_auth_method": {
           "type": "string",
@@ -169,7 +169,7 @@
             "client_secret_post"
           ],
           "default": "client_secret_basic",
-          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
+          "description": "How the client authenticates at the token endpoint."
         },
         "scopes": {
           "type": "array",
@@ -238,31 +238,31 @@
         "authorization_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Where the user is sent to authorize."
         },
         "token_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Where the authorization code is exchanged."
         },
         "userinfo_endpoint": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://|^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?(/|$)",
+          "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
           "description": "Where the authenticated user's profile is fetched."
         },
         "client_id": {
           "type": "string",
           "minLength": 1,
           "maxLength": 512,
-          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 061). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
+          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 062). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
         },
         "client_secret": {
           "type": "string",
           "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
-          "description": "A reference to the variable holding the client secret (ADR 061), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
+          "description": "A reference to the variable holding the client secret (ADR 062), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
         },
         "token_endpoint_auth_method": {
           "type": "string",
@@ -271,7 +271,7 @@
             "client_secret_post"
           ],
           "default": "client_secret_basic",
-          "description": "How the client authenticates at the token endpoint. Providers genuinely differ; closed because each value is an engine behaviour."
+          "description": "How the client authenticates at the token endpoint."
         },
         "scopes": {
           "type": "array",
@@ -319,7 +319,7 @@
           "enum": [
             "github_primary_email"
           ],
-          "description": "Provider-specific follow-up call after userinfo, implemented in the engine. Closed: every value is implemented behaviour. New values are non-breaking."
+          "description": "Provider-specific follow-up call after userinfo. New values are non-breaking."
         }
       },
       "allOf": [

@@ -15,6 +15,7 @@ fileGroups:
     - "/api/**/*.json"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
+    - "/scripts/generate-meta-schemas.ts"
     - "moon.yml"
     - "package.json"
     - "bin/**"
@@ -60,10 +61,16 @@ tasks:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
       - "/api/openapi/endpoints/**/*-error-response.yaml"
+      - "/api/openapi/endpoints/schemas/*.json"
       - "/internal/**/*_enumer.go"
       - "/internal/**/*.mock.go"
     options:
       runFromWorkspaceRoot: true
+      # Generation rewrites files other projects read mid-graph: the JSON
+      # meta-schemas (config:sync-schemas) and the error-response YAML
+      # (api:generate). The shared mutex keeps those from running against a
+      # half-written or pruned tree; CI already runs the pruned check alone.
+      mutex: "generated-sources"
 
   # Generators only write; they never retract. Removing everything and
   # regenerating is how orphaned output gets pruned — whatever does not come
@@ -77,6 +84,7 @@ tasks:
       cache: false
       runInCI: false
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   check-generate:
     command: "node scripts/check-go-generate.mjs"
@@ -91,6 +99,7 @@ tasks:
       - "/scripts/generated-outputs.mjs"
     options:
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   # check-generate plus a prune, so output nothing generates any more fails the
   # build instead of lingering. Deliberately not a dep of vet/test: it deletes
@@ -107,6 +116,7 @@ tasks:
       - "/scripts/dev-process.mjs"
     options:
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   vet:
     command: "go vet ./..."
@@ -114,6 +124,32 @@ tasks:
       - "check-generate"
       # Same embed race as test/build: go vet compiles //go:embed all:dist while
       # a concurrent console/login-ui build can emptyOutDir the placeholder.
+      - "console:build"
+      - "login-ui:build"
+    inputs:
+      - "@group(serverInputs)"
+    options:
+      runFromWorkspaceRoot: true
+
+  # Custom go/analysis checks, run directly rather than through go vet so the
+  # built-in vet analyzers (task "vet") keep running alongside. Today this is
+  # egresslint, which enforces the single egress-client invariant (ADR 061):
+  # outbound HTTP or TCP clients may only be built in internal/httputil, and
+  # any other site needs an //egress:allow <reason> directive. Further
+  # analyzers join the same binary (tools/analyzers/cmd/analyzers).
+  #
+  # Runs once per build configuration: the default set, then each integration
+  # tag on its own, because the tagged files are invisible to the default run
+  # and the tags cannot be combined (each lane defines its own TestMain).
+  lint:
+    script: |
+      set -e
+      go run ./tools/analyzers/cmd/analyzers ./...
+      for tag in postgres_integration spanner_integration sqlite_integration; do
+        GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
+      done
+    deps:
+      - "check-generate"
       - "console:build"
       - "login-ui:build"
     inputs:
@@ -134,6 +170,7 @@ tasks:
       - "format"
       - "check-generate"
       - "vet"
+      - "lint"
       # Order UI builds before go test so a batched moon graph cannot compile
       # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
       # Intentionally deps-only (not inputs): UI-only changes must not invalidate

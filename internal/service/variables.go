@@ -16,7 +16,7 @@ type VariableToSet struct {
 	IsSecret bool
 }
 
-// VariableService reads and writes the variables one owner entered (ADR 061).
+// VariableService reads and writes the variables one owner entered (ADR 062).
 //
 // The owner is an address, not a position in a ladder: nothing is inherited
 // from the project by its environments, or seen by the project in them. Storage

@@ -288,7 +288,7 @@ func TestVariablesProjectForeignKey(t *testing.T) {
 }
 
 // TestVariablesEnvironmentForeignKey covers the environment half of the owner
-// being a real reference (ADR 061). It is the case the empty string makes
+// being a real reference (ADR 062). It is the case the empty string makes
 // awkward: ” is the project level, an address of its own that no environment
 // row answers to, so the constraint rides a generated column (NULLIF of
 // environment_id) that is NULL for exactly that address. Both halves of that

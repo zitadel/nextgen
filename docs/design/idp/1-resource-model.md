@@ -141,7 +141,7 @@ How to read the schema:
   guarantees `sub`, though overrides exist for pairwise IDs like Entra) but
   strictly required for OAuth2.
 - **Strict Secrets:** Literal secrets cannot be committed.
-  Because the schema objects are strict and no `client_secret` property exists,
+  Because `client_secret` accepts only a whole-value `${{ NAME }}` reference,
   pasting a raw secret triggers an immediate validation error.
 - **Editor and UI Affordances:** The `format: "uri"` rule is just an annotation
   for editor linting (per Draft 2020-12).
@@ -362,7 +362,7 @@ Broader property gating and persistent on-user verification state come back with
 the dialect in [PR #901](https://github.com/zitadel/nextgen/pull/901) due to
 lack of use, this design acts as its first future consumer, so all references
 here describe its planned return shape rather than the shipped dialect.
-[`user-property.json`](../../../packages/config/meta-schemas/user-property.json)
+[`user-property.json`](../../../api/openapi/endpoints/schemas/user-property.json)
 today carries only `x-unique`, `x-claim`, and `x-audit`.
 While basic gating at the callback's verification evaluation
 ([area 3](3-social-login-flow.md#callback-processing)) requires only the
@@ -405,7 +405,7 @@ provisional (see [Open points](#open-points)).
 | **Impossible Auto-Creation (Data)** | Warning | `creation` is `auto`, but a referencing schema requires a property that the `claim_mapping` does not target. Every sign-in will stop to collect the missing data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Impossible Auto-Creation (Verification)** | Warning | `creation` is `auto`, but a referencing schema requires an `x-unique` property (851) or an `x-verify` property (when `x-verify` returns) that lacks a `verified_claims` entry. Absent entries evaluate as unverified, so the auto-creation condition can never pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **Mutable Subject Claim** | Warning | Using a mutable claim like `email`, `login`, `preferred_username`, `username`, or `name` as the `subject_claim` introduces an account-hijacking risk: if the external provider ever reassigns that value to a new person, the new user will silently inherit the original holder's account. To prevent this, the catalog safely defaults to scaffolding immutable identifiers, such as Google's `sub` or GitHub's `id`. Furthermore, because the `subject_claim` is permanently fixed for the lifecycle of the connection, the system will explicitly warn the developer prior to the first apply if a potentially reassignable claim is configured.                                                                                      |
-| **Missing Variables** | Error / Warning | A `${{ NAME }}` reference has no variable behind it. Interactive journeys and the test command's local env check raise `E_CREDENTIAL_MISSING` as an error (the developer is present to fix it). That check only confirms the variables are set; the live credential probe against the provider is deferred ([README](README.md#scope-for-851)). Batch `plan` only warns, so one IdP file cannot force secrets into every CI pipeline; the authoritative presence check belongs to release-to-environment time ([ADR 061](../../adrs/061-per-environment-variables-and-secrets.md) §9, [#534](https://github.com/zitadel/nextgen/issues/534)) (see [Upstream Security Pushback](#upstream-security-pushback)). Shipped `assertEnvRefs` hard-fails `plan` for schemas and flows today, so the batch relaxation is a deliberate change.                                                                                                                                                                                            |
+| **Missing Variables** | Error / Warning | A `${{ NAME }}` reference has no variable behind it. Interactive journeys and the test command's local env check raise `E_CREDENTIAL_MISSING` as an error (the developer is present to fix it). That check only confirms the variables are set; the live credential probe against the provider is deferred ([README](README.md#scope-for-851)). Batch `plan` only warns, so one IdP file cannot force secrets into every CI pipeline; the authoritative presence check belongs to release-to-environment time ([ADR 062](../../adrs/062-per-environment-variables-and-secrets.md) §9, [#534](https://github.com/zitadel/nextgen/issues/534)) (see [Upstream Security Pushback](#upstream-security-pushback)). Shipped `assertEnvRefs` hard-fails `plan` for schemas and flows today, so the batch relaxation is a deliberate change.                                                                                                                                                                                            |
 | **Literal Secret** | Error | A hardcoded `client_secret` is present (returns a friendly error message, though the schema strictly rejects it anyway).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **Reserved Authorize Parameter** | Error | A `static_authorize_parameters` key names an engine-owned protocol parameter (`client_id`, `redirect_uri`, `response_type`, `scope`, `state`, `nonce`, `code_challenge`, `code_challenge_method`) or one the engine reserves (`response_mode`, `request`, `request_uri`: the callback accepts the query response mode only, and the engine composes the request itself), or a credential (`client_secret`, `client_assertion`). A config override of `state` or `nonce` would silently defeat CSRF and token binding, and a credential here would be committed to source control and appended to the public authorize URL. The schema's `propertyNames` already rejects the keys; this rule restates the failure with a friendly message. |
 | **Cleartext Endpoint** | Error | An endpoint URL (`issuer`, `jwks_uri`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`) is not `https://`. The schema `pattern` already rejects it, with a `http://localhost` / `http://127.0.0.1` exception for local development.                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -511,19 +511,19 @@ Everything else forms the mutable revision body.
 ## Secrets and Environments
 
 Both halves of a connection's credential are variables
-([ADR 061](../../adrs/061-per-environment-variables-and-secrets.md)): the file
+([ADR 062](../../adrs/062-per-environment-variables-and-secrets.md)): the file
 carries `"client_secret": "${{ GITHUB_CLIENT_SECRET }}"` and, where the project
 registers a separate OAuth client per environment,
 `"client_id": "${{ GITHUB_CLIENT_ID }}"`. The connection is stored and read back
 holding those references — nothing resolves on the write path, and the domain
-object carries them too (ADR 061 §9); the engine resolves against the
+object carries them too (ADR 062 §9); the engine resolves against the
 environment serving the request, at the point of use.
 
 **Not by substituting the whole connection.** There is no single "when needed"
 here: `client_id` is wanted at `authorize`, `client_id` and `client_secret` at
 `callback`. Resolving the whole document at `authorize` would decrypt a
 credential that step never uses and hand it to code with no reason to hold it.
-Each step fetches the names it needs (ADR 061 §7 and §9,
+Each step fetches the names it needs (ADR 062 §7 and §9,
 `GetDecryptedVariables`),
 which costs the same — one query plus one key lookup — and keeps the cleartext
 secret out of anything the `authorize` step carries or logs.
@@ -532,7 +532,7 @@ This is the pattern the section below was written to constrain, now decided.
 The constraints it set are the reason the decision looks the way it does, so
 they are kept rather than deleted:
 
-| Ruled Out Approach | Reason | How ADR 061 avoids it |
+| Ruled Out Approach | Reason | How ADR 062 avoids it |
 | :--- | :--- | :--- |
 | **Client-side resolution** (uploading the resolved value in the document) | Every immutable revision would permanently embed the secret. Leaks could never be scrubbed, rollbacks would reactivate revoked secrets, and plan diffs would expose secret material in Git and CI logs. | Substitution happens in the engine when a document is served, never before upload. The revision holds the reference. |
 | **Server-side OS resolution** (server reads from its own environment) | This only works for self-hosted setups. In a multi-tenant system, operators would be forced to inject every tenant's secrets into the core engine configuration. | Variables are project data, stored per project and encrypted with that project's own key (ADR 029), not process environment. |
@@ -544,17 +544,17 @@ new config revision, and the value stays outside the release boundary — which
 is what lets one release be promoted between environments unchanged (ADR 035).
 
 **Strict Invariant:** Secret resolution must never happen upstream of anything
-that is diffed, hashed, committed, or printed. ADR 061 §7 holds it: reads return
+that is diffed, hashed, committed, or printed. ADR 062 §7 holds it: reads return
 ciphertext, and decryption happens only during substitution.
 
-### What ADR 061 settled
+### What ADR 062 settled
 
 - **A secret is referenceable only as the whole value.** `"a8f3c1-${{ TAIL }}"`
   is refused (`var.secret_not_whole_value`), because the literal text around a
   placeholder would be rendered into the resolved credential — a credential
   nobody entered, frozen into an immutable revision. The connection schema
   encodes this in `client_secret`'s pattern.
-- **No `client_id_env` twin.** ADR 061 rejected a second field beside every
+- **No `client_id_env` twin.** ADR 062 rejected a second field beside every
   referencing field: the schema would double and a value could only be
   referenced where someone anticipated it. `client_id` takes a literal or a
   reference in the one field, which is what the open challenge below asked for.
@@ -563,7 +563,7 @@ ciphertext, and decryption happens only during substitution.
   for the API surface at least.
 - **Encryption minimums.** Per-project envelope keys, and decryption resolved by
   the key named in the value's own JWE header, so a stored secret survives the
-  first rotation of the project's key (ADR 061 §7, ADR 029).
+  first rotation of the project's key (ADR 062 §7, ADR 029).
 
 ### Open Challenges
 
@@ -573,33 +573,33 @@ ciphertext, and decryption happens only during substitution.
   never appears in the file, so a successful apply and a rotation the engine
   never received look identical.
 
-  ADR 061 narrows this rather than closing it: the rotation is now a `PATCH
+  ADR 062 narrows this rather than closing it: the rotation is now a `PATCH
   /variables` whose success or failure the caller sees directly, so the write is
   confirmed at the moment it happens. What is still missing is a way to confirm
   after the fact *which* value a serving environment currently holds — a read
   would answer `{"secret": true}` and nothing more.
-- **Per-environment values do not fall back.** ADR 061 §4 gives the project and
+- **Per-environment values do not fall back.** ADR 062 §4 gives the project and
   each environment separate owners with no inheritance, so a `client_id` that is
   the same everywhere still has to be entered on every environment that serves
   the connection; entering it once on the project does not reach them. Nothing
   keeps those copies in step. Whether the "set it once" case gets an answer is
-  open in ADR 061 §10.
+  open in ADR 062 §10.
 - **Presence at deploy time:** a reference nothing was entered for is left
-  standing (ADR 061 §2), which is right for the substitution pass and wrong for
+  standing (ADR 062 §2), which is right for the substitution pass and wrong for
   a deploy. Validating a release against a target environment before it goes
-  live is open in ADR 061 §10 and belongs with deployments (ADR 035).
+  live is open in ADR 062 §10 and belongs with deployments (ADR 035).
 
 ### Upstream Security Pushback
 
 These are the constraints raised against the then-deferred secret-store
-specification. ADR 061 answers the first and third; the second stays open, and
+specification. ADR 062 answers the first and third; the second stays open, and
 its own bullet says where it now belongs.
 
 - **Write-only production stores** — *met on the API surface.* A secret reads
   back as `{"secret": true}` and never as a value, so no client credential can
   fetch production secret material. The remaining gap is not the API but the
   resolved document: substitution puts decrypted secrets into a served document
-  with nothing marking which values they are (ADR 061 §10). The original
+  with nothing marking which values they are (ADR 062 §10). The original
   objection follows.
 
   The proposed "read-back" store, where
@@ -610,7 +610,7 @@ its own bullet says where it now belongs.
   without saying what a read is authorized against.
   Production values must be writable by the deployment identity, readable
   exclusively by the engine, and never fetchable by local developer setups.
-- **Scoping the presence check** — *still open, and now located.* ADR 061 §2
+- **Scoping the presence check** — *still open, and now located.* ADR 062 §2
   leaves an unresolved reference standing rather than failing, so nothing forces
   secrets into an unrelated CI pipeline; §9 puts the strict check at
   release-to-environment time, which is where this asked for it. The original
@@ -631,7 +631,7 @@ its own bullet says where it now belongs.
   batch `plan` warns.
 - **Encryption minimums** — *met.* Stating "encrypted at rest" is insufficient;
   the architecture must guarantee per-tenant envelope keys, engine-only
-  decryption, and a strictly write-only external API surface. ADR 061 §7 gives
+  decryption, and a strictly write-only external API surface. ADR 062 §7 gives
   all three: the project's own `secret` key under ADR 029 envelope encryption,
   decryption only inside substitution, and an API that never returns a value.
 
@@ -687,7 +687,7 @@ Behaviors this design relies on but does not implement.
   Record it now; it cannot be reconstructed afterwards.
 - **The secret lifecycle:** The store, its write surface, the engine join and
   rotation are decided by
-  [ADR 061](../../adrs/061-per-environment-variables-and-secrets.md): variables
+  [ADR 062](../../adrs/062-per-environment-variables-and-secrets.md): variables
   per project and environment, `PATCH /variables` to write, substitution at
   serve time, rotation as a store write. This document contributes the
   structural constraints and the security pushback in the section above, which
@@ -700,7 +700,7 @@ Behaviors this design relies on but does not implement.
   docker `--env` values
   ([`docker.ts`](../../../apps/cli/src/lib/local-server/docker.ts)); nothing
   loads `.env.local`, and `plan` checks references against `process.env` alone,
-  so no configured provider can complete a token exchange. ADR 061 is explicit
+  so no configured provider can complete a token exchange. ADR 062 is explicit
   that these are **not** operating-system environment variables, so the capture
   step should write the value through `PATCH /variables` against the environment
   being configured, and `plan` should check references against that project

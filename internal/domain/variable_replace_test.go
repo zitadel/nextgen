@@ -296,7 +296,7 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 
 	// A secret embedded in a larger string would render the text around it into
 	// the resolved value, so the whole-value form is the only one it is
-	// referenceable in. §2 of ADR 061.
+	// referenceable in. §2 of ADR 062.
 	t.Run("refuses a secret referenced as part of a larger string", func(t *testing.T) {
 		t.Parallel()
 

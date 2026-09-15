@@ -166,7 +166,7 @@ func toAPIVariables(variables []*domain.Variable) (api.Variables, error) {
 
 // toAPIVariable renders one variable for the wire. A secret is
 // reported as held and nothing else: the row carries ciphertext, and returning
-// either that or its plaintext would settle a question ADR 061 §9 leaves open.
+// either that or its plaintext would settle a question ADR 062 §9 leaves open.
 func toAPIVariable(variable *domain.Variable) (api.Variable, error) {
 	if variable.IsSecret {
 		return api.NewSecretVariableVariable(api.SecretVariable{Secret: api.SecretVariableSecretTrue}), nil

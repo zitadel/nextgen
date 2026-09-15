@@ -1,7 +1,7 @@
 title: VariableScalar
 description: |
   A variable's value. JSON scalars only — a string, a number, or a boolean
-  (ADR 061 §1).
+  (ADR 062 §1).
 
   The value travels through JSON in both directions, so the set of types is
   JSON's. A number always reads back as a JSON number however it was written;
