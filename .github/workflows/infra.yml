@@ -1,0 +1,316 @@
+name: Infrastructure / Dev
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '!infra/README.md'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '!infra/README.md'
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  TOFU_VERSION: '1.9.0'
+
+jobs:
+  # ─── Env tier (infra/) ──────────────────────────────────────────────────────
+  plan:
+    if: github.event_name == 'pull_request'
+    name: Plan / dev
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: infra
+      ENVIRONMENT: dev
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_INFRA_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_INFRA_SERVICE_ACCOUNT }}
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+
+      - name: Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          tofu init -backend-config=environments/${{ env.ENVIRONMENT }}.tfbackend
+
+      - name: Plan
+        id: plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          # tee makes the pipeline's exit status tee's, not tofu's; without
+          # pipefail a failed plan would pass the step and post a misleading
+          # comment. The mgmt plan below already guards this way.
+          set -o pipefail
+          tofu plan \
+            -var-file="environments/${{ env.ENVIRONMENT }}.tfvars" \
+            -no-color \
+            -out=tfplan \
+            2>&1 | tee /tmp/plan.txt
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('/tmp/plan.txt', 'utf8');
+            const maxLen = 60000;
+            const truncated = plan.length > maxLen
+              ? plan.substring(0, maxLen) + '\n\n... (truncated)'
+              : plan;
+
+            const body = `### OpenTofu Plan — dev
+
+            \`\`\`
+            ${truncated}
+            \`\`\`
+
+            *Pushed by @${context.actor}*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('### OpenTofu Plan — dev')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  apply:
+    if: github.event_name == 'push'
+    name: Apply / dev
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: infra-dev
+      cancel-in-progress: false
+    env:
+      WORKING_DIR: infra
+      ENVIRONMENT: dev
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_INFRA_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_INFRA_SERVICE_ACCOUNT }}
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+
+      - name: Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          tofu init -backend-config=environments/${{ env.ENVIRONMENT }}.tfbackend
+
+      - name: Plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          # tee makes the pipeline's exit status tee's, not tofu's; without
+          # pipefail a failed plan would pass the step and post a misleading
+          # comment. The mgmt plan below already guards this way.
+          set -o pipefail
+          tofu plan \
+            -var-file="environments/${{ env.ENVIRONMENT }}.tfvars" \
+            -no-color \
+            -out=tfplan \
+            2>&1 | tee /tmp/plan.txt
+
+      - name: Publish plan to step summary
+        run: |
+          {
+            echo "### OpenTofu Plan — ${{ env.ENVIRONMENT }}"
+            echo
+            echo '```'
+            head -c 60000 /tmp/plan.txt
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        working-directory: ${{ env.WORKING_DIR }}
+        run: tofu apply tfplan
+
+  # ─── Mgmt tier (infra/mgmt/) — plan only, drift detection ──────────────────
+  # Mgmt applies are manual on purpose (cross-project IAM and WIF changes have
+  # a big blast radius). This job runs `tofu plan` on every PR touching
+  # mgmt files, posts the diff to the PR, and fails on push-to-main if the
+  # plan is non-empty — that indicates someone merged a mgmt change without
+  # applying it locally first.
+  mgmt-plan:
+    if: |
+      (github.event_name == 'pull_request' || github.event_name == 'push')
+    name: Mgmt plan
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: infra/mgmt
+    steps:
+      # Full history: the detection below diffs two arbitrary SHAs, and on the
+      # default depth-1 checkout neither is present. `git diff` then dies with
+      # "fatal: bad object" and — inside an `if` condition, where `set -e` does
+      # not fire — the failure was read as "nothing changed". This job reported
+      # success without running a plan on every PR it has ever seen, including
+      # the one that added infra/mgmt/ in the first place.
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Detect mgmt changes
+        id: changed
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+          # An all-zero "before" sha means the branch was created by this
+          # push; compare against origin/main instead.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            git fetch origin main
+            base="$(git rev-parse origin/main^)"
+          fi
+          # Run the diff on its own so a git failure fails the step, instead of
+          # being swallowed by the pipeline that reads it.
+          changes="$(git diff --name-only "$base" "$head" -- infra/mgmt/)"
+          if [ -n "$changes" ]; then
+            echo "mgmt files changed:"
+            echo "$changes"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no mgmt changes between $base and $head"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: google-github-actions/auth@v2
+        if: steps.changed.outputs.changed == 'true'
+        with:
+          workload_identity_provider: ${{ vars.GCP_INFRA_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_INFRA_SERVICE_ACCOUNT }}
+
+      - uses: opentofu/setup-opentofu@v1
+        if: steps.changed.outputs.changed == 'true'
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+
+      - name: Init
+        if: steps.changed.outputs.changed == 'true'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: tofu init -backend-config=mgmt.tfbackend
+
+      - name: Plan
+        if: steps.changed.outputs.changed == 'true'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          # -detailed-exitcode returns 2 for "there are changes", which is the
+          # case this job exists to report. Under the runner's `bash -e` that
+          # non-zero status killed the step before PLAN_EXIT was written, so the
+          # comment and summary steps were skipped exactly when they mattered.
+          # Capture the code, then fail only on a real error (1).
+          set +e
+          tofu plan -var-file=mgmt.tfvars -no-color -detailed-exitcode 2>&1 | tee /tmp/mgmt-plan.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "PLAN_EXIT=$rc" >> "$GITHUB_ENV"
+          [ "$rc" != 1 ]
+
+      - name: Publish plan to step summary
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          {
+            echo "### OpenTofu Plan — mgmt"
+            echo
+            echo '```'
+            head -c 60000 /tmp/mgmt-plan.txt
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment plan on PR
+        if: steps.changed.outputs.changed == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('/tmp/mgmt-plan.txt', 'utf8');
+            const maxLen = 60000;
+            const truncated = plan.length > maxLen
+              ? plan.substring(0, maxLen) + '\n\n... (truncated)'
+              : plan;
+
+            const body = `### OpenTofu Plan — mgmt
+
+            \`\`\`
+            ${truncated}
+            \`\`\`
+
+            *Mgmt applies are manual — pull this branch and run \`cd infra/mgmt && tofu apply -var-file=mgmt.tfvars\` after review.*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('### OpenTofu Plan — mgmt')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail on push-to-main if plan is non-empty
+        if: steps.changed.outputs.changed == 'true' && github.event_name == 'push'
+        run: |
+          # tofu plan -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes.
+          if [ "${PLAN_EXIT:-0}" = "2" ]; then
+            echo "::error::Mgmt plan on main is non-empty. Merged mgmt changes require a manual \`tofu apply\` — see the step summary for the plan diff."
+            exit 1
+          fi
+          if [ "${PLAN_EXIT:-0}" = "1" ]; then
+            echo "::error::Mgmt plan failed."
+            exit 1
+          fi
