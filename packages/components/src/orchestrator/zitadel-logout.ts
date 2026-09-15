@@ -285,7 +285,7 @@ export class ZitadelLogout extends LitElement {
     const root = this.shadowRoot;
     if (root && !this.templateMode) {
       applyBaseTokens(root);
-      applyBrandingTokens(root, undefined, this.themeController.theme);
+      applyBrandingTokens(root, undefined);
     }
     this.dataset.theme = this.themeController.theme;
     this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
