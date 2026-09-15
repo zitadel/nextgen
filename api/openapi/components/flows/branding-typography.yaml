@@ -1,5 +1,7 @@
 type: object
 additionalProperties: false
+dependentRequired:
+  font_url: [font_family]
 description: |
   The typeface the login surface renders in. One face covers both body and
   headings; separate heading and mono faces are not modelled yet.
@@ -32,7 +34,7 @@ properties:
       the face, and Zitadel does not inject a stylesheet into a document it
       does not own.
     example: https://fonts.googleapis.com/css2?family=Inter&display=swap
-    pattern: '^[hH][tT][tT][pP][sS]://'
+    pattern: '^[hH][tT][tT][pP][sS]://[^/?#@]+(?:[/?#]|$)'
   scale:
     type: number
     minimum: 0.75
