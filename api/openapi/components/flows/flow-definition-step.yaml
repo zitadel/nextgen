@@ -1,6 +1,40 @@
 type: object
 required: [name]
 additionalProperties: false
+# A step is rejected when it matches any of these shapes.
+not:
+  anyOf:
+    # sso_providers offered without a callback transition to return to
+    - required: [sso_providers]
+      properties:
+        sso_providers: { minItems: 1 }
+      anyOf:
+        - not: { required: [transitions] }
+        - properties:
+            transitions:
+              not: { required: [callback] }
+    # a terminal step that also collects, acts, gates or transitions
+    - required: [complete]
+      anyOf:
+        - required: [fields]
+          properties: { fields: { minItems: 1 } }
+        - required: [actions]
+          properties: { actions: { minItems: 1 } }
+        - required: [sso_providers]
+          properties: { sso_providers: { minItems: 1 } }
+        - required: [gates]
+          properties: { gates: { minProperties: 1 } }
+        - required: [transitions]
+          properties: { transitions: { minProperties: 1 } }
+    # a non-terminal step that does nothing
+    - not: { required: [complete] }
+      properties:
+        fields: { maxItems: 0 }
+        actions: { maxItems: 0 }
+        sso_providers: { maxItems: 0 }
+        gates: { maxProperties: 0 }
+        transitions:
+          not: { required: [callback] }
 description: |
   A step in a flow definition. This is the admin-authored configuration,
   not the runtime payload sent to the frontend.
@@ -144,6 +178,13 @@ properties:
             Example: a "Sign up" navigation on the login identifier step
             (`{ target: register, purpose: register }`).
       additionalProperties: false
+      not:
+        required: [purpose, action]
+        properties:
+          purpose:
+            type: string
+          action:
+            type: string
     example:
       submit:
         target: password

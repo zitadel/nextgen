@@ -141,6 +141,73 @@ describe("meta-schemas", () => {
     expect(check(flow)).toBe(false);
   });
 
+  // Step and transition shapes the engine can never run are rejected by the
+  // dialect too, so an editor flags them before plan does.
+  it("rejects step and transition shapes the engine cannot run", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const withStep = (step: Record<string, unknown>): object => {
+      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+        steps: object[];
+      };
+      flow.steps.push({ name: "extra", ...step });
+      return flow;
+    };
+    const provider = { id: "google", name: "Google", template: "google" };
+    const cases: Array<[string, Record<string, unknown>, boolean]> = [
+      ["sso_providers without transitions", { sso_providers: [provider] }, false],
+      [
+        "sso_providers without a callback",
+        { sso_providers: [provider], transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      [
+        "sso_providers with a callback",
+        { sso_providers: [provider], transitions: { callback: { target: "extra" } } },
+        true,
+      ],
+      [
+        "terminal step with actions",
+        { complete: "show", actions: [{ name: "submit", kind: "submit" }] },
+        false,
+      ],
+      [
+        "terminal step with transitions",
+        { complete: "show", transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      ["terminal step with empty lists", { complete: "show", fields: [], actions: [] }, true],
+      ["non-terminal step with nothing", {}, false],
+      ["non-terminal step with only empty lists", { fields: [], actions: [] }, false],
+      [
+        "non-terminal step with only a callback",
+        { transitions: { callback: { target: "extra" } } },
+        true,
+      ],
+      ["non-terminal step with fields", { fields: ["email"] }, true],
+      [
+        "transition with both purpose and action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "transition with purpose and a null action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: null } },
+        },
+        true,
+      ],
+    ];
+    for (const [name, step, valid] of cases) {
+      expect(check(withStep(step)), `${name}: ${JSON.stringify(check.errors)}`).toBe(valid);
+    }
+  });
+
   // The dialect is what an editor validates against, so the property-name
   // rule has to hold in a plain JSON Schema validator, not just in the
   // server's Go one.
@@ -221,6 +288,24 @@ describe("meta-schemas", () => {
     expect(check({ hero_url: "http://[0:0:0:0:0:0:0:1]/hero.png" })).toBe(false);
     expect(check({ hero_url: "http://[::ffff:127.0.0.1]/hero.png" })).toBe(false);
     expect(check({ hero_url: "http://localhost:65536/hero.png" })).toBe(false);
+    // Userinfo in an asset URL is a credential every visitor's browser sends,
+    // so the dialect rejects it like the zod and Go gates; an `@` in the path
+    // is not userinfo.
+    expect(check({ logo_url: "https://bob:secret@cdn.example.com/logo.svg" })).toBe(false);
+    expect(
+      check({ theme: { dark: { logo_url: "https://bob@cdn.example.com/on-dark.svg" } } }),
+    ).toBe(false);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://u:p@fonts.example.com/css" },
+      }),
+    ).toBe(false);
+    expect(check({ logo_url: "https://cdn.example.com/logo@2x.png" })).toBe(true);
+    // A stylesheet alone names no face to render in.
+    expect(check({ typography: { font_url: "https://fonts.example.com/css" } })).toBe(false);
+    expect(
+      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com/css" } }),
+    ).toBe(true);
   });
 
   it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {

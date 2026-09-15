@@ -30,6 +30,17 @@ describe("brandingConfigSchema", () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
+  it("measures asset URL length in bytes, like the server", () => {
+    const prefix = "https://cdn.example.com/";
+    const atLimit = `${prefix}${"a".repeat(2048 - prefix.length)}`;
+    // 1124 characters, but "é" is two bytes in UTF-8, so 2224 bytes.
+    const multiByte = `${prefix}${"é".repeat(1100)}`;
+    expect(brandingConfigSchema.safeParse({ ...base, logo_url: atLimit }).success).toBe(true);
+    const result = brandingConfigSchema.safeParse({ ...base, logo_url: multiByte });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("2048 bytes");
+  });
+
   it("rejects non-loopback http asset URLs", () => {
     for (const url of [
       "http://cdn.example.com/logo.svg",

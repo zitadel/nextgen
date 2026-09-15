@@ -8,7 +8,7 @@ import { z } from "zod";
 import {
   isBrandingColor,
   isBrandingFontFamily,
-  MAX_BRANDING_URL_LENGTH,
+  MAX_BRANDING_URL_BYTES,
 } from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
@@ -119,10 +119,12 @@ function validateBrandingAssetUrl(
   if (value === undefined || value === "") {
     return;
   }
-  if (value.length > MAX_BRANDING_URL_LENGTH) {
+  // The server counts bytes (validateBrandingAssetURL), so a URL with
+  // non-ASCII characters can be short in characters and still too long.
+  if (new TextEncoder().encode(value).length > MAX_BRANDING_URL_BYTES) {
     ctx.addIssue({
       code: "custom",
-      message: `${field} must be at most ${MAX_BRANDING_URL_LENGTH} characters.`,
+      message: `${field} must be at most ${MAX_BRANDING_URL_BYTES} bytes.`,
     });
     return;
   }
