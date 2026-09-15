@@ -23,6 +23,25 @@ type UserRefResolver interface {
 // Projects hold few schemas; paging is correctness, not tuning.
 const refSchemaPageSize = 100
 
+func listUserSchemas(ctx context.Context, stmts AllStatements, projectID string) func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
+	return func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
+		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
+			),
+			Pagination: database.Page[domain.JSONSchemaField]{
+				Limit:  refSchemaPageSize,
+				Cursor: cursor,
+				OrderBy: database.OrderBy[domain.JSONSchemaField]{
+					Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldURL)},
+					Direction: database.OrderAsc,
+				},
+			},
+		}, JSONSchemaQueryOptions{})
+	}
+}
+
 // StatementsUserRefResolver resolves refs against the statement surface.
 type StatementsUserRefResolver struct {
 	Pool StatementPool
@@ -108,23 +127,7 @@ func (r StatementsUserRefResolver) ResolveRefsForUsers(ctx context.Context, proj
 // for the batched user query. A user whose schema URL is not stored (or
 // designates nothing) resolves to a bare user-id ref.
 func (r StatementsUserRefResolver) designatingSchemas(ctx context.Context, projectID string) (map[string][]byte, []string, error) {
-	stmts := r.Pool.Statements()
-	list := func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
-		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
-			Filter: database.And(
-				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
-			),
-			Pagination: database.Page[domain.JSONSchemaField]{
-				Limit:  refSchemaPageSize,
-				Cursor: cursor,
-				OrderBy: database.OrderBy[domain.JSONSchemaField]{
-					Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldURL)},
-					Direction: database.OrderAsc,
-				},
-			},
-		}, JSONSchemaQueryOptions{})
-	}
+	list := listUserSchemas(ctx, r.Pool.Statements(), projectID)
 	first, err := list(nil)
 	if err != nil {
 		return nil, nil, err

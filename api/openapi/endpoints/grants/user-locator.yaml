@@ -1,0 +1,20 @@
+title: UserLocator
+description: |
+  Name a user with exactly one of `user_id` or `identifier`. Sending both
+  or neither is `grant.invalid`. Unknown properties are rejected by
+  `additionalProperties: false` as `req.invalid` before the handler runs.
+type: object
+additionalProperties: false
+properties:
+  user_id:
+    $ref: ../../components/schemas/user-id.yaml
+    description: |
+      Platform-homed user id (`user_<opaque>`). The user must be active.
+  identifier:
+    type: string
+    minLength: 1
+    description: |
+      The user schema's designated identifier (`x-identifier`), looked
+      up in the platform project. Exactly one active match is required;
+      zero or several resolve as not found.
+    example: alice@acme.com

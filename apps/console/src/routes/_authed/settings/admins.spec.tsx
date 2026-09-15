@@ -42,22 +42,21 @@ function grant(overrides: Record<string, unknown> = {}) {
   return {
     id: "asgn_1",
     project_id: "proj_1",
-    principal_type: "user",
-    principal_id: "user_1",
     object_type: "project",
     relation: "admin",
     created_at: "2026-09-01T10:00:00Z",
+    user: { user_id: "user_1" },
     ...overrides,
   };
 }
 
 /**
- * A user principal as `expand: ["principal"]` embeds it: the same body
- * `GET /users/{id}` serves, so the envelope travels with the identity fields.
+ * A user as `expand: ["principal"]` inlines it: extras live on the same
+ * `user` object as the ref (`user_id`, never `id`).
  */
-function userPrincipal(identity: Record<string, unknown>) {
+function grantUser(identity: Record<string, unknown>) {
   return {
-    id: "user_1",
+    user_id: "user_1",
     schema: "sch_1",
     attributes: {},
     metadata: {
@@ -86,11 +85,10 @@ describe("admins screen", () => {
     // One request, not a read per row: the principal rides along on the list
     // (ADR 059), and ADR 058's resolved identity is what the row shows.
     const bodies = stubGrants(
-      grant({ principal: userPrincipal({ display: "Maya Patel", identifier: "maya@acme.com" }) }),
+      grant({ user: grantUser({ display: "Maya Patel", identifier: "maya@acme.com" }) }),
       grant({
         id: "asgn_2",
-        principal_id: "user_2",
-        principal: userPrincipal({ id: "user_2", identifier: "sol@acme.com" }),
+        user: grantUser({ user_id: "user_2", identifier: "sol@acme.com" }),
       }),
     );
     await renderAdmins();
@@ -103,8 +101,8 @@ describe("admins screen", () => {
   });
 
   it("falls back to the principal id when the principal cannot be loaded", async () => {
-    // `principal: null` is what a deleted user's surviving grant looks like.
-    stubGrants(grant({ principal: null }));
+    // A deleted user's surviving grant is a degraded ref: `user_id` only.
+    stubGrants(grant({ user: { user_id: "user_1" } }));
     await renderAdmins();
 
     const table = within(await screen.findByRole("table"));
@@ -114,7 +112,7 @@ describe("admins screen", () => {
   it("renders whatever relation a grant carries, not just admin", async () => {
     // The screen only creates `admin`, but the catalog has three relations and
     // a grant made elsewhere must not be mislabelled.
-    stubGrants(grant({ relation: "viewer", principal: userPrincipal({ identifier: "vi@acme.com" }) }));
+    stubGrants(grant({ relation: "viewer", user: grantUser({ identifier: "vi@acme.com" }) }));
     await renderAdmins();
 
     const table = within(await screen.findByRole("table"));
@@ -122,14 +120,12 @@ describe("admins screen", () => {
   });
 
   it("labels a team principal by its name", async () => {
-    // A team grant carries the team body, which has a `name` and no identity
-    // chain. `principal_type` is what tells the two apart.
+    // A team grant carries `team` and omits `user`. `name` is already on the ref.
     stubGrants(
       grant({
-        principal_type: "team",
-        principal_id: "team_1",
-        principal: {
-          id: "team_1",
+        user: undefined,
+        team: {
+          team_id: "team_1",
           name: "Platform",
           status: "active",
           created_at: "2026-09-01T10:00:00Z",
@@ -187,8 +183,7 @@ describe("admins screen", () => {
     // Bound to the person, at the only level this journey grants (#769).
     await waitFor(() =>
       expect(created).toEqual({
-        principal_type: "user",
-        principal_id: "user_9",
+        user: { user_id: "user_9" },
         relation: "admin",
       }),
     );
@@ -197,7 +192,7 @@ describe("admins screen", () => {
   it("does not offer people who are already admins", async () => {
     // `POST /grants` refuses a second grant for the same principal and relation,
     // so offering them would be offering a choice that cannot work.
-    stubGrants(grant({ principal_id: "user_9", principal: userPrincipal({ id: "user_9" }) }));
+    stubGrants(grant({ user: grantUser({ user_id: "user_9" }) }));
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
@@ -223,8 +218,7 @@ describe("admins screen", () => {
     stubGrants(
       grant({
         relation: "viewer",
-        principal_id: "user_9",
-        principal: userPrincipal({ id: "user_9" }),
+        user: grantUser({ user_id: "user_9" }),
       }),
     );
     server.use(
@@ -274,7 +268,7 @@ describe("admins screen", () => {
     // carries, and "Remove admin" over a `viewer` row would misdescribe the
     // click.
     stubGrants(
-      grant({ relation: "viewer", principal: userPrincipal({ display: "Sasha Kim" }) }),
+      grant({ relation: "viewer", user: grantUser({ display: "Sasha Kim" }) }),
     );
     await renderAdmins();
 
@@ -287,7 +281,7 @@ describe("admins screen", () => {
   it("does not carry a failed removal into the next opening", async () => {
     // The dialog content is mounted per opening, so the error from one attempt
     // is not sitting there when the operator opens it again.
-    stubGrants(grant({ principal: userPrincipal({ display: "Maya Patel" }) }));
+    stubGrants(grant({ user: grantUser({ display: "Maya Patel" }) }));
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () =>
         HttpResponse.json({ code: "grant.not_found", message: "no such grant" }, { status: 404 }),
@@ -332,7 +326,7 @@ describe("admins screen", () => {
   });
 
   it("removes an admin after confirming", async () => {
-    stubGrants(grant({ principal: userPrincipal({ display: "Maya Patel" }) }));
+    stubGrants(grant({ user: grantUser({ display: "Maya Patel" }) }));
     let deleted: string | undefined;
     server.use(
       http.delete(`${GRANTS_URL}/:id`, ({ params }) => {
@@ -352,7 +346,7 @@ describe("admins screen", () => {
   });
 
   it("keeps the row when the removal is cancelled", async () => {
-    stubGrants(grant({ principal: userPrincipal({ display: "Maya Patel" }) }));
+    stubGrants(grant({ user: grantUser({ display: "Maya Patel" }) }));
     let deleteCalls = 0;
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () => {
