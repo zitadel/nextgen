@@ -224,19 +224,151 @@ func (l Drupal7LimitsConfig) validationOpts() *drupal7.ValidationOpts {
 }
 
 func (c *HashConfig) NewHasher() (*PasswapHasher, error) {
+	factory, err := c.NewHasherFactory()
+	if err != nil {
+		return nil, err
+	}
+	return factory.Default(), nil
+}
+
+type HasherFactory struct {
+	verifiers      []verifier.Verifier
+	verifierPrefix []string
+	limits         HashLimitsConfig
+	hexSupported   bool
+	defaultHasher  *PasswapHasher
+}
+
+func (c *HashConfig) NewHasherFactory() (*HasherFactory, error) {
 	verifiers, vPrefixes, err := c.buildVerifiers()
 	if err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
 	}
-	hasher, hPrefixes, err := c.Hasher.buildHasher(c.Limits)
+	factory := &HasherFactory{
+		verifiers:      verifiers,
+		verifierPrefix: vPrefixes,
+		limits:         c.Limits,
+		hexSupported:   slices.Contains(c.Verifiers, HashNameMd5Plain),
+	}
+	factory.defaultHasher, err = factory.New(c.Hasher)
+	if err != nil {
+		return nil, err
+	}
+	return factory, nil
+}
+
+func (f *HasherFactory) Default() *PasswapHasher {
+	return f.defaultHasher
+}
+
+func (f *HasherFactory) New(cfg HasherConfig) (*PasswapHasher, error) {
+	hasher, prefixes, err := cfg.buildHasher(f.limits)
 	if err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
 	}
 	return &PasswapHasher{
-		Swapper:      passwap.NewSwapper(hasher, verifiers...),
-		Prefixes:     append(hPrefixes, vPrefixes...),
-		HexSupported: slices.Contains(c.Verifiers, HashNameMd5Plain),
+		Swapper:      passwap.NewSwapper(hasher, f.verifiers...),
+		Prefixes:     append(prefixes, f.verifierPrefix...),
+		HexSupported: f.hexSupported,
 	}, nil
+}
+
+func (f *HasherFactory) Check(cfg HasherConfig) error {
+	_, prefixes, err := cfg.buildHasher(f.limits)
+	if err != nil {
+		return fmt.Errorf("password hash config invalid: %w", err)
+	}
+	for _, prefix := range prefixes {
+		if !slices.Contains(f.verifierPrefix, prefix) {
+			return fmt.Errorf("password hash config invalid: %w: %q writes %q, which no configured verifier reads",
+				ErrAlgorithmNotSupported, cfg.Algorithm, prefix)
+		}
+	}
+	return f.checkLimits(cfg)
+}
+
+// bound is one cost parameter measured against the deployment's limits.
+type bound struct {
+	name     string
+	value    int
+	min, max int
+}
+
+// checkLimits restates the bounds the verifiers apply, ahead of the hashing
+// that would otherwise be needed to reach them. The pairs come from the same
+// [HashLimitsConfig] fields the verifiers are built from, so the two cannot
+// disagree about what is in range.
+func (f *HasherFactory) checkLimits(cfg HasherConfig) error {
+	limits := f.limits
+	switch cfg.Algorithm {
+	case HashNameArgon2i, HashNameArgon2id:
+		p, err := cfg.argon2Params(argon2.Params{})
+		if err != nil {
+			return err
+		}
+		return checkBounds(cfg.Algorithm,
+			bound{"time", int(p.Time), int(limits.Argon2.MinTime), int(limits.Argon2.MaxTime)},
+			bound{"memory", int(p.Memory), int(limits.Argon2.MinMemory), int(limits.Argon2.MaxMemory)},
+			bound{"threads", int(p.Threads), int(limits.Argon2.MinThreads), int(limits.Argon2.MaxThreads)},
+		)
+	case HashNameBcrypt:
+		cost, err := cfg.bcryptCost()
+		if err != nil {
+			return err
+		}
+		return checkBounds(cfg.Algorithm,
+			bound{"cost", cost, limits.Bcrypt.MinCost, limits.Bcrypt.MaxCost},
+		)
+	case HashNameScrypt:
+		// r and p are not the caller's to set -- they come from passwap's
+		// recommended parameters -- but a deployment whose limits exclude them
+		// could not read the result back, so they are checked all the same.
+		p, err := cfg.scryptParams()
+		if err != nil {
+			return err
+		}
+		return checkBounds(cfg.Algorithm,
+			bound{"cost", p.LN, limits.Scrypt.MinLN, limits.Scrypt.MaxLN},
+			bound{"r", p.R, limits.Scrypt.MinR, limits.Scrypt.MaxR},
+			bound{"p", p.P, limits.Scrypt.MinP, limits.Scrypt.MaxP},
+		)
+	case HashNamePBKDF2:
+		p, _, err := cfg.pbkdf2Params()
+		if err != nil {
+			return err
+		}
+		return checkBounds(cfg.Algorithm,
+			bound{"rounds", int(p.Rounds), int(limits.PBKDF2.MinRounds), int(limits.PBKDF2.MaxRounds)},
+		)
+	case HashNameSha2:
+		use512, rounds, err := cfg.sha2Params()
+		if err != nil {
+			return err
+		}
+		if use512 {
+			return checkBounds(cfg.Algorithm,
+				bound{"rounds", rounds, limits.Sha2.MinSha512Rounds, limits.Sha2.MaxSha512Rounds},
+			)
+		}
+		return checkBounds(cfg.Algorithm,
+			bound{"rounds", rounds, limits.Sha2.MinSha256Rounds, limits.Sha2.MaxSha256Rounds},
+		)
+	default:
+		// buildHasher ran first and rejects everything else, so reaching here
+		// means an algorithm gained a hasher without gaining limits with it.
+		return fmt.Errorf("password hash config invalid: %w: %q has no configured limits",
+			ErrAlgorithmNotSupported, cfg.Algorithm)
+	}
+}
+
+func checkBounds(algorithm HashName, bounds ...bound) error {
+	for _, b := range bounds {
+		if b.value < b.min || b.value > b.max {
+			return fmt.Errorf("password hash config invalid: %w: %s %s is %d, outside the configured %d..%d",
+				ErrBoundsError, algorithm, b.name, b.value, b.min, b.max)
+		}
+	}
+	return nil
 }
 
 type prefixVerifier struct {

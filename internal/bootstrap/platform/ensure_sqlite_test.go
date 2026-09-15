@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -36,8 +37,23 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	schemaValidator, err := domain.NewSchemaValidator(testSchemaBase)
 	require.NoError(t, err)
 
+	// bcrypt at cost 10, bounded 10..16: this test is about Ensure, not about
+	// hashing, but the project service needs the deployment's hashing
+	// configuration to answer whether a project may pick a method of its own.
+	hashers, err := (&crypto.HashConfig{
+		Verifiers: []crypto.HashName{crypto.HashNameBcrypt},
+		Hasher: crypto.HasherConfig{
+			Algorithm: crypto.HashNameBcrypt,
+			Params:    map[string]any{"cost": 10},
+		},
+		Limits: crypto.HashLimitsConfig{
+			Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		},
+	}).NewHasherFactory()
+	require.NoError(t, err)
+
 	keys := service.NewKeyService(pool, *masterKeys)
-	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys), keys
+	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers), keys
 }
 
 // TestEnsureSQLiteIdempotent proves the DB-backed idempotency the issue

@@ -63,9 +63,20 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
 		return nil, err
 	}
-	// An absent or null name leaves nothing to write; Update rejects the empty
-	// string with proj.name_invalid, the 400 the contract declares.
-	project, err := h.projectService.Update(ctx, projectID, req.Name.Or(""))
+
+	update := service.UpdateProjectRequest{ID: projectID}
+	if name, ok := req.Name.Get(); ok {
+		update.Name = &name
+	}
+	if req.PasswordHash.IsSet() {
+		policy, err := passwordHashPolicyToDomain(req.PasswordHash)
+		if err != nil {
+			return nil, err
+		}
+		update.PasswordHashPolicy = &policy
+	}
+
+	project, err := h.projectService.Update(ctx, update)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +110,82 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 
 // ------------------ Converters ---------------
 
+// passwordHashPolicyToDomain converts a hashing method off the wire. Explicit
+// null is the instruction to stop choosing one, and reaches the domain as a nil
+// policy.
+func passwordHashPolicyToDomain(field api.OptNilPasswordHashPolicy) (*domain.PasswordHashPolicy, error) {
+	body, ok := field.Get()
+	if !ok {
+		return nil, nil
+	}
+	params := make(map[string]any, 6)
+	if v, ok := body.Params.Time.Get(); ok {
+		params["time"] = v
+	}
+	if v, ok := body.Params.Memory.Get(); ok {
+		params["memory"] = v
+	}
+	if v, ok := body.Params.Threads.Get(); ok {
+		params["threads"] = v
+	}
+	if v, ok := body.Params.Cost.Get(); ok {
+		params["cost"] = v
+	}
+	if v, ok := body.Params.Rounds.Get(); ok {
+		params["rounds"] = v
+	}
+	if v, ok := body.Params.Hash.Get(); ok {
+		params["hash"] = string(v)
+	}
+	// The domain owns which parameters an algorithm takes, so the wire type
+	// carries every parameter as optional and the exact set is checked there.
+	return domain.NewPasswordHashPolicy(string(body.Algorithm), params)
+}
+
+// passwordHashPolicyResponse answers with the project's own hashing method, or
+// null where it uses the deployment default -- the same shape a PATCH sends, so
+// what a caller reads back is what they could write.
+func passwordHashPolicyResponse(policy *domain.PasswordHashPolicy) api.OptNilPasswordHashPolicy {
+	if policy == nil {
+		var absent api.OptNilPasswordHashPolicy
+		absent.SetToNull()
+		return absent
+	}
+	body := api.PasswordHashPolicy{Algorithm: api.PasswordHashPolicyAlgorithm(policy.Algorithm)}
+	number := func(name string) api.OptInt {
+		value, ok := passwordHashParamInt(policy.Params[name])
+		if !ok {
+			return api.OptInt{}
+		}
+		return api.NewOptInt(value)
+	}
+	body.Params.Time = number("time")
+	body.Params.Memory = number("memory")
+	body.Params.Threads = number("threads")
+	body.Params.Cost = number("cost")
+	body.Params.Rounds = number("rounds")
+	if mode, ok := policy.Params["hash"].(string); ok {
+		body.Params.Hash = api.NewOptPasswordHashPolicyParamsHash(api.PasswordHashPolicyParamsHash(mode))
+	}
+	return api.NewOptNilPasswordHashPolicy(body)
+}
+
+// passwordHashParamInt reads a stored parameter as a number. A policy that came
+// back through storage carries JSON numbers (float64); one still in hand from
+// the request carries ints.
+func passwordHashParamInt(value any) (int, bool) {
+	switch typed := value.(type) {
+	case int:
+		return typed, true
+	case int64:
+		return int(typed), true
+	case float64:
+		return int(typed), true
+	default:
+		return 0, false
+	}
+}
+
 func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) service.ListProjectsRequest {
 	svcReq := service.ListProjectsRequest{
 		ProjectID: projectID,
@@ -121,6 +208,7 @@ func projectResponse(project *domain.Project) *api.ProjectResponse {
 		ID:             project.ID,
 		Name:           project.Name,
 		PreviewOrigins: project.PreviewOrigins,
+		PasswordHash:   passwordHashPolicyResponse(project.PasswordHashPolicy),
 		CreatedAt:      project.CreatedAt,
 		UpdatedAt:      project.UpdatedAt,
 	}
@@ -134,7 +222,8 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrProjectPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code:
+	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code,
+		domain.ErrProjectPasswordHashInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrProjectAlreadyClaimed().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
