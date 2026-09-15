@@ -27,6 +27,8 @@ import {
 } from "./api-client.js";
 import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
+import { resolveLogoUrl } from "./branding.js";
+import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
@@ -202,6 +204,14 @@ export class ZitadelLogin extends ZitadelSurface {
 
   private engine: Liquid | null = null;
 
+  /**
+   * The theme the last commit rendered with. The template output carries the
+   * resolved side's mark, so a theme change rewrites the string and
+   * `unsafeHTML` rebuilds the form — which drops what the visitor had typed
+   * unless it is put back.
+   */
+  private lastRenderedTheme: ResolvedTheme | null = null;
+
   private readonly sanitise = createSanitiser();
 
   /**
@@ -365,13 +375,23 @@ export class ZitadelLogin extends ZitadelSurface {
         card.toggleAttribute("data-suppress-header", this.suppressHeader);
       }
     }
+    const previousTheme = this.lastRenderedTheme;
+    this.lastRenderedTheme = this.themeController.theme;
+
     const props = changed as Map<string, unknown>;
-    if (!props.has("response")) return;
-    // `changed` holds the OLD value: nullish (`null` initializer, or
-    // undefined when the property never changed before) means this commit
-    // applied the first response — the initial paint, not a user-driven
-    // step swap.
-    void this.hydrateStepAfterRender(props.get("response") == null);
+    if (props.has("response")) {
+      // `changed` holds the OLD value: nullish (`null` initializer, or
+      // undefined when the property never changed before) means this commit
+      // applied the first response — the initial paint, not a user-driven
+      // step swap.
+      void this.hydrateStepAfterRender(props.get("response") == null);
+      return;
+    }
+    if (previousTheme !== null && previousTheme !== this.lastRenderedTheme) {
+      // A flip mid-step is not a step change: restore what was typed, but
+      // leave focus where the visitor put it.
+      void this.restoreValuesAfterRender();
+    }
   }
 
   /**
@@ -387,6 +407,18 @@ export class ZitadelLogin extends ZitadelSurface {
    * swaps are user-initiated, so focus moves in both modes.
    */
   private async hydrateStepAfterRender(initial = false): Promise<void> {
+    await this.restoreValuesAfterRender();
+    if (!initial || this.variant === "page") {
+      this.moveFocusToFirstField(initial && this.variant === "page");
+    }
+  }
+
+  /**
+   * Put captured values back once the rebuilt subtree has rendered. Awaits the
+   * child atoms' own first render before touching them, rather than guessing a
+   * frame with `requestAnimationFrame`.
+   */
+  private async restoreValuesAfterRender(): Promise<void> {
     await this.updateComplete;
     const atoms = this.shadowRoot?.querySelectorAll<LitElement>(
       "zl-field, zl-select, zl-checkbox, zl-button",
@@ -395,9 +427,6 @@ export class ZitadelLogin extends ZitadelSurface {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
-    if (!initial || this.variant === "page") {
-      this.moveFocusToFirstField(initial && this.variant === "page");
-    }
   }
 
   override render() {
@@ -464,6 +493,20 @@ export class ZitadelLogin extends ZitadelSurface {
       return rendered.replace("</zl-page-shell>", `${html}</zl-page-shell>`);
     }
     return rendered + html;
+  }
+
+  /**
+   * The branding a template renders against, with `logo_url` already resolved
+   * to the mark for the active side. Templates read one logo field and get the
+   * right file per surface; the per-side URLs stay on `theme` for a template
+   * that wants to reach them itself.
+   */
+  private brandingForTemplate(): Branding | Record<string, never> {
+    if (!this.branding) {
+      return {};
+    }
+    const logoUrl = resolveLogoUrl(this.branding, this.themeController.theme);
+    return { ...this.branding, logo_url: logoUrl };
   }
 
   /**
@@ -718,7 +761,7 @@ export class ZitadelLogin extends ZitadelSurface {
       messages: [],
       identity: this.deriveIdentity(),
       errors,
-      branding: this.branding ?? {},
+      branding: this.brandingForTemplate(),
       loading: this.loading,
     };
 
