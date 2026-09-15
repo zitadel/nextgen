@@ -583,7 +583,8 @@ type Invoker interface {
 	// QueryIdps invokes queryIdps operation.
 	//
 	// Returns the identity provider connections of a project, paginated with a
-	// cursor.
+	// cursor. By default one row per connection, carrying its newest revision.
+	// `revisions: all` returns a row per revision instead.
 	//
 	// POST /idps/query
 	QueryIdps(ctx context.Context, request *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
@@ -8842,7 +8843,8 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 // QueryIdps invokes queryIdps operation.
 //
 // Returns the identity provider connections of a project, paginated with a
-// cursor.
+// cursor. By default one row per connection, carrying its newest revision.
+// `revisions: all` returns a row per revision instead.
 //
 // POST /idps/query
 func (c *Client) QueryIdps(ctx context.Context, request *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error) {

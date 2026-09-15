@@ -1,5 +1,6 @@
 type: object
-description: An identity provider connection with the revision it currently serves.
+description: |
+  An identity provider connection.
 required:
   - id
   - revision_id

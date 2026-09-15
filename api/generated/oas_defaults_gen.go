@@ -92,6 +92,10 @@ func (s *QueryIdpsRequest) setDefaults() {
 		val := int(20)
 		s.Limit.SetTo(Limit(val))
 	}
+	{
+		val := QueryIdpsRequestRevisions("latest")
+		s.Revisions.SetTo(val)
+	}
 }
 
 // setDefaults set default value of fields.

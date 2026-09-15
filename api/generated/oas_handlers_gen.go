@@ -10754,7 +10754,8 @@ func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w ht
 // handleQueryIdpsRequest handles queryIdps operation.
 //
 // Returns the identity provider connections of a project, paginated with a
-// cursor.
+// cursor. By default one row per connection, carrying its newest revision.
+// `revisions: all` returns a row per revision instead.
 //
 // POST /idps/query
 func (s *Server) handleQueryIdpsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
