@@ -5,12 +5,18 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/dep-not_found.yaml'
+        - $ref: '../../components/schemas/errors/dep-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/env-not_found.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          dep.not_found: '../../components/schemas/errors/dep-not_found.yaml'
+          dep.permission_denied: '../../components/schemas/errors/dep-permission_denied.yaml'
+          env.not_found: '../../components/schemas/errors/env-not_found.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -19,6 +25,21 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      dep.not_found:
+        summary: dep.not_found
+        value:
+          code: dep.not_found
+          message: 'deployment: not found'
+      dep.permission_denied:
+        summary: dep.permission_denied
+        value:
+          code: dep.permission_denied
+          message: 'deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)'
+      env.not_found:
+        summary: env.not_found
+        value:
+          code: env.not_found
+          message: 'environment not found'
       internal:
         summary: internal
         value:
