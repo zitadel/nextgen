@@ -28,30 +28,26 @@
       "description": "Slugs of the Project-level identity provider connections available to users of this schema. Each entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does not by itself make it available here."
     }
   },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "enabled": {
-            "const": true
-          }
-        },
-        "required": [
-          "enabled"
-        ]
-      },
-      "then": {
-        "required": [
-          "providers"
-        ]
-      },
-      "else": {
-        "not": {
-          "required": [
-            "providers"
-          ]
-        }
+  "if": {
+    "properties": {
+      "enabled": {
+        "const": true
       }
+    },
+    "required": [
+      "enabled"
+    ]
+  },
+  "then": {
+    "required": [
+      "providers"
+    ]
+  },
+  "else": {
+    "not": {
+      "required": [
+        "providers"
+      ]
     }
-  ]
+  }
 }

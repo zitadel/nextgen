@@ -200,7 +200,7 @@ the CLI's help layer, not the envelope.
   and are not compared. The repair — an exact-pin install command for the
   project's detected package manager — is emitted in `data.next_commands`
   and quoted in the warning message.
-- `claim` — attach the project to a team so it becomes permanent. Mints a
+- `claim` — claim the project for a team to make it permanent. Mints a
   short-lived link, opens it in a browser, and blocks until the developer
   finishes signing in there, then records `claimed_at` and `team_id` in
   `.zitadel/secret`. Nothing about the project changes: the issuer, users,
@@ -214,7 +214,8 @@ the CLI's help layer, not the envelope.
   possible within 14 days of project creation: past that the platform answers
   `410 proj.claim_window_expired`, the command exits `E_VALIDATION`, and a
   fresh link does **not** help — only a fresh `setup` yields a claimable
-  project (the old one keeps working, it just can't be attached anymore).
+  project (the old one can no longer be claimed; it stays temporary and its
+  data may be lost).
   `--dry-run` stops before
   anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
   there is nothing to preview, because a claim is decided in a browser.
@@ -345,9 +346,13 @@ validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
 must be absolute `https://`. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
-creation, but CLI-created projects are authored from local files first. Flow create, read, list,
-update, and delete are available, while the server enforces lifecycle rules
-such as draft-only edits. Managed files carry a marker comment; `eject` removes only
+creation, but CLI-created projects are authored from local files first. Flows are
+revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
+immutable flow revision; a schema revise re-publishes the flows pinned to it with
+the new `user_schema` in the same run. A login pinned by `flow-name` serves that
+flow's newest revision; an unpinned login serves the newest active unscoped flow
+in the project, whatever its name. Removing a flow file does not retire the
+flow. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

@@ -87,6 +87,10 @@ type Handler interface {
 	// unrevoked grant with the same principal and relation occupies the unique
 	// key even after `expires_at`; DELETE it before re-creating.
 	// Create does not accept `expand`; the 201 `user` / `team` are refs only.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the target project (home may differ). CSRF/Origin
+	// for cookie mutations is a follow-up (#1140).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -173,21 +177,15 @@ type Handler interface {
 	//
 	// POST /users
 	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
-	// DeleteFlowDefinition implements deleteFlowDefinition operation.
-	//
-	// Delete a flow definition by id.
-	// If the flow definition is currently being used by a flow, the deletion will fail.
-	// If the flow definition is the last active flow definition for a given purpose, the deletion will
-	// fail to prevent disruption of new flows being started for that purpose.
-	//
-	// DELETE /flow_definitions/{id}
-	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
 	// DeleteGrant implements deleteGrant operation.
 	//
 	// Soft-revokes a grant this API manages and emits `authz.revoked`.
 	// Already-revoked, missing, project-secret setup, and owning-team grants
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -319,7 +317,12 @@ type Handler interface {
 	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
 	// owning-team (`relation=team`) rows, and cross-project ids return 404.
 	// `expand=principal` adds envelope fields on `user` or `team` and requires
-	// `user.read` and `team.read` in addition to `project.read`.
+	// `user.read` and `team.read` in addition to `project.read` for project
+	// secrets. A user-bound Console session that already passed the project
+	// Check may expand without those scopes.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -496,12 +499,29 @@ type Handler interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
+	// PatchMyUser implements patchMyUser operation.
+	//
+	// Partially updates the caller's own schema-defined attributes. The merged
+	// result is validated against the user's schema before commit. Concurrent
+	// writes are last-write-wins.
+	//
+	// PATCH /users/me
+	PatchMyUser(ctx context.Context, req *PatchMyUserRequest) (PatchMyUserRes, error)
 	// PatchProject implements patchProject operation.
 	//
 	// Updates the state of a project.
 	//
 	// PATCH /projects/{project_id}
 	PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (PatchProjectRes, error)
+	// PatchUserByID implements PatchUserByID operation.
+	//
+	// Partially updates a user's schema-defined attributes, and optionally
+	// moves the user to another registered schema. The merged result is
+	// validated against the schema before commit. Concurrent writes are
+	// last-write-wins.
+	//
+	// PATCH /users/{user_id}
+	PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.
@@ -512,8 +532,13 @@ type Handler interface {
 	// `resource_scope_index`; project scope is required on the query (same as
 	// get). Requires `project.read`. `expand: ["principal"]` adds envelope
 	// fields on `user` / `team` and additionally requires `user.read` and
-	// `team.read` (documented on the expand enum; those scopes cannot be ANDed
-	// onto this security block because they are body-conditional).
+	// `team.read` for project secrets (documented on the expand enum; those
+	// scopes cannot be ANDed onto this security block because they are
+	// body-conditional). A user-bound Console session that already passed
+	// the project Check may expand without those scopes.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -540,9 +565,13 @@ type Handler interface {
 	// QueryUsers implements queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// The project comes from the credential, not from a parameter: the operation
-	// is bound to the token's own project by construction. This is why it takes
-	// no `project_id`, unlike the other query endpoints.
+	// The project comes from the credential, not from a parameter: the
+	// operation is bound to the credential's home project by construction
+	// (oauth2 secret or user-bound session). This is why it takes no
+	// `project_id`, unlike the other query endpoints.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest) (QueryUsersRes, error)
@@ -600,13 +629,6 @@ type Handler interface {
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
-	// UpdateFlowDefinition implements updateFlowDefinition operation.
-	//
-	// Update a flow definition by id. This endpoint replaces the existing flow definition.
-	// If `flow_definition.status` is omitted, the current status is preserved.
-	//
-	// PUT /flow_definitions/{id}
-	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
 	// UpdateTeam implements updateTeam operation.
 	//
 	// Update team. Only active teams can be updated.

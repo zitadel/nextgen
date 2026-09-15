@@ -23,6 +23,7 @@ type ReleaseArtifactsModule = {
     ) => Promise<void>;
   }) => Promise<unknown>;
   containerTags: (input: { image?: string; version: string; prerelease: boolean }) => string[];
+  TAG_PRERELEASE_AS_LATEST: boolean;
   readServerRelease: (repoRoot: string) => Promise<{
     name: string;
     version: string;
@@ -135,14 +136,25 @@ describe("release artifact helpers", () => {
     });
   });
 
-  it("only adds latest for stable container releases", async () => {
+  it("adds latest for stable container releases", async () => {
     const { containerTags } = await loadModule();
 
-    expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
-      "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
-    ]);
     expect(containerTags({ version: "1.2.3", prerelease: false })).toEqual([
       "ghcr.io/zitadel/nextgen:1.2.3",
+      "ghcr.io/zitadel/nextgen:latest",
+    ]);
+  });
+
+  // Temporary, paired with TAG_PRERELEASE_AS_LATEST in release-artifacts.mjs:
+  // pre-GA there is no stable release to own `:latest`, so the alpha train
+  // carries it. Delete this and restore the prerelease case above when the flag
+  // goes back to false on `changeset pre exit`.
+  it("also adds latest for prereleases while the alpha train owns it", async () => {
+    const { containerTags, TAG_PRERELEASE_AS_LATEST } = await loadModule();
+
+    expect(TAG_PRERELEASE_AS_LATEST).toBe(true);
+    expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
+      "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
       "ghcr.io/zitadel/nextgen:latest",
     ]);
   });

@@ -62,6 +62,9 @@ const (
 	EventTypeAuthCheckSucceeded   EventType = "auth.check.succeeded"
 
 	EventTypeFlowdefCreated EventType = "flowdef.created"
+	// Retired, no producer. Kept so stored rows decode.
+	// TODO(grvijayan): remove both, their OpenAPI event types and the
+	// gen_event_schemas entries once the rows have aged out of retention.
 	EventTypeFlowdefUpdated EventType = "flowdef.updated"
 	EventTypeFlowdefDeleted EventType = "flowdef.deleted"
 

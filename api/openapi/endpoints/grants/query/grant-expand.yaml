@@ -9,8 +9,9 @@ description: |
   object stays id-only — the same shape as not expanding.
 
   Expanding requires `user.read` and `team.read` in addition to
-  `project.read`. Both are checked once for the whole request. If the
-  caller lacks either, the request is 403; extras are not omitted
-  silently.
+  `project.read` for project secrets. Both are checked once for the whole
+  request. If the caller lacks either, the request is 403; extras are not
+  omitted silently. A user-bound Console session that already passed the
+  project Check may expand without those scopes.
 enum:
   - principal

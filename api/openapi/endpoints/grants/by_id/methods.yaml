@@ -11,12 +11,19 @@ get:
     events). Misses, revoked rows, project-secret setup (`sk_proj`),
     owning-team (`relation=team`) rows, and cross-project ids return 404.
     `expand=principal` adds envelope fields on `user` or `team` and requires
-    `user.read` and `team.read` in addition to `project.read`.
+    `user.read` and `team.read` in addition to `project.read` for project
+    secrets. A user-bound Console session that already passed the project
+    Check may expand without those scopes.
+
+    Accepts either a project secret (`oauth2`) or a user-bound Console
+    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+    is a follow-up (#1140).
   tags:
     - Grants
   security:
     - oauth2:
         - project.read
+    - nextgenSession: []
   parameters:
     - name: id
       in: path
@@ -74,11 +81,16 @@ delete:
     Already-revoked, missing, project-secret setup, and owning-team grants
     return 404. The row is not un-revoked. Expired grants can still be
     revoked so the unique binding can be reused.
+
+    Accepts either a project secret (`oauth2`) or a user-bound Console
+    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+    is a follow-up (#1140).
   tags:
     - Grants
   security:
     - oauth2:
         - project.write
+    - nextgenSession: []
   parameters:
     - name: id
       in: path

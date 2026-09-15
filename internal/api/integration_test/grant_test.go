@@ -673,6 +673,17 @@ func TestGrantQueryExpand(t *testing.T) {
 	})
 }
 
+func grantByID(t *testing.T, grants []api.Grant, id string) api.Grant {
+	t.Helper()
+	for _, g := range grants {
+		if g.ID == id {
+			return g
+		}
+	}
+	t.Fatalf("grant %s not in page %s", id, helpers.MustMarshal(t, grants))
+	return api.Grant{}
+}
+
 func assertGrantNotFound(t *testing.T, resp any) {
 	t.Helper()
 	switch v := resp.(type) {
@@ -682,6 +693,10 @@ func assertGrantNotFound(t *testing.T, resp any) {
 		assert.Equal(t, api.ErrorCode("grant.not_found"), v.Code)
 	case *api.DeleteGrantNotFound:
 		assert.Equal(t, api.ErrorCode("grant.not_found"), v.Code)
+	case *api.QueryGrantsErrorResponseStatusCode:
+		assert.Equal(t, http.StatusNotFound, v.StatusCode)
+		require.True(t, v.Response.IsGrantNotFound(), helpers.MustMarshal(t, resp))
+		assert.Equal(t, "grant.not_found", v.Response.GrantNotFound.Code)
 	default:
 		t.Fatalf("want grant.not_found, got %T %s", resp, helpers.MustMarshal(t, resp))
 	}
@@ -718,4 +733,82 @@ func assertGrantAlreadyExists(t *testing.T, resp any) {
 	conflict, ok := resp.(*api.CreateGrantConflict)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
 	assert.Equal(t, api.ErrorCode("grant.already_exists"), conflict.Code)
+}
+
+func TestGrantSessionCaller(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	operatorID := harness.CreateUserWithTeam(t, platform.ID)
+	harness.SeedProjectViewer(t, project.ID, operatorID)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(platformSessionCookie(t, operatorID).Value)
+
+	subjectID := harness.CreateUserWithTeam(t, platform.ID)
+	params := api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)}
+
+	createResp, err := client.CreateGrant(t.Context(), userIDGrant(subjectID, api.CreateGrantRequestRelationViewer), params)
+	require.NoError(t, err)
+	created, ok := createResp.(*api.Grant)
+	require.True(t, ok, helpers.MustMarshal(t, createResp))
+	assert.Equal(t, project.ID, created.ProjectID)
+	require.True(t, created.User.IsSet())
+	assert.Equal(t, api.UserID(subjectID), created.User.Value.UserID)
+
+	getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+		ID:        created.ID,
+		ProjectID: api.ProjectID(project.ID),
+	})
+	require.NoError(t, err)
+	got, ok := getResp.(*api.Grant)
+	require.True(t, ok, helpers.MustMarshal(t, getResp))
+	assert.Equal(t, created.ID, got.ID)
+
+	queryParams := api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)}
+	listResp, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, queryParams)
+	require.NoError(t, err)
+	listed, ok := listResp.(*api.QueryGrantsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, listResp))
+	listedGrant := grantByID(t, listed.Grants, created.ID)
+	assert.False(t, listedGrant.User.Value.Schema.IsSet())
+
+	expandResp, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
+		Expand: []api.GrantExpand{api.GrantExpandPrincipal},
+	}, queryParams)
+	require.NoError(t, err)
+	expanded, ok := expandResp.(*api.QueryGrantsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, expandResp))
+	expandedGrant := grantByID(t, expanded.Grants, created.ID)
+	require.True(t, expandedGrant.User.IsSet())
+	assert.True(t, expandedGrant.User.Value.Schema.IsSet())
+	assert.Equal(t, api.UserID(subjectID), expandedGrant.User.Value.UserID)
+
+	delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
+		ID:        created.ID,
+		ProjectID: api.ProjectID(project.ID),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
+
+	t.Run("no foothold is not found", func(t *testing.T) {
+		t.Parallel()
+		strangerID := harness.CreateUserWithTeam(t, platform.ID)
+		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		stranger.SetSessionToken(platformSessionCookie(t, strangerID).Value)
+		resp, err := stranger.CreateGrant(t.Context(), userIDGrant(harness.CreateUserWithTeam(t, platform.ID), api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		assertGrantNotFound(t, resp)
+
+		queryResp, err := stranger.QueryGrants(t.Context(), &api.QueryGrantsRequest{
+			Expand: []api.GrantExpand{api.GrantExpandPrincipal},
+		}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		assertGrantNotFound(t, queryResp)
+	})
 }

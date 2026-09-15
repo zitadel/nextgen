@@ -43,6 +43,14 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *FlowStepAction) setDefaults() {
+	{
+		val := bool(false)
+		s.Primary.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *QueryGrantsRequest) setDefaults() {
 	{
 		val := int(20)
