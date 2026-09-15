@@ -31,7 +31,7 @@ post:
             summary: Resolve a single slug
             description: |
               A slug is unique within the project, so `equals` on it matches
-              at most one row.
+              at most one row in the default mode.
             value:
               filter:
                 - field: slug

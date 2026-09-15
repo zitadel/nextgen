@@ -24238,7 +24238,8 @@ func NewStringIdpConnectionVerifiedClaimsItem(v string) IdpConnectionVerifiedCla
 }
 
 // Field to filter or sort identity provider connections by:
-// - `slug`: unique within the project, so `equals` matches at most one row
+// - `slug`: unique within the project. `equals` returns the newest revision
+// of that connection by default, or every revision with `revisions: all`
 // - `created_at`: RFC3339 timestamp.
 // Ref: #
 type IdpFilterField string
@@ -24331,14 +24332,16 @@ type IdpResponse struct {
 	// A unique connection id, generated when the connection is created, and shared by
 	// every revision. This id is referenced by the identity links.
 	ID string `json:"id"`
-	// The latest revision id, pinned by auth attempts and releases.
+	// The id of the revision this row holds, pinned by auth attempts and
+	// releases. Single reads and the default query return the newest one.
 	RevisionID string `json:"revision_id"`
 	// The identifier by which user schemas and flow definitions reference the
 	// connection. Fixed for the life of the connection.
 	Slug string `json:"slug"`
 	// When the connection was created.
 	CreatedAt time.Time `json:"created_at"`
-	// When the connection was last revised.
+	// When this revision was created. On the newest revision, that is when
+	// the connection was last revised.
 	UpdatedAt time.Time `json:"updated_at"`
 	// The stored connection document.
 	Definition IdpConnection `json:"definition"`

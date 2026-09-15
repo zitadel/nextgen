@@ -18,7 +18,8 @@ properties:
   revision_id:
     type: string
     description: |
-      The latest revision id, pinned by auth attempts and releases.
+      The id of the revision this row holds, pinned by auth attempts and
+      releases. Single reads and the default query return the newest one.
     example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
   slug:
     type: string
@@ -35,7 +36,8 @@ properties:
     type: string
     format: date-time
     description: |
-      When the connection was last revised.
+      When this revision was created. On the newest revision, that is when
+      the connection was last revised.
     example: '2026-07-14T09:11:00Z'
   definition:
     $ref: idp-connection.yaml
