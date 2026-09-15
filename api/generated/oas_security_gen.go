@@ -40,8 +40,14 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
 	CompleteClaimOperation:   []string{},
+	CreateGrantOperation:     []string{},
+	DeleteGrantOperation:     []string{},
+	GetGrantOperation:        []string{},
 	GetMySessionOperation:    []string{},
 	GetMyUserOperation:       []string{},
+	PatchMyUserOperation:     []string{},
+	QueryGrantsOperation:     []string{},
+	QueryUsersOperation:      []string{},
 	RevokeMySessionOperation: []string{},
 }
 
@@ -100,9 +106,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	CreateUserOperation: []string{
 		"user.write",
-	},
-	DeleteFlowDefinitionOperation: []string{
-		"flow_definition.delete",
 	},
 	DeleteGrantOperation: []string{
 		"project.write",
@@ -192,6 +195,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	PatchProjectOperation: []string{
 		"project.write",
 	},
+	PatchUserByIDOperation: []string{
+		"user.write",
+	},
 	QueryGrantsOperation: []string{
 		"project.read",
 	},
@@ -212,9 +218,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
-	},
-	UpdateFlowDefinitionOperation: []string{
-		"flow_definition.write",
 	},
 	UpdateTeamOperation: []string{
 		"team.write",

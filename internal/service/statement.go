@@ -83,7 +83,6 @@ type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
@@ -294,6 +293,17 @@ const DefaultUserTeamsLimit = 10
 type UserStatements interface {
 	Statements
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
+	// PatchUser reconciles the stored user to the given post-merge state:
+	// header (schema_url, updated_at), attribute rows, and unique-attribute
+	// registry rows are all rewritten. It writes nothing and returns a
+	// NoRowFoundError when the row's updated_at no longer matches
+	// [domain.PatchUser.ExpectedUpdatedAt] (concurrent write) or the user is
+	// gone.
+	PatchUser(ctx context.Context, user *domain.PatchUser) error
+	// GetUserUniqueAttributeScopes reads the stored registry team scope per
+	// attribute key, so a patch keeps the scope an existing claim was created
+	// under. An unknown user reads as an empty map, not an error.
+	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
@@ -503,14 +513,16 @@ type AuthzCatalogStatements interface {
 //
 // Use cases:
 //   - ActiveSystemCatalogID: active system catalog (kind=system, owner=system).
-//   - HasAuthzProjectFoothold: any active assignment or membership edge in project.
+//   - HasAuthzProjectFoothold: any active assignment in project (team expand via
+//     homeProjectID) or a local membership edge in project. Empty homeProjectID
+//     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
 //     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
-	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
+	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

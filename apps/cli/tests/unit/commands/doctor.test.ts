@@ -193,7 +193,7 @@ describe("doctor command", () => {
     expect(json.data.ok).toBe(true);
     const claim = json.data.checks.find((check) => check.name === "claim");
     expect(claim?.status).toBe("warn");
-    expect(claim?.message).toContain("temporary until you attach it to a team");
+    expect(claim?.message).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 

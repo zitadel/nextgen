@@ -17,7 +17,6 @@
 export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: identifier (email entry — first screen)
-  // Figma 2xl `6593:141983`, card `6593:141985`, stack `6593:141989`
   // ═══════════════════════════════════════════════════════════════════════════
   "identifier.title": "Sign in",
   "identifier.description": "Enter your email to continue",
@@ -71,7 +70,6 @@ export const en: Record<string, string> = {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (passkey enrollment offer — after registration)
-  // Figma `6594:630`, heading `6594:89142`, body `6594:12796`
   // ═══════════════════════════════════════════════════════════════════════════
   "passkey-upsell.title": "Sign in faster next time",
   "passkey-upsell.description": "No password needed ever again.",
@@ -79,7 +77,7 @@ export const en: Record<string, string> = {
   "passkey-upsell.description.line2": "Sign in with Face ID, Touch ID, or PIN.",
   "passkey-upsell.action.passkey_register": "Set up passkey",
   "passkey-upsell.action.skip": "Skip for now",
-  // Figma `6594:630` setup-passkey annotations — kept for backward compat.
+  // Setup-passkey copy — kept for backward compat.
   "passkey-upsell.action.setup": "Set up passkey",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -100,7 +98,6 @@ export const en: Record<string, string> = {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (terminal — signed-in confirmation)
-  // Figma `6596:132846`
   // ═══════════════════════════════════════════════════════════════════════════
   "done.title": "You're signed in as",
   "done.description": "",
@@ -189,7 +186,7 @@ export const en: Record<string, string> = {
   "error.password_required": "Please enter a password",
   "error.password_incorrect": "Wrong email or password.",
   "error.email_exists": "An account with this email already exists.",
-  /** Figma sign-in error `6602:180268` — inline on password field. */
+  /** Sign-in error, inline on the password field. */
   "error.invalid_credentials": "Wrong email or password.",
   "error.required": "This field is required.",
 
@@ -202,7 +199,7 @@ export const en: Record<string, string> = {
   "error.field_max_length": "{0} is too long.",
   "error.field_invalid": "Please check {0}.",
 
-  // --- Sign-in form-level alert (Figma `6594:125237`, alert `6596:132779`) ---
+  // --- Sign-in form-level alert ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",
   "error.sign_in_server.body": "Please try again in a few minutes",
 };

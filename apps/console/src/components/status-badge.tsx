@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
  * (`active`, `suspended`, `deactivated`, `pending_purge`) and teams (`active`,
  * `deactivated`).
  *
- * `Badge` is the design-system component (`26:169`) and already carries every
+ * `Badge` is the design-system component and already carries every
  * dimension of the pill — `h-5`, `gap-1`, `px-2 py-0.5`, `rounded-full`,
  * `text-xs font-medium` — so nothing here restates it. What the design adds is
  * the component's own left icon slot (`showLeftIcon`), filled with a dot rather

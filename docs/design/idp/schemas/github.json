@@ -19,8 +19,8 @@
     "authorization_endpoint": "https://github.com/login/oauth/authorize",
     "token_endpoint": "https://github.com/login/oauth/access_token",
     "userinfo_endpoint": "https://api.github.com/user",
-    "client_id": "Iv1.abc123",
-    "client_secret_env": "GITHUB_CLIENT_SECRET",
+    "client_id": "${{ GITHUB_CLIENT_ID }}",
+    "client_secret": "${{ GITHUB_CLIENT_SECRET }}",
     "token_endpoint_auth_method": "client_secret_post",
     "scopes": [
       "read:user",

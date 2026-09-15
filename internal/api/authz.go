@@ -128,6 +128,17 @@ var environmentAccess = resourceAccess{
 	denied:    domain.ErrEnvironmentPermissionDenied,
 }
 
+// releaseAccess gates the project's release snapshots (ADR 035, #531).
+// Create and get are project-scoped: both carry a project_id and the get
+// filters its lookup by it, so no route resolves a path id through RSI and the
+// kind is only used to narrow a partial-access list.
+var releaseAccess = resourceAccess{
+	kind:      domain.ResourceKindRelease,
+	readMiss:  domain.ErrReleaseNotFound,
+	writeMiss: domain.ErrReleaseProjectNotFound,
+	denied:    domain.ErrReleasePermissionDenied,
+}
+
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
 // project-scoped (no RSI kind); credential ceiling is project.write like other
 // management resources until #420 mints a fine-grained events relation.
@@ -308,18 +319,33 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
 		return resolver.DecisionUnspecified, errAuthzNoScope
 	}
-	if !hasOperatorProjectWrite(scope.Scope) {
-		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
-		if scope.ProjectID == "" || scope.ProjectID != projectID {
-			return resolver.DecisionUnspecified, errAuthzNoScope
-		}
-		return resolver.DecisionUnspecified, errAuthzPreviewDenied
+	if err := credentialCeiling(scope, projectID); err != nil {
+		return resolver.DecisionUnspecified, err
 	}
 	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
 	if err != nil {
 		return resolver.DecisionUnspecified, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
 	return dec, nil
+}
+
+// credentialCeiling is the pre-resolver gate on the credential plane.
+// Empty home fails closed. Users skip the secret write ceiling; secrets
+// still need project.write (ADR 053 §5).
+func credentialCeiling(scope ScopeContext, targetProjectID string) error {
+	if scope.ProjectID == "" {
+		return errAuthzNoScope
+	}
+	if scope.PrincipalType == domain.AuthzPrincipalTypeUser {
+		return nil
+	}
+	if hasOperatorProjectWrite(scope.Scope) {
+		return nil
+	}
+	if scope.ProjectID != targetProjectID {
+		return errAuthzNoScope
+	}
+	return errAuthzPreviewDenied
 }
 
 // hasOperatorProjectWrite is the credential-plane ceiling: only the full

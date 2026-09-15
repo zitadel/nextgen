@@ -298,9 +298,21 @@ export async function buildContainerImage(options = {}) {
   return { args, contextDir, tags };
 }
 
+// Temporary: while the repo is pre-GA every release is a prerelease, so the
+// rule below ("only stable moves `:latest`") leaves `:latest` pinned to a build
+// that predates the alpha train. Anyone following the documented Docker quick
+// start — `docs/operations/env.example` defaults `NEXTGEN_IMAGE` to `:latest` —
+// gets that stale image rather than the alpha they expect.
+//
+// Until the first stable release, point `:latest` at the alpha train too. Flip
+// this back to `false` when leaving prerelease mode (`changeset pre exit`, see
+// `.changeset/README.md`), so a later alpha can never overwrite a stable
+// `:latest`.
+export const TAG_PRERELEASE_AS_LATEST = true;
+
 export function containerTags({ image = SERVER_IMAGE, version, prerelease }) {
   const tags = [`${image}:${version}`];
-  if (!prerelease) {
+  if (!prerelease || TAG_PRERELEASE_AS_LATEST) {
     tags.push(`${image}:latest`);
   }
   return tags;

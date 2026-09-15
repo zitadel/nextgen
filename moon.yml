@@ -58,11 +58,13 @@ tasks:
   # affected-gate and release-body logic never become test files nothing
   # executes.
   test:
-    command: "node --test scripts/ci-mode.test.mjs scripts/release-github.test.mjs"
+    script: "node --test scripts/ci-mode.test.mjs scripts/release-github.test.mjs && corepack pnpm exec tsx --test scripts/generate-meta-schemas.test.ts"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
       - "scripts/dev-process.mjs"
+      - "scripts/generate-meta-schemas.ts"
+      - "scripts/generate-meta-schemas.test.ts"
       - "scripts/release-artifacts.mjs"
       - "scripts/release-github.mjs"
       - "scripts/release-github.test.mjs"

@@ -95,19 +95,21 @@ describe("attachment predicate", () => {
 });
 
 describe("claim copy", () => {
-  // The 14-day window is now enforced at claim time (the server answers
-  // proj.claim_window_expired), so the nudge may finally promise the deadline.
-  // It still promises no deletion, because nothing removes the project when
-  // the window closes (ADR 046 §Non-goals).
-  it("promises the window, not deletion", () => {
+  // The 14-day window is enforced at claim time (the server answers
+  // proj.claim_window_expired), so the nudge promises the deadline — and the
+  // data-loss stake, per product decision: temporary projects get purged
+  // after the window. "lost", deliberately not "deleted"/"removed": the copy
+  // warns about the outcome without promising a mechanism.
+  it("names the window and the data-loss stake", () => {
     expect(claimAction("0.1.0")).toContain("within 14 days of creation");
+    expect(claimAction("0.1.0")).toContain("its data may be lost");
     expect(claimAction("0.1.0")).not.toMatch(/delete|removed|expire/i);
     expect(claimAction("0.1.0")).toContain("npx @zitadel/cli@latest claim");
   });
 
   it("names the concrete deadline when the creation time is known", () => {
     const withDeadline = claimAction("0.1.0", claimWindowDeadline("2026-09-04T10:00:00.000Z"));
-    expect(withDeadline).toContain("before ");
+    expect(withDeadline).toContain("Claim your Project before ");
     expect(withDeadline).toContain("2026");
     expect(withDeadline).not.toContain("within 14 days of creation");
   });
@@ -115,7 +117,7 @@ describe("claim copy", () => {
   it("boxes the same nudge with the command pulled out of the prose", () => {
     const box = claimBoxAction("0.1.0");
     expect(box.command).toBe("npx @zitadel/cli@latest claim");
-    expect(box.text).toContain("temporary until you attach it to a team");
+    expect(box.text).toContain("temporary and its data may be lost");
     expect(box.text).not.toContain("npx");
   });
 

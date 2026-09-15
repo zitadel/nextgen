@@ -26,9 +26,6 @@ export type ZlSelectChangeDetail = { name: string; value: string };
 /**
  * Atom: `<zl-select>` — a select bound to a single choice.
  *
- * Spec lineage (file `8UjCXw8yemgljmbkWGrSfE`, "Zitadel - Design System - External"):
- *   - trigger + open/selected matrix:  node `4397:4816` (Dropdown)
- *   - option (Items) state matrix:      node `4397:4098` (Input text)
  *
  * Agent-first contract (see `packages/components/AGENTS.md` → "Input atoms expose
  * a real native control"): the operable, accessible, form-associated, and
