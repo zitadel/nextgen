@@ -1,4 +1,4 @@
-# ADR 061: CLI Resource Commands
+# ADR 062: CLI Resource Commands
 
 > **Status:** Proposed
 > **Date:** 2026-09-14
