@@ -7,7 +7,7 @@
 > here but are written only through `plan` / `apply`
 > ([ADR 007](../../adrs/007-gitops-configuration-surface.md),
 > [ADR 035](../../adrs/035-configuration-environments.md)). The decisions behind
-> this surface are [ADR 061](../../adrs/061-cli-resource-commands.md).
+> this surface are [ADR 062](../../adrs/062-cli-resource-commands.md).
 
 ## Shape
 

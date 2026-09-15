@@ -27,7 +27,7 @@ import { RESOURCES } from "../../../src/commands/resources";
  * therefore not a judgement call and accept no exclusion — see the test below.
  *
  * The converse does not hold. Several resources here still list through `GET`
- * (recorded as an open question in ADR 061), so a collection without a query
+ * (recorded as an open question in ADR 062), so a collection without a query
  * endpoint may or may not be a resource, and that is where a person decides.
  */
 const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
@@ -85,7 +85,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
-  setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 061 §12)",
+  setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 062 §12)",
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
 };
