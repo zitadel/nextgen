@@ -6,9 +6,10 @@
  * edits — no docs crawl, no hosted schema required.
  *
  * The files under `meta-schemas/` are generated: `scripts/sync-meta-schemas.mjs`
- * copies them from `api/openapi/endpoints/schemas/*.json` (the source the
- * server embeds) ahead of build, typecheck and test. Edit the source, never
- * the copy.
+ * copies them from `api/openapi/endpoints/schemas/*.json` (the files the
+ * server embeds) ahead of build, typecheck and test. Those are generated in
+ * turn from the OpenAPI YAML by `scripts/generate-meta-schemas.ts` at the repo
+ * root, so the YAML is the only thing to edit.
  */
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with {
   type: "json",
