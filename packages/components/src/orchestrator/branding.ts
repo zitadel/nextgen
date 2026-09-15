@@ -1,90 +1,86 @@
 /**
  * Client-side branding shape consumed by the orchestrator.
  *
- * The five baseline wire fields (`layout`, `liquid_template`, `logo_url`,
- * `hero_url`) come straight from the orval-generated
- * `CreateFlow201Branding`. The v2 "structured extension" blocks (palette /
- * typography / shape / assets / theme) are deliberately client-only — see
- * `docs/design/branding/schema.md` "Proposed structured extension". Once
- * those land on the wire we drop the extension blocks here too.
+ * The appearance blocks (`theme`, `typography`, `shape`) are wire fields: a
+ * branding revision stores them and flow responses project them, so they are
+ * re-exported from the generated model rather than redeclared. Aliasing keeps
+ * the orchestrator's vocabulary (`BrandingPalette`, `BrandingShape`) without a
+ * second definition that can drift from the revision it paints.
  *
- * The validator (`branding-validator.ts`) strips fields the OpenAPI doesn't
- * model if a misconfigured tenant ever leaks them down through the wire.
+ * `attribution` is the one genuine client extension: it is a property of the
+ * embedding, not of the stored revision.
  */
 import type {
   CreateFlow201Branding,
   CreateFlow201BrandingLayout,
+  CreateFlow201BrandingShape,
+  CreateFlow201BrandingTheme,
+  CreateFlow201BrandingThemeLight,
+  CreateFlow201BrandingThemeLightPalette,
+  CreateFlow201BrandingTypography,
 } from "@zitadel/api/generated/model";
 
 export type FlowLayout = CreateFlow201BrandingLayout;
 
-export type BrandingPalette = {
-  primary?: string;
-  on_primary?: string;
-  background?: string;
-  surface?: string;
-  muted?: string;
-  border?: string;
-  text?: string;
-  text_muted?: string;
-  link?: string;
-  success?: string;
-  warning?: string;
-  error?: string;
-};
-
-export type BrandingTypography = {
-  font_family?: string;
-  /**
-   * Display face for card titles and labels. Optional: without it a tenant's
-   * `font_family` sets the headings too, which is the single-font look most
-   * brands want. Naming it is how a brand keeps a separate display face.
-   */
-  font_family_heading?: string;
-  font_family_mono?: string;
-  scale?: number;
-};
-
-export type BrandingShape = {
-  /**
-   * A preset name or a pixel value. Only the presets reach the tokens today;
-   * mapping a number is #1061, and until then a numeric radius persists on the
-   * revision and leaves the shipped rounding in place.
-   */
-  radius?: "none" | "sm" | "md" | "lg" | "full" | number;
-  density?: "compact" | "regular" | "comfortable";
-};
-
-export type BrandingTheme = {
-  mode?: "light" | "dark" | "auto";
-  dark?: {
-    palette?: BrandingPalette;
-  };
-};
-
-export type BrandingAssets = {
-  logo_dark?: string;
-  favicon?: string;
-  background_image?: string;
-};
+export type BrandingPalette = CreateFlow201BrandingThemeLightPalette;
 
 /**
- * Wire shape (`CreateFlow201Branding`) plus the v2 client-only extension.
- * Structurally a superset, so any `CreateFlow201Branding` payload from the
- * wire is assignable to `Branding` without a cast.
+ * One complete surface. Light and dark carry the same fields and neither
+ * inherits from the other, so the two sides share one type.
+ */
+export type BrandingThemeSide = CreateFlow201BrandingThemeLight;
+
+export type BrandingTheme = CreateFlow201BrandingTheme;
+
+export type BrandingTypography = CreateFlow201BrandingTypography;
+
+export type BrandingShape = CreateFlow201BrandingShape;
+
+/** The published sides a revision offers, in the order the surface prefers them. */
+export type PublishedSides = readonly ResolvableSide[];
+
+export type ResolvableSide = "light" | "dark";
+
+/**
+ * Which sides the revision actually publishes. A side is published when the
+ * revision names it at all — an empty side object still says "this surface is
+ * mine", it just takes the maintained defaults for every key.
+ */
+export function publishedSides(branding: Branding | undefined): PublishedSides {
+  const theme = branding?.theme;
+  const sides: ResolvableSide[] = [];
+  if (theme?.light) sides.push("light");
+  if (theme?.dark) sides.push("dark");
+  return sides;
+}
+
+/**
+ * The mark for the resolved surface. A logo is pixels and is never recoloured,
+ * so a side without its own file shows no mark rather than borrowing the other
+ * side's. The legacy top-level `logo_url` is a single-mark fallback and applies
+ * only when neither side names one.
+ */
+export function resolveLogoUrl(
+  branding: Branding | undefined,
+  theme: ResolvableSide,
+): string | undefined {
+  if (!branding) return undefined;
+  const sides = branding.theme;
+  const sideLogo = theme === "light" ? sides?.light?.logo_url : sides?.dark?.logo_url;
+  if (sideLogo) return sideLogo;
+  if (sides?.light?.logo_url || sides?.dark?.logo_url) return undefined;
+  return branding.logo_url;
+}
+
+/**
+ * Wire shape plus the embedding-owned attribution block.
  *
  * `attribution.show_zitadel` controls the "Secured with Zitadel" pill in
  * the orchestrator footer. Tenants set it to `false` only when they have a
  * licence that permits removing attribution (community / OSS deployments
- * always show it). The flag intentionally lives on `Branding` so it can
- * be overridden per-flow alongside the rest of the visual surface.
+ * always show it).
  */
 export type Branding = CreateFlow201Branding & {
-  palette?: BrandingPalette;
-  typography?: BrandingTypography;
-  shape?: BrandingShape;
-  assets?: BrandingAssets;
-  theme?: BrandingTheme;
   attribution?: BrandingAttribution;
 };
 

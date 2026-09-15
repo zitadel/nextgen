@@ -72,7 +72,7 @@ export class ZitadelSurface extends LitElement {
     const root = this.shadowRoot;
     if (root) {
       applyBaseTokens(root);
-      applyBrandingTokens(root, branding, this.themeController.theme);
+      applyBrandingTokens(root, branding);
       // Fonts load as a document-level `<link>`, because `@font-face` inside a
       // shadow tree never registers. That makes injection a page-wide grant,
       // so neither face goes into a document we do not own: on a dedicated
