@@ -46114,16 +46114,16 @@ func (s *SchemaURL) SetURL(val url.URL) {
 // Ref: #
 type SecretVariable struct {
 	// Always `true`. A non-secret variable is returned as a bare scalar instead.
-	Secret SecretVariableSecret `json:"secret"`
+	Secret bool `json:"secret"`
 }
 
 // GetSecret returns the value of Secret.
-func (s *SecretVariable) GetSecret() SecretVariableSecret {
+func (s *SecretVariable) GetSecret() bool {
 	return s.Secret
 }
 
 // SetSecret sets the value of Secret.
-func (s *SecretVariable) SetSecret(val SecretVariableSecret) {
+func (s *SecretVariable) SetSecret(val bool) {
 	s.Secret = val
 }
 
@@ -46160,20 +46160,6 @@ func (s *SecretVariableInput) SetValue(val VariableScalar) {
 // SetSecret sets the value of Secret.
 func (s *SecretVariableInput) SetSecret(val bool) {
 	s.Secret = val
-}
-
-// Always `true`. A non-secret variable is returned as a bare scalar instead.
-type SecretVariableSecret bool
-
-const (
-	SecretVariableSecretTrue SecretVariableSecret = true
-)
-
-// AllValues returns all SecretVariableSecret values.
-func (SecretVariableSecret) AllValues() []SecretVariableSecret {
-	return []SecretVariableSecret{
-		SecretVariableSecretTrue,
-	}
 }
 
 // Merged schema.

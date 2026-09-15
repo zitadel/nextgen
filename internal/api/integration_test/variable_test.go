@@ -103,7 +103,7 @@ func TestVariables(t *testing.T) {
 			}),
 		})
 
-		held := api.NewSecretVariableVariable(api.SecretVariable{Secret: api.SecretVariableSecretTrue})
+		held := api.NewSecretVariableVariable(api.SecretVariable{Secret: true})
 		assert.Equal(t, held, get(t, prod)["GITHUB_CLIENT_SECRET"])
 
 		// The ciphertext must not leak through the single-variable read either.

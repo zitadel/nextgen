@@ -72040,7 +72040,7 @@ func (s *SecretVariable) Encode(e *jx.Encoder) {
 func (s *SecretVariable) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("secret")
-		s.Secret.Encode(e)
+		e.Bool(true)
 	}
 }
 
@@ -72060,7 +72060,9 @@ func (s *SecretVariable) Decode(d *jx.Decoder) error {
 		case "secret":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				if err := s.Secret.Decode(d); err != nil {
+				v, err := d.Bool()
+				s.Secret = bool(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -72230,38 +72232,6 @@ func (s *SecretVariableInput) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *SecretVariableInput) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes SecretVariableSecret as json.
-func (s SecretVariableSecret) Encode(e *jx.Encoder) {
-	e.Bool(bool(s))
-}
-
-// Decode decodes SecretVariableSecret from json.
-func (s *SecretVariableSecret) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode SecretVariableSecret to nil")
-	}
-	v, err := d.Bool()
-	if err != nil {
-		return err
-	}
-	*s = SecretVariableSecret(v)
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s SecretVariableSecret) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SecretVariableSecret) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

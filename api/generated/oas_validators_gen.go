@@ -8273,29 +8273,6 @@ func (s SchemaDocument) Validate() error {
 	}
 }
 
-func (s *SecretVariable) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Secret.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "secret",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
 func (s *SecretVariableInput) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -8317,15 +8294,6 @@ func (s *SecretVariableInput) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s SecretVariableSecret) Validate() error {
-	switch s {
-	case true:
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s *SessionDeletedEvent) Validate() error {
@@ -10239,10 +10207,7 @@ func (s Variable) Validate() error {
 		}
 		return nil
 	case SecretVariableVariable:
-		if err := s.SecretVariable.Validate(); err != nil {
-			return err
-		}
-		return nil
+		return nil // no validation needed
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}

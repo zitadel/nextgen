@@ -169,7 +169,7 @@ func toAPIVariables(variables []*domain.Variable) (api.Variables, error) {
 // either that or its plaintext would settle a question ADR 062 §9 leaves open.
 func toAPIVariable(variable *domain.Variable) (api.Variable, error) {
 	if variable.IsSecret {
-		return api.NewSecretVariableVariable(api.SecretVariable{Secret: api.SecretVariableSecretTrue}), nil
+		return api.NewSecretVariableVariable(api.SecretVariable{Secret: true}), nil
 	}
 	scalar, err := toAPIVariableScalar(variable.Value)
 	if err != nil {
