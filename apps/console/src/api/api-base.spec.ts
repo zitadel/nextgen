@@ -40,6 +40,24 @@ describe("apiBase", () => {
     expect(apiBase).toBe("/elsewhere");
   });
 
+  it("allows a later import to bind a new proxyPath after reset", async () => {
+    // The write-once globalThis slot is what leaked across Vitest files, not
+    // the `apiBase` export: a fresh module can print the stubbed env while
+    // `configureZitadel` still returns the previous `/api` handle.
+    vi.stubEnv("DEV", true);
+    vi.stubEnv("VITE_CONSOLE_API_BASE", undefined);
+    const first = await import("./zitadel");
+    expect(first.apiBase).toBe("/api");
+
+    _resetConfigForTesting();
+    vi.resetModules();
+    vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
+    const second = await import("./zitadel");
+    const { getZitadelConfig } = await import("@zitadel/api/config");
+    expect(second.apiBase).toBe("http://localhost/api");
+    expect(getZitadelConfig()?.proxyPath).toBe("http://localhost/api");
+  });
+
   it("treats an empty VITE_CONSOLE_API_BASE as unset, matching the dev proxy", async () => {
     // The dev proxy's `env.VITE_CONSOLE_API_BASE || "/api"` treats "" as
     // unset; a `??` here would keep "" and bypass the proxy under the dev
