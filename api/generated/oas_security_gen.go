@@ -116,6 +116,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	DeleteUserByIDOperation: []string{
 		"user.delete",
 	},
+	DeleteVariableOperation: []string{
+		"variable.write",
+	},
 	ExchangeHandoffOperation: []string{
 		"session.write",
 	},
@@ -160,6 +163,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetUserByIDOperation: []string{
 		"user.read",
+	},
+	GetVariableOperation: []string{
+		"variable.read",
+	},
+	GetVariablesOperation: []string{
+		"variable.read",
 	},
 	InitClaimOperation: []string{
 		"project.write",
@@ -221,6 +230,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	UpdateTeamOperation: []string{
 		"team.write",
+	},
+	UpdateVariablesOperation: []string{
+		"variable.write",
 	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempt.write",

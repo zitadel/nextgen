@@ -23,6 +23,7 @@ const (
 	DeleteGrantOperation                   OperationName = "DeleteGrant"
 	DeleteTeamOperation                    OperationName = "DeleteTeam"
 	DeleteUserByIDOperation                OperationName = "DeleteUserByID"
+	DeleteVariableOperation                OperationName = "DeleteVariable"
 	ExchangeHandoffOperation               OperationName = "ExchangeHandoff"
 	FinishUserPasskeyRegistrationOperation OperationName = "FinishUserPasskeyRegistration"
 	GetAuthAttemptOperation                OperationName = "GetAuthAttempt"
@@ -45,6 +46,8 @@ const (
 	GetSessionOperation                    OperationName = "GetSession"
 	GetTeamOperation                       OperationName = "GetTeam"
 	GetUserByIDOperation                   OperationName = "GetUserByID"
+	GetVariableOperation                   OperationName = "GetVariable"
+	GetVariablesOperation                  OperationName = "GetVariables"
 	InitClaimOperation                     OperationName = "InitClaim"
 	IssueChallengeOperation                OperationName = "IssueChallenge"
 	ListBrandingOperation                  OperationName = "ListBranding"
@@ -68,5 +71,6 @@ const (
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"
 	UpdateTeamOperation                    OperationName = "UpdateTeam"
+	UpdateVariablesOperation               OperationName = "UpdateVariables"
 	VerifyChallengeProofOperation          OperationName = "VerifyChallengeProof"
 )

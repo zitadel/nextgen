@@ -101,7 +101,7 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["oidc missing client_secret", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined } }, false],
   ["literal client_secret in block", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "leak" } }, false],
   ["client_secret reference with text around it", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "a8f3c1-${{ TAIL }}" } }, false],
-  ["client_secret_env twin (ADR 061)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" } }, false],
+  ["client_secret_env twin (ADR 062)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" } }, false],
   ["client_id as a variable reference", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: "${{ ID }}" } }, true],
   ["camelCase leftover (clientId)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined, clientId: "c" } }, false],
   ["secret_strategy not shipped", { ...root, protocol: "oidc", oidc: { ...oidcBlock, secret_strategy: "static" } }, false],

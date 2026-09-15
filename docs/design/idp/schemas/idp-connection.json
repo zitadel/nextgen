@@ -155,12 +155,12 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 512,
-          "description": "Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference to a variable in case of separate clients per environment."
+          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 062). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
         },
         "client_secret": {
           "type": "string",
           "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
-          "description": "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
+          "description": "A reference to the variable holding the client secret (ADR 062), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
         },
         "token_endpoint_auth_method": {
           "type": "string",
@@ -257,12 +257,12 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 512,
-          "description": "Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference to a variable in case of separate clients per environment."
+          "description": "Either a literal, or a `${{ NAME }}` reference to a variable (ADR 062). A project that registers a separate OAuth client per environment references it; one client for everything can write it down."
         },
         "client_secret": {
           "type": "string",
           "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
-          "description": "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
+          "description": "A reference to the variable holding the client secret (ADR 062), never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The engine resolves it against the environment serving the request."
         },
         "token_endpoint_auth_method": {
           "type": "string",
