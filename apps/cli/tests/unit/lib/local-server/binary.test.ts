@@ -45,6 +45,37 @@ describe("local server binary helpers", () => {
     expect(runtime.command).toBe("/tmp/fake-nextgen-server --migrate");
     expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
     expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
+    expect(runtime.env).toEqual({ injected: [] });
+  });
+
+  it("passes resolved project variables through the child environment, never argv", async () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    const runtime = await startBinaryRuntime({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+      port: 8091,
+      serverUrl: "http://localhost:8091",
+      env: {
+        values: { GOOGLE_CLIENT_SECRET: "canary-secret" },
+        injected: ["GOOGLE_CLIENT_SECRET"],
+      },
+    });
+
+    const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(options.env.GOOGLE_CLIENT_SECRET).toBe("canary-secret");
+    expect([command, ...args].join(" ")).not.toContain("canary-secret");
+    expect(runtime.command).not.toContain("canary-secret");
+    expect(runtime.env).toEqual({
+      injected: ["GOOGLE_CLIENT_SECRET"],
+    });
+    expect(JSON.stringify(runtime)).not.toContain("canary-secret");
   });
 
   it("records an explicit source build version with a binary override", () => {
