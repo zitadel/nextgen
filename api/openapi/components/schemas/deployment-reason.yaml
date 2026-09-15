@@ -1,0 +1,16 @@
+title: DeploymentReason
+type: string
+description: |
+  Why the deployment was created. All three are the same operation — a new
+  deployment pointing the environment at a release — and the reason records
+  the caller's intent:
+
+  - `deploy` — a release goes live on the environment.
+  - `promote` — a release that already runs on another environment goes live
+    here; `source_environment_id` records where it came from.
+  - `rollback` — a release the environment ran earlier goes live again.
+enum:
+  - deploy
+  - promote
+  - rollback
+example: deploy
