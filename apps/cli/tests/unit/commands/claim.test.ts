@@ -11,7 +11,7 @@ import {
   setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
-import { http, passthrough } from "msw";
+import { http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -421,6 +421,60 @@ describe("claim", () => {
       expect(res.exitCode).toBe(0);
       expect(`${res.stdout}${res.stderr}`).not.toContain("advertised a claim page");
     });
+
+    // The stub would complete this claim on the first poll, so an exit of 0
+    // here would mean the command ignored the runtime document and started
+    // a claim the real server could never finish.
+    it("refuses a local server that does not host the platform project", async () => {
+      const { cwd } = await makeProject();
+      const serverUrl = await startClaimServer(undefined, { hostsPlatform: false });
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+      const res = await runCliForTest([
+        "claim",
+        "--cwd",
+        cwd,
+        "--json",
+        "--server",
+        "local",
+        "--no-open",
+      ]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as { status: string; code: string; message: string };
+      expect(json.status).toBe("error");
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toContain("cannot complete a claim");
+      expect((await readSecret(cwd)).team_id).toBeUndefined();
+    });
+  });
+
+  // msw's platform handlers answer claim/init on any origin, so a minted
+  // challenge in the store would mean the command asked before checking.
+  it("refuses a self-hosted server without minting a challenge", async () => {
+    const { cwd } = await makeProject();
+    server.use(
+      http.get("https://zitadel.example.com/console/runtime.json", () =>
+        HttpResponse.json({ mode: "standalone", console_project_id: "proj_customer" }),
+      ),
+    );
+
+    const res = await runCliForTest([
+      "claim",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "https://zitadel.example.com",
+      "--no-open",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(snapshotPlatformStore().claimChallengeIds).toHaveLength(0);
+    expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 });
 
@@ -433,11 +487,23 @@ describe("claim", () => {
  */
 async function startClaimServer(
   claimUrl = "http://localhost/claim/ch_localstub",
+  { hostsPlatform = true }: { hostsPlatform?: boolean } = {},
 ): Promise<string> {
   const httpServer = createServer((req, res) => {
     const url = req.url ?? "";
     if (url === "/healthz") {
       res.writeHead(200).end("ok");
+      return;
+    }
+    // The runtime document `claim` reads to decide whether this server can
+    // complete a claim at all (serverHostsPlatform).
+    if (url === "/console/runtime.json") {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          mode: "standalone",
+          console_project_id: hostsPlatform ? "proj_platform" : "proj_local_app",
+        }),
+      );
       return;
     }
     if (url.endsWith("/claim/init")) {

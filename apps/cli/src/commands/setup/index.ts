@@ -25,6 +25,7 @@ import {
   claimCommand,
   claimState,
   claimWindowDeadline,
+  serverHostsPlatform,
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
@@ -422,7 +423,7 @@ export default class Setup extends BaseCommand {
     // Nudged on the cloud, and on a local server that actually hosts the
     // platform plane: `claimState` is offline and gates local to
     // not-applicable, but setup is online anyway, so it asks the server's
-    // runtime document (see localServerHostsPlatform). A dry run contacts no
+    // runtime document (see serverHostsPlatform). A dry run contacts no
     // platform, so it previews the nudge for local servers optimistically
     // instead of probing.
     // The deadline is concrete because the server enforces the claim window
@@ -434,7 +435,7 @@ export default class Setup extends BaseCommand {
     const nudgeClaim =
       claimState({ secret: {}, server: answers.server }).kind === "detached" ||
       (serverKind.value(answers.server) === "local" &&
-        (dryRun || (await localServerHostsPlatform(answers.server))));
+        (dryRun || (await serverHostsPlatform(answers.server))));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
@@ -566,35 +567,6 @@ async function resolveScaffoldFramework(
     });
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
-}
-
-/**
- * Whether a local server hosts the platform plane, i.e. whether a claim
- * started against it can actually complete. `platform.bootstrap_project`
- * pins the deployment's default project to the well-known proj_platform, and
- * the console runtime document publishes that resolution, so one public GET
- * answers the question. Fail closed: an unreadable, absent, or hanging
- * document means no nudge, never a nudge into a flow that would 401 at
- * claim/complete — the timeout mirrors checkLocalServerHealth so a socket
- * that accepts and stalls cannot hang setup after the real work is done.
- * Exported so the fail-closed behavior is testable without a live server.
- */
-export async function localServerHostsPlatform(
-  server: string,
-  timeoutMs = 1500,
-): Promise<boolean> {
-  try {
-    const res = await fetch(new URL("/console/runtime.json", server), {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) {
-      return false;
-    }
-    const doc = (await res.json()) as { console_project_id?: unknown };
-    return doc.console_project_id === "proj_platform";
-  } catch {
-    return false;
-  }
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */

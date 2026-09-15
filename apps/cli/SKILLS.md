@@ -216,6 +216,11 @@ the CLI's help layer, not the envelope.
   fresh link does **not** help — only a fresh `setup` yields a claimable
   project (the old one can no longer be claimed; it stays temporary and its
   data may be lost).
+  A claim needs a server that hosts the platform plane: Zitadel Cloud always
+  does, and a local or self-hosted server only when it was started with
+  `platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true`).
+  Against any other server the command exits `E_VALIDATION` before minting a
+  link, instead of opening a claim page that cannot complete.
   `--dry-run` stops before
   anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
   there is nothing to preview, because a claim is decided in a browser.

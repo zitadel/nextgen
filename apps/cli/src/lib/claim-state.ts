@@ -38,6 +38,37 @@ function formatDeadline(deadline: Date): string {
   });
 }
 
+/**
+ * Whether a server hosts the platform plane, i.e. whether a claim started
+ * against it can actually complete. The cloud always does, so it is not
+ * asked. Anywhere else `platform.bootstrap_project` pins the deployment's
+ * default project to the well-known proj_platform, and the console runtime
+ * document publishes that resolution, so one public GET answers the question.
+ * Fail closed: an unreadable, absent, or hanging document means no, never a
+ * claim that would 401 at claim/complete — the timeout mirrors
+ * checkLocalServerHealth so a socket that accepts and stalls cannot hang the
+ * caller.
+ *
+ * Shared by `setup` (whether to nudge) and `claim` (whether to start), so the
+ * nudge and the command cannot disagree about where a claim is possible.
+ */
+export async function serverHostsPlatform(server: string, timeoutMs = 1500): Promise<boolean> {
+  if (serverKind.value(server) === "cloud") {
+    return true;
+  }
+  try {
+    const res = await fetch(new URL("/console/runtime.json", server), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      return false;
+    }
+    const doc = (await res.json()) as { console_project_id?: unknown };
+    return doc.console_project_id === "proj_platform";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Whether this project is attached to a team, as the CLI can tell locally.
