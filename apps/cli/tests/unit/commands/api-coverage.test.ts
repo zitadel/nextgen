@@ -67,8 +67,6 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   createBranding: "configuration is written by plan/apply from .zitadel/",
   createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
   createFlowDefinition: "configuration is written by plan/apply from .zitadel/",
-  updateFlowDefinition: "configuration is written by plan/apply from .zitadel/",
-  deleteFlowDefinition: "configuration is written by plan/apply from .zitadel/",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
