@@ -9,6 +9,8 @@ Versioned Zitadel local config schemas and defaults — the contract behind the
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `@zitadel/config/schemas`                          | Zod schemas for the local config files (`schemaConfigSchema`, `flowConfigSchema`, `brandingConfigSchema`) |
 | `@zitadel/config/branding-url`                     | Canonical loopback HTTP URL predicate shared by config and browser render gates                           |
+| `@zitadel/config/branding-contrast`                | Contrast pairs, thresholds and measurement for a branding palette                                         |
+| `@zitadel/config/css-color`                        | Resolves the colour forms a branding palette accepts to sRGB                                              |
 | `@zitadel/config/validate`                         | Validation entry points the CLI runs on `plan`/`apply`                                                    |
 | `@zitadel/config/normalize`                        | Normalization used to compare local files against server state                                            |
 | `@zitadel/config/defaults`                         | The versioned default user schema, login flow, and branding designs                                       |
