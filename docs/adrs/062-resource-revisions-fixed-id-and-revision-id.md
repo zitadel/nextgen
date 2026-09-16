@@ -35,6 +35,10 @@ differently:
   `revision_id` per revision, because identity links reference the connection
   and must keep resolving after a revise.
 
+This ADR uses three words. A kind is schema, flow definition, branding or
+connection. A resource is one of a kind, such as the `Consumer` schema or the
+`google` connection. A revision is one immutable version of a resource.
+
 So `id` has two meanings in one API. For three kinds it names a revision, for
 one kind it names the resource. A release pointer records the revision it
 pins under `revision_id`, and for schemas, flow definitions and branding that
@@ -88,14 +92,16 @@ Get-by-id returns the newest revision of the resource.
 
 A list takes a `revisions` parameter with two values:
 
-- `latest` returns the newest revision of each resource, one row per resource.
+- `latest` returns the newest revision of each resource.
 - `all` returns every revision.
 
-Each kind picks its own default and states it in the operation's description.
-A page token is only valid in the mode that issued it: a token from a `latest`
-request cannot page an `all` request, and the other way round. `GET /schemas`
-works this way today (#957), and `POST /idps/query` is defined the same way
-in #1217.
+`latest` is the default for every kind. A list without the `revisions`
+parameter returns the newest revision of each resource of that kind. With
+`revisions=all` it returns every revision. A page token is only valid in the
+mode that issued it: a token from a `latest` request cannot page an `all`
+request, and the other way round. Today `GET /schemas` has both modes with
+`all` as its default (#957), and `POST /idps/query` in #1217 has `latest` as
+its default.
 
 Every kind also has a read by `revision_id`, so a pinned revision can be
 fetched after newer ones exist. Two callers depend on it: the release service
@@ -147,7 +153,9 @@ service's pointer validation from get-by-id to the read by `revision_id`:
   releases already pin it. The ticket also updates the users and flow steps
   that reference a schema by its id. A schema stored without an `objectType`
   has nothing to group its revisions by; the ticket decides whether such a
-  document is rejected or kept as a resource with one revision.
+  document is rejected or kept as a resource with one revision. `GET /schemas`
+  changes its default from `all` to `latest`. The CLI `schemas list` command
+  shows the history of one `objectType` and passes `revisions=all` explicitly.
 - **Branding.** `id` becomes fixed per project and each publish allocates a
   `revision_id`.
 
