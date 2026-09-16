@@ -3364,6 +3364,45 @@ func (c *MockAllStatementsIsStatementsCall) DoAndReturn(f func()) *MockAllStatem
 	return c
 }
 
+// ListAuthorizedProjects mocks base method.
+func (m *MockAllStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAuthorizedProjects", ctx, homeProjectID, userID, page)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Project])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAuthorizedProjects indicates an expected call of ListAuthorizedProjects.
+func (mr *MockAllStatementsMockRecorder) ListAuthorizedProjects(ctx, homeProjectID, userID, page any) *MockAllStatementsListAuthorizedProjectsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuthorizedProjects", reflect.TypeOf((*MockAllStatements)(nil).ListAuthorizedProjects), ctx, homeProjectID, userID, page)
+	return &MockAllStatementsListAuthorizedProjectsCall{Call: call}
+}
+
+// MockAllStatementsListAuthorizedProjectsCall wrap *gomock.Call
+type MockAllStatementsListAuthorizedProjectsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListAuthorizedProjectsCall) Return(arg0 *database.ListResult[*domain.Project], arg1 error) *MockAllStatementsListAuthorizedProjectsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListAuthorizedProjectsCall) Do(f func(context.Context, string, string, database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockAllStatementsListAuthorizedProjectsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListAuthorizedProjectsCall) DoAndReturn(f func(context.Context, string, string, database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockAllStatementsListAuthorizedProjectsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListAuthzAssignments mocks base method.
 func (m *MockAllStatements) ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error) {
 	m.ctrl.T.Helper()
@@ -9838,6 +9877,45 @@ func (c *MockAuthzAssignmentStatementsIsStatementsCall) Do(f func()) *MockAuthzA
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsIsStatementsCall) DoAndReturn(f func()) *MockAuthzAssignmentStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListAuthorizedProjects mocks base method.
+func (m *MockAuthzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAuthorizedProjects", ctx, homeProjectID, userID, page)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Project])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAuthorizedProjects indicates an expected call of ListAuthorizedProjects.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListAuthorizedProjects(ctx, homeProjectID, userID, page any) *MockAuthzAssignmentStatementsListAuthorizedProjectsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuthorizedProjects", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListAuthorizedProjects), ctx, homeProjectID, userID, page)
+	return &MockAuthzAssignmentStatementsListAuthorizedProjectsCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsListAuthorizedProjectsCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListAuthorizedProjectsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsListAuthorizedProjectsCall) Return(arg0 *database.ListResult[*domain.Project], arg1 error) *MockAuthzAssignmentStatementsListAuthorizedProjectsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsListAuthorizedProjectsCall) Do(f func(context.Context, string, string, database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockAuthzAssignmentStatementsListAuthorizedProjectsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsListAuthorizedProjectsCall) DoAndReturn(f func(context.Context, string, string, database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockAuthzAssignmentStatementsListAuthorizedProjectsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
