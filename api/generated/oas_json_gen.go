@@ -46229,6 +46229,365 @@ func (s *ListFlowDefinitionsErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ListMyProjectsBadRequest as json.
+func (s *ListMyProjectsBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes ListMyProjectsBadRequest from json.
+func (s *ListMyProjectsBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListMyProjectsBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListMyProjectsBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListMyProjectsBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListMyProjectsBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListMyProjectsErrorResponse as json.
+func (s ListMyProjectsErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListMyProjectsErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListMyProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListMyProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListMyProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SessTokenInvalidListMyProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.token_invalid")
+		{
+			s := s.SessTokenInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListMyProjectsErrorResponse from json.
+func (s *ListMyProjectsErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListMyProjectsErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListMyProjectsErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListMyProjectsErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListMyProjectsErrorResponse
+					found = true
+				case "sess.token_invalid":
+					s.Type = SessTokenInvalidListMyProjectsErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListMyProjectsErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalListMyProjectsErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListMyProjectsErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessTokenInvalidListMyProjectsErrorResponse:
+		if err := s.SessTokenInvalid.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListMyProjectsErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListMyProjectsErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListMyProjectsInternalServerError as json.
+func (s *ListMyProjectsInternalServerError) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes ListMyProjectsInternalServerError from json.
+func (s *ListMyProjectsInternalServerError) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListMyProjectsInternalServerError to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListMyProjectsInternalServerError(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListMyProjectsInternalServerError) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListMyProjectsInternalServerError) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ListMyProjectsResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ListMyProjectsResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("projects")
+		e.ArrStart()
+		for _, elem := range s.Projects {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfListMyProjectsResponse = [2]string{
+	0: "projects",
+	1: "next_page_token",
+}
+
+// Decode decodes ListMyProjectsResponse from json.
+func (s *ListMyProjectsResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListMyProjectsResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "projects":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Projects = make([]ProjectResponse, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem ProjectResponse
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Projects = append(s.Projects, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"projects\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ListMyProjectsResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfListMyProjectsResponse) {
+					name = jsonFieldsNameOfListMyProjectsResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListMyProjectsResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListMyProjectsResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ListReleasesErrorResponse as json.
 func (s ListReleasesErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()

@@ -637,6 +637,20 @@ func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params List
 	return r, ht.ErrNotImplemented
 }
 
+// ListMyProjects implements listMyProjects operation.
+//
+// The projects the signed-in user holds an active grant on, either directly or
+// through a team they are a member of. Ordered by project id and paged with an
+// opaque cursor.
+// This is not the same question as `queryProjects`, which answers with the one
+// project the calling credential is bound to. Here the session is the caller
+// and the grants are the answer, so the list spans projects.
+//
+// GET /users/me/projects
+func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListReleases implements listReleases operation.
 //
 // Lists the project's releases, newest first.

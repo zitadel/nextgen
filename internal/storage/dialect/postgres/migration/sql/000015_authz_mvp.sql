@@ -199,6 +199,13 @@ CREATE INDEX idx_authz_assignments_principal_project
         (project_id, principal_type, principal_id)
     WHERE revoked_at IS NULL;
 
+-- ADR 053 §6: authorized-projects discovery starts from the principal and has
+-- no project to anchor on, so the project column comes last here.
+CREATE INDEX idx_authz_assignments_principal
+    ON zitadel_nextgen.authz_assignments
+        (principal_type, principal_id, project_id)
+    WHERE revoked_at IS NULL;
+
 CREATE INDEX idx_authz_assignments_delegation
     ON zitadel_nextgen.authz_assignments (project_id, delegation_id)
     WHERE delegation_id IS NOT NULL;
@@ -313,6 +320,7 @@ DROP TABLE IF EXISTS zitadel_nextgen.authz_membership_edges;
 DROP INDEX IF EXISTS zitadel_nextgen.authz_assignments_one_owning_team;
 DROP INDEX IF EXISTS zitadel_nextgen.authz_assignments_unique_active;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_authz_assignments_delegation;
+DROP INDEX IF EXISTS zitadel_nextgen.idx_authz_assignments_principal;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_authz_assignments_principal_project;
 DROP TABLE IF EXISTS zitadel_nextgen.authz_assignments;
 DROP TABLE IF EXISTS zitadel_nextgen.authz_bundle_members;
