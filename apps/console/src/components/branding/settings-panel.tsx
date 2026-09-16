@@ -5,6 +5,13 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   type BrandingDensity,
   type BrandingDraft,
   type BrandingRadius,
@@ -31,6 +38,14 @@ const ROW_VALUE = "flex w-[156px] items-center gap-2";
 const SECTION_TITLE = "text-sm font-medium text-foreground";
 const VALUE_INPUT =
   "h-6 w-full border-transparent bg-transparent px-1 text-sm shadow-none hover:border-input focus-visible:border-input";
+// The trigger reads as the value it holds until you reach for it, matching the
+// text rows beside it. `dark:bg-transparent` is explicit because the component's
+// own `dark:bg-input/30` is a different variant, which tailwind-merge keeps.
+const VALUE_SELECT =
+  "h-6 w-full border-transparent bg-transparent px-1 text-sm shadow-none dark:bg-transparent hover:border-input dark:hover:bg-input/30 focus-visible:border-input data-[size=sm]:h-6";
+
+/** Radix treats "" as no selection, so the cleared state needs a value of its own. */
+const DEFAULT_OPTION = "__default";
 
 type Props = {
   draft: BrandingDraft;
@@ -52,10 +67,10 @@ export function SettingsPanel({ draft, onChange }: Props) {
       </header>
 
       <Section title="Appearance">
-        <TextRow
+        <SelectRow
           label="Theme"
           value={draft.theme?.mode ?? ""}
-          placeholder="auto"
+          options={THEME_MODES}
           onChange={(value) =>
             onChange({ ...draft, theme: { ...draft.theme, mode: themeMode(value) } })
           }
@@ -79,43 +94,33 @@ export function SettingsPanel({ draft, onChange }: Props) {
             onChange({ ...draft, typography: { ...draft.typography, font_url: value } })
           }
         />
-        <TextRow
+        <NumberRow
           label="Type scale"
-          value={draft.typography?.scale?.toString() ?? ""}
-          placeholder="1"
-          onChange={(value) =>
-            onChange({
-              ...draft,
-              typography: { ...draft.typography, scale: numberOrUndefined(value) },
-            })
-          }
+          value={draft.typography?.scale}
+          min={0.75}
+          max={1.25}
+          step={0.05}
+          onChange={(scale) => onChange({ ...draft, typography: { ...draft.typography, scale } })}
         />
       </Section>
 
       <Section title="Shape">
-        <TextRow
-          label="Corner radius"
-          value={draft.shape?.radius?.toString() ?? ""}
-          placeholder="md or 8"
-          onChange={(value) =>
-            onChange({ ...draft, shape: { ...draft.shape, radius: radiusValue(value) } })
-          }
-        />
-        <TextRow
+        <RadiusRows draft={draft} onChange={onChange} />
+        <SelectRow
           label="Density"
           value={draft.shape?.density ?? ""}
-          placeholder="regular"
+          options={DENSITIES}
           onChange={(value) =>
             onChange({ ...draft, shape: { ...draft.shape, density: densityValue(value) } })
           }
         />
-        <TextRow
+        <NumberRow
           label="Logo scale"
-          value={draft.shape?.logo_scale?.toString() ?? ""}
-          placeholder="1"
-          onChange={(value) =>
-            onChange({ ...draft, shape: { ...draft.shape, logo_scale: numberOrUndefined(value) } })
-          }
+          value={draft.shape?.logo_scale}
+          min={0.5}
+          max={2}
+          step={0.1}
+          onChange={(logo_scale) => onChange({ ...draft, shape: { ...draft.shape, logo_scale } })}
         />
       </Section>
 
@@ -137,6 +142,53 @@ export function SettingsPanel({ draft, onChange }: Props) {
       <PaletteSection side="dark" draft={draft} issues={issues} onChange={onChange} />
       <PaletteSection side="light" draft={draft} issues={issues} onChange={onChange} />
     </div>
+  );
+}
+
+/**
+ * Corner radius is a preset name or a pixel value, so the control is both: a
+ * preset list with a `custom` entry that reveals the pixel field. Typing a
+ * number into a preset field was the alternative, which is a field that
+ * accepts two vocabularies and validates neither.
+ */
+function RadiusRows({
+  draft,
+  onChange,
+}: {
+  draft: BrandingDraft;
+  onChange: (next: BrandingDraft) => void;
+}) {
+  const radius = draft.shape?.radius;
+  const custom = typeof radius === "number";
+  return (
+    <>
+      <SelectRow
+        label="Corner radius"
+        value={custom ? "custom" : (radius ?? "")}
+        options={[...RADIUS_PRESETS, "custom"]}
+        onChange={(value) =>
+          onChange({
+            ...draft,
+            shape: {
+              ...draft.shape,
+              radius: value === "custom" ? 8 : radiusPreset(value),
+            },
+          })
+        }
+      />
+      {custom && (
+        <NumberRow
+          label="Radius in pixels"
+          value={radius}
+          min={0}
+          max={32}
+          step={1}
+          onChange={(pixels) =>
+            onChange({ ...draft, shape: { ...draft.shape, radius: pixels ?? 0 } })
+          }
+        />
+      )}
+    </>
   );
 }
 
@@ -257,6 +309,88 @@ function PaletteRow({
   );
 }
 
+/**
+ * A value the contract constrains to a named set. A text field here loses
+ * input silently — "regula" is not a density, so it would clear the field
+ * with nothing to say why.
+ */
+function SelectRow({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className={ROW}>
+      <span className={ROW_LABEL}>{label}</span>
+      <span className={ROW_VALUE}>
+        {/* `default` is its own option rather than an empty value: Radix reads
+            an empty string as "no value", which would make clearing the field
+            unselectable. */}
+        <Select
+          value={value === "" ? DEFAULT_OPTION : value}
+          onValueChange={(next) => onChange(next === DEFAULT_OPTION ? "" : next)}
+        >
+          <SelectTrigger aria-label={label} className={VALUE_SELECT} size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={DEFAULT_OPTION}>default</SelectItem>
+            {options.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </span>
+    </div>
+  );
+}
+
+/** A bounded number. The range is the contract's, so the control carries it. */
+function NumberRow({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number | undefined;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number | undefined) => void;
+}) {
+  return (
+    <div className={ROW}>
+      <span className={ROW_LABEL}>{label}</span>
+      <span className={ROW_VALUE}>
+        <Input
+          aria-label={label}
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          className={VALUE_INPUT}
+          value={value ?? ""}
+          placeholder="default"
+          onChange={(event) =>
+            onChange(event.target.value === "" ? undefined : Number(event.target.value))
+          }
+        />
+      </span>
+    </div>
+  );
+}
+
 function TextRow({
   label,
   value,
@@ -284,23 +418,10 @@ function TextRow({
   );
 }
 
-function numberOrUndefined(value: string): number | undefined {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-/**
- * `md` stays a preset name, `8` becomes pixels, and anything else clears the
- * field — typing a half-finished value should not publish a broken revision.
- */
-function radiusValue(value: string): BrandingRadius | undefined {
-  const trimmed = value.trim();
-  if (trimmed === "") return undefined;
-  if (RADIUS_PRESETS.includes(trimmed as (typeof RADIUS_PRESETS)[number])) {
-    return trimmed as BrandingRadius;
-  }
-  const pixels = Number.parseInt(trimmed, 10);
-  return String(pixels) === trimmed ? pixels : undefined;
+function radiusPreset(value: string): BrandingRadius | undefined {
+  return RADIUS_PRESETS.includes(value as (typeof RADIUS_PRESETS)[number])
+    ? (value as BrandingRadius)
+    : undefined;
 }
 
 /** Which sides may run. Anything else clears the field. */
