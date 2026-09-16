@@ -344,8 +344,11 @@ Recorded here because §12 makes them the API's problem, not the CLI's:
   rather than locally — the one place §11's "nothing `--help` offers can fail"
   does not hold. Either implement them or remove them from the contract, and
   the CLI stops offering them automatically.
-- `users` cannot be filtered by email, which is the field a human most often
-  has in hand.
+- `users` cannot be filtered by email. Not an oversight: email lives in the
+  user's `attributes`, which the project's own schema defines, and search over
+  schema-defined attributes is not supported yet. It is worth naming because
+  email is the field a human most often has in hand, so this is the case most
+  likely to force attribute search.
 - Grants have no update endpoint, so a grant is changed by deleting and
   recreating it.
 - `GET /branding` is the only list with no cursor at all, and answers with a
