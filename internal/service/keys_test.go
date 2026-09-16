@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/mock/gomock"
 
+	"github.com/zitadel/nextgen/internal/cache"
 	nextgencrypto "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	zmetrics "github.com/zitadel/nextgen/internal/instrumentation/metrics"
@@ -36,7 +37,7 @@ func newMockedKeyService(t testing.TB) (
 // newMockedKeyServiceWithCrypterCache is newMockedKeyService with the crypter
 // cache chosen by the caller, which is how the benchmark measures a service
 // that caches nothing against one that does.
-func newMockedKeyServiceWithCrypterCache(t testing.TB, crypters service.CrypterCache) (
+func newMockedKeyServiceWithCrypterCache(t testing.TB, crypters cache.Cache[service.CrypterCacheKey, op.Crypto]) (
 	svc service.KeyService,
 	statements *servicemocks.MockAllStatements,
 	masterKeys domain.MasterKeys,
@@ -331,14 +332,14 @@ func TestKeyCaches_ReportUnderTheirOwnNames(t *testing.T) {
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
 	meter := zmetrics.WithMeterProvider(provider)
 
-	crypters, err := service.NewLRUCrypterCache(8, meter)
+	crypters, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, 8, meter)
 	require.NoError(t, err)
-	signingKeys, err := service.NewLRUSigningKeyCache(8, meter)
+	signingKeys, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, 8, meter)
 	require.NoError(t, err)
 
 	// One miss on each, so an undifferentiated counter would read as two on one.
-	_, _ = crypters.Get("absent", jose.A256GCM)
-	_, _ = signingKeys.Get("absent", domain.SigningKeyPurposeToken)
+	_, _ = crypters.Get(service.CrypterCacheKey{KeyID: "absent", Algorithm: jose.A256GCM})
+	_, _ = signingKeys.Get(service.SigningKeyCacheKey{ProjectID: "absent", Purpose: domain.SigningKeyPurposeToken})
 
 	assert.Equal(t, map[string]int64{"crypter": 1, "signing_key": 1}, lookupsByCache(t, reader))
 }
@@ -376,7 +377,7 @@ func TestKeyCaches_RecordOneLookupPerRequest(t *testing.T) {
 
 	reader := sdkmetric.NewManualReader()
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	crypters, err := service.NewLRUCrypterCache(8, zmetrics.WithMeterProvider(provider))
+	crypters, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, 8, zmetrics.WithMeterProvider(provider))
 	require.NoError(t, err)
 
 	svc, statements, masterKey := newMockedKeyServiceWithCrypterCache(t, crypters)
@@ -399,11 +400,11 @@ func TestKeyCaches_RecordOneLookupPerRequest(t *testing.T) {
 
 // newKeyCaches gives each service its own caches, so a hit in one test can
 // never answer a read in another.
-func newKeyCaches(t testing.TB) (service.CrypterCache, service.SigningKeyCache) {
+func newKeyCaches(t testing.TB) (cache.Cache[service.CrypterCacheKey, op.Crypto], cache.Cache[service.SigningKeyCacheKey, domain.SigningKey]) {
 	t.Helper()
-	crypters, err := service.NewLRUCrypterCache(testKeyCacheSize)
+	crypters, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, testKeyCacheSize)
 	require.NoError(t, err)
-	signingKeys, err := service.NewLRUSigningKeyCache(testKeyCacheSize)
+	signingKeys, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, testKeyCacheSize)
 	require.NoError(t, err)
 	return crypters, signingKeys
 }
@@ -416,9 +417,11 @@ const testKeyCacheSize = 64
 // behaviour before the cache existed.
 type nullCrypterCache struct{}
 
-func (nullCrypterCache) Add(string, jose.ContentEncryption, op.Crypto) bool { return false }
+func (nullCrypterCache) Add(service.CrypterCacheKey, op.Crypto) bool { return false }
 
-func (nullCrypterCache) Get(string, jose.ContentEncryption) (op.Crypto, bool) { return nil, false }
+func (nullCrypterCache) Get(service.CrypterCacheKey) (op.Crypto, bool) { return nil, false }
+
+var _ cache.Cache[service.CrypterCacheKey, op.Crypto] = (*nullCrypterCache)(nil)
 
 // newWrappedKEK returns a project KEK whose material is wrapped by the given
 // crypter, together with the raw material for later verification.
@@ -533,7 +536,7 @@ func TestKeyService_GetProjectCrypter_FollowsRotation(t *testing.T) {
 func BenchmarkGetCrypter(b *testing.B) {
 	// Same service, same key, same mocked read in both arms: only the cache
 	// differs, so the difference is the unwrap the cache removes.
-	setup := func(b *testing.B, crypters service.CrypterCache) (service.KeyService, *domain.EncryptionKey) {
+	setup := func(b *testing.B, crypters cache.Cache[service.CrypterCacheKey, op.Crypto]) (service.KeyService, *domain.EncryptionKey) {
 		svc, statements, masterKey := newMockedKeyServiceWithCrypterCache(b, crypters)
 		kek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
 		require.NoError(b, err)
@@ -554,7 +557,7 @@ func BenchmarkGetCrypter(b *testing.B) {
 	})
 
 	b.Run("Cached", func(b *testing.B) {
-		crypters, err := service.NewLRUCrypterCache(testKeyCacheSize)
+		crypters, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, testKeyCacheSize)
 		require.NoError(b, err)
 		svc, kek := setup(b, crypters)
 

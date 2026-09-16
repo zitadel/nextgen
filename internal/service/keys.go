@@ -5,10 +5,9 @@ import (
 	"errors"
 
 	"github.com/go-jose/go-jose/v4"
-	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -28,52 +27,20 @@ type KeyService interface {
 	MigrateToLatestMasterKey(ctx context.Context) error
 }
 
-// CrypterCache caches the crypter a key resolves to, keyed by the key's id and
-// content encryption algorithm.
-//
-// The crypter, not the key row: resolving one unwraps the key's material with
-// the key that wraps it, and for a key wrapped directly by a master key that is
-// an RSA private-key operation on every single call. Caching the row would save
-// the database read and leave that cost untouched, which is the larger half on
-// an authenticated request.
-//
-// A crypter is safe to hand to several callers at once: it holds the unwrapped
-// material and builds everything else per call, mutating nothing.
-//
-// Nothing evicts on rotation, and nothing needs to. Entries are keyed by key
-// id, and a key's material never changes -- re-wrapping it under a new master
-// key (see MigrateToLatestMasterKey) leaves the same bytes inside. A retired
-// key still resolves here on purpose: whatever it encrypted has to stay
-// readable. Which key is *current* is a separate question, and never answered
-// from this cache -- see GetProjectEncryptionKey.
-type CrypterCache interface {
-	Add(keyID string, algorithm jose.ContentEncryption, crypter op.Crypto) (evicted bool)
-	Get(keyID string, algorithm jose.ContentEncryption) (crypter op.Crypto, ok bool)
-}
-
-// SigningKeyCache caches signing keys to reduce the load on the database.
-//
-// Values in the cache are values, not pointers to ensure a copy is always
-// returned and the value of the cache cannot be corrupted by accident.
-type SigningKeyCache interface {
-	Add(key domain.SigningKey) (evicted bool)
-	Get(projectID string, purpose domain.SigningKeyPurpose) (key domain.SigningKey, ok bool)
-}
-
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
 	db              *DB
 	masterKeys      domain.MasterKeys
-	crypterCache    CrypterCache
-	signingKeyCache SigningKeyCache
+	crypterCache    cache.Cache[CrypterCacheKey, op.Crypto]
+	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey]
 }
 
 func NewKeyService(
 	db *DB,
 	masterKeys domain.MasterKeys,
-	crypterCache CrypterCache,
-	signingKeyCache SigningKeyCache,
+	crypterCache cache.Cache[CrypterCacheKey, op.Crypto],
+	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey],
 ) KeyService {
 	return &keyService{
 		db:              db,
@@ -81,6 +48,16 @@ func NewKeyService(
 		crypterCache:    crypterCache,
 		signingKeyCache: signingKeyCache,
 	}
+}
+
+type CrypterCacheKey struct {
+	KeyID     string
+	Algorithm jose.ContentEncryption
+}
+
+type SigningKeyCacheKey struct {
+	ProjectID string
+	Purpose   domain.SigningKeyPurpose
 }
 
 // ------------------------------------------------------
@@ -119,7 +96,7 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 // This is the per-request path: every authenticated request decrypts its bearer
 // credential through here, so a hit has to cost neither a read nor an unwrap.
 func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error) {
-	if crypter, ok := s.crypterCache.Get(keyID, algorithm); ok {
+	if crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: keyID, Algorithm: algorithm}); ok {
 		return crypter, nil
 	}
 
@@ -150,7 +127,7 @@ func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, pu
 	if err != nil {
 		return nil, err
 	}
-	if crypter, ok := s.crypterCache.Get(key.ID, key.Algorithm); ok {
+	if crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm}); ok {
 		return crypter, nil
 	}
 	return s.getCrypterOfKey(ctx, key)
@@ -192,7 +169,7 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return nil, err
 	}
 
-	s.crypterCache.Add(key.ID, key.Algorithm, crypter)
+	s.crypterCache.Add(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm}, crypter)
 	return crypter, nil
 }
 
@@ -213,7 +190,7 @@ func (s *keyService) SaveSigningKey(ctx context.Context, stmts AllStatements, ke
 }
 
 func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error) {
-	if key, ok := s.signingKeyCache.Get(projectID, purpose); ok {
+	if key, ok := s.signingKeyCache.Get(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}); ok {
 		return new(key), nil
 	}
 
@@ -229,7 +206,7 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 		return nil, domain.ErrInternal(err).WithMessage("failed to get signing key from the database")
 	}
 
-	s.signingKeyCache.Add(*key)
+	s.signingKeyCache.Add(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}, *key)
 	return key, nil
 }
 
@@ -323,85 +300,4 @@ func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
 		return errors.Join(errs...)
 	}
 	return nil
-}
-
-// The names these caches report under; see the metrics package for the series.
-const (
-	cacheNameCrypter    = "crypter"
-	cacheNameSigningKey = "signing_key"
-)
-
-type crypterCacheKey struct {
-	keyID     string
-	algorithm jose.ContentEncryption
-}
-
-type LRUCrypterCache struct {
-	cache   *lru.Cache[crypterCacheKey, op.Crypto]
-	metrics *metrics.Cache
-}
-
-func NewLRUCrypterCache(size int, opts ...metrics.Option) (*LRUCrypterCache, error) {
-	cache, err := lru.New[crypterCacheKey, op.Crypto](size)
-	if err != nil {
-		return nil, err
-	}
-
-	instruments, err := metrics.NewCache(cacheNameCrypter, cache.Len, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return new(LRUCrypterCache{cache: cache, metrics: instruments}), nil
-}
-
-func (c LRUCrypterCache) Add(keyID string, algorithm jose.ContentEncryption, crypter op.Crypto) (evicted bool) {
-	evicted = c.cache.Add(crypterCacheKey{keyID: keyID, algorithm: algorithm}, crypter)
-	c.metrics.RecordAdd(evicted)
-	return evicted
-}
-
-func (c LRUCrypterCache) Get(keyID string, algorithm jose.ContentEncryption) (crypter op.Crypto, ok bool) {
-	crypter, ok = c.cache.Get(crypterCacheKey{keyID: keyID, algorithm: algorithm})
-	c.metrics.RecordLookup(ok)
-	return crypter, ok
-}
-
-type signingKeyCacheKey struct {
-	projectID string
-	purpose   domain.SigningKeyPurpose
-}
-type LRUSigningKeyCache struct {
-	cache   *lru.Cache[signingKeyCacheKey, domain.SigningKey]
-	metrics *metrics.Cache
-}
-
-func NewLRUSigningKeyCache(size int, opts ...metrics.Option) (*LRUSigningKeyCache, error) {
-	cache, err := lru.New[signingKeyCacheKey, domain.SigningKey](size)
-	if err != nil {
-		return nil, err
-	}
-
-	instruments, err := metrics.NewCache(cacheNameSigningKey, cache.Len, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return new(LRUSigningKeyCache{cache: cache, metrics: instruments}), nil
-}
-
-func (c LRUSigningKeyCache) Add(key domain.SigningKey) (evicted bool) {
-	evicted = c.cache.Add(signingKeyCacheKey{
-		projectID: key.ProjectID,
-		purpose:   key.Purpose,
-	}, key)
-	c.metrics.RecordAdd(evicted)
-	return evicted
-}
-
-func (c LRUSigningKeyCache) Get(projectID string, purpose domain.SigningKeyPurpose) (key domain.SigningKey, ok bool) {
-	key, ok = c.cache.Get(signingKeyCacheKey{
-		projectID: projectID,
-		purpose:   purpose,
-	})
-	c.metrics.RecordLookup(ok)
-	return key, ok
 }

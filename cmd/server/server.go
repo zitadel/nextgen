@@ -31,6 +31,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
@@ -46,6 +47,7 @@ import (
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 // flagDisableMasterKeyGeneration is the command-line half of
@@ -217,11 +219,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// config's decision: with no exporter the provider is a no-op and the
 	// instruments cost nothing.
 	cacheMeter := metrics.WithMeterProvider(telemetry.MeterProvider())
-	crypterCache, err := service.NewLRUCrypterCache(cfg.Keys.CrypterLRUCacheSize, cacheMeter)
+	crypterCache, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, cfg.Keys.CrypterLRUCacheSize, cacheMeter)
 	if err != nil {
 		return fmt.Errorf("failed to build crypter cache: %w", err)
 	}
-	signingKeyCache, err := service.NewLRUSigningKeyCache(cfg.Keys.SigningKeyLRUCacheSize, cacheMeter)
+	signingKeyCache, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, cfg.Keys.SigningKeyLRUCacheSize, cacheMeter)
 	if err != nil {
 		return fmt.Errorf("failed to build signing key cache: %w", err)
 	}
