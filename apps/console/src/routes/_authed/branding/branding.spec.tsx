@@ -75,7 +75,8 @@ describe("branding screen", () => {
     // #936: customisation continues from the appearance currently live rather
     // than from an empty form.
     expect(await screen.findByLabelText("Font family")).toHaveValue("Arimo, sans-serif");
-    expect(screen.getByLabelText("Corner radius")).toHaveValue("md");
+    // A Radix select is a button showing its value, not a form control with one.
+    expect(screen.getByLabelText("Corner radius")).toHaveTextContent("md");
     expect(screen.getByLabelText("Logo dark")).toHaveValue("https://cdn.example.com/on-dark.svg");
   });
 
