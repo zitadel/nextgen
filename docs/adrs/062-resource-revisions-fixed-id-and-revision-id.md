@@ -63,9 +63,9 @@ Every revisioned resource carries two ids:
   every revision of it.
 - `revision_id` is allocated per revision.
 
-Newly allocated ids of both kinds are prefix plus opaque id per ADR 047. Each
-kind registers two prefixes, one for the resource and one for the revision. A
-connection, for example, carries `idp_01KWH3B72K7M7F0N9WD3P2E4YM` as `id` and
+Both ids are prefix plus opaque id per ADR 047. Each kind registers two
+prefixes, one for the resource and one for the revision. A connection, for
+example, carries `idp_01KWH3B72K7M7F0N9WD3P2E4YM` as `id` and
 `idprev_01KWH3B72K7M7F0N9WD3P2E4YN` as `revision_id`.
 
 ### 2. A revision is immutable
@@ -155,7 +155,8 @@ service's pointer validation from get-by-id to the read by `revision_id`:
   has nothing to group its revisions by; the ticket decides whether such a
   document is rejected or kept as a resource with one revision. `GET /schemas`
   changes its default from `all` to `latest`. The CLI `schemas list` command
-  shows the history of one `objectType` and passes `revisions=all` explicitly.
+  shows the history of one `objectType` and relies on the `all` default today;
+  the ticket adds `revisions=all` to its call.
 - **Branding.** `id` becomes fixed per project and each publish allocates a
   `revision_id`.
 
@@ -186,20 +187,26 @@ that call returns not found. The client reads the row by `revision_id` instead.
   such ids with get-by-id today, and each migration ticket changes those calls
   to the read by `revision_id`. Other clients make the same change themselves.
 - The ADR 035 example table and its pointer prose are read through this ADR.
-  ADR 035 itself changes only by the amendment note that points here.
+  ADR 035 itself changes only by the amendment notes that point here.
 
 ## Open questions
 
 - **Existing rows.** Whether the migrations carry existing schemas, flow
   definitions and branding at all is open. The project is in alpha, and #957
   and #932 edited migrations in place on that basis. If they are dropped,
-  nothing below applies. If they are carried, each row's id is copied into
-  `revision_id`, and the resource needs a fixed `id`, one new value shared by
-  all of its rows. Migrations are SQL files, and ADR 047 allows minting only
-  through the dialect generator in Go, so the migration cannot create that
-  value. Three options:
+  nothing below applies. If they are carried, their revision ids keep the
+  resource prefix, so a `sch_` value no longer says whether it is a resource
+  id or a revision id, and the third option below makes the oldest row's id
+  equal its own `revision_id`. Re-prefixing carried revision ids avoids that
+  but rewrites what releases, users and flow steps hold. Each row's id is
+  copied into `revision_id`, and the resource needs a fixed `id`, one new
+  value shared by all of its rows. Migrations are SQL files, and ADR 047
+  allows minting only through the dialect generator in Go, so the migration
+  cannot create that value. Three options:
   - mint it in SQL with the dialect's UUID function, which needs an ADR 047
-    exception for backfills
+    exception for backfills and gives those ids a UUID body where other ids
+    of the kind have a ULID body on Postgres and SQLite; ids are opaque to
+    clients, so this is a consistency cost, not a breakage
   - run a Go step after the SQL migration that allocates it through the
     generator
   - reuse the oldest revision's id as the fixed `id`, so no new value is
