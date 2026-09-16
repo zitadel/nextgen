@@ -59,8 +59,9 @@ Every revisioned resource carries two ids:
   every revision of it.
 - `revision_id` is allocated per revision.
 
-Both are dialect-minted prefixed ids per ADR 047. Each kind registers two
-prefixes, one for the resource and one for the revision.
+Newly allocated ids of both kinds are dialect-minted prefixed ids per ADR
+047. Each kind registers two prefixes, one for the resource and one for the
+revision.
 
 ### 2. A revision is immutable
 
@@ -108,8 +109,8 @@ A resource can be referenced in three ways:
 - **By handle**, inside a release. Resources in a release reference each other
   by handle, and a handle means the revision the release pins for it.
   Unchanged from ADR 035.
-- **By `id`**, when the reference must outlive handle changes and revisions.
-  An identity link references a connection's `id`.
+- **By `id`**, when the reference must outlive revisions. An identity link
+  references a connection's `id`.
 - **By `revision_id`**, when the reference must keep pointing at one exact
   revision. Releases, auth attempts and user records pin a `revision_id`.
 
@@ -150,8 +151,7 @@ from get-by-id to the read by `revision_id`:
   `revision_id`.
 
 An id that a release, an attempt or a user record holds stays resolvable
-after the migration. How the existing per-revision ids map onto `revision_id`
-is decided per kind in its ticket.
+after the migration.
 
 ## Consequences
 

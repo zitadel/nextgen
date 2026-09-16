@@ -107,6 +107,8 @@ the forbid; handlers enforce it where ogen cannot (e.g. create-user).
 | Middleware `req_*` | Correlation only; local `RequestIDGenerator` |
 | Secrets (`sk_*`, handoff, session token material) | Cryptographic secrets, not row PKs |
 
+> Amended by [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md): a schema's resource `id` is dialect-minted; a declared `$id` stays a document property.
+
 ### 6. Pre-persist ceremony IDs
 
 When an ID is needed before insert (provisional `user_*`, in-memory

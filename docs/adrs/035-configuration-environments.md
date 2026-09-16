@@ -76,6 +76,8 @@ For example, release `rel_01KX3RG8A7F0N9WD3P2E4YM5C1` might contain:
 | app       | `name` = `web`               | `app_01KWJC2B78ZQ…`        |
 | policy    | `name` = `password`          | `pol_01KWHF3XY6RN…`        |
 
+> Amended by [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md): the Revision column is the revision's `revision_id`, and the idp handle is `slug`.
+
 The "handle" is the field each resource kind uses as its stable identifier across revisions. For example, schemas use `objectType`.
 
 Each release also records **audit metadata** — who created it, when, and from what source:
@@ -141,6 +143,8 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 | `POST /releases`               | Assemble a release from existing revision ids. Payload is a list of `(kind, handle, revision_id)` tuples. No new revisions minted. Validates handle references and templates. |
 | `GET /releases`                | List releases in the project, newest first. Each entry carries audit metadata; pointer tuples are omitted (fetch via `GET /releases/{release_id}`).                         |
 | `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{id}`, `GET /flow_definitions/{id}`, …). |
+
+> Amended by [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md): a pinned revision is fetched through the per-kind read by `revision_id`, since get-by-id returns the newest revision.
 
 A release owns pointers and audit metadata, not content. Per-kind endpoints stay the single source of truth for resource bytes; a release is the immutable snapshot of *which* revisions belong together. Consumers that need content (e.g. `zitadel status` diffing against local, or a UI rendering a release preview) resolve each pointer themselves. This keeps releases lightweight and avoids duplicating resource storage.
 
@@ -554,13 +558,3 @@ above already shows. Handle resolution is per kind, not a shared column read.
 
 The illustrative table is otherwise unchanged; this fixes the name the wire
 uses, not the model.
-
-## Amendment (2026-09-16): fixed id and revision id
-
-[ADR 062](062-resource-revisions-fixed-id-and-revision-id.md) gives every
-revisioned resource a fixed `id` shared by all its revisions and a
-`revision_id` per revision. The [Releases](#releases) table above lists a
-resource id in its Revision column, which held while a kind allocated a new id
-per revision. Under ADR 062 that column is the revision's `revision_id`, and
-the idp row's handle is `slug`. The pointer tuple `{kind, handle, revision_id}`
-keeps its shape.
