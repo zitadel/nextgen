@@ -44,8 +44,9 @@ function painted(value: string): string {
   if (!ctx) throw new Error("no 2d context");
   ctx.fillStyle = value;
   ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-  return `${r},${g},${b},${Math.round((a / 255) * 100) / 100}`;
+  const data = ctx.getImageData(0, 0, 1, 1).data;
+  const at = (index: number): number => data[index] ?? 0;
+  return `${at(0)},${at(1)},${at(2)},${Math.round((at(3) / 255) * 100) / 100}`;
 }
 
 function resolved(value: string): string {
@@ -59,12 +60,14 @@ describe("css colour resolution matches the browser", () => {
     it(`resolves ${value} the way Chrome paints it`, () => {
       // Canvas stores premultiplied alpha, so a translucent value rounds a
       // channel by one; compare within that rather than exactly.
-      const [pr, pg, pb, pa] = painted(value).split(",").map(Number) as number[];
-      const [rr, rg, rb, ra] = resolved(value).split(",").map(Number) as number[];
-      expect(Math.abs((rr as number) - (pr as number))).toBeLessThanOrEqual(1);
-      expect(Math.abs((rg as number) - (pg as number))).toBeLessThanOrEqual(1);
-      expect(Math.abs((rb as number) - (pb as number))).toBeLessThanOrEqual(1);
-      expect(Math.abs((ra as number) - (pa as number))).toBeLessThanOrEqual(0.01);
+      const paintedChannels = painted(value).split(",").map(Number);
+      const resolvedChannels = resolved(value).split(",").map(Number);
+      const tolerance = [1, 1, 1, 0.01];
+      for (let i = 0; i < tolerance.length; i += 1) {
+        expect(Math.abs((resolvedChannels[i] ?? 0) - (paintedChannels[i] ?? 0))).toBeLessThanOrEqual(
+          tolerance[i] as number,
+        );
+      }
     });
   }
 });
