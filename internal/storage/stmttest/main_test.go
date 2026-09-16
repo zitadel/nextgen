@@ -17,10 +17,10 @@ import (
 )
 
 type dialectOpener struct {
-	name               string
-	open               func(ctx context.Context) (dbtest.Pool, func(), error)
-	seed               func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
-	hardDeleteTeam     func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error
+	name                   string
+	open                   func(ctx context.Context) (dbtest.Pool, func(), error)
+	seed                   func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
+	hardDeleteTeam         func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error
 	insertJSONSchemaAt     func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error
 	insertFlowDefinitionAt func(ctx context.Context, pool dbtest.Pool, projectID, id, name string, createdAt time.Time) error
 	schemaNullability      []schematest.ColumnNullability
