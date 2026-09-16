@@ -12482,6 +12482,45 @@ func (c *MockProjectServiceListCall) DoAndReturn(f func(context.Context, service
 	return c
 }
 
+// ListAuthorized mocks base method.
+func (m *MockProjectService) ListAuthorized(ctx context.Context, req service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAuthorized", ctx, req)
+	ret0, _ := ret[0].(*service.ListProjectsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAuthorized indicates an expected call of ListAuthorized.
+func (mr *MockProjectServiceMockRecorder) ListAuthorized(ctx, req any) *MockProjectServiceListAuthorizedCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuthorized", reflect.TypeOf((*MockProjectService)(nil).ListAuthorized), ctx, req)
+	return &MockProjectServiceListAuthorizedCall{Call: call}
+}
+
+// MockProjectServiceListAuthorizedCall wrap *gomock.Call
+type MockProjectServiceListAuthorizedCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectServiceListAuthorizedCall) Return(arg0 *service.ListProjectsResponse, arg1 error) *MockProjectServiceListAuthorizedCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectServiceListAuthorizedCall) Do(f func(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error)) *MockProjectServiceListAuthorizedCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectServiceListAuthorizedCall) DoAndReturn(f func(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error)) *MockProjectServiceListAuthorizedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Update mocks base method.
 func (m *MockProjectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
 	m.ctrl.T.Helper()
