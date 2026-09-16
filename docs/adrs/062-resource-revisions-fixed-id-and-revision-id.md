@@ -63,9 +63,9 @@ Every revisioned resource carries two ids:
   every revision of it.
 - `revision_id` is allocated per revision.
 
-Both ids are prefix plus opaque id per ADR 047. Each kind registers two
-prefixes, one for the resource and one for the revision. A connection, for
-example, carries `idp_01KWH3B72K7M7F0N9WD3P2E4YM` as `id` and
+Both ids, when newly allocated, are prefix plus opaque id per ADR 047. Each
+kind registers two prefixes, one for the resource and one for the revision. A
+connection, for example, carries `idp_01KWH3B72K7M7F0N9WD3P2E4YM` as `id` and
 `idprev_01KWH3B72K7M7F0N9WD3P2E4YN` as `revision_id`.
 
 ### 2. A revision is immutable
@@ -194,15 +194,15 @@ that call returns not found. The client reads the row by `revision_id` instead.
 - **Existing rows.** Whether the migrations carry existing schemas, flow
   definitions and branding at all is open. The project is in alpha, and #957
   and #932 edited migrations in place on that basis. If they are dropped,
-  nothing below applies. If they are carried, their revision ids keep the
-  resource prefix, so a `sch_` value no longer says whether it is a resource
-  id or a revision id, and the third option below makes the oldest row's id
-  equal its own `revision_id`. Re-prefixing carried revision ids avoids that
-  but rewrites what releases, users and flow steps hold. Each row's id is
-  copied into `revision_id`, and the resource needs a fixed `id`, one new
-  value shared by all of its rows. Migrations are SQL files, and ADR 047
-  allows minting only through the dialect generator in Go, so the migration
-  cannot create that value. Three options:
+  nothing below applies. If they are carried, each row's id is copied into
+  `revision_id`, and the resource needs a fixed `id`, one new value shared by
+  all of its rows. Carried revision ids then keep the resource prefix, so a
+  `sch_` value no longer says whether it is a resource id or a revision id,
+  and the third option below makes the oldest row's id equal its own
+  `revision_id`. Re-prefixing carried revision ids avoids that but rewrites
+  what releases, users and flow steps hold. Migrations are SQL files, and ADR
+  047 allows minting only through the dialect generator in Go, so the
+  migration cannot create the fixed `id`. Three options:
   - mint it in SQL with the dialect's UUID function, which needs an ADR 047
     exception for backfills and gives those ids a UUID body where other ids
     of the kind have a ULID body on Postgres and SQLite; ids are opaque to
