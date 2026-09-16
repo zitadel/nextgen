@@ -7,9 +7,9 @@
 >
 > **Amends** [ADR 035](035-configuration-environments.md): every revisioned
 > resource carries a fixed `id` and a `revision_id`, and a release pointer
-> pins `revision_id`. Amends [ADR 047 §5](047-dialect-id-generation.md#5-not-resource-pk-generation):
-> a schema's resource id is dialect-minted; a declared `$id` stays a document
-> property.
+> pins `revision_id`. Amends [ADR 047 §2 and §5](047-dialect-id-generation.md#5-not-resource-pk-generation):
+> a schema's resource id is always dialect-minted; a declared `$id` stays a
+> document property.
 
 ## Context
 
@@ -152,9 +152,10 @@ service's pointer validation from get-by-id to the read by `revision_id`:
   `revision_id`.
 
 The existing prefix of each kind names the resource, as `idp_` does for
-connections, and each migration registers a revision prefix. Rows that exist
-keep their current id as their `revision_id`. A value that a release, a user
-record or a flow step holds is still found through the read by `revision_id`.
+connections, and each migration registers a revision prefix. If existing rows
+are carried over, they keep their current id as their `revision_id`. A value
+that a release, a user record or a flow step holds is still found through the
+read by `revision_id`.
 Those holders look the value up with get-by-id today, and the migration ticket
 changes their lookups to the read by `revision_id`. Before the migration a
 client that stored `sch_01A` reads it with `GET /schemas/sch_01A`. After it,
@@ -171,21 +172,24 @@ that call returns not found. The client reads the row by `revision_id` instead.
   read today, because their `id` names a revision. Once `id` is fixed, each
   migration ticket adds a distinct read by `revision_id` for its kind.
   Connections have no per-revision read at all; a follow-up to #1217 adds one.
-- Ids of schemas, flow definitions and branding that a client stored before
-  the migration stop working with get-by-id, as described under Migration. The
-  console and the CLI sync read such ids with get-by-id today, and each
-  migration ticket changes those calls to the read by `revision_id`. Other
-  clients make the same change themselves.
+- If existing rows are carried over, ids of schemas, flow definitions and
+  branding that a client stored before the migration stop working with
+  get-by-id, as described under Migration. The console and the CLI sync read
+  such ids with get-by-id today, and each migration ticket changes those calls
+  to the read by `revision_id`. Other clients make the same change themselves.
 - The ADR 035 example table and its pointer prose are read through this ADR.
   ADR 035 itself changes only by the amendment note that points here.
 
 ## Open questions
 
-- **Where the fixed `id` of an existing resource comes from.** The migration
-  copies each existing row's id into `revision_id`. The resource then needs a
-  fixed `id`, one new value shared by all of its rows. Migrations are SQL
-  files, and ADR 047 allows minting only through the dialect generator in Go,
-  so the migration cannot create that value. Three options:
+- **Existing rows.** Whether the migrations carry existing schemas, flow
+  definitions and branding at all is open. The project is in alpha, and #957
+  and #932 edited migrations in place on that basis. If they are dropped,
+  nothing below applies. If they are carried, each row's id is copied into
+  `revision_id`, and the resource needs a fixed `id`, one new value shared by
+  all of its rows. Migrations are SQL files, and ADR 047 allows minting only
+  through the dialect generator in Go, so the migration cannot create that
+  value. Three options:
   - mint it in SQL with the dialect's UUID function, which needs an ADR 047
     exception for backfills
   - run a Go step after the SQL migration that allocates it through the
