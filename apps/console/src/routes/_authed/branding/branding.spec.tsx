@@ -96,7 +96,7 @@ describe("branding screen", () => {
   it("recounts as the palette is edited", async () => {
     serveRevision();
     await renderAt("/branding");
-    const onPrimary = await screen.findByLabelText("On primary");
+    const onPrimary = await screen.findByLabelText("On primary (dark mode)");
 
     // #0A0A0A on the same red reads at 5.3:1, so the warning goes.
     await userEvent.clear(onPrimary);
