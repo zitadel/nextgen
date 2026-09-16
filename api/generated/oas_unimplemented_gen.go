@@ -510,10 +510,6 @@ func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionPar
 // GetTeam implements getTeam operation.
 //
 // Returns a Team by its id.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Session callers are authorized as
-// the human against the team's project; one they cannot read answers
-// 404, the same shape a foreign secret gets.
 //
 // GET /teams/{team_id}
 func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
@@ -726,11 +722,6 @@ func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySession
 // QueryTeams implements queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Session callers are authorized as
-// the human against the requested project and see only the teams their
-// grants reach, so a signed-in user with no grant gets an empty page
-// rather than a 403.
 //
 // POST /teams/query
 func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
