@@ -185,6 +185,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * loginElement.locales = { en: { "identifier.title": "Welcome" } };
    * ```
    */
+  /**
+   * Paint this branding instead of the revision the flow response carries.
+   *
+   * For a surface that edits branding — the console's branding screen — where
+   * the point is to see unpublished values against a real flow. It changes
+   * what this element paints and nothing else: the published revision still
+   * governs every other visitor, and the draft is never sent anywhere.
+   */
+  @property({ attribute: false }) accessor brandingOverride: Branding | undefined;
+
   @property({ attribute: false }) accessor locales:
     | Readonly<Record<string, Partial<Locale>>>
     | undefined;
@@ -344,7 +354,12 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
-    this.applySurfaceTheme(this.branding);
+    if (changed.has("brandingOverride")) {
+      // The draft carries its own `theme.mode` and its own published sides, so
+      // the controller has to resolve against it rather than the wire value.
+      this.themeController.setBranding(this.activeBranding());
+    }
+    this.applySurfaceTheme(this.activeBranding());
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
 
@@ -502,11 +517,17 @@ export class ZitadelLogin extends ZitadelSurface {
    * that wants to reach them itself.
    */
   private brandingForTemplate(): Branding | Record<string, never> {
-    if (!this.branding) {
+    const branding = this.activeBranding();
+    if (!branding) {
       return {};
     }
-    const logoUrl = resolveLogoUrl(this.branding, this.themeController.theme);
-    return { ...this.branding, logo_url: logoUrl };
+    const logoUrl = resolveLogoUrl(branding, this.themeController.theme);
+    return { ...branding, logo_url: logoUrl };
+  }
+
+  /** The draft when one is set, otherwise the revision the flow carried. */
+  private activeBranding(): Branding | undefined {
+    return this.brandingOverride ?? this.branding;
   }
 
   /**
