@@ -51,7 +51,7 @@ content:
         summary: team.owns_project
         value:
           code: team.owns_project
-          message: 'the team still owns a project and cannot be deactivated; transfer or revoke its project ownership first'
+          message: 'the team still owns a project and cannot be deactivated while it does'
       team.permission_denied:
         summary: team.permission_denied
         value:
