@@ -685,8 +685,8 @@ func TestDeleteTeam(t *testing.T) {
 		assert.Equal(t, domain.MembershipStatusRemoved, membership.Status)
 	})
 
-	// ADR 054 §2: a team that owns a project may not be deactivated, or the
-	// project is left owned by a dead team that nobody can act through.
+	// A team that owns a project may not be deactivated, or the project is
+	// left owned by a dead team that nobody can act through.
 	t.Run("refuses a team that owns a project", func(t *testing.T) {
 		t.Parallel()
 

@@ -385,7 +385,7 @@ func TestClaimStatements_OwningTeamGrant(t *testing.T) {
 		})
 
 		// The mirror of GetActiveOwningTeamGrant, asked from the team's side.
-		// It backs the ADR 054 §2 guard that refuses to deactivate an owner.
+		// It backs the guard that refuses to deactivate a team that owns one.
 		t.Run("has active owning team grant", func(t *testing.T) {
 			owner := "team-owner-" + uniqueSuffix(t)
 			stranger := "team-stranger-" + uniqueSuffix(t)
