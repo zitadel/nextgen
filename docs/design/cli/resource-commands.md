@@ -1,13 +1,14 @@
 # CLI Resource Commands
 
-> **Status:** Shipped — eleven resources; see the table below.
+> **Status:** Proposed — eleven resources; see the table below. The decisions
+> are [ADR 062](../../adrs/062-cli-resource-commands.md), the implementation is
+> [#1210](https://github.com/zitadel/nextgen/pull/1210).
 > **Context:** The imperative surface for runtime resources that
 > [README.md](README.md#what-lives-in-zitadel-and-what-doesnt) reserves for
 > data the developer does not own in git. Configuration resources are readable
-> here but are written only through `plan` / `apply`
-> ([ADR 007](../../adrs/007-gitops-configuration-surface.md),
-> [ADR 035](../../adrs/035-configuration-environments.md)). The decisions behind
-> this surface are [ADR 062](../../adrs/062-cli-resource-commands.md).
+> here but are written only by the declarative path — `deploy` under
+> [ADR 035](../../adrs/035-configuration-environments.md), which replaces the
+> `plan` / `apply` of [ADR 007](../../adrs/007-gitops-configuration-surface.md).
 
 ## Shape
 
@@ -25,9 +26,9 @@ zitadel <resource> delete  <id> [--force]
 ```
 
 The verbs are generated from one registry
-([`apps/cli/src/commands/resources.ts`](../../../apps/cli/src/commands/resources.ts))
+(`apps/cli/src/commands/resources.ts`)
 by a platform-agnostic factory
-([`apps/cli/src/lib/oclif/crud/`](../../../apps/cli/src/lib/oclif/crud/)).
+(`apps/cli/src/lib/oclif/crud/`).
 The registry names the client call per verb, the id field, the table columns,
 and the filterable and sortable fields. The factory owns everything below.
 Adding a backend resource is adding a registry entry.
@@ -106,7 +107,7 @@ the create's required fields.
 Every verb reads `.zitadel/secret` and sends the project secret as the bearer
 (operator plane, [ADR 036](../../adrs/036-api-credential-planes.md)). Endpoints
 that take `project_id` receive it from the secret; there is no project flag.
-The server is resolved exactly as for `apply` (`--server`, `ZITADEL_API_BASE`,
+The server is resolved exactly as for the other commands (`--server`, `ZITADEL_API_BASE`,
 `zitadel.json`, default).
 
 ## Listing and pagination
@@ -128,7 +129,8 @@ The server is resolved exactly as for `apply` (`--server`, `ZITADEL_API_BASE`,
 - The envelope is identical for every resource:
 
   ```json
-  { "status": "ok", "data": { "items": [ … ], "count": 42, "next_page_token": "…" } }
+  { "cli_version": "…", "command": "users:list", "source": "…",
+    "status": "ok", "data": { "items": [ … ], "count": 42, "next_page_token": "…" } }
   ```
 
   `next_page_token` is a string while more pages exist and `null` when the
@@ -324,6 +326,6 @@ HTTP failures map through the CLI's existing taxonomy: `401`/`403` →
    per id rather than stop at the first failure.
 2. **Filter value typing.** Every value is a string. Numeric or boolean filter
    fields would need a per-field cast in the registry.
-3. **Config-resource reads.** `flows`, `schemas`, `branding`, `releases`, and
-   `environments` could gain `list` / `get` through the same factory; their
-   write path stays `apply` / `deploy`.
+3. **Config-resource reads.** Done: `schemas`, `flow-definitions`, `branding`,
+   `releases` and `environments` expose `list` / `get` through the same
+   factory. Their write path stays the declarative one (`deploy`, ADR 035).

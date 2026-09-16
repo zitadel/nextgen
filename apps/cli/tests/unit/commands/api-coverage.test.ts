@@ -63,10 +63,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
 
   // Configuration is written declaratively (ADR 035), never imperatively here.
-  createSchema: "configuration is written by plan/apply from .zitadel/",
-  createBranding: "configuration is written by plan/apply from .zitadel/",
+  createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+  createBranding: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
-  createFlowDefinition: "configuration is written by plan/apply from .zitadel/",
+  createFlowDefinition: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
