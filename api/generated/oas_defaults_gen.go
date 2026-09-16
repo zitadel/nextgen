@@ -43,6 +43,14 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *FlowStepAction) setDefaults() {
+	{
+		val := bool(false)
+		s.Primary.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *IdpConnectionOAuth2) setDefaults() {
 	{
 		val := IdpConnectionOAuth2TokenEndpointAuthMethod("client_secret_basic")

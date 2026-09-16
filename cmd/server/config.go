@@ -7,6 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -23,6 +24,9 @@ type Config struct {
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
 	Events          EventsConfig           `mapstructure:"events"`
+	// HTTPClient configures the hardened egress client used for every fetch
+	// of a URL a platform user can inject (see the egress-policy ADR).
+	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.
@@ -97,6 +101,8 @@ func (c Config) Validate() error {
 	for _, validate := range []func() error{
 		c.Session.Validate,
 		c.Platform.Validate,
+		c.HTTPClient.Validate,
+		c.Schema.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
@@ -155,6 +161,19 @@ type ServerConfig struct {
 type SchemaConfig struct {
 	BuiltinPublicBase string `mapstructure:"builtin_public_base"`
 	LRUCacheSize      int    `mapstructure:"lru_cache_size"`
+	// ResolveTimeout bounds one whole schema ingest including every $ref it
+	// follows, so recursion depth cannot multiply the per-request
+	// httpclient.timeout into sequential waits.
+	ResolveTimeout time.Duration `mapstructure:"resolve_timeout"`
+}
+
+func (c SchemaConfig) Validate() error {
+	// A negative value would reach context.WithTimeout and fail every
+	// uncached ingest at runtime instead of failing the boot.
+	if c.ResolveTimeout < 0 {
+		return fmt.Errorf("schema.resolve_timeout must not be negative, got %s", c.ResolveTimeout)
+	}
+	return nil
 }
 
 type MasterKeyConfig struct {

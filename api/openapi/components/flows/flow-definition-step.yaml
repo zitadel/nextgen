@@ -1,5 +1,6 @@
 type: object
 required: [name]
+additionalProperties: false
 description: |
   A step in a flow definition. This is the admin-authored configuration,
   not the runtime payload sent to the frontend.
@@ -16,6 +17,7 @@ properties:
     description: |
       Unique step identifier within this flow. Used as transition targets
       and returned in the API response as `step.name`.
+    pattern: "^[a-z][a-z0-9_-]*$"
     example: login
 
   fields:
@@ -28,6 +30,7 @@ properties:
       transition outcome).
     items:
       type: string
+    uniqueItems: true
     default: []
     example: [email, password]
 
@@ -67,6 +70,24 @@ properties:
     description: Available SSO identity providers for this step.
     items:
       $ref: sso-provider.yaml
+    # The file on disk names connections by slug; the CLI resolves them into
+    # the provider objects the API takes (#1044). Until the API accepts slugs
+    # itself, the editor schema carries the slug shape as an override.
+    x-dialect:
+      uniqueItems: true
+      items:
+        x-replace: true
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]*$"
+        maxLength: 64
+      example: [google, github]
+      description: |
+        List of connection slugs offered on this step. Each entry must match
+        the `slug` of a connection in the project; the connection supplies the
+        display name and template at render time. When non-empty, the step
+        must define a `transitions.callback` entry — the engine handles the
+        reserved `sso` action transparently and fires `callback` on this step
+        when the IdP returns.
     default: []
     example:
       - id: google
@@ -76,6 +97,10 @@ properties:
   on_success:
     type: string
     enum: [create_user]
+    # `create_user_with_sso` is declared in the file dialect ahead of the API
+    # (#1044); the engine does not run it yet.
+    x-dialect:
+      enum: [create_user, create_user_with_sso]
     description: |
       Server-side mutation to execute when this step completes successfully.
       Runs after field validation passes, before the transition fires.

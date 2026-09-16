@@ -15,8 +15,8 @@ import type { ResourceEntry, SyncAction } from "./types.js";
  * (a schema revision would otherwise publish before the flow update
  * fails).
  *
- * Only actions that upload a flow (create/update, including repin-forced
- * updates) are validated: an unchanged flow is never re-judged, so a
+ * Only actions that upload a flow (create/update/revise, including repin-forced
+ * revisions) are validated: an unchanged flow is never re-judged, so a
  * validator behavior change cannot break an already-applied project.
  *
  * Warning-severity issues ANNOTATE the actions in place (`action.warnings`)
@@ -52,7 +52,7 @@ export function validatePlannedFlows(opts: {
   );
 
   for (const action of opts.actions) {
-    if (action.kind !== "create" && action.kind !== "update") {
+    if (action.kind !== "create" && action.kind !== "update" && action.kind !== "revise") {
       continue;
     }
     if (action.syncer.kind !== "flow") {
@@ -108,23 +108,23 @@ export function validatePlannedFlows(opts: {
 }
 
 /**
- * Warn when applying a NEW active, unscoped flow into a project that
- * already has flows: the engine's default selection is newest-unscoped-
- * wins (ties broken by id), so this flow silently becomes what
- * `<zitadel-login>` renders for its purposes unless the widget pins a
- * `flow-name`. Deliberately engine-level rather than a validator rule:
- * the verdict depends on the action kind and the rest of the plan/state,
- * which `validateFlowDefinition` never sees. A project's first flow is
- * exempt — becoming the default is the point of creating it.
+ * Warn when uploading an active, unscoped flow into a project that has
+ * other flows: the engine's default selection is the newest active
+ * unscoped flow across the whole project (created_at, then id), not per
+ * name, so the uploaded row silently becomes what `<zitadel-login>`
+ * renders for its purposes unless the widget pins a `flow-name`. A new
+ * revision moves the default exactly like a new flow does — and a schema
+ * edit re-publishes every flow pinned to it in scan order, so each repin
+ * revision is warned about too. Deliberately engine-level rather than a
+ * validator rule: the verdict depends on the action kind and the rest of
+ * the plan/state, which `validateFlowDefinition` never sees. A project's
+ * only flow is exempt — being the default is the point of it.
  */
 function defaultSwapWarning(
-  action: Extract<SyncAction, { kind: "create" | "update" }>,
+  action: Extract<SyncAction, { kind: "create" | "update" | "revise" }>,
   flowCreatePaths: readonly string[],
   trackedFlowPaths: readonly string[],
 ): { rule: string; message: string } | undefined {
-  if (action.kind !== "create") {
-    return undefined; // updates keep their created_at; the default cannot move
-  }
   const body = action.content as {
     status?: unknown;
     purposes?: Record<string, unknown>;
@@ -148,10 +148,14 @@ function defaultSwapWarning(
   if (otherFlows === 0) {
     return undefined;
   }
+  const subject =
+    action.kind === "create"
+      ? "this flow becomes the new default"
+      : "this revision becomes the newest active flow and the default";
   return {
     rule: "warn/default-flow-swap",
     message:
-      `once applied, this flow becomes the new default for ${humanList(purposes)}: ` +
+      `once applied, ${subject} for ${humanList(purposes)}: ` +
       `pages that do not explicitly set flow-name on <zitadel-login> will start rendering it. ` +
       `If that is not intended, scope it with "audience" or set flow-name on the pages that should use it.`,
   };
@@ -173,7 +177,7 @@ function humanList(items: readonly string[]): string {
  * run, schema-dependent rules are skipped.
  */
 function resolveSchemaContent(
-  action: Extract<SyncAction, { kind: "create" | "update" }>,
+  action: Extract<SyncAction, { kind: "create" | "update" | "revise" }>,
   scannedContents: ReadonlyMap<string, object>,
   stateResources: Readonly<Record<string, ResourceEntry>>,
 ): object | undefined {
