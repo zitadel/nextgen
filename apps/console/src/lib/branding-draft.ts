@@ -91,3 +91,8 @@ export type BrandingRadius = NonNullable<NonNullable<BrandingDraft["shape"]>["ra
 export const DENSITIES = ["compact", "regular", "comfortable"] as const;
 
 export type BrandingDensity = NonNullable<NonNullable<BrandingDraft["shape"]>["density"]>;
+
+/** Which published sides may run, `auto` following the viewer's preference. */
+export const THEME_MODES = ["light", "dark", "auto"] as const;
+
+export type BrandingThemeMode = NonNullable<NonNullable<BrandingDraft["theme"]>["mode"]>;

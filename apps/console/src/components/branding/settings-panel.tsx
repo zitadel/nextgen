@@ -8,21 +8,29 @@ import {
   type BrandingDensity,
   type BrandingDraft,
   type BrandingRadius,
+  type BrandingThemeMode,
   DENSITIES,
   PALETTE_KEYS,
   PALETTE_LABELS,
   type PaletteKey,
   RADIUS_PRESETS,
+  THEME_MODES,
   type ThemeSide,
   withPaletteValue,
   withSideLogo,
 } from "@/lib/branding-draft";
 
-const ROW = "flex items-center justify-between gap-3 py-1.5 text-sm";
-const ROW_LABEL = "text-muted-foreground";
+// Geometry from the design: a 108px label column, a 12px gap and a 156px value
+// column inside the panel's 276px content width. Rows sit on a 26px rhythm,
+// colour rows on 28px, and a value is left-aligned in its column rather than
+// flush to the panel edge.
+const ROW = "flex items-center gap-3 py-px text-sm";
+const COLOUR_ROW = "flex items-center gap-3 py-0.5 text-sm";
+const ROW_LABEL = "w-[108px] shrink-0 text-muted-foreground";
+const ROW_VALUE = "flex w-[156px] items-center gap-2";
 const SECTION_TITLE = "text-sm font-medium text-foreground";
 const VALUE_INPUT =
-  "h-7 w-44 border-transparent bg-transparent px-2 text-right text-sm shadow-none hover:border-input focus-visible:border-input";
+  "h-6 w-full border-transparent bg-transparent px-1 text-sm shadow-none hover:border-input focus-visible:border-input";
 
 type Props = {
   draft: BrandingDraft;
@@ -35,13 +43,24 @@ export function SettingsPanel({ draft, onChange }: Props) {
   const issues = useMemo(() => contrastIssues(draft), [draft]);
 
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto p-5">
-      <header>
+    <div className="flex h-full flex-col overflow-y-auto px-3 pt-4 pb-3">
+      <header className="pb-2">
         <h2 className={SECTION_TITLE}>Branding</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           Override the corresponding theme tokens in your project configuration.
         </p>
       </header>
+
+      <Section title="Appearance">
+        <TextRow
+          label="Theme"
+          value={draft.theme?.mode ?? ""}
+          placeholder="auto"
+          onChange={(value) =>
+            onChange({ ...draft, theme: { ...draft.theme, mode: themeMode(value) } })
+          }
+        />
+      </Section>
 
       <Section title="Typography">
         <TextRow
@@ -123,8 +142,10 @@ export function SettingsPanel({ draft, onChange }: Props) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t border-border pt-4">
-      <h3 className={`${SECTION_TITLE} mb-1`}>{title}</h3>
+    <section className="border-t border-border py-4">
+      {/* Each section frame carries 8px of its own padding and sits 8px from
+          the separator, so a row clears the next heading by 32px. */}
+      <h3 className={`${SECTION_TITLE} mb-[10px]`}>{title}</h3>
       {children}
     </section>
   );
@@ -146,7 +167,7 @@ function PaletteSection({
   const palette = draft.theme?.[side]?.palette ?? {};
 
   return (
-    <section className="border-t border-border pt-4">
+    <section className="border-t border-border py-4">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2"
@@ -203,23 +224,12 @@ function PaletteRow({
   // surface it is editing.
   const name = `${PALETTE_LABELS[paletteKey]} (${side} mode)`;
   return (
-    <div className={ROW}>
+    <div className={COLOUR_ROW}>
       <span className={ROW_LABEL}>{PALETTE_LABELS[paletteKey]}</span>
-      <span className="flex items-center gap-2">
-        {issue && (
-          <span
-            className="text-destructive"
-            title={`Contrast ${issue.ratio}:1, needs ${issue.required}:1`}
-          >
-            <TriangleAlert className="size-3.5" aria-hidden />
-            <span className="sr-only">
-              Contrast {issue.ratio} to 1, needs {issue.required} to 1
-            </span>
-          </span>
-        )}
+      <span className={ROW_VALUE}>
         <span
           aria-hidden
-          className="size-3.5 rounded-sm border border-border"
+          className="size-3.5 shrink-0 rounded-sm border border-border"
           style={{ background: value || "transparent" }}
         />
         <Input
@@ -229,6 +239,19 @@ function PaletteRow({
           placeholder="default"
           onChange={(event) => onChange(event.target.value)}
         />
+        {/* The design puts the contrast mark at the value column's right edge,
+            after the value rather than before the swatch. */}
+        {issue && (
+          <span
+            className="shrink-0 text-destructive"
+            title={`Contrast ${issue.ratio}:1, needs ${issue.required}:1`}
+          >
+            <TriangleAlert className="size-3.5" aria-hidden />
+            <span className="sr-only">
+              Contrast {issue.ratio} to 1, needs {issue.required} to 1
+            </span>
+          </span>
+        )}
       </span>
     </div>
   );
@@ -248,13 +271,15 @@ function TextRow({
   return (
     <div className={ROW}>
       <span className={ROW_LABEL}>{label}</span>
-      <Input
-        aria-label={label}
-        className={VALUE_INPUT}
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      <span className={ROW_VALUE}>
+        <Input
+          aria-label={label}
+          className={VALUE_INPUT}
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </span>
     </div>
   );
 }
@@ -276,6 +301,14 @@ function radiusValue(value: string): BrandingRadius | undefined {
   }
   const pixels = Number.parseInt(trimmed, 10);
   return String(pixels) === trimmed ? pixels : undefined;
+}
+
+/** Which sides may run. Anything else clears the field. */
+function themeMode(value: string): BrandingThemeMode | undefined {
+  const trimmed = value.trim();
+  return THEME_MODES.includes(trimmed as BrandingThemeMode)
+    ? (trimmed as BrandingThemeMode)
+    : undefined;
 }
 
 function densityValue(value: string): BrandingDensity | undefined {
