@@ -54,6 +54,14 @@ Resource first, plural, then the verb. `zitadel users create`, not
 | `events` | `list` `get` |
 | `schemas`, `environments`, `releases`, `flow-definitions`, `branding` | `list` `get` |
 
+`environments` is spelled against an existing contract and needs resolving
+before this lands: [ADR 035 §Inspection commands](035-configuration-environments.md)
+is Accepted and specifies `zitadel env list`, while this registry produces
+`zitadel environments list` and `zitadel environments get <name>`. Two spellings
+for one thing is worse than either. Either this surface adopts `env`, or ADR 035
+is amended to the plural — recorded below rather than decided here, because it
+is a public command contract someone else already wrote down.
+
 Configuration resources are readable but never writable here. They are authored
 as files and shipped through a release (§1), so a write verb would be a second
 writer over the same state — but reading what the server currently holds is how
@@ -152,9 +160,11 @@ a filter on page two.
 
 ### 9. `--json` is the contract; human output adapts to the terminal
 
-`--json` emits the standard envelope (`status`, `data`, and on failure `code`,
-`message`, `hint`, `next_commands`) and nothing else, so `jq` is the intended
-consumer and never has to strip a banner.
+`--json` emits the standard envelope and nothing else, so `jq` is the intended
+consumer and never has to strip a banner. The envelope is the one ADR 004
+already defines — `cli_version`, `command` and `source` beside `status` and
+`data`, plus `code`, `message`, `hint` and `next_commands` on failure — not a
+shape this surface invents.
 
 Human output is chosen by the terminal, not by a flag the user must remember:
 a list renders as an aligned table on a TTY and as tab-separated records when
@@ -210,9 +220,15 @@ including an endpoint that spells one field's range as two parameters
 
 **This abstracts the transport, not the capability.** Each field declares the
 operations it actually accepts, so `--help` and `zitadel resources --json` name
-them per field, and an operation the endpoint cannot honour is refused locally,
-saying which field is the limitation. The CLI never advertises a filter that
-would fail at the server, and never silently drops one. What it refuses to do
+them per field, and an operation a field does not declare is refused locally,
+saying which field is the limitation. The CLI never silently drops a filter.
+
+The limit of this is worth stating rather than glossing: the registry can only
+declare what the *contract* says a field accepts. Three operations the query
+contract advertises answer `501` today (below), so the CLI offers them and the
+server refuses them. Local validation removes the class of failure the CLI can
+see — a field or operation the contract does not have — not the class only the
+server knows about. What it refuses to do
 is make the caller learn a second grammar because the endpoint behind one
 resource was written differently from the endpoint behind another.
 
@@ -271,10 +287,11 @@ the surface stays learnable. What a filter *can do* is meaning, and that is
 never invented: an operation the endpoint lacks is refused, a verb it lacks is
 absent, a field it cannot sort by gets no `--sort`.
 
-So `events`, `schemas` and `flow-definitions` reading through `GET` while every
-other list uses `POST /<resource>/query` is smoothed over in the spelling and
-recorded as an open question for the API — three resources, not one, so it is a
-pattern rather than an exception. A CLI that papers over a *capability* teaches
+So the six lists that read through `GET` — `events`, `schemas`,
+`environments`, `releases`, `flow-definitions` and `branding` — while the other
+five use `POST /<resource>/query` are smoothed over in the spelling and recorded
+as an open question for the API. A majority of the collections deviate, which
+makes it the prevailing shape rather than an exception. A CLI that papers over a *capability* teaches
 a shape that is not real; one that papers over a *calling convention* spares
 its users someone else's history.
 
@@ -312,17 +329,24 @@ not own.
 These are the places where the CLI surfaced something the API should decide.
 Recorded here because §12 makes them the API's problem, not the CLI's:
 
-- `events`, `schemas` and `flow-definitions` read through `GET` with query
-  parameters while every other list uses `POST /<resource>/query`. The CLI
+- Six of the eleven collections read through `GET` with query parameters
+  (`events`, `schemas`, `environments`, `releases`, `flow-definitions`,
+  `branding`) while five use `POST /<resource>/query`. The CLI
   hides the difference (§11), but these endpoints accept only `equals`, sort by
   at most one implicit field, and spell a range as two parameters — so the
   capability gap is real even where the spelling is not. Either the deviation
   is intended and should be written down, or these should move.
+- `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
+  accepted ADR names the command; this one produces a different spelling for
+  the same data. It needs one owner's decision, not two documents.
 - `GET /releases` answered 500 on a project with no releases, on the prebuilt
   server this branch was tested against. It may already be fixed; it is
   recorded because the CLI is how it was noticed.
 - Three filter operations are advertised by the query contract but answer 501.
-  The CLI offers them because the contract does; today they fail at runtime.
+  The CLI offers them because the contract does, so they fail at the server
+  rather than locally — the one place §11's "nothing `--help` offers can fail"
+  does not hold. Either implement them or remove them from the contract, and
+  the CLI stops offering them automatically.
 - `users` cannot be filtered by email, which is the field a human most often
   has in hand.
 - Grants have no update endpoint, so a grant is changed by deleting and
