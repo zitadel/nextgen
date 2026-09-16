@@ -13,29 +13,29 @@ This ADR records the choices behind it and why the alternatives were rejected.
 
 ### 1. Configuration stays declarative; runtime resources become imperative
 
-A thing that belongs in git — branding, login flows, schemas — is edited as a
-file and shipped through a release ([ADR 035](035-configuration-environments.md)).
-A thing that is unbounded or owned by someone other than the developer — a
-user, a session, an audit event — gets a command and is never tracked in
-`.zitadel/`. Where a resource falls decides its interface, so the boundary is
-the first thing this ADR fixes.
+A thing that belongs in git is edited as a file and shipped through a release
+([ADR 035](035-configuration-environments.md)). Branding, login flows and
+schemas are all of that kind. A thing that is unbounded, or owned by someone
+other than the developer, gets a command and is never tracked in `.zitadel/`. A
+user, a session and an audit event are all of that kind. Where a resource falls
+decides its interface, so the boundary is the first thing this ADR fixes.
 
 This describes the eleven resources here, not a law for everything that comes
-later. A resource can legitimately need both paths — a customer-managed SSO
-connection might be configuration when the developer owns it and an API
-resource when the customer does — and that case should be decided on its own
-merits rather than by this rule.
+later. A resource can legitimately need both paths. A customer-managed SSO
+connection might be configuration when the developer owns it, and an API
+resource when the customer does. That case should be decided on its own merits
+rather than by this rule.
 
 ### 2. The grammar is `zitadel <resource> <verb> [id] [flags]`
 
-Resource first, plural, then the verb. `zitadel users create`, not
-`zitadel create user` and not `zitadel user create`.
+Resource first, plural, then the verb. `zitadel users create`, not `zitadel
+create user` and not `zitadel user create`.
 
 - **Resource before verb** because it groups: everything about users is one
   `--help` page and one tab-completion prefix, and a new verb can never collide
   with a top-level command the way `zitadel create` eventually would. This is
-  the `gh` / `kubectl` / `stripe` ordering; the verb-first ordering is `docker`'s
-  pre-1.13 mistake, which `docker` itself moved away from.
+  the `gh` / `kubectl` / `stripe` ordering; the verb-first ordering is
+  `docker`'s pre-1.13 mistake, which `docker` itself moved away from.
 - **Plural** because `list` returns many and the noun should not change number
   between `users list` and `users get`.
 - **The id is a positional argument, not `--id`.** It is the object of the
@@ -61,65 +61,60 @@ Resource first, plural, then the verb. `zitadel users create`, not
 | `schemas`, `environments`, `releases`, `flow-definitions`, `branding` | `list` `get` |
 
 `environments` is spelled against an existing contract and needs resolving
-before this lands: [ADR 035 §Inspection commands](035-configuration-environments.md)
-is Accepted and specifies `zitadel env list`, while this registry produces
-`zitadel environments list` and `zitadel environments get <name>`. Two spellings
-for one thing is worse than either. Either this surface adopts `env`, or ADR 035
-is amended to the plural — recorded below rather than decided here, because it
-is a public command contract someone else already wrote down.
+before this lands. [ADR 035 §Inspection
+commands](035-configuration-environments.md) is Accepted and specifies `zitadel
+env list`. This surface produces `zitadel environments list` and `zitadel
+environments get <name>`. Two spellings for one thing is worse than either.
+Either this surface adopts `env`, or ADR 035 is amended to the plural —
+recorded below rather than decided here, because it is a public command
+contract someone else already wrote down.
 
 Configuration resources are readable but never writable here. They are authored
 as files and shipped through a release (§1), so a write verb would be a second
-writer over the same state — but reading what the server currently holds is how
-you check that a deploy landed, and refusing that would be dogma rather than
-design.
+writer over the same state. Reading is different. Seeing what the server
+currently holds is how you check that a deploy landed, and refusing that would
+be dogma rather than design.
 
 Elsewhere the verb set follows the endpoints. The CLI does not synthesise a
-missing verb out of other calls, and it does not hide one that exists — with
-two deliberate exceptions: `POST /projects` is unauthenticated bootstrap that
-mints secrets into `.zitadel/secret`, which is `setup`'s job, and `POST
+missing verb out of other calls, and it does not hide one that exists. There
+are two deliberate exceptions. `POST /projects` is unauthenticated bootstrap
+that mints secrets into `.zitadel/secret`, which is `setup`'s job. `POST
 /sessions` mints an end-user session, which belongs to the SDKs and the login
-flow rather than to a terminal. `delete` means the resource is gone. An operation that changes a resource's
-state while leaving it readable is named after what it does: `DELETE /sessions/{id}`
-terminates a session, so the command is `revoke`, and `DELETE /teams/{id}`
-deactivates a team that stays readable ([ADR 024](024-user-team-lifecycle-ownership.md)),
-so the command is `deactivate`.
+flow rather than to a terminal. `delete` means the resource is gone. An
+operation that changes a resource's state while leaving it readable is named
+after what it does. `DELETE /sessions/{id}` terminates a session, so the
+command is `revoke`. `DELETE /teams/{id}` deactivates a team that stays
+readable ([ADR 024](024-user-team-lifecycle-ownership.md)), so the command is
+`deactivate`.
 
-This follows `gh`, which is strict about the word rather than about uniformity:
-secrets, keys and labels are `delete`d, while a pull request is `close`d,
-`lock`ed or `merge`d, and `gh pr delete` does not exist at all. Spelling a
-deactivation `delete` would tell someone their team is gone when it is still
-there, and no amount of consistency is worth that. The result still reports
-what happened beside the id (`deleted`, `revoked`, `deactivated`), so an agent
-reads the outcome rather than inferring it from the verb.
+This follows `gh`, which is strict about the word rather than about uniformity.
+Secrets, keys and labels are `delete`d. A pull request is `close`d, `lock`ed or
+`merge`d, and `gh pr delete` does not exist at all. Spelling a deactivation
+`delete` would tell someone their team is gone when it is still there, and no
+amount of consistency is worth that. The result still reports what happened
+beside the id (`deleted`, `revoked`, `deactivated`), so an agent reads the
+outcome rather than inferring it from the verb.
 
 ### 4. One registry, one generic factory
 
-Every command is generated from a single descriptor table by a factory that
-knows nothing about Zitadel — including its wire vocabulary. The cursor
-property names and the structured-query body shape are declared by the caller
-and default to this API's (ADRs 027 and 031) rather than being written into the
-factory, so "platform-agnostic" is a property a test can demonstrate rather
-than a label. Adding a resource is a table entry; changing a
-convention changes it everywhere at once. Hand-authoring a command file per
-verb is not allowed — that is how surfaces drift, and it is the failure this
-ADR exists to prevent.
+Every command is generated from a single descriptor table by machinery that
+knows nothing about Zitadel. Even the API's own conventions, such as how a
+cursor is named, are declared by the table rather than assumed, so
+"platform-agnostic" is something a test can demonstrate rather than a label.
+Adding a resource is a table entry; changing a convention changes it everywhere
+at once. Hand-authoring a command file per verb is not allowed — that is how
+surfaces drift, and it is the failure this ADR exists to prevent.
 
-### 5. The CLI lists its commands explicitly
+### 5. The generated surface is described, not discovered
 
-Most CLI frameworks find commands by scanning a directory of files, one file per
-command. A generated command has no file, so that cannot work here. The CLI
-therefore keeps one list naming every command it has, generated and hand-written
-alike.
+Whatever a command is built from, what it *offers* is published: `zitadel
+commands --json` and `zitadel resources --json` describe the commands, their
+flags and their fields, and nothing about how they were produced. Agents read
+that output, so it is part of the contract rather than a by-product.
 
-The cost is that writing a new command file no longer makes it appear; the list
-has to name it too. That is accepted, because the alternative is two ways of
-registering a command, with the generated ones second-class — and because a list
-you can read is easier to audit than a convention you have to know.
-
-Generated commands also keep their internals out of the machine-readable command
-listing, so `zitadel commands --json` describes what a command takes rather than
-how it was built. Agents read that output, which is why it matters.
+How commands are registered with the framework is an implementation matter and
+lives in
+[`docs/design/cli/resource-commands.md`](../design/cli/resource-commands.md).
 
 ### 6. Body fields are flags, generated from the request schema
 
@@ -132,8 +127,9 @@ before a request is made. Conventions:
   derivable from the API docs and vice versa.
 - **`--data '{…}'` and `--file` stay**, because a nested object or an array
   cannot be a single flag. `--file -` reads stdin, and fails immediately when
-  stdin is a terminal rather than waiting on input that is never coming. When both supply the same key, the flag wins: the
-  more specific, later-typed thing overrides the blob.
+  stdin is a terminal rather than waiting on input that is never coming. When
+  both supply the same key, the flag wins: the more specific, later-typed thing
+  overrides the blob.
 - **An open record takes repeatable typed entries**: `key=value` is always a
   string, `key:=value` parses the value as JSON. This is HTTPie's split, chosen
   because guessing loses either way — bare inference turns a postal code into a
@@ -143,10 +139,10 @@ before a request is made. Conventions:
 
 ### 7. One call describes the whole surface
 
-`zitadel resources [--json]` reports every resource, its verbs, its columns, its
-`filter_fields` and `sort_fields`, its `create_fields` and `update_fields` with
-each flag's name, kind and whether it is required, and its `delete_outcome`. It
-contacts no server and needs no credential.
+`zitadel resources [--json]` reports every resource, its verbs, its columns,
+its `filter_fields` and `sort_fields`, its `create_fields` and `update_fields`
+with each flag's name, kind and whether it is required, and its
+`delete_outcome`. It contacts no server and needs no credential.
 
 An agent that has to discover the surface by scraping `--help` is parsing prose
 we reformat at will. This is the machine-readable alternative, and it is the
@@ -157,9 +153,9 @@ than `deleted`, and help text alone could not tell it that.
 
 ### 8. The CLI suggests runnable commands, not raw tokens
 
-Any result that has an obvious next step carries `next_commands`, and each entry
-is a complete invocation that runs as typed — not a fragment and not a bare
-value the caller has to splice.
+Any result that has an obvious next step carries `next_commands`, and each
+entry is a complete invocation that runs as typed — not a fragment and not a
+bare value the caller has to splice.
 
 A paged list repeats the whole original invocation with `--page-token` appended
 and the token shell-quoted, so every filter, sort and limit survives the hop;
@@ -172,60 +168,62 @@ a filter on page two.
 
 `--json` emits the standard envelope and nothing else, so `jq` is the intended
 consumer and never has to strip a banner. The envelope is the one ADR 004
-already defines — `cli_version`, `command` and `source` beside `status` and
-`data`, plus `code`, `message`, `hint` and `next_commands` on failure — not a
-shape this surface invents.
+already defines, not a shape this surface invents. It carries `cli_version`,
+`command` and `source` beside `status` and `data`, plus `code`, `message`,
+`hint` and `next_commands` on failure.
 
-Human output is chosen by the terminal, not by a flag the user must remember:
-a list renders as an aligned table on a TTY and as tab-separated records when
-piped or given `--plain`, so `awk` and `cut` work without column noise, and a
-`get` renders as a labelled record.
+Human output is chosen by the terminal, not by a flag the user must remember. A
+list renders as an aligned table on a TTY, and as tab-separated records when
+piped or given `--plain`, so `awk` and `cut` work without column noise. A `get`
+renders as a labelled record.
 
-Reading one record is `get`, and there is no `view`. `gh` splits the two —
-`view` for people, `--json` for machines — but our commands already switch shape
-on the terminal, so a second verb would make reading a record the one operation
+Reading one record is `get`, and there is no `view`. `gh` splits the two, with
+`view` for people and `--json` for machines. Our commands already switch shape
+on the terminal. A second verb would make reading a record the one operation
 where the human and machine forms are different commands. `get` renders the
 labelled layout on a TTY and the raw object otherwise.
 
 Each resource declares its default columns, and they are chosen so a human can
 act on a row: an identifier they recognise, not an opaque id and two
-timestamps. `--fields` overrides them. Columns hide nothing — `--json` always
-returns the complete object — but the piped tab-separated form uses the same
-list, so a bad column choice degrades scripts as well as tables. Its legal values come from the generated response
-schema rather than from whatever the current page happened to return, so the
-same argument gets the same answer on an empty project as on a full one, and
-the check runs before any request. A field whose keys are the customer's rather
-than the API's — a user's `attributes` — validates as a prefix, so
-`attributes.anything` is accepted while `atributes.email` is caught as a typo. Progress output is suppressed when stdout
-is not a terminal rather than redirected to stderr, because a spinner in a log
-file is noise either way.
+timestamps. `--fields` overrides them. Columns hide nothing, because `--json`
+always returns the complete object. The piped tab-separated form uses the same
+list though, so a bad column choice degrades scripts as well as tables. Its
+legal values come from the generated response schema, not from whatever the
+current page happened to return. So the same argument gets the same answer on
+an empty project as on a full one, and the check runs before any request. Some
+fields have keys the customer chooses rather than the API, such as a user's
+`attributes`. Those validate as a prefix, so `attributes.anything` is accepted
+while `atributes.email` is caught as a typo. Progress output is suppressed when
+stdout is not a terminal rather than redirected to stderr, because a spinner in
+a log file is noise either way.
 
 ### 10. Destructive verbs confirm; `--force` is per command, never global
 
 On a terminal, a destructive verb prompts. Non-interactively they require
 `--force`, and refusing without it is an error carrying the exact command to
-re-run. `--force` is declared by each command that honours it rather than
-inherited globally, because what it permits differs — overwrite a managed file,
-destroy a resource — and a global flag would let a habit formed on the harmless
-one carry into the destructive one. `--dry-run` and `--non-interactive` / `-n`
-are global, since their meaning does not change per command.
+re-run. Each command that honours `--force` declares its own, rather than
+inheriting one. What it permits differs: on `setup` it overwrites a managed
+file, on a destructive verb it destroys a resource. A single global flag would
+let a habit formed on the harmless one carry into the destructive one.
+`--dry-run` and `--non-interactive` / `-n` are global, since their meaning does
+not change per command.
 
 Declining the prompt is `status: "skipped"`, not an error: the user did what
 the prompt asked, and a non-zero exit would make a cancelled confirmation
 indistinguishable from a failed deletion in a script. The endpoints answer 204
-with no body, so success echoes the id beside an outcome property —
-`deleted`, `revoked`, or `deactivated` — rather than inventing a resource the
-server did not return.
+with no body. Success therefore echoes the id beside an outcome property,
+either `deleted`, `revoked` or `deactivated`, rather than inventing a resource
+the server did not return.
 
 ### 11. One filter grammar, whatever the transport
 
 Every list takes `--filter field=operation:value`, repeatable, and `--sort
 field:direction` where the endpoint can sort. The caller writes the same thing
-for `users` as for `events`, and the registry decides how it reaches the wire:
-a structured query endpoint receives a validated filter body
-([ADR 031](031-openapi-querying.md)), a `GET` list receives query parameters —
-including an endpoint that spells one field's range as two parameters
-(`created_after`, `created_before`) while the caller still writes
+for `users` as for `events`. The registry decides how it reaches the wire. A
+structured query endpoint receives a validated filter body ([ADR
+031](031-openapi-querying.md)). A `GET` list receives query parameters,
+including the case where one field's range is two separate parameters
+(`created_after` and `created_before`) while the caller still writes
 `created_at=greater_than_or_equal:…`.
 
 **This abstracts the transport, not the capability.** Each field declares the
@@ -236,26 +234,26 @@ saying which field is the limitation. The CLI never silently drops a filter.
 The limit of this is worth stating rather than glossing: the registry can only
 declare what the *contract* says a field accepts. Three operations the query
 contract advertises answer `501` today (below), so the CLI offers them and the
-server refuses them. Local validation removes the class of failure the CLI can
-see — a field or operation the contract does not have — not the class only the
-server knows about. What it refuses to do
-is make the caller learn a second grammar because the endpoint behind one
-resource was written differently from the endpoint behind another.
+server refuses them. Local validation removes the failures the CLI can see,
+meaning a field or operation the contract does not have. It cannot remove the
+ones only the server knows about. What it refuses to do is make the caller
+learn a second grammar because the endpoint behind one resource was written
+differently from the endpoint behind another.
 
 Repeated uses of a field combine with AND, except where a field declares
-otherwise — a repeated `GET` parameter widens rather than narrows, so that
-field says so, and both the flag help and the discovery output repeat it.
-Hiding that difference would change what a query means.
+otherwise. A repeated `GET` parameter widens rather than narrows, so that field
+says so, and both the flag help and the discovery output repeat it. Hiding that
+difference would change what a query means.
 
-Paging is declared the same way: `--limit` / `--page-token` / `--all` expose
-cursor pagination directly ([ADR 027](027-cursor-based-pagination.md)); a list
-whose endpoint has no cursor declares itself unpaged and has no paging flags
-rather than advertising ones the server ignores; and a list whose partial
-answer would read as a complete one — a revision history — declares that a bare
-invocation drains, with `--limit` or `--page-token` still returning one page.
-`--all` is the only place the CLI loops, and it stops with an error if a cursor
-repeats, since an unbounded follow of a server-supplied token is a hang wearing
-a progress spinner.
+Paging is declared the same way. `--limit`, `--page-token` and `--all` expose
+cursor pagination directly ([ADR 027](027-cursor-based-pagination.md)). A list
+whose endpoint has no cursor declares itself unpaged, so it has no paging flags
+at all rather than advertising ones the server ignores. And a list whose
+partial answer would read as a complete one, such as a revision history,
+declares that a bare invocation drains. `--limit` or `--page-token` still
+return a single page there. `--all` is the only place the CLI loops, and it
+stops with an error if a cursor repeats, since an unbounded follow of a
+server-supplied token is a hang wearing a progress spinner.
 
 ### 12. Credentials never reach a command line
 
@@ -264,10 +262,9 @@ read from `.zitadel/secret` ([ADR 036](036-api-credential-planes.md)). Shell
 history and process listings are readable by other users, so this is enforced
 in code rather than documented as advice.
 
-The refusal matches on the *name*, against a wordlist hardcoded in the CLI:
-`password`, `secret`, `token`, `credential`, and compounds like `apiKey`, split
-across `snake_case`, `kebab-case` and `camelCase` so `client_secret` and
-`userToken` match while `passwordless` does not.
+The refusal matches on the field's *name*, against a list of credential words
+held in the CLI. It recognises the obvious ones in any spelling, so
+`client_secret` and `userToken` are refused while `passwordless` is not.
 
 **This is a stopgap and should be replaced by a schema-derived signal.** A
 hardcoded list is wrong in both directions: it cannot know that a customer's
@@ -281,39 +278,38 @@ the OpenAPI documents use `format: password` in at least one place. Neither
 reaches the CLI: nothing enforces `writeOnly` server-side today, and the
 generated Zod schemas the commands introspect drop both keywords, so there is
 nothing to read even where an author set them. Making this real means enforcing
-`writeOnly` and carrying it (and `format`) through code generation — backend and
-generator work, not a CLI change.
+`writeOnly` and carrying it (and `format`) through code generation — backend
+and generator work, not a CLI change.
 
 Until then the wordlist earns its place only as the weaker half of a pair:
-credentials are not user attributes at all
-([ADR 020](020-credentials-out-of-user-schema.md)), so anything it catches was
+credentials are not user attributes at all ([ADR
+020](020-credentials-out-of-user-schema.md)), so anything it catches was
 already a mistake.
 
 ### 13. The command surface follows the API, not the reverse
 
-The line is between transport and meaning. How a filter travels — a query body
-or a query parameter, one parameter or two — is plumbing, and §11 hides it so
-the surface stays learnable. What a filter *can do* is meaning, and that is
-never invented: an operation the endpoint lacks is refused, a verb it lacks is
+The line is between transport and meaning. How a filter travels is plumbing: a
+query body or a query parameter, one parameter or two. §11 hides that so the
+surface stays learnable. What a filter *can do* is meaning, and that is never
+invented: an operation the endpoint lacks is refused, a verb it lacks is
 absent, a field it cannot sort by gets no `--sort`.
 
-Six lists read through `GET` — `events`, `schemas`, `environments`,
-`releases`, `flow-definitions` and `branding` — while five use
-`POST /<resource>/query`. That is the contract, not drift:
-[ADR 031](031-openapi-querying.md) allows `GET` alongside the query endpoint
-and says plainly that it "won't have filter/sort functionality". Those six
-genuinely have less capability, and the CLI reports exactly that — fewer
-operations per field, and no `--sort` where the endpoint cannot sort — while
-spelling what they *can* do the same way as everything else. Whether any of
-them should gain `/query` is a question about who needs to filter them, not a
-defect to fix.
+Six lists read through `GET`, and five use `POST /<resource>/query`. The six
+are `events`, `schemas`, `environments`, `releases`, `flow-definitions` and
+`branding`. That is the contract, not drift: [ADR 031](031-openapi-querying.md)
+allows `GET` alongside the query endpoint and says plainly that it "won't have
+filter/sort functionality". Those six genuinely have less capability, and the
+CLI reports exactly that. They get fewer operations per field, and no `--sort`
+where the endpoint cannot sort. What they *can* do is spelled the same way as
+everything else. Whether any of them should gain `/query` is a question about
+who needs to filter them, not a defect to fix.
 
 ### 14. Four facts are frozen for agents
 
-The `--json` envelope shape, the exit codes, the error codes
-([ADR 030](030-error-model-mapping-and-reporting.md)), and the cursor field
-names are what agents parse ([ADR 004](004-agent-contract-and-agents-md.md)).
-Changing any of them is a breaking change even though no type signature moves.
+The `--json` envelope shape, the exit codes, the error codes ([ADR
+030](030-error-model-mapping-and-reporting.md)), and the cursor field names are
+what agents parse ([ADR 004](004-agent-contract-and-agents-md.md)). Changing
+any of them is a breaking change even though no type signature moves.
 
 ## Context
 
@@ -326,12 +322,12 @@ makes a CLI surface diverge from the API it fronts.
 
 ## Non-goals
 
-IdP and app management stay experimental under
-[ADR 007](007-gitops-configuration-surface.md): their server contracts are not
-real yet, and neither is in the registry. This ADR does not change that.
+IdP and app management stay experimental under [ADR
+007](007-gitops-configuration-surface.md): their server contracts are not real
+yet, and neither is in the registry. This ADR does not change that.
 
 Conventions that belong to the whole CLI rather than to this surface are out of
-scope and deferred: `-h` not working, the absence of `--quiet`, the
+scope and deferred. Those are `-h` not working, the absence of `--quiet`, the
 `--no-input` spelling, `-n`'s collision with the conventional "dry run", weak
 typo suggestions on unknown commands, no network timeout, and no pager. They
 are real, but fixing them here would mean changing commands this surface does
