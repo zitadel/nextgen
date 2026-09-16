@@ -264,6 +264,7 @@ func TestTeamService_Delete(t *testing.T) {
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, nil)
 			},
 		},
 		{
@@ -286,6 +287,36 @@ func TestTeamService_Delete(t *testing.T) {
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, assert.AnError)
+			},
+			wantErr: domain.ErrInternal(assert.AnError),
+		},
+		{
+			// ADR 054 §2: deactivating the owner would orphan the project.
+			name:   "team that owns a project is refused",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(true, nil)
+				// No event: the transaction rolls back, so nothing is recorded.
+			},
+			wantErr: domain.ErrTeamOwnsProject(),
+		},
+		{
+			// A revoked owning grant is not ownership; the guard reads active
+			// rows only, so this team deactivates like any other.
+			name:   "team whose owning grant was revoked deactivates",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, nil)
+			},
+		},
+		{
+			name:   "ownership lookup fails",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
 		},

@@ -245,6 +245,10 @@ func (UnimplementedHandler) DeleteGrant(ctx context.Context, params DeleteGrantP
 // users whose lifecycle it owns are deactivated with it.
 // The request is idempotent. Deleting a team that is already deactivated
 // or doesn't exist succeeds without changing anything.
+// A team that still owns a project is refused with `409
+// team.owns_project`: deactivating it would leave the project owned by a
+// dead team and so unmanageable. Transfer or revoke the project ownership
+// first.
 //
 // DELETE /teams/{team_id}
 func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamParams) (r DeleteTeamRes, _ error) {
