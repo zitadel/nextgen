@@ -109,8 +109,9 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		// The id is server-minted, so the only unique constraint a create can
 		// lose is (project_id, name, created_at): another revision of the same
-		// flow landed on the same instant.
-		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+		// flow landed on the same instant. Other integrity violations (foreign
+		// key, check) are not that race and keep their own semantics.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return nil, domain.ErrFlowDefinitionRevisionConflict().WithParent(err)
 		}
 		return nil, err

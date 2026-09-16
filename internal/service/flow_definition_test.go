@@ -493,6 +493,59 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			wantErr: assert.AnError,
 		},
 		{
+			name: "a lost revision race answers revision_conflict",
+			fields: fields{
+				schemaResolver: &mockSchemaGetter{
+					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
+						return userSchema, nil
+					},
+				},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{
+					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
+						return "https://example.com/schemas/flow-definition.json", nil
+					},
+				},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return []domain.PivotingTarget{}, nil
+				},
+				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
+					stmts := servicemocks.NewMockAllStatements(ctrl)
+					stmts.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.FlowDefinition) error {
+						return database.NewUniqueError("flow_definitions", "idx_flow_definitions_name_revision", assert.AnError)
+					}).Times(1)
+					return stmts
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				req: service.FlowDefinitionRequest{
+					ProjectID:     "project1",
+					Name:          "login",
+					Status:        "active",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[string]string{"login": "step_1"},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []domain.Field{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: new(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionRevisionConflict(),
+		},
+		{
 			name: "failed to get user schema",
 			fields: fields{
 				schemaResolver: &mockSchemaGetter{
