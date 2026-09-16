@@ -4593,8 +4593,8 @@ type ListFlowDefinitionsParams struct {
 	// time first.
 	Name OptString `json:",omitempty,omitzero"`
 	// Which revisions to return. Every revision of a flow shares its
-	// `name`, so publishing a definition under an existing `name` mints a
-	// new row.
+	// `name`, so publishing a definition under an existing `name` generates
+	// a new row.
 	// `all` (the default) returns every revision — the full history an
 	// export, an audit or a GitOps diff needs. `latest` returns the newest
 	// revision of each `name`, which is one row per flow.
