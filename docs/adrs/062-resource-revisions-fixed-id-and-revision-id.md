@@ -59,9 +59,10 @@ Every revisioned resource carries two ids:
   every revision of it.
 - `revision_id` is allocated per revision.
 
-Newly allocated ids of both kinds are dialect-minted prefixed ids per ADR
-047. Each kind registers two prefixes, one for the resource and one for the
-revision.
+Newly allocated ids of both kinds are prefix plus opaque id per ADR 047. Each
+kind registers two prefixes, one for the resource and one for the revision. A
+connection, for example, carries `idp_01KWH3B72K7M7F0N9WD3P2E4YM` as `id` and
+`idprev_01KWH3B72K7M7F0N9WD3P2E4YN` as `revision_id`.
 
 ### 2. A revision is immutable
 
