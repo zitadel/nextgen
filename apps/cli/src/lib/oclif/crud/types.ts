@@ -8,7 +8,7 @@ import type { GlobalOptions } from "../types";
  * verb calls through; the factory itself never sees a client.
  */
 
-export type Verb = "list" | "get" | "create" | "update" | "delete";
+export type Verb = "list" | "get" | "create" | "update" | "delete" | "revoke" | "deactivate";
 export type ResourceCommandId = `${string}:${Verb}`;
 export type Json = Readonly<Record<string, unknown>>;
 export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
@@ -117,14 +117,20 @@ export type UpdateSpec<Ctx> = Readonly<{
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
   /**
-   * What the API actually does, when that is not plain removal — a team's
-   * DELETE deactivates it and leaves it readable (ADR 024), a session's
-   * revokes it. Reported to the caller beside the id instead of claiming the
-   * resource is gone. Defaults to `deleted`.
+   * The command verb, when the endpoint does something other than remove the
+   * resource. `delete` means the thing is gone; an operation that changes a
+   * resource's state while leaving it readable is named after what it does —
+   * a session is `revoke`d, a team is `deactivate`d (ADR 024).
    *
-   * The *verb* is always `delete`: a resource is removed the same way
-   * everywhere, and what the server did to it is a property of the answer,
-   * not a different command to learn.
+   * This follows `gh`, which deletes secrets and keys but closes, locks and
+   * merges pull requests, and has no `pr delete` at all. Spelling a
+   * deactivation `delete` would tell the user the team is gone when it is
+   * still there. Defaults to `delete`.
+   */
+  verb?: Extract<Verb, "delete" | "revoke" | "deactivate">;
+  /**
+   * The property reported beside the id, naming what the server did. Defaults
+   * to the verb's own past tense (`deleted`, `revoked`, `deactivated`).
    */
   outcome?: string;
   call: (ctx: Ctx, id: string) => Promise<void>;

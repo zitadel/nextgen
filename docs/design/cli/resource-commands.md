@@ -38,8 +38,8 @@ Runtime resources:
 | Resource   | Verbs                             | Backing endpoints                                   |
 | ---------- | --------------------------------- | --------------------------------------------------- |
 | `users`    | list, get, create, update, delete | `POST /users/query`, `/users/{id}`                  |
-| `teams`    | list, get, create, update, delete | `POST /teams/query`, `/teams/{id}`                  |
-| `sessions` | list, get, delete                 | `POST /sessions/query`, `DELETE /sessions/{id}`     |
+| `teams`    | list, get, create, update, deactivate | `POST /teams/query`, `/teams/{id}`              |
+| `sessions` | list, get, revoke                 | `POST /sessions/query`, `DELETE /sessions/{id}`     |
 | `events`   | list, get                         | `GET /events`, `GET /events/{id}`                   |
 | `grants`   | list, get, create, delete         | `POST /grants/query`, `/grants/{id}`                |
 | `projects` | list, get, update                 | `POST /projects/query`, `/projects/{id}`            |
@@ -91,8 +91,8 @@ $ zitadel resources
 resource  verbs                              filter on
 --------  ---------------------------------  ---------------------------------------------
 users     list, get, create, update, delete  created_at, id, schema, status, team_id, …
-teams     list, get, create, update, delete  created_at, name, status
-sessions  list, get, delete                  created_at, user_id, state, …
+teams     list, get, create, update, deactivate  created_at, name, status
+sessions  list, get, revoke                  created_at, user_id, state, …
 ```
 
 `--json` also carries `delete_outcome`, the property a delete's envelope puts
@@ -293,9 +293,10 @@ request.
 
 ## Deleting
 
-- The verb is always `delete`, whatever the endpoint does to the resource. A
-  session's DELETE revokes and a team's deactivates; neither renames the
-  command, because removal should be spelled one way across the surface.
+- `delete` means the resource is gone. An endpoint that changes state and
+  leaves the resource readable is named after what it does: `sessions revoke`,
+  `teams deactivate`. This is `gh`'s rule — secrets are deleted, pull requests
+  are closed — and it keeps the verb from lying about the outcome.
 - Interactive runs confirm first. Non-interactive runs require `--force`, the
   same guard as `reset`; without it the command fails with `E_VALIDATION` and a
   `next_commands` entry carrying the exact retry. `--force` is declared per

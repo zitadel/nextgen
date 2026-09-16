@@ -165,8 +165,8 @@ export const RESOURCES = {
       call: ({ client }, id, body) => client.updateTeam(id, body as UpdateTeamBodyT),
     },
     // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
-    // command reports that rather than claiming the team is gone.
-    delete: { outcome: "deactivated", call: ({ client }, id) => client.deleteTeam(id) },
+    // command is named after that rather than claiming the team is gone.
+    delete: { verb: "deactivate", call: ({ client }, id) => client.deleteTeam(id) },
   },
 
   sessions: {
@@ -190,10 +190,9 @@ export const RESOURCES = {
         client.querySessions(body as QuerySessionsBodyT, { project_id: projectId }),
     },
     get: { call: ({ client }, id) => client.getSession(id), response: GetSessionResponse },
-    // The endpoint revokes rather than removes, so the result says so; the
-    // verb stays `delete`, because a resource is removed the same way
-    // everywhere and what the server did is a property of the answer.
-    delete: { outcome: "revoked", call: ({ client }, id) => client.revokeSession(id) },
+    // The endpoint terminates the session rather than removing a record, so
+    // the command says `revoke`. `delete` would tell the caller it is gone.
+    delete: { verb: "revoke", call: ({ client }, id) => client.revokeSession(id) },
   },
 
   events: {
