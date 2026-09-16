@@ -93,23 +93,21 @@ convention changes it everywhere at once. Hand-authoring a command file per
 verb is not allowed — that is how surfaces drift, and it is the failure this
 ADR exists to prevent.
 
-### 5. Commands are registered from a table, not discovered from the filesystem
+### 5. The CLI lists its commands explicitly
 
-A generated command has no file, so oclif's directory-pattern discovery cannot
-find it. The CLI uses oclif's explicit strategy instead: one exported `COMMANDS`
-table naming every command, hand-written and generated alike, built from a
-single bundle entry.
+Most CLI frameworks find commands by scanning a directory of files, one file per
+command. A generated command has no file, so that cannot work here. The CLI
+therefore keeps one list naming every command it has, generated and hand-written
+alike.
 
-The cost is that adding a command file no longer registers it — the table has to
-name it. That is accepted, because the alternative is two registration
-mechanisms where a generated command is second-class, and because an explicit
-table is greppable.
+The cost is that writing a new command file no longer makes it appear; the list
+has to name it too. That is accepted, because the alternative is two ways of
+registering a command, with the generated ones second-class — and because a list
+you can read is easier to audit than a convention you have to know.
 
-Generated commands must also keep their internals out of oclif's serialized
-statics: the registry entry behind a command is held outside the class, so
-`zitadel commands --json` and the published manifest describe the command rather
-than the machinery behind it. An agent reading that output is the reason it
-matters.
+Generated commands also keep their internals out of the machine-readable command
+listing, so `zitadel commands --json` describes what a command takes rather than
+how it was built. Agents read that output, which is why it matters.
 
 ### 6. Body fields are flags, generated from the request schema
 
