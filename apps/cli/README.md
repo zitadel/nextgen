@@ -144,15 +144,15 @@ which ships in this package.
 * [`zitadel schemas get ID`](#zitadel-schemas-get-id)
 * [`zitadel schemas list`](#zitadel-schemas-list)
 * [`zitadel search`](#zitadel-search)
-* [`zitadel sessions delete ID`](#zitadel-sessions-delete-id)
 * [`zitadel sessions get ID`](#zitadel-sessions-get-id)
 * [`zitadel sessions list`](#zitadel-sessions-list)
+* [`zitadel sessions revoke ID`](#zitadel-sessions-revoke-id)
 * [`zitadel setup`](#zitadel-setup)
 * [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel stop`](#zitadel-stop)
 * [`zitadel teams create`](#zitadel-teams-create)
-* [`zitadel teams delete ID`](#zitadel-teams-delete-id)
+* [`zitadel teams deactivate ID`](#zitadel-teams-deactivate-id)
 * [`zitadel teams get ID`](#zitadel-teams-get-id)
 * [`zitadel teams list`](#zitadel-teams-list)
 * [`zitadel teams update ID`](#zitadel-teams-update-id)
@@ -1454,44 +1454,6 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-search](https://github.com/oclif/plugin-search/blob/v1.2.50/src/commands/search.ts)_
 
-## `zitadel sessions delete ID`
-
-Delete a session by id.
-
-```
-USAGE
-  $ zitadel sessions delete ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [-e
-    development|preview|production]
-
-ARGUMENTS
-  ID  session id
-
-FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -f, --force                 Delete the session without the confirmation
-                              prompt. Required when non-interactive.
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Delete a session by id.
-
-EXAMPLES
-  $ zitadel sessions delete <id> --force --json
-```
-
 ## `zitadel sessions get ID`
 
 Get one session by id.
@@ -1612,6 +1574,44 @@ EXAMPLES
   $ zitadel sessions list --all --json
 
   $ zitadel sessions list --filter created_at=equals:<value> --sort created_at:desc
+```
+
+## `zitadel sessions revoke ID`
+
+Revoke a session by id.
+
+```
+USAGE
+  $ zitadel sessions revoke ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [-e
+    development|preview|production]
+
+ARGUMENTS
+  ID  session id
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Revoke the session without the confirmation
+                              prompt. Required when non-interactive.
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Revoke a session by id.
+
+EXAMPLES
+  $ zitadel sessions revoke <id> --force --json
 ```
 
 ## `zitadel setup`
@@ -1833,13 +1833,13 @@ EXAMPLES
   $ zitadel teams create --file ./team.json
 ```
 
-## `zitadel teams delete ID`
+## `zitadel teams deactivate ID`
 
-Delete a team by id.
+Deactivate a team by id.
 
 ```
 USAGE
-  $ zitadel teams delete ID [--json] [-c <value>] [-s <value>] [-n]
+  $ zitadel teams deactivate ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [-e
     development|preview|production]
 
@@ -1850,8 +1850,8 @@ FLAGS
   -c, --cwd=<value>           Project directory to operate on.
   -e, --environment=<option>  Target environment (default: development).
                               <options: development|preview|production>
-  -f, --force                 Delete the team without the confirmation prompt.
-                              Required when non-interactive.
+  -f, --force                 Deactivate the team without the confirmation
+                              prompt. Required when non-interactive.
   -n, --non-interactive       Disable prompts. Required when scripting or
                               running as an agent.
   -s, --server=<value>        Override the resolved server URL.
@@ -1865,10 +1865,10 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Delete a team by id.
+  Deactivate a team by id.
 
 EXAMPLES
-  $ zitadel teams delete <id> --force --json
+  $ zitadel teams deactivate <id> --force --json
 ```
 
 ## `zitadel teams get ID`

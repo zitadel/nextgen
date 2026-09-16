@@ -20,6 +20,12 @@ user, a session, an audit event — gets a command and is never tracked in
 `.zitadel/`. Where a resource falls decides its interface, so the boundary is
 the first thing this ADR fixes.
 
+This describes the eleven resources here, not a law for everything that comes
+later. A resource can legitimately need both paths — a customer-managed SSO
+connection might be configuration when the developer owns it and an API
+resource when the customer does — and that case should be decided on its own
+merits rather than by this rule.
+
 ### 2. The grammar is `zitadel <resource> <verb> [id] [flags]`
 
 Resource first, plural, then the verb. `zitadel users create`, not
@@ -47,10 +53,10 @@ Resource first, plural, then the verb. `zitadel users create`, not
 | Resource | Verbs |
 |---|---|
 | `users` | `list` `get` `create` `update` `delete` |
-| `teams` | `list` `get` `create` `update` `delete` |
+| `teams` | `list` `get` `create` `update` `deactivate` |
 | `grants` | `list` `get` `create` `delete` |
 | `projects` | `list` `get` `update` |
-| `sessions` | `list` `get` `delete` |
+| `sessions` | `list` `get` `revoke` |
 | `events` | `list` `get` |
 | `schemas`, `environments`, `releases`, `flow-definitions`, `branding` | `list` `get` |
 
@@ -73,13 +79,19 @@ missing verb out of other calls, and it does not hide one that exists — with
 two deliberate exceptions: `POST /projects` is unauthenticated bootstrap that
 mints secrets into `.zitadel/secret`, which is `setup`'s job, and `POST
 /sessions` mints an end-user session, which belongs to the SDKs and the login
-flow rather than to a terminal. A verb is never renamed to describe what the
-endpoint does with the resource. `DELETE /sessions/{id}` revokes and
-`DELETE /teams/{id}` deactivates ([ADR 024](024-user-team-lifecycle-ownership.md)),
-and both are `delete` on the command line: removal is spelled one way
-everywhere, and what the server did is a property of the answer
-(`deleted`, `revoked`, `deactivated`) rather than a different command to
-learn.
+flow rather than to a terminal. `delete` means the resource is gone. An operation that changes a resource's
+state while leaving it readable is named after what it does: `DELETE /sessions/{id}`
+terminates a session, so the command is `revoke`, and `DELETE /teams/{id}`
+deactivates a team that stays readable ([ADR 024](024-user-team-lifecycle-ownership.md)),
+so the command is `deactivate`.
+
+This follows `gh`, which is strict about the word rather than about uniformity:
+secrets, keys and labels are `delete`d, while a pull request is `close`d,
+`lock`ed or `merge`d, and `gh pr delete` does not exist at all. Spelling a
+deactivation `delete` would tell someone their team is gone when it is still
+there, and no amount of consistency is worth that. The result still reports
+what happened beside the id (`deleted`, `revoked`, `deactivated`), so an agent
+reads the outcome rather than inferring it from the verb.
 
 ### 4. One registry, one generic factory
 
@@ -190,7 +202,7 @@ file is noise either way.
 
 ### 10. Destructive verbs confirm; `--force` is per command, never global
 
-On a terminal, `delete` prompts. Non-interactively they require
+On a terminal, a destructive verb prompts. Non-interactively they require
 `--force`, and refusing without it is an error carrying the exact command to
 re-run. `--force` is declared by each command that honours it rather than
 inherited globally, because what it permits differs — overwrite a managed file,

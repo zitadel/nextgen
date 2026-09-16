@@ -23,7 +23,7 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
         ...(resource.get ? ["get"] : []),
         ...(resource.create ? ["create"] : []),
         ...(resource.update ? ["update"] : []),
-        ...(resource.delete ? ["delete"] : []),
+        ...(resource.delete ? [resource.delete.verb ?? "delete"] : []),
       ],
       columns: [...resource.columns],
       // Whether `list` is cursor-paginated. An agent that loops on
@@ -37,7 +37,11 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
       // reading this surface should not have to guess which.
       ...(resource.delete
         ? {
-            delete_outcome: resource.delete.outcome ?? "deleted",
+            delete_outcome:
+              resource.delete.outcome ??
+              { delete: "deleted", revoke: "revoked", deactivate: "deactivated" }[
+                resource.delete.verb ?? "delete"
+              ],
           }
         : {}),
       // Every list shares one filter grammar, so the surface reports each

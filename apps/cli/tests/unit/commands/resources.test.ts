@@ -926,11 +926,11 @@ describe("body field flags", () => {
 describe("dry runs", () => {
   it("previews a delete without --force, since it sends nothing", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["teams", "delete", "team_1", "--dry-run"]);
+    const res = await run(cwd, ["teams", "deactivate", "team_1", "--dry-run"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       dry_run: true,
-      verb: "delete",
+      verb: "deactivate",
       topic: "teams",
       id: "team_1",
     });
@@ -980,13 +980,13 @@ describe("an empty list writes nothing", () => {
 });
 
 describe("delete outcomes", () => {
-  it("reports what a team delete actually does, rather than claiming removal", async () => {
+  it("names the command after what the endpoint does, not after removal", async () => {
     const cwd = await makeProject();
     server.use(
       http.delete(`${SERVER}/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
-    const res = await run(cwd, ["teams", "delete", "team_1", "--force"]);
+    const res = await run(cwd, ["teams", "deactivate", "team_1", "--force"]);
     expect(res.exitCode).toBe(0);
     // ADR 024: the API deactivates the team and leaves it readable.
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
@@ -1025,12 +1025,12 @@ describe("page tokens are opaque", () => {
 });
 
 describe("other resources", () => {
-  it("sessions delete reports that the server revoked rather than removed", async () => {
+  it("sessions revoke terminates the session and says so", async () => {
     const cwd = await makeProject();
     server.use(
       http.delete(`${SERVER}/sessions/sess_1`, () => new HttpResponse(null, { status: 204 })),
     );
-    const res = await run(cwd, ["sessions", "delete", "sess_1", "--force"]);
+    const res = await run(cwd, ["sessions", "revoke", "sess_1", "--force"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       id: "sess_1",

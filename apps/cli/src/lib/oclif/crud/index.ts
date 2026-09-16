@@ -68,7 +68,7 @@ export const buildResourceCommands = <Ctx>(
         ...bind("get", GetOperation, resource.get),
         ...bind("create", CreateOperation, resource.create),
         ...bind("update", UpdateOperation, resource.update),
-        ...bind("delete", DeleteOperation, resource.delete),
+        ...bind(resource.delete?.verb ?? "delete", DeleteOperation, resource.delete),
       ];
     }),
   );
