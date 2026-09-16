@@ -22,3 +22,14 @@ func (h *Harness) SeedProjectViewer(t *testing.T, projectID, userID string) {
 	asgn.ApplyScope(domain.NewProjectAssignmentScope())
 	require.NoError(t, h.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
 }
+
+// SeedOwningTeam writes the owning-team assignment claim/complete writes
+// (ADR 046 §1), binding a team to the project's `team` relation. It is the
+// shape that makes a claimer an operator: the seeded catalog resolves
+// `project.viewer` for the team's members through `member from team`, so a
+// test that seeds a direct user grant instead would not exercise that path.
+func (h *Harness) SeedOwningTeam(t *testing.T, projectID, teamID string) {
+	t.Helper()
+	asgn := domain.NewClaimTeamAssignment(projectID, teamID)
+	require.NoError(t, h.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+}

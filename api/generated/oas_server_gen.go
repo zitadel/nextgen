@@ -394,6 +394,10 @@ type Handler interface {
 	// GetTeam implements getTeam operation.
 	//
 	// Returns a Team by its id.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the team's project; one they cannot read answers
+	// 404, the same shape a foreign secret gets.
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
@@ -552,6 +556,11 @@ type Handler interface {
 	// QueryTeams implements queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the requested project and see only the teams their
+	// grants reach, so a signed-in user with no grant gets an empty page
+	// rather than a 403.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)

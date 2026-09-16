@@ -45,10 +45,12 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // `/` has no screen of its own and lands on Teams, so the redirect having run
   // is what proves the console booted.
   await expect(page).toHaveURL(/\/ui\/console\/teams\?status=active$/);
-  // The shell, not the screen: this lane carries no project secret, so the list
-  // itself fails closed until session-derived authorization lands (Console ADR
-  // 0003). The sidebar renders either way, and it is what shows the signed-in
-  // console was reached.
+  // The shell, not the screen. #1227 taught queryTeams to accept the session
+  // cookie, so the list no longer 401s -- but this lane's seeded user has no
+  // team and no grant, so it has no foothold in the console project and the
+  // call answers 404 instead. Rows need a grant, which is what `src-real/`
+  // has a project secret for. The sidebar renders either way, and it is what
+  // shows the signed-in console was reached.
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 });
 
