@@ -358,6 +358,26 @@ function latestSchemaRevisions(newestFirst: SchemaRecord[]): SchemaRecord[] {
   });
 }
 
+/**
+ * `revisions=latest` keeps the newest revision of each flow `name`. Takes the
+ * list already sorted newest-first, so the first record of a name is the one
+ * to keep — matching the server's anti-join on `(project_id, name)`.
+ */
+function latestFlowRevisions(newestFirst: FlowDefinitionRecord[]): FlowDefinitionRecord[] {
+  const seen = new Set<string>();
+  return newestFirst.filter((r) => {
+    const name = r.body.name;
+    if (typeof name !== "string") {
+      return true;
+    }
+    if (seen.has(name)) {
+      return false;
+    }
+    seen.add(name);
+    return true;
+  });
+}
+
 function schemaID(id: string): string {
   try {
     return decodeURIComponent(id);
@@ -958,12 +978,16 @@ export function setupPlatformHandlers() {
 
       // Newest by creation first, matching the server's
       // `created_at DESC, id DESC`.
+      const matching = [...store.flowDefinitions.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .filter((record) => !query.data.name || record.body.name === query.data.name)
+        .sort(compareNewestFirst);
+      // `name` is the column the server's anti-join correlates on, so
+      // narrowing by name before selecting the latest is equivalent.
+      const current =
+        query.data.revisions === "latest" ? latestFlowRevisions(matching) : matching;
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: [...store.flowDefinitions.values()]
-          .filter((record) => record.projectId === query.data.project_id)
-          .filter((record) => !query.data.name || record.body.name === query.data.name)
-          .sort(compareNewestFirst)
-          .map(flowResponse),
+        flow_definitions: current.map(flowResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");

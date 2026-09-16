@@ -150,6 +150,15 @@ CREATE INDEX idx_flow_definitions_project_status ON flow_definitions (project_id
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- Revisions of one flow share its name and are ordered by created_at, so at
+-- most one may carry a given timestamp: a collision has no determinate winner
+-- and must fail loudly instead. The index is also the seek the latest-revision
+-- anti-join in ListFlowDefinitions uses.
+CREATE UNIQUE INDEX idx_flow_definitions_name_revision
+    ON flow_definitions (project_id, name, created_at);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE TABLE auth_attempts (
     project_id      TEXT    NOT NULL,
     id              TEXT    NOT NULL,
@@ -624,6 +633,9 @@ DROP INDEX IF EXISTS idx_auth_attempts_handoff_token;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS auth_attempts;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_flow_definitions_name_revision;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_flow_definitions_project_status;

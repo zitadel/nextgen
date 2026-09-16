@@ -4592,6 +4592,15 @@ type ListFlowDefinitionsParams struct {
 	// `name`, so the result is that flow's revisions, newest by creation
 	// time first.
 	Name OptString `json:",omitempty,omitzero"`
+	// Which revisions to return. Every revision of a flow shares its
+	// `name`, so publishing a definition under an existing `name` mints a
+	// new row.
+	// `all` (the default) returns every revision — the full history an
+	// export, an audit or a GitOps diff needs. `latest` returns the newest
+	// revision of each `name`, which is one row per flow.
+	// A `page_token` is bound to the mode it was issued in and is rejected by
+	// the other.
+	Revisions OptListFlowDefinitionsRevisions `json:",omitempty,omitzero"`
 	// Related entities to embed on each returned flow definition.
 	Expand []FlowDefinitionExpand `json:",omitempty"`
 }
@@ -4638,6 +4647,15 @@ func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListF
 		}
 		if v, ok := packed[key]; ok {
 			params.Name = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "revisions",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Revisions = v.(OptListFlowDefinitionsRevisions)
 		}
 	}
 	{
@@ -4941,6 +4959,67 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "name",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Set default value for query: revisions.
+	{
+		val := ListFlowDefinitionsRevisions("all")
+		params.Revisions.SetTo(val)
+	}
+	// Decode query: revisions.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "revisions",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotRevisionsVal ListFlowDefinitionsRevisions
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotRevisionsVal = ListFlowDefinitionsRevisions(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Revisions.SetTo(paramsDotRevisionsVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Revisions.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "revisions",
 			In:   "query",
 			Err:  err,
 		}

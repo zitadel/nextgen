@@ -410,7 +410,7 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 		return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: filter, Pagination: page,
-		})
+		}, service.FlowDefinitionQueryOptions{})
 	}, func(def *domain.FlowDefinition) string { return def.ID }, 2)
 
 	t.Run("default_order", func(t *testing.T) {
@@ -418,7 +418,7 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 			return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.FlowDefinitionField]{Limit: 2, Cursor: cursor},
-			})
+			}, service.FlowDefinitionQueryOptions{})
 		}, func(def *domain.FlowDefinition) string { return def.ID })
 		assertDrainMatch(t, want, got)
 	})

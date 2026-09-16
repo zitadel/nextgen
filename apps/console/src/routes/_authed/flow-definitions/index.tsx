@@ -31,8 +31,12 @@ export const Route = createFileRoute("/_authed/flow-definitions/")({
   staticData: { nav: { label: "Login flows", order: 4, icon: Workflow } },
   loader: async () => {
     // Without the embed the row has only the schema's id, not its name.
+    // `latest` because this is a directory of flows, not a revision history:
+    // publishing under an existing name mints a new row, and only the newest
+    // one is the flow.
     const page = await api.listFlowDefinitions({
       project_id: getConsoleProjectId(),
+      revisions: "latest",
       expand: ["user_schema"],
     });
     return { flows: page.flow_definitions.map(toFlowRow) };

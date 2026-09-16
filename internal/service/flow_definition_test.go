@@ -218,7 +218,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						fd.ID = "flowdef_test01"
 						return nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								Name:   "external-flow",
@@ -326,7 +326,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField], service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
 					}).Times(1)
 					return stmts
@@ -797,7 +797,7 @@ func Test_flowDefinitionService_List(t *testing.T) {
 			},
 			statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 				stmts := servicemocks.NewMockAllStatements(ctrl)
-				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
+				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 					&database.ListResult[*domain.FlowDefinition]{
 						Items: []*domain.FlowDefinition{
 							{
@@ -829,8 +829,71 @@ func Test_flowDefinitionService_List(t *testing.T) {
 						Name:      "login-flow-2",
 					},
 				},
-				NextPageToken: "next-page",
+				NextPageToken: "all.next-page",
 			},
+		},
+		{
+			name: "latest mode reaches the statement and stamps its own token",
+			req: service.ListFlowDefinitionsRequest{
+				ProjectID:             "project1",
+				LatestRevisionPerName: true,
+			},
+			statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
+				stmts := servicemocks.NewMockAllStatements(ctrl)
+				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField], queryOpts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
+						assert.True(t, queryOpts.LatestRevisionPerName)
+						return &database.ListResult[*domain.FlowDefinition]{
+							Items:      []*domain.FlowDefinition{{ProjectID: "project1", ID: "flowdef_123", Name: "login-flow"}},
+							NextCursor: []byte("next"),
+						}, nil
+					},
+				).Times(1)
+				return stmts
+			},
+			want: &service.ListFlowDefinitionsResponse{
+				Items:         []*domain.FlowDefinition{{ProjectID: "project1", ID: "flowdef_123", Name: "login-flow"}},
+				NextPageToken: "latest.next",
+			},
+		},
+		{
+			name: "latest mode page token is unwrapped into the cursor",
+			req: service.ListFlowDefinitionsRequest{
+				ProjectID:             "project1",
+				LatestRevisionPerName: true,
+				PageToken:             "latest.tok",
+			},
+			statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
+				stmts := servicemocks.NewMockAllStatements(ctrl)
+				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField], _ service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
+						assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+						return &database.ListResult[*domain.FlowDefinition]{}, nil
+					},
+				).Times(1)
+				return stmts
+			},
+			want: &service.ListFlowDefinitionsResponse{},
+		},
+		{
+			// Both modes sort identically, so nothing downstream would notice
+			// the swap: the token has to be refused here or the caller silently
+			// gets a page of a row set they did not ask for.
+			name: "token from the other mode is rejected",
+			req: service.ListFlowDefinitionsRequest{
+				ProjectID:             "project1",
+				LatestRevisionPerName: true,
+				PageToken:             "all.tok",
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unstamped page token is rejected",
+			req: service.ListFlowDefinitionsRequest{
+				ProjectID: "project1",
+				PageToken: "tok",
+			},
+			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
 			name: "name filter narrows the list to one flow's revisions",
@@ -840,8 +903,8 @@ func Test_flowDefinitionService_List(t *testing.T) {
 			},
 			statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 				stmts := servicemocks.NewMockAllStatements(ctrl)
-				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField], _ service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 						assert.Equal(t, database.And(
 							database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), "project1"),
 							database.Equal(database.Col(domain.FlowDefinitionFieldName), "login-flow"),
@@ -858,7 +921,7 @@ func Test_flowDefinitionService_List(t *testing.T) {
 			req:  service.ListFlowDefinitionsRequest{ProjectID: "project1"},
 			statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 				stmts := servicemocks.NewMockAllStatements(ctrl)
-				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
+				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 					(*database.ListResult[*domain.FlowDefinition])(nil), assert.AnError,
 				).Times(1)
 				return stmts
@@ -922,8 +985,8 @@ func Test_flowDefinitionService_List_limit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			stmts := servicemocks.NewMockAllStatements(ctrl)
-			stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+			stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField], _ service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 					assert.Equal(t, tt.wantLimit, opts.Pagination.Limit)
 					return &database.ListResult[*domain.FlowDefinition]{}, nil
 				},

@@ -107,6 +107,12 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 		})
 	})
 	if err != nil {
+		// The id is server-minted, so the only unique constraint a create can
+		// lose is (project_id, name, created_at): another revision of the same
+		// flow landed on the same instant.
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			return nil, domain.ErrFlowDefinitionRevisionConflict().WithParent(err)
+		}
 		return nil, err
 	}
 	return flowDefinition, nil
@@ -146,7 +152,7 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pi
 				database.Equal(database.Col(domain.FlowDefinitionFieldName), target.Name),
 				database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 			),
-		})
+		}, FlowDefinitionQueryOptions{})
 		if err != nil {
 			return err
 		}
@@ -192,8 +198,10 @@ type ListFlowDefinitionsRequest struct {
 	ProjectID string
 	Purpose   string
 	Name      string
-	Limit     int
-	PageToken string
+	// LatestRevisionPerName keeps only the newest revision of each flow name.
+	LatestRevisionPerName bool
+	Limit                 int
+	PageToken             string
 }
 
 type ListFlowDefinitionsResponse struct {
@@ -219,9 +227,9 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 	if req.Name != "" {
 		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldName), req.Name))
 	}
-	var cursor []byte
-	if req.PageToken != "" {
-		cursor = []byte(req.PageToken)
+	cursor, err := revisionsCursor(req.PageToken, req.LatestRevisionPerName)
+	if err != nil {
+		return nil, err
 	}
 	opts := &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
@@ -230,12 +238,13 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 			Cursor: cursor,
 		},
 	}
-	result, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, opts)
+	result, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, opts,
+		FlowDefinitionQueryOptions{LatestRevisionPerName: req.LatestRevisionPerName})
 	if err != nil {
 		return nil, mapListError(err, "failed to list flow definitions")
 	}
 	return &ListFlowDefinitionsResponse{
 		Items:         result.Items,
-		NextPageToken: string(result.NextCursor),
+		NextPageToken: stampRevisionsMode(result.NextCursor, req.LatestRevisionPerName),
 	}, nil
 }

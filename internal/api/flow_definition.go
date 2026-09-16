@@ -272,7 +272,8 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 
 func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListFlowDefinitionsRequest {
 	req := service.ListFlowDefinitionsRequest{
-		ProjectID: string(params.ProjectID),
+		ProjectID:             string(params.ProjectID),
+		LatestRevisionPerName: params.Revisions.Value == api.ListFlowDefinitionsRevisionsLatest,
 	}
 	purpose, ok := params.Purpose.Get()
 	if ok {
