@@ -7,6 +7,7 @@
 > **Amends:** [ADR 011](011-resource-identifiers.md) (single ID class),
 > [ADR 012](012-ephemeral-id-api-representation.md) (prefixed API ids);
 > completes the open checklist item in [ADR 028](028-storage-v2-statements-and-dialects.md)
+> **Amended by:** [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md) (§5: a schema's resource id is dialect-minted; a declared `$id` stays a document property)
 
 ## Context
 

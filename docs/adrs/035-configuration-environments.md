@@ -3,6 +3,7 @@
 > **Status:** Accepted
 > **Date:** 2026-07-07
 > **Context:** Multi-environment lifecycle for source-controlled configuration
+> **Amended by:** [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md) (fixed `id` plus `revision_id` on every revisioned resource; a pointer pins `revision_id`)
 
 ## Status quo
 
@@ -553,3 +554,13 @@ above already shows. Handle resolution is per kind, not a shared column read.
 
 The illustrative table is otherwise unchanged; this fixes the name the wire
 uses, not the model.
+
+## Amendment (2026-09-16): fixed id and revision id
+
+[ADR 062](062-resource-revisions-fixed-id-and-revision-id.md) gives every
+revisioned resource a fixed `id` shared by all its revisions and a
+`revision_id` per revision. The [Releases](#releases) table above lists a
+resource id in its Revision column, which held while a kind allocated a new id
+per revision. Under ADR 062 that column is the revision's `revision_id`, and
+the idp row's handle is `slug`. The pointer tuple `{kind, handle, revision_id}`
+keeps its shape.
