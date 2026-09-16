@@ -172,6 +172,7 @@ function PaletteSection({
             <PaletteRow
               key={key}
               paletteKey={key}
+              side={side}
               value={palette[key] ?? ""}
               issue={sideIssues.find((candidate) => candidate.pair.startsWith(`${key}/`))}
               onChange={(value) => onChange(withPaletteValue(draft, side, key, value))}
@@ -185,15 +186,22 @@ function PaletteSection({
 
 function PaletteRow({
   paletteKey,
+  side,
   value,
   issue,
   onChange,
 }: {
   paletteKey: PaletteKey;
+  side: ThemeSide;
   value: string;
   issue: ContrastIssue | undefined;
   onChange: (value: string) => void;
 }) {
+  // Both sides carry a row called "Primary". The visible label sits under its
+  // section heading, but the accessible name has to stand on its own — a
+  // screen reader reaching two fields both called "Primary" cannot tell which
+  // surface it is editing.
+  const name = `${PALETTE_LABELS[paletteKey]} (${side} mode)`;
   return (
     <div className={ROW}>
       <span className={ROW_LABEL}>{PALETTE_LABELS[paletteKey]}</span>
@@ -215,7 +223,7 @@ function PaletteRow({
           style={{ background: value || "transparent" }}
         />
         <Input
-          aria-label={PALETTE_LABELS[paletteKey]}
+          aria-label={name}
           className={VALUE_INPUT}
           value={value}
           placeholder="default"
