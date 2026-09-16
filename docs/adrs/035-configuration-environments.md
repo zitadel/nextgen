@@ -76,7 +76,7 @@ For example, release `rel_01KX3RG8A7F0N9WD3P2E4YM5C1` might contain:
 | app       | `name` = `web`               | `app_01KWJC2B78ZQ…`        |
 | policy    | `name` = `password`          | `pol_01KWHF3XY6RN…`        |
 
-> Amended by [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md): the Revision column is the revision's `revision_id`, and the idp handle is `slug`.
+> Amended by [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md): the Revision column is the revision's `revision_id`, and the idp handle is `slug`, not `name`.
 
 The "handle" is the field each resource kind uses as its stable identifier across revisions. For example, schemas use `objectType`.
 

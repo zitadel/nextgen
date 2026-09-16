@@ -159,7 +159,9 @@ after the migration.
   field name everywhere.
 - Every revisioned row carries two ids, and the prefix registry gains one
   entry per kind.
-- No kind has a read by `revision_id` today. Each migration ticket adds it
-  for its kind, and a follow-up to #1217 adds it for connections.
+- For schemas, flow definitions and branding, get-by-id is the per-revision
+  read today, because their `id` names a revision. Once `id` is fixed, each
+  migration ticket adds a distinct read by `revision_id` for its kind.
+  Connections have no per-revision read at all; a follow-up to #1217 adds one.
 - The ADR 035 example table and its pointer prose are read through this ADR.
   ADR 035 itself changes only by the amendment note that points here.
