@@ -86,8 +86,10 @@ function BrandingScreen() {
 
       {/* The panel is long and the preview is content-sized, so the row takes
           its height from the viewport and the panel scrolls inside it —
-          otherwise the grid stretches the preview to the panel's full length. */}
-      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_22rem]">
+          otherwise the grid stretches the preview to the panel's full length.
+          302px is the design's 300 plus the 1px card border each side, so the
+          content the rows align to is the 276 the design lays them out in. */}
+      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_302px]">
         <Card className="flex min-h-[32rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs">
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
