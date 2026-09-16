@@ -118,7 +118,7 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 		service.WithAuthzListUnrestricted(ctx),
 		&database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-		})
+		}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	assert.Len(t, flows.Items, len(wantFlows), "a project with no login flow cannot serve a sign-in")
 }
