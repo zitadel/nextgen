@@ -79,8 +79,8 @@ Each kind keeps its handle:
 - `slug` for connections
 - the constant `default` for branding, which has no naming field
 
-A handle is unique within a project and fixed for the life of the resource.
-It resolves through the kind's list filter.
+A handle is unique within a project for its kind and fixed for the life of
+the resource. It resolves through the kind's list filter.
 
 ### 4. Reads
 
@@ -94,7 +94,8 @@ A list takes a `revisions` parameter with two values:
 Each kind picks its own default and states it in the operation's description.
 A page token is only valid in the mode that issued it: a token from a `latest`
 request cannot page an `all` request, and the other way round. `GET /schemas`
-works this way today (#957), and `POST /idps/query` follows it (#1217).
+works this way today (#957), and `POST /idps/query` is defined the same way
+in #1217.
 
 Every kind also has a read by `revision_id`, so a pinned revision can be
 fetched after newer ones exist. Two callers depend on it: the release service
@@ -128,14 +129,13 @@ for it. The ADR 035 example reads, for the kinds that exist:
 | branding         | `default`                    | the revision   |
 | idp              | `slug` = `google`            | the revision   |
 
-Prefixes are domain constants registered per ADR 047 and are not decided here.
+Prefix tokens are domain constants registered per ADR 047.
 
 ## Migration
 
-Connections already have this shape. The three older kinds adopt it when they
-are next touched, and before they participate in a release. Each migration is
-its own ticket, and each switches the release service's pointer validation
-from get-by-id to the read by `revision_id`:
+Connections already have the two ids. The three older kinds should adopt this
+as well. Each migration is its own ticket, and each switches the release
+service's pointer validation from get-by-id to the read by `revision_id`:
 
 - **Flow definitions.** `id` becomes fixed per `name` and each write allocates
   a `revision_id`. The list filtered by `name` keeps returning the revisions
@@ -151,8 +151,15 @@ from get-by-id to the read by `revision_id`:
 - **Branding.** `id` becomes fixed per project and each publish allocates a
   `revision_id`.
 
-An id that a release, an attempt or a user record holds stays resolvable
-after the migration.
+The existing prefix of each kind names the resource, as `idp_` does for
+connections, and each migration registers a revision prefix. Rows that exist
+keep their current id as their `revision_id`. A value that a release, a user
+record or a flow step holds is still found through the read by `revision_id`.
+Those holders look the value up with get-by-id today, and the migration ticket
+changes their lookups to the read by `revision_id`. Before the migration a
+client that stored `sch_01A` reads it with `GET /schemas/sch_01A`. After it,
+`sch_01A` is a `revision_id`, and get-by-id matches the `id` column only, so
+that call returns not found. The client reads the row by `revision_id` instead.
 
 ## Consequences
 
@@ -164,5 +171,26 @@ after the migration.
   read today, because their `id` names a revision. Once `id` is fixed, each
   migration ticket adds a distinct read by `revision_id` for its kind.
   Connections have no per-revision read at all; a follow-up to #1217 adds one.
+- Ids of schemas, flow definitions and branding that a client stored before
+  the migration stop working with get-by-id, as described under Migration. The
+  console and the CLI sync read such ids with get-by-id today, and each
+  migration ticket changes those calls to the read by `revision_id`. Other
+  clients make the same change themselves.
 - The ADR 035 example table and its pointer prose are read through this ADR.
   ADR 035 itself changes only by the amendment note that points here.
+
+## Open questions
+
+- **Where the fixed `id` of an existing resource comes from.** The migration
+  copies each existing row's id into `revision_id`. The resource then needs a
+  fixed `id`, one new value shared by all of its rows. Migrations are SQL
+  files, and ADR 047 allows minting only through the dialect generator in Go,
+  so the migration cannot create that value. Three options:
+  - mint it in SQL with the dialect's UUID function, which needs an ADR 047
+    exception for backfills
+  - run a Go step after the SQL migration that allocates it through the
+    generator
+  - reuse the oldest revision's id as the fixed `id`, so no new value is
+    needed
+
+  The first migration ticket decides.
