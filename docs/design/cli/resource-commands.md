@@ -81,7 +81,7 @@ returns oclif command classes keyed by id (`users:list`).
 ## Discovery
 
 `zitadel resources` answers, in one call, what an agent otherwise pieces
-together from eight `--help` invocations: which resources exist, the verbs each
+together from thirty-three `--help` invocations: which resources exist, the verbs each
 exposes, what its list can filter and sort on, and the body fields of its
 writes. It is a projection of the registry, talks to no server, and is the role
 `stripe resources` and `kubectl api-resources` play in those CLIs.
@@ -326,6 +326,3 @@ HTTP failures map through the CLI's existing taxonomy: `401`/`403` →
    per id rather than stop at the first failure.
 2. **Filter value typing.** Every value is a string. Numeric or boolean filter
    fields would need a per-field cast in the registry.
-3. **Config-resource reads.** Done: `schemas`, `flow-definitions`, `branding`,
-   `releases` and `environments` expose `list` / `get` through the same
-   factory. Their write path stays the declarative one (`deploy`, ADR 035).
