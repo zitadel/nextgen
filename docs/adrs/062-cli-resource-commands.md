@@ -339,9 +339,6 @@ Recorded here because §12 makes them the API's problem, not the CLI's:
 - `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
   accepted ADR names the command; this one produces a different spelling for
   the same data. It needs one owner's decision, not two documents.
-- `GET /releases` answered 500 on a project with no releases, on the prebuilt
-  server this branch was tested against. It may already be fixed; it is
-  recorded because the CLI is how it was noticed.
 - Three filter operations are advertised by the query contract but answer 501.
   The CLI offers them because the contract does, so they fail at the server
   rather than locally — the one place §11's "nothing `--help` offers can fail"
