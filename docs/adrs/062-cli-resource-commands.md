@@ -287,13 +287,16 @@ the surface stays learnable. What a filter *can do* is meaning, and that is
 never invented: an operation the endpoint lacks is refused, a verb it lacks is
 absent, a field it cannot sort by gets no `--sort`.
 
-So the six lists that read through `GET` — `events`, `schemas`,
-`environments`, `releases`, `flow-definitions` and `branding` — while the other
-five use `POST /<resource>/query` are smoothed over in the spelling and recorded
-as an open question for the API. A majority of the collections deviate, which
-makes it the prevailing shape rather than an exception. A CLI that papers over a *capability* teaches
-a shape that is not real; one that papers over a *calling convention* spares
-its users someone else's history.
+Six lists read through `GET` — `events`, `schemas`, `environments`,
+`releases`, `flow-definitions` and `branding` — while five use
+`POST /<resource>/query`. That is the contract, not drift:
+[ADR 031](031-openapi-querying.md) allows `GET` alongside the query endpoint
+and says plainly that it "won't have filter/sort functionality". Those six
+genuinely have less capability, and the CLI reports exactly that — fewer
+operations per field, and no `--sort` where the endpoint cannot sort — while
+spelling what they *can* do the same way as everything else. Whether any of
+them should gain `/query` is a question about who needs to filter them, not a
+defect to fix.
 
 ### 14. Four facts are frozen for agents
 
@@ -329,13 +332,10 @@ not own.
 These are the places where the CLI surfaced something the API should decide.
 Recorded here because §12 makes them the API's problem, not the CLI's:
 
-- Six of the eleven collections read through `GET` with query parameters
-  (`events`, `schemas`, `environments`, `releases`, `flow-definitions`,
-  `branding`) while five use `POST /<resource>/query`. The CLI
-  hides the difference (§11), but these endpoints accept only `equals`, sort by
-  at most one implicit field, and spell a range as two parameters — so the
-  capability gap is real even where the spelling is not. Either the deviation
-  is intended and should be written down, or these should move.
+- Six collections list through `GET` only, so they cannot be filtered beyond
+  `equals` and cannot be sorted ([ADR 031](031-openapi-querying.md) permits
+  exactly this). Not a defect, but worth revisiting per resource as use cases
+  appear; `users` by email below is the concrete one today.
 - `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
   accepted ADR names the command; this one produces a different spelling for
   the same data. It needs one owner's decision, not two documents.
@@ -375,9 +375,9 @@ Recorded here because §12 makes them the API's problem, not the CLI's:
   entirely: a collection with `POST /<collection>/query` is one by the API's
   own definition ([ADR 031](031-openapi-querying.md)), so the test requires
   commands for it and accepts no exclusion. That covers five of the eleven
-  today. The other six list through `GET` — the deviation recorded below — so
-  until that is resolved, a new collection without a query endpoint still needs
-  a person to classify it.
+  today. A `GET`-only collection is equally legitimate under ADR 031, so the
+  absence of a query endpoint proves nothing either way and a new collection
+  still needs a person to classify it.
 - Column choices are product decisions sitting in a table with nothing
   asserting they are sensible. That is how `users` shipped a table keyed on a
   schema URL identical on every row instead of the person's email, and the same
