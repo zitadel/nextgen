@@ -143,7 +143,7 @@ describe("branding screen", () => {
     expect(screen.getByTestId("preview")).toHaveTextContent("login");
   });
 
-  it("offers each flow once, and only the journeys it serves", async () => {
+  it("asks for one row per flow, and offers only the journeys it serves", async () => {
     const loginOnly = {
       id: "flow_2",
       flow_definition: {
@@ -153,29 +153,27 @@ describe("branding screen", () => {
         steps: [],
       },
     };
+    let asked: string | null = null;
     server.use(
-      // The list carries no revisions filter, so a revised flow arrives twice
-      // under one name. The name is what a preview starts a flow by.
-      http.get(FLOWS_URL, () =>
-        HttpResponse.json({ flow_definitions: [FLOW, FLOW, loginOnly] }),
-      ),
+      http.get(FLOWS_URL, ({ request }) => {
+        asked = new URL(request.url).searchParams.get("revisions");
+        return HttpResponse.json({ flow_definitions: [FLOW, loginOnly] });
+      }),
       http.get(LIST_URL, () => HttpResponse.json([])),
     );
     await renderAt("/branding");
 
     await userEvent.click(await screen.findByLabelText("Previewed flow"));
-    // Scoped to the menu: the trigger shows the selected label too.
+    // Without this the list is one row per revision, and a revised flow is an
+    // ambiguous repeat of a name the preview starts a flow by.
+    expect(asked).toBe("latest");
     const menu = await screen.findByRole("listbox");
-    expect(within(menu).getAllByText("Flow: Default login")).toHaveLength(1);
 
     // A flow that serves only login cannot start a register preview: asking
     // for a purpose it does not carry answers flowdef.purpose_mismatch.
     await userEvent.click(within(menu).getByText("Flow: Login only"));
     expect(screen.queryByRole("tab", { name: "Sign up" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Sign in" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("tab", { name: "Sign in" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("lists the project's own flows to preview", async () => {
