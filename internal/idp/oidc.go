@@ -16,13 +16,21 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// OIDCConnection is the engine's view of an OIDC connection revision, reduced
-// to what client construction needs. Each endpoint field overrides the
-// discovered one; empty means it comes from the issuer's discovery document.
+// OIDCConnection is the engine's view of the OIDC block of a connection
+// revision. Each endpoint field overrides the discovered one; empty means it
+// comes from the issuer's discovery document.
 type OIDCConnection struct {
 	Issuer   string
 	ClientID string
-	Scopes   []string
+	// ClientSecretRef is the unresolved `${{ NAME }}` reference. The
+	// `authorize` step needs no secret; the `callback` resolves it per attempt.
+	ClientSecretRef         string
+	TokenEndpointAuthMethod TokenEndpointAuthMethod
+	Scopes                  []string
+	PKCEEnabled             bool
+	// StaticAuthorizeParameters are appended to the `authorize` request after
+	// the engine-owned keys are dropped.
+	StaticAuthorizeParameters map[string]string
 
 	AuthorizationEndpoint string
 	TokenEndpoint         string
@@ -32,6 +40,15 @@ type OIDCConnection struct {
 	// no use for a `userinfo` endpoint.
 	IDTokenMapping bool
 }
+
+// TokenEndpointAuthMethod is how the client authenticates at the token
+// endpoint.
+type TokenEndpointAuthMethod string
+
+const (
+	ClientSecretBasic TokenEndpointAuthMethod = "client_secret_basic"
+	ClientSecretPost  TokenEndpointAuthMethod = "client_secret_post"
+)
 
 // Endpoints is the resolved set the ceremony uses. Userinfo is empty when
 // the connection maps claims from the id_token.

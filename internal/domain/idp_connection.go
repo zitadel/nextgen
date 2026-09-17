@@ -29,3 +29,25 @@ func ErrIDPConnectionFieldImmutable(details any) Error {
 func ErrIDPDiscoveryFailed(cause error) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("discovery_failed"), "identity provider connection: discovery failed", nil, cause)
 }
+
+// The following errors re-check at the start of an attempt what the schema enforced at
+// write time (defense in depth). Each is a distinct kind, so the log names
+// the rule; the user sees the generic misconfigured-provider error.
+
+func ErrIDPProtocolBlockMissing(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("protocol_block_missing"), "identity provider connection: the protocol block is missing", nil, cause)
+}
+
+func ErrIDPScopesMissingOpenID() Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("scopes_missing_openid"), "identity provider connection: OIDC scopes must contain openid", nil, nil)
+}
+
+func ErrIDPEndpointCleartext(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoint_cleartext"), "identity provider connection: endpoints must use https", nil, cause)
+}
+
+// ErrIDPOAuth2Unsupported refuses a stored oauth2 connection: the schema
+// accepts the protocol, but the engine does not serve it yet (#1066).
+func ErrIDPOAuth2Unsupported() Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("oauth2_unsupported"), "identity provider connection: the oauth2 protocol is not supported yet", nil, nil)
+}
