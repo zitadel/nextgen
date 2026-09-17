@@ -125,9 +125,17 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // One request per page. Filters are parsed and checked against each
     // field's own declaration first, so an operation the endpoint does not
     // offer fails locally with what that field accepts.
-    const parsed = (Array.isArray(flags.filter) ? flags.filter : []).map((raw) =>
+    const given = (Array.isArray(flags.filter) ? flags.filter : []).map((raw) =>
       parseFilter(String(raw), spec.filters ?? []),
     );
+    // A field that declares a default contributes it only when the caller did
+    // not name that field, so naming it always wins.
+    const defaults = (spec.filters ?? []).flatMap((field) =>
+      field.default !== undefined && !given.some((one) => one.field.field === field.field)
+        ? [{ field, operation: "equals", value: field.default }]
+        : [],
+    );
+    const parsed = [...given, ...defaults];
     const sorting =
       typeof flags.sort === "string" ? parseSort(flags.sort, spec.sorts ?? []) : undefined;
 

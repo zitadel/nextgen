@@ -57,6 +57,7 @@ import type {
 import { consola } from "consola";
 
 import { environmentSchema } from "../lib/environment";
+import { ZitadelError } from "../lib/errors";
 import { buildResourceCommands, type ResourceRegistry } from "../lib/oclif/crud";
 import { readZitadelSecret } from "../lib/project";
 
@@ -323,27 +324,58 @@ export const RESOURCES = {
   schemas: {
     singular: "schema",
     idField: "id",
+    // Addressed by object type as well as by revision id, so the argument is
+    // named for the thing rather than for one of its two spellings.
+    idArg: "schema",
+    idDescription: "object type (current revision) or revision id",
     columns: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
     heading: "schema.objectType",
     detail: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
     list: {
       items: "schemas",
-      // A schema list is a revision history, and a history truncated at one
-      // page reads as a complete one. Draining keeps `schemas list` answering
-      // the question it is asked (#947).
-      drains: true,
       response: ListSchemasResponse,
       filters: [
         { field: "object_type", operations: ["equals"] },
         { field: "kind", operations: ["equals"] },
-        { field: "revisions", operations: ["equals"], values: ["all", "latest"] },
+        {
+          field: "revisions",
+          operations: ["equals"],
+          values: ["all", "latest"],
+          // Editing a schema mints a new revision rather than changing the old
+          // one, so the unfiltered list is a history: the same object type over
+          // and over. Someone typing `schemas list` means "what schemas do I
+          // have", which is one row each. The console made the same choice.
+          default: "latest",
+        },
       ],
       call: ({ client, projectId }, params) =>
         client.listSchemas({ ...params, project_id: projectId } as ListSchemasParams),
     },
     get: {
-      call: ({ client }, id) => client.getSchemaById(id),
       response: GetSchemaByIdResponse,
+      // A schema is addressed two ways. `sch_…`, or the customer's own `$id`
+      // URI, names one immutable revision and fetches directly. Anything else
+      // is an object type, which the endpoint resolves to the current revision
+      // in a single call. The API has no fetch-by-object-type route yet; when
+      // it does, this collapses to one client call like every other `get`.
+      call: async ({ client, projectId }, ref) => {
+        if (ref.startsWith("sch_") || ref.includes("://")) {
+          return client.getSchemaById(ref);
+        }
+        const page = await client.listSchemas({
+          project_id: projectId,
+          object_type: ref,
+          revisions: "latest",
+          limit: 1,
+        } as ListSchemasParams);
+        const current = page.schemas[0];
+        if (!current) {
+          throw new ZitadelError("E_NOT_FOUND", `No schema for object type "${ref}"`, {
+            hint: "Run `schemas list` to see the object types this project has.",
+          });
+        }
+        return current;
+      },
     },
   },
 
@@ -390,6 +422,9 @@ export const RESOURCES = {
   "flow-definitions": {
     singular: "flow definition",
     idField: "id",
+    // Addressed by flow name as well as by revision id; see `schemas`.
+    idArg: "flow",
+    idDescription: "flow name (newest revision) or revision id",
     columns: ["id", "flow_definition.name", "flow_definition.status", "created_at"],
     heading: "flow_definition.name",
     detail: ["id", "flow_definition.name", "flow_definition.status", "created_at", "updated_at"],
@@ -400,6 +435,9 @@ export const RESOURCES = {
         { field: "name", operations: ["equals"] },
         { field: "purpose", operations: ["equals"] },
       ],
+      // No `revisions` parameter here yet, so the unfiltered list is still a
+      // history. When the API gains one, this takes `default: "latest"` on a
+      // `revisions` field exactly as `schemas` does.
       call: ({ client, projectId }, params) =>
         client.listFlowDefinitions({
           ...params,
@@ -407,8 +445,27 @@ export const RESOURCES = {
         } as ListFlowDefinitionsParams),
     },
     get: {
-      call: ({ client }, id) => client.getFlowDefinition(id),
       response: GetFlowDefinitionResponse,
+      // `flowdef_…` names one revision. Anything else is a flow name, and the
+      // endpoint returns that flow's revisions newest first, so the first row
+      // is the current one.
+      call: async ({ client, projectId }, ref) => {
+        if (ref.startsWith("flowdef_")) {
+          return client.getFlowDefinition(ref);
+        }
+        const page = await client.listFlowDefinitions({
+          project_id: projectId,
+          name: ref,
+          limit: 1,
+        } as ListFlowDefinitionsParams);
+        const current = page.flow_definitions[0];
+        if (!current) {
+          throw new ZitadelError("E_NOT_FOUND", `No flow definition named "${ref}"`, {
+            hint: "Run `flow-definitions list` to see the flows this project has.",
+          });
+        }
+        return current;
+      },
     },
   },
 

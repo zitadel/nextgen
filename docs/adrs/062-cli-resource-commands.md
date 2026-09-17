@@ -248,14 +248,31 @@ difference would change what a query means.
 Paging is declared the same way. `--limit`, `--page-token` and `--all` expose
 cursor pagination directly ([ADR 027](027-cursor-based-pagination.md)). A list
 whose endpoint has no cursor declares itself unpaged, so it has no paging flags
-at all rather than advertising ones the server ignores. And a list whose
-partial answer would read as a complete one, such as a revision history,
-declares that a bare invocation drains. `--limit` or `--page-token` still
-return a single page there. `--all` is the only place the CLI loops, and it
+at all rather than advertising ones the server ignores. A filter field can also declare the value sent when the
+caller does not name it. That is how a revisioned collection lists the current
+revisions rather than its whole history: naming the field always wins, so the
+history stays one filter away. `--all` is the only place the CLI loops, and it
 stops with an error if a cursor repeats, since an unbounded follow of a
 server-supplied token is a hang wearing a progress spinner.
 
-### 12. Credentials never reach a command line
+### 12. A resource is addressed by whatever identifies it
+
+`get` takes whatever names the thing. Usually that is an id. An environment is
+addressed by its name. A revisioned resource is addressed either by one
+revision or by the value that groups them, so `zitadel schemas get human-user`
+returns the current revision of that object type and `zitadel schemas get
+sch_07` returns exactly that one.
+
+Where the API has a route for it this costs nothing. `environments get` calls
+`/environments/{name}` and the registry simply says so. Where it does not, the
+resource resolves the reference itself with one filtered list, and that
+resolution lives in the resource's own entry rather than in the generic
+machinery. It is a workaround. It decides from the shape of the argument which
+kind of reference it was given, which is a rule the server never promised. An
+endpoint that fetches by correlation value would delete it, and is recorded
+below.
+
+### 13. Credentials never reach a command line
 
 No flag, argument, or record entry may carry one; the operator credential is
 read from `.zitadel/secret` ([ADR 036](036-api-credential-planes.md)). Shell
@@ -286,7 +303,7 @@ credentials are not user attributes at all ([ADR
 020](020-credentials-out-of-user-schema.md)), so anything it catches was
 already a mistake.
 
-### 13. The command surface follows the API, not the reverse
+### 14. The command surface follows the API, not the reverse
 
 The line is between transport and meaning. How a filter travels is plumbing: a
 query body or a query parameter, one parameter or two. §11 hides that so the
@@ -304,7 +321,7 @@ where the endpoint cannot sort. What they *can* do is spelled the same way as
 everything else. Whether any of them should gain `/query` is a question about
 who needs to filter them, not a defect to fix.
 
-### 14. Four facts are frozen for agents
+### 15. Four facts are frozen for agents
 
 The `--json` envelope shape, the exit codes, the error codes ([ADR
 030](030-error-model-mapping-and-reporting.md)), and the cursor field names are
@@ -336,12 +353,18 @@ not own.
 ## Open questions for the API
 
 These are the places where the CLI surfaced something the API should decide.
-Recorded here because §12 makes them the API's problem, not the CLI's:
+Recorded here because §14 makes them the API's problem, not the CLI's:
 
 - Six collections list through `GET` only, so they cannot be filtered beyond
   `equals` and cannot be sorted ([ADR 031](031-openapi-querying.md) permits
   exactly this). Not a defect, but worth revisiting per resource as use cases
   appear; `users` by email below is the concrete one today.
+- No endpoint fetches a schema by object type or a flow by name, so §12
+  resolves those with a filtered list and a rule about how ids look. A route
+  such as `GET /schemas/by-object-type/{objectType}` would remove the rule.
+- Flow definitions have no `revisions` parameter, so their list is still a
+  history while `schemas` shows the current ones. Adding it makes the two
+  consistent, and the CLI then needs one line per resource.
 - `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
   accepted ADR names the command; this one produces a different spelling for
   the same data. It needs one owner's decision, not two documents.
@@ -363,7 +386,7 @@ Recorded here because §12 makes them the API's problem, not the CLI's:
 - Sensitivity is not carried end to end. `writeOnly` is accepted and reserved
   on a user property but unenforced, `format: password` appears in the OpenAPI
   documents, and code generation drops both — so the CLI cannot derive what is
-  secret and falls back to a hardcoded wordlist (§12). Enforcing `writeOnly`
+  secret and falls back to a hardcoded wordlist (§13). Enforcing `writeOnly`
   and preserving it through generation would let the guard be exact.
 
 ## Consequences

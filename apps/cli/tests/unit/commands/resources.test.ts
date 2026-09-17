@@ -1174,75 +1174,135 @@ describe("configuration resources are read-only", () => {
   });
 });
 
-describe("schemas list drains its revision history", () => {
-  // `GET /schemas` pages by cursor (#924) and the command showed the full
-  // history before it was generated (#947). A history truncated at one page
-  // reads as a complete one, so a bare invocation still walks every page.
-  it("walks next_page_token without being asked", async () => {
+describe("schemas list shows the current schemas, not the history", () => {
+  // Editing a schema mints a new revision, so the unfiltered list is a history
+  // of the same object types repeated. `schemas list` asks the endpoint for
+  // the latest of each instead, which is what the console shows.
+  it("sends revisions=latest when the caller does not say", async () => {
     const cwd = await makeProject();
-    const askedTokens: Array<string | null> = [];
+    let url: URL | undefined;
     server.use(
       http.get(`${SERVER}/schemas`, ({ request }) => {
-        const url = new URL(request.url);
-        const token = url.searchParams.get("page_token");
-        askedTokens.push(token);
-        return token
-          ? HttpResponse.json({
-              schemas: [{ id: "sch_01", schema: { kind: "user-schema" }, metadata: { created_at: "2026-06-01T00:00:00Z" } }],
-            })
-          : HttpResponse.json({
-              schemas: [{ id: "sch_02", schema: { kind: "user-schema" }, metadata: { created_at: "2026-07-02T00:00:00Z" } }],
-              next_page_token: "tok_2",
-            });
+        url = new URL(request.url);
+        return HttpResponse.json({
+          schemas: [
+            { id: "sch_04", schema: { objectType: "human-user", kind: "user-schema" }, metadata: { created_at: "2026-07-02T00:00:00Z" } },
+            { id: "sch_05", schema: { objectType: "machine-user", kind: "user-schema" }, metadata: { created_at: "2026-07-03T00:00:00Z" } },
+          ],
+        });
       }),
     );
 
     const res = await run(cwd, ["schemas", "list"]);
 
     expect(res.exitCode).toBe(0);
-    expect(askedTokens).toEqual([null, "tok_2"]);
-    const json = parseJson(res.stdout) as {
-      data: { items: Array<{ id: string }>; count: number; next_page_token: string | null };
-    };
-    expect(json.data.items.map((s) => s.id)).toEqual(["sch_02", "sch_01"]);
-    expect(json.data.count).toBe(2);
-    expect(json.data.next_page_token).toBeNull();
+    expect(url?.searchParams.get("revisions")).toBe("latest");
+    const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
+    expect(json.data.items.map((s) => s.id)).toEqual(["sch_04", "sch_05"]);
   });
 
-  it("returns a single page when one is explicitly asked for", async () => {
+  it("still gives the full history when asked for it", async () => {
+    // The behaviour #947 protected is one filter away, not gone.
     const cwd = await makeProject();
-    let calls = 0;
+    let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas`, () => {
-        calls += 1;
+      http.get(`${SERVER}/schemas`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json({ schemas: [] });
+      }),
+    );
+
+    const res = await run(cwd, ["schemas", "list", "--filter", "revisions=all"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(url?.searchParams.get("revisions")).toBe("all");
+  });
+
+  it("lets a named field beat its own default", async () => {
+    const cwd = await makeProject();
+    const seen: Array<string | null> = [];
+    server.use(
+      http.get(`${SERVER}/schemas`, ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get("revisions"));
+        return HttpResponse.json({ schemas: [] });
+      }),
+    );
+
+    await run(cwd, ["schemas", "list", "--filter", "revisions=latest"]);
+    await run(cwd, ["schemas", "list", "--filter", "object_type=human-user"]);
+
+    // Naming it wins; naming a different field leaves the default in place.
+    expect(seen).toEqual(["latest", "latest"]);
+  });
+});
+
+describe("a schema or flow is addressable by name as well as by id", () => {
+  it("fetches a revision directly when given one", async () => {
+    const cwd = await makeProject();
+    let path = "";
+    server.use(
+      http.get(`${SERVER}/schemas/sch_04`, ({ request }) => {
+        path = new URL(request.url).pathname;
+        return HttpResponse.json({ id: "sch_04", schema: { objectType: "human-user" } });
+      }),
+    );
+
+    const res = await run(cwd, ["schemas", "get", "sch_04"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(path).toBe("/schemas/sch_04");
+  });
+
+  it("resolves an object type to its current revision in one call", async () => {
+    const cwd = await makeProject();
+    let url: URL | undefined;
+    server.use(
+      http.get(`${SERVER}/schemas`, ({ request }) => {
+        url = new URL(request.url);
         return HttpResponse.json({
-          schemas: [{ id: "sch_02", schema: { kind: "user-schema" }, metadata: { created_at: "2026-07-02T00:00:00Z" } }],
-          next_page_token: "tok_2",
+          schemas: [{ id: "sch_04", schema: { objectType: "human-user", kind: "user-schema" } }],
         });
       }),
     );
 
-    const res = await run(cwd, ["schemas", "list", "--limit", "1"]);
+    const res = await run(cwd, ["schemas", "get", "human-user"]);
 
     expect(res.exitCode).toBe(0);
-    expect(calls).toBe(1);
-    const json = parseJson(res.stdout) as { data: { next_page_token: string | null } };
-    expect(json.data.next_page_token).toBe("tok_2");
+    expect(url?.searchParams.get("object_type")).toBe("human-user");
+    expect(url?.searchParams.get("revisions")).toBe("latest");
+    const json = parseJson(res.stdout) as { data: { id: string } };
+    expect(json.data.id).toBe("sch_04");
   });
 
-  it("pages every other resource by default", async () => {
+  it("says so when the object type has no schema", async () => {
     const cwd = await makeProject();
-    let calls = 0;
+    server.use(http.get(`${SERVER}/schemas`, () => HttpResponse.json({ schemas: [] })));
+
+    const res = await run(cwd, ["schemas", "get", "nonexistent"]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_NOT_FOUND");
+    expect(json.message).toContain("nonexistent");
+  });
+
+  it("resolves a flow name to its newest revision", async () => {
+    const cwd = await makeProject();
+    let url: URL | undefined;
     server.use(
-      http.post(`${SERVER}/teams/query`, () => {
-        calls += 1;
-        return HttpResponse.json({ teams: [{ id: "team_1", name: "a" }], next_page_token: "t2" });
+      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json({
+          flow_definitions: [{ id: "flowdef_9", flow_definition: { name: "default-login" } }],
+        });
       }),
     );
 
-    const res = await run(cwd, ["teams", "list"]);
+    const res = await run(cwd, ["flow-definitions", "get", "default-login"]);
 
     expect(res.exitCode).toBe(0);
-    expect(calls).toBe(1);
+    expect(url?.searchParams.get("name")).toBe("default-login");
+    const json = parseJson(res.stdout) as { data: { id: string } };
+    expect(json.data.id).toBe("flowdef_9");
   });
 });

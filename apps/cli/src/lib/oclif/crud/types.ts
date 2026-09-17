@@ -43,6 +43,13 @@ export type FilterField = Readonly<{
   /** Closed value set, enforced before any request. */
   values?: readonly string[];
   /**
+   * Value sent when the caller does not name this field. Use it where the
+   * server's own default is not the answer most callers want: a revisioned
+   * collection lists every revision by default, while someone typing `list`
+   * usually means "show me the current ones".
+   */
+  default?: string;
+  /**
    * How repeated uses of this field combine. `and` (the default) narrows;
    * `or` widens, which is what a `GET` list does with a repeated parameter.
    * Stated per field because it is not inferable and changes what a query
@@ -149,6 +156,12 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * does rather than calling everything an id.
    */
   idArg?: string;
+  /**
+   * What the positional accepts, for `--help`. Defaults to
+   * `<singular> <idArg>`, which reads well when the argument is an `id` or a
+   * `name` but not when a resource takes more than one kind of reference.
+   */
+  idDescription?: string;
   /** Dot-paths projected into the human-readable table; `--json` carries the full resource. */
   columns: readonly string[];
   /**

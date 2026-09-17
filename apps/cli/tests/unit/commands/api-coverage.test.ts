@@ -73,6 +73,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getMyUser: "the end user's own view of themselves, on their own credential",
   patchMyUser: "the end user's own view of themselves, on their own credential",
   getMySession: "the end user's own session, on their own credential",
+  listMyProjects: "the projects the signed-in user can act on, read on their own credential",
   revokeMySession: "the end user's own session, on their own credential",
 
   // Session and passkey protocol, driven by the SDKs and the login flow.
@@ -121,6 +122,12 @@ const clientOperations = (): ClientOperations => {
   );
 };
 
+/**
+ * Placeholder arguments covering the shapes a positional can take: a plain
+ * name, a prefixed resource id, and a URI id.
+ */
+const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as const;
+
 /** The client operations the registry's verbs actually invoke. */
 const calledOperations = async (): Promise<ReadonlySet<string>> => {
   const called = new Set<string>();
@@ -135,9 +142,14 @@ const calledOperations = async (): Promise<ReadonlySet<string>> => {
   for (const resource of Object.values(RESOURCES)) {
     const verbs = resource as Record<string, { call?: (...args: never[]) => unknown } | undefined>;
     for (const verb of ["list", "get", "create", "update", "delete"] as const) {
-      // Arguments are placeholders: the recording client resolves everything,
-      // so only the property that was reached matters.
-      await verbs[verb]?.call?.(context, "ID" as never, {} as never);
+      // A verb may branch on the shape of its argument — a schema is addressed
+      // by revision id or by object type — so every branch is driven, or the
+      // client call behind the untaken one would look unused. The recording
+      // client resolves `{}`, so a call that inspects its response throws;
+      // only the property that was reached matters, so the throw is discarded.
+      for (const ref of REFS) {
+        await verbs[verb]?.call?.(context, ref as never, {} as never).catch(() => undefined);
+      }
     }
   }
   return called;

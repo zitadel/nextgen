@@ -125,7 +125,7 @@ which ships in this package.
 * [`zitadel environments list`](#zitadel-environments-list)
 * [`zitadel events get ID`](#zitadel-events-get-id)
 * [`zitadel events list`](#zitadel-events-list)
-* [`zitadel flow-definitions get ID`](#zitadel-flow-definitions-get-id)
+* [`zitadel flow-definitions get FLOW`](#zitadel-flow-definitions-get-flow)
 * [`zitadel flow-definitions list`](#zitadel-flow-definitions-list)
 * [`zitadel grants create`](#zitadel-grants-create)
 * [`zitadel grants delete ID`](#zitadel-grants-delete-id)
@@ -141,7 +141,7 @@ which ships in this package.
 * [`zitadel releases list`](#zitadel-releases-list)
 * [`zitadel reset`](#zitadel-reset)
 * [`zitadel resources`](#zitadel-resources)
-* [`zitadel schemas get ID`](#zitadel-schemas-get-id)
+* [`zitadel schemas get SCHEMA`](#zitadel-schemas-get-schema)
 * [`zitadel schemas list`](#zitadel-schemas-list)
 * [`zitadel search`](#zitadel-search)
 * [`zitadel sessions get ID`](#zitadel-sessions-get-id)
@@ -676,18 +676,18 @@ EXAMPLES
   $ zitadel events list --filter category=equals:<value> --sort occurred_at:desc
 ```
 
-## `zitadel flow-definitions get ID`
+## `zitadel flow-definitions get FLOW`
 
 Get one flow definition by id.
 
 ```
 USAGE
-  $ zitadel flow-definitions get ID [--json] [-c <value>] [-s <value>] [-n]
+  $ zitadel flow-definitions get FLOW [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
     development|preview|production]
 
 ARGUMENTS
-  ID  flow definition id
+  FLOW  flow name (newest revision) or revision id
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -1348,18 +1348,18 @@ EXAMPLES
   $ zitadel resources --json | jq -r '.data.resources[] | "\(.topic): \(.verbs | join(", "))"'
 ```
 
-## `zitadel schemas get ID`
+## `zitadel schemas get SCHEMA`
 
 Get one schema by id.
 
 ```
 USAGE
-  $ zitadel schemas get ID [--json] [-c <value>] [-s <value>] [-n]
+  $ zitadel schemas get SCHEMA [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
     development|preview|production]
 
 ARGUMENTS
-  ID  schema id
+  SCHEMA  object type (current revision) or revision id
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -1391,7 +1391,7 @@ EXAMPLES
 
 ## `zitadel schemas list`
 
-List schemas. Fetches every page unless --limit or --page-token asks for one.
+List schemas.
 
 ```
 USAGE
@@ -1429,10 +1429,12 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List schemas. Fetches every page unless --limit or --page-token asks for one.
+  List schemas.
 
 EXAMPLES
   $ zitadel schemas list --json
+
+  $ zitadel schemas list --all --json
 
   $ zitadel schemas list --filter object_type=equals:<value>
 ```

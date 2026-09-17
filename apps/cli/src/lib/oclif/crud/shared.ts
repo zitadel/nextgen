@@ -13,7 +13,8 @@ export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resour
 /** The single positional argument the id-taking verbs share. */
 export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
   const name = idName(resource);
-  return { [name]: Args.string({ required: true, description: `${resource.singular} ${name}` }) };
+  const description = resource.idDescription ?? `${resource.singular} ${name}`;
+  return { [name]: Args.string({ required: true, description }) };
 };
 
 /** The value the caller passed for that argument. */

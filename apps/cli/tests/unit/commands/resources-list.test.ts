@@ -81,7 +81,13 @@ describe("zitadel resources", () => {
             topic: string;
             paged?: boolean;
             drains?: boolean;
-            filters?: Array<{ field: string; operations: string[]; values?: string[]; combine?: string }>;
+            filters?: Array<{
+              field: string;
+              operations: string[];
+              values?: string[];
+              combine?: string;
+              default?: string;
+            }>;
           }>;
         };
       }
@@ -99,7 +105,14 @@ describe("zitadel resources", () => {
 
     // Paging is part of the same contract.
     expect(resources.find((r) => r.topic === "branding")?.paged).toBe(false);
-    expect(resources.find((r) => r.topic === "schemas")?.drains).toBe(true);
+    // A field whose default changes what a bare list returns is reported, so an
+    // agent knows `schemas list` is the current schemas rather than every
+    // revision.
+    expect(
+      resources
+        .find((r) => r.topic === "schemas")
+        ?.filters?.find((f) => f.field === "revisions")?.default,
+    ).toBe("latest");
   });
 
   it("names the property a delete's envelope carries, which is not always `deleted`", async () => {
