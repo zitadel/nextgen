@@ -73,8 +73,10 @@ type Endpoints struct {
 // OIDCClient is a relying party built for one attempt against one connection
 // revision.
 type OIDCClient struct {
-	party     rp.RelyingParty
-	endpoints Endpoints
+	conn        Connection
+	redirectURI string
+	party       rp.RelyingParty
+	endpoints   Endpoints
 }
 
 // NewOIDCClient resolves every endpoint the ceremony needs and builds the
@@ -84,8 +86,8 @@ type OIDCClient struct {
 // when an override is missing, so a fully overridden connection makes no
 // request. httpClient must be the hardened egress client: every URL fetched
 // here is tenant-authored (ADR 061).
-func NewOIDCClient(ctx context.Context, conn OIDCConnection, redirectURI string, httpClient *http.Client) (*OIDCClient, error) {
-	endpoints, err := resolveEndpoints(ctx, conn, httpClient)
+func NewOIDCClient(ctx context.Context, conn Connection, redirectURI string, httpClient *http.Client) (*OIDCClient, error) {
+	endpoints, err := resolveEndpoints(ctx, conn.OIDC, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -94,9 +96,9 @@ func NewOIDCClient(ctx context.Context, conn OIDCConnection, redirectURI string,
 	// The secret is absent by design; the `authorize` request needs none, and
 	// the callback resolves it per attempt.
 	party, err := rp.NewRelyingPartyOAuth(&oauth2.Config{
-		ClientID:    conn.ClientID,
+		ClientID:    conn.OIDC.ClientID,
 		RedirectURL: redirectURI,
-		Scopes:      conn.Scopes,
+		Scopes:      conn.OIDC.Scopes,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  endpoints.Authorization,
 			TokenURL: endpoints.Token,
@@ -106,7 +108,7 @@ func NewOIDCClient(ctx context.Context, conn OIDCConnection, redirectURI string,
 		// Only a PKCE-from-discovery option fails here, and none is passed.
 		return nil, domain.ErrInternal(err)
 	}
-	return &OIDCClient{party: party, endpoints: endpoints}, nil
+	return &OIDCClient{conn: conn, redirectURI: redirectURI, party: party, endpoints: endpoints}, nil
 }
 
 func resolveEndpoints(ctx context.Context, conn OIDCConnection, httpClient *http.Client) (Endpoints, error) {

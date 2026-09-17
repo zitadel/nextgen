@@ -176,7 +176,7 @@ func TestNewOIDCClient(t *testing.T) {
 				t.Cleanup(cancel)
 			}
 
-			c, err := NewOIDCClient(ctx, conn, redirectURI, srv.Client())
+			c, err := NewOIDCClient(ctx, Connection{RevisionID: "idprev_1", OIDC: conn}, redirectURI, srv.Client())
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
