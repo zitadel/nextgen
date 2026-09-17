@@ -29,6 +29,33 @@ test("previews the project's own login beside the settings", async ({ page, seed
   await expectNoErrorBoundary(page);
 });
 
+test("is reached from the sidebar, nested under the flows it brands", async ({ page, seed }) => {
+  await signIn(page, await seed.user());
+
+  await page.goto("/projects");
+
+  // Branding is a sub-row of Login flows, as the design nests it: it is how
+  // those flows render rather than a destination of its own.
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  const flows = nav
+    .locator('[data-slot="sidebar-menu-item"]')
+    .filter({ has: page.getByRole("link", { name: "Login flows" }) });
+  const branding = flows.locator('[data-slot="sidebar-menu-sub"]').getByRole("link", {
+    name: "Branding",
+  });
+  await expect(branding).toBeVisible();
+  await branding.click();
+
+  await expect(page).toHaveURL(/\/branding$/);
+
+  // The selector lists the project's own flows, so it comes from the instance
+  // rather than a fixed set. A real instance is what proves the label is the
+  // one the flow list shows for the same definition.
+  await expect(page.getByLabel("Previewed flow")).toContainText("Flow: Default login");
+
+  await expectNoErrorBoundary(page);
+});
+
 test("warns on a palette that cannot be read, as it is typed", async ({ page, seed }) => {
   await signIn(page, await seed.user());
 
@@ -56,6 +83,25 @@ test("warns on a palette that cannot be read, as it is typed", async ({ page, se
     "background-color",
     "rgb(235, 54, 20)",
   );
+
+  await expectNoErrorBoundary(page);
+});
+
+test("says what a failing pair measures and which rule it misses", async ({ page, seed }) => {
+  await signIn(page, await seed.user());
+
+  await page.goto("/branding");
+  await page.getByLabel("Primary (dark mode)", { exact: true }).fill("#EB3614");
+  await page.getByLabel("On primary (dark mode)", { exact: true }).fill("#FAFAFA");
+
+  // The row has space for a glyph, so the measurement sits behind it. Reaching
+  // it by role proves it is operable rather than a title a pointer alone finds.
+  await page.getByRole("button", { name: /Primary \/ On primary/ }).click();
+
+  await expect(page.getByText("Primary / On primary", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(/3.97:1 .* fails AA for normal text \(4.5:1 required\)/),
+  ).toBeVisible();
 
   await expectNoErrorBoundary(page);
 });
