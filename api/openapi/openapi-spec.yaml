@@ -43,8 +43,8 @@ tags:
     description: |
       External login providers a project offers, each published as a
       revisioned connection document and referenced by its slug from user
-      schemas and flow definitions. Create-or-revise, query, and read by id
-      or by slug.
+      schemas and flow definitions. Create-or-revise, query, read by id or by
+      slug, and revision reads.
   - name: Releases
     description: |
       Immutable, project-scoped configuration snapshots. A release pins one
@@ -166,6 +166,10 @@ paths:
     $ref: endpoints/idps/query/methods.yaml
   /idps/{id}:
     $ref: endpoints/idps/by_id/methods.yaml
+  /idps/{id}/revisions:
+    $ref: endpoints/idps/by_id/revisions/methods.yaml
+  /idps/revisions/{revision_id}:
+    $ref: endpoints/idps/revisions/by_id/methods.yaml
   /releases:
     $ref: endpoints/releases/methods.yaml
   /releases/{release_id}:

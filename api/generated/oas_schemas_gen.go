@@ -21668,6 +21668,142 @@ type GetIdpByIdUnauthorized ErrorDetails
 
 func (*GetIdpByIdUnauthorized) getIdpByIdRes() {}
 
+// GetIdpRevisionByIdErrorResponse represents sum type.
+type GetIdpRevisionByIdErrorResponse struct {
+	Type             GetIdpRevisionByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// GetIdpRevisionByIdErrorResponseType is oneOf type of GetIdpRevisionByIdErrorResponse.
+type GetIdpRevisionByIdErrorResponseType string
+
+// Possible values for GetIdpRevisionByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetIdpRevisionByIdErrorResponse GetIdpRevisionByIdErrorResponseType = "auth.unauthorized"
+	InternalGetIdpRevisionByIdErrorResponse         GetIdpRevisionByIdErrorResponseType = "internal"
+	ReqInvalidGetIdpRevisionByIdErrorResponse       GetIdpRevisionByIdErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetIdpRevisionByIdErrorResponse is AuthUnauthorized.
+func (s GetIdpRevisionByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetIdpRevisionByIdErrorResponse
+}
+
+// IsInternal reports whether GetIdpRevisionByIdErrorResponse is Internal.
+func (s GetIdpRevisionByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetIdpRevisionByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetIdpRevisionByIdErrorResponse is ReqInvalid.
+func (s GetIdpRevisionByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetIdpRevisionByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetIdpRevisionByIdErrorResponse to AuthUnauthorized.
+func (s *GetIdpRevisionByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetIdpRevisionByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetIdpRevisionByIdErrorResponse is AuthUnauthorized.
+func (s GetIdpRevisionByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetIdpRevisionByIdErrorResponse returns new GetIdpRevisionByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetIdpRevisionByIdErrorResponse(v AuthUnauthorized) GetIdpRevisionByIdErrorResponse {
+	var s GetIdpRevisionByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetIdpRevisionByIdErrorResponse to Internal.
+func (s *GetIdpRevisionByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetIdpRevisionByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetIdpRevisionByIdErrorResponse is Internal.
+func (s GetIdpRevisionByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetIdpRevisionByIdErrorResponse returns new GetIdpRevisionByIdErrorResponse from Internal.
+func NewInternalGetIdpRevisionByIdErrorResponse(v Internal) GetIdpRevisionByIdErrorResponse {
+	var s GetIdpRevisionByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetIdpRevisionByIdErrorResponse to ReqInvalid.
+func (s *GetIdpRevisionByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetIdpRevisionByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetIdpRevisionByIdErrorResponse is ReqInvalid.
+func (s GetIdpRevisionByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetIdpRevisionByIdErrorResponse returns new GetIdpRevisionByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetIdpRevisionByIdErrorResponse(v ReqInvalid) GetIdpRevisionByIdErrorResponse {
+	var s GetIdpRevisionByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetIdpRevisionByIdErrorResponseStatusCode wraps GetIdpRevisionByIdErrorResponse with StatusCode.
+type GetIdpRevisionByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetIdpRevisionByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetIdpRevisionByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetIdpRevisionByIdErrorResponseStatusCode) GetResponse() GetIdpRevisionByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetIdpRevisionByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetIdpRevisionByIdErrorResponseStatusCode) SetResponse(val GetIdpRevisionByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetIdpRevisionByIdErrorResponseStatusCode) getIdpRevisionByIdRes() {}
+
+type GetIdpRevisionByIdForbidden ErrorDetails
+
+func (*GetIdpRevisionByIdForbidden) getIdpRevisionByIdRes() {}
+
+type GetIdpRevisionByIdNotFound ErrorDetails
+
+func (*GetIdpRevisionByIdNotFound) getIdpRevisionByIdRes() {}
+
+type GetIdpRevisionByIdUnauthorized ErrorDetails
+
+func (*GetIdpRevisionByIdUnauthorized) getIdpRevisionByIdRes() {}
+
 type GetLiveOK struct {
 	Data io.Reader
 }
@@ -24747,7 +24883,8 @@ type IdpResponse struct {
 	// every revision. This id is referenced by the identity links.
 	ID string `json:"id"`
 	// The id of the revision this row holds, pinned by auth attempts and
-	// releases. Single reads and the query return the newest one.
+	// releases. `GET /idps/{id}` and the query return the newest one;
+	// `GET /idps/revisions/{revision_id}` returns the one named.
 	RevisionID string `json:"revision_id"`
 	// The identifier by which user schemas and flow definitions reference the
 	// connection. Fixed for the life of the connection.
@@ -24821,7 +24958,8 @@ func (s *IdpResponse) SetDefinition(val IdpConnection) {
 	s.Definition = val
 }
 
-func (*IdpResponse) getIdpByIdRes() {}
+func (*IdpResponse) getIdpByIdRes()         {}
+func (*IdpResponse) getIdpRevisionByIdRes() {}
 
 // The claim challenge minted for a project.
 // Ref: #
@@ -26034,6 +26172,174 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// ListIdpRevisionsErrorResponse represents sum type.
+type ListIdpRevisionsErrorResponse struct {
+	Type             ListIdpRevisionsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// ListIdpRevisionsErrorResponseType is oneOf type of ListIdpRevisionsErrorResponse.
+type ListIdpRevisionsErrorResponseType string
+
+// Possible values for ListIdpRevisionsErrorResponseType.
+const (
+	AuthUnauthorizedListIdpRevisionsErrorResponse ListIdpRevisionsErrorResponseType = "auth.unauthorized"
+	InternalListIdpRevisionsErrorResponse         ListIdpRevisionsErrorResponseType = "internal"
+	ReqInvalidListIdpRevisionsErrorResponse       ListIdpRevisionsErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListIdpRevisionsErrorResponse is AuthUnauthorized.
+func (s ListIdpRevisionsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListIdpRevisionsErrorResponse
+}
+
+// IsInternal reports whether ListIdpRevisionsErrorResponse is Internal.
+func (s ListIdpRevisionsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListIdpRevisionsErrorResponse
+}
+
+// IsReqInvalid reports whether ListIdpRevisionsErrorResponse is ReqInvalid.
+func (s ListIdpRevisionsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListIdpRevisionsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListIdpRevisionsErrorResponse to AuthUnauthorized.
+func (s *ListIdpRevisionsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListIdpRevisionsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListIdpRevisionsErrorResponse is AuthUnauthorized.
+func (s ListIdpRevisionsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListIdpRevisionsErrorResponse returns new ListIdpRevisionsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListIdpRevisionsErrorResponse(v AuthUnauthorized) ListIdpRevisionsErrorResponse {
+	var s ListIdpRevisionsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListIdpRevisionsErrorResponse to Internal.
+func (s *ListIdpRevisionsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListIdpRevisionsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListIdpRevisionsErrorResponse is Internal.
+func (s ListIdpRevisionsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListIdpRevisionsErrorResponse returns new ListIdpRevisionsErrorResponse from Internal.
+func NewInternalListIdpRevisionsErrorResponse(v Internal) ListIdpRevisionsErrorResponse {
+	var s ListIdpRevisionsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListIdpRevisionsErrorResponse to ReqInvalid.
+func (s *ListIdpRevisionsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListIdpRevisionsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListIdpRevisionsErrorResponse is ReqInvalid.
+func (s ListIdpRevisionsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListIdpRevisionsErrorResponse returns new ListIdpRevisionsErrorResponse from ReqInvalid.
+func NewReqInvalidListIdpRevisionsErrorResponse(v ReqInvalid) ListIdpRevisionsErrorResponse {
+	var s ListIdpRevisionsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListIdpRevisionsErrorResponseStatusCode wraps ListIdpRevisionsErrorResponse with StatusCode.
+type ListIdpRevisionsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListIdpRevisionsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListIdpRevisionsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListIdpRevisionsErrorResponseStatusCode) GetResponse() ListIdpRevisionsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListIdpRevisionsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListIdpRevisionsErrorResponseStatusCode) SetResponse(val ListIdpRevisionsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListIdpRevisionsErrorResponseStatusCode) listIdpRevisionsRes() {}
+
+type ListIdpRevisionsForbidden ErrorDetails
+
+func (*ListIdpRevisionsForbidden) listIdpRevisionsRes() {}
+
+type ListIdpRevisionsNotFound ErrorDetails
+
+func (*ListIdpRevisionsNotFound) listIdpRevisionsRes() {}
+
+// Paginated list of the revisions of one identity provider connection, newest
+// first.
+// Ref: #
+type ListIdpRevisionsResponse struct {
+	Revisions []IdpResponse `json:"revisions"`
+	// Token to pass as `page_token` in the next request to fetch the following
+	// page. Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetRevisions returns the value of Revisions.
+func (s *ListIdpRevisionsResponse) GetRevisions() []IdpResponse {
+	return s.Revisions
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListIdpRevisionsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetRevisions sets the value of Revisions.
+func (s *ListIdpRevisionsResponse) SetRevisions(val []IdpResponse) {
+	s.Revisions = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListIdpRevisionsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListIdpRevisionsResponse) listIdpRevisionsRes() {}
+
+type ListIdpRevisionsUnauthorized ErrorDetails
+
+func (*ListIdpRevisionsUnauthorized) listIdpRevisionsRes() {}
 
 type ListMyProjectsBadRequest ErrorDetails
 

@@ -446,11 +446,23 @@ func (UnimplementedHandler) GetHealth(ctx context.Context) (r GetHealthRes, _ er
 
 // GetIdpById implements getIdpById operation.
 //
-// Reads a connection by its id.
+// Reads a connection by its id, at its newest revision.
+// `GET /idps/{id}/revisions` lists every revision of the connection.
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /idps/{id}
 func (UnimplementedHandler) GetIdpById(ctx context.Context, params GetIdpByIdParams) (r GetIdpByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetIdpRevisionById implements getIdpRevisionById operation.
+//
+// Reads one revision of a connection by its `revision_id`, the value an auth
+// attempt or a release pins.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /idps/revisions/{revision_id}
+func (UnimplementedHandler) GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (r GetIdpRevisionByIdRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -634,6 +646,17 @@ func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsPar
 //
 // GET /flow_definitions
 func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (r ListFlowDefinitionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListIdpRevisions implements listIdpRevisions operation.
+//
+// Returns every revision of one connection, newest first, paginated with a
+// cursor. The order is fixed, so there is no `sorting`.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /idps/{id}/revisions
+func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (r ListIdpRevisionsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

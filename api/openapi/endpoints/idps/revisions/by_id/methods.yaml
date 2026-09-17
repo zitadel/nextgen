@@ -1,9 +1,9 @@
 get:
-  operationId: getIdpById
-  summary: Get an identity provider connection by id
+  operationId: getIdpRevisionById
+  summary: Get one revision of an identity provider connection
   description: |
-    Reads a connection by its id, at its newest revision.
-    `GET /idps/{id}/revisions` lists every revision of the connection.
+    Reads one revision of a connection by its `revision_id`, the value an auth
+    attempt or a release pins.
 
     The lookup is scoped to the project in `project_id`.
   tags:
@@ -12,30 +12,30 @@ get:
     - oauth2:
         - idp.read
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
-    - name: id
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - name: revision_id
       in: path
       required: true
-      description: The connection id, allocated when the connection was created.
+      description: The revision id, allocated when the revision was written.
       schema:
         type: string
-        example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+        example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
   responses:
     '200':
-      description: The identity provider connection was retrieved successfully.
+      description: The revision was retrieved successfully.
       content:
         application/json:
           schema:
-            $ref: ../idp-response.yaml
+            $ref: ../../idp-response.yaml
           examples:
-            revised:
-              summary: A connection that has been revised since it was created.
+            first:
+              summary: The first revision of a connection that has since been revised
               value:
                 id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
-                revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                revision_id: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
                 slug: google
                 created_at: '2026-07-14T09:11:00Z'
-                updated_at: '2026-07-16T14:20:00Z'
+                updated_at: '2026-07-14T09:11:00Z'
                 definition:
                   slug: google
                   protocol: oidc
@@ -68,20 +68,19 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     '403':
       description: Insufficient permissions.
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     '404':
       description: |
-        No identity provider connection with this id exists in the given
-        project.
+        No revision with this id exists in the given project.
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     default:
-      $ref: getIdpById-error-response.yaml
+      $ref: getIdpRevisionById-error-response.yaml
