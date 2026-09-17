@@ -312,7 +312,7 @@ function PaletteSection({
               side={side}
               value={palette[key] ?? ""}
               fallback={defaults[key]}
-              issue={sideIssues.find((candidate) => candidate.pair.startsWith(`${key}/`))}
+              issues={sideIssues.filter((candidate) => candidate.pair.startsWith(`${key}/`))}
               onChange={(value) => onChange(withPaletteValue(draft, side, key, value))}
             />
           ))}
@@ -327,14 +327,14 @@ function PaletteRow({
   side,
   value,
   fallback,
-  issue,
+  issues,
   onChange,
 }: {
   paletteKey: PaletteKey;
   side: ThemeSide;
   value: string;
   fallback: string;
-  issue: ContrastIssue | undefined;
+  issues: ContrastIssue[];
   onChange: (value: string) => void;
 }) {
   // Both sides carry a row called "Primary", so the accessible name carries
@@ -362,38 +362,50 @@ function PaletteRow({
           placeholder={fallback.toUpperCase()}
           onChange={(event) => onChange(event.target.value)}
         />
-        {issue && <ContrastIssueMarker issue={issue} label={pairLabel(issue.pair)} />}
+        {issues.length > 0 && <ContrastIssueMarker issues={issues} />}
       </span>
     </div>
   );
 }
 
-
 /**
  * The warning on a failing row, and the detail behind it. The row has space for
- * a glyph only, so the ratio and the rule it misses live in a popover rather
+ * a glyph only, so the ratios and the rules they miss live in a popover rather
  * than a title attribute a keyboard or a touch device never sees.
+ *
+ * A colour can fail against more than one surface — `text` is painted on the
+ * page, the card and the secondary button — and the section badge counts each
+ * of those. One marker per row carries them all, so every counted failure can
+ * be opened.
  */
-function ContrastIssueMarker({ issue, label }: { issue: ContrastIssue; label: string }) {
-  // WCAG holds text to 4.5:1 and a user-interface component boundary to 3:1,
-  // so the sentence names which rule this pair is being held to.
-  const rule =
-    issue.required === CONTRAST_AA_LARGE ? "user interface components" : "normal text";
-  const detail = `${issue.ratio}:1 — fails AA for ${rule} (${issue.required}:1 required).`;
+function ContrastIssueMarker({ issues }: { issues: ContrastIssue[] }) {
+  const detailed = issues.map((issue) => ({
+    label: pairLabel(issue.pair),
+    // WCAG holds text to 4.5:1 and a user-interface component boundary to 3:1,
+    // so the sentence names which rule this pair is being held to.
+    detail: `${issue.ratio}:1 — fails AA for ${
+      issue.required === CONTRAST_AA_LARGE ? "user interface components" : "normal text"
+    } (${issue.required}:1 required).`,
+  }));
 
   return (
     <Popover>
       <PopoverTrigger
         className="shrink-0 cursor-pointer text-destructive"
-        aria-label={`${label}: ${detail}`}
+        aria-label={detailed.map((entry) => `${entry.label}: ${entry.detail}`).join(" ")}
       >
         <TriangleAlert className="size-3.5" aria-hidden />
       </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-auto max-w-[240px] flex-col gap-2.5 border-foreground/10 p-2">
-        <PopoverHeader className="gap-0.5 text-xs leading-4">
-          <PopoverTitle>{label}</PopoverTitle>
-          <PopoverDescription>{detail}</PopoverDescription>
-        </PopoverHeader>
+      <PopoverContent
+        align="end"
+        className="flex w-auto max-w-[240px] flex-col gap-2.5 border-foreground/10 p-2"
+      >
+        {detailed.map((entry) => (
+          <PopoverHeader key={entry.label} className="gap-0.5 text-xs leading-4">
+            <PopoverTitle>{entry.label}</PopoverTitle>
+            <PopoverDescription>{entry.detail}</PopoverDescription>
+          </PopoverHeader>
+        ))}
       </PopoverContent>
     </Popover>
   );

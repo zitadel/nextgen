@@ -38,10 +38,25 @@ export const Route = createFileRoute("/_authed/branding/")({
     ]);
     // The preview runs one of the project's own flows, so the selector lists
     // what it can actually render rather than a fixed set.
-    const previewFlows = flows.flow_definitions.map((entry) => ({
-      name: entry.flow_definition.name,
-      label: flowDisplayName(entry.flow_definition),
-    }));
+    //
+    // One entry per name: the list is newest first and carries no `revisions`
+    // filter, so a revised flow can appear more than once under the same name.
+    // The name is what the preview starts a flow by, which makes a second
+    // revision of it an ambiguous row rather than another choice.
+    //
+    // Each entry also carries the purposes it serves. A definition can serve
+    // one without the other, and starting a flow for a purpose it does not
+    // serve answers `flowdef.purpose_mismatch` rather than a preview.
+    const previewFlows: PreviewFlow[] = [];
+    for (const entry of flows.flow_definitions) {
+      const { name } = entry.flow_definition;
+      if (previewFlows.some((seen) => seen.name === name)) continue;
+      previewFlows.push({
+        name,
+        label: flowDisplayName(entry.flow_definition),
+        purposes: Object.keys(entry.flow_definition.purposes ?? {}),
+      });
+    }
     const latest = revisions[0];
     if (!latest) return { published: {} as BrandingDraft, flows: previewFlows };
     const revision = await api.getBrandingById(latest.id);
@@ -49,6 +64,9 @@ export const Route = createFileRoute("/_authed/branding/")({
   },
   component: BrandingScreen,
 });
+
+/** A flow the preview can run, and the purposes it serves. */
+type PreviewFlow = { name: string; label: string; purposes: string[] };
 
 // Passkey is absent until the state selector lands: it needs a step the flow
 // only reaches after an identifier, and a tab that renders the sign-in step
@@ -71,6 +89,21 @@ function BrandingScreen() {
   const [draft, setDraft] = useState<BrandingDraft>(published);
   const [journey, setJourney] = useState<PreviewJourney>("register");
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
+
+  // Only the journeys the chosen flow actually serves: asking it for a purpose
+  // it does not carry answers `flowdef.purpose_mismatch` instead of rendering.
+  // A flow the list did not describe is treated as serving everything, so a
+  // missing `purposes` narrows nothing.
+  const selected = flows.find((flow) => flow.name === flowName);
+  const journeys = selected?.purposes.length
+    ? JOURNEYS.filter((entry) => selected.purposes.includes(entry.id))
+    : JOURNEYS;
+  // Switching to a flow that does not serve the open tab moves to one it does,
+  // rather than leaving a tab selected that the preview cannot start.
+  const activeJourney = journeys.some((entry) => entry.id === journey)
+    ? journey
+    : (journeys[0]?.id ?? journey);
+  if (activeJourney !== journey) setJourney(activeJourney);
   const [theme, setTheme] = useState<"light" | "dark" | "auto">("auto");
   const [narrow, setNarrow] = useState(false);
 
@@ -108,9 +141,12 @@ function BrandingScreen() {
           </div>
         )}
         <div className="flex items-center justify-between gap-[10px] lg:flex-1">
-          <Tabs value={journey} onValueChange={(value) => setJourney(value as PreviewJourney)}>
+          <Tabs
+            value={activeJourney}
+            onValueChange={(value) => setJourney(value as PreviewJourney)}
+          >
             <TabsList>
-              {JOURNEYS.map((entry) => (
+              {journeys.map((entry) => (
                 <TabsTrigger key={entry.id} value={entry.id}>
                   {entry.label}
                 </TabsTrigger>
@@ -151,7 +187,7 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview draft={draft} journey={journey} flowName={flowName} theme={theme} />
+            <LoginPreview draft={draft} journey={activeJourney} flowName={flowName} theme={theme} />
           </div>
         </Card>
 
