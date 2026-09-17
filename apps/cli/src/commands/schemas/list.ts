@@ -8,7 +8,7 @@ import type {
   ListSchemas200SchemasItem,
 } from "@zitadel/api/generated/model";
 
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { environmentSchema } from "../../lib/environment";
 import { readZitadelSecret } from "../../lib/project";
 
@@ -23,6 +23,8 @@ import { readZitadelSecret } from "../../lib/project";
  */
 export default class SchemasList extends BaseCommand {
   static override description = "List revisions of a user-schema by objectType.";
+  static override group = CommandGroups.configuration;
+  static override groupOrder = 3;
   static override flags = {
     "object-type": Flags.string({
       char: "t",

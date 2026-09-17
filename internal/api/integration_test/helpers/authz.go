@@ -7,9 +7,11 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// SeedProjectViewer writes a project-scoped viewer assignment. Until #420,
-// that relation also closes editor/admin Checks on the seeded catalog.
-func (h *Harness) SeedProjectViewer(t *testing.T, projectID, userID string) {
+// SeedProjectViewer writes a project-scoped viewer assignment and returns it,
+// so a caller that needs to revoke or inspect the grant has its minted id.
+// Until #420, that relation also closes editor/admin Checks on the seeded
+// catalog.
+func (h *Harness) SeedProjectViewer(t *testing.T, projectID, userID string) *domain.AuthzAssignment {
 	t.Helper()
 	asgn := &domain.AuthzAssignment{
 		ProjectID:     projectID,
@@ -21,6 +23,7 @@ func (h *Harness) SeedProjectViewer(t *testing.T, projectID, userID string) {
 	}
 	asgn.ApplyScope(domain.NewProjectAssignmentScope())
 	require.NoError(t, h.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+	return asgn
 }
 
 // SeedOwningTeam writes the owning-team assignment claim/complete writes

@@ -103,18 +103,22 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMyUserOperation:       true,
 	api.PatchMyUserOperation:     true,
 	api.CompleteClaimOperation:   true,
+	api.ListMyProjectsOperation:  true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
-// building cookies Skip so dual-scheme oauth2 can still satisfy.
+// building cookies Skip so dual-scheme oauth2 can still satisfy. On a
+// session-only operation nothing else can satisfy, so the skip becomes the 401
+// the contract declares.
 var userBoundSessionOperations = map[api.OperationName]bool{
-	api.CreateGrantOperation: true,
-	api.GetGrantOperation:    true,
-	api.DeleteGrantOperation: true,
-	api.QueryGrantsOperation: true,
-	api.QueryUsersOperation:  true,
-	api.QueryTeamsOperation:  true,
-	api.GetTeamOperation:     true,
+	api.CreateGrantOperation:    true,
+	api.GetGrantOperation:       true,
+	api.DeleteGrantOperation:    true,
+	api.QueryGrantsOperation:    true,
+	api.QueryUsersOperation:     true,
+	api.QueryTeamsOperation:     true,
+	api.GetTeamOperation:        true,
+	api.ListMyProjectsOperation: true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
