@@ -135,6 +135,21 @@ func TestNewOIDCClient(t *testing.T) {
 			wantCauseMsg: "missing token_endpoint in discovery",
 		},
 		{
+			name: "a discovered endpoint that is not https is rejected",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				issuer := "http://" + r.Host
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"issuer":"` + issuer + `",` +
+					`"authorization_endpoint":"http://accounts.example.test/authorize",` +
+					`"token_endpoint":"` + issuer + `/token",` +
+					`"userinfo_endpoint":"` + issuer + `/userinfo",` +
+					`"jwks_uri":"` + issuer + `/keys"}`))
+			},
+			conn:         func(issuer string) OIDCConnection { return OIDCConnection{Issuer: issuer} },
+			wantErr:      domain.ErrIDPDiscoveryFailed(nil),
+			wantCauseMsg: "authorization_endpoint in discovery is not an https endpoint",
+		},
+		{
 			name: "an unparseable discovery document fails discovery",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("<html>not json</html>"))

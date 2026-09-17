@@ -155,13 +155,19 @@ func resolveEndpoints(ctx context.Context, conn OIDCConnection, httpClient *http
 }
 
 // overrideOrDiscovered keeps the override in dst, takes the discovered value
-// when there is none, and fails when neither names the endpoint.
+// when there is none, and fails when neither names the endpoint. A
+// discovered value passes the same pattern the schema enforces on an
+// override: the library only checks the document's issuer, so without this
+// a document could send the browser to a cleartext or relative URL.
 func overrideOrDiscovered(dst *string, discovered, name string) error {
 	if *dst != "" {
 		return nil
 	}
 	if discovered == "" {
 		return domain.ErrIDPDiscoveryFailed(fmt.Errorf("missing %s in discovery", name))
+	}
+	if !endpointPattern.MatchString(discovered) {
+		return domain.ErrIDPDiscoveryFailed(fmt.Errorf("%s in discovery is not an https endpoint", name))
 	}
 	*dst = discovered
 	return nil
