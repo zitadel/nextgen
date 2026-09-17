@@ -205,6 +205,11 @@ func TestNewOIDCClient(t *testing.T) {
 	}
 }
 
+func TestNewOIDCClientNilClient(t *testing.T) {
+	_, err := NewOIDCClient(context.Background(), Connection{RevisionID: "idprev_1"}, redirectURI, nil)
+	require.ErrorIs(t, err, domain.ErrInternal(nil))
+}
+
 func TestSigningAlgorithms(t *testing.T) {
 	assert.Equal(t, []string{"RS256", "ES256", "PS256"}, SigningAlgorithms())
 }

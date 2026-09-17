@@ -158,6 +158,22 @@ func TestParseConnection(t *testing.T) {
 			wantCauseMsg: "token_endpoint is not https",
 		},
 		{
+			name: "an issuer with a query string is rejected",
+			body: `{
+				"slug": "google",
+				"protocol": "oidc",
+				"display_name": "Google",
+				"oidc": {
+					"issuer": "https://accounts.example.test/?tenant=1",
+					"client_id": "client",
+					"client_secret": "${{ GOOGLE_SECRET }}",
+					"scopes": ["openid"]
+				}
+			}`,
+			wantErr:      new(domain.ErrIDPEndpointCleartext("issuer")),
+			wantCauseMsg: "issuer is not https",
+		},
+		{
 			name: "an oauth2 body is refused",
 			body: `{
 				"slug": "github",
