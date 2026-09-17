@@ -441,17 +441,29 @@ export default class Setup extends BaseCommand {
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     if (!dryRun && serverKind.value(answers.server) === "local") {
       const admin = await readLocalAdmin(cwd);
+      // The runtime document naming the platform project does not prove a
+      // claim can complete (a deployment can pin that project without the
+      // platform bootstrap, which leaves the admin without a personal team),
+      // so attaching the project is best-effort: on failure the project stays
+      // unclaimed and setup falls back to the usual claim nudge instead of
+      // failing after it has already written the app files.
       if (admin && (await localServerHostsPlatform(answers.server))) {
-        const owner = await claimProjectAsAdmin({
-          serverUrl: answers.server,
-          projectId: project.id,
-          projectSecret: project.project_secret,
-          admin,
-        });
-        const secret = await readZitadelSecret(cwd);
-        await writeZitadelSecret(cwd, { ...secret, ...owner });
-        ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
-        consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+        try {
+          const owner = await claimProjectAsAdmin({
+            serverUrl: answers.server,
+            projectId: project.id,
+            projectSecret: project.project_secret,
+            admin,
+          });
+          const secret = await readZitadelSecret(cwd);
+          await writeZitadelSecret(cwd, { ...secret, ...owner });
+          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+        } catch (error) {
+          consola.warn(
+            `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
+          );
+        }
       }
     }
 
