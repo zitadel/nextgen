@@ -1,5 +1,6 @@
 import { contrastIssues, type ContrastIssue } from "@zitadel/config/branding-contrast";
-import { ChevronDown, TriangleAlert } from "lucide-react";
+import { parseCssColor } from "@zitadel/config/css-color";
+import { ChevronDown, ChevronUp, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator as BaseSeparator } from "@/components/ui/separator";
+import { MAINTAINED_FONT_FAMILY, maintainedPalette } from "@/lib/branding-defaults";
 import {
   type BrandingDensity,
   type BrandingDraft,
@@ -25,29 +28,60 @@ import {
   type ThemeSide,
   withFontFamily,
   withPaletteValue,
-  withTypography,
   withSideLogo,
+  withTypography,
 } from "@/lib/branding-draft";
 
-// Geometry from the design: a 108px label column, a 12px gap and a 156px value
-// column inside the panel's 276px content width. Rows sit on a 26px rhythm,
-// colour rows on 28px, and a value is left-aligned in its column rather than
-// flush to the panel edge.
-const ROW = "flex items-center gap-3 py-px text-sm";
-const COLOUR_ROW = "flex items-center gap-3 py-0.5 text-sm";
-const ROW_LABEL = "w-[108px] shrink-0 text-muted-foreground";
-const ROW_VALUE = "flex w-[156px] items-center gap-2";
-const SECTION_TITLE = "text-sm font-medium text-foreground";
-const VALUE_INPUT =
-  "h-6 w-full border-transparent bg-transparent px-1 text-sm shadow-none hover:border-input focus-visible:border-input";
-// The trigger reads as the value it holds until you reach for it, matching the
-// text rows beside it. `dark:bg-transparent` is explicit because the component's
-// own `dark:bg-input/30` is a different variant, which tailwind-merge keeps.
-const VALUE_SELECT =
-  "h-6 w-full border-transparent bg-transparent px-1 text-sm shadow-none dark:bg-transparent hover:border-input dark:hover:bg-input/30 focus-visible:border-input data-[size=sm]:h-6";
+/** Where the panel's "Learn more" goes. */
+const BRANDING_DOCS_URL = "https://zitadel.com/docs/cli/customize-design";
 
-/** Radix treats "" as no selection, so the cleared state needs a value of its own. */
-const DEFAULT_OPTION = "__default";
+// The design's separators are zero-height lines, so they add nothing to the
+// 8px gap either side of them.
+function Separator() {
+  return <BaseSeparator className="-my-px" />;
+}
+
+const PANEL_TITLE = "font-serif text-base leading-5 font-normal text-foreground";
+const SECTION_TITLE = "font-serif text-sm leading-5 font-normal text-foreground";
+const SECTION = "flex flex-col gap-[10px] py-2";
+
+// A row is 16px on a 26px rhythm. The control inside is 24px so it stays a
+// usable target, and overflows the row by 4px each side rather than pushing
+// the rhythm apart.
+const ROW = "flex h-4 items-center justify-between";
+const ROW_LABEL = "w-[108px] shrink-0 text-xs leading-4 text-foreground";
+const ROW_VALUE = "flex w-[156px] items-center";
+const VALUE_TEXT = "text-xs leading-4 font-normal text-muted-foreground";
+const VALUE_INPUT = `-my-1 h-6 w-full rounded-none border-transparent bg-transparent px-0 shadow-none placeholder:text-muted-foreground hover:border-b-input focus-visible:border-b-input focus-visible:ring-0 md:text-xs ${VALUE_TEXT}`;
+// `dark:bg-transparent` is explicit: the trigger's own `dark:bg-input/30` is a
+// different variant, which tailwind-merge keeps.
+// The chevron appears on hover and focus only: at rest the row reads as the
+// plain value the design shows.
+const VALUE_SELECT = `-my-1 h-6 w-full rounded-none border-transparent bg-transparent px-0 shadow-none data-[size=sm]:h-6 dark:bg-transparent [&_svg]:opacity-0 hover:[&_svg]:opacity-100 focus-visible:[&_svg]:opacity-100 ${VALUE_TEXT}`;
+
+const COLOUR_ROW = "flex h-5 items-center justify-between";
+const SWATCH =
+  "size-3.5 shrink-0 cursor-pointer appearance-none rounded-[3px] border border-border bg-transparent p-0 [&::-moz-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-[2px] [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch-wrapper]:p-0";
+const ISSUE_BADGE = "rounded-4xl bg-destructive/10 text-destructive dark:bg-destructive/20";
+
+const THEME_LABELS: Record<BrandingThemeMode, string> = {
+  light: "Light",
+  dark: "Dark",
+  auto: "Auto",
+};
+const DENSITY_LABELS: Record<BrandingDensity, string> = {
+  compact: "Compact",
+  regular: "Regular",
+  comfortable: "Comfortable",
+};
+const RADIUS_LABELS: Record<string, string> = {
+  none: "None",
+  sm: "Small",
+  md: "Medium",
+  lg: "Large",
+  full: "Full",
+  custom: "Custom",
+};
 
 type Props = {
   draft: BrandingDraft;
@@ -55,41 +89,48 @@ type Props = {
 };
 
 export function SettingsPanel({ draft, onChange }: Props) {
-  // Recomputed on every edit: the counts are the panel's live feedback, and
-  // the check is a pure function over a dozen colours.
-  const issues = useMemo(() => contrastIssues(draft), [draft]);
+  const issues = useMemo(() => chosenContrastIssues(draft), [draft]);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto px-3 pt-4 pb-3">
-      <header className="pb-2">
-        <h2 className={SECTION_TITLE}>Branding</h2>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Override the corresponding theme tokens in your project configuration.
+    <div className="flex h-full flex-col gap-2 overflow-y-auto px-3 py-4">
+      <header className="flex flex-col gap-2 py-2">
+        <h2 className={PANEL_TITLE}>Branding</h2>
+        <p className="text-xs leading-4 text-muted-foreground">
+          Override the corresponding theme tokens in your project configuration.{" "}
+          <a href={BRANDING_DOCS_URL} target="_blank" rel="noreferrer" className="underline">
+            Learn more
+          </a>
         </p>
       </header>
 
-      <Section title="Appearance">
+      <Separator />
+      <section className={SECTION}>
+        <h3 className={SECTION_TITLE}>Appearance</h3>
         <SelectRow
           label="Theme"
           value={draft.theme?.mode ?? ""}
+          fallback="auto"
           options={THEME_MODES}
+          labels={THEME_LABELS}
           onChange={(value) =>
-            onChange({ ...draft, theme: { ...draft.theme, mode: themeMode(value) } })
+            onChange({ ...draft, theme: { ...draft.theme, mode: value as BrandingThemeMode } })
           }
         />
-      </Section>
+      </section>
 
-      <Section title="Typography">
+      <Separator />
+      <section className={SECTION}>
+        <h3 className={SECTION_TITLE}>Typography</h3>
         <TextRow
           label="Font family"
           value={draft.typography?.font_family ?? ""}
-          placeholder="Arimo"
+          fallback={MAINTAINED_FONT_FAMILY}
           onChange={(value) => onChange(withFontFamily(draft, value))}
         />
         <TextRow
           label="Font URL"
           value={draft.typography?.font_url ?? ""}
-          placeholder="https://…/font.css"
+          fallback="None"
           onChange={(value) => onChange(withTypography(draft, "font_url", value))}
         />
         <NumberRow
@@ -100,16 +141,20 @@ export function SettingsPanel({ draft, onChange }: Props) {
           step={0.05}
           onChange={(scale) => onChange({ ...draft, typography: { ...draft.typography, scale } })}
         />
-      </Section>
+      </section>
 
-      <Section title="Shape">
+      <Separator />
+      <section className={SECTION}>
+        <h3 className={SECTION_TITLE}>Shape</h3>
         <RadiusRows draft={draft} onChange={onChange} />
         <SelectRow
           label="Density"
           value={draft.shape?.density ?? ""}
+          fallback="regular"
           options={DENSITIES}
+          labels={DENSITY_LABELS}
           onChange={(value) =>
-            onChange({ ...draft, shape: { ...draft.shape, density: densityValue(value) } })
+            onChange({ ...draft, shape: { ...draft.shape, density: value as BrandingDensity } })
           }
         />
         <NumberRow
@@ -120,34 +165,54 @@ export function SettingsPanel({ draft, onChange }: Props) {
           step={0.1}
           onChange={(logo_scale) => onChange({ ...draft, shape: { ...draft.shape, logo_scale } })}
         />
-      </Section>
+      </section>
 
-      <Section title="Assets">
+      <Separator />
+      <section className={SECTION}>
+        <h3 className={SECTION_TITLE}>Assets</h3>
         <TextRow
           label="Logo light"
           value={draft.theme?.light?.logo_url ?? ""}
-          placeholder="https://…/logo-on-light.svg"
+          fallback="None"
           onChange={(value) => onChange(withSideLogo(draft, "light", value))}
         />
         <TextRow
           label="Logo dark"
           value={draft.theme?.dark?.logo_url ?? ""}
-          placeholder="https://…/logo-on-dark.svg"
+          fallback="None"
           onChange={(value) => onChange(withSideLogo(draft, "dark", value))}
         />
-      </Section>
+      </section>
 
+      <Separator />
       <PaletteSection side="dark" draft={draft} issues={issues} onChange={onChange} />
       <PaletteSection side="light" draft={draft} issues={issues} onChange={onChange} />
+      <Separator />
     </div>
   );
 }
 
 /**
+ * Contrast measured on what renders — the draft over the maintained defaults —
+ * but reported only for pairs the customer has touched. A primary set against
+ * the default label still warns; the defaults on their own do not.
+ */
+function chosenContrastIssues(draft: BrandingDraft): ContrastIssue[] {
+  const effective = { theme: {} as Record<ThemeSide, { palette: Record<string, string> }> };
+  for (const side of ["light", "dark"] as const) {
+    effective.theme[side] = {
+      palette: { ...maintainedPalette(side), ...(draft.theme?.[side]?.palette ?? {}) },
+    };
+  }
+  return contrastIssues(effective).filter((issue) => {
+    const chosen = draft.theme?.[issue.theme]?.palette ?? {};
+    return issue.pair.split("/").some((key) => chosen[key as PaletteKey] !== undefined);
+  });
+}
+
+/**
  * Corner radius is a preset name or a pixel value, so the control is both: a
- * preset list with a `custom` entry that reveals the pixel field. Typing a
- * number into a preset field was the alternative, which is a field that
- * accepts two vocabularies and validates neither.
+ * preset list with a `custom` entry that reveals the pixel field.
  */
 function RadiusRows({
   draft,
@@ -163,13 +228,15 @@ function RadiusRows({
       <SelectRow
         label="Corner radius"
         value={custom ? "custom" : (radius ?? "")}
+        fallback="md"
         options={[...RADIUS_PRESETS, "custom"]}
+        labels={RADIUS_LABELS}
         onChange={(value) =>
           onChange({
             ...draft,
             shape: {
               ...draft.shape,
-              radius: value === "custom" ? 8 : radiusPreset(value),
+              radius: value === "custom" ? 8 : (value as BrandingRadius),
             },
           })
         }
@@ -190,17 +257,6 @@ function RadiusRows({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="border-t border-border py-4">
-      {/* Each section frame carries 8px of its own padding and sits 8px from
-          the separator, so a row clears the next heading by 32px. */}
-      <h3 className={`${SECTION_TITLE} mb-[10px]`}>{title}</h3>
-      {children}
-    </section>
-  );
-}
-
 function PaletteSection({
   side,
   draft,
@@ -215,36 +271,37 @@ function PaletteSection({
   const [open, setOpen] = useState(side === "dark");
   const sideIssues = issues.filter((issue) => issue.theme === side);
   const palette = draft.theme?.[side]?.palette ?? {};
+  const defaults = maintainedPalette(side);
+  const Chevron = open ? ChevronUp : ChevronDown;
 
   return (
-    <section className="border-t border-border py-4">
+    <section className={open ? "flex flex-col border-b border-border" : "flex flex-col"}>
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2"
+        className="flex w-full cursor-pointer items-center justify-between py-2"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
         <span className={SECTION_TITLE}>Colors {side} mode</span>
         <span className="flex items-center gap-2">
           {sideIssues.length > 0 && (
-            <Badge variant="destructive">
+            <Badge variant="destructive" className={ISSUE_BADGE}>
               {sideIssues.length} {sideIssues.length === 1 ? "issue" : "issues"}
             </Badge>
           )}
-          <ChevronDown
-            className={`size-4 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`}
-          />
+          <Chevron className="size-4 text-foreground" aria-hidden />
         </span>
       </button>
 
       {open && (
-        <div className="mt-2">
+        <div className="flex flex-col gap-2 py-2">
           {PALETTE_KEYS.map((key) => (
             <PaletteRow
               key={key}
               paletteKey={key}
               side={side}
               value={palette[key] ?? ""}
+              fallback={defaults[key]}
               issue={sideIssues.find((candidate) => candidate.pair.startsWith(`${key}/`))}
               onChange={(value) => onChange(withPaletteValue(draft, side, key, value))}
             />
@@ -259,38 +316,42 @@ function PaletteRow({
   paletteKey,
   side,
   value,
+  fallback,
   issue,
   onChange,
 }: {
   paletteKey: PaletteKey;
   side: ThemeSide;
   value: string;
+  fallback: string;
   issue: ContrastIssue | undefined;
   onChange: (value: string) => void;
 }) {
-  // Both sides carry a row called "Primary". The visible label sits under its
-  // section heading, but the accessible name has to stand on its own — a
-  // screen reader reaching two fields both called "Primary" cannot tell which
-  // surface it is editing.
+  // Both sides carry a row called "Primary", so the accessible name carries
+  // the side: a screen reader cannot see which section heading it sits under.
   const name = `${PALETTE_LABELS[paletteKey]} (${side} mode)`;
+  const shown = value || fallback;
+
   return (
     <div className={COLOUR_ROW}>
       <span className={ROW_LABEL}>{PALETTE_LABELS[paletteKey]}</span>
-      <span className={ROW_VALUE}>
-        <span
-          aria-hidden
-          className="size-3.5 shrink-0 rounded-sm border border-border"
-          style={{ background: value || "transparent" }}
+      <span className={`${ROW_VALUE} gap-1.5`}>
+        {/* The swatch is the picker. It speaks hex only, so a value written as a
+            colour function is converted for it while the text keeps the original. */}
+        <input
+          type="color"
+          aria-label={`${name} picker`}
+          className={SWATCH}
+          value={toHex(shown)}
+          onChange={(event) => onChange(event.target.value.toUpperCase())}
         />
         <Input
           aria-label={name}
-          className={VALUE_INPUT}
+          className={`${VALUE_INPUT} font-medium leading-5`}
           value={value}
-          placeholder="default"
+          placeholder={fallback.toUpperCase()}
           onChange={(event) => onChange(event.target.value)}
         />
-        {/* The design puts the contrast mark at the value column's right edge,
-            after the value rather than before the swatch. */}
         {issue && (
           <span
             className="shrink-0 text-destructive"
@@ -307,41 +368,42 @@ function PaletteRow({
   );
 }
 
-/**
- * A value the contract constrains to a named set. A text field here loses
- * input silently — "regula" is not a density, so it would clear the field
- * with nothing to say why.
- */
+/** A native colour input takes `#rrggbb` only. */
+function toHex(color: string): string {
+  const parsed = parseCssColor(color);
+  if (!parsed) return "#000000";
+  const channel = (n: number): string => Math.round(n).toString(16).padStart(2, "0");
+  return `#${channel(parsed.r)}${channel(parsed.g)}${channel(parsed.b)}`;
+}
+
 function SelectRow({
   label,
   value,
+  fallback,
   options,
+  labels,
   onChange,
 }: {
   label: string;
   value: string;
+  fallback: string;
   options: readonly string[];
+  labels: Record<string, string>;
   onChange: (value: string) => void;
 }) {
   return (
     <div className={ROW}>
       <span className={ROW_LABEL}>{label}</span>
       <span className={ROW_VALUE}>
-        {/* `default` is its own option rather than an empty value: Radix reads
-            an empty string as "no value", which would make clearing the field
-            unselectable. */}
-        <Select
-          value={value === "" ? DEFAULT_OPTION : value}
-          onValueChange={(next) => onChange(next === DEFAULT_OPTION ? "" : next)}
-        >
+        <Select value={value} onValueChange={onChange}>
           <SelectTrigger aria-label={label} className={VALUE_SELECT} size="sm">
-            <SelectValue />
+            {/* Unset shows what the login actually uses, not a word for "unset". */}
+            <SelectValue placeholder={labels[fallback] ?? fallback} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={DEFAULT_OPTION}>default</SelectItem>
             {options.map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {labels[option] ?? option}
               </SelectItem>
             ))}
           </SelectContent>
@@ -351,7 +413,6 @@ function SelectRow({
   );
 }
 
-/** A bounded number. The range is the contract's, so the control carries it. */
 function NumberRow({
   label,
   value,
@@ -379,7 +440,7 @@ function NumberRow({
           step={step}
           className={VALUE_INPUT}
           value={value ?? ""}
-          placeholder="default"
+          placeholder="1"
           onChange={(event) =>
             onChange(event.target.value === "" ? undefined : Number(event.target.value))
           }
@@ -392,12 +453,12 @@ function NumberRow({
 function TextRow({
   label,
   value,
-  placeholder,
+  fallback,
   onChange,
 }: {
   label: string;
   value: string;
-  placeholder: string;
+  fallback: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -408,29 +469,10 @@ function TextRow({
           aria-label={label}
           className={VALUE_INPUT}
           value={value}
-          placeholder={placeholder}
+          placeholder={fallback}
           onChange={(event) => onChange(event.target.value)}
         />
       </span>
     </div>
   );
-}
-
-function radiusPreset(value: string): BrandingRadius | undefined {
-  return RADIUS_PRESETS.includes(value as (typeof RADIUS_PRESETS)[number])
-    ? (value as BrandingRadius)
-    : undefined;
-}
-
-/** Which sides may run. Anything else clears the field. */
-function themeMode(value: string): BrandingThemeMode | undefined {
-  const trimmed = value.trim();
-  return THEME_MODES.includes(trimmed as BrandingThemeMode)
-    ? (trimmed as BrandingThemeMode)
-    : undefined;
-}
-
-function densityValue(value: string): BrandingDensity | undefined {
-  const trimmed = value.trim();
-  return DENSITIES.includes(trimmed as BrandingDensity) ? (trimmed as BrandingDensity) : undefined;
 }
