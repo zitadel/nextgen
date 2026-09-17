@@ -93,17 +93,18 @@ Every resource kind has four reads:
 - The list or query returns each resource once, at its newest revision. It
   carries no history, so it takes no `revisions` parameter.
 - `GET /<kind>/{id}` returns the resource at its newest revision.
-- `GET /<kind>/{id}/revisions` returns the revisions of one resource.
+- `GET /<kind>/{id}/revisions` returns the revisions of one resource. It is
+  a list, so it paginates with `page_token` per ADR 027.
 - `GET /<kind>/revisions/{revision_id}` returns one revision. A release
   pointer holds a `revision_id` and no resource id, so this read takes the
   `revision_id` alone. A prefixed id cannot collide with the literal
   `revisions`.
 
-`GET /<kind>/revisions/{revision_id}` is the read a release depends on. When
-a release is created, the release service reads each pinned revision through
-it to check that the revision exists, and ADR 035 tells consumers of a release
-to fetch its content the same way. A kind therefore gets both revision routes
-before it can be pinned by a release.
+`GET /<kind>/revisions/{revision_id}` is the read a release depends on.
+Creating a release fails if a pinned revision does not exist, and ADR 035
+tells consumers of a release to fetch its content through this route. A kind
+therefore gets `GET /<kind>/revisions/{revision_id}` before it can be pinned
+by a release.
 
 Today `GET /schemas` has a `revisions=all|latest` mode (#957). It is removed
 once the revision routes for schemas exist.
@@ -139,8 +140,8 @@ Prefix tokens are domain constants registered per ADR 047.
 
 Connections already have the two ids. The three older kinds should adopt this
 as well. Each migration is its own ticket. Each adds the two revision routes
-for its kind and switches the release service's pointer validation from
-get-by-id to `GET /<kind>/revisions/{revision_id}`:
+for its kind and switches the existence check at release creation from
+get-by-id to a lookup by `revision_id`:
 
 - **Flow definitions.** `id` becomes fixed per `name` and each write allocates
   a `revision_id`. The list filtered by `name` returns the newest revision of
