@@ -360,7 +360,7 @@ describe("local runtime commands", () => {
     expect(envelope.status).toBe("ok");
     binaryPids.push(envelope.data.runtime.pid);
 
-    // The child received the ZITADEL_* variables, .env.local first, and
+    // The child received the NEXTGEN_* variables, .env.local first, and
     // nothing else from the files.
     await expect(childEnv(serverUrl, "NEXTGEN_GOOGLE_SECRET")).resolves.toBe("canary-local");
     await expect(childEnv(serverUrl, "NEXTGEN_GITHUB_SECRET")).resolves.toBe("canary-github");

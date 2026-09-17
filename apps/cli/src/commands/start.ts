@@ -102,7 +102,7 @@ export default class Start extends BaseCommand {
 
     const paths = await ensureLocalState(this.meta.cwd);
     const existingRuntime = await readRuntimeMetadata(this.meta.cwd);
-    // ZITADEL_* variables from .env.local and .env are read before any runtime
+    // NEXTGEN_* variables from .env.local and .env are read before any runtime
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
     const env = await loadProjectEnv(this.meta.cwd);
