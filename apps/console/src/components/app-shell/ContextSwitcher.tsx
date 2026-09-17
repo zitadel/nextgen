@@ -240,6 +240,12 @@ function Switcher({
             // used to be buttons whose click only closed the popover, which
             // looked like a switch and was not one. A link says what it does —
             // it opens the project — and leaves the pill as it was.
+            //
+            // Interim: the row becomes a context setter that re-scopes the
+            // sidenav and its views to the chosen project instead of opening
+            // its detail. That needs selected-project state and management
+            // endpoints that authorize the session against the target project;
+            // until they do, a granted project's detail answers 401/403.
             rows.map((option) => {
               const content = (
                 <>
@@ -263,7 +269,13 @@ function Switcher({
                     <Link
                       {...option.link}
                       onClick={() => setOpen(false)}
-                      className={cn(rowClass, "hover:bg-accent focus-visible:bg-accent focus-visible:outline-none")}
+                      // The ring is the buttons' (`ui/button.tsx`): the background
+                      // alone is also the hover state, so it cannot be what tells
+                      // a keyboard user where focus is.
+                      className={cn(
+                        rowClass,
+                        "outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                      )}
                     >
                       {content}
                     </Link>
