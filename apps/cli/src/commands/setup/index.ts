@@ -30,6 +30,8 @@ import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
+import { claimProjectAsAdmin, readLocalAdmin } from "../../lib/local-server/admin";
+import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -432,11 +434,33 @@ export default class Setup extends BaseCommand {
     // computes the same date the platform will hold the user to. A dry run
     // gets the generic wording: its stand-in project has a fixed past
     // created_at, and no real window started anyway.
+    // On a CLI-managed local server the developer already exists as the local
+    // admin, so the project is attached to their team right away and
+    // `zitadel claim` has nothing left to do. Claiming an anonymous project
+    // stays a cloud journey.
+    let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
+    if (!dryRun && serverKind.value(answers.server) === "local") {
+      const admin = await readLocalAdmin(cwd);
+      if (admin && (await localServerHostsPlatform(answers.server))) {
+        const owner = await claimProjectAsAdmin({
+          serverUrl: answers.server,
+          projectId: project.id,
+          projectSecret: project.project_secret,
+          admin,
+        });
+        const secret = await readZitadelSecret(cwd);
+        await writeZitadelSecret(cwd, { ...secret, ...owner });
+        ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+        consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+      }
+    }
+
     const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
-      claimState({ secret: {}, server: answers.server }).kind === "detached" ||
-      (serverKind.value(answers.server) === "local" &&
-        (dryRun || (await localServerHostsPlatform(answers.server))));
+      !ownedByLocalAdmin &&
+      (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+        (serverKind.value(answers.server) === "local" &&
+          (dryRun || (await localServerHostsPlatform(answers.server)))));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
