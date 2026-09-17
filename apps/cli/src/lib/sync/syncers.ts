@@ -1,5 +1,3 @@
-import { writeFileSync } from "node:fs";
-
 import type {
   CreateBranding201,
   CreateBrandingBody,
@@ -20,8 +18,8 @@ import { validateLoginTemplate } from "@zitadel/config/template";
 
 import {
   BRANDING_DIR,
+  assertNoLegacyTemplateKey,
   readDescriptorTemplate,
-  resolveTemplatePath,
   toBrandingWireBody,
   toLocalBrandingBody,
 } from "../branding";
@@ -46,8 +44,8 @@ export function makeSyncers(opts: {
   projectId: string;
   env: EnvLookup;
   /**
-   * Project root. The branding syncer resolves `liquid_template_file`
-   * references against it when inlining templates for hashing and upload.
+   * Project root. The branding syncer resolves `$file` references against it
+   * when inlining templates for hashing and upload.
    */
   cwd: string;
 }): ReadonlyArray<ResourceSyncer> {
@@ -238,7 +236,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
  * edit publishes a new revision via `POST /branding`, no update or delete.
  * Unlike schemas, nothing references branding revisions, so a revise never
  * triggers re-pinning. The descriptor keeps the template in a sibling
- * `.liquid` file (`liquid_template_file`); this syncer inlines it for
+ * `.liquid` file behind a `$file` reference; this syncer inlines it for
  * hashing and upload and splits it back out on write-back.
  */
 class BrandingSyncer implements ResourceSyncer {
@@ -269,6 +267,7 @@ class BrandingSyncer implements ResourceSyncer {
    * cannot run (its save gate is lexical; see ADR 040).
    */
   validate(data: object): void {
+    assertNoLegacyTemplateKey(data);
     const result = brandingConfigSchema.safeParse(data);
     if (!result.success) {
       throw new ZitadelError("E_VALIDATION", "Branding file is not a valid branding descriptor", {
@@ -324,15 +323,10 @@ class BrandingSyncer implements ResourceSyncer {
   }
 
   private canonicalToLocal(canonicalWire: object, localData: object): object {
-    const local = localData as { liquid_template_file?: unknown };
-    const template = (canonicalWire as { liquid_template?: unknown }).liquid_template;
-    if (typeof local.liquid_template_file === "string" && typeof template === "string") {
-      const path = resolveTemplatePath(this.cwd, local.liquid_template_file);
-      if (readDescriptorTemplate(this.cwd, localData) !== template) {
-        writeFileSync(path, template);
-        consola.info(`Updated ${local.liquid_template_file} from the server's canonical response`);
-      }
+    const { document, written } = toLocalBrandingBody(this.cwd, canonicalWire, localData);
+    for (const ref of written) {
+      consola.info(`Updated ${ref} from the server's canonical response`);
     }
-    return toLocalBrandingBody(canonicalWire, localData);
+    return document;
   }
 }

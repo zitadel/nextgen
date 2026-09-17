@@ -241,7 +241,7 @@ describe("annotateAssetWarnings", () => {
 
   it("ignores descriptors without asset URLs and non-branding resources", async () => {
     const actions: SyncAction[] = [
-      ...reviseBranding({ layout: "split", liquid_template_file: "./login.liquid" }),
+      ...reviseBranding({ layout: "split", liquid_template: { $file: "./login.liquid" } }),
       {
         kind: "create",
         path: ".zitadel/flows/default.json",

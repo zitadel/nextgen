@@ -24884,7 +24884,7 @@ type IdpResponse struct {
 	ID string `json:"id"`
 	// The id of the revision this row holds, pinned by auth attempts and
 	// releases. `GET /idps/{id}` and the query return the newest one;
-	// `GET /idps/revisions/{revision_id}` returns the one named.
+	// `GET /idps/revisions/{revision_id}` returns the requested revision.
 	RevisionID string `json:"revision_id"`
 	// The identifier by which user schemas and flow definitions reference the
 	// connection. Fixed for the life of the connection.
