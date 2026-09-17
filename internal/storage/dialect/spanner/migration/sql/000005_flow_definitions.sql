@@ -22,8 +22,21 @@ CREATE INDEX idx_flow_definitions_project_status
     ON flow_definitions (project_id, status)
 -- +goose StatementEnd
 
+-- Revisions of one flow share its name and are ordered by created_at, so at
+-- most one may carry a given timestamp: a collision has no determinate winner
+-- and must fail loudly instead. The index is also the seek the latest-revision
+-- anti-join in ListFlowDefinitions uses. name is NOT NULL, so no NULL_FILTERED
+-- is needed here.
+-- +goose StatementBegin
+CREATE UNIQUE INDEX idx_flow_definitions_name_revision
+    ON flow_definitions (project_id, name, created_at)
+-- +goose StatementEnd
+
 -- +goose Down
 -- +goose NO TRANSACTION
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_flow_definitions_name_revision
+-- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_flow_definitions_project_status
 -- +goose StatementEnd

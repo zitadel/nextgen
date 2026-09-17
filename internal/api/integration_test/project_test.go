@@ -157,6 +157,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 				database.Equal(database.Col(domain.FlowDefinitionFieldName), "default-login"),
 			),
 		},
+		service.FlowDefinitionQueryOptions{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, listed)
@@ -226,6 +227,7 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 				database.Equal(database.Col(domain.FlowDefinitionFieldName), "default-login"),
 			),
 		},
+		service.FlowDefinitionQueryOptions{},
 	)
 	require.NoError(t, err)
 	if listed != nil {

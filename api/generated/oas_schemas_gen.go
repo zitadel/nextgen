@@ -8392,6 +8392,7 @@ type CreateFlowDefinitionErrorResponse struct {
 	FlowdefInvalid           FlowdefInvalid
 	FlowdefNotFound          FlowdefNotFound
 	FlowdefPermissionDenied  FlowdefPermissionDenied
+	FlowdefRevisionConflict  FlowdefRevisionConflict
 	Internal                 Internal
 	SchNotFound              SchNotFound
 	ReqInvalid               ReqInvalid
@@ -8408,6 +8409,7 @@ const (
 	FlowdefInvalidCreateFlowDefinitionErrorResponse           CreateFlowDefinitionErrorResponseType = "flowdef.invalid"
 	FlowdefNotFoundCreateFlowDefinitionErrorResponse          CreateFlowDefinitionErrorResponseType = "flowdef.not_found"
 	FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse  CreateFlowDefinitionErrorResponseType = "flowdef.permission_denied"
+	FlowdefRevisionConflictCreateFlowDefinitionErrorResponse  CreateFlowDefinitionErrorResponseType = "flowdef.revision_conflict"
 	InternalCreateFlowDefinitionErrorResponse                 CreateFlowDefinitionErrorResponseType = "internal"
 	SchNotFoundCreateFlowDefinitionErrorResponse              CreateFlowDefinitionErrorResponseType = "sch.not_found"
 	ReqInvalidCreateFlowDefinitionErrorResponse               CreateFlowDefinitionErrorResponseType = "req.invalid"
@@ -8437,6 +8439,11 @@ func (s CreateFlowDefinitionErrorResponse) IsFlowdefNotFound() bool {
 // IsFlowdefPermissionDenied reports whether CreateFlowDefinitionErrorResponse is FlowdefPermissionDenied.
 func (s CreateFlowDefinitionErrorResponse) IsFlowdefPermissionDenied() bool {
 	return s.Type == FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefRevisionConflict reports whether CreateFlowDefinitionErrorResponse is FlowdefRevisionConflict.
+func (s CreateFlowDefinitionErrorResponse) IsFlowdefRevisionConflict() bool {
+	return s.Type == FlowdefRevisionConflictCreateFlowDefinitionErrorResponse
 }
 
 // IsInternal reports whether CreateFlowDefinitionErrorResponse is Internal.
@@ -8561,6 +8568,27 @@ func (s CreateFlowDefinitionErrorResponse) GetFlowdefPermissionDenied() (v Flowd
 func NewFlowdefPermissionDeniedCreateFlowDefinitionErrorResponse(v FlowdefPermissionDenied) CreateFlowDefinitionErrorResponse {
 	var s CreateFlowDefinitionErrorResponse
 	s.SetFlowdefPermissionDenied(v)
+	return s
+}
+
+// SetFlowdefRevisionConflict sets CreateFlowDefinitionErrorResponse to FlowdefRevisionConflict.
+func (s *CreateFlowDefinitionErrorResponse) SetFlowdefRevisionConflict(v FlowdefRevisionConflict) {
+	s.Type = FlowdefRevisionConflictCreateFlowDefinitionErrorResponse
+	s.FlowdefRevisionConflict = v
+}
+
+// GetFlowdefRevisionConflict returns FlowdefRevisionConflict and true boolean if CreateFlowDefinitionErrorResponse is FlowdefRevisionConflict.
+func (s CreateFlowDefinitionErrorResponse) GetFlowdefRevisionConflict() (v FlowdefRevisionConflict, ok bool) {
+	if !s.IsFlowdefRevisionConflict() {
+		return v, false
+	}
+	return s.FlowdefRevisionConflict, true
+}
+
+// NewFlowdefRevisionConflictCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from FlowdefRevisionConflict.
+func NewFlowdefRevisionConflictCreateFlowDefinitionErrorResponse(v FlowdefRevisionConflict) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetFlowdefRevisionConflict(v)
 	return s
 }
 
@@ -19542,6 +19570,59 @@ func (s *FlowdefPurposeMismatchDetails) init() FlowdefPurposeMismatchDetails {
 
 // Merged schema.
 // Ref: #
+type FlowdefRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefRevisionConflict) GetDetails() OptFlowdefRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefRevisionConflict) SetDetails(val OptFlowdefRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefRevisionConflictDetails map[string]jx.Raw
+
+func (s *FlowdefRevisionConflictDetails) init() FlowdefRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type FlowdefSchemaFetchFailed struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -24787,6 +24868,47 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 		return nil
 	case ListFlowDefinitionsPurposeLinkAccount:
 		*s = ListFlowDefinitionsPurposeLinkAccount
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ListFlowDefinitionsRevisions string
+
+const (
+	ListFlowDefinitionsRevisionsAll    ListFlowDefinitionsRevisions = "all"
+	ListFlowDefinitionsRevisionsLatest ListFlowDefinitionsRevisions = "latest"
+)
+
+// AllValues returns all ListFlowDefinitionsRevisions values.
+func (ListFlowDefinitionsRevisions) AllValues() []ListFlowDefinitionsRevisions {
+	return []ListFlowDefinitionsRevisions{
+		ListFlowDefinitionsRevisionsAll,
+		ListFlowDefinitionsRevisionsLatest,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListFlowDefinitionsRevisions) MarshalText() ([]byte, error) {
+	switch s {
+	case ListFlowDefinitionsRevisionsAll:
+		return []byte(s), nil
+	case ListFlowDefinitionsRevisionsLatest:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListFlowDefinitionsRevisions) UnmarshalText(data []byte) error {
+	switch ListFlowDefinitionsRevisions(data) {
+	case ListFlowDefinitionsRevisionsAll:
+		*s = ListFlowDefinitionsRevisionsAll
+		return nil
+	case ListFlowDefinitionsRevisionsLatest:
+		*s = ListFlowDefinitionsRevisionsLatest
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -30160,6 +30282,52 @@ func (o OptFlowdefPurposeMismatchDetails) Or(d FlowdefPurposeMismatchDetails) Fl
 	return d
 }
 
+// NewOptFlowdefRevisionConflictDetails returns new OptFlowdefRevisionConflictDetails with value set to v.
+func NewOptFlowdefRevisionConflictDetails(v FlowdefRevisionConflictDetails) OptFlowdefRevisionConflictDetails {
+	return OptFlowdefRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefRevisionConflictDetails is optional FlowdefRevisionConflictDetails.
+type OptFlowdefRevisionConflictDetails struct {
+	Value FlowdefRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefRevisionConflictDetails was set.
+func (o OptFlowdefRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefRevisionConflictDetails) Reset() {
+	var v FlowdefRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefRevisionConflictDetails) SetTo(v FlowdefRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefRevisionConflictDetails) Get() (v FlowdefRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefRevisionConflictDetails) Or(d FlowdefRevisionConflictDetails) FlowdefRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowdefSchemaFetchFailedDetails returns new OptFlowdefSchemaFetchFailedDetails with value set to v.
 func NewOptFlowdefSchemaFetchFailedDetails(v FlowdefSchemaFetchFailedDetails) OptFlowdefSchemaFetchFailedDetails {
 	return OptFlowdefSchemaFetchFailedDetails{
@@ -30844,6 +31012,52 @@ func (o OptListFlowDefinitionsPurpose) Get() (v ListFlowDefinitionsPurpose, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListFlowDefinitionsPurpose) Or(d ListFlowDefinitionsPurpose) ListFlowDefinitionsPurpose {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListFlowDefinitionsRevisions returns new OptListFlowDefinitionsRevisions with value set to v.
+func NewOptListFlowDefinitionsRevisions(v ListFlowDefinitionsRevisions) OptListFlowDefinitionsRevisions {
+	return OptListFlowDefinitionsRevisions{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListFlowDefinitionsRevisions is optional ListFlowDefinitionsRevisions.
+type OptListFlowDefinitionsRevisions struct {
+	Value ListFlowDefinitionsRevisions
+	Set   bool
+}
+
+// IsSet returns true if OptListFlowDefinitionsRevisions was set.
+func (o OptListFlowDefinitionsRevisions) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListFlowDefinitionsRevisions) Reset() {
+	var v ListFlowDefinitionsRevisions
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListFlowDefinitionsRevisions) SetTo(v ListFlowDefinitionsRevisions) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListFlowDefinitionsRevisions) Get() (v ListFlowDefinitionsRevisions, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListFlowDefinitionsRevisions) Or(d ListFlowDefinitionsRevisions) ListFlowDefinitionsRevisions {
 	if v, ok := o.Get(); ok {
 		return v
 	}
