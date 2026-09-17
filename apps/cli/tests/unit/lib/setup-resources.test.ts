@@ -300,7 +300,7 @@ describe("materializeSetupResources branding design", () => {
       await readFile(join(cwd, DEFAULT_BRANDING_CONFIG_PATH), "utf8"),
     ) as Record<string, unknown>;
     expect(descriptor.$schema).toBe("../meta/branding.json");
-    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     const template = await readFile(join(cwd, DEFAULT_BRANDING_TEMPLATE_PATH), "utf8");
     expect(template).toBe(getDefaultBrandingConfig("split").template);

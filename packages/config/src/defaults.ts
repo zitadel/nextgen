@@ -90,7 +90,8 @@ export type DefaultBrandingConfig = {
   /** The `.zitadel/branding/branding.json` descriptor body (sans `$schema`). */
   branding: {
     layout: "centered" | "split";
-    liquid_template_file: string;
+    /** A `$file` reference to the sibling template; the CLI inlines it before publishing. */
+    liquid_template: { $file: string };
   };
   /** The `.zitadel/branding/login.liquid` template content. */
   template: string;
@@ -113,7 +114,7 @@ export function getDefaultBrandingConfig(
   return {
     branding: {
       layout: DESIGN_LAYOUTS[known],
-      liquid_template_file: "./login.liquid",
+      liquid_template: { $file: "./login.liquid" },
     },
     template: readFileSync(packageFilePath(`../defaults/branding/${known}/login.liquid`), "utf8"),
   };

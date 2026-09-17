@@ -9,7 +9,16 @@ import { brandingConfigSchema } from "./schemas.js";
  * sanitiser — a descriptor plan accepts must never be one apply rejects.
  */
 describe("brandingConfigSchema", () => {
-  const base = { layout: "split", liquid_template_file: "./login.liquid" };
+  const base = { layout: "split", liquid_template: { $file: "./login.liquid" } };
+
+  it("accepts the template inline or as a $file reference, and rejects the old key", () => {
+    const parses = (descriptor: object): boolean =>
+      brandingConfigSchema.safeParse(descriptor).success;
+    expect(parses({ layout: "split", liquid_template: "<p></p>" })).toBe(true);
+    expect(parses(base)).toBe(true);
+    expect(parses({ layout: "split", liquid_template: { $file: "" } })).toBe(false);
+    expect(parses({ layout: "split", liquid_template_file: "./login.liquid" })).toBe(false);
+  });
 
   it("accepts a descriptor with https asset URLs", () => {
     const result = brandingConfigSchema.safeParse({
@@ -19,6 +28,17 @@ describe("brandingConfigSchema", () => {
       hero_url: "https://cdn.example.com/hero.png",
     });
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it("measures asset URL length in bytes, like the server", () => {
+    const prefix = "https://cdn.example.com/";
+    const atLimit = `${prefix}${"a".repeat(2048 - prefix.length)}`;
+    // 1124 characters, but "é" is two bytes in UTF-8, so 2224 bytes.
+    const multiByte = `${prefix}${"é".repeat(1100)}`;
+    expect(brandingConfigSchema.safeParse({ ...base, logo_url: atLimit }).success).toBe(true);
+    const result = brandingConfigSchema.safeParse({ ...base, logo_url: multiByte });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("2048 bytes");
   });
 
   it("rejects non-loopback http asset URLs", () => {
@@ -161,10 +181,13 @@ describe("brandingConfigSchema", () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
-  it("rejects unknown keys and double template carriers", () => {
+  it("rejects unknown keys, including inside a $file reference", () => {
     expect(brandingConfigSchema.safeParse({ ...base, hero_urll: "x" }).success).toBe(false);
     expect(
-      brandingConfigSchema.safeParse({ ...base, liquid_template: "<zl-card></zl-card>" }).success,
+      brandingConfigSchema.safeParse({
+        ...base,
+        liquid_template: { $file: "./login.liquid", extra: 1 },
+      }).success,
     ).toBe(false);
   });
 });
