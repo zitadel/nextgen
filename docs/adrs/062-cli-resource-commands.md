@@ -362,9 +362,6 @@ Recorded here because §14 makes them the API's problem, not the CLI's:
 - No endpoint fetches a schema by object type or a flow by name, so §12
   resolves those with a filtered list and a rule about how ids look. A route
   such as `GET /schemas/by-object-type/{objectType}` would remove the rule.
-- Flow definitions have no `revisions` parameter, so their list is still a
-  history while `schemas` shows the current ones. Adding it makes the two
-  consistent, and the CLI then needs one line per resource.
 - `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
   accepted ADR names the command; this one produces a different spelling for
   the same data. It needs one owner's decision, not two documents.

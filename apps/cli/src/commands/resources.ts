@@ -445,10 +445,16 @@ export const RESOURCES = {
       filters: [
         { field: "name", operations: ["equals"] },
         { field: "purpose", operations: ["equals"] },
+        {
+          field: "revisions",
+          operations: ["equals"],
+          values: ["all", "latest"],
+          // Publishing under an existing name mints a new row (#1246), so the
+          // unfiltered list is a history of the same flows. Same reasoning as
+          // `schemas`: a bare list is the current flows.
+          default: "latest",
+        },
       ],
-      // No `revisions` parameter here yet, so the unfiltered list is still a
-      // history. When the API gains one, this takes `default: "latest"` on a
-      // `revisions` field exactly as `schemas` does.
       call: ({ client, projectId }, params) =>
         client.listFlowDefinitions({
           ...params,

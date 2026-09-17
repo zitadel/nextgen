@@ -1306,3 +1306,38 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     expect(json.data.id).toBe("flowdef_9");
   });
 });
+
+describe("flow definitions list the current flows", () => {
+  // #1246 added `revisions` to GET /flow_definitions, so flows now behave like
+  // schemas: a bare list is the current flows, not every revision of each.
+  it("sends revisions=latest when the caller does not say", async () => {
+    const cwd = await makeProject();
+    let url: URL | undefined;
+    server.use(
+      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json({ flow_definitions: [] });
+      }),
+    );
+
+    const res = await run(cwd, ["flow-definitions", "list"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(url?.searchParams.get("revisions")).toBe("latest");
+  });
+
+  it("still gives the full history when asked", async () => {
+    const cwd = await makeProject();
+    let url: URL | undefined;
+    server.use(
+      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json({ flow_definitions: [] });
+      }),
+    );
+
+    await run(cwd, ["flow-definitions", "list", "--filter", "revisions=all"]);
+
+    expect(url?.searchParams.get("revisions")).toBe("all");
+  });
+});
