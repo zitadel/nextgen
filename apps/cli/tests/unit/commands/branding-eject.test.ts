@@ -58,7 +58,7 @@ describe("branding eject", () => {
     ) as Record<string, unknown>;
     expect(descriptor.$schema).toBe("../meta/branding.json");
     expect(descriptor.layout).toBe("centered");
-    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     const template = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
     expect(template).toBe(getDefaultBrandingConfig("centered").template);
