@@ -121,8 +121,7 @@ func TestParseConnection(t *testing.T) {
 				"protocol": "oidc",
 				"display_name": "Google"
 			}`,
-			wantErr:      domain.ErrIDPProtocolBlockMissing(nil),
-			wantCauseMsg: "protocol is oidc but the oidc block is absent",
+			wantErr: domain.ErrIDPProtocolBlockMissing("oidc"),
 		},
 		{
 			name: "scopes without openid are rejected",
@@ -153,8 +152,7 @@ func TestParseConnection(t *testing.T) {
 					"scopes": ["openid"]
 				}
 			}`,
-			wantErr:      domain.ErrIDPEndpointCleartext(nil),
-			wantCauseMsg: "token_endpoint is not an https endpoint",
+			wantErr: domain.ErrIDPEndpointCleartext("token_endpoint"),
 		},
 		{
 			name: "an oauth2 body is refused",

@@ -32,18 +32,24 @@ func ErrIDPDiscoveryFailed(cause error) Error {
 
 // The following errors re-check at the start of an attempt what the schema enforced at
 // write time (defense in depth). Each is a distinct kind, so the log names
-// the rule; the user sees the generic misconfigured-provider error.
+// the rule; the user sees the generic misconfigured-provider error. The
+// messages name schema fields, never values.
 
-func ErrIDPProtocolBlockMissing(cause error) Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("protocol_block_missing"), "identity provider connection: the protocol block is missing", nil, cause)
+// ErrIDPProtocolBlockMissing reports a document whose protocol names a block
+// the document does not carry. protocol is the schema enum value.
+func ErrIDPProtocolBlockMissing(protocol string) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("protocol_block_missing"), "identity provider connection: the "+protocol+" block is missing", nil, nil)
 }
 
 func ErrIDPScopesMissingOpenID() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("scopes_missing_openid"), "identity provider connection: OIDC scopes must contain openid", nil, nil)
 }
 
-func ErrIDPEndpointCleartext(cause error) Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoint_cleartext"), "identity provider connection: endpoints must use https", nil, cause)
+// ErrIDPEndpointCleartext names the endpoint field that is not https. The
+// field name is schema vocabulary, not tenant data, so it may show; the URL
+// itself never does.
+func ErrIDPEndpointCleartext(field string) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoint_cleartext"), "identity provider connection: "+field+" is not an https endpoint", nil, nil)
 }
 
 // ErrIDPOAuth2Unsupported refuses a stored oauth2 connection: the schema

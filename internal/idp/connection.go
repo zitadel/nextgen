@@ -2,7 +2,6 @@ package idp
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -65,7 +64,7 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 		return Connection{}, domain.ErrInternal(fmt.Errorf("unknown protocol %q", stored.Protocol))
 	}
 	if stored.OIDC == nil {
-		return Connection{}, domain.ErrIDPProtocolBlockMissing(fmt.Errorf("protocol is oidc but the oidc block is absent"))
+		return Connection{}, domain.ErrIDPProtocolBlockMissing("oidc")
 	}
 	oidc := stored.OIDC
 	if !slices.Contains(oidc.Scopes, "openid") {
@@ -107,22 +106,22 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 }
 
 // requireTLS re-checks the schema's endpoint pattern on every endpoint the
-// block sets. The cause names the offending field, never a URL.
+// block sets. The error names the offending field, never a URL.
 func requireTLS(oidc *oidcBody) error {
 	if !validEndpoint(oidc.Issuer) {
-		return domain.ErrIDPEndpointCleartext(errors.New("issuer is not an https endpoint"))
+		return domain.ErrIDPEndpointCleartext("issuer")
 	}
 	if !validEndpoint(oidc.JWKSURI) {
-		return domain.ErrIDPEndpointCleartext(errors.New("jwks_uri is not an https endpoint"))
+		return domain.ErrIDPEndpointCleartext("jwks_uri")
 	}
 	if !validEndpoint(oidc.AuthorizationEndpoint) {
-		return domain.ErrIDPEndpointCleartext(errors.New("authorization_endpoint is not an https endpoint"))
+		return domain.ErrIDPEndpointCleartext("authorization_endpoint")
 	}
 	if !validEndpoint(oidc.TokenEndpoint) {
-		return domain.ErrIDPEndpointCleartext(errors.New("token_endpoint is not an https endpoint"))
+		return domain.ErrIDPEndpointCleartext("token_endpoint")
 	}
 	if !validEndpoint(oidc.UserinfoEndpoint) {
-		return domain.ErrIDPEndpointCleartext(errors.New("userinfo_endpoint is not an https endpoint"))
+		return domain.ErrIDPEndpointCleartext("userinfo_endpoint")
 	}
 	return nil
 }
