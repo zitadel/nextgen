@@ -4498,6 +4498,7 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 }
 
 func (*AuthUnauthorized) completeClaimRes()   {}
+func (*AuthUnauthorized) listMyProjectsRes()  {}
 func (*AuthUnauthorized) revokeMySessionRes() {}
 
 // Additional error-specific context.
@@ -24913,6 +24914,224 @@ func (s *ListFlowDefinitionsRevisions) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+type ListMyProjectsBadRequest ErrorDetails
+
+func (*ListMyProjectsBadRequest) listMyProjectsRes() {}
+
+// ListMyProjectsErrorResponse represents sum type.
+type ListMyProjectsErrorResponse struct {
+	Type             ListMyProjectsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+	SessTokenInvalid SessTokenInvalid
+}
+
+// ListMyProjectsErrorResponseType is oneOf type of ListMyProjectsErrorResponse.
+type ListMyProjectsErrorResponseType string
+
+// Possible values for ListMyProjectsErrorResponseType.
+const (
+	AuthUnauthorizedListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "auth.unauthorized"
+	InternalListMyProjectsErrorResponse         ListMyProjectsErrorResponseType = "internal"
+	ReqInvalidListMyProjectsErrorResponse       ListMyProjectsErrorResponseType = "req.invalid"
+	SessTokenInvalidListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "sess.token_invalid"
+)
+
+// IsAuthUnauthorized reports whether ListMyProjectsErrorResponse is AuthUnauthorized.
+func (s ListMyProjectsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyProjectsErrorResponse
+}
+
+// IsInternal reports whether ListMyProjectsErrorResponse is Internal.
+func (s ListMyProjectsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyProjectsErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyProjectsErrorResponse is ReqInvalid.
+func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyProjectsErrorResponse
+}
+
+// IsSessTokenInvalid reports whether ListMyProjectsErrorResponse is SessTokenInvalid.
+func (s ListMyProjectsErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidListMyProjectsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyProjectsErrorResponse to AuthUnauthorized.
+func (s *ListMyProjectsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyProjectsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyProjectsErrorResponse is AuthUnauthorized.
+func (s ListMyProjectsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyProjectsErrorResponse(v AuthUnauthorized) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyProjectsErrorResponse to Internal.
+func (s *ListMyProjectsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyProjectsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyProjectsErrorResponse is Internal.
+func (s ListMyProjectsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from Internal.
+func NewInternalListMyProjectsErrorResponse(v Internal) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyProjectsErrorResponse to ReqInvalid.
+func (s *ListMyProjectsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyProjectsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyProjectsErrorResponse is ReqInvalid.
+func (s ListMyProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from ReqInvalid.
+func NewReqInvalidListMyProjectsErrorResponse(v ReqInvalid) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessTokenInvalid sets ListMyProjectsErrorResponse to SessTokenInvalid.
+func (s *ListMyProjectsErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidListMyProjectsErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if ListMyProjectsErrorResponse is SessTokenInvalid.
+func (s ListMyProjectsErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidListMyProjectsErrorResponse(v SessTokenInvalid) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetSessTokenInvalid(v)
+	return s
+}
+
+// ListMyProjectsErrorResponseStatusCode wraps ListMyProjectsErrorResponse with StatusCode.
+type ListMyProjectsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyProjectsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyProjectsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyProjectsErrorResponseStatusCode) GetResponse() ListMyProjectsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyProjectsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyProjectsErrorResponseStatusCode) SetResponse(val ListMyProjectsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyProjectsErrorResponseStatusCode) listMyProjectsRes() {}
+
+type ListMyProjectsInternalServerError ErrorDetails
+
+func (*ListMyProjectsInternalServerError) listMyProjectsRes() {}
+
+// Paginated list of projects, ordered by project id.
+// Ref: #
+type ListMyProjectsResponse struct {
+	Projects []ProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Present when the page was full. A following request may return an empty page
+	// and no token, which ends the listing.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *ListMyProjectsResponse) GetProjects() []ProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListMyProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *ListMyProjectsResponse) SetProjects(val []ProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListMyProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+// ListMyProjectsResponseHeaders wraps ListMyProjectsResponse with response headers.
+type ListMyProjectsResponseHeaders struct {
+	CacheControl OptString
+	Response     ListMyProjectsResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListMyProjectsResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyProjectsResponseHeaders) GetResponse() ListMyProjectsResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListMyProjectsResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) {
+	s.Response = val
+}
+
+func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {

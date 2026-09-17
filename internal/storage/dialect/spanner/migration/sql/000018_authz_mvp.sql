@@ -242,6 +242,14 @@ CREATE INDEX idx_authz_assignments_principal_project
     ON authz_assignments (project_id, principal_type, principal_id)
 -- +goose StatementEnd
 
+-- ADR 053 §6: authorized-projects discovery starts from the principal and has
+-- no project to anchor on, so the project column comes last here. Spanner has no
+-- partial indexes, so revoked rows stay indexed and the query filters them.
+-- +goose StatementBegin
+CREATE INDEX idx_authz_assignments_principal
+    ON authz_assignments (principal_type, principal_id, project_id)
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 CREATE NULL_FILTERED INDEX idx_authz_assignments_delegation
     ON authz_assignments (project_id, delegation_id)
@@ -380,6 +388,9 @@ DROP INDEX authz_assignments_unique_active
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX idx_authz_assignments_delegation
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX idx_authz_assignments_principal
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX idx_authz_assignments_principal_project
