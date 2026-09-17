@@ -104,6 +104,8 @@ paths:
     $ref: endpoints/users/by_id/teams/methods.yaml
   /users/me:
     $ref: endpoints/users/me/methods.yaml
+  /users/me/projects:
+    $ref: endpoints/users/me/projects/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml
   /flow/{id}:

@@ -68,6 +68,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("teams", func(t *testing.T) { battleTeams(t, d) })
 		t.Run("grants", func(t *testing.T) { battleGrants(t, d) })
 		t.Run("grants_expires_at", func(t *testing.T) { battleGrantsExpiresAt(t, d) })
+		t.Run("authorized_projects", func(t *testing.T) { battleAuthorizedProjects(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
@@ -156,6 +157,21 @@ func battleGrants(t *testing.T, d dialect) {
 			Pagination: page,
 		})
 	}, func(a *domain.AuthzAssignment) string { return a.ID }, 2)
+}
+
+func battleAuthorizedProjects(t *testing.T, d dialect) {
+	t.Helper()
+	u := seedAuthorizedUser(t, d.stmts)
+	want := make([]string, 0, 5)
+	for range 5 {
+		customer := ensureProject(t, d.stmts)
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(customer, u.teamID)))
+		want = append(want, customer)
+	}
+	slices.Sort(want)
+	drainIncarnation(t, want, authorizedProjectsOrderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, page)
+	}, func(p *domain.Project) string { return p.ID }, 2)
 }
 
 // battleGrantsExpiresAt pages a mix of nil and set expires_at values sorted by
@@ -410,7 +426,7 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 		return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: filter, Pagination: page,
-		})
+		}, service.FlowDefinitionQueryOptions{})
 	}, func(def *domain.FlowDefinition) string { return def.ID }, 2)
 
 	t.Run("default_order", func(t *testing.T) {
@@ -418,7 +434,7 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 			return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.FlowDefinitionField]{Limit: 2, Cursor: cursor},
-			})
+			}, service.FlowDefinitionQueryOptions{})
 		}, func(def *domain.FlowDefinition) string { return def.ID })
 		assertDrainMatch(t, want, got)
 	})
