@@ -13,12 +13,10 @@ const PLUGIN_SUMMARIES: Readonly<Record<string, string>> = {
   version: "Show the CLI version",
 };
 
-const DOCS_URL = "https://zitadel.com/docs";
-
 /**
  * Root help in the style of `gh --help`: a tagline, usage, the commands under
  * headed groups with oclif's utilities last, then flags, examples, and where
- * to learn more. Only {@link showRootHelp} is replaced; per-command and
+ * to go next. Only {@link showRootHelp} is replaced; per-command and
  * per-topic help (`start --help`, `schemas --help`) stay oclif's own. Wired
  * in via `oclif.helpClass` in `package.json`.
  */
@@ -56,10 +54,7 @@ export default class ZitadelHelp extends Help {
       ),
       this.section(
         "Learn more",
-        [
-          `Use \`${bin} <command> --help\` for more information about a command.`,
-          `Read the manual at ${DOCS_URL}`,
-        ].join("\n"),
+        `Use \`${bin} <command> --help\` for more information about a command.`,
       ),
     ];
     this.log(sections.join("\n\n"));

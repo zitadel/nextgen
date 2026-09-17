@@ -52,7 +52,6 @@ Examples
 
 Learn more
   Use \`zitadel <command> --help\` for more information about a command.
-  Read the manual at https://zitadel.com/docs
 `;
 
 /**
