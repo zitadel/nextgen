@@ -28,7 +28,7 @@ import {
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
 import {
   createOrca,
@@ -108,6 +108,8 @@ const RENDERER_FLAG_DESCRIPTION =
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> setup --framework next",
     "<%= config.bin %> setup --framework react --dev-port 3000",

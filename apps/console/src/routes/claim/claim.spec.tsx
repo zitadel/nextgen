@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { makeTestSession } from "../../auth/session.fixture";
 import { createAppRouter } from "../../router";
+import { resetClaimAttemptsForTests } from "./index";
 
 /**
  * The claim page (#615): `claim/init` hands the CLI a URL of the form
@@ -64,6 +65,10 @@ afterAll(() => server.close());
 
 beforeEach(() => {
   fetchSession.mockReset();
+  // The spend gate outlives a mount by design, and every case here claims the
+  // same URL, so without this each test would replay the previous one's
+  // outcome instead of calling the server.
+  resetClaimAttemptsForTests();
   // The widget renders only when a project id resolves (ADR 0004 §§2–3);
   // pin the dev override so the unauthenticated branch exercises it.
   vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
@@ -76,8 +81,8 @@ afterEach(() => {
 
 async function renderAt(path: string) {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
-  render(<RouterProvider router={router} />);
-  return router;
+  const { unmount } = render(<RouterProvider router={router} />);
+  return { router, unmount };
 }
 
 /** Answers the countdown read with a window closing `days` from now. */
@@ -139,6 +144,44 @@ describe("claim page", () => {
     // CLI picks the claim up on its own without being told to.
     expect(screen.getByRole("link", { name: "Open the console" })).toBeInTheDocument();
     expect(screen.queryByText(/terminal/i)).not.toBeInTheDocument();
+  });
+
+  // The gap the in-component ref cannot cover: a fresh mount gets a fresh ref.
+  // The page was observed mounting twice on the way back from the sign-in
+  // widget, and the second mount re-spent a challenge the first had completed
+  // -- which the server refuses with 409 by contract, replacing the success
+  // already on screen with "Already claimed".
+  it("spends the challenge once across a remount, keeping the success", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    let calls = 0;
+    server.use(
+      http.post(COMPLETE_PATTERN, () => {
+        calls += 1;
+        // The second spend answers exactly as the server does.
+        return calls === 1
+          ? HttpResponse.json({
+              project_id: PROJECT_ID,
+              team_id: "team_personal",
+              claimed_at: "2026-08-24T10:00:00Z",
+            })
+          : HttpResponse.json(
+              {
+                code: "proj-already_claimed",
+                message: "The project is already claimed by a team.",
+                details: { team_id: "team_personal" },
+              },
+              { status: 409 },
+            );
+      }),
+    );
+
+    const first = await renderAt(CLAIM_PATH);
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    first.unmount();
+
+    await renderAt(CLAIM_PATH);
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    expect(calls).toBe(1);
   });
 
   it("shows the owning team's dashboard when the project is already claimed", async () => {

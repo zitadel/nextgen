@@ -15,7 +15,8 @@ const telemetryChannel = (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL || "develo
 /**
  * Unbundled, multi-entry build for oclif: each command compiles to its own
  * `dist/commands/<name>.mjs` so oclif can discover and lazy-load them at
- * runtime. `@oclif/*` (core + plugins) stays external — resolved from
+ * runtime, and the root help class to `dist/lib/oclif/help.mjs` for
+ * `oclif.helpClass`. `@oclif/*` (core + plugins) stays external — resolved from
  * node_modules at runtime, never bundled — which is what lets the plugin
  * system work.
  */
@@ -34,6 +35,7 @@ export default defineConfig({
     "commands/status": "src/commands/status.ts",
     "commands/schemas/list": "src/commands/schemas/list.ts",
     "commands/branding/eject": "src/commands/branding/eject.ts",
+    "lib/oclif/help": "src/lib/oclif/help.ts",
   },
   outDir: "dist",
   format: ["esm"],
