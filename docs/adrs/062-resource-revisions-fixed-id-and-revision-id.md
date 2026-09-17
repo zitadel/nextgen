@@ -88,27 +88,25 @@ the resource. It resolves through the kind's list filter.
 
 ### 4. Reads
 
-Get-by-id returns the newest revision of the resource.
+Every resource kind has four reads:
 
-A list takes a `revisions` parameter with two values:
+- The list or query returns each resource once, at its newest revision. It
+  carries no history, so it takes no `revisions` parameter.
+- `GET /<kind>/{id}` returns the resource at its newest revision.
+- `GET /<kind>/{id}/revisions` returns the revisions of one resource.
+- `GET /<kind>/revisions/{revision_id}` returns one revision. A release
+  pointer holds a `revision_id` and no resource id, so this read takes the
+  `revision_id` alone. A prefixed id cannot collide with the literal
+  `revisions`.
 
-- `latest` returns the newest revision of each resource.
-- `all` returns every revision.
+`GET /<kind>/revisions/{revision_id}` is the read a release depends on. When
+a release is created, the release service reads each pinned revision through
+it to check that the revision exists, and ADR 035 tells consumers of a release
+to fetch its content the same way. A kind therefore gets both revision routes
+before it can be pinned by a release.
 
-`latest` is the default for every kind. A list without the `revisions`
-parameter returns the newest revision of each resource of that kind. With
-`revisions=all` it returns every revision. A page token is only valid in the
-mode that issued it: a token from a `latest` request cannot page an `all`
-request, and the other way round. Today `GET /schemas` has both modes with
-`all` as its default (#957), and `POST /idps/query` in #1217 has `latest` as
-its default.
-
-Every kind also has a read by `revision_id`, so a pinned revision can be
-fetched after newer ones exist. Two callers depend on it: the release service
-validates each pointer by reading the revision it names, and ADR 035 tells
-release consumers to fetch content the same way. The read must exist before a
-kind can be pinned by a release. Whether it is a path or a list filter is
-decided per kind in its migration ticket.
+Today `GET /schemas` has a `revisions=all|latest` mode (#957). It is removed
+once the revision routes for schemas exist.
 
 ### 5. References
 
@@ -140,12 +138,13 @@ Prefix tokens are domain constants registered per ADR 047.
 ## Migration
 
 Connections already have the two ids. The three older kinds should adopt this
-as well. Each migration is its own ticket, and each switches the release
-service's pointer validation from get-by-id to the read by `revision_id`:
+as well. Each migration is its own ticket. Each adds the two revision routes
+for its kind and switches the release service's pointer validation from
+get-by-id to `GET /<kind>/revisions/{revision_id}`:
 
 - **Flow definitions.** `id` becomes fixed per `name` and each write allocates
-  a `revision_id`. The list filtered by `name` keeps returning the revisions
-  of one flow.
+  a `revision_id`. The list filtered by `name` returns the newest revision of
+  one flow, and `GET /flow_definitions/{id}/revisions` returns its history.
 - **Schemas.** All revisions of one `objectType` share a fixed `id`, and each
   write allocates a `revision_id`. A document's `$id` URI stays a property of
   the document and is no longer used as the resource id. Rows that are
@@ -154,22 +153,25 @@ service's pointer validation from get-by-id to the read by `revision_id`:
   that reference a schema by its id. A schema stored without an `objectType`
   has nothing to group its revisions by; the ticket decides whether such a
   document is rejected or kept as a resource with one revision. `GET /schemas`
-  changes its default from `all` to `latest`. The CLI `schemas list` command
-  shows the history of one `objectType` and relies on the `all` default today;
-  the ticket adds `revisions=all` to its call.
+  drops its `revisions` mode and returns each schema once. The CLI
+  `schemas list` command shows the history of one `objectType` and relies on
+  the `all` default today; the ticket moves it to
+  `GET /schemas/{id}/revisions`, with the id resolved through the list
+  filtered by `objectType`.
 - **Branding.** `id` becomes fixed per project and each publish allocates a
   `revision_id`.
 
 The existing prefix of each kind names the resource, as `idp_` does for
 connections, and each migration registers a revision prefix. If existing rows
 are carried over, they keep their current id as their `revision_id`. A value
-that a release, a user record or a flow step holds is still found through the
-read by `revision_id`.
-Those holders look the value up with get-by-id today, and the migration ticket
-changes their lookups to the read by `revision_id`. Before the migration a
+that a release, a user record or a flow step holds is still found through
+`GET /<kind>/revisions/{revision_id}`. Those holders look the value up with
+get-by-id today, and the migration ticket changes their lookups to that
+route. Before the migration a
 client that stored `sch_01A` reads it with `GET /schemas/sch_01A`. After it,
 `sch_01A` is a `revision_id`, and get-by-id matches the `id` column only, so
-that call returns not found. The client reads the row by `revision_id` instead.
+that call returns not found. The client reads the row through
+`GET /schemas/revisions/sch_01A` instead.
 
 ## Consequences
 
@@ -179,13 +181,14 @@ that call returns not found. The client reads the row by `revision_id` instead.
   entry per kind.
 - For schemas, flow definitions and branding, get-by-id is the per-revision
   read today, because their `id` names a revision. Once `id` is fixed, each
-  migration ticket adds a distinct read by `revision_id` for its kind.
-  Connections have no per-revision read at all; a follow-up to #1217 adds one.
+  migration ticket adds the two revision routes for its kind. Connections
+  have neither route; a follow-up to #1217 adds them.
 - If existing rows are carried over, ids of schemas, flow definitions and
   branding that a client stored before the migration stop working with
   get-by-id, as described under Migration. The console and the CLI sync read
   such ids with get-by-id today, and each migration ticket changes those calls
-  to the read by `revision_id`. Other clients make the same change themselves.
+  to `GET /<kind>/revisions/{revision_id}`. Other clients make the same change
+  themselves.
 - The ADR 035 example table and its pointer prose are read through this ADR.
   ADR 035 itself changes only by the amendment notes that point here.
 
