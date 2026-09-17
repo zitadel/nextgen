@@ -53,6 +53,7 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
               field: field.field,
               operations: [...field.operations],
               ...(field.values ? { values: [...field.values] } : {}),
+              ...(field.default !== undefined ? { default: field.default } : {}),
               ...(field.combine === "or" ? { combine: "or" } : {}),
             })),
           }

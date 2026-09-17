@@ -57,11 +57,18 @@ holds and never writes them here:
 | `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
 
 Three of these behave differently underneath, and the registry says so rather
-than the caller having to learn it: `schemas list` drains every page because a
-truncated revision history reads as a complete one; `environments get` takes a
-name, because that is what the endpoint addresses; and `branding list` has no
-paging flags at all, because its endpoint has no cursor and answers with a bare
-array.
+than the caller having to learn it. `schemas list` sends `revisions=latest`, so
+it shows the current schemas rather than every revision ever written;
+`--filter revisions=all` gives the history. `environments get` takes a name,
+because that is what the endpoint addresses. `branding list` has no paging
+flags at all, because its endpoint has no cursor and answers with a bare array.
+
+`schemas` and `flow-definitions` are also addressable by the value that groups
+their revisions, so `schemas get human-user` returns the current revision of
+that object type and `flow-definitions get default-login` the newest revision
+of that flow. A prefixed id or a URI is still fetched directly. There is no
+endpoint for either lookup yet, so each entry resolves the reference with one
+filtered list of its own; see ADR 062 §12.
 
 ## Anatomy
 
@@ -113,11 +120,11 @@ The server is resolved exactly as for the other commands (`--server`, `ZITADEL_A
 ## Listing and pagination
 
 - `list` returns **one page**. The server's default page size applies unless
-  `--limit N` (1–100) is given. Two resources declare otherwise: `schemas`
-  drains on a bare invocation, because a truncated revision history reads as a
-  complete one, and still returns a single page when `--limit` or
-  `--page-token` asks for one; `branding` has no paging flags at all, because
-  its endpoint has no cursor.
+  `--limit N` (1–100) is given. `branding` declares otherwise: it has no paging
+  flags at all, because its endpoint has no cursor.
+- A filter field may declare the value sent when the caller does not name it.
+  `schemas` uses this for `revisions`, defaulting to `latest`; naming the field
+  always wins, so `--filter revisions=all` still returns the history.
 - `--page-token T` continues from a previous response; the token is opaque and
   is passed back verbatim.
 - `--all` drains every page in order. It is exclusive with `--page-token`.
