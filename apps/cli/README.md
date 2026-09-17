@@ -743,7 +743,8 @@ FLAGS
                               own columns; `--json` is unaffected.
       --filter=<value>...     Filter as field=operation:value (operation
                               defaults to equals). Fields: name (equals),
-                              purpose (equals).
+                              purpose (equals), revisions (equals; values
+                              all|latest).
       --limit=<value>         Page size (server default 20, max 100).
       --page-token=<value>    Continue from a previous page's next_page_token.
       --plain                 Tab-separated rows with no header, for piping.

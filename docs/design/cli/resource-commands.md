@@ -57,9 +57,9 @@ holds and never writes them here:
 | `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
 
 Three of these behave differently underneath, and the registry says so rather
-than the caller having to learn it. `schemas list` sends `revisions=latest`, so
-it shows the current schemas rather than every revision ever written;
-`--filter revisions=all` gives the history. `environments get` takes a name,
+than the caller having to learn it. `schemas list` and `flow-definitions list` send
+`revisions=latest`, so they show the current schemas and flows rather than
+every revision ever written; `--filter revisions=all` gives the history. `environments get` takes a name,
 because that is what the endpoint addresses. `branding list` has no paging
 flags at all, because its endpoint has no cursor and answers with a bare array.
 
