@@ -332,19 +332,19 @@ describe("local runtime commands", () => {
     expect(dockerCalls).toEqual([["version", "--format", "{{.Server.Version}}"]]);
   });
 
-  it("start hands ZITADEL_* variables from .env.local and .env to the runtime, names only on disk", async () => {
+  it("start hands NEXTGEN_* variables from .env.local and .env to the runtime, names only on disk", async () => {
     const cwd = await tempProject("zitadel-start-env-");
     const fake = await fakeServerBinary();
     const port = await freePort();
     const serverUrl = `http://localhost:${String(port)}`;
     await writeFile(
       join(cwd, ".env.local"),
-      "ZITADEL_GOOGLE_SECRET=canary-local\nUNDECLARED_SECRET=canary-undeclared\n",
+      "NEXTGEN_GOOGLE_SECRET=canary-local\nUNDECLARED_SECRET=canary-undeclared\n",
       "utf8",
     );
     await writeFile(
       join(cwd, ".env"),
-      "ZITADEL_GOOGLE_SECRET=canary-base\nZITADEL_GITHUB_SECRET=canary-github\n",
+      "NEXTGEN_GOOGLE_SECRET=canary-base\nNEXTGEN_GITHUB_SECRET=canary-github\n",
       "utf8",
     );
 
@@ -362,13 +362,13 @@ describe("local runtime commands", () => {
 
     // The child received the ZITADEL_* variables, .env.local first, and
     // nothing else from the files.
-    await expect(childEnv(serverUrl, "ZITADEL_GOOGLE_SECRET")).resolves.toBe("canary-local");
-    await expect(childEnv(serverUrl, "ZITADEL_GITHUB_SECRET")).resolves.toBe("canary-github");
+    await expect(childEnv(serverUrl, "NEXTGEN_GOOGLE_SECRET")).resolves.toBe("canary-local");
+    await expect(childEnv(serverUrl, "NEXTGEN_GITHUB_SECRET")).resolves.toBe("canary-github");
     await expect(childEnv(serverUrl, "UNDECLARED_SECRET")).resolves.toBeUndefined();
 
     // Names only, in the envelope and on disk.
     expect(envelope.data.runtime.env).toEqual({
-      injected: ["ZITADEL_GITHUB_SECRET", "ZITADEL_GOOGLE_SECRET"],
+      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET"],
     });
     expect(result.stdout).not.toContain("canary");
     expect(result.stderr).not.toContain("canary");
@@ -405,7 +405,7 @@ describe("local runtime commands", () => {
     const fake = await fakeDocker({ existingContainerImage: image });
     const serverUrl = await startHealthServer();
     const port = Number(new URL(serverUrl).port);
-    const recorded = { injected: ["ZITADEL_GOOGLE_SECRET"] };
+    const recorded = { injected: ["NEXTGEN_GOOGLE_SECRET"] };
     await writeRuntimeMetadata(cwd, { ...runtimeFor(cwd, serverUrl), image, env: recorded });
 
     const result = await runCliForTest(
@@ -1092,4 +1092,3 @@ async function childEnv(serverUrl: string, name: string): Promise<string | undef
   const response = await fetch(`${serverUrl}/env/${name}`);
   return response.status === 200 ? response.text() : undefined;
 }
-

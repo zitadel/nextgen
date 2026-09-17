@@ -21,7 +21,9 @@ async function projectWith(files: Record<string, string>): Promise<string> {
 
 describe("dev-runtime env", () => {
   it("parses KEY=value lines, comments, quoted values, and a leading BOM", async () => {
-    const cwd = await projectWith({ ".env": "\uFEFF# comment\nA=1\nB=\"two words\"\nC='single'\n" });
+    const cwd = await projectWith({
+      ".env": "\uFEFF# comment\nA=1\nB=\"two words\"\nC='single'\n",
+    });
     await expect(loadEnvFiles(cwd)).resolves.toEqual({ A: "1", B: "two words", C: "single" });
   });
 
@@ -39,23 +41,35 @@ describe("dev-runtime env", () => {
     await expect(loadEnvFiles(await projectWith({}))).resolves.toEqual({});
   });
 
-  it("forwards only ZITADEL_* names, sorted, and never the rest of the files", async () => {
+  it("forwards only NEXTGEN_* names, sorted, and never the rest of the files", async () => {
     const cwd = await projectWith({
-      ".env.local": "ZITADEL_GOOGLE_SECRET=canary\nDATABASE_URL=postgres://nope\nzitadel_lower=no\n",
-      ".env": "ZITADEL_API_KEY=key\nZITADEL_GOOGLE_SECRET=loses\n",
+      ".env.local":
+        "NEXTGEN_GOOGLE_SECRET=canary\nZITADEL_PROJECT_SECRET=app-side\nDATABASE_URL=postgres://nope\nnextgen_lower=no\n",
+      ".env": "NEXTGEN_API_KEY=key\nNEXTGEN_GOOGLE_SECRET=loses\n",
     });
 
     await expect(loadProjectEnv(cwd)).resolves.toEqual({
-      values: { ZITADEL_API_KEY: "key", ZITADEL_GOOGLE_SECRET: "canary" },
-      injected: ["ZITADEL_API_KEY", "ZITADEL_GOOGLE_SECRET"],
+      values: { NEXTGEN_API_KEY: "key", NEXTGEN_GOOGLE_SECRET: "canary" },
+      injected: ["NEXTGEN_API_KEY", "NEXTGEN_GOOGLE_SECRET"],
+    });
+  });
+
+  it("never reads the keys the CLI sets itself at spawn", async () => {
+    const cwd = await projectWith({
+      ".env.local":
+        "NEXTGEN_SERVER_DATA_DIR=/elsewhere\nNEXTGEN_SERVER_ADDRESS=:1\nNEXTGEN_SERVER_PUBLIC_BASE=http://x\nNEXTGEN_OK=1\n",
+    });
+    await expect(loadProjectEnv(cwd)).resolves.toEqual({
+      values: { NEXTGEN_OK: "1" },
+      injected: ["NEXTGEN_OK"],
     });
   });
 
   it("treats an empty value as unset", async () => {
-    const cwd = await projectWith({ ".env.local": "ZITADEL_EMPTY=\nZITADEL_SET=x\n" });
+    const cwd = await projectWith({ ".env.local": "NEXTGEN_EMPTY=\nNEXTGEN_SET=x\n" });
     await expect(loadProjectEnv(cwd)).resolves.toEqual({
-      values: { ZITADEL_SET: "x" },
-      injected: ["ZITADEL_SET"],
+      values: { NEXTGEN_SET: "x" },
+      injected: ["NEXTGEN_SET"],
     });
   });
 

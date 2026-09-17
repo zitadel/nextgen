@@ -1,10 +1,12 @@
 /**
  * Dev-runtime secret join (issue #1049).
  *
- * Secrets the local runtime needs, such as a provider client secret, live in
- * the developer's env files, never in `.zitadel/`. When `zitadel start` spawns
- * the local server it reads `.env.local`, then `.env`, and hands every
- * `ZITADEL_*` variable to the runtime.
+ * The developer's env files configure the local server. When `zitadel start`
+ * spawns it, the CLI reads `.env.local`, then `.env`, and hands every
+ * `NEXTGEN_*` variable to the runtime: that is the server's own configuration
+ * namespace (`server.data_dir` is `NEXTGEN_SERVER_DATA_DIR`, and so on). The
+ * three keys the CLI sets itself, address, data dir and public base, are not
+ * read from the files at all.
  *
  * Only that prefix crosses into the runtime; everything else in the env files
  * stays on disk. Values travel through the child's environment, never argv,
@@ -20,8 +22,15 @@ import { isObject } from "../json";
 /** Highest priority first. */
 export const ENV_FILES = [".env.local", ".env"] as const;
 
-/** Variables handed to the runtime: the `ZITADEL_` prefix, upper-case. */
-export const ENV_PREFIX = "ZITADEL_";
+/** Variables handed to the runtime: the server's config prefix, upper-case. */
+export const ENV_PREFIX = "NEXTGEN_";
+
+/** Keys the CLI sets itself at spawn; a file may not set them, so they are not read. */
+const CLI_OWNED = new Set([
+  "NEXTGEN_SERVER_ADDRESS",
+  "NEXTGEN_SERVER_DATA_DIR",
+  "NEXTGEN_SERVER_PUBLIC_BASE",
+]);
 
 /** What `runtime.json` and the `start`/`status` envelopes record: names only. */
 export type EnvSummary = Readonly<{ injected: readonly string[] }>;
@@ -68,14 +77,14 @@ const readEnvFile = (path: string): Promise<Readonly<Record<string, string>>> =>
   );
 
 /**
- * The `ZITADEL_*` variables from the project's env files, ready to hand to a
+ * The `NEXTGEN_*` variables from the project's env files, ready to hand to a
  * runtime. `start` calls this before it stops or spawns anything, so an
  * unreadable file fails fast and leaves a running runtime alone.
  */
 export const loadProjectEnv = async (cwd: string): Promise<ResolvedEnv> => {
   const values = Object.fromEntries(
     Object.entries(await loadEnvFiles(cwd)).filter(
-      ([name, value]) => name.startsWith(ENV_PREFIX) && value !== "",
+      ([name, value]) => name.startsWith(ENV_PREFIX) && !CLI_OWNED.has(name) && value !== "",
     ),
   );
   return { values, injected: Object.keys(values).sort() };
