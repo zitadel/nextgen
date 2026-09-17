@@ -1,0 +1,102 @@
+{
+  "_comment": "Palettes and the contrast warnings they must produce. Language-neutral on purpose: any second implementation (the API, the CLI) is checked against this file so the console and the server never disagree about what an issue is. Ratios are rounded to two decimals.",
+  "cases": [
+    {
+      "name": "maintained defaults carry no warnings",
+      "branding": { "theme": { "light": { "palette": {} }, "dark": { "palette": {} } } },
+      "issues": []
+    },
+    {
+      "name": "the button label the design flags",
+      "branding": {
+        "theme": { "dark": { "palette": { "on_primary": "#FAFAFA", "primary": "#EB3614" } } }
+      },
+      "issues": [
+        { "theme": "dark", "pair": "on_primary/primary", "ratio": 3.97, "required": 4.5 }
+      ]
+    },
+    {
+      "name": "a readable palette",
+      "branding": {
+        "theme": {
+          "light": {
+            "palette": {
+              "text": "#0F172A",
+              "text_muted": "#475569",
+              "background": "#FFFFFF",
+              "surface": "#FFFFFF",
+              "muted": "#F1F5F9",
+              "on_primary": "#FFFFFF",
+              "primary": "#1D4ED8",
+              "link": "#1D4ED8",
+              "error": "#B91C1C",
+              "success": "#15803D",
+              "warning": "#A16207",
+              "border": "#64748B"
+            }
+          }
+        }
+      },
+      "issues": []
+    },
+    {
+      "name": "each side is judged on its own colours",
+      "branding": {
+        "theme": {
+          "light": { "palette": { "text": "#0F172A", "surface": "#FFFFFF" } },
+          "dark": { "palette": { "text": "#333333", "surface": "#0A0A0A" } }
+        }
+      },
+      "issues": [{ "theme": "dark", "pair": "text/surface", "ratio": 1.57, "required": 4.5 }]
+    },
+    {
+      "name": "text on the muted fill is checked, not only on the card",
+      "branding": {
+        "theme": {
+          "light": {
+            "palette": { "text": "#6B7280", "text_muted": "#9CA3AF", "muted": "#4B5563", "surface": "#FFFFFF" }
+          }
+        }
+      },
+      "issues": [
+        { "theme": "light", "pair": "text_muted/surface", "ratio": 2.54, "required": 4.5 },
+        { "theme": "light", "pair": "text/muted", "ratio": 1.56, "required": 4.5 },
+        { "theme": "light", "pair": "text_muted/muted", "ratio": 2.98, "required": 4.5 }
+      ]
+    },
+    {
+      "name": "a translucent fill is measured over the card it sits on",
+      "branding": {
+        "theme": {
+          "light": {
+            "palette": { "on_primary": "#FFFFFF", "primary": "#FFFFFF80", "surface": "#FFFFFF", "background": "#000000" }
+          }
+        }
+      },
+      "issues": [{ "theme": "light", "pair": "on_primary/primary", "ratio": 1, "required": 4.5 }]
+    },
+    {
+      "name": "a pair whose backdrop is the host application is not judged",
+      "branding": { "theme": { "light": { "palette": { "text": "#FAFAFA", "background": "#00000080" } } } },
+      "issues": []
+    },
+    {
+      "name": "colour forms other than hex are measured the same way",
+      "branding": {
+        "theme": {
+          "light": {
+            "palette": {
+              "text": "color-mix(in srgb, white 70%, black)",
+              "surface": "rebeccapurple",
+              "link": "currentColor"
+            }
+          }
+        }
+      },
+      "issues": [
+        { "theme": "light", "pair": "text/surface", "ratio": 3.99, "required": 4.5 },
+        { "theme": "light", "pair": "link/surface", "ratio": 3.99, "required": 4.5 }
+      ]
+    }
+  ]
+}

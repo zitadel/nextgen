@@ -847,3 +847,194 @@ func TestProjectService_DefaultProject(t *testing.T) {
 		assert.Equal(t, domain.ErrProjectNotFound().Code, de.Code)
 	})
 }
+
+func TestProjectService_ListAuthorized(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		req          service.ListAuthorizedProjectsRequest
+		result       *database.ListResult[*domain.Project]
+		statementErr error
+		wantErr      error
+		checkCall    func(t *testing.T, home, user string, page database.Page[domain.ProjectField])
+		checkResp    func(t *testing.T, resp *service.ListProjectsResponse)
+	}{
+		{
+			name: "defaults order by id ascending",
+			req:  service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a"},
+			result: &database.ListResult[*domain.Project]{
+				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
+				NextCursor: []byte("next"),
+			},
+			checkCall: func(t *testing.T, home, user string, page database.Page[domain.ProjectField]) {
+				assert.Equal(t, "proj_platform", home)
+				assert.Equal(t, "user_a", user)
+				assert.Equal(t, uint32(20), page.Limit)
+				assert.Empty(t, page.Cursor)
+				assert.Equal(t, database.OrderAsc, page.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldID),
+				}, page.OrderBy.Columns)
+			},
+			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
+				assert.Len(t, resp.Projects, 2)
+				assert.Equal(t, "next", resp.NextPageToken)
+			},
+		},
+		{
+			name:   "limit clamped to max",
+			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", Limit: 500},
+			result: &database.ListResult[*domain.Project]{},
+			checkCall: func(t *testing.T, _, _ string, page database.Page[domain.ProjectField]) {
+				assert.Equal(t, uint32(100), page.Limit)
+			},
+		},
+		{
+			name:   "page token is passed through as the cursor",
+			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", PageToken: "tok"},
+			result: &database.ListResult[*domain.Project]{},
+			checkCall: func(t *testing.T, _, _ string, page database.Page[domain.ProjectField]) {
+				assert.Equal(t, []byte("tok"), page.Cursor)
+			},
+		},
+		{
+			name:         "invalid cursor maps to request invalid",
+			req:          service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", PageToken: "bad"},
+			statementErr: database.ErrInvalidCursor(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+		{
+			name:         "statement error is wrapped",
+			req:          service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a"},
+			statementErr: assert.AnError,
+			wantErr:      domain.ErrInternal(assert.AnError),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+			expectActiveSessionUser(statements)
+
+			var gotHome, gotUser string
+			var gotPage database.Page[domain.ProjectField]
+			statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, home, user string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+					gotHome, gotUser, gotPage = home, user, page
+					return tc.result, tc.statementErr
+				})
+
+			resp, err := svc.ListAuthorized(context.Background(), tc.req)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.checkCall != nil {
+				tc.checkCall(t, gotHome, gotUser, gotPage)
+			}
+			if tc.checkResp != nil {
+				tc.checkResp(t, resp)
+			}
+		})
+	}
+}
+
+// An empty user or home project must never reach storage: the predicate would
+// bind empty strings and the query stops being an authorization question.
+func TestProjectService_ListAuthorizedFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		req  service.ListAuthorizedProjectsRequest
+	}{
+		{"no user", service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform"}},
+		{"no home project", service.ListAuthorizedProjectsRequest{UserID: "user_a"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+			statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+			resp, err := svc.ListAuthorized(context.Background(), tc.req)
+			assert.Nil(t, resp)
+			require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
+		})
+	}
+}
+
+// expectActiveSessionUser stubs the home-project read that vets the session user.
+func expectActiveSessionUser(s *servicemocks.MockAllStatements) {
+	s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+		ProjectID: "proj_platform",
+		ID:        "user_a",
+		Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
+	}, nil)
+}
+
+// Deactivating a user does not revoke its live sessions (#553), so the session
+// user is re-read on every call and a user that is gone or no longer active is
+// refused before any grant is read.
+func TestProjectService_ListAuthorizedRequiresActiveUser(t *testing.T) {
+	t.Parallel()
+
+	req := service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a"}
+
+	t.Run("active user reaches the grant query", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		var gotFilter database.Filter[domain.UserField]
+		statements.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, filter database.Filter[domain.UserField], _ service.UserQueryOptions) (*domain.User, error) {
+				gotFilter = filter
+				return &domain.User{ProjectID: "proj_platform", ID: "user_a"}, nil
+			})
+		statements.EXPECT().ListAuthorizedProjects(gomock.Any(), "proj_platform", "user_a", gomock.Any()).
+			Return(&database.ListResult[*domain.Project]{Items: []*domain.Project{{ID: "proj_a"}}}, nil)
+
+		resp, err := svc.ListAuthorized(context.Background(), req)
+		require.NoError(t, err)
+		require.Len(t, resp.Projects, 1)
+		// The status term is what makes this a liveness check rather than an
+		// existence check, so pin the whole filter.
+		assert.Equal(t, database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), "proj_platform"),
+			database.Equal(database.Col(domain.UserFieldID), "user_a"),
+			database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+		), gotFilter)
+	})
+
+	// A deactivated user reads back as no row, because the filter pins active.
+	t.Run("user that is not active is refused before any grant is read", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		statements.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, database.NewNoRowFoundError(errors.New("no rows")))
+		statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+		resp, err := svc.ListAuthorized(context.Background(), req)
+		assert.Nil(t, resp)
+		require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
+	})
+
+	t.Run("storage error on the user read is internal", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		statements.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, assert.AnError)
+		statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+		resp, err := svc.ListAuthorized(context.Background(), req)
+		assert.Nil(t, resp)
+		require.ErrorIs(t, err, domain.ErrInternal(assert.AnError))
+		assert.NotErrorIs(t, err, domain.ErrSessionTokenInvalid(),
+			"a database outage must not read as a rejected session")
+	})
+}
