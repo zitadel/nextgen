@@ -31,7 +31,6 @@ func discoveryHandler(t *testing.T) http.HandlerFunc {
 }
 
 func TestNewOIDCClient(t *testing.T) {
-	const redirectURI = "https://app.example.test/__nextgen/idp/callback"
 	overrides := OIDCConnection{
 		AuthorizationEndpoint: "https://override.example.test/authorize",
 		TokenEndpoint:         "https://override.example.test/token",

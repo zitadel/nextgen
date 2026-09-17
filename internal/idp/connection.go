@@ -9,9 +9,12 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// endpointPattern is the connection schema's endpoint pattern: https, or
-// http only for the local development hosts.
-var endpointPattern = regexp.MustCompile(`^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$`)
+// The connection schema's URL patterns: https, or http only for the local
+// development hosts. The issuer takes no query string, an endpoint may.
+var (
+	issuerPattern   = regexp.MustCompile(`^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)(/[^\s?#]*)?$`)
+	endpointPattern = regexp.MustCompile(`^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$`)
+)
 
 // Connection is the engine's view of a pinned connection revision: the body
 // decoded, defaults applied, and the rules an attempt relies on re-checked.
@@ -105,10 +108,10 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 	return conn, nil
 }
 
-// requireTLS re-checks the schema's endpoint pattern on every endpoint the
-// block sets. The error names the offending field, never a URL.
+// requireTLS re-checks the schema's URL patterns on every endpoint the block
+// sets. The error names the offending field, never a URL.
 func requireTLS(oidc *oidcBody) error {
-	if !validEndpoint(oidc.Issuer) {
+	if !issuerPattern.MatchString(oidc.Issuer) {
 		return domain.ErrIDPEndpointCleartext("issuer")
 	}
 	if !validEndpoint(oidc.JWKSURI) {

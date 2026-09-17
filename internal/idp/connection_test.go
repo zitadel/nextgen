@@ -15,8 +15,9 @@ func TestParseConnection(t *testing.T) {
 		name string
 		body string
 		want Connection
-		// wantErr is the domain kind; wantCauseMsg pins the log-only cause.
-		wantErr      error
+		// wantErr is compared by code, message, and details; wantCauseMsg
+		// pins the log-only parent.
+		wantErr      *domain.Error
 		wantCauseMsg string
 	}{
 		{
@@ -121,7 +122,8 @@ func TestParseConnection(t *testing.T) {
 				"protocol": "oidc",
 				"display_name": "Google"
 			}`,
-			wantErr: domain.ErrIDPProtocolBlockMissing("oidc"),
+			wantErr:      new(domain.ErrIDPProtocolBlockMissing("oidc")),
+			wantCauseMsg: "oidc block is missing",
 		},
 		{
 			name: "scopes without openid are rejected",
@@ -136,7 +138,7 @@ func TestParseConnection(t *testing.T) {
 					"scopes": ["email"]
 				}
 			}`,
-			wantErr: domain.ErrIDPScopesMissingOpenID(),
+			wantErr: new(domain.ErrIDPScopesMissingOpenID()),
 		},
 		{
 			name: "an http endpoint on a non-local host is rejected",
@@ -152,7 +154,8 @@ func TestParseConnection(t *testing.T) {
 					"scopes": ["openid"]
 				}
 			}`,
-			wantErr: domain.ErrIDPEndpointCleartext("token_endpoint"),
+			wantErr:      new(domain.ErrIDPEndpointCleartext("token_endpoint")),
+			wantCauseMsg: "token_endpoint is not https",
 		},
 		{
 			name: "an oauth2 body is refused",
@@ -169,12 +172,12 @@ func TestParseConnection(t *testing.T) {
 					"client_secret": "${{ GITHUB_SECRET }}"
 				}
 			}`,
-			wantErr: domain.ErrIDPOAuth2Unsupported(),
+			wantErr: new(domain.ErrIDPOAuth2Unsupported()),
 		},
 		{
 			name:         "an undecodable body is an internal error",
 			body:         "{",
-			wantErr:      domain.ErrInternal(nil),
+			wantErr:      new(domain.ErrInternal(nil)),
 			wantCauseMsg: "decode connection revision: unexpected end of JSON input",
 		},
 	}
@@ -183,11 +186,12 @@ func TestParseConnection(t *testing.T) {
 			got, err := ParseConnection("idprev_1", []byte(tt.body))
 
 			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-				assert.Equal(t, tt.wantErr.Error(), err.Error())
+				de, ok := errors.AsType[domain.Error](err)
+				require.True(t, ok, "got %v", err)
+				assert.Equal(t, tt.wantErr.Code, de.Code)
+				assert.Equal(t, tt.wantErr.Message, de.Message)
+				assert.Equal(t, tt.wantErr.Details, de.Details)
 				if tt.wantCauseMsg != "" {
-					de, ok := errors.AsType[domain.Error](err)
-					require.True(t, ok)
 					assert.EqualError(t, de.Parent, tt.wantCauseMsg)
 				}
 				return

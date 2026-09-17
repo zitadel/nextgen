@@ -6,6 +6,7 @@ package idp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -87,6 +88,11 @@ type OIDCClient struct {
 // request. httpClient must be the hardened egress client: every URL fetched
 // here is tenant-authored (ADR 061).
 func NewOIDCClient(ctx context.Context, conn Connection, redirectURI string, httpClient *http.Client) (*OIDCClient, error) {
+	// A nil client would only fail once a fetch happens, deep inside the
+	// library; a fully overridden connection would hide the wiring bug.
+	if httpClient == nil {
+		return nil, domain.ErrInternal(errors.New("idp: http client is nil"))
+	}
 	endpoints, err := resolveEndpoints(ctx, conn.OIDC, httpClient)
 	if err != nil {
 		return nil, err

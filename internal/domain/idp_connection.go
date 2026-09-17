@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 // PrefixIDPConnection namespaces connection ids ("idp_01KWH3B..."), the id an
 // identity link references. Revisions carry their own prefix, registered with
 // the storage layer that allocates them, and are what attempts and releases pin.
@@ -32,24 +34,25 @@ func ErrIDPDiscoveryFailed(cause error) Error {
 
 // The following errors re-check at the start of an attempt what the schema enforced at
 // write time (defense in depth). Each is a distinct kind, so the log names
-// the rule; the user sees the generic misconfigured-provider error. The
-// messages name schema fields, never values.
+// the rule; the user sees the generic misconfigured-provider error. Where a
+// rule applies to one of several fields, details names the field for the
+// client and the parent names it for the log; a value never appears in
+// either. The messages stay literal so the error schema generator sees them.
 
 // ErrIDPProtocolBlockMissing reports a document whose protocol names a block
 // the document does not carry. protocol is the schema enum value.
 func ErrIDPProtocolBlockMissing(protocol string) Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("protocol_block_missing"), "identity provider connection: the "+protocol+" block is missing", nil, nil)
+	return newError(PrefixIDPConnection.ErrorCodePrefix("protocol_block_missing"), "identity provider connection: the protocol block is missing", map[string]any{"protocol": protocol}, fmt.Errorf("%s block is missing", protocol))
 }
 
 func ErrIDPScopesMissingOpenID() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("scopes_missing_openid"), "identity provider connection: OIDC scopes must contain openid", nil, nil)
 }
 
-// ErrIDPEndpointCleartext names the endpoint field that is not https. The
-// field name is schema vocabulary, not tenant data, so it may show; the URL
-// itself never does.
+// ErrIDPEndpointCleartext reports an endpoint that is not https and not on
+// localhost. field is the schema field name; the URL itself never appears.
 func ErrIDPEndpointCleartext(field string) Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoint_cleartext"), "identity provider connection: "+field+" is not an https endpoint", nil, nil)
+	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoint_cleartext"), "identity provider connection: an endpoint is not https", map[string]any{"field": field}, fmt.Errorf("%s is not https", field))
 }
 
 // ErrIDPOAuth2Unsupported refuses a stored oauth2 connection: the schema

@@ -3,6 +3,8 @@ package idp
 import (
 	"context"
 	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -13,19 +15,26 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
+const redirectURI = "https://app.example.test/__nextgen/idp/callback"
+
 func TestOIDCClientAuthorize(t *testing.T) {
-	const redirectURI = "https://app.example.test/__nextgen/idp/callback"
+	// Every endpoint is overridden, so construction makes no request; the
+	// server fails the test if one arrives.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+	}))
+	t.Cleanup(srv.Close)
 	base := Connection{
 		RevisionID: "idprev_1",
 		OIDC: OIDCConnection{
-			Issuer:                "https://accounts.example.test",
+			Issuer:                srv.URL,
 			ClientID:              "client",
 			Scopes:                []string{"openid", "email"},
 			PKCEEnabled:           true,
-			AuthorizationEndpoint: "https://accounts.example.test/authorize",
-			TokenEndpoint:         "https://accounts.example.test/token",
-			UserinfoEndpoint:      "https://accounts.example.test/userinfo",
-			JWKSURI:               "https://accounts.example.test/keys",
+			AuthorizationEndpoint: srv.URL + "/authorize",
+			TokenEndpoint:         srv.URL + "/token",
+			UserinfoEndpoint:      srv.URL + "/userinfo",
+			JWKSURI:               srv.URL + "/keys",
 		},
 	}
 	req := AuthorizeRequest{State: "state-1", Nonce: "nonce-1", PKCEVerifier: "verifier-1"}
@@ -137,8 +146,7 @@ func TestOIDCClientAuthorize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Every endpoint is overridden, so construction makes no request.
-			c, err := NewOIDCClient(context.Background(), tt.conn(base), redirectURI, nil)
+			c, err := NewOIDCClient(context.Background(), tt.conn(base), redirectURI, srv.Client())
 			require.NoError(t, err)
 
 			got, err := c.Authorize(tt.req)
@@ -150,12 +158,47 @@ func TestOIDCClientAuthorize(t *testing.T) {
 			require.NoError(t, err)
 			u, err := url.Parse(got.URL)
 			require.NoError(t, err)
-			assert.Equal(t, "https://accounts.example.test/authorize", u.Scheme+"://"+u.Host+u.Path)
+			assert.Equal(t, srv.URL+"/authorize", u.Scheme+"://"+u.Host+u.Path)
 			assert.Equal(t, tt.wantParams, u.Query())
 			got.URL = ""
 			assert.Equal(t, tt.wantRedirect, got)
 		})
 	}
+}
+
+// TestOIDCClientAuthorizeViaDiscovery covers the other construction path:
+// no override, so the authorize URL is the one discovery named.
+func TestOIDCClientAuthorizeViaDiscovery(t *testing.T) {
+	srv := httptest.NewServer(discoveryHandler(t))
+	t.Cleanup(srv.Close)
+	conn := Connection{
+		RevisionID: "idprev_1",
+		OIDC: OIDCConnection{
+			Issuer:      srv.URL,
+			ClientID:    "client",
+			Scopes:      []string{"openid"},
+			PKCEEnabled: true,
+		},
+	}
+	c, err := NewOIDCClient(context.Background(), conn, redirectURI, srv.Client())
+	require.NoError(t, err)
+
+	got, err := c.Authorize(AuthorizeRequest{State: "state-1", Nonce: "nonce-1", PKCEVerifier: "verifier-1"})
+
+	require.NoError(t, err)
+	u, err := url.Parse(got.URL)
+	require.NoError(t, err)
+	assert.Equal(t, srv.URL+"/authorize", u.Scheme+"://"+u.Host+u.Path)
+	assert.Equal(t, url.Values{
+		"client_id":             {"client"},
+		"redirect_uri":          {redirectURI},
+		"response_type":         {"code"},
+		"scope":                 {"openid"},
+		"state":                 {"state-1"},
+		"nonce":                 {"nonce-1"},
+		"code_challenge":        {oidc.NewSHACodeChallenge("verifier-1")},
+		"code_challenge_method": {"S256"},
+	}, u.Query())
 }
 
 func TestRandomTokens(t *testing.T) {
