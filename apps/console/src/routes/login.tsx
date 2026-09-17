@@ -39,10 +39,17 @@ import { useTheme } from "../theme";
  * the sign-in screen follows the same preference as the rest of the console.
  */
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { next?: string; handoff?: string } => ({
     next: sanitizeNextPath(typeof search.next === "string" ? search.next : undefined),
+    handoff: typeof search.handoff === "string" ? search.handoff : undefined,
   }),
   beforeLoad: async ({ search }) => {
+    // SPIKE: a sign-in link (`/login?handoff=<token>`) printed by the CLI
+    // carries a one-time handoff token; trade it for the session cookie
+    // before deciding whether to show the widget.
+    if (search.handoff) {
+      await exchangeLinkHandoff(search.handoff);
+    }
     const session = await fetchSession();
     if (session) {
       // Already signed in — skip the widget. `next` is router-relative by
@@ -53,6 +60,30 @@ export const Route = createFileRoute("/login")({
   },
   component: LoginScreen,
 });
+
+/**
+ * SPIKE: exchanges a sign-in link's handoff token for the `__nextgen_session`
+ * cookie, the same `POST /sessions/exchange` the widget calls at the end of a
+ * login flow. Failures fall through to the normal sign-in widget.
+ */
+async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
+  const projectId = getConsoleProjectId();
+  if (!projectId) return;
+  const publishableKey = getPublishableKey();
+  try {
+    await fetch(`${apiBase}/sessions/exchange?project_id=${encodeURIComponent(projectId)}`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        ...(publishableKey ? { authorization: `Bearer ${publishableKey}` } : {}),
+      },
+      body: JSON.stringify({ handoff_token: handoffToken }),
+    });
+  } catch {
+    // Fall through to the widget.
+  }
+}
 
 function LoginScreen() {
   const { next } = Route.useSearch();

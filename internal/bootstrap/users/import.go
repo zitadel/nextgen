@@ -112,7 +112,10 @@ func buildCreateAttributes(attrs map[domain.AttributeKey]json.RawMessage) (domai
 			return nil, err
 		}
 		scope := domain.AttributeUniquenessUnspecified
-		if key == attrKeyUsername {
+		// SPIKE: the default user schema identifies users by `email`
+		// (x-identifier), so a bootstrap user is only findable at login when
+		// `email` is registered as a unique attribute too.
+		if key == attrKeyUsername || key == "email" {
 			scope = domain.AttributeUniquenessProject
 		}
 		attr, err := domain.NewCreateAttribute(key, value, scope)
