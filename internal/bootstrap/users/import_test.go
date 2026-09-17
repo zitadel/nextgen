@@ -114,6 +114,48 @@ func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 	require.Contains(t, err.Error(), "uq_teams_project_name")
 }
 
+// A user schema that identifies users by `email` must see the imported user's
+// email in the unique-attributes registry, or sign-in cannot resolve them.
+func TestImport_uniqueAttributesFollowSchema(t *testing.T) {
+	ctx := t.Context()
+	v2Pool := testPool(t)
+	stmts := v2Pool.Statements()
+
+	suffix := rand.Text()
+	projectID := "proj_" + suffix
+	userID := "user_" + suffix
+	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
+		ID:             projectID,
+		Name:           "project-" + projectID,
+		PreviewOrigins: []string{},
+	}))
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+
+	doc := validDocument()
+	doc.Header.ProjectID = projectID
+	doc.Header.TeamID = "team_" + suffix
+	doc.Header.ID = userID
+	doc.Attributes["email"] = json.RawMessage(`"admin-` + suffix + `@example.com"`)
+	require.NoError(t, stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
+		ProjectID: projectID,
+		URL:       doc.Header.SchemaURL,
+		Kind:      domain.JSONSchemaKindUnknown,
+		Schema: []byte(`{"type":"object","properties":{` +
+			`"email":{"type":"string","x-unique":"project"}}}`),
+	}))
+	raw, err := json.Marshal(doc)
+	require.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "user.json")
+	require.NoError(t, os.WriteFile(path, raw, 0o600))
+
+	require.NoError(t, users.Import(ctx, v2Pool, testHasher(t), "postgres", []string{path}))
+
+	scopes, err := stmts.GetUserUniqueAttributeScopes(ctx, projectID, userID)
+	require.NoError(t, err)
+	require.Contains(t, scopes, domain.AttributeKey("email"))
+	require.Contains(t, scopes, domain.AttributeKey("username"))
+}
+
 // writeUserFile writes a valid user document carrying the given IDs and returns
 // its path.
 func writeUserFile(t *testing.T, projectID, teamID, userID string) string {
