@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Monitor, Palette, Smartphone, Sun } from "lucide-react";
+import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
 import { useState } from "react";
 
 import { LoginPreview, type PreviewJourney } from "@/components/branding/login-preview";
@@ -7,25 +7,45 @@ import { SettingsPanel } from "@/components/branding/settings-panel";
 import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { BrandingDraft } from "@/lib/branding-draft";
+import { flowDisplayName } from "@/lib/flow-definition";
 
 import { api } from "../../../api/zitadel";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/branding/")({
-  // Order 5: Login flows sits at 4, and branding configures what those flows render.
-  staticData: { nav: { label: "Branding", order: 5, icon: Palette } },
+  // Nested under Login flows, as in the design: branding is how those flows
+  // render, not a resource of its own. Sub-rows carry no icon.
+  staticData: { nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
   loader: async () => {
     // Newest first, so the head of the list is what visitors see today. The
     // list carries ids only, so the configuration itself is a second call. A
     // project that has never published branding has no revision, and the draft
     // then starts from the maintained defaults.
-    const revisions = await api.listBranding({ project_id: getConsoleProjectId() });
+    const projectId = getConsoleProjectId();
+    const [revisions, flows] = await Promise.all([
+      api.listBranding({ project_id: projectId }),
+      api.listFlowDefinitions({ project_id: projectId }),
+    ]);
+    // The preview runs one of the project's own flows, so the selector lists
+    // what it can actually render rather than a fixed set.
+    const previewFlows = flows.flow_definitions.map((entry) => ({
+      name: entry.flow_definition.name,
+      label: flowDisplayName(entry.flow_definition),
+    }));
     const latest = revisions[0];
-    if (!latest) return { published: {} as BrandingDraft };
+    if (!latest) return { published: {} as BrandingDraft, flows: previewFlows };
     const revision = await api.getBrandingById(latest.id);
-    return { published: revision.branding as BrandingDraft };
+    return { published: revision.branding as BrandingDraft, flows: previewFlows };
   },
   component: BrandingScreen,
 });
@@ -38,12 +58,19 @@ const JOURNEYS: { id: PreviewJourney; label: string }[] = [
   { id: "login", label: "Sign in" },
 ];
 
+// The flow selector is drawn as a ghost button, not a bordered select: no
+// border or shadow, and its icons take the foreground colour rather than the
+// muted one a bordered trigger uses.
+const GHOST_TRIGGER =
+  "h-9 gap-1.5 border-0 px-2.5 font-medium shadow-none hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:hover:bg-accent [&_svg:not([class*='text-'])]:text-foreground";
+
 function BrandingScreen() {
-  const { published } = Route.useLoaderData();
+  const { published, flows } = Route.useLoaderData();
   // The draft starts from what is in use, per #936: customisation continues
   // from the appearance currently live rather than from an empty form.
   const [draft, setDraft] = useState<BrandingDraft>(published);
   const [journey, setJourney] = useState<PreviewJourney>("register");
+  const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
   const [theme, setTheme] = useState<"light" | "dark" | "auto">("auto");
   const [narrow, setNarrow] = useState(false);
 
@@ -53,7 +80,27 @@ function BrandingScreen() {
         <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Branding</h1>
       </div>
 
-      <div className="mt-3 flex items-center gap-3 px-2">
+      <div className="mt-3 flex items-center gap-[10px] px-2">
+        {flows.length > 0 && (
+          <>
+            <Select value={flowName} onValueChange={setFlowName}>
+              <SelectTrigger aria-label="Previewed flow" className={GHOST_TRIGGER}>
+                <Workflow />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {flows.map((flow) => (
+                  <SelectItem key={flow.name} value={flow.name}>
+                    Flow: {flow.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* The vertical variant sets h-full, which wins over a plain h-5 and
+                collapses to nothing in a centred row, so the height is forced. */}
+            <Separator orientation="vertical" className="h-5!" />
+          </>
+        )}
         <Tabs value={journey} onValueChange={(value) => setJourney(value as PreviewJourney)}>
           <TabsList>
             {JOURNEYS.map((entry) => (
@@ -64,7 +111,7 @@ function BrandingScreen() {
           </TabsList>
         </Tabs>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-2">
           <Button
             variant="outline"
             size="icon"
@@ -96,7 +143,7 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview draft={draft} journey={journey} flowName="" theme={theme} />
+            <LoginPreview draft={draft} journey={journey} flowName={flowName} theme={theme} />
           </div>
         </Card>
 
