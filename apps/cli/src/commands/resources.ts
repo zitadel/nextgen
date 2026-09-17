@@ -57,6 +57,7 @@ import type {
 import { consola } from "consola";
 
 import { environmentSchema } from "../lib/environment";
+import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
 import { buildResourceCommands, type ResourceRegistry } from "../lib/oclif/crud";
 import { readZitadelSecret } from "../lib/project";
@@ -92,6 +93,7 @@ const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "sign
  */
 export const RESOURCES = {
   users: {
+    group: CommandGroups.resources,
     singular: "user",
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
@@ -137,6 +139,7 @@ export const RESOURCES = {
   },
 
   teams: {
+    group: CommandGroups.resources,
     singular: "team",
     idField: "id",
     columns: ["id", "name", "status", "created_at"],
@@ -171,6 +174,7 @@ export const RESOURCES = {
   },
 
   sessions: {
+    group: CommandGroups.resources,
     singular: "session",
     idField: "session_id",
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
@@ -197,6 +201,7 @@ export const RESOURCES = {
   },
 
   events: {
+    group: CommandGroups.resources,
     singular: "event",
     idField: "id",
     columns: ["id", "event_type", "category", "actor_id", "occurred_at"],
@@ -253,6 +258,7 @@ export const RESOURCES = {
   },
 
   grants: {
+    group: CommandGroups.resources,
     singular: "grant",
     idField: "id",
     columns: ["id", "principal_type", "principal_id", "relation", "created_at", "expires_at"],
@@ -295,6 +301,7 @@ export const RESOURCES = {
   },
 
   projects: {
+    group: CommandGroups.resources,
     singular: "project",
     idField: "id",
     columns: ["id", "name", "created_at"],
@@ -322,6 +329,7 @@ export const RESOURCES = {
   // would be a second writer over the same state; reading what the server
   // currently holds is how you check that a deploy landed.
   schemas: {
+    group: CommandGroups.configuration,
     singular: "schema",
     idField: "id",
     // Addressed by object type as well as by revision id, so the argument is
@@ -380,6 +388,7 @@ export const RESOURCES = {
   },
 
   environments: {
+    group: CommandGroups.configuration,
     singular: "environment",
     idField: "id",
     // Addressed by its public handle: `GET /environments/{name}`, and the name
@@ -402,6 +411,7 @@ export const RESOURCES = {
   },
 
   releases: {
+    group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha"],
@@ -420,6 +430,7 @@ export const RESOURCES = {
   },
 
   "flow-definitions": {
+    group: CommandGroups.configuration,
     singular: "flow definition",
     idField: "id",
     // Addressed by flow name as well as by revision id; see `schemas`.
@@ -470,6 +481,7 @@ export const RESOURCES = {
   },
 
   branding: {
+    group: CommandGroups.configuration,
     singular: "branding revision",
     idField: "id",
     columns: ["id", "created_at"],
