@@ -8,10 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { api } from "../../api/zitadel";
-import { getConsoleProjectId } from "../../runtime/runtime";
 
 /**
- * Org / project switchers — Figma `Sidebar / PopoverContextSwitcher`
+ * Org / project pills — Figma `Sidebar / PopoverContextSwitcher`
  * (`j3qqriDab6WQfrlgLujf4Y`). Desktop: 196px `bg-card` pills side-by-side.
  * Mobile (`Dashboard xs`): full-width stacked rows. Built on shadcn `Popover`.
  *
@@ -23,6 +22,12 @@ import { getConsoleProjectId } from "../../runtime/runtime";
  * button that is wrong in one of the two places it appears.
  */
 
+/**
+ * What the project pill says once the read has answered with nothing. Also the
+ * fallback for a failed read, so neither case leaves a skeleton behind.
+ */
+const NO_PROJECTS = "No projects";
+
 interface SwitcherOption {
   id: string;
   label: string;
@@ -31,12 +36,12 @@ interface SwitcherOption {
 
 export function ContextSwitcher() {
   const projects = useProjects();
-  // The current management bridge scope-pins `queryProjects` to one project.
-  // Until root ADR 053's authorized-project query lands, this normally resolves
-  // to a single entry — the switcher shows the truth rather than a list it
-  // cannot switch between.
-  const current =
-    projects?.find((project) => project.id === getConsoleProjectId()) ?? projects?.[0];
+  // Display only (#1237): there is no selected-project state, so the pill shows
+  // the first project the person can act on and the dropdown lists the rest as
+  // labels. It does not prefer `getConsoleProjectId()`: that is the project the
+  // console signs into — the platform project on a platform deployment — which
+  // is never the one anybody means here. Real switching is #814's territory.
+  const current = projects?.[0];
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -71,13 +76,29 @@ export function ContextSwitcher() {
             options={teams}
             ariaLabel="Switch organization"
           /> */}
-      <Switcher icon={Boxes} label={current?.label} options={projects} ariaLabel="Switch project" />
+      <Switcher
+        icon={Boxes}
+        label={current?.label}
+        currentId={current?.id}
+        options={projects}
+        emptyLabel={NO_PROJECTS}
+        ariaLabel="Switch project"
+      />
     </div>
   );
 }
 
 /**
- * Projects for the switcher, from `POST /projects/query`.
+ * The projects the signed-in person can act on, from `GET /users/me/projects`
+ * (root ADR 053 §6) — their own, and the ones somebody else granted them.
+ *
+ * Read with the session cookie, so it answers the same on the embedded console
+ * as behind the dev proxy. `POST /projects/query` cannot serve this: the server
+ * pins it to the calling credential's home project and accepts only a project
+ * secret, which left the embedded pill a permanent skeleton.
+ *
+ * One page is enough: the pill shows the first project and the dropdown is a
+ * reference list, not the directory — the Projects screen pages the full set.
  *
  * Loaded here rather than in the `_authed` loader so the shell paints
  * immediately and a failure degrades to an empty switcher instead of blocking
@@ -89,7 +110,7 @@ function useProjects(): SwitcherOption[] | undefined {
   useEffect(() => {
     let cancelled = false;
     void api
-      .queryProjects({})
+      .listMyProjects()
       .then((result) => {
         if (cancelled) return;
         setProjects(result.projects.map((project) => ({ id: project.id, label: project.name })));
@@ -110,21 +131,32 @@ function Switcher({
   label,
   shortLabel,
   plan,
+  currentId,
   options,
+  emptyLabel,
   ariaLabel,
 }: {
   icon: LucideIcon;
-  /** `undefined` while the label is still loading. */
+  /** `undefined` while loading, and when there are no options to name. */
   label: string | undefined;
   shortLabel?: string;
   plan?: string;
+  /** The option the pill is showing, marked `aria-current` in the list. */
+  currentId?: string;
   /** `undefined` while options are loading. */
   options: SwitcherOption[] | undefined;
+  /** Shown in place of a label once the options have loaded and there are none. */
+  emptyLabel: string;
   ariaLabel: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const listId = useId();
+
+  // Loading is the options not having answered yet — not the label being
+  // absent, which is also what an empty answer looks like.
+  const loading = options === undefined;
+  const empty = options?.length === 0;
 
   const rows = (options ?? []).filter((option) =>
     option.label.toLowerCase().includes(query.trim().toLowerCase()),
@@ -147,8 +179,12 @@ function Switcher({
           )}
         >
           <Icon size={16} className="shrink-0 text-foreground" aria-hidden />
-          {label === undefined ? (
+          {loading ? (
             <Skeleton className="h-4 min-w-0 flex-1" />
+          ) : label === undefined ? (
+            <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">
+              {emptyLabel}
+            </span>
           ) : (
             <span className="min-w-0 flex-1 truncate text-left font-serif text-foreground">
               <span className="md:hidden">{shortLabel ?? label}</span>
@@ -183,24 +219,27 @@ function Switcher({
 
         <ul id={listId} aria-label={ariaLabel} className="flex flex-col">
           {rows.length === 0 ? (
-            <li className="px-3 py-2.5 text-sm text-muted-foreground">No results</li>
+            <li className="px-3 py-2.5 text-sm text-muted-foreground">
+              {empty ? emptyLabel : "No results"}
+            </li>
           ) : (
+            // Labels, not buttons: nothing here selects anything yet. The rows
+            // used to be buttons whose click only closed the popover, which
+            // looked like a switch and was not one.
             rows.map((option) => (
-              <li key={option.id}>
-                <button
-                  type="button"
-                  aria-pressed={option.label === label}
-                  onClick={() => setOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left hover:bg-accent"
-                >
-                  <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
-                  {option.plan && (
-                    <Badge variant="secondary" className="shrink-0">
-                      {option.plan}
-                    </Badge>
-                  )}
-                </button>
+              <li
+                key={option.id}
+                // By id, not by label: two projects may share a name.
+                aria-current={option.id === currentId ? "true" : undefined}
+                className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left"
+              >
+                <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+                <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
+                {option.plan && (
+                  <Badge variant="secondary" className="shrink-0">
+                    {option.plan}
+                  </Badge>
+                )}
               </li>
             ))
           )}
