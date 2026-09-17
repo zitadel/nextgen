@@ -1,6 +1,12 @@
+import { mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { Plugin } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { COMMAND_GROUPS } from "../../../src/lib/oclif/groups";
+import { cliPackageRoot } from "../../helpers/oclif-build";
 import { parseJson, runCliForTest, stripAnsi } from "../../helpers/run-cli";
 
 /** The root screen, byte for byte, as issue #1248 specifies it. */
@@ -48,6 +54,32 @@ Learn more
   Use \`zitadel <command> --help\` for more information about a command.
   Read the manual at https://zitadel.com/docs
 `;
+
+/**
+ * A package root laid out as the published tarball is: `package.json`, `dist`,
+ * and an `oclif.manifest.json` generated the way `prepack` (`oclif manifest`)
+ * generates it, so oclif loads commands from the manifest instead of scanning
+ * `dist/commands`. `node_modules` is linked so the plugins resolve.
+ */
+async function stagePublishedPackage(): Promise<{ manifestPath: string; root: string }> {
+  const root = await mkdtemp(join(tmpdir(), "zitadel-cli-published-"));
+  await Promise.all([
+    writeFile(join(root, "package.json"), await readFile(join(cliPackageRoot, "package.json"))),
+    symlink(join(cliPackageRoot, "dist"), join(root, "dist")),
+    symlink(join(cliPackageRoot, "node_modules"), join(root, "node_modules")),
+  ]);
+  const plugin = new Plugin({
+    errorOnManifestCreate: true,
+    ignoreManifest: true,
+    respectNoCacheDefault: true,
+    root: cliPackageRoot,
+    type: "core",
+  });
+  await plugin.load();
+  const manifestPath = join(root, "oclif.manifest.json");
+  await writeFile(manifestPath, JSON.stringify(plugin.manifest, null, 2));
+  return { manifestPath, root };
+}
 
 describe("root help", () => {
   it.each([
@@ -98,5 +130,36 @@ describe("root help", () => {
       .map((command) => command.id);
 
     expect(ungrouped).toEqual([]);
+  });
+});
+
+describe("root help from the published manifest", () => {
+  it("renders the same groups when commands load from oclif.manifest.json", async () => {
+    const { root } = await stagePublishedPackage();
+
+    const { exitCode, stdout, stderr } = await runCliForTest(["--help"], {}, root);
+
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    expect(stripAnsi(stdout)).toBe(ROOT_HELP);
+  });
+
+  it("reads the groups from the manifest, not from dist", async () => {
+    const { manifestPath, root } = await stagePublishedPackage();
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+      commands: Record<string, { group?: string; groupOrder?: number }>;
+    };
+    expect(manifest.commands.setup).toMatchObject({ group: "Project commands", groupOrder: 1 });
+    // A manifest that lost the statics is what a regression would ship; the
+    // screen must visibly change, proving the manifest is what was rendered.
+    delete manifest.commands.setup.group;
+    delete manifest.commands.setup.groupOrder;
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+    const { stdout } = await runCliForTest(["--help"], {}, root);
+
+    const text = stripAnsi(stdout);
+    expect(text).not.toContain("Project commands\n  setup:");
+    expect(text).toMatch(/Additional commands\n(?:.*\n)*  setup: /);
   });
 });

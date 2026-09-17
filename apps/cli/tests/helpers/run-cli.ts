@@ -15,9 +15,14 @@ const cliVersion = JSON.parse(
  * code, with `env` overlaid onto `process.env` for the duration. Mirrors a real
  * `zitadel <args>` invocation; the JSON envelope is emitted by the domain
  * `run*` functions to stdout exactly as in production. Requires the CLI to have
- * been built (vitest global setup builds `dist/commands`).
+ * been built (vitest global setup builds `dist/commands`). `root` is the
+ * package oclif loads; pass a staged copy to exercise a published layout.
  */
-export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {}) {
+export async function runCliForTest(
+  argv: string[],
+  env: NodeJS.ProcessEnv = {},
+  root: string = cliPackageRoot,
+) {
   let stdout = "";
   let stderr = "";
   const originalOut = process.stdout.write.bind(process.stdout);
@@ -47,7 +52,7 @@ export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {})
 
   let exitCode = 0;
   try {
-    await run(argv, cliPackageRoot);
+    await run(argv, root);
   } catch (error) {
     exitCode = exitCodeOf(error);
   } finally {
