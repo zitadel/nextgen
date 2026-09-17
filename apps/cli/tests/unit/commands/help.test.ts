@@ -160,6 +160,6 @@ describe("root help from the published manifest", () => {
 
     const text = stripAnsi(stdout);
     expect(text).not.toContain("Project commands\n  setup:");
-    expect(text).toMatch(/Additional commands\n(?:.*\n)*  setup: /);
+    expect(text).toMatch(/Additional commands\n(?:.*\n)* {2}setup: /);
   });
 });
