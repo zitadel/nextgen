@@ -42822,7 +42822,7 @@ type QueryIdpsRequest struct {
 	// `sorting` as the request that issued the token. Omitting `sorting` reuses
 	// the default sort and only succeeds when that default matches the token.
 	PageToken OptNilPageToken `json:"page_token"`
-	// Sort order. Defaults to `created_at` ascending; `revision_id` breaks ties either way.
+	// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
 	Sorting OptQueryIdpsRequestSorting `json:"sorting"`
 	// Filter criteria for querying connections. Combined with AND.
 	Filter []QueryIdpsRequestFilterItem `json:"filter"`
@@ -42905,7 +42905,7 @@ func (s *QueryIdpsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
-// Sort order. Defaults to `created_at` ascending; `revision_id` breaks ties either way.
+// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
 type QueryIdpsRequestSorting struct {
 	// The field to sort by.
 	Field IdpFilterField `json:"field"`

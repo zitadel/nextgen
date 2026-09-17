@@ -9,4 +9,4 @@ The identity provider connection endpoints are now part of the API contract, and
 
 The request and response bodies mirror the `idp-connection.json` schema, so a connection is typed the same way in a client as it is in a `.zitadel/idps/<slug>.json` file.
 
-No handler ships yet. Until the handler tickets land, calling one of these endpoints returns 500 with the `internal` code.
+No handler ships yet. Until the handlers ship, calling one of these endpoints returns 500 with the `internal` code.

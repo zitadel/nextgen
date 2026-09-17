@@ -43,8 +43,8 @@ tags:
     description: |
       External login providers a project offers, each published as a
       revisioned connection document and referenced by its slug from user
-      schemas and flow definitions. Create-or-revise, query, read by id or by
-      slug, and revision reads.
+      schemas and flow definitions. Create-or-revise, query, read by id, and
+      revision reads. A slug resolves through the query.
   - name: Releases
     description: |
       Immutable, project-scoped configuration snapshots. A release pins one

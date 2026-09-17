@@ -13,7 +13,7 @@ properties:
       - type: 'null'
   sorting:
     type: object
-    description: Sort order. Defaults to `created_at` ascending; `revision_id` breaks ties either way.
+    description: Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
     required:
       - field
       - direction
