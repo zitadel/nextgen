@@ -34,29 +34,22 @@ export const Route = createFileRoute("/_authed/branding/")({
     const projectId = getConsoleProjectId();
     const [revisions, flows] = await Promise.all([
       api.listBranding({ project_id: projectId }),
-      api.listFlowDefinitions({ project_id: projectId }),
+      // One row per flow rather than per revision (#1246), as the Login
+      // flows directory asks for it. The preview starts a flow by name, so a
+      // second revision of one is an ambiguous row rather than another choice.
+      api.listFlowDefinitions({ project_id: projectId, revisions: "latest" }),
     ]);
     // The preview runs one of the project's own flows, so the selector lists
     // what it can actually render rather than a fixed set.
     //
-    // One entry per name: the list is newest first and carries no `revisions`
-    // filter, so a revised flow can appear more than once under the same name.
-    // The name is what the preview starts a flow by, which makes a second
-    // revision of it an ambiguous row rather than another choice.
-    //
-    // Each entry also carries the purposes it serves. A definition can serve
-    // one without the other, and starting a flow for a purpose it does not
-    // serve answers `flowdef.purpose_mismatch` rather than a preview.
-    const previewFlows: PreviewFlow[] = [];
-    for (const entry of flows.flow_definitions) {
-      const { name } = entry.flow_definition;
-      if (previewFlows.some((seen) => seen.name === name)) continue;
-      previewFlows.push({
-        name,
-        label: flowDisplayName(entry.flow_definition),
-        purposes: Object.keys(entry.flow_definition.purposes ?? {}),
-      });
-    }
+    // Each entry carries the purposes it serves. A definition can serve one
+    // without the other, and starting a flow for a purpose it does not serve
+    // answers `flowdef.purpose_mismatch` rather than a preview.
+    const previewFlows: PreviewFlow[] = flows.flow_definitions.map((entry) => ({
+      name: entry.flow_definition.name,
+      label: flowDisplayName(entry.flow_definition),
+      purposes: Object.keys(entry.flow_definition.purposes ?? {}),
+    }));
     const latest = revisions[0];
     if (!latest) return { published: {} as BrandingDraft, flows: previewFlows };
     const revision = await api.getBrandingById(latest.id);
