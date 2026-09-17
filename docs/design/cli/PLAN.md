@@ -49,8 +49,8 @@ framework version floors are enforced per
    every label is a `text_key` resolved client-side via the `| t` filter.
    [`packages/config/defaults/default-login.json`](../../../packages/config/defaults/default-login.json)
    is the authority for step shape.
-5. **Liquid templates are referenced, not embedded.** Branding revisions carry
-   `liquid_template_file` references; the CLI inlines on upload. The bundled
+5. **Liquid templates are referenced, not embedded.** Branding descriptors carry
+   a `$file` reference in `liquid_template`; the CLI inlines on upload. The bundled
    master template is
    [`packages/components/src/orchestrator/templates/default.liquid`](../../../packages/components/src/orchestrator/templates/default.liquid);
    the design catalog lives under
