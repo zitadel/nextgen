@@ -1,5 +1,6 @@
 import type { Interfaces } from "@oclif/core";
 
+import type { CommandGroup } from "../groups";
 import type { GlobalOptions } from "../types";
 
 /**
@@ -147,6 +148,11 @@ export type DeleteSpec<Ctx> = Readonly<{
 export type ResourceDescriptor<Ctx> = Readonly<{
   /** Singular noun for messages (`user`). */
   singular: string;
+  /**
+   * Group the root help lists this resource's commands under. Generated
+   * commands have no file to carry a `static group`, so the table says it.
+   */
+  group?: CommandGroup;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
   /**

@@ -1,5 +1,6 @@
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { describeRegistry } from "../lib/oclif/crud";
+import { CommandGroups } from "../lib/oclif/groups";
 import { RESOURCES } from "./resources";
 
 /**
@@ -13,6 +14,8 @@ import { RESOURCES } from "./resources";
  */
 export default class ResourcesList extends BaseCommand {
   static override id = "resources";
+  static override group = CommandGroups.resources;
+  static override groupOrder = 0;
   static override description = "List the resources this CLI manages and what can be done to each.";
   static override examples = [
     "<%= config.bin %> resources",
