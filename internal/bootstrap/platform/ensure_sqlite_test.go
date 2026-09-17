@@ -11,11 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+<<<<<<< HEAD
 	"github.com/zitadel/nextgen/internal/crypto"
+=======
+	"github.com/zitadel/nextgen/internal/cache"
+>>>>>>> origin/main
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dbtest"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const testSchemaBase = "https://example.com/api/schemas"
@@ -37,6 +42,7 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	schemaValidator, err := domain.NewSchemaValidator(testSchemaBase)
 	require.NoError(t, err)
 
+<<<<<<< HEAD
 	// bcrypt at cost 10, bounded 10..16: this test is about Ensure, not about
 	// hashing, but the project service needs the deployment's hashing
 	// configuration to answer whether a project may pick a method of its own.
@@ -54,6 +60,15 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 
 	keys := service.NewKeyService(pool, *masterKeys)
 	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers), keys
+=======
+	crypters, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, 64)
+	require.NoError(t, err)
+	signingKeys, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, 64)
+	require.NoError(t, err)
+
+	keys := service.NewKeyService(pool, *masterKeys, crypters, signingKeys)
+	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys), keys
+>>>>>>> origin/main
 }
 
 // TestEnsureSQLiteIdempotent proves the DB-backed idempotency the issue
