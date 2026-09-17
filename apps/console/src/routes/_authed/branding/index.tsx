@@ -30,10 +30,12 @@ export const Route = createFileRoute("/_authed/branding/")({
   component: BrandingScreen,
 });
 
+// Passkey is absent until the state selector lands: it needs a step the flow
+// only reaches after an identifier, and a tab that renders the sign-in step
+// under another name claims a journey it does not preview.
 const JOURNEYS: { id: PreviewJourney; label: string }[] = [
   { id: "register", label: "Sign up" },
   { id: "login", label: "Sign in" },
-  { id: "passkey", label: "Passkey" },
 ];
 
 function BrandingScreen() {

@@ -23,7 +23,9 @@ import {
   RADIUS_PRESETS,
   THEME_MODES,
   type ThemeSide,
+  withFontFamily,
   withPaletteValue,
+  withTypography,
   withSideLogo,
 } from "@/lib/branding-draft";
 
@@ -82,17 +84,13 @@ export function SettingsPanel({ draft, onChange }: Props) {
           label="Font family"
           value={draft.typography?.font_family ?? ""}
           placeholder="Arimo"
-          onChange={(value) =>
-            onChange({ ...draft, typography: { ...draft.typography, font_family: value } })
-          }
+          onChange={(value) => onChange(withFontFamily(draft, value))}
         />
         <TextRow
           label="Font URL"
           value={draft.typography?.font_url ?? ""}
           placeholder="https://…/font.css"
-          onChange={(value) =>
-            onChange({ ...draft, typography: { ...draft.typography, font_url: value } })
-          }
+          onChange={(value) => onChange(withTypography(draft, "font_url", value))}
         />
         <NumberRow
           label="Type scale"

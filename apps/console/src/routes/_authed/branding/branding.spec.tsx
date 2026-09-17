@@ -34,7 +34,7 @@ afterAll(() => {
 });
 
 const PUBLISHED = {
-  typography: { font_family: "Arimo, sans-serif" },
+  typography: { font_family: "Arimo, sans-serif", font_url: "https://cdn.example.com/font.css" },
   shape: { radius: "md", density: "regular" },
   theme: {
     mode: "auto",
@@ -113,5 +113,32 @@ describe("branding screen", () => {
     expect(await screen.findByTestId("preview")).toHaveTextContent("register");
     await userEvent.click(screen.getByRole("tab", { name: "Sign in" }));
     expect(screen.getByTestId("preview")).toHaveTextContent("login");
+  });
+
+  it("offers only the journeys it can actually render", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    // Passkey needs a step the flow reaches after an identifier, which waits on
+    // the state selector.
+    expect(await screen.findByRole("tab", { name: "Sign up" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Passkey" })).not.toBeInTheDocument();
+  });
+});
+
+describe("clearing a field", () => {
+  it("drops the key rather than publishing an empty string", async () => {
+    serveRevision();
+    await renderAt("/branding");
+    const family = await screen.findByLabelText("Font family");
+
+    // The contract requires at least one character, so `""` is refused where
+    // an absent key takes the maintained default.
+    await userEvent.clear(family);
+
+    expect(family).toHaveValue("");
+    // The URL goes with it: a stylesheet loading a face nothing names is
+    // rejected on publish.
+    expect(screen.getByLabelText("Font URL")).toHaveValue("");
   });
 });

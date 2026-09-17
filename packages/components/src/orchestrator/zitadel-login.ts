@@ -645,7 +645,10 @@ export class ZitadelLogin extends ZitadelSurface {
       renderingOrigin: this.ownerDocument.location.origin,
     });
     this.branding = branding;
-    this.themeController.setBranding(branding);
+    // `activeBranding`, not `branding`: with a draft set, the sides and mode
+    // that resolve the theme have to be the draft's, or the element paints one
+    // side's colours while resolving the other's.
+    this.themeController.setBranding(this.activeBranding());
     if (issues.length > 0) {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }

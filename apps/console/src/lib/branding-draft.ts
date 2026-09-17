@@ -96,3 +96,31 @@ export type BrandingDensity = NonNullable<NonNullable<BrandingDraft["shape"]>["d
 export const THEME_MODES = ["light", "dark", "auto"] as const;
 
 export type BrandingThemeMode = NonNullable<NonNullable<BrandingDraft["theme"]>["mode"]>;
+
+/**
+ * Set a typography string, dropping the key when it is cleared. An empty string
+ * is not the same as an absent key: the contract requires at least one
+ * character, so publishing `""` fails where omitting it takes the default.
+ */
+export function withTypography(
+  draft: BrandingDraft,
+  key: "font_family" | "font_url",
+  value: string,
+): BrandingDraft {
+  const typography = { ...(draft.typography ?? {}) };
+  if (value.trim() === "") {
+    delete typography[key];
+  } else {
+    typography[key] = value;
+  }
+  return { ...draft, typography };
+}
+
+/**
+ * Clearing the family clears the URL with it: a stylesheet that loads a face
+ * nothing names is rejected.
+ */
+export function withFontFamily(draft: BrandingDraft, value: string): BrandingDraft {
+  const next = withTypography(draft, "font_family", value);
+  return value.trim() === "" ? withTypography(next, "font_url", "") : next;
+}

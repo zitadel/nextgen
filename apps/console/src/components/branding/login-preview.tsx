@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { project } from "../../api/zitadel";
 
-export type PreviewJourney = "register" | "login" | "passkey";
+export type PreviewJourney = "register" | "login";
 
 type Props = {
   /** The unpublished branding to paint. */
@@ -40,7 +40,7 @@ export function LoginPreview({ draft, journey, flowName, theme }: Props) {
     if (!container) return;
     const login = document.createElement("zitadel-login") as ZitadelLogin;
     login.variant = "widget";
-    login.purpose = journey === "register" ? "register" : "login";
+    login.purpose = journey;
     login.flowName = flowName;
     login.project = project;
     container.replaceChildren(login);
