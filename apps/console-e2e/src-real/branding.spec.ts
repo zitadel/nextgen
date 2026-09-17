@@ -44,6 +44,11 @@ test("warns on a palette that cannot be read, as it is typed", async ({ page, se
 
   await expect(page.getByText("1 issue")).toBeVisible();
 
+  // The draft publishes only its dark side, so that is the side the widget
+  // resolves whatever the viewer prefers. Asserted rather than assumed: the
+  // colour check below is only meaningful against the side being painted.
+  await expect(page.locator("zitadel-login")).toHaveAttribute("data-theme", "dark");
+
   // The draft reaches the widget, not just the panel: the preview's primary
   // button takes the colour being typed.
   const button = page.locator("zitadel-login").locator("zl-button").first();
