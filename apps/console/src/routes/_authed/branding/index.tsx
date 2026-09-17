@@ -88,7 +88,10 @@ function BrandingScreen() {
                 <Workflow />
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              {/* Item-aligned is the shadcn default: it lays the selected row
+                  over the trigger, so with one flow the menu reads as the
+                  button growing a tick. The design drops it below. */}
+              <SelectContent position="popper" sideOffset={4}>
                 {flows.map((flow) => (
                   <SelectItem key={flow.name} value={flow.name}>
                     Flow: {flow.label}
