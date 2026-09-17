@@ -32,9 +32,6 @@ import {
   withTypography,
 } from "@/lib/branding-draft";
 
-/** Where the panel's "Learn more" goes. */
-const BRANDING_DOCS_URL = "https://zitadel.com/docs/cli/customize-design";
-
 // The design's separators are zero-height lines, so they add nothing to the
 // 8px gap either side of them.
 function Separator() {
@@ -95,11 +92,11 @@ export function SettingsPanel({ draft, onChange }: Props) {
     <div className="flex h-full flex-col gap-2 overflow-y-auto px-3 py-4">
       <header className="flex flex-col gap-2 py-2">
         <h2 className={PANEL_TITLE}>Branding</h2>
+        {/* The design ends this with a "Learn more" link. Held back until the
+            docs page it should point at exists — the current branding page
+            covers ejecting Liquid templates, not these settings. */}
         <p className="text-xs leading-4 text-muted-foreground">
-          Override the corresponding theme tokens in your project configuration.{" "}
-          <a href={BRANDING_DOCS_URL} target="_blank" rel="noreferrer" className="underline">
-            Learn more
-          </a>
+          Override the corresponding theme tokens in your project configuration.
         </p>
       </header>
 
