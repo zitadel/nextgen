@@ -44864,22 +44864,6 @@ func (s ListMyProjectsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case SessTokenInvalidListMyProjectsErrorResponse:
-		e.FieldStart("code")
-		e.Str("sess.token_invalid")
-		{
-			s := s.SessTokenInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	}
 }
 
@@ -44915,9 +44899,6 @@ func (s *ListMyProjectsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidListMyProjectsErrorResponse
 					found = true
-				case "sess.token_invalid":
-					s.Type = SessTokenInvalidListMyProjectsErrorResponse
-					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -44942,10 +44923,6 @@ func (s *ListMyProjectsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidListMyProjectsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case SessTokenInvalidListMyProjectsErrorResponse:
-		if err := s.SessTokenInvalid.Decode(d); err != nil {
 			return err
 		}
 	default:

@@ -143,6 +143,15 @@ describe("inlineFileReferences", () => {
     });
   });
 
+  it("still throws E_VALIDATION on a non-missing read failure when omitting", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, baseDir, "dir.liquid"));
+    const document = { t: { $file: "./dir.liquid" } };
+    expect(() => inlineFileReferences(document, { cwd, baseDir }, { onMissing: "omit" })).toThrow(
+      /cannot be read/,
+    );
+  });
+
   it("still refuses paths that leave the project when omitting", async () => {
     const cwd = await makeProject();
     const document = { t: { $file: "../../../x" } };

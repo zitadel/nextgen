@@ -25554,7 +25554,6 @@ type ListMyProjectsErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
 	ReqInvalid       ReqInvalid
-	SessTokenInvalid SessTokenInvalid
 }
 
 // ListMyProjectsErrorResponseType is oneOf type of ListMyProjectsErrorResponse.
@@ -25565,7 +25564,6 @@ const (
 	AuthUnauthorizedListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "auth.unauthorized"
 	InternalListMyProjectsErrorResponse         ListMyProjectsErrorResponseType = "internal"
 	ReqInvalidListMyProjectsErrorResponse       ListMyProjectsErrorResponseType = "req.invalid"
-	SessTokenInvalidListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "sess.token_invalid"
 )
 
 // IsAuthUnauthorized reports whether ListMyProjectsErrorResponse is AuthUnauthorized.
@@ -25581,11 +25579,6 @@ func (s ListMyProjectsErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether ListMyProjectsErrorResponse is ReqInvalid.
 func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyProjectsErrorResponse
-}
-
-// IsSessTokenInvalid reports whether ListMyProjectsErrorResponse is SessTokenInvalid.
-func (s ListMyProjectsErrorResponse) IsSessTokenInvalid() bool {
-	return s.Type == SessTokenInvalidListMyProjectsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListMyProjectsErrorResponse to AuthUnauthorized.
@@ -25648,27 +25641,6 @@ func (s ListMyProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListMyProjectsErrorResponse(v ReqInvalid) ListMyProjectsErrorResponse {
 	var s ListMyProjectsErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetSessTokenInvalid sets ListMyProjectsErrorResponse to SessTokenInvalid.
-func (s *ListMyProjectsErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
-	s.Type = SessTokenInvalidListMyProjectsErrorResponse
-	s.SessTokenInvalid = v
-}
-
-// GetSessTokenInvalid returns SessTokenInvalid and true boolean if ListMyProjectsErrorResponse is SessTokenInvalid.
-func (s ListMyProjectsErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
-	if !s.IsSessTokenInvalid() {
-		return v, false
-	}
-	return s.SessTokenInvalid, true
-}
-
-// NewSessTokenInvalidListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from SessTokenInvalid.
-func NewSessTokenInvalidListMyProjectsErrorResponse(v SessTokenInvalid) ListMyProjectsErrorResponse {
-	var s ListMyProjectsErrorResponse
-	s.SetSessTokenInvalid(v)
 	return s
 }
 
