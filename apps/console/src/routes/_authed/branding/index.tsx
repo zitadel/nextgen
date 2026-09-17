@@ -80,9 +80,12 @@ function BrandingScreen() {
         <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Branding</h1>
       </div>
 
-      <div className="mt-3 flex items-center gap-[10px] px-2">
+      {/* Two rows on a phone, one on a desktop: the design pairs the selectors
+          on the first row and the tabs with the environment buttons on the
+          second, each edge-aligned. The separators only exist inline. */}
+      <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-[10px] lg:px-2">
         {flows.length > 0 && (
-          <>
+          <div className="flex items-center justify-between gap-[10px]">
             <Select value={flowName} onValueChange={setFlowName}>
               <SelectTrigger aria-label="Previewed flow" className={GHOST_TRIGGER}>
                 <Workflow />
@@ -101,38 +104,40 @@ function BrandingScreen() {
             </Select>
             {/* The vertical variant sets h-full, which wins over a plain h-5 and
                 collapses to nothing in a centred row, so the height is forced. */}
-            <Separator orientation="vertical" className="h-5!" />
-          </>
+            <Separator orientation="vertical" className="hidden h-5! lg:block" />
+          </div>
         )}
-        <Tabs value={journey} onValueChange={(value) => setJourney(value as PreviewJourney)}>
-          <TabsList>
-            {JOURNEYS.map((entry) => (
-              <TabsTrigger key={entry.id} value={entry.id}>
-                {entry.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center justify-between gap-[10px] lg:flex-1">
+          <Tabs value={journey} onValueChange={(value) => setJourney(value as PreviewJourney)}>
+            <TabsList>
+              {JOURNEYS.map((entry) => (
+                <TabsTrigger key={entry.id} value={entry.id}>
+                  {entry.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={narrow ? "Show at desktop width" : "Show at phone width"}
-            aria-pressed={narrow}
-            onClick={() => setNarrow((value) => !value)}
-          >
-            {narrow ? <Smartphone /> : <Monitor />}
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Switch the previewed theme"
-            onClick={() => setTheme(nextTheme(theme))}
-            title={`Theme: ${theme}`}
-          >
-            <Sun />
-          </Button>
+          <div className="flex items-center gap-2 lg:ml-auto">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={narrow ? "Show at desktop width" : "Show at phone width"}
+              aria-pressed={narrow}
+              onClick={() => setNarrow((value) => !value)}
+            >
+              {narrow ? <Smartphone /> : <Monitor />}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Switch the previewed theme"
+              onClick={() => setTheme(nextTheme(theme))}
+              title={`Theme: ${theme}`}
+            >
+              <Sun />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -141,8 +146,8 @@ function BrandingScreen() {
           otherwise the grid stretches the preview to the panel's full length.
           302px is the design's 300 plus the 1px card border each side, so the
           content the rows align to is the 276 the design lays them out in. */}
-      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_302px]">
-        <Card className="flex min-h-[32rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs">
+      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
+        <Card className="flex min-h-[29rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs lg:min-h-[32rem]">
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
