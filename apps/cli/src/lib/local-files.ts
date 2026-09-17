@@ -36,6 +36,7 @@ export type FileReferenceContext = { readonly cwd: string; readonly baseDir: str
 type Path = ReadonlyArray<string | number>;
 
 type Container = Record<string, unknown> | unknown[];
+const omittedReference = Symbol("omittedReference");
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -78,7 +79,11 @@ function readIfPresent(path: string): string | undefined {
   }
 }
 
-function readFileReference(path: string, ref: string, options: { readonly onMissing: "throw" | "omit" }): string | undefined {
+function readFileReference(
+  path: string,
+  ref: string,
+  options: { readonly onMissing: "throw" | "omit" },
+): string | typeof omittedReference {
   let content: string | undefined;
   try {
     content = readIfPresent(path);
@@ -91,7 +96,7 @@ function readFileReference(path: string, ref: string, options: { readonly onMiss
     return content;
   }
   if (options.onMissing === "omit") {
-    return undefined;
+    return omittedReference;
   }
   throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
     hint: "Create the referenced file or fix the path.",
@@ -215,13 +220,13 @@ export function inlineFileReferences<T>(
       return readFileReference(resolveFileReference(context, ref), ref, options);
     }
     if (Array.isArray(node)) {
-      return node.map(inline).filter((item) => item !== undefined);
+      return node.map(inline).filter((item) => item !== omittedReference);
     }
     if (isPlainObject(node)) {
       const out: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(node)) {
         const inlined = inline(value);
-        if (inlined !== undefined) {
+        if (inlined !== omittedReference) {
           out[key] = inlined;
         }
       }
