@@ -83,6 +83,15 @@ export function parseJson(stdout: string): unknown {
   return JSON.parse(stdout);
 }
 
+// Spelled as an escape so the pattern carries no literal control character.
+const ESC = "\\u001B";
+const ANSI_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+/** Drops SGR colour codes so assertions can target the text itself. */
+export function stripAnsi(text: string): string {
+  return text.replaceAll(ANSI_SEQUENCE, "");
+}
+
 export function expectedPublicCliCommand(args: string): string {
   return publicCliCommand(args, cliVersion.version);
 }
