@@ -8,3 +8,20 @@ api/openapi/endpoints/schemas/user-schema.yaml:
     # a data-format migration.
     - '#/properties/objectType'
     - '#/properties/metaSchema'
+api/openapi/endpoints/schemas/sso-auth-method.yaml:
+  no-required-schema-properties-undefined:
+    # `providers` is defined at the schema root; the if/then/else arms only
+    # require or forbid it depending on `enabled`, which is what gives editors
+    # a precise error instead of an "all arms failed" oneOf.
+    - '#/then/required/0'
+    - '#/else/not/required/0'
+api/openapi/components/flows/flow-definition-step.yaml:
+  no-required-schema-properties-undefined:
+    # Every name is a step property defined at the schema root; each arm of the
+    # rejection `not` only tests whether it is present, which is how the dialect
+    # states the step shapes the engine cannot run without breaking codegen.
+    - '#/not/anyOf/0/anyOf/0/not/required/0'
+    - '#/not/anyOf/0/anyOf/1/properties/transitions/not/required/0'
+    - '#/not/anyOf/1/required/0'
+    - '#/not/anyOf/2/not/required/0'
+    - '#/not/anyOf/2/properties/transitions/not/required/0'

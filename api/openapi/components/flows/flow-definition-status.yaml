@@ -5,7 +5,5 @@ description: |
   
   active: The flow definition is ready to be used. The flow engine can select it for new flows.
   draft: The engine will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.
-  
-  Allowed transitions:
-  - draft -> active: To activate the flow definition.
-  - active -> draft: To remove the flow definition from active use immediately.
+
+  A revision's status is fixed at creation. Publish a new revision to change it.

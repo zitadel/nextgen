@@ -17,6 +17,10 @@ tasks:
       - "scripts/sync-meta-schemas.mjs"
     outputs:
       - "meta-schemas/*.json"
+    options:
+      # Reads files server:generate and its checks rewrite or prune; see the
+      # mutex note on server:generate.
+      mutex: "generated-sources"
 
   lint:
     command: "corepack pnpm run lint"

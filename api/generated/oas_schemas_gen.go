@@ -3493,11 +3493,11 @@ func (s *AuthMethod) SetEnabled(val bool) {
 // A list of authentication methods supported by the user definition.
 // Ref: #
 type AuthMethods struct {
-	Password  OptAuthMethod `json:"password"`
-	Passkey   OptAuthMethod `json:"passkey"`
-	MagicLink OptAuthMethod `json:"magic_link"`
-	SSO       OptAuthMethod `json:"sso"`
-	Otp       OptAuthMethod `json:"otp"`
+	Password  OptAuthMethod    `json:"password"`
+	Passkey   OptAuthMethod    `json:"passkey"`
+	MagicLink OptAuthMethod    `json:"magic_link"`
+	SSO       OptSSOAuthMethod `json:"sso"`
+	Otp       OptAuthMethod    `json:"otp"`
 }
 
 // GetPassword returns the value of Password.
@@ -3516,7 +3516,7 @@ func (s *AuthMethods) GetMagicLink() OptAuthMethod {
 }
 
 // GetSSO returns the value of SSO.
-func (s *AuthMethods) GetSSO() OptAuthMethod {
+func (s *AuthMethods) GetSSO() OptSSOAuthMethod {
 	return s.SSO
 }
 
@@ -3541,7 +3541,7 @@ func (s *AuthMethods) SetMagicLink(val OptAuthMethod) {
 }
 
 // SetSSO sets the value of SSO.
-func (s *AuthMethods) SetSSO(val OptAuthMethod) {
+func (s *AuthMethods) SetSSO(val OptSSOAuthMethod) {
 	s.SSO = val
 }
 
@@ -4498,6 +4498,7 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 }
 
 func (*AuthUnauthorized) completeClaimRes()   {}
+func (*AuthUnauthorized) listMyProjectsRes()  {}
 func (*AuthUnauthorized) revokeMySessionRes() {}
 
 // Additional error-specific context.
@@ -5942,16 +5943,25 @@ func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes
 // Branding configuration, used in two places with one shape: as the request
 // body of `POST /branding`, which publishes it as a new immutable revision,
 // and as a read-only projection on flow responses, which carries the
-// project's latest revision.
+// project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+// that `zitadel apply` publishes.
 // Every field is optional. An omitted key uses Zitadel's maintained default,
 // so a revision carrying one colour is as valid as one carrying the whole
 // object.
 // Ref: #
 type Branding struct {
-	// Layout preset the bundled template branches on, and the degrade target
-	// when a custom template fails validation. Ejected templates may ignore
-	// it. Selects a template rather than restyling the widget, so it is not
-	// an appearance control.
+	// Editor affordance: path or URL of this file's JSON meta-schema, so an
+	// editor validates and autocompletes it. The CLI strips it before upload;
+	// the platform ignores it.
+	Schema OptString `json:"$schema"`
+	// Degrade preset (`centered` or `split`) the bundled default template
+	// branches on, and the fallback when a custom template fails validation.
+	// Not the complete design catalog: all named designs (`centered`, `split`,
+	// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+	// these two values; switch designs with
+	// `zitadel branding eject --design <name>` instead of editing this field.
+	// Ejected templates may ignore it. Selects a template rather than restyling
+	// the widget, so it is not an appearance control.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template for rendering this step. The orchestrator renders
 	// it into its Shadow DOM with the capability dictionaries as context.
@@ -5965,6 +5975,11 @@ type Branding struct {
 	Theme      OptBrandingTheme      `json:"theme"`
 	Typography OptBrandingTypography `json:"typography"`
 	Shape      OptBrandingShape      `json:"shape"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *Branding) GetSchema() OptString {
+	return s.Schema
 }
 
 // GetLayout returns the value of Layout.
@@ -6000,6 +6015,11 @@ func (s *Branding) GetTypography() OptBrandingTypography {
 // GetShape returns the value of Shape.
 func (s *Branding) GetShape() OptBrandingShape {
 	return s.Shape
+}
+
+// SetSchema sets the value of Schema.
+func (s *Branding) SetSchema(val OptString) {
+	s.Schema = val
 }
 
 // SetLayout sets the value of Layout.
@@ -6533,10 +6553,14 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
-// Layout preset the bundled template branches on, and the degrade target
-// when a custom template fails validation. Ejected templates may ignore
-// it. Selects a template rather than restyling the widget, so it is not
-// an appearance control.
+// Degrade preset (`centered` or `split`) the bundled default template
+// branches on, and the fallback when a custom template fails validation.
+// Not the complete design catalog: all named designs (`centered`, `split`,
+// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+// these two values; switch designs with
+// `zitadel branding eject --design <name>` instead of editing this field.
+// Ejected templates may ignore it. Selects a template rather than restyling
+// the widget, so it is not an appearance control.
 type BrandingLayout string
 
 const (
@@ -10970,13 +10994,437 @@ func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
 	s.GitDirty = val
 }
 
-type CreateSchemaBadRequest ErrorDetails
+// CreateSchemaErrorResponse represents sum type.
+type CreateSchemaErrorResponse struct {
+	Type                     CreateSchemaErrorResponseType // switch on this field
+	AuthUnauthorized         AuthUnauthorized
+	EvtInvalid               EvtInvalid
+	Internal                 Internal
+	SchAlreadyExists         SchAlreadyExists
+	SchFetchDenied           SchFetchDenied
+	SchFetchDowngrade        SchFetchDowngrade
+	SchFetchTimeout          SchFetchTimeout
+	SchFetchTooLarge         SchFetchTooLarge
+	SchFetchTooManyRedirects SchFetchTooManyRedirects
+	SchInvalidRequest        SchInvalidRequest
+	SchNotFound              SchNotFound
+	SchPermissionDenied      SchPermissionDenied
+	SchRevisionConflict      SchRevisionConflict
+	ReqInvalid               ReqInvalid
+}
 
-func (*CreateSchemaBadRequest) createSchemaRes() {}
+// CreateSchemaErrorResponseType is oneOf type of CreateSchemaErrorResponse.
+type CreateSchemaErrorResponseType string
 
-type CreateSchemaConflict ErrorDetails
+// Possible values for CreateSchemaErrorResponseType.
+const (
+	AuthUnauthorizedCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateSchemaErrorResponse               CreateSchemaErrorResponseType = "evt.invalid"
+	InternalCreateSchemaErrorResponse                 CreateSchemaErrorResponseType = "internal"
+	SchAlreadyExistsCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "sch.already_exists"
+	SchFetchDeniedCreateSchemaErrorResponse           CreateSchemaErrorResponseType = "sch.fetch_denied"
+	SchFetchDowngradeCreateSchemaErrorResponse        CreateSchemaErrorResponseType = "sch.fetch_downgrade"
+	SchFetchTimeoutCreateSchemaErrorResponse          CreateSchemaErrorResponseType = "sch.fetch_timeout"
+	SchFetchTooLargeCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "sch.fetch_too_large"
+	SchFetchTooManyRedirectsCreateSchemaErrorResponse CreateSchemaErrorResponseType = "sch.fetch_too_many_redirects"
+	SchInvalidRequestCreateSchemaErrorResponse        CreateSchemaErrorResponseType = "sch.invalid_request"
+	SchNotFoundCreateSchemaErrorResponse              CreateSchemaErrorResponseType = "sch.not_found"
+	SchPermissionDeniedCreateSchemaErrorResponse      CreateSchemaErrorResponseType = "sch.permission_denied"
+	SchRevisionConflictCreateSchemaErrorResponse      CreateSchemaErrorResponseType = "sch.revision_conflict"
+	ReqInvalidCreateSchemaErrorResponse               CreateSchemaErrorResponseType = "req.invalid"
+)
 
-func (*CreateSchemaConflict) createSchemaRes() {}
+// IsAuthUnauthorized reports whether CreateSchemaErrorResponse is AuthUnauthorized.
+func (s CreateSchemaErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateSchemaErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateSchemaErrorResponse is EvtInvalid.
+func (s CreateSchemaErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateSchemaErrorResponse
+}
+
+// IsInternal reports whether CreateSchemaErrorResponse is Internal.
+func (s CreateSchemaErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateSchemaErrorResponse
+}
+
+// IsSchAlreadyExists reports whether CreateSchemaErrorResponse is SchAlreadyExists.
+func (s CreateSchemaErrorResponse) IsSchAlreadyExists() bool {
+	return s.Type == SchAlreadyExistsCreateSchemaErrorResponse
+}
+
+// IsSchFetchDenied reports whether CreateSchemaErrorResponse is SchFetchDenied.
+func (s CreateSchemaErrorResponse) IsSchFetchDenied() bool {
+	return s.Type == SchFetchDeniedCreateSchemaErrorResponse
+}
+
+// IsSchFetchDowngrade reports whether CreateSchemaErrorResponse is SchFetchDowngrade.
+func (s CreateSchemaErrorResponse) IsSchFetchDowngrade() bool {
+	return s.Type == SchFetchDowngradeCreateSchemaErrorResponse
+}
+
+// IsSchFetchTimeout reports whether CreateSchemaErrorResponse is SchFetchTimeout.
+func (s CreateSchemaErrorResponse) IsSchFetchTimeout() bool {
+	return s.Type == SchFetchTimeoutCreateSchemaErrorResponse
+}
+
+// IsSchFetchTooLarge reports whether CreateSchemaErrorResponse is SchFetchTooLarge.
+func (s CreateSchemaErrorResponse) IsSchFetchTooLarge() bool {
+	return s.Type == SchFetchTooLargeCreateSchemaErrorResponse
+}
+
+// IsSchFetchTooManyRedirects reports whether CreateSchemaErrorResponse is SchFetchTooManyRedirects.
+func (s CreateSchemaErrorResponse) IsSchFetchTooManyRedirects() bool {
+	return s.Type == SchFetchTooManyRedirectsCreateSchemaErrorResponse
+}
+
+// IsSchInvalidRequest reports whether CreateSchemaErrorResponse is SchInvalidRequest.
+func (s CreateSchemaErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestCreateSchemaErrorResponse
+}
+
+// IsSchNotFound reports whether CreateSchemaErrorResponse is SchNotFound.
+func (s CreateSchemaErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundCreateSchemaErrorResponse
+}
+
+// IsSchPermissionDenied reports whether CreateSchemaErrorResponse is SchPermissionDenied.
+func (s CreateSchemaErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedCreateSchemaErrorResponse
+}
+
+// IsSchRevisionConflict reports whether CreateSchemaErrorResponse is SchRevisionConflict.
+func (s CreateSchemaErrorResponse) IsSchRevisionConflict() bool {
+	return s.Type == SchRevisionConflictCreateSchemaErrorResponse
+}
+
+// IsReqInvalid reports whether CreateSchemaErrorResponse is ReqInvalid.
+func (s CreateSchemaErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateSchemaErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateSchemaErrorResponse to AuthUnauthorized.
+func (s *CreateSchemaErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateSchemaErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateSchemaErrorResponse is AuthUnauthorized.
+func (s CreateSchemaErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateSchemaErrorResponse(v AuthUnauthorized) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateSchemaErrorResponse to EvtInvalid.
+func (s *CreateSchemaErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateSchemaErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateSchemaErrorResponse is EvtInvalid.
+func (s CreateSchemaErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateSchemaErrorResponse(v EvtInvalid) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets CreateSchemaErrorResponse to Internal.
+func (s *CreateSchemaErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateSchemaErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateSchemaErrorResponse is Internal.
+func (s CreateSchemaErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from Internal.
+func NewInternalCreateSchemaErrorResponse(v Internal) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchAlreadyExists sets CreateSchemaErrorResponse to SchAlreadyExists.
+func (s *CreateSchemaErrorResponse) SetSchAlreadyExists(v SchAlreadyExists) {
+	s.Type = SchAlreadyExistsCreateSchemaErrorResponse
+	s.SchAlreadyExists = v
+}
+
+// GetSchAlreadyExists returns SchAlreadyExists and true boolean if CreateSchemaErrorResponse is SchAlreadyExists.
+func (s CreateSchemaErrorResponse) GetSchAlreadyExists() (v SchAlreadyExists, ok bool) {
+	if !s.IsSchAlreadyExists() {
+		return v, false
+	}
+	return s.SchAlreadyExists, true
+}
+
+// NewSchAlreadyExistsCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchAlreadyExists.
+func NewSchAlreadyExistsCreateSchemaErrorResponse(v SchAlreadyExists) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchAlreadyExists(v)
+	return s
+}
+
+// SetSchFetchDenied sets CreateSchemaErrorResponse to SchFetchDenied.
+func (s *CreateSchemaErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
+	s.Type = SchFetchDeniedCreateSchemaErrorResponse
+	s.SchFetchDenied = v
+}
+
+// GetSchFetchDenied returns SchFetchDenied and true boolean if CreateSchemaErrorResponse is SchFetchDenied.
+func (s CreateSchemaErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
+	if !s.IsSchFetchDenied() {
+		return v, false
+	}
+	return s.SchFetchDenied, true
+}
+
+// NewSchFetchDeniedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchDenied.
+func NewSchFetchDeniedCreateSchemaErrorResponse(v SchFetchDenied) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchDenied(v)
+	return s
+}
+
+// SetSchFetchDowngrade sets CreateSchemaErrorResponse to SchFetchDowngrade.
+func (s *CreateSchemaErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
+	s.Type = SchFetchDowngradeCreateSchemaErrorResponse
+	s.SchFetchDowngrade = v
+}
+
+// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if CreateSchemaErrorResponse is SchFetchDowngrade.
+func (s CreateSchemaErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
+	if !s.IsSchFetchDowngrade() {
+		return v, false
+	}
+	return s.SchFetchDowngrade, true
+}
+
+// NewSchFetchDowngradeCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchDowngrade.
+func NewSchFetchDowngradeCreateSchemaErrorResponse(v SchFetchDowngrade) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchDowngrade(v)
+	return s
+}
+
+// SetSchFetchTimeout sets CreateSchemaErrorResponse to SchFetchTimeout.
+func (s *CreateSchemaErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
+	s.Type = SchFetchTimeoutCreateSchemaErrorResponse
+	s.SchFetchTimeout = v
+}
+
+// GetSchFetchTimeout returns SchFetchTimeout and true boolean if CreateSchemaErrorResponse is SchFetchTimeout.
+func (s CreateSchemaErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
+	if !s.IsSchFetchTimeout() {
+		return v, false
+	}
+	return s.SchFetchTimeout, true
+}
+
+// NewSchFetchTimeoutCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchTimeout.
+func NewSchFetchTimeoutCreateSchemaErrorResponse(v SchFetchTimeout) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchTimeout(v)
+	return s
+}
+
+// SetSchFetchTooLarge sets CreateSchemaErrorResponse to SchFetchTooLarge.
+func (s *CreateSchemaErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
+	s.Type = SchFetchTooLargeCreateSchemaErrorResponse
+	s.SchFetchTooLarge = v
+}
+
+// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if CreateSchemaErrorResponse is SchFetchTooLarge.
+func (s CreateSchemaErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
+	if !s.IsSchFetchTooLarge() {
+		return v, false
+	}
+	return s.SchFetchTooLarge, true
+}
+
+// NewSchFetchTooLargeCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchTooLarge.
+func NewSchFetchTooLargeCreateSchemaErrorResponse(v SchFetchTooLarge) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchTooLarge(v)
+	return s
+}
+
+// SetSchFetchTooManyRedirects sets CreateSchemaErrorResponse to SchFetchTooManyRedirects.
+func (s *CreateSchemaErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
+	s.Type = SchFetchTooManyRedirectsCreateSchemaErrorResponse
+	s.SchFetchTooManyRedirects = v
+}
+
+// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if CreateSchemaErrorResponse is SchFetchTooManyRedirects.
+func (s CreateSchemaErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
+	if !s.IsSchFetchTooManyRedirects() {
+		return v, false
+	}
+	return s.SchFetchTooManyRedirects, true
+}
+
+// NewSchFetchTooManyRedirectsCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchTooManyRedirects.
+func NewSchFetchTooManyRedirectsCreateSchemaErrorResponse(v SchFetchTooManyRedirects) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchTooManyRedirects(v)
+	return s
+}
+
+// SetSchInvalidRequest sets CreateSchemaErrorResponse to SchInvalidRequest.
+func (s *CreateSchemaErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestCreateSchemaErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if CreateSchemaErrorResponse is SchInvalidRequest.
+func (s CreateSchemaErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestCreateSchemaErrorResponse(v SchInvalidRequest) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchInvalidRequest(v)
+	return s
+}
+
+// SetSchNotFound sets CreateSchemaErrorResponse to SchNotFound.
+func (s *CreateSchemaErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundCreateSchemaErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if CreateSchemaErrorResponse is SchNotFound.
+func (s CreateSchemaErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchNotFound.
+func NewSchNotFoundCreateSchemaErrorResponse(v SchNotFound) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets CreateSchemaErrorResponse to SchPermissionDenied.
+func (s *CreateSchemaErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedCreateSchemaErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if CreateSchemaErrorResponse is SchPermissionDenied.
+func (s CreateSchemaErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedCreateSchemaErrorResponse(v SchPermissionDenied) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchPermissionDenied(v)
+	return s
+}
+
+// SetSchRevisionConflict sets CreateSchemaErrorResponse to SchRevisionConflict.
+func (s *CreateSchemaErrorResponse) SetSchRevisionConflict(v SchRevisionConflict) {
+	s.Type = SchRevisionConflictCreateSchemaErrorResponse
+	s.SchRevisionConflict = v
+}
+
+// GetSchRevisionConflict returns SchRevisionConflict and true boolean if CreateSchemaErrorResponse is SchRevisionConflict.
+func (s CreateSchemaErrorResponse) GetSchRevisionConflict() (v SchRevisionConflict, ok bool) {
+	if !s.IsSchRevisionConflict() {
+		return v, false
+	}
+	return s.SchRevisionConflict, true
+}
+
+// NewSchRevisionConflictCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchRevisionConflict.
+func NewSchRevisionConflictCreateSchemaErrorResponse(v SchRevisionConflict) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchRevisionConflict(v)
+	return s
+}
+
+// SetReqInvalid sets CreateSchemaErrorResponse to ReqInvalid.
+func (s *CreateSchemaErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateSchemaErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateSchemaErrorResponse is ReqInvalid.
+func (s CreateSchemaErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from ReqInvalid.
+func NewReqInvalidCreateSchemaErrorResponse(v ReqInvalid) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateSchemaErrorResponseStatusCode wraps CreateSchemaErrorResponse with StatusCode.
+type CreateSchemaErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateSchemaErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateSchemaErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateSchemaErrorResponseStatusCode) GetResponse() CreateSchemaErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateSchemaErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateSchemaErrorResponseStatusCode) SetResponse(val CreateSchemaErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateSchemaErrorResponseStatusCode) createSchemaRes() {}
 
 // CreateSchemaReq represents sum type.
 type CreateSchemaReq struct {
@@ -11835,275 +12283,6 @@ func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
 type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
-
-// DeleteFlowDefinitionErrorResponse represents sum type.
-type DeleteFlowDefinitionErrorResponse struct {
-	Type                    DeleteFlowDefinitionErrorResponseType // switch on this field
-	AuthUnauthorized        AuthUnauthorized
-	EvtInvalid              EvtInvalid
-	FlowdefNotFound         FlowdefNotFound
-	FlowdefPermissionDenied FlowdefPermissionDenied
-	Internal                Internal
-	FlowdefMissingID        FlowdefMissingID
-	FlowdefMissingProjectID FlowdefMissingProjectID
-	ReqInvalid              ReqInvalid
-}
-
-// DeleteFlowDefinitionErrorResponseType is oneOf type of DeleteFlowDefinitionErrorResponse.
-type DeleteFlowDefinitionErrorResponseType string
-
-// Possible values for DeleteFlowDefinitionErrorResponseType.
-const (
-	AuthUnauthorizedDeleteFlowDefinitionErrorResponse        DeleteFlowDefinitionErrorResponseType = "auth.unauthorized"
-	EvtInvalidDeleteFlowDefinitionErrorResponse              DeleteFlowDefinitionErrorResponseType = "evt.invalid"
-	FlowdefNotFoundDeleteFlowDefinitionErrorResponse         DeleteFlowDefinitionErrorResponseType = "flowdef.not_found"
-	FlowdefPermissionDeniedDeleteFlowDefinitionErrorResponse DeleteFlowDefinitionErrorResponseType = "flowdef.permission_denied"
-	InternalDeleteFlowDefinitionErrorResponse                DeleteFlowDefinitionErrorResponseType = "internal"
-	FlowdefMissingIDDeleteFlowDefinitionErrorResponse        DeleteFlowDefinitionErrorResponseType = "flowdef.missing_id"
-	FlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse DeleteFlowDefinitionErrorResponseType = "flowdef.missing_project_id"
-	ReqInvalidDeleteFlowDefinitionErrorResponse              DeleteFlowDefinitionErrorResponseType = "req.invalid"
-)
-
-// IsAuthUnauthorized reports whether DeleteFlowDefinitionErrorResponse is AuthUnauthorized.
-func (s DeleteFlowDefinitionErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedDeleteFlowDefinitionErrorResponse
-}
-
-// IsEvtInvalid reports whether DeleteFlowDefinitionErrorResponse is EvtInvalid.
-func (s DeleteFlowDefinitionErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidDeleteFlowDefinitionErrorResponse
-}
-
-// IsFlowdefNotFound reports whether DeleteFlowDefinitionErrorResponse is FlowdefNotFound.
-func (s DeleteFlowDefinitionErrorResponse) IsFlowdefNotFound() bool {
-	return s.Type == FlowdefNotFoundDeleteFlowDefinitionErrorResponse
-}
-
-// IsFlowdefPermissionDenied reports whether DeleteFlowDefinitionErrorResponse is FlowdefPermissionDenied.
-func (s DeleteFlowDefinitionErrorResponse) IsFlowdefPermissionDenied() bool {
-	return s.Type == FlowdefPermissionDeniedDeleteFlowDefinitionErrorResponse
-}
-
-// IsInternal reports whether DeleteFlowDefinitionErrorResponse is Internal.
-func (s DeleteFlowDefinitionErrorResponse) IsInternal() bool {
-	return s.Type == InternalDeleteFlowDefinitionErrorResponse
-}
-
-// IsFlowdefMissingID reports whether DeleteFlowDefinitionErrorResponse is FlowdefMissingID.
-func (s DeleteFlowDefinitionErrorResponse) IsFlowdefMissingID() bool {
-	return s.Type == FlowdefMissingIDDeleteFlowDefinitionErrorResponse
-}
-
-// IsFlowdefMissingProjectID reports whether DeleteFlowDefinitionErrorResponse is FlowdefMissingProjectID.
-func (s DeleteFlowDefinitionErrorResponse) IsFlowdefMissingProjectID() bool {
-	return s.Type == FlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse
-}
-
-// IsReqInvalid reports whether DeleteFlowDefinitionErrorResponse is ReqInvalid.
-func (s DeleteFlowDefinitionErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidDeleteFlowDefinitionErrorResponse
-}
-
-// SetAuthUnauthorized sets DeleteFlowDefinitionErrorResponse to AuthUnauthorized.
-func (s *DeleteFlowDefinitionErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedDeleteFlowDefinitionErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if DeleteFlowDefinitionErrorResponse is AuthUnauthorized.
-func (s DeleteFlowDefinitionErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedDeleteFlowDefinitionErrorResponse(v AuthUnauthorized) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetEvtInvalid sets DeleteFlowDefinitionErrorResponse to EvtInvalid.
-func (s *DeleteFlowDefinitionErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidDeleteFlowDefinitionErrorResponse
-	s.EvtInvalid = v
-}
-
-// GetEvtInvalid returns EvtInvalid and true boolean if DeleteFlowDefinitionErrorResponse is EvtInvalid.
-func (s DeleteFlowDefinitionErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
-	if !s.IsEvtInvalid() {
-		return v, false
-	}
-	return s.EvtInvalid, true
-}
-
-// NewEvtInvalidDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from EvtInvalid.
-func NewEvtInvalidDeleteFlowDefinitionErrorResponse(v EvtInvalid) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetEvtInvalid(v)
-	return s
-}
-
-// SetFlowdefNotFound sets DeleteFlowDefinitionErrorResponse to FlowdefNotFound.
-func (s *DeleteFlowDefinitionErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
-	s.Type = FlowdefNotFoundDeleteFlowDefinitionErrorResponse
-	s.FlowdefNotFound = v
-}
-
-// GetFlowdefNotFound returns FlowdefNotFound and true boolean if DeleteFlowDefinitionErrorResponse is FlowdefNotFound.
-func (s DeleteFlowDefinitionErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
-	if !s.IsFlowdefNotFound() {
-		return v, false
-	}
-	return s.FlowdefNotFound, true
-}
-
-// NewFlowdefNotFoundDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from FlowdefNotFound.
-func NewFlowdefNotFoundDeleteFlowDefinitionErrorResponse(v FlowdefNotFound) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetFlowdefNotFound(v)
-	return s
-}
-
-// SetFlowdefPermissionDenied sets DeleteFlowDefinitionErrorResponse to FlowdefPermissionDenied.
-func (s *DeleteFlowDefinitionErrorResponse) SetFlowdefPermissionDenied(v FlowdefPermissionDenied) {
-	s.Type = FlowdefPermissionDeniedDeleteFlowDefinitionErrorResponse
-	s.FlowdefPermissionDenied = v
-}
-
-// GetFlowdefPermissionDenied returns FlowdefPermissionDenied and true boolean if DeleteFlowDefinitionErrorResponse is FlowdefPermissionDenied.
-func (s DeleteFlowDefinitionErrorResponse) GetFlowdefPermissionDenied() (v FlowdefPermissionDenied, ok bool) {
-	if !s.IsFlowdefPermissionDenied() {
-		return v, false
-	}
-	return s.FlowdefPermissionDenied, true
-}
-
-// NewFlowdefPermissionDeniedDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from FlowdefPermissionDenied.
-func NewFlowdefPermissionDeniedDeleteFlowDefinitionErrorResponse(v FlowdefPermissionDenied) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetFlowdefPermissionDenied(v)
-	return s
-}
-
-// SetInternal sets DeleteFlowDefinitionErrorResponse to Internal.
-func (s *DeleteFlowDefinitionErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalDeleteFlowDefinitionErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if DeleteFlowDefinitionErrorResponse is Internal.
-func (s DeleteFlowDefinitionErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from Internal.
-func NewInternalDeleteFlowDefinitionErrorResponse(v Internal) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetFlowdefMissingID sets DeleteFlowDefinitionErrorResponse to FlowdefMissingID.
-func (s *DeleteFlowDefinitionErrorResponse) SetFlowdefMissingID(v FlowdefMissingID) {
-	s.Type = FlowdefMissingIDDeleteFlowDefinitionErrorResponse
-	s.FlowdefMissingID = v
-}
-
-// GetFlowdefMissingID returns FlowdefMissingID and true boolean if DeleteFlowDefinitionErrorResponse is FlowdefMissingID.
-func (s DeleteFlowDefinitionErrorResponse) GetFlowdefMissingID() (v FlowdefMissingID, ok bool) {
-	if !s.IsFlowdefMissingID() {
-		return v, false
-	}
-	return s.FlowdefMissingID, true
-}
-
-// NewFlowdefMissingIDDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from FlowdefMissingID.
-func NewFlowdefMissingIDDeleteFlowDefinitionErrorResponse(v FlowdefMissingID) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetFlowdefMissingID(v)
-	return s
-}
-
-// SetFlowdefMissingProjectID sets DeleteFlowDefinitionErrorResponse to FlowdefMissingProjectID.
-func (s *DeleteFlowDefinitionErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
-	s.Type = FlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse
-	s.FlowdefMissingProjectID = v
-}
-
-// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if DeleteFlowDefinitionErrorResponse is FlowdefMissingProjectID.
-func (s DeleteFlowDefinitionErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
-	if !s.IsFlowdefMissingProjectID() {
-		return v, false
-	}
-	return s.FlowdefMissingProjectID, true
-}
-
-// NewFlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from FlowdefMissingProjectID.
-func NewFlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse(v FlowdefMissingProjectID) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetFlowdefMissingProjectID(v)
-	return s
-}
-
-// SetReqInvalid sets DeleteFlowDefinitionErrorResponse to ReqInvalid.
-func (s *DeleteFlowDefinitionErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidDeleteFlowDefinitionErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if DeleteFlowDefinitionErrorResponse is ReqInvalid.
-func (s DeleteFlowDefinitionErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from ReqInvalid.
-func NewReqInvalidDeleteFlowDefinitionErrorResponse(v ReqInvalid) DeleteFlowDefinitionErrorResponse {
-	var s DeleteFlowDefinitionErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// DeleteFlowDefinitionErrorResponseStatusCode wraps DeleteFlowDefinitionErrorResponse with StatusCode.
-type DeleteFlowDefinitionErrorResponseStatusCode struct {
-	StatusCode int
-	Response   DeleteFlowDefinitionErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *DeleteFlowDefinitionErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *DeleteFlowDefinitionErrorResponseStatusCode) GetResponse() DeleteFlowDefinitionErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *DeleteFlowDefinitionErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *DeleteFlowDefinitionErrorResponseStatusCode) SetResponse(val DeleteFlowDefinitionErrorResponse) {
-	s.Response = val
-}
-
-func (*DeleteFlowDefinitionErrorResponseStatusCode) deleteFlowDefinitionRes() {}
-
-// DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
-type DeleteFlowDefinitionNoContent struct{}
-
-func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
 
 // DeleteGrantErrorResponse represents sum type.
 type DeleteGrantErrorResponse struct {
@@ -13461,7 +13640,6 @@ func (*ErrorDetails) createFlowDefinitionRes() {}
 func (*ErrorDetails) createFlowRes()           {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
-func (*ErrorDetails) deleteFlowDefinitionRes() {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
@@ -13508,7 +13686,6 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 
 func (*ErrorDetailsStatusCode) completeClaimRes()   {}
 func (*ErrorDetailsStatusCode) createBrandingRes()  {}
-func (*ErrorDetailsStatusCode) createSchemaRes()    {}
 func (*ErrorDetailsStatusCode) createTeamRes()      {}
 func (*ErrorDetailsStatusCode) deleteTeamRes()      {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes() {}
@@ -13518,12 +13695,10 @@ func (*ErrorDetailsStatusCode) getEventRes()        {}
 func (*ErrorDetailsStatusCode) getHealthRes()       {}
 func (*ErrorDetailsStatusCode) getLiveRes()         {}
 func (*ErrorDetailsStatusCode) getReadyRes()        {}
-func (*ErrorDetailsStatusCode) getSchemaByIdRes()   {}
 func (*ErrorDetailsStatusCode) getTeamRes()         {}
 func (*ErrorDetailsStatusCode) initClaimRes()       {}
 func (*ErrorDetailsStatusCode) listBrandingRes()    {}
 func (*ErrorDetailsStatusCode) listEventsRes()      {}
-func (*ErrorDetailsStatusCode) listSchemasRes()     {}
 func (*ErrorDetailsStatusCode) queryTeamsRes()      {}
 func (*ErrorDetailsStatusCode) updateTeamRes()      {}
 
@@ -16285,6 +16460,10 @@ func (s *FlowCookieInvalidDetails) init() FlowCookieInvalidDetails {
 // the purpose + audience when a flow is created via POST /flow.
 // Ref: #
 type FlowDefinition struct {
+	// Editor affordance: path or URL of this file's JSON meta-schema, so an
+	// editor validates and autocompletes it. The CLI strips it before upload;
+	// the platform ignores it.
+	Schema OptString `json:"$schema"`
 	// Stable identifier for this flow, used as the target of cross-flow
 	// `switch` and `pivot` transitions. Every revision of a flow shares its
 	// `name`; publishing a definition under an existing `name` adds a
@@ -16308,6 +16487,11 @@ type FlowDefinition struct {
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
 	Steps []FlowDefinitionStep `json:"steps"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *FlowDefinition) GetSchema() OptString {
+	return s.Schema
 }
 
 // GetName returns the value of Name.
@@ -16338,6 +16522,11 @@ func (s *FlowDefinition) GetAudience() OptFlowAudience {
 // GetSteps returns the value of Steps.
 func (s *FlowDefinition) GetSteps() []FlowDefinitionStep {
 	return s.Steps
+}
+
+// SetSchema sets the value of Schema.
+func (s *FlowDefinition) SetSchema(val OptString) {
+	s.Schema = val
 }
 
 // SetName sets the value of Name.
@@ -16535,15 +16724,12 @@ func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
 
 func (*FlowDefinitionResponse) createFlowDefinitionRes() {}
 func (*FlowDefinitionResponse) getFlowDefinitionRes()    {}
-func (*FlowDefinitionResponse) updateFlowDefinitionRes() {}
 
 // The lifecycle state of this flow definition.
 // active: The flow definition is ready to be used. The flow engine can select it for new flows.
 // draft: The engine will not select it for new flows, and existing flows must handle it gracefully
 // if they reference this definition.
-// Allowed transitions:
-// - draft -> active: To activate the flow definition.
-// - active -> draft: To remove the flow definition from active use immediately.
+// A revision's status is fixed at creation. Publish a new revision to change it.
 // Ref: #
 type FlowDefinitionStatus string
 
@@ -16988,33 +17174,6 @@ func (s *FlowDefinitionStepTransitionsItemPurpose) UnmarshalText(data []byte) er
 	}
 }
 
-// Replaces the existing flow definition.
-// Ref: #
-type FlowDefinitionUpdateRequest struct {
-	SchemaURI      OptSchemaURI   `json:"schema_uri"`
-	FlowDefinition FlowDefinition `json:"flow_definition"`
-}
-
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionUpdateRequest) GetSchemaURI() OptSchemaURI {
-	return s.SchemaURI
-}
-
-// GetFlowDefinition returns the value of FlowDefinition.
-func (s *FlowDefinitionUpdateRequest) GetFlowDefinition() FlowDefinition {
-	return s.FlowDefinition
-}
-
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionUpdateRequest) SetSchemaURI(val OptSchemaURI) {
-	s.SchemaURI = val
-}
-
-// SetFlowDefinition sets the value of FlowDefinition.
-func (s *FlowDefinitionUpdateRequest) SetFlowDefinition(val FlowDefinition) {
-	s.FlowDefinition = val
-}
-
 // Ref: #
 type FlowHint struct {
 	// Auto-submits identifier step (maps to OIDC login_hint).
@@ -17447,7 +17606,7 @@ type FlowStep struct {
 	Fields []Field `json:"fields"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
-	Actions []StepAction `json:"actions"`
+	Actions []FlowStepAction `json:"actions"`
 	// Security gates that must be satisfied before the step can be submitted.
 	// The engine injects gates dynamically based on policy, even if they
 	// are not declared in the flow definition.
@@ -17494,7 +17653,7 @@ func (s *FlowStep) GetFields() []Field {
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowStep) GetActions() []StepAction {
+func (s *FlowStep) GetActions() []FlowStepAction {
 	return s.Actions
 }
 
@@ -17544,7 +17703,7 @@ func (s *FlowStep) SetFields(val []Field) {
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowStep) SetActions(val []StepAction) {
+func (s *FlowStep) SetActions(val []FlowStepAction) {
 	s.Actions = val
 }
 
@@ -17561,6 +17720,138 @@ func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
 // SetChallenge sets the value of Challenge.
 func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
 	s.Challenge = val
+}
+
+// An action the engine offers on a runtime step. Every declared action of the
+// definition's step appears here, plus the engine-injected `back` whenever
+// returning to the previous step is possible.
+// Ref: #
+type FlowStepAction struct {
+	// Action identifier. Sent back in the submit request as `action`.
+	Name string `json:"name"`
+	// How the client should treat the action:
+	// - `submit`: collect the step's fields and submit.
+	// - `passkey`: run a WebAuthn assertion, then submit the result.
+	// - `passkey_register`: run a WebAuthn registration, then submit the result.
+	// - `navigate`: submit without collecting fields; pure routing.
+	// - `back`: return the user to the previous step. Engine-injected, never
+	// declared in a flow definition.
+	Kind FlowStepActionKind `json:"kind"`
+	// Marks this as the default/primary action. The runtime template uses
+	// this hint to choose visual emphasis.
+	Primary OptBool `json:"primary"`
+	// Localization key for the action's label, resolved client-side from a
+	// locale dictionary.
+	TextKey OptString `json:"text_key"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowStepAction) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *FlowStepAction) GetKind() FlowStepActionKind {
+	return s.Kind
+}
+
+// GetPrimary returns the value of Primary.
+func (s *FlowStepAction) GetPrimary() OptBool {
+	return s.Primary
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *FlowStepAction) GetTextKey() OptString {
+	return s.TextKey
+}
+
+// SetName sets the value of Name.
+func (s *FlowStepAction) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *FlowStepAction) SetKind(val FlowStepActionKind) {
+	s.Kind = val
+}
+
+// SetPrimary sets the value of Primary.
+func (s *FlowStepAction) SetPrimary(val OptBool) {
+	s.Primary = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *FlowStepAction) SetTextKey(val OptString) {
+	s.TextKey = val
+}
+
+// How the client should treat the action:
+// - `submit`: collect the step's fields and submit.
+// - `passkey`: run a WebAuthn assertion, then submit the result.
+// - `passkey_register`: run a WebAuthn registration, then submit the result.
+// - `navigate`: submit without collecting fields; pure routing.
+// - `back`: return the user to the previous step. Engine-injected, never
+// declared in a flow definition.
+type FlowStepActionKind string
+
+const (
+	FlowStepActionKindSubmit          FlowStepActionKind = "submit"
+	FlowStepActionKindPasskey         FlowStepActionKind = "passkey"
+	FlowStepActionKindPasskeyRegister FlowStepActionKind = "passkey_register"
+	FlowStepActionKindNavigate        FlowStepActionKind = "navigate"
+	FlowStepActionKindBack            FlowStepActionKind = "back"
+)
+
+// AllValues returns all FlowStepActionKind values.
+func (FlowStepActionKind) AllValues() []FlowStepActionKind {
+	return []FlowStepActionKind{
+		FlowStepActionKindSubmit,
+		FlowStepActionKindPasskey,
+		FlowStepActionKindPasskeyRegister,
+		FlowStepActionKindNavigate,
+		FlowStepActionKindBack,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepActionKind) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepActionKindSubmit:
+		return []byte(s), nil
+	case FlowStepActionKindPasskey:
+		return []byte(s), nil
+	case FlowStepActionKindPasskeyRegister:
+		return []byte(s), nil
+	case FlowStepActionKindNavigate:
+		return []byte(s), nil
+	case FlowStepActionKindBack:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepActionKind) UnmarshalText(data []byte) error {
+	switch FlowStepActionKind(data) {
+	case FlowStepActionKindSubmit:
+		*s = FlowStepActionKindSubmit
+		return nil
+	case FlowStepActionKindPasskey:
+		*s = FlowStepActionKindPasskey
+		return nil
+	case FlowStepActionKindPasskeyRegister:
+		*s = FlowStepActionKindPasskeyRegister
+		return nil
+	case FlowStepActionKindNavigate:
+		*s = FlowStepActionKindNavigate
+		return nil
+	case FlowStepActionKindBack:
+		*s = FlowStepActionKindBack
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // A pending authentication challenge issued by the server. Present when the
@@ -19046,8 +19337,8 @@ func (s *FlowdefNotFoundDetails) init() FlowdefNotFoundDetails {
 	return m
 }
 
-// Shared allowlisted fields for `flowdef.created` (full snapshot) and
-// `flowdef.updated` (delta: only changed fields present). Steps are omitted.
+// Allowlisted fields of the created revision. Retired `flowdef.updated`
+// rows carry a delta in the same shape. Steps are omitted.
 // Ref: #
 type FlowdefPayload struct {
 	Name       OptString                 `json:"name"`
@@ -19294,59 +19585,6 @@ func (s *FlowdefSchemaFetchFailed) SetDetails(val OptFlowdefSchemaFetchFailedDet
 type FlowdefSchemaFetchFailedDetails map[string]jx.Raw
 
 func (s *FlowdefSchemaFetchFailedDetails) init() FlowdefSchemaFetchFailedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type FlowdefUpdateConflict struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptFlowdefUpdateConflictDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *FlowdefUpdateConflict) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *FlowdefUpdateConflict) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *FlowdefUpdateConflict) GetDetails() OptFlowdefUpdateConflictDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *FlowdefUpdateConflict) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *FlowdefUpdateConflict) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *FlowdefUpdateConflict) SetDetails(val OptFlowdefUpdateConflictDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type FlowdefUpdateConflictDetails map[string]jx.Raw
-
-func (s *FlowdefUpdateConflictDetails) init() FlowdefUpdateConflictDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -21912,13 +22150,185 @@ func (s *GetReleaseByIdErrorResponseStatusCode) SetResponse(val GetReleaseByIdEr
 
 func (*GetReleaseByIdErrorResponseStatusCode) getReleaseByIdRes() {}
 
-type GetSchemaByIdBadRequest ErrorDetails
+// GetSchemaByIdErrorResponse represents sum type.
+type GetSchemaByIdErrorResponse struct {
+	Type                GetSchemaByIdErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	SchNotFound         SchNotFound
+	SchPermissionDenied SchPermissionDenied
+	ReqInvalid          ReqInvalid
+}
 
-func (*GetSchemaByIdBadRequest) getSchemaByIdRes() {}
+// GetSchemaByIdErrorResponseType is oneOf type of GetSchemaByIdErrorResponse.
+type GetSchemaByIdErrorResponseType string
 
-type GetSchemaByIdNotFound ErrorDetails
+// Possible values for GetSchemaByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetSchemaByIdErrorResponse    GetSchemaByIdErrorResponseType = "auth.unauthorized"
+	InternalGetSchemaByIdErrorResponse            GetSchemaByIdErrorResponseType = "internal"
+	SchNotFoundGetSchemaByIdErrorResponse         GetSchemaByIdErrorResponseType = "sch.not_found"
+	SchPermissionDeniedGetSchemaByIdErrorResponse GetSchemaByIdErrorResponseType = "sch.permission_denied"
+	ReqInvalidGetSchemaByIdErrorResponse          GetSchemaByIdErrorResponseType = "req.invalid"
+)
 
-func (*GetSchemaByIdNotFound) getSchemaByIdRes() {}
+// IsAuthUnauthorized reports whether GetSchemaByIdErrorResponse is AuthUnauthorized.
+func (s GetSchemaByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetSchemaByIdErrorResponse
+}
+
+// IsInternal reports whether GetSchemaByIdErrorResponse is Internal.
+func (s GetSchemaByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetSchemaByIdErrorResponse
+}
+
+// IsSchNotFound reports whether GetSchemaByIdErrorResponse is SchNotFound.
+func (s GetSchemaByIdErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundGetSchemaByIdErrorResponse
+}
+
+// IsSchPermissionDenied reports whether GetSchemaByIdErrorResponse is SchPermissionDenied.
+func (s GetSchemaByIdErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedGetSchemaByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetSchemaByIdErrorResponse is ReqInvalid.
+func (s GetSchemaByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetSchemaByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetSchemaByIdErrorResponse to AuthUnauthorized.
+func (s *GetSchemaByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetSchemaByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetSchemaByIdErrorResponse is AuthUnauthorized.
+func (s GetSchemaByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetSchemaByIdErrorResponse(v AuthUnauthorized) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetSchemaByIdErrorResponse to Internal.
+func (s *GetSchemaByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetSchemaByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetSchemaByIdErrorResponse is Internal.
+func (s GetSchemaByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from Internal.
+func NewInternalGetSchemaByIdErrorResponse(v Internal) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets GetSchemaByIdErrorResponse to SchNotFound.
+func (s *GetSchemaByIdErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundGetSchemaByIdErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if GetSchemaByIdErrorResponse is SchNotFound.
+func (s GetSchemaByIdErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from SchNotFound.
+func NewSchNotFoundGetSchemaByIdErrorResponse(v SchNotFound) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets GetSchemaByIdErrorResponse to SchPermissionDenied.
+func (s *GetSchemaByIdErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedGetSchemaByIdErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if GetSchemaByIdErrorResponse is SchPermissionDenied.
+func (s GetSchemaByIdErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedGetSchemaByIdErrorResponse(v SchPermissionDenied) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetSchPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets GetSchemaByIdErrorResponse to ReqInvalid.
+func (s *GetSchemaByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetSchemaByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetSchemaByIdErrorResponse is ReqInvalid.
+func (s GetSchemaByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetSchemaByIdErrorResponse(v ReqInvalid) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetSchemaByIdErrorResponseStatusCode wraps GetSchemaByIdErrorResponse with StatusCode.
+type GetSchemaByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetSchemaByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetSchemaByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetSchemaByIdErrorResponseStatusCode) GetResponse() GetSchemaByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetSchemaByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetSchemaByIdErrorResponseStatusCode) SetResponse(val GetSchemaByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetSchemaByIdErrorResponseStatusCode) getSchemaByIdRes() {}
 
 // GetSessionErrorResponse represents sum type.
 type GetSessionErrorResponse struct {
@@ -22343,8 +22753,10 @@ type Grant struct {
 	// serves for `principal_type=user`, or `GET /teams/{id}` for
 	// `principal_type=team`. Discriminate with the grant's existing
 	// `principal_type`.
-	// Requires `user.read` and `team.read` in addition to `project.read`.
-	// Both are checked on the whole request before the list.
+	// Requires `user.read` and `team.read` in addition to `project.read`
+	// for project secrets. Both are checked on the whole request before
+	// the list. A user-bound Console session that already passed the
+	// project Check may expand without those scopes.
 	Principal OptNilGrantExpandedPrincipal `json:"principal"`
 }
 
@@ -22521,10 +22933,12 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 // `principal_type=user`, or `GET /teams/{id}` for `principal_type=team`,
 // and `null` when that principal cannot be loaded. Discriminate with the
 // grant's existing `principal_type`.
-// Requires `user.read` and `team.read` in addition to `project.read`.
-// Both are checked on the whole request before the list, because a mixed
-// page is the common case. A caller who may not read either resource
-// receives 403 rather than a silently missing `principal`.
+// Requires `user.read` and `team.read` in addition to `project.read`
+// for project secrets. Both are checked on the whole request before the
+// list, because a mixed page is the common case. A user-bound Console
+// session that already passed the project Check may expand without
+// those scopes. A caller who may not read either resource receives 403
+// rather than a silently missing `principal`.
 // Ref: #
 type GrantExpand string
 
@@ -24379,6 +24793,224 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
+type ListMyProjectsBadRequest ErrorDetails
+
+func (*ListMyProjectsBadRequest) listMyProjectsRes() {}
+
+// ListMyProjectsErrorResponse represents sum type.
+type ListMyProjectsErrorResponse struct {
+	Type             ListMyProjectsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+	SessTokenInvalid SessTokenInvalid
+}
+
+// ListMyProjectsErrorResponseType is oneOf type of ListMyProjectsErrorResponse.
+type ListMyProjectsErrorResponseType string
+
+// Possible values for ListMyProjectsErrorResponseType.
+const (
+	AuthUnauthorizedListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "auth.unauthorized"
+	InternalListMyProjectsErrorResponse         ListMyProjectsErrorResponseType = "internal"
+	ReqInvalidListMyProjectsErrorResponse       ListMyProjectsErrorResponseType = "req.invalid"
+	SessTokenInvalidListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "sess.token_invalid"
+)
+
+// IsAuthUnauthorized reports whether ListMyProjectsErrorResponse is AuthUnauthorized.
+func (s ListMyProjectsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyProjectsErrorResponse
+}
+
+// IsInternal reports whether ListMyProjectsErrorResponse is Internal.
+func (s ListMyProjectsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyProjectsErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyProjectsErrorResponse is ReqInvalid.
+func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyProjectsErrorResponse
+}
+
+// IsSessTokenInvalid reports whether ListMyProjectsErrorResponse is SessTokenInvalid.
+func (s ListMyProjectsErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidListMyProjectsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyProjectsErrorResponse to AuthUnauthorized.
+func (s *ListMyProjectsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyProjectsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyProjectsErrorResponse is AuthUnauthorized.
+func (s ListMyProjectsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyProjectsErrorResponse(v AuthUnauthorized) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyProjectsErrorResponse to Internal.
+func (s *ListMyProjectsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyProjectsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyProjectsErrorResponse is Internal.
+func (s ListMyProjectsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from Internal.
+func NewInternalListMyProjectsErrorResponse(v Internal) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyProjectsErrorResponse to ReqInvalid.
+func (s *ListMyProjectsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyProjectsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyProjectsErrorResponse is ReqInvalid.
+func (s ListMyProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from ReqInvalid.
+func NewReqInvalidListMyProjectsErrorResponse(v ReqInvalid) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessTokenInvalid sets ListMyProjectsErrorResponse to SessTokenInvalid.
+func (s *ListMyProjectsErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidListMyProjectsErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if ListMyProjectsErrorResponse is SessTokenInvalid.
+func (s ListMyProjectsErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidListMyProjectsErrorResponse(v SessTokenInvalid) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetSessTokenInvalid(v)
+	return s
+}
+
+// ListMyProjectsErrorResponseStatusCode wraps ListMyProjectsErrorResponse with StatusCode.
+type ListMyProjectsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyProjectsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyProjectsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyProjectsErrorResponseStatusCode) GetResponse() ListMyProjectsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyProjectsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyProjectsErrorResponseStatusCode) SetResponse(val ListMyProjectsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyProjectsErrorResponseStatusCode) listMyProjectsRes() {}
+
+type ListMyProjectsInternalServerError ErrorDetails
+
+func (*ListMyProjectsInternalServerError) listMyProjectsRes() {}
+
+// Paginated list of projects, ordered by project id.
+// Ref: #
+type ListMyProjectsResponse struct {
+	Projects []ProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Present when the page was full. A following request may return an empty page
+	// and no token, which ends the listing.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *ListMyProjectsResponse) GetProjects() []ProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListMyProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *ListMyProjectsResponse) SetProjects(val []ProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListMyProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+// ListMyProjectsResponseHeaders wraps ListMyProjectsResponse with response headers.
+type ListMyProjectsResponseHeaders struct {
+	CacheControl OptString
+	Response     ListMyProjectsResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListMyProjectsResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyProjectsResponseHeaders) GetResponse() ListMyProjectsResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListMyProjectsResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) {
+	s.Response = val
+}
+
+func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
+
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {
 	Type                ListReleasesErrorResponseType // switch on this field
@@ -24589,6 +25221,186 @@ func (s *ListReleasesResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*ListReleasesResponse) listReleasesRes() {}
+
+// ListSchemasErrorResponse represents sum type.
+type ListSchemasErrorResponse struct {
+	Type                ListSchemasErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	SchNotFound         SchNotFound
+	SchPermissionDenied SchPermissionDenied
+	ReqInvalid          ReqInvalid
+}
+
+// ListSchemasErrorResponseType is oneOf type of ListSchemasErrorResponse.
+type ListSchemasErrorResponseType string
+
+// Possible values for ListSchemasErrorResponseType.
+const (
+	AuthUnauthorizedListSchemasErrorResponse    ListSchemasErrorResponseType = "auth.unauthorized"
+	InternalListSchemasErrorResponse            ListSchemasErrorResponseType = "internal"
+	SchNotFoundListSchemasErrorResponse         ListSchemasErrorResponseType = "sch.not_found"
+	SchPermissionDeniedListSchemasErrorResponse ListSchemasErrorResponseType = "sch.permission_denied"
+	ReqInvalidListSchemasErrorResponse          ListSchemasErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListSchemasErrorResponse is AuthUnauthorized.
+func (s ListSchemasErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListSchemasErrorResponse
+}
+
+// IsInternal reports whether ListSchemasErrorResponse is Internal.
+func (s ListSchemasErrorResponse) IsInternal() bool {
+	return s.Type == InternalListSchemasErrorResponse
+}
+
+// IsSchNotFound reports whether ListSchemasErrorResponse is SchNotFound.
+func (s ListSchemasErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundListSchemasErrorResponse
+}
+
+// IsSchPermissionDenied reports whether ListSchemasErrorResponse is SchPermissionDenied.
+func (s ListSchemasErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedListSchemasErrorResponse
+}
+
+// IsReqInvalid reports whether ListSchemasErrorResponse is ReqInvalid.
+func (s ListSchemasErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListSchemasErrorResponse
+}
+
+// SetAuthUnauthorized sets ListSchemasErrorResponse to AuthUnauthorized.
+func (s *ListSchemasErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListSchemasErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListSchemasErrorResponse is AuthUnauthorized.
+func (s ListSchemasErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListSchemasErrorResponse returns new ListSchemasErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListSchemasErrorResponse(v AuthUnauthorized) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListSchemasErrorResponse to Internal.
+func (s *ListSchemasErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListSchemasErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListSchemasErrorResponse is Internal.
+func (s ListSchemasErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListSchemasErrorResponse returns new ListSchemasErrorResponse from Internal.
+func NewInternalListSchemasErrorResponse(v Internal) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets ListSchemasErrorResponse to SchNotFound.
+func (s *ListSchemasErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundListSchemasErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if ListSchemasErrorResponse is SchNotFound.
+func (s ListSchemasErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundListSchemasErrorResponse returns new ListSchemasErrorResponse from SchNotFound.
+func NewSchNotFoundListSchemasErrorResponse(v SchNotFound) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets ListSchemasErrorResponse to SchPermissionDenied.
+func (s *ListSchemasErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedListSchemasErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if ListSchemasErrorResponse is SchPermissionDenied.
+func (s ListSchemasErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedListSchemasErrorResponse returns new ListSchemasErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedListSchemasErrorResponse(v SchPermissionDenied) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetSchPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets ListSchemasErrorResponse to ReqInvalid.
+func (s *ListSchemasErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListSchemasErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListSchemasErrorResponse is ReqInvalid.
+func (s ListSchemasErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListSchemasErrorResponse returns new ListSchemasErrorResponse from ReqInvalid.
+func NewReqInvalidListSchemasErrorResponse(v ReqInvalid) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListSchemasErrorResponseStatusCode wraps ListSchemasErrorResponse with StatusCode.
+type ListSchemasErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListSchemasErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListSchemasErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListSchemasErrorResponseStatusCode) GetResponse() ListSchemasErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListSchemasErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListSchemasErrorResponseStatusCode) SetResponse(val ListSchemasErrorResponse) {
+	s.Response = val
+}
+
+func (*ListSchemasErrorResponseStatusCode) listSchemasRes() {}
 
 type ListSchemasKind string
 
@@ -29394,52 +30206,6 @@ func (o OptFlowdefSchemaFetchFailedDetails) Or(d FlowdefSchemaFetchFailedDetails
 	return d
 }
 
-// NewOptFlowdefUpdateConflictDetails returns new OptFlowdefUpdateConflictDetails with value set to v.
-func NewOptFlowdefUpdateConflictDetails(v FlowdefUpdateConflictDetails) OptFlowdefUpdateConflictDetails {
-	return OptFlowdefUpdateConflictDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowdefUpdateConflictDetails is optional FlowdefUpdateConflictDetails.
-type OptFlowdefUpdateConflictDetails struct {
-	Value FlowdefUpdateConflictDetails
-	Set   bool
-}
-
-// IsSet returns true if OptFlowdefUpdateConflictDetails was set.
-func (o OptFlowdefUpdateConflictDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowdefUpdateConflictDetails) Reset() {
-	var v FlowdefUpdateConflictDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowdefUpdateConflictDetails) SetTo(v FlowdefUpdateConflictDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowdefUpdateConflictDetails) Get() (v FlowdefUpdateConflictDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowdefUpdateConflictDetails) Or(d FlowdefUpdateConflictDetails) FlowdefUpdateConflictDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptFlowdefUpdatedEventDelegationType returns new OptFlowdefUpdatedEventDelegationType with value set to v.
 func NewOptFlowdefUpdatedEventDelegationType(v FlowdefUpdatedEventDelegationType) OptFlowdefUpdatedEventDelegationType {
 	return OptFlowdefUpdatedEventDelegationType{
@@ -34173,6 +34939,328 @@ func (o OptRequestAPIEventDelegationType) Or(d RequestAPIEventDelegationType) Re
 	return d
 }
 
+// NewOptSSOAuthMethod returns new OptSSOAuthMethod with value set to v.
+func NewOptSSOAuthMethod(v SSOAuthMethod) OptSSOAuthMethod {
+	return OptSSOAuthMethod{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSSOAuthMethod is optional SSOAuthMethod.
+type OptSSOAuthMethod struct {
+	Value SSOAuthMethod
+	Set   bool
+}
+
+// IsSet returns true if OptSSOAuthMethod was set.
+func (o OptSSOAuthMethod) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSSOAuthMethod) Reset() {
+	var v SSOAuthMethod
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSSOAuthMethod) SetTo(v SSOAuthMethod) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSSOAuthMethod) Get() (v SSOAuthMethod, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSSOAuthMethod) Or(d SSOAuthMethod) SSOAuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchAlreadyExistsDetails returns new OptSchAlreadyExistsDetails with value set to v.
+func NewOptSchAlreadyExistsDetails(v SchAlreadyExistsDetails) OptSchAlreadyExistsDetails {
+	return OptSchAlreadyExistsDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchAlreadyExistsDetails is optional SchAlreadyExistsDetails.
+type OptSchAlreadyExistsDetails struct {
+	Value SchAlreadyExistsDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchAlreadyExistsDetails was set.
+func (o OptSchAlreadyExistsDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchAlreadyExistsDetails) Reset() {
+	var v SchAlreadyExistsDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchAlreadyExistsDetails) SetTo(v SchAlreadyExistsDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchAlreadyExistsDetails) Get() (v SchAlreadyExistsDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchAlreadyExistsDetails) Or(d SchAlreadyExistsDetails) SchAlreadyExistsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchDeniedDetails returns new OptSchFetchDeniedDetails with value set to v.
+func NewOptSchFetchDeniedDetails(v SchFetchDeniedDetails) OptSchFetchDeniedDetails {
+	return OptSchFetchDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchDeniedDetails is optional SchFetchDeniedDetails.
+type OptSchFetchDeniedDetails struct {
+	Value SchFetchDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchDeniedDetails was set.
+func (o OptSchFetchDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchDeniedDetails) Reset() {
+	var v SchFetchDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchDeniedDetails) SetTo(v SchFetchDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchDeniedDetails) Get() (v SchFetchDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchDeniedDetails) Or(d SchFetchDeniedDetails) SchFetchDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchDowngradeDetails returns new OptSchFetchDowngradeDetails with value set to v.
+func NewOptSchFetchDowngradeDetails(v SchFetchDowngradeDetails) OptSchFetchDowngradeDetails {
+	return OptSchFetchDowngradeDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchDowngradeDetails is optional SchFetchDowngradeDetails.
+type OptSchFetchDowngradeDetails struct {
+	Value SchFetchDowngradeDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchDowngradeDetails was set.
+func (o OptSchFetchDowngradeDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchDowngradeDetails) Reset() {
+	var v SchFetchDowngradeDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchDowngradeDetails) SetTo(v SchFetchDowngradeDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchDowngradeDetails) Get() (v SchFetchDowngradeDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchDowngradeDetails) Or(d SchFetchDowngradeDetails) SchFetchDowngradeDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchTimeoutDetails returns new OptSchFetchTimeoutDetails with value set to v.
+func NewOptSchFetchTimeoutDetails(v SchFetchTimeoutDetails) OptSchFetchTimeoutDetails {
+	return OptSchFetchTimeoutDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchTimeoutDetails is optional SchFetchTimeoutDetails.
+type OptSchFetchTimeoutDetails struct {
+	Value SchFetchTimeoutDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchTimeoutDetails was set.
+func (o OptSchFetchTimeoutDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchTimeoutDetails) Reset() {
+	var v SchFetchTimeoutDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchTimeoutDetails) SetTo(v SchFetchTimeoutDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchTimeoutDetails) Get() (v SchFetchTimeoutDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchTimeoutDetails) Or(d SchFetchTimeoutDetails) SchFetchTimeoutDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchTooLargeDetails returns new OptSchFetchTooLargeDetails with value set to v.
+func NewOptSchFetchTooLargeDetails(v SchFetchTooLargeDetails) OptSchFetchTooLargeDetails {
+	return OptSchFetchTooLargeDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchTooLargeDetails is optional SchFetchTooLargeDetails.
+type OptSchFetchTooLargeDetails struct {
+	Value SchFetchTooLargeDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchTooLargeDetails was set.
+func (o OptSchFetchTooLargeDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchTooLargeDetails) Reset() {
+	var v SchFetchTooLargeDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchTooLargeDetails) SetTo(v SchFetchTooLargeDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchTooLargeDetails) Get() (v SchFetchTooLargeDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchTooLargeDetails) Or(d SchFetchTooLargeDetails) SchFetchTooLargeDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchFetchTooManyRedirectsDetails returns new OptSchFetchTooManyRedirectsDetails with value set to v.
+func NewOptSchFetchTooManyRedirectsDetails(v SchFetchTooManyRedirectsDetails) OptSchFetchTooManyRedirectsDetails {
+	return OptSchFetchTooManyRedirectsDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchTooManyRedirectsDetails is optional SchFetchTooManyRedirectsDetails.
+type OptSchFetchTooManyRedirectsDetails struct {
+	Value SchFetchTooManyRedirectsDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchTooManyRedirectsDetails was set.
+func (o OptSchFetchTooManyRedirectsDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchTooManyRedirectsDetails) Reset() {
+	var v SchFetchTooManyRedirectsDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchTooManyRedirectsDetails) SetTo(v SchFetchTooManyRedirectsDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchTooManyRedirectsDetails) Get() (v SchFetchTooManyRedirectsDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchTooManyRedirectsDetails) Or(d SchFetchTooManyRedirectsDetails) SchFetchTooManyRedirectsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchInvalidRequestDetails returns new OptSchInvalidRequestDetails with value set to v.
 func NewOptSchInvalidRequestDetails(v SchInvalidRequestDetails) OptSchInvalidRequestDetails {
 	return OptSchInvalidRequestDetails{
@@ -34305,6 +35393,52 @@ func (o OptSchPermissionDeniedDetails) Get() (v SchPermissionDeniedDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSchPermissionDeniedDetails) Or(d SchPermissionDeniedDetails) SchPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchRevisionConflictDetails returns new OptSchRevisionConflictDetails with value set to v.
+func NewOptSchRevisionConflictDetails(v SchRevisionConflictDetails) OptSchRevisionConflictDetails {
+	return OptSchRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchRevisionConflictDetails is optional SchRevisionConflictDetails.
+type OptSchRevisionConflictDetails struct {
+	Value SchRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchRevisionConflictDetails was set.
+func (o OptSchRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchRevisionConflictDetails) Reset() {
+	var v SchRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchRevisionConflictDetails) SetTo(v SchRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchRevisionConflictDetails) Get() (v SchRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchRevisionConflictDetails) Or(d SchRevisionConflictDetails) SchRevisionConflictDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -43064,6 +44198,36 @@ type RevokeSessionUnauthorized ErrorDetails
 
 func (*RevokeSessionUnauthorized) revokeSessionRes() {}
 
+// Ref: #
+type SSOAuthMethod struct {
+	// Whether the authentication method is enabled or not.
+	Enabled bool `json:"enabled"`
+	// Slugs of the Project-level identity provider connections available to users of this schema. Each
+	// entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does not
+	// by itself make it available here.
+	Providers []string `json:"providers"`
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *SSOAuthMethod) GetEnabled() bool {
+	return s.Enabled
+}
+
+// GetProviders returns the value of Providers.
+func (s *SSOAuthMethod) GetProviders() []string {
+	return s.Providers
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *SSOAuthMethod) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// SetProviders sets the value of Providers.
+func (s *SSOAuthMethod) SetProviders(val []string) {
+	s.Providers = val
+}
+
 // An available SSO identity provider.
 // Ref: #
 type SSOProvider struct {
@@ -43103,6 +44267,324 @@ func (s *SSOProvider) SetName(val string) {
 // SetTemplate sets the value of Template.
 func (s *SSOProvider) SetTemplate(val string) {
 	s.Template = val
+}
+
+// Merged schema.
+// Ref: #
+type SchAlreadyExists struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchAlreadyExistsDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchAlreadyExists) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchAlreadyExists) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchAlreadyExists) GetDetails() OptSchAlreadyExistsDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchAlreadyExists) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchAlreadyExists) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchAlreadyExists) SetDetails(val OptSchAlreadyExistsDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchAlreadyExistsDetails map[string]jx.Raw
+
+func (s *SchAlreadyExistsDetails) init() SchAlreadyExistsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchDenied) GetDetails() OptSchFetchDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchDenied) SetDetails(val OptSchFetchDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchDeniedDetails map[string]jx.Raw
+
+func (s *SchFetchDeniedDetails) init() SchFetchDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchDowngrade struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchDowngradeDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchDowngrade) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchDowngrade) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchDowngrade) GetDetails() OptSchFetchDowngradeDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchDowngrade) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchDowngrade) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchDowngrade) SetDetails(val OptSchFetchDowngradeDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchDowngradeDetails map[string]jx.Raw
+
+func (s *SchFetchDowngradeDetails) init() SchFetchDowngradeDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchTimeout struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchTimeoutDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchTimeout) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchTimeout) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchTimeout) GetDetails() OptSchFetchTimeoutDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchTimeout) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchTimeout) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchTimeout) SetDetails(val OptSchFetchTimeoutDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchTimeoutDetails map[string]jx.Raw
+
+func (s *SchFetchTimeoutDetails) init() SchFetchTimeoutDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchTooLarge struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchTooLargeDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchTooLarge) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchTooLarge) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchTooLarge) GetDetails() OptSchFetchTooLargeDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchTooLarge) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchTooLarge) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchTooLarge) SetDetails(val OptSchFetchTooLargeDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchTooLargeDetails map[string]jx.Raw
+
+func (s *SchFetchTooLargeDetails) init() SchFetchTooLargeDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchTooManyRedirects struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchTooManyRedirectsDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchTooManyRedirects) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchTooManyRedirects) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchTooManyRedirects) GetDetails() OptSchFetchTooManyRedirectsDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchTooManyRedirects) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchTooManyRedirects) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchTooManyRedirects) SetDetails(val OptSchFetchTooManyRedirectsDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchTooManyRedirectsDetails map[string]jx.Raw
+
+func (s *SchFetchTooManyRedirectsDetails) init() SchFetchTooManyRedirectsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // Merged schema.
@@ -43256,6 +44738,59 @@ func (s *SchPermissionDenied) SetDetails(val OptSchPermissionDeniedDetails) {
 type SchPermissionDeniedDetails map[string]jx.Raw
 
 func (s *SchPermissionDeniedDetails) init() SchPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchRevisionConflict) GetDetails() OptSchRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchRevisionConflict) SetDetails(val OptSchRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchRevisionConflictDetails map[string]jx.Raw
+
+func (s *SchRevisionConflictDetails) init() SchRevisionConflictDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -46000,14 +47535,16 @@ func (s *SortDirection) UnmarshalText(data []byte) error {
 	}
 }
 
-// Configuration for a user-invokable action on a step. The `name` is sent
-// back in the submit request as `action`; the engine resolves the action's
-// declared `kind` to decide how to handle the submission.
+// An action a flow author declares on a step of a flow definition. The
+// `name` is sent back in the submit request as `action`; the engine resolves
+// the action's declared `kind` to decide how to handle the submission.
 // Ref: #
 type StepAction struct {
 	// Action identifier. Sent back in the submit request as `action`.
 	Name string `json:"name"`
-	// Classifies how the engine handles this action:
+	// Classifies how the engine handles this action. `back` is not declarable:
+	// the engine injects it into runtime steps (see `flow-step-action.yaml`)
+	// whenever going back is available.
 	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
 	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
 	// fires once the returned assertion verifies.
@@ -46015,8 +47552,6 @@ type StepAction struct {
 	// transition fires once the returned attestation verifies.
 	// - `navigate`: route through the transition without running the input
 	// pipeline. Used for pure-routing actions declared in the flow definition.
-	// - `back`: return the user to the previous step. Surfaced by the engine
-	// when going back is available.
 	Kind StepActionKind `json:"kind"`
 	// Marks this as the default/primary action. The runtime template uses
 	// this hint to choose visual emphasis. At most one action per step
@@ -46069,7 +47604,9 @@ func (s *StepAction) SetTextKey(val OptString) {
 	s.TextKey = val
 }
 
-// Classifies how the engine handles this action:
+// Classifies how the engine handles this action. `back` is not declarable:
+// the engine injects it into runtime steps (see `flow-step-action.yaml`)
+// whenever going back is available.
 // - `submit`: collect the step's fields and run validate/dispatch/on_success.
 // - `passkey`: issue a WebAuthn assertion challenge; the matching transition
 // fires once the returned assertion verifies.
@@ -46077,8 +47614,6 @@ func (s *StepAction) SetTextKey(val OptString) {
 // transition fires once the returned attestation verifies.
 // - `navigate`: route through the transition without running the input
 // pipeline. Used for pure-routing actions declared in the flow definition.
-// - `back`: return the user to the previous step. Surfaced by the engine
-// when going back is available.
 type StepActionKind string
 
 const (
@@ -46086,7 +47621,6 @@ const (
 	StepActionKindPasskey         StepActionKind = "passkey"
 	StepActionKindPasskeyRegister StepActionKind = "passkey_register"
 	StepActionKindNavigate        StepActionKind = "navigate"
-	StepActionKindBack            StepActionKind = "back"
 )
 
 // AllValues returns all StepActionKind values.
@@ -46096,7 +47630,6 @@ func (StepActionKind) AllValues() []StepActionKind {
 		StepActionKindPasskey,
 		StepActionKindPasskeyRegister,
 		StepActionKindNavigate,
-		StepActionKindBack,
 	}
 }
 
@@ -46110,8 +47643,6 @@ func (s StepActionKind) MarshalText() ([]byte, error) {
 	case StepActionKindPasskeyRegister:
 		return []byte(s), nil
 	case StepActionKindNavigate:
-		return []byte(s), nil
-	case StepActionKindBack:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -46132,9 +47663,6 @@ func (s *StepActionKind) UnmarshalText(data []byte) error {
 		return nil
 	case StepActionKindNavigate:
 		*s = StepActionKindNavigate
-		return nil
-	case StepActionKindBack:
-		*s = StepActionKindBack
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -48711,390 +50239,6 @@ func (s *UnavailableDetails) init() UnavailableDetails {
 	return m
 }
 
-type UpdateFlowDefinitionBadRequest ErrorDetails
-
-func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
-
-// UpdateFlowDefinitionErrorResponse represents sum type.
-type UpdateFlowDefinitionErrorResponse struct {
-	Type                     UpdateFlowDefinitionErrorResponseType // switch on this field
-	AuthUnauthorized         AuthUnauthorized
-	EvtInvalid               EvtInvalid
-	FlowdefInvalid           FlowdefInvalid
-	FlowdefNotFound          FlowdefNotFound
-	FlowdefPermissionDenied  FlowdefPermissionDenied
-	FlowdefUpdateConflict    FlowdefUpdateConflict
-	Internal                 Internal
-	SchNotFound              SchNotFound
-	FlowdefMissingID         FlowdefMissingID
-	FlowdefMissingProjectID  FlowdefMissingProjectID
-	ReqInvalid               ReqInvalid
-	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
-}
-
-// UpdateFlowDefinitionErrorResponseType is oneOf type of UpdateFlowDefinitionErrorResponse.
-type UpdateFlowDefinitionErrorResponseType string
-
-// Possible values for UpdateFlowDefinitionErrorResponseType.
-const (
-	AuthUnauthorizedUpdateFlowDefinitionErrorResponse         UpdateFlowDefinitionErrorResponseType = "auth.unauthorized"
-	EvtInvalidUpdateFlowDefinitionErrorResponse               UpdateFlowDefinitionErrorResponseType = "evt.invalid"
-	FlowdefInvalidUpdateFlowDefinitionErrorResponse           UpdateFlowDefinitionErrorResponseType = "flowdef.invalid"
-	FlowdefNotFoundUpdateFlowDefinitionErrorResponse          UpdateFlowDefinitionErrorResponseType = "flowdef.not_found"
-	FlowdefPermissionDeniedUpdateFlowDefinitionErrorResponse  UpdateFlowDefinitionErrorResponseType = "flowdef.permission_denied"
-	FlowdefUpdateConflictUpdateFlowDefinitionErrorResponse    UpdateFlowDefinitionErrorResponseType = "flowdef.update_conflict"
-	InternalUpdateFlowDefinitionErrorResponse                 UpdateFlowDefinitionErrorResponseType = "internal"
-	SchNotFoundUpdateFlowDefinitionErrorResponse              UpdateFlowDefinitionErrorResponseType = "sch.not_found"
-	FlowdefMissingIDUpdateFlowDefinitionErrorResponse         UpdateFlowDefinitionErrorResponseType = "flowdef.missing_id"
-	FlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse  UpdateFlowDefinitionErrorResponseType = "flowdef.missing_project_id"
-	ReqInvalidUpdateFlowDefinitionErrorResponse               UpdateFlowDefinitionErrorResponseType = "req.invalid"
-	FlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse UpdateFlowDefinitionErrorResponseType = "flowdef.schema_fetch_failed"
-)
-
-// IsAuthUnauthorized reports whether UpdateFlowDefinitionErrorResponse is AuthUnauthorized.
-func (s UpdateFlowDefinitionErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedUpdateFlowDefinitionErrorResponse
-}
-
-// IsEvtInvalid reports whether UpdateFlowDefinitionErrorResponse is EvtInvalid.
-func (s UpdateFlowDefinitionErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidUpdateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefInvalid reports whether UpdateFlowDefinitionErrorResponse is FlowdefInvalid.
-func (s UpdateFlowDefinitionErrorResponse) IsFlowdefInvalid() bool {
-	return s.Type == FlowdefInvalidUpdateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefNotFound reports whether UpdateFlowDefinitionErrorResponse is FlowdefNotFound.
-func (s UpdateFlowDefinitionErrorResponse) IsFlowdefNotFound() bool {
-	return s.Type == FlowdefNotFoundUpdateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefPermissionDenied reports whether UpdateFlowDefinitionErrorResponse is FlowdefPermissionDenied.
-func (s UpdateFlowDefinitionErrorResponse) IsFlowdefPermissionDenied() bool {
-	return s.Type == FlowdefPermissionDeniedUpdateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefUpdateConflict reports whether UpdateFlowDefinitionErrorResponse is FlowdefUpdateConflict.
-func (s UpdateFlowDefinitionErrorResponse) IsFlowdefUpdateConflict() bool {
-	return s.Type == FlowdefUpdateConflictUpdateFlowDefinitionErrorResponse
-}
-
-// IsInternal reports whether UpdateFlowDefinitionErrorResponse is Internal.
-func (s UpdateFlowDefinitionErrorResponse) IsInternal() bool {
-	return s.Type == InternalUpdateFlowDefinitionErrorResponse
-}
-
-// IsSchNotFound reports whether UpdateFlowDefinitionErrorResponse is SchNotFound.
-func (s UpdateFlowDefinitionErrorResponse) IsSchNotFound() bool {
-	return s.Type == SchNotFoundUpdateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefMissingID reports whether UpdateFlowDefinitionErrorResponse is FlowdefMissingID.
-func (s UpdateFlowDefinitionErrorResponse) IsFlowdefMissingID() bool {
-	return s.Type == FlowdefMissingIDUpdateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefMissingProjectID reports whether UpdateFlowDefinitionErrorResponse is FlowdefMissingProjectID.
-func (s UpdateFlowDefinitionErrorResponse) IsFlowdefMissingProjectID() bool {
-	return s.Type == FlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse
-}
-
-// IsReqInvalid reports whether UpdateFlowDefinitionErrorResponse is ReqInvalid.
-func (s UpdateFlowDefinitionErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidUpdateFlowDefinitionErrorResponse
-}
-
-// IsFlowdefSchemaFetchFailed reports whether UpdateFlowDefinitionErrorResponse is FlowdefSchemaFetchFailed.
-func (s UpdateFlowDefinitionErrorResponse) IsFlowdefSchemaFetchFailed() bool {
-	return s.Type == FlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse
-}
-
-// SetAuthUnauthorized sets UpdateFlowDefinitionErrorResponse to AuthUnauthorized.
-func (s *UpdateFlowDefinitionErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedUpdateFlowDefinitionErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if UpdateFlowDefinitionErrorResponse is AuthUnauthorized.
-func (s UpdateFlowDefinitionErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedUpdateFlowDefinitionErrorResponse(v AuthUnauthorized) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetEvtInvalid sets UpdateFlowDefinitionErrorResponse to EvtInvalid.
-func (s *UpdateFlowDefinitionErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidUpdateFlowDefinitionErrorResponse
-	s.EvtInvalid = v
-}
-
-// GetEvtInvalid returns EvtInvalid and true boolean if UpdateFlowDefinitionErrorResponse is EvtInvalid.
-func (s UpdateFlowDefinitionErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
-	if !s.IsEvtInvalid() {
-		return v, false
-	}
-	return s.EvtInvalid, true
-}
-
-// NewEvtInvalidUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from EvtInvalid.
-func NewEvtInvalidUpdateFlowDefinitionErrorResponse(v EvtInvalid) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetEvtInvalid(v)
-	return s
-}
-
-// SetFlowdefInvalid sets UpdateFlowDefinitionErrorResponse to FlowdefInvalid.
-func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
-	s.Type = FlowdefInvalidUpdateFlowDefinitionErrorResponse
-	s.FlowdefInvalid = v
-}
-
-// GetFlowdefInvalid returns FlowdefInvalid and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefInvalid.
-func (s UpdateFlowDefinitionErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
-	if !s.IsFlowdefInvalid() {
-		return v, false
-	}
-	return s.FlowdefInvalid, true
-}
-
-// NewFlowdefInvalidUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefInvalid.
-func NewFlowdefInvalidUpdateFlowDefinitionErrorResponse(v FlowdefInvalid) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetFlowdefInvalid(v)
-	return s
-}
-
-// SetFlowdefNotFound sets UpdateFlowDefinitionErrorResponse to FlowdefNotFound.
-func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
-	s.Type = FlowdefNotFoundUpdateFlowDefinitionErrorResponse
-	s.FlowdefNotFound = v
-}
-
-// GetFlowdefNotFound returns FlowdefNotFound and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefNotFound.
-func (s UpdateFlowDefinitionErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
-	if !s.IsFlowdefNotFound() {
-		return v, false
-	}
-	return s.FlowdefNotFound, true
-}
-
-// NewFlowdefNotFoundUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefNotFound.
-func NewFlowdefNotFoundUpdateFlowDefinitionErrorResponse(v FlowdefNotFound) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetFlowdefNotFound(v)
-	return s
-}
-
-// SetFlowdefPermissionDenied sets UpdateFlowDefinitionErrorResponse to FlowdefPermissionDenied.
-func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefPermissionDenied(v FlowdefPermissionDenied) {
-	s.Type = FlowdefPermissionDeniedUpdateFlowDefinitionErrorResponse
-	s.FlowdefPermissionDenied = v
-}
-
-// GetFlowdefPermissionDenied returns FlowdefPermissionDenied and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefPermissionDenied.
-func (s UpdateFlowDefinitionErrorResponse) GetFlowdefPermissionDenied() (v FlowdefPermissionDenied, ok bool) {
-	if !s.IsFlowdefPermissionDenied() {
-		return v, false
-	}
-	return s.FlowdefPermissionDenied, true
-}
-
-// NewFlowdefPermissionDeniedUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefPermissionDenied.
-func NewFlowdefPermissionDeniedUpdateFlowDefinitionErrorResponse(v FlowdefPermissionDenied) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetFlowdefPermissionDenied(v)
-	return s
-}
-
-// SetFlowdefUpdateConflict sets UpdateFlowDefinitionErrorResponse to FlowdefUpdateConflict.
-func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefUpdateConflict(v FlowdefUpdateConflict) {
-	s.Type = FlowdefUpdateConflictUpdateFlowDefinitionErrorResponse
-	s.FlowdefUpdateConflict = v
-}
-
-// GetFlowdefUpdateConflict returns FlowdefUpdateConflict and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefUpdateConflict.
-func (s UpdateFlowDefinitionErrorResponse) GetFlowdefUpdateConflict() (v FlowdefUpdateConflict, ok bool) {
-	if !s.IsFlowdefUpdateConflict() {
-		return v, false
-	}
-	return s.FlowdefUpdateConflict, true
-}
-
-// NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefUpdateConflict.
-func NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(v FlowdefUpdateConflict) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetFlowdefUpdateConflict(v)
-	return s
-}
-
-// SetInternal sets UpdateFlowDefinitionErrorResponse to Internal.
-func (s *UpdateFlowDefinitionErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalUpdateFlowDefinitionErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if UpdateFlowDefinitionErrorResponse is Internal.
-func (s UpdateFlowDefinitionErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from Internal.
-func NewInternalUpdateFlowDefinitionErrorResponse(v Internal) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetSchNotFound sets UpdateFlowDefinitionErrorResponse to SchNotFound.
-func (s *UpdateFlowDefinitionErrorResponse) SetSchNotFound(v SchNotFound) {
-	s.Type = SchNotFoundUpdateFlowDefinitionErrorResponse
-	s.SchNotFound = v
-}
-
-// GetSchNotFound returns SchNotFound and true boolean if UpdateFlowDefinitionErrorResponse is SchNotFound.
-func (s UpdateFlowDefinitionErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
-	if !s.IsSchNotFound() {
-		return v, false
-	}
-	return s.SchNotFound, true
-}
-
-// NewSchNotFoundUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from SchNotFound.
-func NewSchNotFoundUpdateFlowDefinitionErrorResponse(v SchNotFound) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetSchNotFound(v)
-	return s
-}
-
-// SetFlowdefMissingID sets UpdateFlowDefinitionErrorResponse to FlowdefMissingID.
-func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefMissingID(v FlowdefMissingID) {
-	s.Type = FlowdefMissingIDUpdateFlowDefinitionErrorResponse
-	s.FlowdefMissingID = v
-}
-
-// GetFlowdefMissingID returns FlowdefMissingID and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefMissingID.
-func (s UpdateFlowDefinitionErrorResponse) GetFlowdefMissingID() (v FlowdefMissingID, ok bool) {
-	if !s.IsFlowdefMissingID() {
-		return v, false
-	}
-	return s.FlowdefMissingID, true
-}
-
-// NewFlowdefMissingIDUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefMissingID.
-func NewFlowdefMissingIDUpdateFlowDefinitionErrorResponse(v FlowdefMissingID) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetFlowdefMissingID(v)
-	return s
-}
-
-// SetFlowdefMissingProjectID sets UpdateFlowDefinitionErrorResponse to FlowdefMissingProjectID.
-func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
-	s.Type = FlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse
-	s.FlowdefMissingProjectID = v
-}
-
-// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefMissingProjectID.
-func (s UpdateFlowDefinitionErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
-	if !s.IsFlowdefMissingProjectID() {
-		return v, false
-	}
-	return s.FlowdefMissingProjectID, true
-}
-
-// NewFlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefMissingProjectID.
-func NewFlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse(v FlowdefMissingProjectID) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetFlowdefMissingProjectID(v)
-	return s
-}
-
-// SetReqInvalid sets UpdateFlowDefinitionErrorResponse to ReqInvalid.
-func (s *UpdateFlowDefinitionErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidUpdateFlowDefinitionErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if UpdateFlowDefinitionErrorResponse is ReqInvalid.
-func (s UpdateFlowDefinitionErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from ReqInvalid.
-func NewReqInvalidUpdateFlowDefinitionErrorResponse(v ReqInvalid) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// SetFlowdefSchemaFetchFailed sets UpdateFlowDefinitionErrorResponse to FlowdefSchemaFetchFailed.
-func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
-	s.Type = FlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse
-	s.FlowdefSchemaFetchFailed = v
-}
-
-// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefSchemaFetchFailed.
-func (s UpdateFlowDefinitionErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
-	if !s.IsFlowdefSchemaFetchFailed() {
-		return v, false
-	}
-	return s.FlowdefSchemaFetchFailed, true
-}
-
-// NewFlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefSchemaFetchFailed.
-func NewFlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse(v FlowdefSchemaFetchFailed) UpdateFlowDefinitionErrorResponse {
-	var s UpdateFlowDefinitionErrorResponse
-	s.SetFlowdefSchemaFetchFailed(v)
-	return s
-}
-
-// UpdateFlowDefinitionErrorResponseStatusCode wraps UpdateFlowDefinitionErrorResponse with StatusCode.
-type UpdateFlowDefinitionErrorResponseStatusCode struct {
-	StatusCode int
-	Response   UpdateFlowDefinitionErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UpdateFlowDefinitionErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *UpdateFlowDefinitionErrorResponseStatusCode) GetResponse() UpdateFlowDefinitionErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UpdateFlowDefinitionErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *UpdateFlowDefinitionErrorResponseStatusCode) SetResponse(val UpdateFlowDefinitionErrorResponse) {
-	s.Response = val
-}
-
-func (*UpdateFlowDefinitionErrorResponseStatusCode) updateFlowDefinitionRes() {}
-
-type UpdateFlowDefinitionNotFound ErrorDetails
-
-func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
-
 type UpdateTeamBadRequest ErrorDetails
 
 func (*UpdateTeamBadRequest) updateTeamRes() {}
@@ -51251,8 +52395,10 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 	return m
 }
 
-// This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
-// This is done because a lot of code generators cannot handle that.
+// The meta-schema one property of a customer's user schema is validated
+// against. The generated `user-property.json` adds
+// `allOf: [{$ref: draft-2020-12}]`, which cannot live here because code
+// generators choke on it.
 // Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
 // are accepted without being listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
@@ -51461,8 +52607,9 @@ func (s *UserRef) SetDisplay(val OptString) {
 	s.Display = val
 }
 
-// This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
-// This is done because a lot of code generators cannot handle that.
+// The meta-schema a customer's user schema document is validated against.
+// The generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`,
+// which cannot live here because code generators choke on it.
 // Ref: #
 type UserSchema struct {
 	// The JSON Schema version used for this schema.

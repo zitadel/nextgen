@@ -78,7 +78,6 @@ type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
@@ -453,6 +452,21 @@ type AuthzAssignmentStatements interface {
 	// grant (ADR 049 export visibility), ordered by project_id after afterID
 	// (empty starts at the beginning).
 	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
+	// ListAuthorizedProjects pages the projects the user can act on, by the
+	// three routes ADR 053 §6 puts in the authorized set:
+	//
+	//  1. the user holds an active project-level grant directly;
+	//  2. a team the user has a membership edge in inside homeProjectID holds
+	//     one;
+	//  3. the active catalog's bounded tuple-to-userset path: the user holds a
+	//     grant, directly or through such a team, whose relation closes to the
+	//     source of a project tuple-to-userset edge and whose scope points at
+	//     the tupleset team, so nothing names the user on the project at all.
+	//
+	// Every route is evaluated on the active system catalog, mirroring
+	// CheckAuthz. page.OrderBy carries the sort columns; a cursor issued for a
+	// different OrderBy is rejected.
+	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
@@ -509,14 +523,16 @@ type AuthzCatalogStatements interface {
 //
 // Use cases:
 //   - ActiveSystemCatalogID: active system catalog (kind=system, owner=system).
-//   - HasAuthzProjectFoothold: any active assignment or membership edge in project.
+//   - HasAuthzProjectFoothold: any active assignment in project (team expand via
+//     homeProjectID) or a local membership edge in project. Empty homeProjectID
+//     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
 //     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
-	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
+	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

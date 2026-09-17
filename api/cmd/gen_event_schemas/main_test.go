@@ -43,8 +43,8 @@ func TestCatalogEventTypesMatchDomain(t *testing.T) {
 
 	catalogRaw, err := os.ReadFile(catalogPath)
 	require.NoError(t, err)
-	// Only Path A / Path B tables must match domain constants; Deferred may
-	// list future types that are not yet constants.
+	// Path A, Path B, and Retired tables must match domain constants;
+	// Deferred may list future types that are not yet constants.
 	active := string(catalogRaw)
 	if i := strings.Index(active, "## Deferred"); i >= 0 {
 		active = active[:i]

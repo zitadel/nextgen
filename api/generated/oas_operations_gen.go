@@ -20,7 +20,6 @@ const (
 	CreateSessionOperation                 OperationName = "CreateSession"
 	CreateTeamOperation                    OperationName = "CreateTeam"
 	CreateUserOperation                    OperationName = "CreateUser"
-	DeleteFlowDefinitionOperation          OperationName = "DeleteFlowDefinition"
 	DeleteGrantOperation                   OperationName = "DeleteGrant"
 	DeleteTeamOperation                    OperationName = "DeleteTeam"
 	DeleteUserByIDOperation                OperationName = "DeleteUserByID"
@@ -52,6 +51,7 @@ const (
 	ListEnvironmentsOperation              OperationName = "ListEnvironments"
 	ListEventsOperation                    OperationName = "ListEvents"
 	ListFlowDefinitionsOperation           OperationName = "ListFlowDefinitions"
+	ListMyProjectsOperation                OperationName = "ListMyProjects"
 	ListReleasesOperation                  OperationName = "ListReleases"
 	ListSchemasOperation                   OperationName = "ListSchemas"
 	ListUserPasskeysOperation              OperationName = "ListUserPasskeys"
@@ -68,7 +68,6 @@ const (
 	RevokeSessionOperation                 OperationName = "RevokeSession"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"
-	UpdateFlowDefinitionOperation          OperationName = "UpdateFlowDefinition"
 	UpdateTeamOperation                    OperationName = "UpdateTeam"
 	VerifyChallengeProofOperation          OperationName = "VerifyChallengeProof"
 )

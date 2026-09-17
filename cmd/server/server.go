@@ -31,10 +31,13 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/service"
@@ -44,6 +47,7 @@ import (
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 // flagDisableMasterKeyGeneration is the command-line half of
@@ -138,7 +142,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	slog.Info("building server")
 
-	metrics, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
+	telemetry, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
 		ServiceName:     cfg.Instrumentation.ServiceName,
 		TraceIdFraction: cfg.Instrumentation.Trace.Fraction,
 		TraceExporter:   cfg.Instrumentation.Trace.Exporter,
@@ -148,9 +152,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return fmt.Errorf("failed to create otel metrics: %w", err)
 	}
-	sfs.Add(metrics.Shutdown)
+	sfs.Add(telemetry.Shutdown)
 
-	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
+	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
 
 	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
@@ -192,9 +196,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		}
 	}
 
-	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+	// The hardened egress client guards the one fetch path a platform user
+	// controls: schema ingest by URL. Response size is capped by the client's
+	// MaxBodySize; the resolve timeout bounds one whole $ref chain.
+	egressClient, err := cfg.HTTPClient.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to build egress http client: %w", err)
+	}
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, cfg.Schema.ResolveTimeout, egressClient, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
-	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, nil, builtinPublicBase)
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 0, nil, builtinPublicBase)
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
@@ -204,7 +215,19 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
-	keyService := service.NewKeyService(serviceDBPool, *masterKey)
+	// Whether anything is exported stays the existing instrumentation.metric
+	// config's decision: with no exporter the provider is a no-op and the
+	// instruments cost nothing.
+	cacheMeter := metrics.WithMeterProvider(telemetry.MeterProvider())
+	crypterCache, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, cfg.Keys.CrypterLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build crypter cache: %w", err)
+	}
+	signingKeyCache, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, cfg.Keys.SigningKeyLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build signing key cache: %w", err)
+	}
+	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
@@ -363,8 +386,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level
 		),
-		oasapi.WithMeterProvider(metrics.MeterProvider()),
-		oasapi.WithTracerProvider(metrics.TracerProvider()),
+		oasapi.WithMeterProvider(telemetry.MeterProvider()),
+		oasapi.WithTracerProvider(telemetry.TracerProvider()),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
@@ -499,8 +522,21 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 			MinThreads: 1, MaxThreads: 16,
 		},
 	})
-	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
+	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
+	v.SetDefault("keys.crypter_lru_cache_size", 1000)
+	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
+	// Egress policy for user-injectable URLs (ADR 061). The deny list
+	// blocks by default; allow_list carves exceptions out of it, e.g.
+	// NEXTGEN_HTTPCLIENT_ALLOW_LIST="localhost,127.0.0.0/8,::1/128" for
+	// local development against loopback schema hosts.
+	v.SetDefault("httpclient.max_body_size", 1<<20) // 1 MiB; the only consumer is JSON schema ingest
+	v.SetDefault("httpclient.timeout", 10*time.Second)
+	v.SetDefault("httpclient.max_redirects", 5)
+	v.SetDefault("httpclient.allow_https_downgrade", false)
+	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
+	v.SetDefault("httpclient.allow_list", []string{})
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the

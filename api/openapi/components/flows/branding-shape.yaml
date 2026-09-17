@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 description: |
   Corner rounding, spacing and logo size. Shared across theme sides.
 properties:

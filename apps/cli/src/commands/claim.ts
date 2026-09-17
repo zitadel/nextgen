@@ -10,7 +10,7 @@ import { openInBrowser } from "../lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
 
 /**
@@ -73,6 +73,8 @@ export function claimDeadline(input: {
 export default class Claim extends BaseCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",
