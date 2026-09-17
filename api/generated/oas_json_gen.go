@@ -54850,39 +54850,6 @@ func (s *OptQueryGrantsRequestSorting) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes QueryIdpsRequestRevisions as json.
-func (o OptQueryIdpsRequestRevisions) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes QueryIdpsRequestRevisions from json.
-func (o *OptQueryIdpsRequestRevisions) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptQueryIdpsRequestRevisions to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptQueryIdpsRequestRevisions) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptQueryIdpsRequestRevisions) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes QueryIdpsRequestSorting as json.
 func (o OptQueryIdpsRequestSorting) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -63947,12 +63914,6 @@ func (s *QueryIdpsRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Revisions.Set {
-			e.FieldStart("revisions")
-			s.Revisions.Encode(e)
-		}
-	}
-	{
 		if s.Sorting.Set {
 			e.FieldStart("sorting")
 			s.Sorting.Encode(e)
@@ -63970,12 +63931,11 @@ func (s *QueryIdpsRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfQueryIdpsRequest = [5]string{
+var jsonFieldsNameOfQueryIdpsRequest = [4]string{
 	0: "limit",
 	1: "page_token",
-	2: "revisions",
-	3: "sorting",
-	4: "filter",
+	2: "sorting",
+	3: "filter",
 }
 
 // Decode decodes QueryIdpsRequest from json.
@@ -64006,16 +63966,6 @@ func (s *QueryIdpsRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"page_token\"")
-			}
-		case "revisions":
-			if err := func() error {
-				s.Revisions.Reset()
-				if err := s.Revisions.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"revisions\"")
 			}
 		case "sorting":
 			if err := func() error {
@@ -64190,46 +64140,6 @@ func (s *QueryIdpsRequestFilterItem) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *QueryIdpsRequestFilterItem) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes QueryIdpsRequestRevisions as json.
-func (s QueryIdpsRequestRevisions) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes QueryIdpsRequestRevisions from json.
-func (s *QueryIdpsRequestRevisions) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode QueryIdpsRequestRevisions to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch QueryIdpsRequestRevisions(v) {
-	case QueryIdpsRequestRevisionsAll:
-		*s = QueryIdpsRequestRevisionsAll
-	case QueryIdpsRequestRevisionsLatest:
-		*s = QueryIdpsRequestRevisionsLatest
-	default:
-		*s = QueryIdpsRequestRevisions(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s QueryIdpsRequestRevisions) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *QueryIdpsRequestRevisions) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

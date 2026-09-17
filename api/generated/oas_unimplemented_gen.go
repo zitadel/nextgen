@@ -752,8 +752,7 @@ func (UnimplementedHandler) QueryGrants(ctx context.Context, req *QueryGrantsReq
 // QueryIdps implements queryIdps operation.
 //
 // Returns the identity provider connections of a project, paginated with a
-// cursor. By default one row per connection, carrying its newest revision.
-// `revisions: all` returns a row per revision instead.
+// cursor. One row per connection, carrying its newest revision.
 //
 // POST /idps/query
 func (UnimplementedHandler) QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (r QueryIdpsRes, _ error) {

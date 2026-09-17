@@ -24653,7 +24653,7 @@ func NewStringIdpConnectionVerifiedClaimsItem(v string) IdpConnectionVerifiedCla
 
 // Field to filter or sort identity provider connections by:
 // - `slug`: unique within the project. `equals` returns the newest revision
-// of that connection by default, or every revision with `revisions: all`
+// of that connection
 // - `created_at`: RFC3339 timestamp.
 // Ref: #
 type IdpFilterField string
@@ -24747,7 +24747,7 @@ type IdpResponse struct {
 	// every revision. This id is referenced by the identity links.
 	ID string `json:"id"`
 	// The id of the revision this row holds, pinned by auth attempts and
-	// releases. Single reads and the default query return the newest one.
+	// releases. Single reads and the query return the newest one.
 	RevisionID string `json:"revision_id"`
 	// The identifier by which user schemas and flow definitions reference the
 	// connection. Fixed for the life of the connection.
@@ -36089,52 +36089,6 @@ func (o OptQueryGrantsRequestSorting) Or(d QueryGrantsRequestSorting) QueryGrant
 	return d
 }
 
-// NewOptQueryIdpsRequestRevisions returns new OptQueryIdpsRequestRevisions with value set to v.
-func NewOptQueryIdpsRequestRevisions(v QueryIdpsRequestRevisions) OptQueryIdpsRequestRevisions {
-	return OptQueryIdpsRequestRevisions{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptQueryIdpsRequestRevisions is optional QueryIdpsRequestRevisions.
-type OptQueryIdpsRequestRevisions struct {
-	Value QueryIdpsRequestRevisions
-	Set   bool
-}
-
-// IsSet returns true if OptQueryIdpsRequestRevisions was set.
-func (o OptQueryIdpsRequestRevisions) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptQueryIdpsRequestRevisions) Reset() {
-	var v QueryIdpsRequestRevisions
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptQueryIdpsRequestRevisions) SetTo(v QueryIdpsRequestRevisions) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptQueryIdpsRequestRevisions) Get() (v QueryIdpsRequestRevisions, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptQueryIdpsRequestRevisions) Or(d QueryIdpsRequestRevisions) QueryIdpsRequestRevisions {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptQueryIdpsRequestSorting returns new OptQueryIdpsRequestSorting with value set to v.
 func NewOptQueryIdpsRequestSorting(v QueryIdpsRequestSorting) OptQueryIdpsRequestSorting {
 	return OptQueryIdpsRequestSorting{
@@ -42562,15 +42516,6 @@ type QueryIdpsRequest struct {
 	// `sorting` as the request that issued the token. Omitting `sorting` reuses
 	// the default sort and only succeeds when that default matches the token.
 	PageToken OptNilPageToken `json:"page_token"`
-	// Which revisions to return. A revise appends an immutable revision that
-	// shares the connection's `id` and `slug` and carries its own
-	// `revision_id`.
-	// `latest` (the default) returns the newest revision of each connection,
-	// one row per connection. `all` returns every revision, the
-	// history of a connection when combined with `equals` on `slug`.
-	// A `page_token` is bound to the mode it was issued in and is rejected by
-	// the other.
-	Revisions OptQueryIdpsRequestRevisions `json:"revisions"`
 	// Sort order. Defaults to `created_at` ascending; `revision_id` breaks ties either way.
 	Sorting OptQueryIdpsRequestSorting `json:"sorting"`
 	// Filter criteria for querying connections. Combined with AND.
@@ -42585,11 +42530,6 @@ func (s *QueryIdpsRequest) GetLimit() OptLimit {
 // GetPageToken returns the value of PageToken.
 func (s *QueryIdpsRequest) GetPageToken() OptNilPageToken {
 	return s.PageToken
-}
-
-// GetRevisions returns the value of Revisions.
-func (s *QueryIdpsRequest) GetRevisions() OptQueryIdpsRequestRevisions {
-	return s.Revisions
 }
 
 // GetSorting returns the value of Sorting.
@@ -42610,11 +42550,6 @@ func (s *QueryIdpsRequest) SetLimit(val OptLimit) {
 // SetPageToken sets the value of PageToken.
 func (s *QueryIdpsRequest) SetPageToken(val OptNilPageToken) {
 	s.PageToken = val
-}
-
-// SetRevisions sets the value of Revisions.
-func (s *QueryIdpsRequest) SetRevisions(val OptQueryIdpsRequestRevisions) {
-	s.Revisions = val
 }
 
 // SetSorting sets the value of Sorting.
@@ -42662,55 +42597,6 @@ func (s *QueryIdpsRequestFilterItem) SetValue(val OptFilterValue) {
 // SetOperation sets the value of Operation.
 func (s *QueryIdpsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
-}
-
-// Which revisions to return. A revise appends an immutable revision that
-// shares the connection's `id` and `slug` and carries its own
-// `revision_id`.
-// `latest` (the default) returns the newest revision of each connection,
-// one row per connection. `all` returns every revision, the
-// history of a connection when combined with `equals` on `slug`.
-// A `page_token` is bound to the mode it was issued in and is rejected by
-// the other.
-type QueryIdpsRequestRevisions string
-
-const (
-	QueryIdpsRequestRevisionsAll    QueryIdpsRequestRevisions = "all"
-	QueryIdpsRequestRevisionsLatest QueryIdpsRequestRevisions = "latest"
-)
-
-// AllValues returns all QueryIdpsRequestRevisions values.
-func (QueryIdpsRequestRevisions) AllValues() []QueryIdpsRequestRevisions {
-	return []QueryIdpsRequestRevisions{
-		QueryIdpsRequestRevisionsAll,
-		QueryIdpsRequestRevisionsLatest,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s QueryIdpsRequestRevisions) MarshalText() ([]byte, error) {
-	switch s {
-	case QueryIdpsRequestRevisionsAll:
-		return []byte(s), nil
-	case QueryIdpsRequestRevisionsLatest:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *QueryIdpsRequestRevisions) UnmarshalText(data []byte) error {
-	switch QueryIdpsRequestRevisions(data) {
-	case QueryIdpsRequestRevisionsAll:
-		*s = QueryIdpsRequestRevisionsAll
-		return nil
-	case QueryIdpsRequestRevisionsLatest:
-		*s = QueryIdpsRequestRevisionsLatest
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // Sort order. Defaults to `created_at` ascending; `revision_id` breaks ties either way.

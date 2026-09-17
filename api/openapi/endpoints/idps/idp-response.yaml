@@ -19,7 +19,7 @@ properties:
     type: string
     description: |
       The id of the revision this row holds, pinned by auth attempts and
-      releases. Single reads and the default query return the newest one.
+      releases. Single reads and the query return the newest one.
     example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
   slug:
     type: string

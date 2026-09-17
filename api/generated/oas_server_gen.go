@@ -579,8 +579,7 @@ type Handler interface {
 	// QueryIdps implements queryIdps operation.
 	//
 	// Returns the identity provider connections of a project, paginated with a
-	// cursor. By default one row per connection, carrying its newest revision.
-	// `revisions: all` returns a row per revision instead.
+	// cursor. One row per connection, carrying its newest revision.
 	//
 	// POST /idps/query
 	QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)

@@ -7516,24 +7516,6 @@ func (s *QueryIdpsRequest) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.Revisions.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "revisions",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.Sorting.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -7632,17 +7614,6 @@ func (s *QueryIdpsRequestFilterItem) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s QueryIdpsRequestRevisions) Validate() error {
-	switch s {
-	case "all":
-		return nil
-	case "latest":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s *QueryIdpsRequestSorting) Validate() error {

@@ -11,23 +11,6 @@ properties:
     oneOf:
       - $ref: ../../../components/schemas/page-token.yaml
       - type: 'null'
-  revisions:
-    type: string
-    default: latest
-    enum:
-      - all
-      - latest
-    description: |
-      Which revisions to return. A revise appends an immutable revision that
-      shares the connection's `id` and `slug` and carries its own
-      `revision_id`.
-
-      `latest` (the default) returns the newest revision of each connection,
-      one row per connection. `all` returns every revision, the
-      history of a connection when combined with `equals` on `slug`.
-
-      A `page_token` is bound to the mode it was issued in and is rejected by
-      the other.
   sorting:
     type: object
     description: Sort order. Defaults to `created_at` ascending; `revision_id` breaks ties either way.
