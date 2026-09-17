@@ -1007,7 +1007,6 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // testHasherFactory is the deployment hashing configuration the project tests
 // run against: bcrypt at cost 10, bounded to 10..16, so a project asking for
 // cost 12 is accepted and one asking for cost 4 is not.
@@ -1031,7 +1030,8 @@ func testHasherFactory(t *testing.T) *crypto.HasherFactory {
 	factory, err := cfg.NewHasherFactory()
 	require.NoError(t, err)
 	return factory
-=======
+}
+
 func TestProjectService_ListAuthorized(t *testing.T) {
 	t.Parallel()
 
@@ -1221,5 +1221,4 @@ func TestProjectService_ListAuthorizedRequiresActiveUser(t *testing.T) {
 		assert.NotErrorIs(t, err, domain.ErrSessionTokenInvalid(),
 			"a database outage must not read as a rejected session")
 	})
->>>>>>> origin/main
 }
