@@ -95,10 +95,10 @@ Every resource kind has four reads:
 - `GET /<kind>/{id}` returns the resource at its newest revision.
 - `GET /<kind>/{id}/revisions` returns the revisions of one resource. It is
   a list, so it paginates with `page_token` per ADR 027.
-- `GET /<kind>/revisions/{revision_id}` returns one revision. A release
-  pointer holds a `revision_id` and no resource id, so this read takes the
-  `revision_id` alone. A prefixed id cannot collide with the literal
-  `revisions`.
+- `GET /<kind>/revisions/{revision_id}` returns one revision. A user record
+  and an auth attempt hold a `revision_id` and no resource id, so this read
+  takes the `revision_id` alone. A prefixed id cannot collide with the
+  literal `revisions`.
 
 `GET /<kind>/revisions/{revision_id}` is the read a release depends on.
 Creating a release fails if a pinned revision does not exist, and ADR 035
@@ -119,20 +119,25 @@ A resource can be referenced in three ways:
 - **By `id`**, when the reference must outlive revisions. An identity link
   references a connection's `id`.
 - **By `revision_id`**, when the reference must keep pointing at one exact
-  revision. Releases, auth attempts and user records pin a `revision_id`.
+  revision. Releases, auth attempts and user records pin a `revision_id`. A
+  release records the resource `id` beside it. The other two hold the
+  `revision_id` alone.
 
 ### 6. The release pointer
 
-A release pointer stays `{kind, handle, revision_id}`. Its `revision_id` is
-the revision's own `revision_id`, no longer the resource `id` that stood in
-for it. The ADR 035 example reads, for the kinds that exist:
+A release pointer becomes `{kind, handle, id, revision_id}`. The handle
+stays, because resources inside a release reference each other by it. `id`
+is the resource `id`. `revision_id` is the revision's own `revision_id`, no
+longer the resource `id` that stood in for it. Creating a release already
+reads each pinned revision to find its handle. The `id` comes from that same
+row. The ADR 035 example reads, for the kinds that exist:
 
-| Kind             | Handle                       | `revision_id`  |
-|------------------|------------------------------|----------------|
-| schema           | `objectType` = `human-user`  | the revision   |
-| flow_definition  | `name` = `default-login`     | the revision   |
-| branding         | `default`                    | the revision   |
-| idp              | `slug` = `google`            | the revision   |
+| Kind            | Handle                      | `id`         | `revision_id` |
+|-----------------|-----------------------------|--------------|---------------|
+| schema          | `objectType` = `human-user` | the resource | the revision  |
+| flow_definition | `name` = `default-login`    | the resource | the revision  |
+| branding        | `default`                   | the resource | the revision  |
+| idp             | `slug` = `google`           | the resource | the revision  |
 
 Prefix tokens are domain constants registered per ADR 047.
 
@@ -140,8 +145,10 @@ Prefix tokens are domain constants registered per ADR 047.
 
 Connections already have the two ids. The three older kinds should adopt this
 as well. Each migration is its own ticket. Each adds the two revision routes
-for its kind and switches the existence check at release creation from
-get-by-id to a lookup by `revision_id`:
+for its kind, switches the existence check at release creation from
+get-by-id to a lookup by `revision_id`, and has that lookup record the
+resource `id` on the pointer. The first migration adds the `id` field to the
+pointer. Until a kind migrates, its pointers carry no `id`:
 
 - **Flow definitions.** `id` becomes fixed per `name` and each write allocates
   a `revision_id`. The list filtered by `name` returns the newest revision of
