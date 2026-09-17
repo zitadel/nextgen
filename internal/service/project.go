@@ -57,6 +57,16 @@ type ProjectService interface {
 	// Returns domain.ErrProjectMissingID when the request carries no project.
 	List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error)
 
+	// ListAuthorized returns the projects the session user holds an active
+	// grant on, directly or through a team (ADR 053 §6), ordered by project id
+	// and paginated with an opaque cursor. Unlike List it spans projects: the
+	// grants are the scope, not the caller's own project.
+	//
+	// The session user must be active in its home project; deactivated users are
+	// refused even if their session outlives the deactivation (#553).
+	// Returns domain.ErrSessionTokenInvalid when either id is missing.
+	ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error)
+
 	// Delete hard-deletes a project, cascading to its child resources through the
 	// storage delete. Deleting a project that does not exist is a no-op.
 	Delete(ctx context.Context, id string) error
@@ -438,6 +448,71 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*Li
 		Projects:      result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+// ListAuthorizedProjectsRequest is the input for listing the projects a
+// signed-in user can act on. Both ids come from the session token.
+type ListAuthorizedProjectsRequest struct {
+	// HomeProjectID is the session's project; team membership edges are read
+	// there (ADR 053 §3). Required.
+	HomeProjectID string
+	// UserID is the human the session is bound to. Required.
+	UserID    string
+	Limit     int
+	PageToken string
+}
+
+func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error) {
+	// Fail closed: an empty id would bind an empty string into the grant
+	// predicate instead of narrowing it, so there is no safe default here.
+	if req.UserID == "" || req.HomeProjectID == "" {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+
+	// Deactivating a user does not revoke the sessions already minted for it
+	// (#553), so holding a valid cookie is not proof the human is still allowed
+	// in. Re-read the user active, the way the grant service vets a principal.
+	if err := s.requireActiveSessionUser(ctx, req.HomeProjectID, req.UserID); err != nil {
+		return nil, err
+	}
+
+	result, err := s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, database.Page[domain.ProjectField]{
+		Limit: uint32(normalizeLimit(req.Limit)),
+		OrderBy: database.OrderBy[domain.ProjectField]{
+			Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+			Direction: database.OrderAsc,
+		},
+		Cursor: []byte(req.PageToken),
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list authorized projects")
+	}
+
+	return &ListProjectsResponse{
+		Projects:      result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
+}
+
+// requireActiveSessionUser refuses a session whose user is gone or no longer
+// active in its home project. A missing or non-active user is refused with
+// domain.ErrSessionTokenInvalid, the same error an anonymous session yields, so
+// a caller cannot tell "deactivated" from "never existed" from "not signed in".
+// A storage failure stays an internal error: an outage is not an answer about
+// the user, and reporting it as one would hide the outage.
+func (s *projectService) requireActiveSessionUser(ctx context.Context, homeProjectID, userID string) error {
+	_, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), homeProjectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
+		database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+	), UserQueryOptions{})
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrSessionTokenInvalid()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to read the session user")
+	}
+	return nil
 }
 
 // projectFilter maps an API filter predicate to a storage filter. Operations the
