@@ -1,4 +1,5 @@
 // `Building2` returns with the parked organisation switcher below.
+import { Link, type LinkProps } from "@tanstack/react-router";
 import { Boxes, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
@@ -32,6 +33,11 @@ interface SwitcherOption {
   id: string;
   label: string;
   plan?: string;
+  /**
+   * Where following the row goes. Navigation, not selection: the pill keeps
+   * showing what it showed. Without one the row is a plain label.
+   */
+  link?: Pick<LinkProps, "to" | "params" | "search">;
 }
 
 export function ContextSwitcher() {
@@ -113,7 +119,14 @@ function useProjects(): SwitcherOption[] | undefined {
       .listMyProjects()
       .then((result) => {
         if (cancelled) return;
-        setProjects(result.projects.map((project) => ({ id: project.id, label: project.name })));
+        setProjects(
+          result.projects.map((project) => ({
+            id: project.id,
+            label: project.name,
+            // The same target as a row on the Projects screen.
+            link: { to: "/projects/$projectId", params: { projectId: project.id } },
+          })),
+        );
       })
       .catch(() => {
         if (!cancelled) setProjects([]);
@@ -223,25 +236,43 @@ function Switcher({
               {empty ? emptyLabel : "No results"}
             </li>
           ) : (
-            // Labels, not buttons: nothing here selects anything yet. The rows
+            // Links, not buttons: nothing here selects anything yet. The rows
             // used to be buttons whose click only closed the popover, which
-            // looked like a switch and was not one.
-            rows.map((option) => (
-              <li
-                key={option.id}
-                // By id, not by label: two projects may share a name.
-                aria-current={option.id === currentId ? "true" : undefined}
-                className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left"
-              >
-                <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
-                {option.plan && (
-                  <Badge variant="secondary" className="shrink-0">
-                    {option.plan}
-                  </Badge>
-                )}
-              </li>
-            ))
+            // looked like a switch and was not one. A link says what it does —
+            // it opens the project — and leaves the pill as it was.
+            rows.map((option) => {
+              const content = (
+                <>
+                  <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
+                  {option.plan && (
+                    <Badge variant="secondary" className="shrink-0">
+                      {option.plan}
+                    </Badge>
+                  )}
+                </>
+              );
+              const rowClass = "flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left";
+              return (
+                <li
+                  key={option.id}
+                  // By id, not by label: two projects may share a name.
+                  aria-current={option.id === currentId ? "true" : undefined}
+                >
+                  {option.link ? (
+                    <Link
+                      {...option.link}
+                      onClick={() => setOpen(false)}
+                      className={cn(rowClass, "hover:bg-accent focus-visible:bg-accent focus-visible:outline-none")}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div className={rowClass}>{content}</div>
+                  )}
+                </li>
+              );
+            })
           )}
         </ul>
       </PopoverContent>

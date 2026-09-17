@@ -63,6 +63,7 @@ afterAll(() => server.close());
 function renderShell(path = "/") {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
+  return router;
 }
 
 describe("app shell navigation", () => {
@@ -229,10 +230,33 @@ describe("project pill", () => {
       "Delta",
     ]);
     // Display only: there is no selected-project state to change, so a row that
-    // looked pressable would promise a switch the console cannot make.
+    // looked pressable would promise a switch the console cannot make. Each row
+    // is a link to the project instead — navigation, not selection.
     expect(list.queryAllByRole("button")).toEqual([]);
+    expect(list.getByRole("link", { name: "River" })).toHaveAttribute("href", "/projects/proj_1");
+    expect(list.getByRole("link", { name: "Delta" })).toHaveAttribute("href", "/projects/proj_2");
     expect(list.getByText("River").closest("li")).toHaveAttribute("aria-current", "true");
     expect(list.getByText("Delta").closest("li")).not.toHaveAttribute("aria-current");
+  });
+
+  it("opens the project and closes the list when a row is followed", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({ projects: [{ id: "proj_1", name: "River" }] }),
+      ),
+    );
+    const router = renderShell();
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
+    await userEvent.click(pill);
+    const list = within(await screen.findByRole("list", { name: "Switch project" }));
+    await userEvent.click(list.getByRole("link", { name: "River" }));
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects/proj_1"));
+    expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
+    // Following a row changes the page, not the pill: nothing was selected.
+    expect(pill).toHaveTextContent("River");
   });
 
   it("says there are no projects instead of loading forever", async () => {
