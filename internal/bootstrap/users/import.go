@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/maputil"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -65,7 +66,11 @@ func importFile(
 		return fmt.Errorf("check existing user: %w", err)
 	}
 
-	attrs, err := buildCreateAttributes(doc.Attributes)
+	schema, err := loadUserSchema(ctx, v2Pool.Statements(), doc.Header)
+	if err != nil {
+		return err
+	}
+	attrs, err := buildCreateAttributes(doc.Attributes, schema)
 	if err != nil {
 		return err
 	}
@@ -104,14 +109,21 @@ func importFile(
 	return nil
 }
 
-func buildCreateAttributes(attrs map[domain.AttributeKey]json.RawMessage) (domain.CreateAttributes, error) {
+// buildCreateAttributes registers each attribute's uniqueness the way user
+// creation does (domain.CreateAttributesFromMap): from the property's
+// `x-unique` annotation in the user's schema. Without that, a bootstrap user
+// whose schema identifies users by `email` cannot be found at sign-in, because
+// identifier resolution looks the value up in the unique-attributes registry.
+// `username` stays project-unique regardless, as it always was for bootstrap
+// users.
+func buildCreateAttributes(attrs map[domain.AttributeKey]json.RawMessage, schema map[string]any) (domain.CreateAttributes, error) {
 	out := make(domain.CreateAttributes, 0, len(attrs))
 	for key, raw := range attrs {
 		value, err := decodeScalar(raw, key)
 		if err != nil {
 			return nil, err
 		}
-		scope := domain.AttributeUniquenessUnspecified
+		scope := uniqueScopeFromSchema(schema, key)
 		if key == attrKeyUsername {
 			scope = domain.AttributeUniquenessProject
 		}
@@ -122,6 +134,39 @@ func buildCreateAttributes(attrs map[domain.AttributeKey]json.RawMessage) (domai
 		out = append(out, *attr)
 	}
 	return out, nil
+}
+
+// loadUserSchema reads the user's schema document so attribute uniqueness can
+// follow its `x-unique` annotations. The row always exists by now:
+// ensureDependencies created an empty placeholder when the schema was missing,
+// and an empty document simply declares nothing unique.
+func loadUserSchema(ctx context.Context, stmts service.AllStatements, h Header) (map[string]any, error) {
+	stored, err := stmts.GetJSONSchemaByID(ctx, h.ProjectID, h.SchemaURL)
+	if err != nil {
+		return nil, fmt.Errorf("load json_schema %q: %w", h.SchemaURL, err)
+	}
+	schema := map[string]any{}
+	if len(stored.Schema) == 0 {
+		return schema, nil
+	}
+	if err := json.Unmarshal(stored.Schema, &schema); err != nil {
+		return nil, fmt.Errorf("decode json_schema %q: %w", h.SchemaURL, err)
+	}
+	return schema, nil
+}
+
+// uniqueScopeFromSchema maps a top-level property's `x-unique` annotation to
+// its uniqueness scope, the same rule domain.CreateAttributesFromMap applies.
+func uniqueScopeFromSchema(schema map[string]any, key domain.AttributeKey) domain.AttributeUniqueness {
+	scope, _ := maputil.GetNested[string](schema, []string{"properties", string(key), domain.SchemaAnnotationUnique})
+	switch scope {
+	case domain.SchemaUniqueScopeProject:
+		return domain.AttributeUniquenessProject
+	case domain.SchemaUniqueScopeTeam:
+		return domain.AttributeUniquenessTeam
+	default:
+		return domain.AttributeUniquenessUnspecified
+	}
 }
 
 // DialectFromConfig returns the sole configured database dialect name, or "" if unset.

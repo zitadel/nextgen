@@ -328,6 +328,20 @@ The groups below mirror the ones `zitadel --help` prints.
   `start` with `E_VALIDATION` before any runtime is stopped. `setup` writes a
   comment saying so at the top of the scaffolded `.env.example` and
   `.env.local`.
+  The server boots with the platform project
+  and a local admin, so the developer exists on their own server without
+  signing up: the admin signs in as `admin@zitadel.localhost`, and a
+  generated password is kept in `.zitadel/local/admin.json` (gitignored with
+  the rest of `.zitadel/local/`) and never printed. `start` prints a one-time
+  console sign-in link and reports it as `data.console.sign_in_url` with
+  `data.console.signed_in_as`; if no link can be minted (for example a data
+  directory from before the local admin existed), `data.console.error` and
+  `data.console.hint` say why and `start` still succeeds.
+- `console` — print (and, interactively, open) a fresh one-time sign-in link
+  for the local console as the local admin: `data.sign_in_url`,
+  `data.signed_in_as`, `data.browser_opened`. Each link works once; run the
+  command again for a new one. Fails with `E_VALIDATION` when `start` never
+  created a local admin in this directory. Flags: `--no-open`.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes

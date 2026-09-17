@@ -453,7 +453,10 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.runtime.pid).toBeGreaterThan(0);
     binaryPids.push(envelope.data.runtime.pid);
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_commands).toEqual([
+      expectedPublicCliCommand("setup --server local"),
+      expectedPublicCliCommand("console"),
+    ]);
 
     const runtime = await readRuntimeMetadata(cwd);
     expect(runtime).toMatchObject({
@@ -541,7 +544,10 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_commands).toEqual([
+      expectedPublicCliCommand("setup --server local"),
+      expectedPublicCliCommand("console"),
+    ]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 
@@ -555,7 +561,7 @@ describe("local runtime commands", () => {
     expect(runCall?.join(" ")).toContain(`${localRuntimePaths(cwd).dataDir}:${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).toContain(`NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
-    expect(runCall?.at(-1)).toBe(await expectedDefaultImage());
+    expect(runImage(runCall)).toBe(await expectedDefaultImage());
   });
 
   it("start uses a prebuilt local image without pulling it", async () => {
@@ -575,7 +581,7 @@ describe("local runtime commands", () => {
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls).toContainEqual(["image", "inspect", "zitadel-nextgen:test"]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:test");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe("zitadel-nextgen:test");
   });
 
   it("start uses ZITADEL_LOCAL_IMAGE before the derived alpha image", async () => {
@@ -594,7 +600,7 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:env");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe("zitadel-nextgen:env");
   });
 
   it("start --image overrides ZITADEL_LOCAL_IMAGE", async () => {
@@ -622,7 +628,7 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:override");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe("zitadel-nextgen:override");
   });
 
   it("start replaces an existing container from another image", async () => {
@@ -642,7 +648,7 @@ describe("local runtime commands", () => {
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls.some((args) => args[0] === "stop")).toBe(true);
     expect(dockerCalls.some((args) => args[0] === "rm")).toBe(true);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe(
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe(
       await expectedDefaultImage(),
     );
   });
@@ -1024,6 +1030,17 @@ process.exit(1);
   );
   await chmod(psPath, 0o755);
   return { binDir };
+}
+
+/**
+ * The image of a recorded `docker run`. It is the last argument unless the run
+ * passes server arguments after it (`--migrate --user-file …` for the local
+ * admin), in which case it is the argument just before them.
+ */
+function runImage(args: string[] | undefined): string | undefined {
+  if (!args) return undefined;
+  const serverArgs = args.indexOf("--migrate");
+  return serverArgs > 0 ? args[serverArgs - 1] : args.at(-1);
 }
 
 async function readDockerCalls(logPath: string): Promise<string[][]> {

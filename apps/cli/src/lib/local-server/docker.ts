@@ -21,6 +21,9 @@ export type DockerResult = {
   stderr: string;
 };
 
+/** Where the local admin's bootstrap user document is mounted in the container. */
+const CONTAINER_ADMIN_USER_FILE = "/var/lib/zitadel/bootstrap/admin-user.json";
+
 export type DockerRunSpec = {
   containerName: string;
   image: string;
@@ -32,6 +35,8 @@ export type DockerRunSpec = {
    * value from the docker client's environment; no value appears in argv.
    */
   env?: ResolvedEnv;
+  /** Host path of the local admin's bootstrap user document. */
+  userFile?: string;
 };
 
 export function dockerRunArgs(spec: DockerRunSpec, envNames: readonly string[] = []): string[] {
@@ -55,7 +60,13 @@ export function dockerRunArgs(spec: DockerRunSpec, envNames: readonly string[] =
     // published above, not the cloud default the server config falls back to.
     "--env",
     `NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:${spec.port}`,
+    // Same platform bootstrap as the binary runtime.
+    "--env",
+    "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
   ];
+  if (spec.userFile) {
+    args.push("--volume", `${spec.userFile}:${CONTAINER_ADMIN_USER_FILE}:ro`);
+  }
 
   if (spec.identity) {
     args.push(
@@ -69,6 +80,10 @@ export function dockerRunArgs(spec: DockerRunSpec, envNames: readonly string[] =
   }
 
   args.push(spec.image);
+  // The image's CMD is `--migrate`; passing arguments replaces it, so keep it.
+  if (spec.userFile) {
+    args.push("--migrate", "--user-file", CONTAINER_ADMIN_USER_FILE);
+  }
   return args;
 }
 

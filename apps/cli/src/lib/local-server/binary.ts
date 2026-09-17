@@ -28,6 +28,8 @@ export type BinaryRunSpec = {
   serverUrl: string;
   /** Project variables for the child's environment, never its argv. */
   env?: ResolvedEnv;
+  /** Bootstrap user document for the local admin, passed as `--user-file`. */
+  userFile?: string;
 };
 
 export type StopBinaryRuntimeResult = Readonly<{
@@ -68,7 +70,10 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
-    const args = withMigrateFlag(command.args);
+    const args = withMigrateFlag([
+      ...command.args,
+      ...(spec.userFile ? ["--user-file", spec.userFile] : []),
+    ]);
     const child = spawn(command.command, args, {
       detached: true,
       env: {
@@ -80,6 +85,9 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
         // Browser-facing URLs (claim, dashboard) must point at this local
         // server, not the cloud default the server config falls back to.
         NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
+        // A CLI-managed server always hosts the platform project, so the local
+        // admin has somewhere to exist and the console signs into it.
+        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
       },
       stdio: ["ignore", log.fd, log.fd],
     });

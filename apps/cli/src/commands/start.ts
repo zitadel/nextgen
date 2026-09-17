@@ -2,7 +2,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { Flags } from "@oclif/core";
 
+import consola from "consola";
+
 import { ZitadelError, toZitadelError } from "../lib/errors";
+import { consoleSignInUrl, ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin";
 import {
   binaryLogs,
   isProcessRunning,
@@ -106,6 +109,9 @@ export default class Start extends BaseCommand {
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
     const env = await loadProjectEnv(this.meta.cwd);
+    // The developer exists on their own server from the first start: the
+    // server imports the local admin, and the console signs them in by link.
+    const { admin, userFile } = await ensureLocalAdmin(this.meta.cwd);
 
     if (runtimeBackend === "binary") {
       if (
@@ -117,7 +123,12 @@ export default class Start extends BaseCommand {
         await writeRuntimeMetadata(this.meta.cwd, existingRuntime);
         return this.emit({
           status: "ok",
-          data: readyData(existingRuntime, true, this.meta.cliVersion),
+          data: readyData(
+            existingRuntime,
+            true,
+            this.meta.cliVersion,
+            await consoleLogin(serverUrl, admin),
+          ),
         });
       }
       await stopExistingRuntime(existingRuntime);
@@ -129,6 +140,7 @@ export default class Start extends BaseCommand {
         port,
         serverUrl,
         env,
+        userFile,
       });
       try {
         await waitForHealth(
@@ -154,7 +166,7 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, false, this.meta.cliVersion),
+        data: readyData(metadata, false, this.meta.cliVersion, await consoleLogin(serverUrl, admin)),
       });
     }
 
@@ -183,7 +195,7 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, true, this.meta.cliVersion),
+        data: readyData(metadata, true, this.meta.cliVersion, await consoleLogin(serverUrl, admin)),
       });
     }
 
@@ -200,6 +212,7 @@ export default class Start extends BaseCommand {
       dataDir: paths.dataDir,
       identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
       env,
+      userFile,
     });
     await waitForHealth(serverUrl, this.meta.cliVersion, {
       runtime: "docker",
@@ -219,10 +232,35 @@ export default class Start extends BaseCommand {
     await writeRuntimeMetadata(this.meta.cwd, metadata);
     return this.emit({
       status: "ok",
-      data: readyData(metadata, false, this.meta.cliVersion),
+      data: readyData(metadata, false, this.meta.cliVersion, await consoleLogin(serverUrl, admin)),
     });
   }
 }
+
+/**
+ * Mints a console sign-in link for the local admin. A failure (for
+ * example a data directory from before the local admin existed) must not fail
+ * the start itself, so it degrades to a warning with the fix.
+ */
+async function consoleLogin(serverUrl: string, admin: LocalAdmin): Promise<ConsoleLogin> {
+  try {
+    const url = await consoleSignInUrl(serverUrl, admin);
+    consola.log(`Console: signed in as ${admin.email}. Open this link (works once):`);
+    consola.log(url);
+    return { signed_in_as: admin.email, sign_in_url: url };
+  } catch (error) {
+    const reason = toZitadelError(error);
+    consola.warn(`Could not create a console sign-in link: ${reason.message}`);
+    return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
+  }
+}
+
+type ConsoleLogin = {
+  signed_in_as: string;
+  sign_in_url?: string;
+  error?: string;
+  hint?: string;
+};
 
 function startupCleanupFailedError(
   error: unknown,
@@ -278,6 +316,7 @@ function readyData(
   metadata: RuntimeMetadata,
   alreadyRunning: boolean,
   cliVersion: string,
+  console: ConsoleLogin,
 ) {
   return {
     title: alreadyRunning
@@ -306,11 +345,18 @@ function readyData(
       console: `${metadata.server_url}/ui/console/`,
       login: `${metadata.server_url}/ui/login/`,
     },
+    console,
     next_actions: [
+      ...(console.sign_in_url
+        ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
+        : []),
       "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
     ],
-    next_commands: [publicCliCommand("setup --server local", cliVersion)],
+    next_commands: [
+      publicCliCommand("setup --server local", cliVersion),
+      publicCliCommand("console", cliVersion),
+    ],
   };
 }
 
