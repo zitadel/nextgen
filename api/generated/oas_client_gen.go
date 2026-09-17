@@ -371,11 +371,20 @@ type Invoker interface {
 	GetHealth(ctx context.Context) (GetHealthRes, error)
 	// GetIdpById invokes getIdpById operation.
 	//
-	// Reads a connection by its id.
+	// Reads a connection by its id, at its newest revision.
+	// `GET /idps/{id}/revisions` lists every revision of the connection.
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /idps/{id}
 	GetIdpById(ctx context.Context, params GetIdpByIdParams) (GetIdpByIdRes, error)
+	// GetIdpRevisionById invokes getIdpRevisionById operation.
+	//
+	// Reads one revision of a connection by its `revision_id`, the value an auth
+	// attempt or a release pins.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /idps/revisions/{revision_id}
+	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive invokes getLive operation.
 	//
 	// Check whether the server is started.
@@ -511,6 +520,14 @@ type Invoker interface {
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListIdpRevisions invokes listIdpRevisions operation.
+	//
+	// Returns every revision of one connection, newest first, paginated with a
+	// cursor. The order is fixed, so there is no `sorting`.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /idps/{id}/revisions
+	ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error)
 	// ListMyProjects invokes listMyProjects operation.
 	//
 	// The projects the signed-in user holds an active grant on, either directly or
@@ -4887,7 +4904,8 @@ func (c *Client) sendGetHealth(ctx context.Context) (res GetHealthRes, err error
 
 // GetIdpById invokes getIdpById operation.
 //
-// Reads a connection by its id.
+// Reads a connection by its id, at its newest revision.
+// `GET /idps/{id}/revisions` lists every revision of the connection.
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /idps/{id}
@@ -5025,6 +5043,154 @@ func (c *Client) sendGetIdpById(ctx context.Context, params GetIdpByIdParams) (r
 
 	stage = "DecodeResponse"
 	result, err := decodeGetIdpByIdResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetIdpRevisionById invokes getIdpRevisionById operation.
+//
+// Reads one revision of a connection by its `revision_id`, the value an auth
+// attempt or a release pins.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /idps/revisions/{revision_id}
+func (c *Client) GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error) {
+	res, err := c.sendGetIdpRevisionById(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (res GetIdpRevisionByIdRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getIdpRevisionById"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/idps/revisions/{revision_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetIdpRevisionByIdOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/idps/revisions/"
+	{
+		// Encode "revision_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "revision_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.RevisionID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetIdpRevisionByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetIdpRevisionByIdResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -7402,6 +7568,23 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 		}
 	}
 	{
+		// Encode "revisions" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "revisions",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Revisions.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
 		// Encode "expand" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "expand",
@@ -7478,6 +7661,195 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 
 	stage = "DecodeResponse"
 	result, err := decodeListFlowDefinitionsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListIdpRevisions invokes listIdpRevisions operation.
+//
+// Returns every revision of one connection, newest first, paginated with a
+// cursor. The order is fixed, so there is no `sorting`.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /idps/{id}/revisions
+func (c *Client) ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error) {
+	res, err := c.sendListIdpRevisions(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (res ListIdpRevisionsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listIdpRevisions"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/idps/{id}/revisions"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListIdpRevisionsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/idps/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/revisions"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListIdpRevisionsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListIdpRevisionsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

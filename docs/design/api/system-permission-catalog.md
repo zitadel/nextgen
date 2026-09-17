@@ -247,7 +247,7 @@ grant them via `team.write`.
 
 | Permission | Endpoints | Notes                                                                                                                                                         |
 |---|---|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `idp.read` | `POST /idps/query`, `GET /idps/{id}` | Get + list; list is project-scoped. Config files reference a connection by `slug`; the query resolves one with `equals` on `slug`, as teams resolve a name. |
+| `idp.read` | `POST /idps/query`, `GET /idps/{id}`, `GET /idps/{id}/revisions`, `GET /idps/revisions/{revision_id}` | Get + list; list is project-scoped. Config files reference a connection by `slug`; the query resolves one with `equals` on `slug`, as teams resolve a name. Revision reads carry the same scope as the get. |
 | `idp.write` | `POST /idps` | Create + revise: the `slug` in the submitted document decides whether it creates a connection or appends a revision to an existing connection in the project. |
 | `idp.delete` | `DELETE /idps/{id}` | **Not yet exposed** — target shape.                                                                                                                           |
 

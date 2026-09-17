@@ -23,6 +23,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error {
 			return sqlite.InsertJSONSchemaAt(ctx, pool, projectID, url, objectType, createdAt)
 		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, id, name string, createdAt time.Time) error {
+			return sqlite.InsertFlowDefinitionAt(ctx, pool, projectID, id, name, createdAt)
+		},
 		sqlite.SchemaColumnNullability(),
 		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
 			return sqlite.LiveColumnNullability(ctx, pool)

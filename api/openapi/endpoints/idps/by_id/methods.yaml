@@ -2,7 +2,8 @@ get:
   operationId: getIdpById
   summary: Get an identity provider connection by id
   description: |
-    Reads a connection by its id.
+    Reads a connection by its id, at its newest revision.
+    `GET /idps/{id}/revisions` lists every revision of the connection.
 
     The lookup is scoped to the project in `project_id`.
   tags:

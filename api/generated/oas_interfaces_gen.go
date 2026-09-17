@@ -125,6 +125,10 @@ type GetIdpByIdRes interface {
 	getIdpByIdRes()
 }
 
+type GetIdpRevisionByIdRes interface {
+	getIdpRevisionByIdRes()
+}
+
 type GetLiveRes interface {
 	getLiveRes()
 }
@@ -187,6 +191,10 @@ type ListEventsRes interface {
 
 type ListFlowDefinitionsRes interface {
 	listFlowDefinitionsRes()
+}
+
+type ListIdpRevisionsRes interface {
+	listIdpRevisionsRes()
 }
 
 type ListMyProjectsRes interface {

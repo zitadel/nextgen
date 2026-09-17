@@ -150,6 +150,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpByIdOperation: []string{
 		"idp.read",
 	},
+	GetIdpRevisionByIdOperation: []string{
+		"idp.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
 	},
@@ -185,6 +188,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definition.read",
+	},
+	ListIdpRevisionsOperation: []string{
+		"idp.read",
 	},
 	ListReleasesOperation: []string{
 		"release.read",

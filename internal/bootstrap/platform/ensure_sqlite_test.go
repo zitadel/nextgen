@@ -11,10 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dbtest"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const testSchemaBase = "https://example.com/api/schemas"
@@ -36,7 +38,12 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	schemaValidator, err := domain.NewSchemaValidator(testSchemaBase)
 	require.NoError(t, err)
 
-	keys := service.NewKeyService(pool, *masterKeys)
+	crypters, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, 64)
+	require.NoError(t, err)
+	signingKeys, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, 64)
+	require.NoError(t, err)
+
+	keys := service.NewKeyService(pool, *masterKeys, crypters, signingKeys)
 	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys), keys
 }
 
@@ -118,7 +125,7 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 		service.WithAuthzListUnrestricted(ctx),
 		&database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-		})
+		}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	assert.Len(t, flows.Items, len(wantFlows), "a project with no login flow cannot serve a sign-in")
 }
