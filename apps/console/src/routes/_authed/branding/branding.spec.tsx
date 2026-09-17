@@ -22,6 +22,7 @@ vi.mock("@/components/branding/login-preview", () => ({
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const LIST_URL = "http://localhost/api/branding";
+const FLOWS_URL = "http://localhost/api/flow_definitions";
 const REVISION_URL = "http://localhost/api/branding/brnd_1";
 
 const server = setupServer();
@@ -46,8 +47,14 @@ const PUBLISHED = {
   },
 };
 
+const FLOW = {
+  id: "flow_1",
+  flow_definition: { name: "default-login", status: "active", purposes: { login: "identifier" }, steps: [] },
+};
+
 function serveRevision(branding: unknown = PUBLISHED) {
   server.use(
+    http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [FLOW] })),
     http.get(LIST_URL, () =>
       HttpResponse.json([{ id: "brnd_1", created_at: "2026-01-01T00:00:00Z" }]),
     ),
@@ -81,7 +88,10 @@ describe("branding screen", () => {
   });
 
   it("starts from the maintained defaults when nothing has been published", async () => {
-    server.use(http.get(LIST_URL, () => HttpResponse.json([])));
+    server.use(
+      http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [FLOW] })),
+      http.get(LIST_URL, () => HttpResponse.json([])),
+    );
     await renderAt("/branding");
 
     expect(await screen.findByLabelText("Font family")).toHaveValue("");
@@ -113,6 +123,15 @@ describe("branding screen", () => {
     expect(await screen.findByTestId("preview")).toHaveTextContent("register");
     await userEvent.click(screen.getByRole("tab", { name: "Sign in" }));
     expect(screen.getByTestId("preview")).toHaveTextContent("login");
+  });
+
+  it("lists the project's own flows to preview", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    // `default-login` is a slug on the wire; the selector is where it becomes
+    // a label, as the flow list does.
+    expect(await screen.findByLabelText("Previewed flow")).toHaveTextContent("Default login");
   });
 
   it("offers only the journeys it can actually render", async () => {
