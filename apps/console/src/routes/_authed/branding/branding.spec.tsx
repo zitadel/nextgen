@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -49,7 +49,13 @@ const PUBLISHED = {
 
 const FLOW = {
   id: "flow_1",
-  flow_definition: { name: "default-login", status: "active", purposes: { login: "identifier" }, steps: [] },
+  flow_definition: {
+    name: "default-login",
+    status: "active",
+    // Both, as the checked-in default flow definition carries them.
+    purposes: { login: "identifier", register: "register" },
+    steps: [],
+  },
 };
 
 function serveRevision(branding: unknown = PUBLISHED) {
@@ -135,6 +141,41 @@ describe("branding screen", () => {
     expect(await screen.findByTestId("preview")).toHaveTextContent("register");
     await userEvent.click(screen.getByRole("tab", { name: "Sign in" }));
     expect(screen.getByTestId("preview")).toHaveTextContent("login");
+  });
+
+  it("offers each flow once, and only the journeys it serves", async () => {
+    const loginOnly = {
+      id: "flow_2",
+      flow_definition: {
+        name: "login-only",
+        status: "active",
+        purposes: { login: "identifier" },
+        steps: [],
+      },
+    };
+    server.use(
+      // The list carries no revisions filter, so a revised flow arrives twice
+      // under one name. The name is what a preview starts a flow by.
+      http.get(FLOWS_URL, () =>
+        HttpResponse.json({ flow_definitions: [FLOW, FLOW, loginOnly] }),
+      ),
+      http.get(LIST_URL, () => HttpResponse.json([])),
+    );
+    await renderAt("/branding");
+
+    await userEvent.click(await screen.findByLabelText("Previewed flow"));
+    // Scoped to the menu: the trigger shows the selected label too.
+    const menu = await screen.findByRole("listbox");
+    expect(within(menu).getAllByText("Flow: Default login")).toHaveLength(1);
+
+    // A flow that serves only login cannot start a register preview: asking
+    // for a purpose it does not carry answers flowdef.purpose_mismatch.
+    await userEvent.click(within(menu).getByText("Flow: Login only"));
+    expect(screen.queryByRole("tab", { name: "Sign up" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sign in" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("lists the project's own flows to preview", async () => {
