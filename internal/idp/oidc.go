@@ -16,6 +16,17 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
+// SigningAlgorithms is the fixed allowlist for id_token signatures:
+// asymmetric only. none is unsigned and the HMAC family signs with the
+// shared client secret, so anyone holding the secret could forge a token.
+// A discovery document never widens this set: the engine
+// does not read its id_token_signing_alg_values_supported and must not use
+// the library option that does. The callback builds its verifier with this
+// list.
+func SigningAlgorithms() []string {
+	return []string{"RS256", "ES256", "PS256"}
+}
+
 // OIDCConnection is the engine's view of the OIDC block of a connection
 // revision. Each endpoint field overrides the discovered one; empty means it
 // comes from the issuer's discovery document.
