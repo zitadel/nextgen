@@ -104,6 +104,18 @@ describe("branding screen", () => {
     expect(await screen.findByText("1 issue")).toBeInTheDocument();
   });
 
+  it("names the failing pair and the rule it misses", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    // The row has space for a glyph only, so the ratio lives behind it. The
+    // surface is named first, as the design labels the pair.
+    await userEvent.click(await screen.findByRole("button", { name: /Primary \/ On primary/ }));
+
+    expect(await screen.findByText("Primary / On primary")).toBeInTheDocument();
+    expect(screen.getByText(/fails AA for normal text \(4.5:1 required\)/)).toBeInTheDocument();
+  });
+
   it("recounts as the palette is edited", async () => {
     serveRevision();
     await renderAt("/branding");

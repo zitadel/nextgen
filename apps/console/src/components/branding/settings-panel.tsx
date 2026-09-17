@@ -1,10 +1,23 @@
-import { contrastIssues, type ContrastIssue } from "@zitadel/config/branding-contrast";
+import {
+  BRANDING_CONTRAST_PAIRS,
+  CONTRAST_AA_LARGE,
+  contrastIssues,
+  type ContrastIssue,
+} from "@zitadel/config/branding-contrast";
 import { parseCssColor } from "@zitadel/config/css-color";
 import { ChevronDown, ChevronUp, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -349,20 +362,49 @@ function PaletteRow({
           placeholder={fallback.toUpperCase()}
           onChange={(event) => onChange(event.target.value)}
         />
-        {issue && (
-          <span
-            className="shrink-0 text-destructive"
-            title={`Contrast ${issue.ratio}:1, needs ${issue.required}:1`}
-          >
-            <TriangleAlert className="size-3.5" aria-hidden />
-            <span className="sr-only">
-              Contrast {issue.ratio} to 1, needs {issue.required} to 1
-            </span>
-          </span>
-        )}
+        {issue && <ContrastIssueMarker issue={issue} label={pairLabel(issue.pair)} />}
       </span>
     </div>
   );
+}
+
+
+/**
+ * The warning on a failing row, and the detail behind it. The row has space for
+ * a glyph only, so the ratio and the rule it misses live in a popover rather
+ * than a title attribute a keyboard or a touch device never sees.
+ */
+function ContrastIssueMarker({ issue, label }: { issue: ContrastIssue; label: string }) {
+  // WCAG holds text to 4.5:1 and a user-interface component boundary to 3:1,
+  // so the sentence names which rule this pair is being held to.
+  const rule =
+    issue.required === CONTRAST_AA_LARGE ? "user interface components" : "normal text";
+  const detail = `${issue.ratio}:1 — fails AA for ${rule} (${issue.required}:1 required).`;
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        className="shrink-0 cursor-pointer text-destructive"
+        aria-label={`${label}: ${detail}`}
+      >
+        <TriangleAlert className="size-3.5" aria-hidden />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-auto max-w-[240px] flex-col gap-2.5 border-foreground/10 p-2">
+        <PopoverHeader className="gap-0.5 text-xs leading-4">
+          <PopoverTitle>{label}</PopoverTitle>
+          <PopoverDescription>{detail}</PopoverDescription>
+        </PopoverHeader>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** `foreground/background` reads as the surface first, as the design labels it. */
+function pairLabel(pair: string): string {
+  const found = BRANDING_CONTRAST_PAIRS.find((candidate) => candidate.id === pair);
+  if (!found) return pair;
+  const name = (key: string) => PALETTE_LABELS[key as PaletteKey] ?? key;
+  return `${name(found.background)} / ${name(found.foreground)}`;
 }
 
 /** A native colour input takes `#rrggbb` only. */
