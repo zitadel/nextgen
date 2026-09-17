@@ -3755,18 +3755,18 @@ func (c *MockAllStatementsListEventsAfterCursorCall) DoAndReturn(f func(context.
 }
 
 // ListFlowDefinitions mocks base method.
-func (m *MockAllStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+func (m *MockAllStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], opts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListFlowDefinitions", ctx, filter)
+	ret := m.ctrl.Call(m, "ListFlowDefinitions", ctx, filter, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.FlowDefinition])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListFlowDefinitions indicates an expected call of ListFlowDefinitions.
-func (mr *MockAllStatementsMockRecorder) ListFlowDefinitions(ctx, filter any) *MockAllStatementsListFlowDefinitionsCall {
+func (mr *MockAllStatementsMockRecorder) ListFlowDefinitions(ctx, filter, opts any) *MockAllStatementsListFlowDefinitionsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFlowDefinitions", reflect.TypeOf((*MockAllStatements)(nil).ListFlowDefinitions), ctx, filter)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFlowDefinitions", reflect.TypeOf((*MockAllStatements)(nil).ListFlowDefinitions), ctx, filter, opts)
 	return &MockAllStatementsListFlowDefinitionsCall{Call: call}
 }
 
@@ -3782,13 +3782,13 @@ func (c *MockAllStatementsListFlowDefinitionsCall) Return(arg0 *database.ListRes
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListFlowDefinitionsCall) Do(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)) *MockAllStatementsListFlowDefinitionsCall {
+func (c *MockAllStatementsListFlowDefinitionsCall) Do(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField], service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error)) *MockAllStatementsListFlowDefinitionsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListFlowDefinitionsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)) *MockAllStatementsListFlowDefinitionsCall {
+func (c *MockAllStatementsListFlowDefinitionsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField], service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error)) *MockAllStatementsListFlowDefinitionsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5590,18 +5590,18 @@ func (c *MockFlowDefinitionStatementsIsStatementsCall) DoAndReturn(f func()) *Mo
 }
 
 // ListFlowDefinitions mocks base method.
-func (m *MockFlowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+func (m *MockFlowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], opts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListFlowDefinitions", ctx, filter)
+	ret := m.ctrl.Call(m, "ListFlowDefinitions", ctx, filter, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.FlowDefinition])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListFlowDefinitions indicates an expected call of ListFlowDefinitions.
-func (mr *MockFlowDefinitionStatementsMockRecorder) ListFlowDefinitions(ctx, filter any) *MockFlowDefinitionStatementsListFlowDefinitionsCall {
+func (mr *MockFlowDefinitionStatementsMockRecorder) ListFlowDefinitions(ctx, filter, opts any) *MockFlowDefinitionStatementsListFlowDefinitionsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFlowDefinitions", reflect.TypeOf((*MockFlowDefinitionStatements)(nil).ListFlowDefinitions), ctx, filter)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFlowDefinitions", reflect.TypeOf((*MockFlowDefinitionStatements)(nil).ListFlowDefinitions), ctx, filter, opts)
 	return &MockFlowDefinitionStatementsListFlowDefinitionsCall{Call: call}
 }
 
@@ -5617,13 +5617,13 @@ func (c *MockFlowDefinitionStatementsListFlowDefinitionsCall) Return(arg0 *datab
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowDefinitionStatementsListFlowDefinitionsCall) Do(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)) *MockFlowDefinitionStatementsListFlowDefinitionsCall {
+func (c *MockFlowDefinitionStatementsListFlowDefinitionsCall) Do(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField], service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error)) *MockFlowDefinitionStatementsListFlowDefinitionsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowDefinitionStatementsListFlowDefinitionsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)) *MockFlowDefinitionStatementsListFlowDefinitionsCall {
+func (c *MockFlowDefinitionStatementsListFlowDefinitionsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.FlowDefinitionField], service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error)) *MockFlowDefinitionStatementsListFlowDefinitionsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

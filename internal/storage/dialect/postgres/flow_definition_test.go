@@ -91,7 +91,7 @@ func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldName), def.Name),
 		),
-	})
+	}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, def.ID, listed.Items[0].ID)
@@ -124,7 +124,7 @@ func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
 		),
-	})
+	}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, login.ID, listed.Items[0].ID)
@@ -151,7 +151,7 @@ func TestFlowDefinitionStatements_ListByStatus(t *testing.T) {
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 		),
-	})
+	}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, active.ID, listed.Items[0].ID)

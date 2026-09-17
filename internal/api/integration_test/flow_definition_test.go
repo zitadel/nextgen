@@ -616,6 +616,130 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 	})
 }
 
+// GET /flow_definitions answers two cardinalities from one endpoint, mirroring
+// GET /schemas (#923): `all` is the revision history, `latest` is one row per
+// flow. Which one is being asked for is a parameter of its own, so both stay
+// reachable with or without a name filter.
+func TestListFlowDefinitionsRevisions(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	createRevision := func(t *testing.T, name string) string {
+		t.Helper()
+		resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+			ProjectID: api.ProjectID(project.ID),
+			FlowDefinition: api.FlowDefinition{
+				Name:       name,
+				Status:     "active",
+				UserSchema: userSchemaURI,
+				Purposes:   map[string]string{"login": "step_1"},
+				Steps:      validSteps(),
+			},
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.FlowDefinitionResponse).ID
+	}
+
+	loginV1 := createRevision(t, "revisions-login")
+	loginV2 := createRevision(t, "revisions-login")
+	registerV1 := createRevision(t, "revisions-register")
+
+	list := func(t *testing.T, params api.ListFlowDefinitionsParams) *api.FlowDefinitionListResponse {
+		t.Helper()
+		params.ProjectID = api.ProjectID(project.ID)
+		res, err := client.ListFlowDefinitions(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionListResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.FlowDefinitionListResponse)
+	}
+	ids := func(resp *api.FlowDefinitionListResponse) []string {
+		out := make([]string, 0, len(resp.FlowDefinitions))
+		for _, item := range resp.FlowDefinitions {
+			out = append(out, item.ID)
+		}
+		return out
+	}
+
+	latestParam := api.NewOptListFlowDefinitionsRevisions(api.ListFlowDefinitionsRevisionsLatest)
+
+	t.Run("all is the default and keeps every revision", func(t *testing.T) {
+		got := ids(list(t, api.ListFlowDefinitionsParams{Name: api.NewOptString("revisions-login")}))
+		assert.Equal(t, []string{loginV2, loginV1}, got, "newest first")
+
+		explicit := ids(list(t, api.ListFlowDefinitionsParams{
+			Name:      api.NewOptString("revisions-login"),
+			Revisions: api.NewOptListFlowDefinitionsRevisions(api.ListFlowDefinitionsRevisionsAll),
+		}))
+		assert.Equal(t, got, explicit, "the default and the explicit value are the same request")
+	})
+
+	t.Run("latest keeps one revision per name", func(t *testing.T) {
+		got := ids(list(t, api.ListFlowDefinitionsParams{Revisions: latestParam}))
+		assert.Contains(t, got, loginV2)
+		assert.Contains(t, got, registerV1)
+		assert.NotContains(t, got, loginV1, "a superseded revision is not current")
+	})
+
+	t.Run("latest narrows to one row when a name is given", func(t *testing.T) {
+		got := ids(list(t, api.ListFlowDefinitionsParams{
+			Name:      api.NewOptString("revisions-login"),
+			Revisions: latestParam,
+		}))
+		assert.Equal(t, []string{loginV2}, got)
+	})
+
+	t.Run("paging latest visits each flow exactly once", func(t *testing.T) {
+		var got []string
+		var pageToken api.OptPageToken
+		for pages := 0; ; pages++ {
+			require.Less(t, pages, 20, "paging did not terminate")
+			page := list(t, api.ListFlowDefinitionsParams{
+				Revisions: latestParam,
+				Limit:     api.NewOptLimit(1),
+				PageToken: pageToken,
+			})
+			got = append(got, ids(page)...)
+			token, ok := page.NextPageToken.Get()
+			if !ok {
+				break
+			}
+			pageToken = api.NewOptPageToken(token)
+		}
+		assert.Equal(t, 1, countOccurrences(got, loginV2))
+		assert.Equal(t, 1, countOccurrences(got, registerV1))
+		assert.Zero(t, countOccurrences(got, loginV1))
+	})
+
+	// Both modes sort by the same columns, so the keyset predicate alone cannot
+	// tell that the row set underneath it changed. The token carries the mode.
+	t.Run("a token from the other mode is rejected", func(t *testing.T) {
+		first := list(t, api.ListFlowDefinitionsParams{Limit: api.NewOptLimit(1)})
+		token, ok := first.NextPageToken.Get()
+		require.True(t, ok, "a full page carries a cursor")
+
+		res, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			Revisions: latestParam,
+			Limit:     api.NewOptLimit(1),
+			PageToken: api.NewOptPageToken(token),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ErrorDetails{}, res, helpers.MustMarshal(t, res))
+		errRes := res.(*api.ErrorDetails)
+		invalid := domain.ErrRequestInvalid()
+		assert.Equal(t, api.ErrorCode(invalid.Code), errRes.Code)
+		assert.Equal(t, invalid.Message, errRes.Message)
+	})
+}
+
 func TestListFlowDefinitions(t *testing.T) {
 	t.Parallel()
 
