@@ -24772,8 +24772,10 @@ type IdpConnection struct {
 	// policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey.
 	// `is_auto_update`, together with per-property verification state.
 	Provisioning OptIdpConnectionProvisioning `json:"provisioning"`
-	// OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or
-	// to serve a provider that exposes no .well-known document.
+	// OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
+	// exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
+	// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting some but not all is
+	// rejected.
 	Oidc OptIdpConnectionOidc `json:"oidc"`
 	// OAuth 2.0 connection details.
 	OAuth2 OptIdpConnectionOAuth2 `json:"oauth2"`
@@ -25129,22 +25131,26 @@ func (s *IdpConnectionOAuth2TokenEndpointAuthMethod) UnmarshalText(data []byte) 
 	}
 }
 
-// OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or
-// to serve a provider that exposes no .well-known document.
+// OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
+// exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
+// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting some but not all is
+// rejected.
 type IdpConnectionOidc struct {
-	// Discovery base. Endpoints are resolved from its .well-known document unless overridden below.
+	// Discovery base. Endpoints are resolved from its .well-known document unless the connection names
+	// them all.
 	Issuer string `json:"issuer"`
-	// Overrides the JWKS endpoint from discovery. Required in practice when the provider exposes no .
-	// well-known document, since ID tokens cannot otherwise be validated.
+	// JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other
+	// endpoints.
 	JwksURI OptString `json:"jwks_uri"`
 	// Read user claims from the id_token instead of the userinfo endpoint, for providers that populate
 	// only the former.
 	IDTokenMapping OptBool `json:"id_token_mapping"`
-	// Overrides discovery.
+	// For a provider that exposes no .well-known document. Set together with the other endpoints.
 	AuthorizationEndpoint OptString `json:"authorization_endpoint"`
-	// Overrides discovery.
+	// For a provider that exposes no .well-known document. Set together with the other endpoints.
 	TokenEndpoint OptString `json:"token_endpoint"`
-	// Overrides discovery.
+	// For a provider that exposes no .well-known document. Set together with the other endpoints; not
+	// needed when id_token_mapping is set.
 	UserinfoEndpoint OptString `json:"userinfo_endpoint"`
 	// Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference
 	// to a variable in case of separate clients per environment.
