@@ -5,3 +5,11 @@ properties:
     oneOf:
       - type: 'null'
       - type: string
+  password_hash:
+    description: |
+      The method this project's passwords are hashed with. Send null to drop the
+      project's own method and go back to the server default; leave the field
+      out to keep whatever the project has.
+    oneOf:
+      - $ref: ../password-hash-policy.yaml
+      - type: 'null'

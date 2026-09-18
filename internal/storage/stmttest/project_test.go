@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -87,6 +88,96 @@ func TestProjectStatements_Update(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
 			err := d.stmts.UpdateProject(t.Context(), project)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
+	})
+}
+
+// The password hashing policy is the projects table's one JSON column and its
+// one nullable one, and NULL is load-bearing: it is what makes a project hash
+// with the deployment default. So the round trip has to prove all three states
+// -- never set, set, and set back to nothing -- rather than just that a value
+// survives.
+func TestProjectStatements_PasswordHashPolicy(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("a new project carries no policy", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+
+			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			assert.Nil(t, stored.PasswordHashPolicy, "no policy means the deployment default")
+		})
+
+		t.Run("round-trips a policy and clears it again", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+
+			policy, err := domain.NewPasswordHashPolicy("argon2id", map[string]any{
+				"time": 3, "memory": 65536, "threads": 4,
+			})
+			require.NoError(t, err)
+			require.NoError(t, d.stmts.SetProjectPasswordHashPolicy(t.Context(), project.ID, policy))
+
+			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			require.NotNil(t, stored.PasswordHashPolicy)
+			assert.Equal(t, crypto.HashNameArgon2id, stored.PasswordHashPolicy.Algorithm)
+			// Numbers come back through JSON, so they are float64 whatever they
+			// were written as. The hasher takes them either way; a test that
+			// asserted ints would be asserting the dialect's JSON decoder.
+			assert.Equal(t, map[string]any{
+				"time": float64(3), "memory": float64(65536), "threads": float64(4),
+			}, stored.PasswordHashPolicy.Params)
+
+			// A rename must not disturb the policy: the two are written by
+			// different statements and read back by the same one.
+			stored.Name = "project-" + rand.Text()
+			require.NoError(t, d.stmts.UpdateProject(t.Context(), stored))
+			require.NotNil(t, stored.PasswordHashPolicy, "a rename reads the policy back with the row")
+
+			require.NoError(t, d.stmts.SetProjectPasswordHashPolicy(t.Context(), project.ID, nil))
+			cleared, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			assert.Nil(t, cleared.PasswordHashPolicy, "a cleared policy is NULL, not an empty object")
+		})
+
+		t.Run("a policy written at create survives", func(t *testing.T) {
+			policy, err := domain.NewPasswordHashPolicy("bcrypt", map[string]any{"cost": 12})
+			require.NoError(t, err)
+			project := newTestProject(uniqueProjectID(t))
+			project.PasswordHashPolicy = policy
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+
+			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			require.NotNil(t, stored.PasswordHashPolicy)
+			assert.Equal(t, crypto.HashNameBcrypt, stored.PasswordHashPolicy.Algorithm)
+			assert.Equal(t, map[string]any{"cost": float64(12)}, stored.PasswordHashPolicy.Params)
+		})
+
+		t.Run("not found returns NoRowFoundError", func(t *testing.T) {
+			err := d.stmts.SetProjectPasswordHashPolicy(t.Context(), uniqueProjectID(t), nil)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
+
+		t.Run("listing carries the policy", func(t *testing.T) {
+			policy, err := domain.NewPasswordHashPolicy("bcrypt", map[string]any{"cost": 12})
+			require.NoError(t, err)
+			project := newTestProject(uniqueProjectID(t))
+			project.PasswordHashPolicy = policy
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+
+			listed, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
+				Filter: database.Equal(database.Col(domain.ProjectFieldID), project.ID),
+			})
+			require.NoError(t, err)
+			require.Len(t, listed.Items, 1)
+			require.NotNil(t, listed.Items[0].PasswordHashPolicy)
+			assert.Equal(t, crypto.HashNameBcrypt, listed.Items[0].PasswordHashPolicy.Algorithm)
 		})
 	})
 }
