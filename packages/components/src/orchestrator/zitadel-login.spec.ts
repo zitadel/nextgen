@@ -1975,3 +1975,26 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submittedFields).not.toHaveProperty("maritalStatus");
   });
 });
+
+describe("<zitadel-login> branding override", () => {
+  it("paints the draft instead of the revision the flow carried", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    document.body.appendChild(element);
+    element.brandingOverride = {
+      theme: { mode: "light", light: { palette: { primary: "#123456" } } },
+    };
+    await element.updateComplete;
+    expect(element.dataset.theme).toBe("light");
+    element.remove();
+  });
+
+  it("falls back to the revision when no draft is set", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.variant = "page";
+    document.body.appendChild(element);
+    await element.updateComplete;
+    // `page` defaults to the design system's primary surface.
+    expect(element.dataset.theme).toBe("dark");
+    element.remove();
+  });
+});

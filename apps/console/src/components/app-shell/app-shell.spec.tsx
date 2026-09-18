@@ -32,6 +32,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // than adding a second top-level row.
 const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
+const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -99,6 +100,22 @@ describe("app shell navigation", () => {
     expect(
       within(parent as HTMLElement).getByRole("link", { name: NESTED_NAV.label }),
     ).toHaveAttribute("href", "/schemas");
+  });
+
+  it("nests Branding under Login flows rather than adding a top-level row", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Login flows/ });
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+
+    const [parent] = nav
+      .getAllByRole("listitem")
+      .filter(
+        (li) => within(li).getAllByRole("link")[0]?.textContent?.trim() === NESTED_BRANDING.parent,
+      );
+    expect(parent).toBeDefined();
+    expect(
+      within(parent as HTMLElement).getByRole("link", { name: NESTED_BRANDING.label }),
+    ).toHaveAttribute("href", "/branding");
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
