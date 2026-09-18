@@ -176,6 +176,37 @@ try {
 
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
 
+/**
+ * Makes the dev account an admin of the seeded project.
+ *
+ * The project pill and the Projects screen list what the signed-in person can
+ * act on (`GET /users/me/projects`), and a seeded user holds no grant — so
+ * without this the default loop shows "No projects" next to a project full of
+ * users. Skipped in claim mode, where claiming is what is meant to produce the
+ * access. Best-effort: a failure costs the row, not the instance.
+ */
+async function grantDevUserAdmin(userId: string): Promise<boolean> {
+  try {
+    const query = new URLSearchParams({ project_id: projectId });
+    const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify({ principal_type: "user", principal_id: userId, relation: "admin" }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+const devUser = seeded[0];
+if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
+  console.warn(
+    "[console-dev-real] could not grant the dev user admin on the project; the project pill and Projects screen will read empty.",
+  );
+}
+
 // Claim mode signs in against the platform project, because that is the only
 // session `claim/complete` accepts. The seeded users stay in the project being
 // claimed — they are its app's users, not the human doing the claiming, who
