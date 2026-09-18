@@ -208,6 +208,16 @@ func (c *OIDCClient) verifyIDToken(ctx context.Context, token *oauth2.Token, non
 	// at_hash when present.
 	claims, err := rp.VerifyTokens[*oidc.IDTokenClaims](ctx, token.AccessToken, raw, &verifier)
 	if err != nil {
+		// The library writes the compared values into these errors. The
+		// log needs the rule that failed, not the nonces, the azp, or the
+		// timestamps. The issuer keeps its text: that value is
+		// configuration, and the log is where an operator sees what the
+		// provider sent instead.
+		for _, sentinel := range []error{oidc.ErrNonceInvalid, oidc.ErrAzpInvalid, oidc.ErrIatInFuture} {
+			if errors.Is(err, sentinel) {
+				err = sentinel
+			}
+		}
 		return nil, domain.ErrIDPIDTokenInvalid(err)
 	}
 	return claims, nil

@@ -462,11 +462,12 @@ func TestVerifyIDToken(t *testing.T) {
 			wantCause: oidc.ErrIatMissing,
 		},
 		{
-			name:      "a nonce other than the attempt's is rejected",
-			token:     func(t *testing.T, p *provider) string { return sign(t, p.key, jose.RS256, "k1", p.claims()) },
-			nonce:     "another-nonce",
-			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
-			wantCause: oidc.ErrNonceInvalid,
+			name:         "a nonce other than the attempt's is rejected, and neither nonce is in the cause",
+			token:        func(t *testing.T, p *provider) string { return sign(t, p.key, jose.RS256, "k1", p.claims()) },
+			nonce:        "another-nonce",
+			wantErr:      domain.ErrIDPIDTokenInvalid(nil),
+			wantCause:    oidc.ErrNonceInvalid,
+			wantCauseMsg: "nonce does not match",
 		},
 		{
 			name: "a missing nonce is rejected",
@@ -951,11 +952,18 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		secret   = "planted-secret"
 		verifier = "planted-verifier"
 		code     = "planted-code"
+		nonce    = "planted-nonce"
 		access   = "planted-access-token"
 		email    = "planted@example.test"
 		query    = "tenant=planted-query"
 	)
-	req := CallbackRequest{Code: code, Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: verifier, ClientSecret: secret}
+	req := CallbackRequest{Code: code, Nonce: nonce, RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: verifier, ClientSecret: secret}
+	// attempt is the fixture's id_token claim set with this attempt's nonce.
+	attempt := func(p *provider) map[string]any {
+		claims := p.claims()
+		claims["nonce"] = nonce
+		return claims
+	}
 	tokenResponse := func(t *testing.T, p *provider, w http.ResponseWriter, claims map[string]any) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{"access_token":%q,"token_type":"bearer","id_token":%q}`, access, sign(t, p.key, jose.RS256, "k1", claims))
@@ -994,7 +1002,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			name: "the id_token carries another nonce",
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
-					claims := p.claims()
+					claims := attempt(p)
 					claims["nonce"], claims["email"] = "another-nonce", email
 					tokenResponse(t, p, w, claims)
 				}
@@ -1010,7 +1018,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 						_, _ = fmt.Fprintf(w, `{"sub":"user-2","email":%q}`, email)
 						return
 					}
-					tokenResponse(t, p, w, p.claims())
+					tokenResponse(t, p, w, attempt(p))
 				}
 			},
 			wantErr: domain.ErrIDPUserinfoFailed(nil),
@@ -1018,7 +1026,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		{
 			name: "the strategy fails",
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
-				return func(w http.ResponseWriter, r *http.Request) { tokenResponse(t, p, w, p.claims()) }
+				return func(w http.ResponseWriter, r *http.Request) { tokenResponse(t, p, w, attempt(p)) }
 			},
 			req: func() CallbackRequest {
 				r := req
@@ -1033,7 +1041,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			name: "the subject is a boolean",
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
-					claims := p.claims()
+					claims := attempt(p)
 					claims["oid"], claims["email"] = true, email
 					tokenResponse(t, p, w, claims)
 				}
@@ -1068,10 +1076,12 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			de, ok := errors.AsType[domain.Error](err)
 			require.True(t, ok)
 			visible := de.Error() + fmt.Sprint(de.Details)
-			for _, planted := range []string{secret, verifier, code, access, email, query, "eyJ"} {
+			for _, planted := range []string{secret, verifier, code, nonce, access, email, query, "eyJ"} {
 				assert.NotContains(t, visible, planted, "user-facing text")
 			}
-			for _, planted := range []string{secret, verifier, access, "eyJ"} {
+			// The cause may carry the token endpoint's error body and its
+			// URL, so the code and the query are not checked here.
+			for _, planted := range []string{secret, verifier, nonce, access, email, "eyJ"} {
 				assert.NotContains(t, de.Parent.Error(), planted, "log-only cause")
 			}
 		})
