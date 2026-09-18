@@ -7073,6 +7073,23 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 		}
 	}
 	{
+		// Encode "revisions" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "revisions",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Revisions.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
 		// Encode "expand" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "expand",

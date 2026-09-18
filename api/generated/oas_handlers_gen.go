@@ -8582,6 +8582,10 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 					In:   "query",
 				}: params.Name,
 				{
+					Name: "revisions",
+					In:   "query",
+				}: params.Revisions,
+				{
 					Name: "expand",
 					In:   "query",
 				}: params.Expand,
