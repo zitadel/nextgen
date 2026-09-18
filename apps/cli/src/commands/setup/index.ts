@@ -441,15 +441,17 @@ export default class Setup extends BaseCommand {
     // stays a cloud journey.
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     if (!dryRun && serverKind.value(answers.server) === "local") {
-      const admin = await readLocalAdmin(cwd);
       // The runtime document naming the platform project does not prove a
       // claim can complete (a deployment can pin that project without the
       // platform bootstrap, which leaves the admin without a personal team),
       // so attaching the project is best-effort: on failure the project stays
       // unclaimed and setup falls back to the usual claim nudge instead of
-      // failing after it has already written the app files.
-      if (admin && (await localServerHostsPlatform(answers.server))) {
-        try {
+      // failing after it has already written the app files. Reading the admin
+      // belongs inside the guard for the same reason — a malformed
+      // `admin.json` must not fail a setup that already wrote the app.
+      try {
+        const admin = await readLocalAdmin(cwd);
+        if (admin && (await localServerHostsPlatform(answers.server))) {
           const owner = await claimProjectAsAdmin({
             serverUrl: answers.server,
             projectId: project.id,
@@ -459,8 +461,11 @@ export default class Setup extends BaseCommand {
           // Only a claim this run completed carries the platform's own
           // timestamp. Without it the record would name a team but no claim
           // time, which `isAttached` reads as a half-written attachment, so
-          // leave the secret alone and let the claim nudge stand.
-          if (owner.claimed_at === undefined || owner.team_id !== admin.team_id) {
+          // leave the secret alone and let the claim nudge stand. The team is
+          // whichever one the platform attached the project to — the admin's
+          // earliest active membership, which need not be the team its
+          // bootstrap document named.
+          if (owner.claimed_at === undefined) {
             consola.info(
               `Project already belongs to team ${owner.team_id}; leaving the local record unchanged.`,
             );
@@ -474,11 +479,11 @@ export default class Setup extends BaseCommand {
             ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
             consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
           }
-        } catch (error) {
-          consola.warn(
-            `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
-          );
         }
+      } catch (error) {
+        consola.warn(
+          `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
+        );
       }
     }
 

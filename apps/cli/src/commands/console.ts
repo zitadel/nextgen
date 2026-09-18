@@ -31,6 +31,11 @@ export default class Console extends BaseCommand {
 
   static override flags = {
     "no-open": Flags.boolean({ description: "Print the sign-in link instead of opening a browser." }),
+    // Inherited from BaseCommand, but this command only ever signs in to the
+    // runtime started from this directory, so the override would be a lie in
+    // the help and the README. Hidden rather than removed: passing it is a
+    // clear error below instead of oclif's "Nonexistent flag".
+    server: Flags.string({ char: "s", hidden: true }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -55,6 +60,21 @@ export default class Console extends BaseCommand {
       throw new ZitadelError("E_VALIDATION", "No local admin in this directory", {
         hint: "Run `zitadel start` first; it creates the local admin the console signs in as.",
         nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
+      });
+    }
+
+    // A link is minted by running the real login flow, which burns a one-time
+    // handoff token on the server — a mutation, so a dry run only reports who
+    // it would sign in as.
+    if (this.meta.dryRun) {
+      consola.info(`Would mint a console sign-in link for ${admin.email}.`);
+      return this.emit({
+        status: "ok",
+        data: {
+          title: "Local console sign-in link.",
+          signed_in_as: admin.email,
+          dry_run: true,
+        },
       });
     }
 
