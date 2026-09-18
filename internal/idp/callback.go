@@ -4,23 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/zitadel/oidc/v3/pkg/client/rp"
+	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"golang.org/x/oauth2"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// exchange trades the authorization code for the provider's tokens. The
-// party from construction carries no secret, so the request is built from a
-// config of its own with the secret and the auth style for this call. The
-// style is explicit: the library's default probes header auth and retries
-// with the secret in the body when the endpoint refuses, which would send a
-// client_secret_basic secret in a form the connection never agreed to. The
-// request goes through the egress client the party was built with.
-//
-// The verifier is sent when the connection enables PKCE and is required
-// then; the state record holds the one from the authorize request.
+// clockSkew is the offset the oidc verifier applies to the time claims. An
+// iat up to one minute in the future is accepted, which covers a provider
+// clock running ahead. An exp less than one minute away is rejected, the
+// same as an expired one.
+const clockSkew = time.Minute
+
+// exchange trades the authorization code for the provider's tokens.
 func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSecret string) (*oauth2.Token, error) {
+	// The secret is set either in the Authorization header or the request
+	// body, based on the token_endpoint_auth_method set in the connection:
+	// the Authorization header for client_secret_basic, the form body for
+	// client_secret_post. Left unset, oauth2 probes the endpoint: header
+	// first and, if that is refused, body.
 	var style oauth2.AuthStyle
 	switch c.conn.OIDC.TokenEndpointAuthMethod {
 	case ClientSecretBasic:
@@ -32,21 +37,50 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 	}
 	var opts []oauth2.AuthCodeOption
 	if c.conn.OIDC.PKCEEnabled {
+		// The state record holds the verifier from the authorize request.
 		if pkceVerifier == "" {
 			return nil, domain.ErrInternal(errors.New("callback: pkce verifier is empty"))
 		}
 		opts = append(opts, oauth2.SetAuthURLParam("code_verifier", pkceVerifier))
 	}
+	// Built here rather than taken from the relying party, which has no
+	// client secret.
 	config := oauth2.Config{
 		ClientID:     c.conn.OIDC.ClientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  c.redirectURI,
 		Endpoint:     oauth2.Endpoint{TokenURL: c.party.OAuthConfig().Endpoint.TokenURL, AuthStyle: style},
 	}
+	// oauth2 reads the http client from the context; this is the egress
+	// client the relying party was built with.
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.party.HttpClient())
 	token, err := config.Exchange(ctx, code, opts...)
 	if err != nil {
 		return nil, domain.ErrIDPExchangeFailed(err)
 	}
 	return token, nil
+}
+
+// verifyIDToken checks the id_token from the token response against the
+// attempt and returns its claims.
+func (c *OIDCClient) verifyIDToken(ctx context.Context, token *oauth2.Token, nonce string) (*oidc.IDTokenClaims, error) {
+	if nonce == "" {
+		return nil, domain.ErrInternal(errors.New("callback: nonce is empty"))
+	}
+	raw, ok := token.Extra("id_token").(string)
+	if !ok || raw == "" {
+		return nil, domain.ErrIDPIDTokenInvalid(rp.ErrMissingIDToken)
+	}
+	// A copy of the connection's verifier, so the nonce is per attempt
+	// while the key set and its JWKS cache are shared.
+	verifier := c.IDTokenVerifier()
+	verifier.Nonce = func(context.Context) string { return nonce }
+	verifier.Offset = clockSkew
+	// Checks the signature, iss, aud with azp, exp and iat, nonce, and
+	// at_hash when present.
+	claims, err := rp.VerifyTokens[*oidc.IDTokenClaims](ctx, token.AccessToken, raw, &verifier)
+	if err != nil {
+		return nil, domain.ErrIDPIDTokenInvalid(err)
+	}
+	return claims, nil
 }

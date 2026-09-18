@@ -2,14 +2,22 @@ package idp
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/oidc/v3/pkg/client/rp"
+	"github.com/zitadel/oidc/v3/pkg/oidc"
+	"golang.org/x/oauth2"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -27,12 +35,106 @@ func (t taggedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return t.next.RoundTrip(r)
 }
 
+// provider is a fake OIDC provider: one signing key served at /keys, and
+// whatever handler a case installs for the other paths. Every request must
+// carry the egress marker.
+type provider struct {
+	srv     *httptest.Server
+	key     *rsa.PrivateKey
+	handler http.HandlerFunc
+	// keysStatus, when set, replaces the JWKS document with that status.
+	keysStatus int
+}
+
+func newProvider(t *testing.T) *provider {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	p := &provider{key: key}
+	p.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "tagged", r.Header.Get("X-Egress"), "request bypassed the egress client")
+		if r.URL.Path == "/keys" {
+			if p.keysStatus != 0 {
+				w.WriteHeader(p.keysStatus)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{
+				{Key: &key.PublicKey, KeyID: "k1", Algorithm: "RS256", Use: "sig"},
+			}})
+			return
+		}
+		if p.handler == nil {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+			return
+		}
+		p.handler(w, r)
+	}))
+	t.Cleanup(p.srv.Close)
+	return p
+}
+
+// client builds the engine client for the fake provider with every endpoint
+// overridden, so no discovery runs.
+func (p *provider) client(t *testing.T, authMethod TokenEndpointAuthMethod, pkce bool) *OIDCClient {
+	conn := Connection{RevisionID: "idprev_1", OIDC: OIDCConnection{
+		Issuer:                  p.srv.URL,
+		ClientID:                "client",
+		Scopes:                  []string{"openid"},
+		TokenEndpointAuthMethod: authMethod,
+		PKCEEnabled:             pkce,
+		AuthorizationEndpoint:   p.srv.URL + "/authorize",
+		TokenEndpoint:           p.srv.URL + "/token",
+		JWKSURI:                 p.srv.URL + "/keys",
+		IDTokenMapping:          true,
+	}}
+	c, err := NewOIDCClient(context.Background(), conn, redirectURI, &http.Client{Transport: taggedTransport{next: p.srv.Client().Transport}})
+	require.NoError(t, err)
+	return c
+}
+
+// claims returns a valid id_token claim set for the provider.
+func (p *provider) claims() map[string]any {
+	now := time.Now()
+	return map[string]any{
+		"iss":   p.srv.URL,
+		"aud":   "client",
+		"sub":   "user-1",
+		"exp":   now.Add(time.Hour).Unix(),
+		"iat":   now.Unix(),
+		"nonce": "the-nonce",
+	}
+}
+
+// sign returns a compact JWS over claims with the given key and algorithm.
+func sign(t *testing.T, key any, alg jose.SignatureAlgorithm, kid string, claims map[string]any) string {
+	payload, err := json.Marshal(claims)
+	require.NoError(t, err)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: alg, Key: key}, (&jose.SignerOptions{}).WithHeader("kid", kid))
+	require.NoError(t, err)
+	jws, err := signer.Sign(payload)
+	require.NoError(t, err)
+	token, err := jws.CompactSerialize()
+	require.NoError(t, err)
+	return token
+}
+
+// unsigned returns an alg=none token, which no library will sign.
+func unsigned(t *testing.T, claims map[string]any) string {
+	payload, err := json.Marshal(claims)
+	require.NoError(t, err)
+	enc := base64.RawURLEncoding.EncodeToString
+	return enc([]byte(`{"alg":"none","typ":"JWT"}`)) + "." + enc(payload) + "."
+}
+
+func tokenWithIDToken(idToken string) *oauth2.Token {
+	return (&oauth2.Token{AccessToken: "the-access-token", TokenType: "bearer"}).WithExtra(map[string]any{"id_token": idToken})
+}
+
 // tokenHandler serves the token endpoint. check inspects the request after
-// the handler has asserted the marker and the grant.
+// the grant has been asserted.
 func tokenHandler(t *testing.T, check func(t *testing.T, r *http.Request)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/token", r.URL.Path)
-		require.Equal(t, "tagged", r.Header.Get("X-Egress"), "request bypassed the egress client")
 		require.NoError(t, r.ParseForm())
 		assert.Equal(t, "authorization_code", r.PostForm.Get("grant_type"))
 		assert.Equal(t, "the-code", r.PostForm.Get("code"))
@@ -46,7 +148,7 @@ func tokenHandler(t *testing.T, check func(t *testing.T, r *http.Request)) http.
 func TestExchange(t *testing.T) {
 	tests := []struct {
 		name string
-		// handler serves the provider; nil fails the test on any request.
+		// handler serves the token endpoint; nil fails the test on any request.
 		handler      http.HandlerFunc
 		authMethod   TokenEndpointAuthMethod
 		pkce         bool
@@ -138,28 +240,9 @@ func TestExchange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := tt.handler
-			if handler == nil {
-				handler = func(w http.ResponseWriter, r *http.Request) {
-					t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
-				}
-			}
-			srv := httptest.NewServer(handler)
-			t.Cleanup(srv.Close)
-			client := &http.Client{Transport: taggedTransport{next: srv.Client().Transport}}
-			conn := Connection{RevisionID: "idprev_1", OIDC: OIDCConnection{
-				Issuer:                  srv.URL,
-				ClientID:                "client",
-				Scopes:                  []string{"openid"},
-				TokenEndpointAuthMethod: tt.authMethod,
-				PKCEEnabled:             tt.pkce,
-				AuthorizationEndpoint:   srv.URL + "/authorize",
-				TokenEndpoint:           srv.URL + "/token",
-				JWKSURI:                 srv.URL + "/keys",
-				IDTokenMapping:          true,
-			}}
-			c, err := NewOIDCClient(context.Background(), conn, redirectURI, client)
-			require.NoError(t, err)
+			p := newProvider(t)
+			p.handler = tt.handler
+			c := p.client(t, tt.authMethod, tt.pkce)
 
 			ctx := context.Background()
 			if tt.timeout > 0 {
@@ -186,6 +269,228 @@ func TestExchange(t *testing.T) {
 			assert.Equal(t, "the-access-token", token.AccessToken)
 			assert.Equal(t, "Bearer", token.Type())
 			assert.Equal(t, "the-id-token", token.Extra("id_token"))
+		})
+	}
+}
+
+func TestVerifyIDToken(t *testing.T) {
+	foreign, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	hmacKey := []byte("the-secret-the-secret-the-secret")
+
+	tests := []struct {
+		name string
+		// token mints the id_token; nil leaves it out of the response.
+		token      func(t *testing.T, p *provider) string
+		nonce      string
+		keysStatus int
+		// wantErr is the domain kind. wantCause is matched against its
+		// log-only parent; wantCauseMsg pins a cause that has no sentinel.
+		wantErr      error
+		wantCause    error
+		wantCauseMsg string
+	}{
+		{
+			name:  "a token signed by the provider's key with the attempt's nonce is accepted",
+			token: func(t *testing.T, p *provider) string { return sign(t, p.key, jose.RS256, "k1", p.claims()) },
+			nonce: "the-nonce",
+		},
+		{
+			name: "an iat within the skew in the future is accepted",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["iat"] = time.Now().Add(clockSkew / 2).Unix()
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce: "the-nonce",
+		},
+		{
+			name: "multiple audiences with azp naming the client are accepted",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["aud"] = []string{"client", "other"}
+				claims["azp"] = "client"
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce: "the-nonce",
+		},
+		{
+			name:         "a response without an id_token is rejected",
+			nonce:        "the-nonce",
+			wantErr:      domain.ErrIDPIDTokenInvalid(nil),
+			wantCause:    rp.ErrMissingIDToken,
+			wantCauseMsg: "id_token missing",
+		},
+		{
+			name:      "alg none is rejected",
+			token:     func(t *testing.T, p *provider) string { return unsigned(t, p.claims()) },
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrSignatureUnsupportedAlg,
+		},
+		{
+			name:      "an HMAC signature is rejected",
+			token:     func(t *testing.T, p *provider) string { return sign(t, hmacKey, jose.HS256, "k1", p.claims()) },
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrSignatureUnsupportedAlg,
+		},
+		{
+			name:      "a signature by a key the JWKS does not serve is rejected",
+			token:     func(t *testing.T, p *provider) string { return sign(t, foreign, jose.RS256, "k2", p.claims()) },
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrSignatureInvalid,
+		},
+		{
+			name:       "a JWKS endpoint that fails rejects the token",
+			token:      func(t *testing.T, p *provider) string { return sign(t, p.key, jose.RS256, "k1", p.claims()) },
+			nonce:      "the-nonce",
+			keysStatus: http.StatusInternalServerError,
+			wantErr:    domain.ErrIDPIDTokenInvalid(nil),
+			wantCause:  oidc.ErrSignatureInvalid,
+		},
+		{
+			name: "a different issuer is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["iss"] = "https://other.example.test"
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrIssuerInvalid,
+		},
+		{
+			name: "an audience without the client is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["aud"] = "other"
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrAudience,
+		},
+		{
+			name: "multiple audiences without azp are rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["aud"] = []string{"client", "other"}
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrAzpMissing,
+		},
+		{
+			name: "an expired token is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["exp"] = time.Now().Add(-2 * clockSkew).Unix()
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrExpired,
+		},
+		{
+			name: "an expiry within the skew is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["exp"] = time.Now().Add(clockSkew / 2).Unix()
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrExpired,
+		},
+		{
+			name: "an iat beyond the skew in the future is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["iat"] = time.Now().Add(2 * clockSkew).Unix()
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrIatInFuture,
+		},
+		{
+			name: "a missing iat is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				delete(claims, "iat")
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrIatMissing,
+		},
+		{
+			name:      "a nonce other than the attempt's is rejected",
+			token:     func(t *testing.T, p *provider) string { return sign(t, p.key, jose.RS256, "k1", p.claims()) },
+			nonce:     "another-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrNonceInvalid,
+		},
+		{
+			name: "a missing nonce is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				delete(claims, "nonce")
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrNonceInvalid,
+		},
+		{
+			name: "an at_hash that does not match the access token is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["at_hash"] = "not-the-hash"
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrAtHash,
+		},
+		{
+			name:         "an empty nonce is a wiring error",
+			token:        func(t *testing.T, p *provider) string { return sign(t, p.key, jose.RS256, "k1", p.claims()) },
+			wantErr:      domain.ErrInternal(nil),
+			wantCauseMsg: "callback: nonce is empty",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newProvider(t)
+			p.keysStatus = tt.keysStatus
+			c := p.client(t, ClientSecretBasic, true)
+			token := &oauth2.Token{AccessToken: "the-access-token", TokenType: "bearer"}
+			if tt.token != nil {
+				token = tokenWithIDToken(tt.token(t, p))
+			}
+
+			claims, err := c.verifyIDToken(context.Background(), token, tt.nonce)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Equal(t, tt.wantErr.Error(), err.Error())
+				de, ok := errors.AsType[domain.Error](err)
+				require.True(t, ok)
+				if tt.wantCause != nil {
+					assert.ErrorIs(t, de.Parent, tt.wantCause)
+				}
+				if tt.wantCauseMsg != "" {
+					assert.EqualError(t, de.Parent, tt.wantCauseMsg)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "user-1", claims.Subject)
+			assert.Equal(t, "the-nonce", claims.Nonce)
 		})
 	}
 }

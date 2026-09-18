@@ -35,13 +35,6 @@ func ErrIDPDiscoveryFailed(cause error) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("discovery_failed"), "identity provider connection: discovery failed", nil, cause)
 }
 
-// The following errors re-check at the start of an attempt what the schema enforced at
-// write time (defense in depth). Each is a distinct kind, so the log names
-// the rule; the user sees the generic misconfigured-provider error. Where a
-// rule applies to one of several fields, details names the field for the
-// client and the parent names it for the log; a value never appears in
-// either. The messages stay literal so the error schema generator sees them.
-
 // ErrIDPProtocolBlockMissing reports a document whose protocol names a block
 // the document does not carry. protocol is the schema enum value.
 func ErrIDPProtocolBlockMissing(protocol string) Error {
@@ -70,11 +63,6 @@ func ErrIDPOAuth2Unsupported() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("oauth2_unsupported"), "identity provider connection: the oauth2 protocol is not supported yet", nil, nil)
 }
 
-// The callback errors below end an attempt after the user authenticated at
-// the provider. Each is a distinct kind, so the log tells the steps apart; the
-// user sees the generic exchange-failure error. cause is log-only and may
-// carry provider-served text, never a token, secret, or claim value.
-
 // ErrIDPExchangeFailed reports that the code exchange yielded no token. One
 // code covers the whole step, as discovery_failed does: the token endpoint
 // answered with an error such as invalid_grant or with a non-conformant
@@ -82,4 +70,12 @@ func ErrIDPOAuth2Unsupported() Error {
 // failed, or an egress cap struck.
 func ErrIDPExchangeFailed(cause error) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("exchange_failed"), "identity provider connection: the code exchange failed", nil, cause)
+}
+
+// ErrIDPIDTokenInvalid reports an id_token the engine will not accept: absent
+// from the token response, signed with an algorithm outside the allowlist or
+// with a key the JWKS endpoint does not serve, or carrying an issuer,
+// audience, expiry, or nonce other than the attempt expects.
+func ErrIDPIDTokenInvalid(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("id_token_invalid"), "identity provider connection: the id_token is invalid", nil, cause)
 }
