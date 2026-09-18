@@ -91,8 +91,9 @@ export default defineConfig({
 ### Start tests authenticated
 
 Most app tests don't want to re-test login. `authenticatedPage` seeds a user,
-drives the real login flow headlessly (the same Flow API the login UI renders),
-and injects the resulting session cookie into a dedicated browser context:
+authenticates them through the auth-attempt API (the state machine the login UI
+itself is built on), and injects the resulting session cookie into a dedicated
+browser context:
 
 ```ts
 test("member sees the dashboard", async ({ authenticatedPage }) => {
@@ -104,12 +105,13 @@ test("member sees the dashboard", async ({ authenticatedPage }) => {
 Underneath sits `seed.session()`, whose `sessionToken` also drives session
 APIs without any browser — backend tests call the instance directly with the
 cookie header (`cookie: __nextgen_session=<sessionToken>`, the SDK
-middleware's own headless pattern). Scope: password flows (the shipped
-`password-first` presets). A flow step demanding anything beyond the user's
-email and password — a challenge, another factor — fails with the step name;
-log in through the UI for those. `seed.identity()` complements registration
-specs: an unused email+password that creates nothing, so the flow under test
-must create the user.
+middleware's own headless pattern). It proves the seeded user's email and
+password directly rather than driving the project's login flow, so seeding is
+unaffected by how that flow is configured. Scope: users a password signs in. A
+project requiring another factor fails at handoff rather than returning a
+session that skipped it; log in through the UI for those. `seed.identity()`
+complements registration specs: an unused email+password that creates nothing,
+so the flow under test must create the user.
 
 ### Drive the login flow
 

@@ -15,60 +15,77 @@ const handle: InstanceHandle = {
   appOrigin: "http://app.invalid:3002",
 };
 
-interface Captured {
-  flowStart?: Record<string, unknown>;
-  flowStartOrigin?: string | null;
-  submits: Array<Record<string, unknown>>;
-  submitCookies: Array<string | null>;
-  exchangeBody?: Record<string, unknown>;
-  exchangeProject?: string;
+interface Proof {
+  challengeId: string;
+  body: Record<string, unknown>;
 }
 
-const captured: Captured = { submits: [], submitCookies: [] };
+interface Captured {
+  attemptBody?: Record<string, unknown>;
+  challenges: Array<Record<string, unknown>>;
+  proofs: Proof[];
+  handoffAttemptId?: string;
+  exchangeBody?: Record<string, unknown>;
+  exchangeProject?: string;
+  exchangeOrigin?: string | null;
+}
 
-const identifierStep = {
-  id: "flow_1",
-  session_token: "flow-token-1",
-  step: { name: "identifier", fields: [{ name: "email" }] },
-};
-const passwordStep = {
-  id: "flow_1",
-  session_token: "flow-token-2",
-  step: { name: "password", fields: [{ name: "x-auth-methods#password" }] },
-};
-const terminalStep = {
-  id: "flow_1",
-  session_token: "flow-token-3",
-  step: { name: "done", complete: "show" },
-  handoff_token: "handoff_1",
-};
+const captured: Captured = { challenges: [], proofs: [] };
 
 const userHandlers = [
   http.post(`${BASE}/users`, () => HttpResponse.json({ id: "user_1" }, { status: 201 })),
   http.put(`${BASE}/users/:userId/password`, () => new HttpResponse(null, { status: 204 })),
 ];
 
+// One challenge id per method, so a proof can be attributed to the factor it
+// answers without depending on call order.
+const challengeIds: Record<string, string> = { identifier: "ch_id", password: "ch_pw" };
+
 const server = setupServer(
   ...userHandlers,
-  http.post(`${BASE}/flow`, async ({ request }) => {
-    captured.flowStart = (await request.json()) as Record<string, unknown>;
-    captured.flowStartOrigin = request.headers.get("origin");
-    return HttpResponse.json(identifierStep, {
-      status: 201,
-      headers: { "set-cookie": "_zflow=state-1; HttpOnly; Path=/" },
-    });
+  http.post(`${BASE}/auth_attempts`, async ({ request }) => {
+    captured.attemptBody = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(
+      { attempt_id: "att_1", project_id: "proj_1", state: "in_progress", created_at: "2027-01-01T00:00:00Z" },
+      { status: 201 },
+    );
   }),
-  http.post(`${BASE}/flow/:id/submit`, async ({ request }) => {
+  http.post(`${BASE}/auth_attempts/:attemptId/challenges`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
-    captured.submits.push(body);
-    captured.submitCookies.push(request.headers.get("cookie"));
-    return HttpResponse.json(captured.submits.length === 1 ? passwordStep : terminalStep, {
-      headers: { "set-cookie": `_zflow=state-${captured.submits.length + 1}; HttpOnly; Path=/` },
-    });
+    captured.challenges.push(body);
+    return HttpResponse.json(
+      {
+        challenge_id: challengeIds[String(body.method)] ?? "ch_other",
+        method: body.method,
+        state: "pending",
+        created_at: "2027-01-01T00:00:00Z",
+      },
+      { status: 201 },
+    );
+  }),
+  http.post(
+    `${BASE}/auth_attempts/:attemptId/challenges/:challengeId/verify`,
+    async ({ request, params }) => {
+      captured.proofs.push({
+        challengeId: String(params.challengeId),
+        body: (await request.json()) as Record<string, unknown>,
+      });
+      return HttpResponse.json({
+        attempt_id: "att_1",
+        project_id: "proj_1",
+        state: "in_progress",
+        created_at: "2027-01-01T00:00:00Z",
+      });
+    },
+  ),
+  http.post(`${BASE}/auth_attempts/:attemptId/handoff`, ({ params }) => {
+    captured.handoffAttemptId = String(params.attemptId);
+    return HttpResponse.json({ handoff_token: "handoff_1", expires_at: "2027-01-01T00:01:00Z" });
   }),
   http.post(`${BASE}/sessions/exchange`, async ({ request }) => {
     captured.exchangeBody = (await request.json()) as Record<string, unknown>;
     captured.exchangeProject = new URL(request.url).searchParams.get("project_id") ?? "";
+    captured.exchangeOrigin = request.headers.get("origin");
     return HttpResponse.json({
       session: { id: "sess_1", user_id: "user_1", expires_at: "2027-01-01T00:00:00Z" },
       session_token: "session-token-1",
@@ -79,45 +96,41 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
-  captured.submits = [];
-  captured.submitCookies = [];
-  delete captured.flowStart;
-  delete captured.flowStartOrigin;
+  captured.challenges = [];
+  captured.proofs = [];
+  delete captured.attemptBody;
+  delete captured.handoffAttemptId;
   delete captured.exchangeBody;
   delete captured.exchangeProject;
+  delete captured.exchangeOrigin;
 });
 afterAll(() => server.close());
 
 describe("seedSession", () => {
-  it("drives the two-step flow like the orchestrator and exchanges the handoff", async () => {
+  it("proves the identifier and password factors and exchanges the handoff", async () => {
     const zitadel = connectZitadel(handle);
     const session = await zitadel.seedSession();
 
-    expect(captured.flowStart).toEqual({ project_id: "proj_1", purpose: "login" });
-    // Step 1: only the declared email field, threading the flow session token.
-    expect(captured.submits[0]).toEqual({
-      session_token: "flow-token-1",
-      action: "submit",
-      fields: { email: session.user.email },
+    expect(captured.attemptBody).toEqual({ project_id: "proj_1" });
+    expect(captured.challenges).toEqual([{ method: "identifier" }, { method: "password" }]);
+
+    // The identifier proof names the attribute the value belongs to: the kit
+    // seeds users by email, and the server resolves nobody without it.
+    expect(captured.proofs[0]).toEqual({
+      challengeId: "ch_id",
+      body: { login_name: session.user.email, attribute_name: "email" },
     });
-    // Step 2: the schema-pointer field name is matched on its tail segment.
-    expect(captured.submits[1]).toEqual({
-      session_token: "flow-token-2",
-      action: "submit",
-      fields: { "x-auth-methods#password": session.user.password },
+    // Each proof answers the challenge just issued for that factor.
+    expect(captured.proofs[1]).toEqual({
+      challengeId: "ch_pw",
+      body: { password: session.user.password },
     });
+
+    expect(captured.handoffAttemptId).toBe("att_1");
     expect(captured.exchangeBody).toEqual({ handoff_token: "handoff_1" });
     expect(captured.exchangeProject).toBe("proj_1");
-    // The sealed flow-state cookie must round-trip and advance each hop.
-    // (msw's node interceptor appends its own virtual cookie store to the
-    // header, so assert containment, not equality — the real path has no
-    // auto-jar, which is why the kit carries its own.)
-    expect(captured.submitCookies[0]).toContain("_zflow=state-1");
-    expect(captured.submitCookies[1]).toContain("_zflow=state-2");
-    expect(captured.submitCookies[1]).not.toContain("_zflow=state-1");
-    // The project's origin allowlist applies to flow calls; the handle's
-    // registered app origin is the default.
-    expect(captured.flowStartOrigin).toBe("http://app.invalid:3002");
+    // The exchange carries the handle's registered app origin by default.
+    expect(captured.exchangeOrigin).toBe("http://app.invalid:3002");
 
     expect(session.sessionToken).toBe("session-token-1");
     expect(session.expiresAt).toBe("2027-01-01T00:00:00Z");
@@ -131,7 +144,7 @@ describe("seedSession", () => {
     });
   });
 
-  it("mints for an existing user without seeding and honors the flow name", async () => {
+  it("mints for an existing user without seeding", async () => {
     const zitadel = connectZitadel(handle);
     const user = { id: "user_9", email: "kept@acme.com", password: "Fixed-pw-1" };
     server.use(
@@ -140,60 +153,37 @@ describe("seedSession", () => {
       }),
     );
 
-    const session = await zitadel.seedSession({
-      user,
-      flowDefinitionName: "custom-login",
-      origin: "http://other.invalid",
-    });
-    expect(captured.flowStart).toEqual({
-      project_id: "proj_1",
-      purpose: "login",
-      flow_definition_name: "custom-login",
-    });
-    expect(captured.flowStartOrigin).toBe("http://other.invalid");
+    const session = await zitadel.seedSession({ user, origin: "http://other.invalid" });
+
     expect(session.user).toBe(user);
-    expect(captured.submits[0]).toMatchObject({ fields: { email: "kept@acme.com" } });
+    expect(captured.proofs[0]?.body).toMatchObject({ login_name: "kept@acme.com" });
+    expect(captured.exchangeOrigin).toBe("http://other.invalid");
   });
 
-  it("fails loudly on a step declaring fields it cannot fill", async () => {
+  it("says which factor was rejected when a proof fails", async () => {
     server.use(
-      http.post(`${BASE}/flow`, () =>
+      http.post(`${BASE}/auth_attempts/:attemptId/challenges/:challengeId/verify`, () =>
+        HttpResponse.json({ code: "att.proof_rejected", message: "The proof was rejected." }, { status: 409 }),
+      ),
+    );
+    const zitadel = connectZitadel(handle);
+
+    await expect(zitadel.seedSession()).rejects.toThrow(/identifier proof was rejected.*identified by email/s);
+  });
+
+  // A project requiring more than a password must fail at handoff rather than
+  // hand back a session that skipped a factor.
+  it("surfaces a handoff the server refuses to complete", async () => {
+    server.use(
+      http.post(`${BASE}/auth_attempts/:attemptId/handoff`, () =>
         HttpResponse.json(
-          {
-            id: "flow_1",
-            session_token: "t",
-            step: { name: "mfa-otp", fields: [{ name: "one_time_code" }] },
-          },
-          { status: 201 },
+          { code: "att.not_completed", message: "The attempt is not completed." },
+          { status: 409 },
         ),
       ),
     );
     const zitadel = connectZitadel(handle);
-    await expect(zitadel.seedSession()).rejects.toThrow(
-      /password flows only.*"mfa-otp".*"one_time_code"/s,
-    );
-  });
 
-  it("explains a missing Origin when the allowlist rejects the call", async () => {
-    server.use(
-      http.post(`${BASE}/flow`, () =>
-        HttpResponse.json(
-          { code: "req.invalid", message: 'origin "x" is not allowed for this project' },
-          { status: 400 },
-        ),
-      ),
-    );
-    const zitadel = connectZitadel({ ...handle, appOrigin: undefined });
-    await expect(zitadel.seedSession()).rejects.toThrow(
-      /No Origin header was sent.*appOrigins/s,
-    );
-  });
-
-  it("caps the number of flow steps instead of looping", async () => {
-    server.use(
-      http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)),
-    );
-    const zitadel = connectZitadel(handle);
-    await expect(zitadel.seedSession()).rejects.toThrow(/did not complete within 6 steps/);
+    await expect(zitadel.seedSession()).rejects.toThrow();
   });
 });

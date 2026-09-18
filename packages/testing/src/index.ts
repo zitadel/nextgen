@@ -28,12 +28,9 @@ export function connectZitadel(handle: InstanceHandle): ConnectedZitadel {
     seedUsers: (count, template) => seedUsers(api, context, count, template),
     identity,
     seedSession: async (input = {}) => {
-      const { user: existing, flowDefinitionName, origin, ...userInput } = input;
+      const { user: existing, origin, ...userInput } = input;
       const user = existing ?? (await seedUser(api, context, userInput));
-      return mintSession(api, handle, context, user, {
-        flowDefinitionName,
-        origin: origin ?? handle.appOrigin,
-      });
+      return mintSession(api, handle, context, user, { origin: origin ?? handle.appOrigin });
     },
   };
   return connected;
