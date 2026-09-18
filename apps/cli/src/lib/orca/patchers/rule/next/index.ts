@@ -45,6 +45,13 @@ export class NextPatcher extends AbstractRulePatcher {
     return framework === "next";
   }
 
+  protected override publicEnv(projectId: string): Record<string, string> {
+    // NEXT_PUBLIC_ZITADEL_RELEASE pins the configuration release a
+    // deployment was built against; empty means the environment's current
+    // one. `zitadel preview` prints the id to put here.
+    return { NEXT_PUBLIC_ZITADEL_PROJECT_ID: projectId, NEXT_PUBLIC_ZITADEL_RELEASE: "" };
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     return nextCodeOps(ctx, getRenderer(ctx.rendererId));
   }

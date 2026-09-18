@@ -139,7 +139,13 @@ ${apply}
 
 ### Shipping configuration
 
-\`zitadel.json\` maps each environment this app runs in (\`development\`, \`preview\`, \`production\`) to a Zitadel project. Configuration ships as a release:
+\`zitadel.json\` maps each environment this app runs in (\`development\`, \`preview\`, \`production\`) to a Zitadel project, and setup wrote a \`.env.<environment>\` for each one beyond development (gitignored, holds that project's credentials). Run the app as one of them locally by sourcing its file first:
+
+\`\`\`sh
+(set -a; . ./.env.preview; set +a; npm run dev)
+\`\`\`
+
+Configuration ships as a release:
 
 \`\`\`sh
 ${preview}                      # try the current .zitadel/ on a preview environment

@@ -255,6 +255,7 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_URL: ctx.server,
         },
       },
+      ...this.environmentEnvOps(ctx),
       {
         kind: "write",
         path: ".zitadel/state.json",
@@ -288,6 +289,49 @@ export abstract class AbstractRulePatcher implements Patcher {
         edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
       },
     ];
+  }
+
+  /**
+   * One `.env.<name>` per environment beyond development, holding what the
+   * app needs to run against that environment's project: the same
+   * `ZITADEL_*` set `.env.local` carries for development plus the
+   * framework's public variables ({@link publicEnv}). Gitignored like every
+   * `.env*`. Source it before the dev server to run the app as that
+   * environment locally (`set -a; . ./.env.preview; set +a; npm run dev`),
+   * or copy its values into the hosting platform's environment settings.
+   */
+  protected environmentEnvOps(ctx: PatchContext): ReadonlyArray<FileOp> {
+    const ops: FileOp[] = [];
+    for (const [name, target] of Object.entries(ctx.environments ?? {})) {
+      if (name === "development" || !target.secret) {
+        continue;
+      }
+      const origins = [...(target.origins ?? [])];
+      ops.push({
+        kind: "merge-env",
+        path: `.env.${name}`,
+        entries: {
+          ZITADEL_PROJECT_ID: target.project,
+          ZITADEL_PROJECT_SECRET: target.secret,
+          ZITADEL_ENVIRONMENT: name,
+          // A wildcard pattern is not an issuer; the app's own origin is
+          // per deployment there, so the value stays empty for previews.
+          ZITADEL_ISSUER: origins.find((origin) => !origin.includes("*")) ?? "",
+          ZITADEL_URL: target.server === "local" ? ctx.server : resolveServerOrigin(target.server),
+          ...this.publicEnv(target.project),
+        },
+      });
+    }
+    return ops;
+  }
+
+  /**
+   * The framework's client-exposed variables for a project (Next's
+   * `NEXT_PUBLIC_*`, Vite's `VITE_*`), written into each environment's
+   * `.env.<name>`. Frameworks without a public-variable convention add none.
+   */
+  protected publicEnv(_projectId: string): Record<string, string> {
+    return {};
   }
 
   /** Framework-specific route/middleware write ops plus the SDK dependency. */

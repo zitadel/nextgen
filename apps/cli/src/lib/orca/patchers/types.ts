@@ -58,7 +58,16 @@ export type PatchContext = PatchView &
      * with every environment implicitly on the top-level server and project.
      */
     environments?: Readonly<
-      Record<string, { server: string; project: string; origins?: readonly string[] }>
+      Record<
+        string,
+        {
+          server: string;
+          project: string;
+          origins?: readonly string[];
+          /** The project's secret, for the environment's `.env.<name>` file. */
+          secret?: string;
+        }
+      >
     >;
   }>;
 

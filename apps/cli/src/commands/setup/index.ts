@@ -310,8 +310,10 @@ export default class Setup extends BaseCommand {
     // written to zitadel.json never names a project that does not exist;
     // sharing ones (preview) point at the project of the environment they
     // name and only add their origins to it.
-    const environments: Record<string, { server: string; project: string; origins?: string[] }> =
-      {};
+    const environments: Record<
+      string,
+      { server: string; project: string; origins?: string[]; secret?: string }
+    > = {};
     const isolatedSecrets: Array<{ name: string; secret: CreateProject201 }> = [];
     for (const answer of declared) {
       if (answer.sharesProjectOf) {
@@ -326,6 +328,7 @@ export default class Setup extends BaseCommand {
           server: host.server,
           project: host.project,
           origins: answer.origins,
+          secret: host.secret,
         };
         continue;
       }
@@ -334,6 +337,7 @@ export default class Setup extends BaseCommand {
           server: answer.server,
           project: project.id,
           origins: answer.origins,
+          secret: project.project_secret,
         };
         continue;
       }
@@ -360,6 +364,7 @@ export default class Setup extends BaseCommand {
         server: answer.server,
         project: isolated.id,
         origins: answer.origins,
+        secret: isolated.project_secret,
       };
       isolatedSecrets.push({ name: answer.name, secret: isolated });
     }
@@ -876,6 +881,8 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "zitadel.json": { subject: "the Zitadel project configuration" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
+  ".env.preview": { subject: "the preview environment variables (source before npm run dev)" },
+  ".env.production": { subject: "the production environment variables" },
   ".zitadel/state.json": { subject: "the sync state file" },
   ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
   ".zitadel/flows/README.md": { subject: "the flows folder README" },

@@ -30,6 +30,10 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
     return buildViteProxyOp(devPort, server);
   }
 
+  protected override publicEnv(projectId: string): Record<string, string> {
+    return { VITE_ZITADEL_PROJECT_ID: projectId };
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       { kind: "write", path: "src/App.tsx", contents: appTemplate(ctx) },

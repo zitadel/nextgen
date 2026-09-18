@@ -256,7 +256,12 @@ docker --image <ref>` remains the explicit image override for debugging.
   `zitadel.json`: `development` on its own project on the local server,
   `production` on its own project on the production server (credential in
   `.zitadel/secret.production`), `preview` on production's project with the
-  pattern as `issuer_pattern`. Non-interactive runs configure `development`
+  pattern as `issuer_pattern`. Setup also writes a gitignored
+  `.env.<environment>` per environment beyond development (`ZITADEL_*` for
+  that project plus the framework's public variables; `NEXT_PUBLIC_ZITADEL_RELEASE`
+  left empty to pin later). Run the app as that environment locally with
+  `(set -a; . ./.env.preview; set +a; npm run dev)`, or copy the values
+  into the hosting platform. Non-interactive runs configure `development`
   only; add the other entries to `zitadel.json` by hand.
 - `deploy` — package `.zitadel/` into a release on the server
   (`POST /configuration-releases`: unchanged resources reuse their newest
