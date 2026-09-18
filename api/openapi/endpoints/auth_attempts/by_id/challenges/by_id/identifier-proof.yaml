@@ -1,12 +1,23 @@
 title: IdentifierProof
 type: object
-description: Proof for `identifier` method
+description: |
+  Proof for `identifier` method.
+
+  A project decides for itself which attributes identify a user — a login flow
+  step collects `email`, `username`, `phone`, or several of them — so the proof
+  names the attribute the value belongs to rather than the server assuming one.
+  The attribute must be registered unique for the project; a value matching only
+  a non-unique property resolves nobody.
 required:
   - login_name
+  - attribute_name
 additionalProperties: false
 properties:
   login_name:
     type: string
-    description: The login name or email being identified
+    description: The value being identified, as the user typed it.
     example: alice@acme.com
-
+  attribute_name:
+    type: string
+    description: The user attribute `login_name` is a value of.
+    example: email
