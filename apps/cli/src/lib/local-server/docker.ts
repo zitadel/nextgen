@@ -60,12 +60,17 @@ export function dockerRunArgs(spec: DockerRunSpec, envNames: readonly string[] =
     // published above, not the cloud default the server config falls back to.
     "--env",
     `NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:${spec.port}`,
-    // Same platform bootstrap as the binary runtime.
-    "--env",
-    "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
   ];
+  // The platform project and the local admin travel together: the admin is a
+  // user of that project. A caller that wants a bare single-project instance
+  // (test harnesses) starts without a user file and gets neither.
   if (spec.userFile) {
-    args.push("--volume", `${spec.userFile}:${CONTAINER_ADMIN_USER_FILE}:ro`);
+    args.push(
+      "--env",
+      "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
+      "--volume",
+      `${spec.userFile}:${CONTAINER_ADMIN_USER_FILE}:ro`,
+    );
   }
 
   if (spec.identity) {

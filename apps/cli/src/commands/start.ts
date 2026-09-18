@@ -111,7 +111,15 @@ export default class Start extends BaseCommand {
     const env = await loadProjectEnv(this.meta.cwd);
     // The developer exists on their own server from the first start: the
     // server imports the local admin, and the console signs them in by link.
-    const { admin, userFile } = await ensureLocalAdmin(this.meta.cwd);
+    // The admin is a user of the platform project, so the two travel together:
+    // a caller that opts out of the platform bootstrap (a test harness wanting
+    // a bare single-project server) gets neither. The opt-out is read from the
+    // same merged environment the server receives — the project's env files
+    // over the shell — so a `false` in `.env.local` turns both off rather than
+    // being overridden by the user file forcing the bootstrap back on.
+    const local = platformBootstrapEnabled({ ...this.meta.env, ...env.values })
+      ? await ensureLocalAdmin(this.meta.cwd)
+      : undefined;
 
     if (runtimeBackend === "binary") {
       if (
@@ -127,7 +135,7 @@ export default class Start extends BaseCommand {
             existingRuntime,
             true,
             this.meta.cliVersion,
-            await consoleLogin(serverUrl, admin),
+            await consoleLoginFor(serverUrl, local?.admin),
           ),
         });
       }
@@ -140,7 +148,7 @@ export default class Start extends BaseCommand {
         port,
         serverUrl,
         env,
-        userFile,
+        userFile: local?.userFile,
       });
       try {
         await waitForHealth(
@@ -166,7 +174,7 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, false, this.meta.cliVersion, await consoleLogin(serverUrl, admin)),
+        data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
       });
     }
 
@@ -195,7 +203,7 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, true, this.meta.cliVersion, await consoleLogin(serverUrl, admin)),
+        data: readyData(metadata, true, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
       });
     }
 
@@ -212,7 +220,7 @@ export default class Start extends BaseCommand {
       dataDir: paths.dataDir,
       identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
       env,
-      userFile,
+      userFile: local?.userFile,
     });
     await waitForHealth(serverUrl, this.meta.cliVersion, {
       runtime: "docker",
@@ -232,17 +240,33 @@ export default class Start extends BaseCommand {
     await writeRuntimeMetadata(this.meta.cwd, metadata);
     return this.emit({
       status: "ok",
-      data: readyData(metadata, false, this.meta.cliVersion, await consoleLogin(serverUrl, admin)),
+      data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
     });
   }
 }
 
 /**
+ * Whether this start boots the platform project, and with it the local admin.
+ * On by default; an explicit `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` opts
+ * out, which is how a harness asks for a bare single-project instance.
+ */
+function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
+  return (env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true").toLowerCase() !== "false";
+}
+
+/**
  * Mints a console sign-in link for the local admin. A failure (for
  * example a data directory from before the local admin existed) must not fail
- * the start itself, so it degrades to a warning with the fix.
+ * the start itself, so it degrades to a warning with the fix. Without a local
+ * admin there is nothing to sign in as, and the result carries no console.
  */
-async function consoleLogin(serverUrl: string, admin: LocalAdmin): Promise<ConsoleLogin> {
+async function consoleLoginFor(
+  serverUrl: string,
+  admin: LocalAdmin | undefined,
+): Promise<ConsoleLogin | undefined> {
+  if (!admin) {
+    return undefined;
+  }
   try {
     const url = await consoleSignInUrl(serverUrl, admin);
     consola.log(`Console: signed in as ${admin.email}. Open this link (works once):`);
@@ -316,7 +340,7 @@ function readyData(
   metadata: RuntimeMetadata,
   alreadyRunning: boolean,
   cliVersion: string,
-  console: ConsoleLogin,
+  console: ConsoleLogin | undefined,
 ) {
   return {
     title: alreadyRunning
@@ -345,9 +369,9 @@ function readyData(
       console: `${metadata.server_url}/ui/console/`,
       login: `${metadata.server_url}/ui/login/`,
     },
-    console,
+    ...(console ? { console } : {}),
     next_actions: [
-      ...(console.sign_in_url
+      ...(console?.sign_in_url
         ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
         : []),
       "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
@@ -355,7 +379,7 @@ function readyData(
     ],
     next_commands: [
       publicCliCommand("setup --server local", cliVersion),
-      publicCliCommand("console", cliVersion),
+      ...(console ? [publicCliCommand("console", cliVersion)] : []),
     ],
   };
 }
