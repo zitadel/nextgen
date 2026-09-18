@@ -93,6 +93,9 @@ func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (Externa
 	if req.Code == "" {
 		return ExternalIdentity{}, domain.ErrInternal(errors.New("callback: code is empty"))
 	}
+	if err := requireStrategy(c.conn, req.SupplementaryFetch); err != nil {
+		return ExternalIdentity{}, err
+	}
 	token, err := c.exchange(ctx, req.Code, req.PKCEVerifier, req.ClientSecret)
 	if err != nil {
 		return ExternalIdentity{}, err
@@ -242,6 +245,21 @@ func (c *OIDCClient) extractClaims(ctx context.Context, token *oauth2.Token, idT
 		return nil, domain.ErrIDPUserinfoFailed(rp.ErrUserInfoSubNotMatching)
 	}
 	return claims, nil
+}
+
+// requireStrategy fails when a verified_claims entry points at the strategy
+// and none is passed. A connection with such an entry is stored only with
+// a strategy selected, so this is a lookup fault, not an unverified claim.
+func requireStrategy(conn Connection, strategy SupplementaryFetch) error {
+	if strategy != nil {
+		return nil
+	}
+	for property, source := range conn.VerifiedClaims {
+		if source.Kind == VerifyByStrategy {
+			return domain.ErrInternal(fmt.Errorf("callback: %s is verified by the strategy, but none is passed", property))
+		}
+	}
+	return nil
 }
 
 // mapClaims keys the provider claims by user-schema property. A property

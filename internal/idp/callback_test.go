@@ -749,6 +749,20 @@ func TestCallback(t *testing.T) {
 			wantErr: domain.ErrIDPExchangeFailed(nil),
 		},
 		{
+			name: "a strategy pointer without a strategy is a wiring error",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, true)
+				conn.ClaimMapping = mapping
+				conn.VerifiedClaims = map[string]VerificationSource{"email": {Kind: VerifyByStrategy}}
+				return conn
+			},
+			// No handler: the provider fails the test on any request.
+			handler:      func(p *provider) http.HandlerFunc { return nil },
+			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			wantErr:      domain.ErrInternal(nil),
+			wantCauseMsg: "callback: email is verified by the strategy, but none is passed",
+		},
+		{
 			name:         "an empty code is a wiring error",
 			conn:         func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
 			req:          CallbackRequest{Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
