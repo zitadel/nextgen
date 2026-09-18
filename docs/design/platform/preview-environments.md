@@ -60,6 +60,13 @@ Precedence: an environment naming the origin literally beats one covering
 it by wildcard; live takes part in the literal tier only and is the default
 when nothing matches.
 
+The allowlist gates every public request, not only passkey ceremonies: a
+browser request whose `Origin` no entry covers answers
+`403 proj.origin_not_allowed` before any environment is resolved. An empty
+allowlist allows everything; a request without an `Origin` (server to
+server) is not gated. `zitadel preview --origin X` appends `X` to the
+allowlist when nothing there covers it.
+
 Entries are bare origins or leftmost-label wildcards: `https://*.vercel.app`
 matches `my-app-feat-sso-acme.vercel.app`, not `vercel.app` nor
 `a.b.vercel.app`. Scheme and port are literal. One matcher
