@@ -3,11 +3,13 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"reflect"
 	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -27,6 +29,10 @@ func (h *Handler) CreateConfigurationRelease(ctx context.Context, req *api.Confi
 	if err := h.requireProjectAccess(ctx, projectID, releaseAccess, opWrite); err != nil {
 		return nil, err
 	}
+	// The per-kind "newest revision" reads below are project-scoped lookups
+	// on behalf of a caller that already holds project write access, not
+	// user-facing lists, so they run without a per-list authz stamp.
+	ctx = service.WithAuthzListUnrestricted(ctx)
 	if len(req.Schemas)+len(req.FlowDefinitions)+len(req.Brandings) == 0 {
 		return nil, domain.ErrReleaseInvalid("the bundle is empty", nil)
 	}
@@ -179,9 +185,11 @@ func (h *Handler) bundleFlowDefinition(ctx context.Context, projectID string, fl
 	}
 	if len(listed.Items) > 0 {
 		current := flowDefinitionResponse(listed.Items[0]).FlowDefinition
-		if same, err := sameAPIValue(&definition, &current, "$schema"); err == nil && same {
+		same, err := sameAPIValue(&definition, &current, "$schema")
+		if err == nil && same {
 			return listed.Items[0].ID, false, nil
 		}
+		logBundleDifference(ctx, "flow_definition", definition.Name, &definition, &current)
 	}
 	svcReq, err := mapCreateRequestToService(&api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(projectID),
@@ -227,6 +235,20 @@ func (h *Handler) bundleBranding(ctx context.Context, projectID string, branding
 	return created.ID, true, nil
 }
 
+// logBundleDifference records why a bundled resource did not match the
+// project's newest revision, so a release that keeps minting revisions for
+// "unchanged" content can be diagnosed from the log.
+func logBundleDifference(ctx context.Context, kind, handle string, bundled, current json.Marshaler) {
+	bundledJSON, _ := bundled.MarshalJSON()
+	currentJSON, _ := current.MarshalJSON()
+	zlog.GetLoggingContext(ctx).Debug("bundle: content differs from the newest revision, allocating a new one",
+		slog.String("kind", kind),
+		slog.String("handle", handle),
+		slog.String("bundled", string(bundledJSON)),
+		slog.String("current", string(currentJSON)),
+	)
+}
+
 // sameAPIValue compares two generated wire values by their canonical JSON,
 // ignoring the named top-level keys.
 func sameAPIValue(a, b json.Marshaler, ignore ...string) (bool, error) {
@@ -242,7 +264,12 @@ func sameAPIValue(a, b json.Marshaler, ignore ...string) (bool, error) {
 }
 
 // sameJSON reports whether two JSON documents are structurally equal after
-// dropping the named top-level keys. Key order and whitespace do not count.
+// dropping the named top-level keys and, at every depth, keys holding a
+// zero value (`false`, `null`, `{}`, `[]`). The server echoes what it
+// stored, and it stores omitted booleans as false and omitted objects as
+// empty (`"audience": {}`, `"primary": false`); an author's file leaves
+// them out. Neither spelling is a change. Key order and whitespace do not
+// count either.
 func sameJSON(a, b []byte, ignore ...string) (bool, error) {
 	var av, bv any
 	if err := json.Unmarshal(a, &av); err != nil {
@@ -251,13 +278,49 @@ func sameJSON(a, b []byte, ignore ...string) (bool, error) {
 	if err := json.Unmarshal(b, &bv); err != nil {
 		return false, err
 	}
-	for _, key := range ignore {
-		if m, ok := av.(map[string]any); ok {
-			delete(m, key)
-		}
-		if m, ok := bv.(map[string]any); ok {
-			delete(m, key)
+	for _, doc := range []any{av, bv} {
+		if m, ok := doc.(map[string]any); ok {
+			for _, key := range ignore {
+				delete(m, key)
+			}
 		}
 	}
-	return reflect.DeepEqual(av, bv), nil
+	return reflect.DeepEqual(dropZeroValues(av), dropZeroValues(bv)), nil
+}
+
+func dropZeroValues(v any) any {
+	switch value := v.(type) {
+	case map[string]any:
+		for key, nested := range value {
+			cleaned := dropZeroValues(nested)
+			if isZeroJSON(cleaned) {
+				delete(value, key)
+				continue
+			}
+			value[key] = cleaned
+		}
+		return value
+	case []any:
+		for i, item := range value {
+			value[i] = dropZeroValues(item)
+		}
+		return value
+	default:
+		return v
+	}
+}
+
+func isZeroJSON(v any) bool {
+	switch value := v.(type) {
+	case nil:
+		return true
+	case bool:
+		return !value
+	case map[string]any:
+		return len(value) == 0
+	case []any:
+		return len(value) == 0
+	default:
+		return false
+	}
 }
