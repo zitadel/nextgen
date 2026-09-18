@@ -86,3 +86,17 @@ func ErrIDPIDTokenInvalid(cause error) Error {
 func ErrIDPUserinfoFailed(cause error) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("userinfo_failed"), "identity provider connection: the userinfo request failed", nil, cause)
 }
+
+// ErrIDPSupplementaryFetchFailed reports that the connection's
+// supplementary_fetch strategy could not complete: its request failed or
+// its response did not parse. An empty result is not a failure.
+func ErrIDPSupplementaryFetchFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("supplementary_fetch_failed"), "identity provider connection: the supplementary fetch failed", nil, cause)
+}
+
+// ErrIDPSubjectInvalid reports a subject claim the engine cannot key an
+// identity on: absent, null, empty, or a boolean, object, or array. The
+// cause names the claim and the shape, never the value.
+func ErrIDPSubjectInvalid(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("subject_invalid"), "identity provider connection: the subject claim is absent or not a string or number", nil, cause)
+}

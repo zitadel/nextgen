@@ -7,8 +7,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,10 +75,10 @@ func newProvider(t *testing.T) *provider {
 	return p
 }
 
-// client builds the engine client for the fake provider with every endpoint
+// connection is a connection to the fake provider with every endpoint
 // overridden, so no discovery runs.
-func (p *provider) client(t *testing.T, authMethod TokenEndpointAuthMethod, pkce, idTokenMapping bool) *OIDCClient {
-	conn := Connection{RevisionID: "idprev_1", OIDC: OIDCConnection{
+func (p *provider) connection(authMethod TokenEndpointAuthMethod, pkce, idTokenMapping bool) Connection {
+	return Connection{RevisionID: "idprev_1", SubjectClaim: "sub", OIDC: OIDCConnection{
 		Issuer:                  p.srv.URL,
 		ClientID:                "client",
 		Scopes:                  []string{"openid"},
@@ -88,9 +90,38 @@ func (p *provider) client(t *testing.T, authMethod TokenEndpointAuthMethod, pkce
 		JWKSURI:                 p.srv.URL + "/keys",
 		IDTokenMapping:          idTokenMapping,
 	}}
+}
+
+// newClient builds the engine client over the tagged egress client.
+func (p *provider) newClient(t *testing.T, conn Connection) *OIDCClient {
 	c, err := NewOIDCClient(context.Background(), conn, redirectURI, &http.Client{Transport: taggedTransport{next: p.srv.Client().Transport}})
 	require.NoError(t, err)
 	return c
+}
+
+func (p *provider) client(t *testing.T, authMethod TokenEndpointAuthMethod, pkce, idTokenMapping bool) *OIDCClient {
+	return p.newClient(t, p.connection(authMethod, pkce, idTokenMapping))
+}
+
+// ceremony serves a whole callback: discovery, a token response carrying an
+// id_token signed over idClaims, and userinfo serving userinfoBody.
+func (p *provider) ceremony(t *testing.T, idClaims map[string]any, userinfoBody string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case oidc.DiscoveryEndpoint:
+			discoveryHandler(t)(w, r)
+		case "/token":
+			require.NoError(t, r.ParseForm())
+			assert.Equal(t, "the-code", r.PostForm.Get("code"))
+			_, _ = fmt.Fprintf(w, `{"access_token":"the-access-token","token_type":"bearer","id_token":%q}`, sign(t, p.key, jose.RS256, "k1", idClaims))
+		case "/userinfo":
+			assert.Equal(t, "Bearer the-access-token", r.Header.Get("Authorization"))
+			_, _ = w.Write([]byte(userinfoBody))
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}
 }
 
 // claims returns a valid id_token claim set for the provider.
@@ -590,6 +621,381 @@ func TestExtractClaims(t *testing.T) {
 			require.NoError(t, err)
 			for name, value := range tt.want {
 				assert.Equal(t, value, got[name], name)
+			}
+		})
+	}
+}
+
+func TestCallback(t *testing.T) {
+	mapping := map[string]string{"email": "email", "givenName": "given_name", "familyName": "family_name"}
+	verified := map[string]VerificationSource{
+		"email":     {Kind: VerifyByClaim, Claim: "email_verified"},
+		"givenName": {Kind: VerifyByTrust},
+	}
+	profile := func(p *provider) map[string]any {
+		claims := p.claims()
+		claims["email"] = "ada@example.test"
+		claims["email_verified"] = true
+		claims["given_name"] = "Ada"
+		return claims
+	}
+	const userinfo = `{"sub":"user-1","email":"ada@example.test","email_verified":true,"given_name":"Ada"}`
+	wantIdentity := ExternalIdentity{
+		Subject:    "user-1",
+		Claims:     map[string]any{"email": "ada@example.test", "givenName": "Ada"},
+		Verified:   map[string]bool{"email": true, "givenName": true},
+		RevisionID: "idprev_1",
+	}
+
+	tests := []struct {
+		name string
+		conn func(p *provider) Connection
+		// handler serves the provider; nil serves the ceremony above.
+		handler      func(p *provider) http.HandlerFunc
+		req          CallbackRequest
+		want         ExternalIdentity
+		wantErr      error
+		wantCause    error
+		wantCauseMsg string
+	}{
+		{
+			name: "OIDC via discovery, claims from userinfo",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, false)
+				conn.OIDC.AuthorizationEndpoint, conn.OIDC.TokenEndpoint, conn.OIDC.UserinfoEndpoint, conn.OIDC.JWKSURI = "", "", "", ""
+				conn.ClaimMapping, conn.VerifiedClaims = mapping, verified
+				return conn
+			},
+			req:  CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			want: wantIdentity,
+		},
+		{
+			name: "OIDC with full overrides, claims from the id_token, client_secret_post, no PKCE",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretPost, false, true)
+				conn.ClaimMapping, conn.VerifiedClaims = mapping, verified
+				return conn
+			},
+			req:  CallbackRequest{Code: "the-code", Nonce: "the-nonce", ClientSecret: "the-secret"},
+			want: wantIdentity,
+		},
+		{
+			name: "the strategy overwrites its claims and vouches for them",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, true)
+				conn.ClaimMapping = mapping
+				conn.VerifiedClaims = map[string]VerificationSource{"email": {Kind: VerifyByStrategy}}
+				return conn
+			},
+			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
+				SupplementaryFetch: func(ctx context.Context, in StrategyInput) (StrategyResult, error) {
+					assert.Equal(t, "idprev_1", in.Connection.RevisionID)
+					assert.Equal(t, "the-access-token", in.AccessToken)
+					assert.Equal(t, "Bearer", in.TokenType)
+					assert.NotNil(t, in.HTTPClient)
+					return StrategyResult{Claims: map[string]any{"email": "primary@example.test"}, Verified: map[string]bool{"email": true}}, nil
+				}},
+			want: ExternalIdentity{
+				Subject:    "user-1",
+				Claims:     map[string]any{"email": "primary@example.test", "givenName": "Ada"},
+				Verified:   map[string]bool{"email": true},
+				RevisionID: "idprev_1",
+			},
+		},
+		{
+			name: "a strategy failure ends the attempt",
+			conn: func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
+			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
+				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
+					return StrategyResult{}, errors.New("emails: status 500")
+				}},
+			wantErr:      domain.ErrIDPSupplementaryFetchFailed(nil),
+			wantCauseMsg: "emails: status 500",
+		},
+		{
+			name: "a subject claim the provider does not send ends the attempt",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, true)
+				conn.SubjectClaim = "oid"
+				return conn
+			},
+			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			wantErr:      domain.ErrIDPSubjectInvalid(nil),
+			wantCauseMsg: "subject claim oid is absent",
+		},
+		{
+			name: "a failing step ends the attempt with its own kind",
+			conn: func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
+			handler: func(p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
+				}
+			},
+			req:     CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name:         "an empty code is a wiring error",
+			conn:         func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
+			req:          CallbackRequest{Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			wantErr:      domain.ErrInternal(nil),
+			wantCauseMsg: "callback: code is empty",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newProvider(t)
+			p.handler = p.ceremony(t, profile(p), userinfo)
+			if tt.handler != nil {
+				p.handler = tt.handler(p)
+			}
+			c := p.newClient(t, tt.conn(p))
+
+			got, err := c.Callback(context.Background(), tt.req)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Equal(t, tt.wantErr.Error(), err.Error())
+				de, ok := errors.AsType[domain.Error](err)
+				require.True(t, ok)
+				if tt.wantCause != nil {
+					assert.ErrorIs(t, de.Parent, tt.wantCause)
+				}
+				if tt.wantCauseMsg != "" {
+					assert.EqualError(t, de.Parent, tt.wantCauseMsg)
+				}
+				assert.Equal(t, ExternalIdentity{}, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+			// No provider token on the identity, in any field.
+			serialized, err := json.Marshal(got)
+			require.NoError(t, err)
+			for _, planted := range []string{"the-access-token", "the-secret", "the-verifier", "eyJ"} {
+				assert.NotContains(t, string(serialized), planted)
+			}
+		})
+	}
+}
+
+func TestEvaluateVerified(t *testing.T) {
+	conn := Connection{
+		ClaimMapping: map[string]string{"email": "email"},
+		VerifiedClaims: map[string]VerificationSource{
+			"email":    {Kind: VerifyByClaim, Claim: "email_verified"},
+			"name":     {Kind: VerifyByTrust},
+			"phone":    {Kind: VerifyByStrategy},
+			"unmapped": {Kind: VerifyByStrategy},
+		},
+	}
+	tests := []struct {
+		name string
+		// emailVerified is the email_verified claim; nil leaves it absent.
+		emailVerified any
+		want          bool
+	}{
+		{name: "the boolean true is verified", emailVerified: true, want: true},
+		{name: `the string "true" is verified`, emailVerified: "true", want: true},
+		{name: `the string "TRUE" is unverified`, emailVerified: "TRUE"},
+		{name: "the number 1 is unverified", emailVerified: json.Number("1")},
+		{name: `the string "yes" is unverified`, emailVerified: "yes"},
+		{name: "the boolean false is unverified", emailVerified: false},
+		{name: "an absent claim is unverified"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claims := map[string]any{"email": "ada@example.test"}
+			if tt.emailVerified != nil {
+				claims["email_verified"] = tt.emailVerified
+			}
+			got := evaluateVerified(conn, claims, StrategyResult{Verified: map[string]bool{"phone": true}})
+			assert.Equal(t, tt.want, got["email"])
+			// Trust needs no claim; the strategy answers for the claim the
+			// property maps to, and a property without a mapping is unverified.
+			assert.True(t, got["name"])
+			assert.False(t, got["phone"])
+			assert.False(t, got["unmapped"])
+		})
+	}
+	t.Run("the strategy answers for the mapped claim", func(t *testing.T) {
+		conn := Connection{
+			ClaimMapping:   map[string]string{"emailAddress": "email"},
+			VerifiedClaims: map[string]VerificationSource{"emailAddress": {Kind: VerifyByStrategy}},
+		}
+		got := evaluateVerified(conn, nil, StrategyResult{Verified: map[string]bool{"email": true}})
+		assert.Equal(t, map[string]bool{"emailAddress": true}, got)
+	})
+}
+
+func TestCoerceSubject(t *testing.T) {
+	tests := []struct {
+		name string
+		// claims is the decoded claim set; the subject claim is sub.
+		claims       string
+		want         string
+		wantCauseMsg string
+	}{
+		{name: "a string is used verbatim", claims: `{"sub":"user-1"}`, want: "user-1"},
+		{name: "a number keeps its exact digits", claims: `{"sub":9007199254740993}`, want: "9007199254740993"},
+		{name: "an absent subject is refused", claims: `{}`, wantCauseMsg: "subject claim sub is absent"},
+		{name: "a null subject is refused", claims: `{"sub":null}`, wantCauseMsg: "subject claim sub is <nil>"},
+		{name: "an empty subject is refused", claims: `{"sub":""}`, wantCauseMsg: "subject claim sub is empty"},
+		{name: "a boolean subject is refused", claims: `{"sub":true}`, wantCauseMsg: "subject claim sub is bool"},
+		{name: "an object subject is refused", claims: `{"sub":{"id":1}}`, wantCauseMsg: "subject claim sub is map[string]interface {}"},
+		{name: "an array subject is refused", claims: `{"sub":[1]}`, wantCauseMsg: "subject claim sub is []interface {}"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claims, err := decodeClaims(strings.NewReader(tt.claims))
+			require.NoError(t, err)
+
+			got, err := coerceSubject("sub", claims)
+
+			if tt.wantCauseMsg != "" {
+				require.ErrorIs(t, err, domain.ErrIDPSubjectInvalid(nil))
+				de, ok := errors.AsType[domain.Error](err)
+				require.True(t, ok)
+				assert.EqualError(t, de.Parent, tt.wantCauseMsg)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestCallbackLeaksNothing runs every failing step with planted values and
+// checks that none reach the user-facing text or details, and that no
+// secret, verifier, or token reaches the log-only cause either.
+func TestCallbackLeaksNothing(t *testing.T) {
+	const (
+		secret   = "planted-secret"
+		verifier = "planted-verifier"
+		code     = "planted-code"
+		access   = "planted-access-token"
+		email    = "planted@example.test"
+		query    = "tenant=planted-query"
+	)
+	req := CallbackRequest{Code: code, Nonce: "the-nonce", PKCEVerifier: verifier, ClientSecret: secret}
+	tokenResponse := func(t *testing.T, p *provider, w http.ResponseWriter, claims map[string]any) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"access_token":%q,"token_type":"bearer","id_token":%q}`, access, sign(t, p.key, jose.RS256, "k1", claims))
+	}
+
+	tests := []struct {
+		name    string
+		conn    func(p *provider) Connection
+		handler func(t *testing.T, p *provider) http.HandlerFunc
+		req     func() CallbackRequest
+		wantErr error
+	}{
+		{
+			name: "the token endpoint rejects the exchange",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":"invalid_client"}`))
+				}
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint with a query string does not answer",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, true)
+				conn.OIDC.TokenEndpoint += "?" + query
+				return conn
+			},
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) }
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the id_token carries another nonce",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					claims := p.claims()
+					claims["nonce"], claims["email"] = "another-nonce", email
+					tokenResponse(t, p, w, claims)
+				}
+			},
+			wantErr: domain.ErrIDPIDTokenInvalid(nil),
+		},
+		{
+			name: "userinfo answers with another subject",
+			conn: func(p *provider) Connection { return p.connection(ClientSecretBasic, true, false) },
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/userinfo" {
+						_, _ = fmt.Fprintf(w, `{"sub":"user-2","email":%q}`, email)
+						return
+					}
+					tokenResponse(t, p, w, p.claims())
+				}
+			},
+			wantErr: domain.ErrIDPUserinfoFailed(nil),
+		},
+		{
+			name: "the strategy fails",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) { tokenResponse(t, p, w, p.claims()) }
+			},
+			req: func() CallbackRequest {
+				r := req
+				r.SupplementaryFetch = func(context.Context, StrategyInput) (StrategyResult, error) {
+					return StrategyResult{}, errors.New("emails: status 500")
+				}
+				return r
+			},
+			wantErr: domain.ErrIDPSupplementaryFetchFailed(nil),
+		},
+		{
+			name: "the subject is a boolean",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					claims := p.claims()
+					claims["oid"], claims["email"] = true, email
+					tokenResponse(t, p, w, claims)
+				}
+			},
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, true)
+				conn.SubjectClaim = "oid"
+				return conn
+			},
+			wantErr: domain.ErrIDPSubjectInvalid(nil),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newProvider(t)
+			p.handler = tt.handler(t, p)
+			conn := p.connection(ClientSecretBasic, true, true)
+			if tt.conn != nil {
+				conn = tt.conn(p)
+			}
+			c := p.newClient(t, conn)
+			request := req
+			if tt.req != nil {
+				request = tt.req()
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			t.Cleanup(cancel)
+
+			_, err := c.Callback(ctx, request)
+
+			require.ErrorIs(t, err, tt.wantErr)
+			de, ok := errors.AsType[domain.Error](err)
+			require.True(t, ok)
+			visible := de.Error() + fmt.Sprint(de.Details)
+			for _, planted := range []string{secret, verifier, code, access, email, query, "eyJ"} {
+				assert.NotContains(t, visible, planted, "user-facing text")
+			}
+			for _, planted := range []string{secret, verifier, access, "eyJ"} {
+				assert.NotContains(t, de.Parent.Error(), planted, "log-only cause")
 			}
 		})
 	}

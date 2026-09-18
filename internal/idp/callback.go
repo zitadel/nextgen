@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -24,6 +25,107 @@ import (
 // clock running ahead. An exp less than one minute away is rejected, the
 // same as an expired one.
 const clockSkew = time.Minute
+
+// CallbackRequest carries what the callback route hands the engine for one
+// attempt.
+type CallbackRequest struct {
+	// Code is the authorization code from the provider's redirect.
+	Code string
+	// Nonce and PKCEVerifier are what the state record stored at authorize.
+	// PKCEVerifier is empty when the connection disables PKCE.
+	Nonce        string
+	PKCEVerifier string
+	// ClientSecret is the resolved value of the connection's reference,
+	// for this call only.
+	ClientSecret string
+	// SupplementaryFetch is the strategy the connection selects, or nil.
+	// The registry that resolves a name to one is #1029.
+	SupplementaryFetch SupplementaryFetch
+}
+
+// ExternalIdentity is what a completed callback yields: the resolved
+// external identity the attempt carries on to identity resolution. It holds
+// no provider token; those live only inside Callback.
+type ExternalIdentity struct {
+	// Subject is the provider's stable identifier as a string; a JSON
+	// number arrives as its exact digits.
+	Subject string
+	// Claims are the provider claims keyed by the user-schema property
+	// claim_mapping names, with the raw decoded values.
+	Claims map[string]any
+	// Verified is the verified_claims outcome per user-schema property.
+	Verified map[string]bool
+	// RevisionID is the connection revision the attempt pinned.
+	RevisionID string
+}
+
+// SupplementaryFetch is the supplementary_fetch strategy slot: a provider
+// specific call after claims extraction whose result overwrites same-named
+// claims and vouches for the ones it verifies.
+type SupplementaryFetch func(ctx context.Context, in StrategyInput) (StrategyResult, error)
+
+// StrategyInput is what a strategy runs with.
+type StrategyInput struct {
+	Connection  Connection
+	AccessToken string
+	TokenType   string
+	// HTTPClient is the egress client; every strategy URL is tenant-served.
+	HTTPClient *http.Client
+}
+
+// StrategyResult is what a strategy emits. Both maps are keyed by provider
+// claim name. An empty result is not a failure: the strategy emits nothing
+// and the extracted claims stand, unverified.
+type StrategyResult struct {
+	Claims   map[string]any
+	Verified map[string]bool
+}
+
+// Callback completes the ceremony for one attempt: exchanges the code,
+// verifies the id_token, extracts claims, runs the strategy, evaluates
+// verification, and coerces the subject. The provider's tokens are dropped
+// when it returns.
+func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (ExternalIdentity, error) {
+	if req.Code == "" {
+		return ExternalIdentity{}, domain.ErrInternal(errors.New("callback: code is empty"))
+	}
+	token, err := c.exchange(ctx, req.Code, req.PKCEVerifier, req.ClientSecret)
+	if err != nil {
+		return ExternalIdentity{}, err
+	}
+	idToken, err := c.verifyIDToken(ctx, token, req.Nonce)
+	if err != nil {
+		return ExternalIdentity{}, err
+	}
+	claims, err := c.extractClaims(ctx, token, idToken)
+	if err != nil {
+		return ExternalIdentity{}, err
+	}
+	var strategy StrategyResult
+	if req.SupplementaryFetch != nil {
+		strategy, err = req.SupplementaryFetch(ctx, StrategyInput{
+			Connection:  c.conn,
+			AccessToken: token.AccessToken,
+			TokenType:   token.Type(),
+			HTTPClient:  c.party.HttpClient(),
+		})
+		if err != nil {
+			return ExternalIdentity{}, domain.ErrIDPSupplementaryFetchFailed(err)
+		}
+		// The strategy is the authority for the claims it emits.
+		maps.Copy(claims, strategy.Claims)
+	}
+	subject, err := coerceSubject(c.conn.SubjectClaim, claims)
+	if err != nil {
+		return ExternalIdentity{}, err
+	}
+	return ExternalIdentity{
+		Subject:    subject,
+		Claims:     mapClaims(c.conn.ClaimMapping, claims),
+		Verified:   evaluateVerified(c.conn, claims, strategy),
+		RevisionID: c.conn.RevisionID,
+	}, nil
+}
 
 // exchange trades the authorization code for the provider's tokens.
 func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSecret string) (*oauth2.Token, error) {
@@ -133,6 +235,61 @@ func (c *OIDCClient) extractClaims(ctx context.Context, token *oauth2.Token, idT
 		return nil, domain.ErrIDPUserinfoFailed(rp.ErrUserInfoSubNotMatching)
 	}
 	return claims, nil
+}
+
+// mapClaims keys the provider claims by user-schema property. A property
+// whose claim is absent is left out.
+func mapClaims(claimMapping map[string]string, claims map[string]any) map[string]any {
+	mapped := make(map[string]any, len(claimMapping))
+	for property, claim := range claimMapping {
+		if value, ok := claims[claim]; ok {
+			mapped[property] = value
+		}
+	}
+	return mapped
+}
+
+// evaluateVerified applies each verified_claims entry.
+func evaluateVerified(conn Connection, claims map[string]any, strategy StrategyResult) map[string]bool {
+	verified := make(map[string]bool, len(conn.VerifiedClaims))
+	for property, source := range conn.VerifiedClaims {
+		switch source.Kind {
+		case VerifyByTrust:
+			verified[property] = true
+		case VerifyByClaim:
+			// The boolean true or the string "true"; anything else,
+			// including an absent claim, is unverified.
+			verified[property] = claims[source.Claim] == true || claims[source.Claim] == "true"
+		case VerifyByStrategy:
+			// The strategy reports by provider claim name, so the property
+			// is first mapped to its claim. An unmapped property is
+			// unverified.
+			verified[property] = strategy.Verified[conn.ClaimMapping[property]]
+		}
+	}
+	return verified
+}
+
+// coerceSubject reads the subject claim as a string. A JSON number becomes
+// its exact decimal text; every other shape is refused, since the stored
+// subject keys the identity and must be a string. The cause names the
+// shape, never the value.
+func coerceSubject(claim string, claims map[string]any) (string, error) {
+	value, ok := claims[claim]
+	if !ok {
+		return "", domain.ErrIDPSubjectInvalid(fmt.Errorf("subject claim %s is absent", claim))
+	}
+	switch v := value.(type) {
+	case string:
+		if v == "" {
+			return "", domain.ErrIDPSubjectInvalid(fmt.Errorf("subject claim %s is empty", claim))
+		}
+		return v, nil
+	case json.Number:
+		return v.String(), nil
+	default:
+		return "", domain.ErrIDPSubjectInvalid(fmt.Errorf("subject claim %s is %T", claim, value))
+	}
 }
 
 // decodeClaims decodes one JSON object with numbers kept as json.Number.
