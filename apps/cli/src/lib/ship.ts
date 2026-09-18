@@ -8,6 +8,7 @@ import { consola } from "consola";
 
 import { buildConfigurationBundle, recordBundleRevisions } from "./bundle";
 import {
+  originsForEntry,
   projectOriginsFromConfig,
   resolveEnvironmentTarget,
   type EnvironmentTarget,
@@ -126,6 +127,29 @@ export async function ensurePreviewEnvironment(opts: {
     `Preview ${env.name} ready${env.expires_at ? ` (expires ${env.expires_at})` : ""}`,
   );
   return { name: env.name, expires_at: env.expires_at ?? null, origins: env.origins ?? [] };
+}
+
+/**
+ * Registers the fixed origins the target environment's frontend is served
+ * from on the project's live environment, so production at
+ * `https://app.vercel.app` is served by live even though the previews'
+ * `https://*.vercel.app` covers it too. Wildcards are not live's business
+ * and are skipped; no fixed origin means live is left as it is.
+ */
+export async function syncLiveOrigins(opts: {
+  client: ZitadelClient;
+  target: EnvironmentTarget;
+}): Promise<string[]> {
+  const origins = originsForEntry(opts.target.entry).filter((origin) => !origin.includes("*"));
+  if (origins.length === 0) {
+    return [];
+  }
+  await opts.client.createEnvironment(
+    { name: LIVE_ENVIRONMENT, class: "live", origins },
+    { project_id: opts.target.projectId },
+  );
+  consola.info(`Live origins     ${origins.join(", ")}`);
+  return origins;
 }
 
 /** Resolves the target and builds an authenticated client for it. */

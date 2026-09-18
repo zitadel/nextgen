@@ -93,6 +93,29 @@ func emitEnvironmentCreated(ctx context.Context, stmts EventStatements, entity *
 	})
 }
 
+// SetLiveOrigins replaces the origins of the live environment: the fixed
+// origins production is served from (`zitadel deploy` takes them from the
+// production entry's issuer in zitadel.json). An origin named here
+// literally is served by live even when a preview's wildcard also covers it.
+func (s *EnvironmentService) SetLiveOrigins(ctx context.Context, projectID string, origins []string) (*domain.Environment, error) {
+	normalized, err := domain.ValidateEnvironmentOrigins(origins)
+	if err != nil {
+		return nil, err
+	}
+	live, err := s.GetByName(ctx, projectID, domain.LiveEnvironmentName)
+	if err != nil {
+		return nil, err
+	}
+	live.Origins = normalized
+	if err := s.v2Pool.Statements().RenewEnvironment(ctx, live); err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrEnvironmentNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to update the live environment's origins")
+	}
+	return live, nil
+}
+
 // UpsertPreview creates the named preview environment, or renews its expiry
 // and replaces its origins when it already exists. `zitadel preview` calls it
 // before every deployment to a preview, so a preview that is still being

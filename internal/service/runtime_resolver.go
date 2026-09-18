@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -137,46 +138,57 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID string, selecto
 	return resolution, nil
 }
 
+// resolveEnvironment picks the environment for an origin. An environment
+// whose origins name the origin literally wins over one that only covers it
+// by wildcard, so production at https://app.vercel.app (registered on live
+// by `zitadel deploy`) is not swallowed by the previews' https://*.vercel.app.
+// Live takes part in the exact tier only; with no match at all it serves the
+// request as the default.
 func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllStatements, projectID, origin, releaseSelector string) (*domain.Environment, RuntimeEnvironmentSource, error) {
 	origin = strings.ToLower(strings.TrimSpace(origin))
-	if origin != "" {
-		// A project has few environments, so one page covers them; the
-		// match runs in Go against the origins document of each preview.
-		result, err := stmts.ListEnvironments(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.EnvironmentField]{
-			Filter: database.And(
-				database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
-				database.Equal(database.Col(domain.EnvironmentFieldClass), domain.EnvironmentClassPreview.String()),
-			),
-			Pagination: database.Page[domain.EnvironmentField]{
-				Limit: 200,
-				OrderBy: database.OrderBy[domain.EnvironmentField]{
-					Columns:   []database.Column[domain.EnvironmentField]{database.Col(domain.EnvironmentFieldName)},
-					Direction: database.OrderAsc,
-				},
+	// A project has few environments, so one page covers them; the match
+	// runs in Go against the origins document of each row.
+	result, err := stmts.ListEnvironments(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.EnvironmentField]{
+		Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
+		Pagination: database.Page[domain.EnvironmentField]{
+			Limit: 200,
+			OrderBy: database.OrderBy[domain.EnvironmentField]{
+				Columns:   []database.Column[domain.EnvironmentField]{database.Col(domain.EnvironmentFieldName)},
+				Direction: database.OrderAsc,
 			},
-		})
-		if err != nil {
-			return nil, "", domain.ErrInternal(err).WithMessage("failed to list preview environments")
+		},
+	})
+	if err != nil {
+		return nil, "", domain.ErrInternal(err).WithMessage("failed to list environments")
+	}
+	var live *domain.Environment
+	var exact, wildcard []*domain.Environment
+	now := r.now()
+	for _, env := range result.Items {
+		if env.Class == domain.EnvironmentClassLive {
+			live = env
 		}
-		now := r.now()
-		var candidates []*domain.Environment
-		for _, env := range result.Items {
-			if env.Expired(now) {
-				continue
-			}
-			if env.ServesOrigin(origin) {
-				candidates = append(candidates, env)
-			}
+		if origin == "" || env.Expired(now) {
+			continue
 		}
+		switch {
+		case slices.Contains(env.Origins, origin):
+			exact = append(exact, env)
+		case env.Class == domain.EnvironmentClassPreview && env.ServesOrigin(origin):
+			wildcard = append(wildcard, env)
+		}
+	}
+	for _, candidates := range [][]*domain.Environment{exact, wildcard} {
 		switch len(candidates) {
 		case 0:
+			continue
 		case 1:
 			return candidates[0], RuntimeEnvironmentSourceOrigin, nil
 		default:
-			// Several previews cover this origin — a wildcard such as
+			// Several environments cover this origin — a wildcard such as
 			// https://*.vercel.app shared by every branch's preview. Never
 			// pick one by name: the release the client pinned says which
-			// preview it was built against.
+			// one it was built against.
 			chosen, err := r.disambiguate(ctx, stmts, projectID, candidates, releaseSelector)
 			if err != nil {
 				return nil, "", err
@@ -184,12 +196,8 @@ func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllState
 			return chosen, RuntimeEnvironmentSourceOrigin, nil
 		}
 	}
-	live, err := stmts.GetEnvironmentByName(ctx, projectID, domain.LiveEnvironmentName)
-	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, "", domain.ErrEnvironmentNotFound()
-		}
-		return nil, "", domain.ErrInternal(err).WithMessage("failed to read the live environment")
+	if live == nil {
+		return nil, "", domain.ErrEnvironmentNotFound()
 	}
 	return live, RuntimeEnvironmentSourceDefault, nil
 }

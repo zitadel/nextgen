@@ -71,6 +71,26 @@ func (h *Handler) CreateEnvironment(ctx context.Context, req *api.CreateEnvironm
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), environmentAccess, opWrite); err != nil {
 		return nil, err
 	}
+	// `live` cannot be created, but posting it sets the origins production
+	// is served from; the request must say class live to make that explicit.
+	if string(req.Name) == domain.LiveEnvironmentName {
+		if class, ok := req.Class.Get(); !ok || class != api.EnvironmentClassLive {
+			return nil, domain.ErrEnvironmentInvalid("the live environment already exists; post it with class live to set its origins")
+		}
+		if req.TTL.IsSet() {
+			return nil, domain.ErrEnvironmentInvalid("live never expires; ttl is not accepted for it")
+		}
+		live, err := h.environmentService.SetLiveOrigins(ctx, string(params.ProjectID), req.Origins)
+		if err != nil {
+			return nil, err
+		}
+		deployments, err := h.currentDeployments(ctx, string(params.ProjectID), []*domain.Environment{live})
+		if err != nil {
+			return nil, err
+		}
+		updated := api.CreateEnvironmentOK(toAPIEnvironment(live, deployments))
+		return &updated, nil
+	}
 	if class, ok := req.Class.Get(); ok && class != api.EnvironmentClassPreview {
 		return nil, domain.ErrEnvironmentInvalid("only preview environments can be created")
 	}

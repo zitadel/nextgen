@@ -51,6 +51,14 @@ Two lists on the server, both fed from `zitadel.json`:
   (`PATCH /projects/{id}`). Empty means allow all.
 - **Preview environment `origins`** — which of those origins a preview
   serves. Defaults to the entry's `issuer_pattern`; `--origin` overrides.
+- **Live `origins`** — the fixed origins production is served from, set by
+  `deploy` from the production entry's `issuer` (`POST /environments` with
+  `name: live, class: live`). Needed because the production domain
+  (`app.vercel.app`) is also covered by the previews' `*.vercel.app`.
+
+Precedence: an environment naming the origin literally beats one covering
+it by wildcard; live takes part in the literal tier only and is the default
+when nothing matches.
 
 Entries are bare origins or leftmost-label wildcards: `https://*.vercel.app`
 matches `my-app-feat-sso-acme.vercel.app`, not `vercel.app` nor

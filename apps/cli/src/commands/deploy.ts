@@ -8,6 +8,7 @@ import {
   connectEnvironment,
   deployRelease,
   LIVE_ENVIRONMENT,
+  syncLiveOrigins,
   syncProjectOrigins,
 } from "../lib/ship";
 
@@ -69,6 +70,7 @@ export default class Deploy extends BaseCommand {
     }
 
     const origins = await syncProjectOrigins({ cwd, client, target });
+    const liveOrigins = await syncLiveOrigins({ client, target });
     const release = await buildRelease({
       cwd,
       client,
@@ -91,7 +93,8 @@ export default class Deploy extends BaseCommand {
         server: target.server,
         project_id: target.projectId,
         target: LIVE_ENVIRONMENT,
-        allowed_origins: origins,
+        allowed_origins: origins.origins,
+        live_origins: liveOrigins,
         release,
         deployment,
         next_actions: [

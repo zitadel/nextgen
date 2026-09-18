@@ -10150,7 +10150,12 @@ type CreateEnvironmentRequest struct {
 	// pull request (`preview-pr-42`). Creating a name that already exists
 	// renews that preview instead of failing.
 	Name EnvironmentName `json:"name"`
-	// Only `preview` is accepted; omitted means `preview`.
+	// Omitted means `preview`. `live` is accepted only together with the
+	// name `live`: it does not create anything, it replaces the origins
+	// production is served from (`zitadel deploy` sends the production
+	// entry's `issuer` from `zitadel.json`). An origin named literally on
+	// `live` is served by `live` even when a preview's wildcard also covers
+	// it.
 	Class OptEnvironmentClass `json:"class"`
 	// How long the preview lives from now, as a Go duration (`168h`) or a
 	// day count (`7d`). Omitted means 7 days; the maximum is 30 days.

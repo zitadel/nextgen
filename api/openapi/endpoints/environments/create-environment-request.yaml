@@ -13,7 +13,13 @@ properties:
       renews that preview instead of failing.
     $ref: ../../components/schemas/environment-name.yaml
   class:
-    description: Only `preview` is accepted; omitted means `preview`.
+    description: |
+      Omitted means `preview`. `live` is accepted only together with the
+      name `live`: it does not create anything, it replaces the origins
+      production is served from (`zitadel deploy` sends the production
+      entry's `issuer` from `zitadel.json`). An origin named literally on
+      `live` is served by `live` even when a preview's wildcard also covers
+      it.
     $ref: ../../components/schemas/environment-class.yaml
   ttl:
     type: string
