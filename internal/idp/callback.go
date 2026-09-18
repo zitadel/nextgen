@@ -51,9 +51,13 @@ type ExternalIdentity struct {
 	// number arrives as its exact digits.
 	Subject string
 	// Claims are the provider claims keyed by the user-schema property
-	// claim_mapping names, with the raw decoded values.
+	// claim_mapping names, with the raw decoded values: a null stays a
+	// nil, a number is a json.Number. A property whose claim the provider
+	// did not send is left out.
 	Claims map[string]any
 	// Verified is the verified_claims outcome per user-schema property.
+	// True means the provider vouched for the value in Claims, so a
+	// property with no value or a null is never verified.
 	Verified map[string]bool
 	// RevisionID is the connection revision the attempt pinned.
 	RevisionID string
@@ -253,6 +257,13 @@ func mapClaims(claimMapping map[string]string, claims map[string]any) map[string
 func evaluateVerified(conn Connection, claims map[string]any, strategy StrategyResult) map[string]bool {
 	verified := make(map[string]bool, len(conn.VerifiedClaims))
 	for property, source := range conn.VerifiedClaims {
+		// Verification is about a value. Without one there is nothing
+		// for the provider to vouch for, whatever the source says.
+		claim := conn.ClaimMapping[property]
+		if value, ok := claims[claim]; !ok || value == nil {
+			verified[property] = false
+			continue
+		}
 		switch source.Kind {
 		case VerifyByTrust:
 			verified[property] = true
@@ -261,10 +272,8 @@ func evaluateVerified(conn Connection, claims map[string]any, strategy StrategyR
 			// including an absent claim, is unverified.
 			verified[property] = claims[source.Claim] == true || claims[source.Claim] == "true"
 		case VerifyByStrategy:
-			// The strategy reports by provider claim name, so the property
-			// is first mapped to its claim. An unmapped property is
-			// unverified.
-			verified[property] = strategy.Verified[conn.ClaimMapping[property]]
+			// The strategy reports by provider claim name.
+			verified[property] = strategy.Verified[claim]
 		}
 	}
 	return verified

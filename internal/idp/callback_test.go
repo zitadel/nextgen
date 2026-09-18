@@ -782,7 +782,7 @@ func TestCallback(t *testing.T) {
 
 func TestEvaluateVerified(t *testing.T) {
 	conn := Connection{
-		ClaimMapping: map[string]string{"email": "email"},
+		ClaimMapping: map[string]string{"email": "email", "name": "name", "phone": "phone_number"},
 		VerifiedClaims: map[string]VerificationSource{
 			"email":    {Kind: VerifyByClaim, Claim: "email_verified"},
 			"name":     {Kind: VerifyByTrust},
@@ -790,43 +790,63 @@ func TestEvaluateVerified(t *testing.T) {
 			"unmapped": {Kind: VerifyByStrategy},
 		},
 	}
+	strategy := StrategyResult{Verified: map[string]bool{"phone_number": true}}
 	tests := []struct {
-		name string
-		// emailVerified is the email_verified claim; nil leaves it absent.
-		emailVerified any
-		want          bool
+		name   string
+		claims map[string]any
+		want   map[string]bool
 	}{
-		{name: "the boolean true is verified", emailVerified: true, want: true},
-		{name: `the string "true" is verified`, emailVerified: "true", want: true},
-		{name: `the string "TRUE" is unverified`, emailVerified: "TRUE"},
-		{name: "the number 1 is unverified", emailVerified: json.Number("1")},
-		{name: `the string "yes" is unverified`, emailVerified: "yes"},
-		{name: "the boolean false is unverified", emailVerified: false},
-		{name: "an absent claim is unverified"},
+		{
+			name:   "every source vouches for a present value",
+			claims: map[string]any{"email": "ada@example.test", "email_verified": true, "name": "Ada", "phone_number": "+41"},
+			want:   map[string]bool{"email": true, "name": true, "phone": true, "unmapped": false},
+		},
+		{
+			name:   `the string "true" is verified`,
+			claims: map[string]any{"email": "ada@example.test", "email_verified": "true"},
+			want:   map[string]bool{"email": true, "name": false, "phone": false, "unmapped": false},
+		},
+		{
+			name:   `the string "TRUE" is unverified`,
+			claims: map[string]any{"email": "ada@example.test", "email_verified": "TRUE"},
+			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+		},
+		{
+			name:   "the number 1 is unverified",
+			claims: map[string]any{"email": "ada@example.test", "email_verified": json.Number("1")},
+			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+		},
+		{
+			name:   `the string "yes" is unverified`,
+			claims: map[string]any{"email": "ada@example.test", "email_verified": "yes"},
+			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+		},
+		{
+			name:   "the boolean false is unverified",
+			claims: map[string]any{"email": "ada@example.test", "email_verified": false},
+			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+		},
+		{
+			name:   "an absent verification claim is unverified",
+			claims: map[string]any{"email": "ada@example.test"},
+			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+		},
+		{
+			name:   "no source vouches for an absent value",
+			claims: map[string]any{"email_verified": true},
+			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+		},
+		{
+			name:   "no source vouches for a null value",
+			claims: map[string]any{"email": nil, "email_verified": true, "name": nil, "phone_number": nil},
+			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			claims := map[string]any{"email": "ada@example.test"}
-			if tt.emailVerified != nil {
-				claims["email_verified"] = tt.emailVerified
-			}
-			got := evaluateVerified(conn, claims, StrategyResult{Verified: map[string]bool{"phone": true}})
-			assert.Equal(t, tt.want, got["email"])
-			// Trust needs no claim; the strategy answers for the claim the
-			// property maps to, and a property without a mapping is unverified.
-			assert.True(t, got["name"])
-			assert.False(t, got["phone"])
-			assert.False(t, got["unmapped"])
+			assert.Equal(t, tt.want, evaluateVerified(conn, tt.claims, strategy))
 		})
 	}
-	t.Run("the strategy answers for the mapped claim", func(t *testing.T) {
-		conn := Connection{
-			ClaimMapping:   map[string]string{"emailAddress": "email"},
-			VerifiedClaims: map[string]VerificationSource{"emailAddress": {Kind: VerifyByStrategy}},
-		}
-		got := evaluateVerified(conn, nil, StrategyResult{Verified: map[string]bool{"email": true}})
-		assert.Equal(t, map[string]bool{"emailAddress": true}, got)
-	})
 }
 
 func TestCoerceSubject(t *testing.T) {
