@@ -2,6 +2,8 @@ import { pbkdf2Sync, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { defaultHumanUserSchemaUrl } from "@zitadel/config";
+
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { LOCAL_RUNTIME_DIR } from "./runtime";
@@ -25,10 +27,12 @@ export const LOCAL_ADMIN_FILE = `${LOCAL_RUNTIME_DIR}/admin.json`;
 export const LOCAL_ADMIN_USER_FILE = `${LOCAL_RUNTIME_DIR}/admin-user.json`;
 
 const PLATFORM_PROJECT_ID = "proj_platform";
-// The default user schema the platform project is seeded with, under the
-// server's default `schema.builtin_public_base`. CLI-managed servers do not
-// override that base.
-const DEFAULT_USER_SCHEMA_URL = "https://nextgen.com/api/schemas/default-human-user.json";
+// The default user schema the platform project is seeded with, derived from
+// the same default `schema.builtin_public_base` the server uses rather than
+// spelled out here: a document naming a schema the server does not have is
+// bootstrapped against an empty placeholder, and the admin then cannot sign in.
+// CLI-managed servers do not override that base.
+const DEFAULT_USER_SCHEMA_URL = defaultHumanUserSchemaUrl();
 const ADMIN_USER_ID = "user_localadmin";
 const ADMIN_TEAM_ID = "team_localadmin";
 /** The local admin's sign-in identifier; the default user schema identifies users by email. */

@@ -304,15 +304,14 @@ Open the local console, signed in as the local admin created by `zitadel start`.
 
 ```
 USAGE
-  $ zitadel console [--json] [-c <value>] [-s <value>] [-n] [-f]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--no-open]
+  $ zitadel console [--json] [-c <value>] [-n] [-f] [--dry-run]
+    [--verbose] [--debug] [--telemetry] [--no-open]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
   -f, --force            Overwrite protected files on conflict.
   -n, --non-interactive  Disable prompts. Required when scripting or running as
                          an agent.
-  -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --no-open          Print the sign-in link instead of opening a browser.
