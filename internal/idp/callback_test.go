@@ -185,6 +185,8 @@ func TestExchange(t *testing.T) {
 		authMethod   TokenEndpointAuthMethod
 		pkce         bool
 		pkceVerifier string
+		// emptySecret passes no client secret instead of the fixture's.
+		emptySecret bool
 		// timeout bounds the call; zero means none.
 		timeout time.Duration
 		// wantErr is the domain kind. wantCause is matched against its
@@ -231,6 +233,13 @@ func TestExchange(t *testing.T) {
 			pkce:         true,
 			wantErr:      domain.ErrInternal(nil),
 			wantCauseMsg: "callback: pkce verifier is empty",
+		},
+		{
+			name:         "an unresolved client secret is a wiring error",
+			authMethod:   ClientSecretBasic,
+			emptySecret:  true,
+			wantErr:      domain.ErrInternal(nil),
+			wantCauseMsg: "callback: client secret is empty",
 		},
 		{
 			name:         "an unknown auth method is a wiring error",
@@ -282,7 +291,11 @@ func TestExchange(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, tt.timeout)
 				t.Cleanup(cancel)
 			}
-			token, err := c.exchange(ctx, "the-code", tt.pkceVerifier, "the-secret")
+			secret := "the-secret"
+			if tt.emptySecret {
+				secret = ""
+			}
+			token, err := c.exchange(ctx, "the-code", tt.pkceVerifier, secret)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)

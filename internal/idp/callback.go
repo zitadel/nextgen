@@ -133,6 +133,9 @@ func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (Externa
 
 // exchange trades the authorization code for the provider's tokens.
 func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSecret string) (*oauth2.Token, error) {
+	if clientSecret == "" {
+		return nil, domain.ErrInternal(errors.New("callback: client secret is empty"))
+	}
 	// The secret is set either in the Authorization header or the request
 	// body, based on the token_endpoint_auth_method set in the connection:
 	// the Authorization header for client_secret_basic, the form body for
