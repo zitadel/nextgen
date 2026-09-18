@@ -224,6 +224,38 @@ func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, af
 	return ids, nil
 }
 
+// ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	var compiler statementCompiler
+	compiler.WriteString(projectQuery)
+	compiler.WriteString(" WHERE id IN (")
+	authz.WriteAuthorizedProjectIDs(&compiler, postgresAuthzEnv(), homeProjectID, userID)
+	compiler.WriteString(")")
+	keyset, err := cursorFilter(page, projectSchema)
+	if err != nil {
+		return nil, err
+	}
+	if keyset != nil {
+		compiler.WriteString(" AND ")
+		compileFilter(&compiler, keyset, projectSchema)
+	}
+	compileOrderBy(&compiler, page.OrderBy, projectSchema)
+	compileLimit(&compiler, page.Limit)
+
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	projects, err := pgx.CollectRows(rows, newProjectStatements(s.client).scanProject)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return &database.ListResult[*domain.Project]{
+		Items:      projects,
+		NextCursor: pagination.MarshalNext(page.OrderBy, projects, projectSchema, page.Limit),
+	}, nil
+}
+
 func scanAuthzAssignment(row pgx.CollectableRow) (*domain.AuthzAssignment, error) {
 	a := new(domain.AuthzAssignment)
 	if err := row.Scan(

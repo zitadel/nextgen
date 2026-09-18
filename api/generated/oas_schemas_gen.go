@@ -4498,6 +4498,7 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 }
 
 func (*AuthUnauthorized) completeClaimRes()   {}
+func (*AuthUnauthorized) listMyProjectsRes()  {}
 func (*AuthUnauthorized) revokeMySessionRes() {}
 
 // Additional error-specific context.
@@ -8391,6 +8392,7 @@ type CreateFlowDefinitionErrorResponse struct {
 	FlowdefInvalid           FlowdefInvalid
 	FlowdefNotFound          FlowdefNotFound
 	FlowdefPermissionDenied  FlowdefPermissionDenied
+	FlowdefRevisionConflict  FlowdefRevisionConflict
 	Internal                 Internal
 	SchNotFound              SchNotFound
 	ReqInvalid               ReqInvalid
@@ -8407,6 +8409,7 @@ const (
 	FlowdefInvalidCreateFlowDefinitionErrorResponse           CreateFlowDefinitionErrorResponseType = "flowdef.invalid"
 	FlowdefNotFoundCreateFlowDefinitionErrorResponse          CreateFlowDefinitionErrorResponseType = "flowdef.not_found"
 	FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse  CreateFlowDefinitionErrorResponseType = "flowdef.permission_denied"
+	FlowdefRevisionConflictCreateFlowDefinitionErrorResponse  CreateFlowDefinitionErrorResponseType = "flowdef.revision_conflict"
 	InternalCreateFlowDefinitionErrorResponse                 CreateFlowDefinitionErrorResponseType = "internal"
 	SchNotFoundCreateFlowDefinitionErrorResponse              CreateFlowDefinitionErrorResponseType = "sch.not_found"
 	ReqInvalidCreateFlowDefinitionErrorResponse               CreateFlowDefinitionErrorResponseType = "req.invalid"
@@ -8436,6 +8439,11 @@ func (s CreateFlowDefinitionErrorResponse) IsFlowdefNotFound() bool {
 // IsFlowdefPermissionDenied reports whether CreateFlowDefinitionErrorResponse is FlowdefPermissionDenied.
 func (s CreateFlowDefinitionErrorResponse) IsFlowdefPermissionDenied() bool {
 	return s.Type == FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefRevisionConflict reports whether CreateFlowDefinitionErrorResponse is FlowdefRevisionConflict.
+func (s CreateFlowDefinitionErrorResponse) IsFlowdefRevisionConflict() bool {
+	return s.Type == FlowdefRevisionConflictCreateFlowDefinitionErrorResponse
 }
 
 // IsInternal reports whether CreateFlowDefinitionErrorResponse is Internal.
@@ -8560,6 +8568,27 @@ func (s CreateFlowDefinitionErrorResponse) GetFlowdefPermissionDenied() (v Flowd
 func NewFlowdefPermissionDeniedCreateFlowDefinitionErrorResponse(v FlowdefPermissionDenied) CreateFlowDefinitionErrorResponse {
 	var s CreateFlowDefinitionErrorResponse
 	s.SetFlowdefPermissionDenied(v)
+	return s
+}
+
+// SetFlowdefRevisionConflict sets CreateFlowDefinitionErrorResponse to FlowdefRevisionConflict.
+func (s *CreateFlowDefinitionErrorResponse) SetFlowdefRevisionConflict(v FlowdefRevisionConflict) {
+	s.Type = FlowdefRevisionConflictCreateFlowDefinitionErrorResponse
+	s.FlowdefRevisionConflict = v
+}
+
+// GetFlowdefRevisionConflict returns FlowdefRevisionConflict and true boolean if CreateFlowDefinitionErrorResponse is FlowdefRevisionConflict.
+func (s CreateFlowDefinitionErrorResponse) GetFlowdefRevisionConflict() (v FlowdefRevisionConflict, ok bool) {
+	if !s.IsFlowdefRevisionConflict() {
+		return v, false
+	}
+	return s.FlowdefRevisionConflict, true
+}
+
+// NewFlowdefRevisionConflictCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from FlowdefRevisionConflict.
+func NewFlowdefRevisionConflictCreateFlowDefinitionErrorResponse(v FlowdefRevisionConflict) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetFlowdefRevisionConflict(v)
 	return s
 }
 
@@ -19545,6 +19574,59 @@ func (s *FlowdefPurposeMismatchDetails) init() FlowdefPurposeMismatchDetails {
 
 // Merged schema.
 // Ref: #
+type FlowdefRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefRevisionConflict) GetDetails() OptFlowdefRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefRevisionConflict) SetDetails(val OptFlowdefRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefRevisionConflictDetails map[string]jx.Raw
+
+func (s *FlowdefRevisionConflictDetails) init() FlowdefRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type FlowdefSchemaFetchFailed struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -24796,6 +24878,265 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
+type ListFlowDefinitionsRevisions string
+
+const (
+	ListFlowDefinitionsRevisionsAll    ListFlowDefinitionsRevisions = "all"
+	ListFlowDefinitionsRevisionsLatest ListFlowDefinitionsRevisions = "latest"
+)
+
+// AllValues returns all ListFlowDefinitionsRevisions values.
+func (ListFlowDefinitionsRevisions) AllValues() []ListFlowDefinitionsRevisions {
+	return []ListFlowDefinitionsRevisions{
+		ListFlowDefinitionsRevisionsAll,
+		ListFlowDefinitionsRevisionsLatest,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListFlowDefinitionsRevisions) MarshalText() ([]byte, error) {
+	switch s {
+	case ListFlowDefinitionsRevisionsAll:
+		return []byte(s), nil
+	case ListFlowDefinitionsRevisionsLatest:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListFlowDefinitionsRevisions) UnmarshalText(data []byte) error {
+	switch ListFlowDefinitionsRevisions(data) {
+	case ListFlowDefinitionsRevisionsAll:
+		*s = ListFlowDefinitionsRevisionsAll
+		return nil
+	case ListFlowDefinitionsRevisionsLatest:
+		*s = ListFlowDefinitionsRevisionsLatest
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ListMyProjectsBadRequest ErrorDetails
+
+func (*ListMyProjectsBadRequest) listMyProjectsRes() {}
+
+// ListMyProjectsErrorResponse represents sum type.
+type ListMyProjectsErrorResponse struct {
+	Type             ListMyProjectsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+	SessTokenInvalid SessTokenInvalid
+}
+
+// ListMyProjectsErrorResponseType is oneOf type of ListMyProjectsErrorResponse.
+type ListMyProjectsErrorResponseType string
+
+// Possible values for ListMyProjectsErrorResponseType.
+const (
+	AuthUnauthorizedListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "auth.unauthorized"
+	InternalListMyProjectsErrorResponse         ListMyProjectsErrorResponseType = "internal"
+	ReqInvalidListMyProjectsErrorResponse       ListMyProjectsErrorResponseType = "req.invalid"
+	SessTokenInvalidListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "sess.token_invalid"
+)
+
+// IsAuthUnauthorized reports whether ListMyProjectsErrorResponse is AuthUnauthorized.
+func (s ListMyProjectsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyProjectsErrorResponse
+}
+
+// IsInternal reports whether ListMyProjectsErrorResponse is Internal.
+func (s ListMyProjectsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyProjectsErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyProjectsErrorResponse is ReqInvalid.
+func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyProjectsErrorResponse
+}
+
+// IsSessTokenInvalid reports whether ListMyProjectsErrorResponse is SessTokenInvalid.
+func (s ListMyProjectsErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidListMyProjectsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyProjectsErrorResponse to AuthUnauthorized.
+func (s *ListMyProjectsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyProjectsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyProjectsErrorResponse is AuthUnauthorized.
+func (s ListMyProjectsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyProjectsErrorResponse(v AuthUnauthorized) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyProjectsErrorResponse to Internal.
+func (s *ListMyProjectsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyProjectsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyProjectsErrorResponse is Internal.
+func (s ListMyProjectsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from Internal.
+func NewInternalListMyProjectsErrorResponse(v Internal) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyProjectsErrorResponse to ReqInvalid.
+func (s *ListMyProjectsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyProjectsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyProjectsErrorResponse is ReqInvalid.
+func (s ListMyProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from ReqInvalid.
+func NewReqInvalidListMyProjectsErrorResponse(v ReqInvalid) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessTokenInvalid sets ListMyProjectsErrorResponse to SessTokenInvalid.
+func (s *ListMyProjectsErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidListMyProjectsErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if ListMyProjectsErrorResponse is SessTokenInvalid.
+func (s ListMyProjectsErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidListMyProjectsErrorResponse(v SessTokenInvalid) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetSessTokenInvalid(v)
+	return s
+}
+
+// ListMyProjectsErrorResponseStatusCode wraps ListMyProjectsErrorResponse with StatusCode.
+type ListMyProjectsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyProjectsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyProjectsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyProjectsErrorResponseStatusCode) GetResponse() ListMyProjectsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyProjectsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyProjectsErrorResponseStatusCode) SetResponse(val ListMyProjectsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyProjectsErrorResponseStatusCode) listMyProjectsRes() {}
+
+type ListMyProjectsInternalServerError ErrorDetails
+
+func (*ListMyProjectsInternalServerError) listMyProjectsRes() {}
+
+// Paginated list of projects, ordered by project id.
+// Ref: #
+type ListMyProjectsResponse struct {
+	Projects []ProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Present when the page was full. A following request may return an empty page
+	// and no token, which ends the listing.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *ListMyProjectsResponse) GetProjects() []ProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListMyProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *ListMyProjectsResponse) SetProjects(val []ProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListMyProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+// ListMyProjectsResponseHeaders wraps ListMyProjectsResponse with response headers.
+type ListMyProjectsResponseHeaders struct {
+	CacheControl OptString
+	Response     ListMyProjectsResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListMyProjectsResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyProjectsResponseHeaders) GetResponse() ListMyProjectsResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListMyProjectsResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) {
+	s.Response = val
+}
+
+func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
+
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {
 	Type                ListReleasesErrorResponseType // switch on this field
@@ -29945,6 +30286,52 @@ func (o OptFlowdefPurposeMismatchDetails) Or(d FlowdefPurposeMismatchDetails) Fl
 	return d
 }
 
+// NewOptFlowdefRevisionConflictDetails returns new OptFlowdefRevisionConflictDetails with value set to v.
+func NewOptFlowdefRevisionConflictDetails(v FlowdefRevisionConflictDetails) OptFlowdefRevisionConflictDetails {
+	return OptFlowdefRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefRevisionConflictDetails is optional FlowdefRevisionConflictDetails.
+type OptFlowdefRevisionConflictDetails struct {
+	Value FlowdefRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefRevisionConflictDetails was set.
+func (o OptFlowdefRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefRevisionConflictDetails) Reset() {
+	var v FlowdefRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefRevisionConflictDetails) SetTo(v FlowdefRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefRevisionConflictDetails) Get() (v FlowdefRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefRevisionConflictDetails) Or(d FlowdefRevisionConflictDetails) FlowdefRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowdefSchemaFetchFailedDetails returns new OptFlowdefSchemaFetchFailedDetails with value set to v.
 func NewOptFlowdefSchemaFetchFailedDetails(v FlowdefSchemaFetchFailedDetails) OptFlowdefSchemaFetchFailedDetails {
 	return OptFlowdefSchemaFetchFailedDetails{
@@ -30629,6 +31016,52 @@ func (o OptListFlowDefinitionsPurpose) Get() (v ListFlowDefinitionsPurpose, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListFlowDefinitionsPurpose) Or(d ListFlowDefinitionsPurpose) ListFlowDefinitionsPurpose {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListFlowDefinitionsRevisions returns new OptListFlowDefinitionsRevisions with value set to v.
+func NewOptListFlowDefinitionsRevisions(v ListFlowDefinitionsRevisions) OptListFlowDefinitionsRevisions {
+	return OptListFlowDefinitionsRevisions{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListFlowDefinitionsRevisions is optional ListFlowDefinitionsRevisions.
+type OptListFlowDefinitionsRevisions struct {
+	Value ListFlowDefinitionsRevisions
+	Set   bool
+}
+
+// IsSet returns true if OptListFlowDefinitionsRevisions was set.
+func (o OptListFlowDefinitionsRevisions) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListFlowDefinitionsRevisions) Reset() {
+	var v ListFlowDefinitionsRevisions
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListFlowDefinitionsRevisions) SetTo(v ListFlowDefinitionsRevisions) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListFlowDefinitionsRevisions) Get() (v ListFlowDefinitionsRevisions, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListFlowDefinitionsRevisions) Or(d ListFlowDefinitionsRevisions) ListFlowDefinitionsRevisions {
 	if v, ok := o.Get(); ok {
 		return v
 	}

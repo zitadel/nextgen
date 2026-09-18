@@ -25,6 +25,21 @@ const (
 
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
 		`FROM zitadel_nextgen.flow_definitions`
+
+	// latestRevisionPerName keeps only the newest revision of each flow name.
+	//
+	// The uniqueness of (project_id, name, created_at) makes created_at a
+	// total order within a name, so no tiebreak belongs in here.
+	//
+	// The sub-query deliberately carries no authz predicate, so "newest" is
+	// the newest revision that exists rather than the newest the caller may
+	// read: a caller granted only a superseded revision sees it under
+	// revisions=all and sees nothing for that flow under revisions=latest.
+	// Which revision is current is a property of the flow, not of the reader.
+	latestRevisionPerName = `NOT EXISTS (SELECT 1 FROM zitadel_nextgen.flow_definitions newer` +
+		` WHERE newer.project_id = zitadel_nextgen.flow_definitions.project_id` +
+		` AND newer.name = zitadel_nextgen.flow_definitions.name` +
+		` AND newer.created_at > zitadel_nextgen.flow_definitions.created_at)`
 )
 
 type flowDefinitionStatements struct{ statement }
@@ -89,11 +104,16 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, pro
 }
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
-func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], queryOpts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 	opts := flowdefinition.EnsureListOptions(filter)
 
+	var conjuncts []string
+	if queryOpts.LatestRevisionPerName {
+		conjuncts = append(conjuncts, latestRevisionPerName)
+	}
+
 	var compiler statementCompiler
-	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "zitadel_nextgen.flow_definitions", "id")
+	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "zitadel_nextgen.flow_definitions", "id", conjuncts...)
 	if err != nil {
 		return nil, err
 	}

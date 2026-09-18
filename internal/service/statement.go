@@ -74,11 +74,18 @@ type ProjectStatements interface {
 // 	Transactioner[FlowDefinitionStatements]
 // }
 
+// FlowDefinitionQueryOptions carries query modes for ListFlowDefinitions that
+// are not column predicates. Column predicates stay in Filter / ListOptions.
+type FlowDefinitionQueryOptions struct {
+	// LatestRevisionPerName keeps only the newest revision of each name.
+	LatestRevisionPerName bool
+}
+
 type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
+	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], opts FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
 
@@ -463,6 +470,21 @@ type AuthzAssignmentStatements interface {
 	// (project, team) rows, since ADR 054 §2 ends ownership only by transfer or
 	// revocation.
 	HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error)
+	// ListAuthorizedProjects pages the projects the user can act on, by the
+	// three routes ADR 053 §6 puts in the authorized set:
+	//
+	//  1. the user holds an active project-level grant directly;
+	//  2. a team the user has a membership edge in inside homeProjectID holds
+	//     one;
+	//  3. the active catalog's bounded tuple-to-userset path: the user holds a
+	//     grant, directly or through such a team, whose relation closes to the
+	//     source of a project tuple-to-userset edge and whose scope points at
+	//     the tupleset team, so nothing names the user on the project at all.
+	//
+	// Every route is evaluated on the active system catalog, mirroring
+	// CheckAuthz. page.OrderBy carries the sort columns; a cursor issued for a
+	// different OrderBy is rejected.
+	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.

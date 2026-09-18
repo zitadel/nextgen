@@ -517,6 +517,42 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(((await none.json()) as { flow_definitions: unknown[] }).flow_definitions).toEqual([]);
   });
 
+  test("GET /flow_definitions?revisions=latest keeps one revision per name and honours purpose", async () => {
+    const publish = async (overrides: Record<string, unknown>) => {
+      const res = await fetch(`${BASE}/flow_definitions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          project_id: "proj_conformance_latest",
+          flow_definition: { ...validFlowDefinitionBody(), ...overrides },
+        }),
+      });
+      expect(res.status).toBe(201);
+      return ((await res.json()) as { id: string }).id;
+    };
+    const loginV1 = await publish({ name: "latest-login" });
+    const loginV2 = await publish({ name: "latest-login" });
+    const registerV1 = await publish({
+      name: "latest-register",
+      purposes: { register: "identifier" },
+    });
+
+    const list = async (params: string) => {
+      const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { flow_definitions: { id: string }[] };
+      return body.flow_definitions.map((entry) => entry.id);
+    };
+
+    // `all` stays the default and keeps every revision, newest first.
+    expect(await list("")).toEqual([registerV1, loginV2, loginV1]);
+    // `latest` keeps the newest revision of each name.
+    expect(await list("&revisions=latest")).toEqual([registerV1, loginV2]);
+    // The purpose filter applies to the surviving revisions.
+    expect(await list("&revisions=latest&purpose=register")).toEqual([registerV1]);
+    expect(await list("&revisions=latest&purpose=login")).toEqual([loginV2]);
+  });
+
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
     const create = await fetch(`${BASE}/flow_definitions`, {

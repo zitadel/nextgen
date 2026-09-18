@@ -260,6 +260,39 @@ func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, af
 	return ids, nil
 }
 
+// ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	var compiler statementCompiler
+	compiler.WriteString(projectQuery)
+	compiler.WriteString(" WHERE id IN (")
+	authz.WriteAuthorizedProjectIDs(&compiler, spannerAuthzEnv(), homeProjectID, userID)
+	compiler.WriteString(")")
+	keyset, err := cursorFilter(page, projectSchema)
+	if err != nil {
+		return nil, err
+	}
+	if keyset != nil {
+		compiler.WriteString(" AND ")
+		compileFilter(&compiler, keyset, projectSchema)
+	}
+	compileOrderBy(&compiler, page.OrderBy, projectSchema)
+	compileLimit(&compiler, page.Limit)
+
+	scan := newProjectStatements(s.db).scanProject
+	var projects []*domain.Project
+	if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		projects, qErr = collectRows(iter, scan)
+		return qErr
+	}); err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.Project]{
+		Items:      projects,
+		NextCursor: pagination.MarshalNext(page.OrderBy, projects, projectSchema, page.Limit),
+	}, nil
+}
+
 // activeUniqueKey is Spanner's stand-in for Postgres's partial unique index on
 // active (non-revoked, non-delegated) assignments. Returns nil when the row must
 // not participate in uniqueness.
