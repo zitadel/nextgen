@@ -42142,13 +42142,18 @@ func (s *IdentifierFactorPayload) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *IdentifierFactorPayload) encodeFields(e *jx.Encoder) {
 	{
+		e.FieldStart("method")
+		s.Method.Encode(e)
+	}
+	{
 		e.FieldStart("user_id")
 		s.UserID.Encode(e)
 	}
 }
 
-var jsonFieldsNameOfIdentifierFactorPayload = [1]string{
-	0: "user_id",
+var jsonFieldsNameOfIdentifierFactorPayload = [2]string{
+	0: "method",
+	1: "user_id",
 }
 
 // Decode decodes IdentifierFactorPayload from json.
@@ -42160,8 +42165,18 @@ func (s *IdentifierFactorPayload) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "user_id":
+		case "method":
 			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Method.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"method\"")
+			}
+		case "user_id":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				if err := s.UserID.Decode(d); err != nil {
 					return err
@@ -42180,7 +42195,7 @@ func (s *IdentifierFactorPayload) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -42239,10 +42254,15 @@ func (s *IdentifierProof) encodeFields(e *jx.Encoder) {
 		e.FieldStart("login_name")
 		e.Str(s.LoginName)
 	}
+	{
+		e.FieldStart("attribute_name")
+		e.Str(s.AttributeName)
+	}
 }
 
-var jsonFieldsNameOfIdentifierProof = [1]string{
+var jsonFieldsNameOfIdentifierProof = [2]string{
 	0: "login_name",
+	1: "attribute_name",
 }
 
 // Decode decodes IdentifierProof from json.
@@ -42266,6 +42286,18 @@ func (s *IdentifierProof) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"login_name\"")
 			}
+		case "attribute_name":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.AttributeName = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"attribute_name\"")
+			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
 		}
@@ -42276,7 +42308,7 @@ func (s *IdentifierProof) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -54919,6 +54951,10 @@ func (s *PasskeyFactorPayload) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *PasskeyFactorPayload) encodeFields(e *jx.Encoder) {
 	{
+		e.FieldStart("method")
+		s.Method.Encode(e)
+	}
+	{
 		e.FieldStart("credential_id")
 		e.Str(s.CredentialID)
 	}
@@ -54946,12 +54982,13 @@ func (s *PasskeyFactorPayload) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPasskeyFactorPayload = [5]string{
-	0: "credential_id",
-	1: "user_verified",
-	2: "backup_eligible",
-	3: "backup_state",
-	4: "authenticator_attachment",
+var jsonFieldsNameOfPasskeyFactorPayload = [6]string{
+	0: "method",
+	1: "credential_id",
+	2: "user_verified",
+	3: "backup_eligible",
+	4: "backup_state",
+	5: "authenticator_attachment",
 }
 
 // Decode decodes PasskeyFactorPayload from json.
@@ -54963,8 +55000,18 @@ func (s *PasskeyFactorPayload) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "credential_id":
+		case "method":
 			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Method.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"method\"")
+			}
+		case "credential_id":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := d.Str()
 				s.CredentialID = string(v)
@@ -54976,7 +55023,7 @@ func (s *PasskeyFactorPayload) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"credential_id\"")
 			}
 		case "user_verified":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := d.Bool()
 				s.UserVerified = bool(v)
@@ -55027,7 +55074,7 @@ func (s *PasskeyFactorPayload) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -55412,23 +55459,73 @@ func (s *PasswordFactorPayload) Encode(e *jx.Encoder) {
 
 // encodeFields encodes fields.
 func (s *PasswordFactorPayload) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("method")
+		s.Method.Encode(e)
+	}
 }
 
-var jsonFieldsNameOfPasswordFactorPayload = [0]string{}
+var jsonFieldsNameOfPasswordFactorPayload = [1]string{
+	0: "method",
+}
 
 // Decode decodes PasswordFactorPayload from json.
 func (s *PasswordFactorPayload) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode PasswordFactorPayload to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "method":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Method.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"method\"")
+			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
 		}
+		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode PasswordFactorPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfPasswordFactorPayload) {
+					name = jsonFieldsNameOfPasswordFactorPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
@@ -84923,6 +85020,19 @@ func (s *VerifyChallengeRequestSum) Decode(d *jx.Decoder) error {
 	if err := d.Capture(func(d *jx.Decoder) error {
 		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
 			switch string(key) {
+			case "attribute_name":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := IdentifierProofVerifyChallengeRequestSum
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
 			case "login_name":
 				// Type-based discrimination: check if field has expected JSON type
 				if typ := d.Next(); typ != jx.String {
