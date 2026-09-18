@@ -19,10 +19,9 @@ import { LOCAL_RUNTIME_DIR } from "./runtime";
  * - `admin-user.json`: the server's bootstrap user document, handed to the
  *   binary as `--user-file`. It carries only a PBKDF2 hash of the password.
  *
- * The password is never printed. The CLI proves it against the auth-attempt
- * API — the state machine the login widget drives — and turns the resulting
- * one-time handoff token into a console sign-in link
- * (`/ui/console/login?handoff=…`).
+ * The password is never printed. The CLI uses it to run the real login flow
+ * headlessly and turns the resulting one-time handoff token into a console
+ * sign-in link (`/ui/console/login?handoff=…`).
  */
 export const LOCAL_ADMIN_FILE = `${LOCAL_RUNTIME_DIR}/admin.json`;
 export const LOCAL_ADMIN_USER_FILE = `${LOCAL_RUNTIME_DIR}/admin-user.json`;
@@ -38,13 +37,8 @@ const ADMIN_USER_ID = "user_localadmin";
 const ADMIN_TEAM_ID = "team_localadmin";
 /** The local admin's sign-in identifier; the default user schema identifies users by email. */
 export const LOCAL_ADMIN_EMAIL = "admin@zitadel.localhost";
-/**
- * Which user attribute identifies the admin. A project decides this for itself,
- * and this one is the CLI's own: the bootstrap document below writes the email
- * under `email`, so that is what an identifier proof names.
- */
-const ADMIN_IDENTIFIER_ATTRIBUTE = "email";
 const PBKDF2_ROUNDS = 210_000;
+const MAX_FLOW_STEPS = 6;
 /**
  * Every call here runs after the server answered `/healthz`, so a stalled
  * request means the server is wedged rather than still starting. Without a
@@ -251,65 +245,17 @@ async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): Promise
 }
 
 /**
- * Authenticates the admin through the auth-attempt API — the same state machine
- * the login widget drives, minus the rendered steps: issue a factor challenge,
- * prove it, hand off. The CLI wrote this user's attributes itself, so it names
- * the one that identifies them rather than reading it off a step.
+ * Runs the platform project's login flow for the admin, exactly as the login
+ * widget would, and stops at the terminal handoff token without exchanging it.
  */
 async function adminHandoff(
   serverUrl: string,
   admin: LocalAdmin,
 ): Promise<{ handoffToken: string; projectId: string; publishableKey: string }> {
-  const publishableKey = await platformPublishableKey(serverUrl);
-  const origin = new URL(serverUrl).origin;
-
-  const post = async (path: string, body: Record<string, unknown>): Promise<JsonResponse> =>
-    fetchJson(`${serverUrl}${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${publishableKey}`, origin },
-      body: JSON.stringify(body),
-    });
-
-  const attempt = await post("/auth_attempts", { project_id: PLATFORM_PROJECT_ID });
-  if (!attempt.ok || !isObject(attempt.body) || typeof attempt.body.attempt_id !== "string") {
-    throw apiError("auth_attempts", attempt);
-  }
-  const attemptId = encodeURIComponent(attempt.body.attempt_id);
-
-  const prove = async (method: string, proof: Record<string, unknown>): Promise<void> => {
-    const challenge = await post(`/auth_attempts/${attemptId}/challenges`, { method });
-    if (!challenge.ok || !isObject(challenge.body) || typeof challenge.body.challenge_id !== "string") {
-      throw apiError(`${method} challenge`, challenge);
-    }
-    const verified = await post(
-      `/auth_attempts/${attemptId}/challenges/${encodeURIComponent(challenge.body.challenge_id)}/verify`,
-      proof,
-    );
-    if (!verified.ok) throw proofError(method, verified, admin);
-  };
-
-  // The bootstrap document registers the admin's email as the unique attribute
-  // that identifies them, so that is the attribute the proof names.
-  await prove("identifier", { login_name: admin.email, attribute_name: ADMIN_IDENTIFIER_ATTRIBUTE });
-  await prove("password", { password: admin.password });
-
-  const handoff = await post(`/auth_attempts/${attemptId}/handoff`, {});
-  if (!handoff.ok || !isObject(handoff.body) || typeof handoff.body.handoff_token !== "string") {
-    throw apiError("handoff", handoff);
-  }
-  return { handoffToken: handoff.body.handoff_token, projectId: PLATFORM_PROJECT_ID, publishableKey };
-}
-
-/**
- * The platform project's browser-safe key, which is also what authorises the
- * auth-attempt calls above. Its absence means this server was not started with
- * the platform project, which no amount of retrying will change.
- */
-async function platformPublishableKey(serverUrl: string): Promise<string> {
-  const res = await fetchJson(`${serverUrl}/console/runtime.json`, { method: "GET" });
-  const runtime = res.body;
+  const runtimeRes = await fetchJson(`${serverUrl}/console/runtime.json`, { method: "GET" });
+  const runtime = runtimeRes.body;
   if (
-    !res.ok ||
+    !runtimeRes.ok ||
     !isObject(runtime) ||
     runtime.console_project_id !== PLATFORM_PROJECT_ID ||
     typeof runtime.publishable_key !== "string"
@@ -322,29 +268,65 @@ async function platformPublishableKey(serverUrl: string): Promise<string> {
         // cannot fix this on its own: the instance has to stop first.
         hint: "Stop it with `zitadel stop`, then run `zitadel start` so it boots with the platform project and the local admin.",
         nextCommands: ["zitadel stop", "zitadel start"],
-        details: {
-          server_url: serverUrl,
-          console_project_id: isObject(runtime) ? runtime.console_project_id : undefined,
-        },
+        details: { server_url: serverUrl, console_project_id: isObject(runtime) ? runtime.console_project_id : undefined },
       },
     );
   }
-  return runtime.publishable_key;
-}
+  const publishableKey = runtime.publishable_key;
+  const origin = new URL(serverUrl).origin;
+  let flowCookie: string | undefined;
 
-/**
- * A rejected identifier proof means this server never imported the admin — an
- * older data directory, say — which is worth saying plainly, because no retry
- * fixes it and the generic proof error would send the reader hunting.
- */
-function proofError(method: string, res: JsonResponse, admin: LocalAdmin): ZitadelError {
-  const code = isObject(res.body) && typeof res.body.code === "string" ? res.body.code : undefined;
-  if (method === "identifier" && code === "att.proof_rejected") {
-    return new ZitadelError("E_AUTH", `The local server has no user ${admin.email}`, {
-      hint: "The local data directory predates the local admin. Run `zitadel reset --force`, then `zitadel start`.",
+  const flow = async (path: string, body: Record<string, unknown>) => {
+    const res = await bounded(`${serverUrl}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${publishableKey}`,
+        origin,
+        ...(flowCookie ? { cookie: flowCookie } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    for (const raw of res.headers.getSetCookie()) {
+      const [pair] = raw.split(";", 1);
+      if (pair?.startsWith("_zflow=")) flowCookie = pair;
+    }
+    const json = await safeJson(res);
+    if (!res.ok || !isObject(json)) {
+      throw apiError(`flow ${path}`, { ok: res.ok, status: res.status, body: json });
+    }
+    return json;
+  };
+
+  let step = await flow("/flow", { project_id: PLATFORM_PROJECT_ID, purpose: "login" });
+  for (let hop = 0; hop < MAX_FLOW_STEPS; hop += 1) {
+    if (typeof step.handoff_token === "string") {
+      return { handoffToken: step.handoff_token, projectId: PLATFORM_PROJECT_ID, publishableKey };
+    }
+    const current = isObject(step.step) ? step.step : {};
+    if (current.name === "register" || current.name === "register-password") {
+      // The login flow only routes to registration when the email is unknown:
+      // the server was not started with this admin (for example an older data
+      // directory). Refuse rather than sign a new user up.
+      throw new ZitadelError("E_AUTH", `The local server has no user ${admin.email}`, {
+        hint: "The local data directory predates the local admin. Run `zitadel reset --force`, then `zitadel start`.",
+      });
+    }
+    const fields: Record<string, string> = {};
+    for (const field of Array.isArray(current.fields) ? current.fields : []) {
+      if (!isObject(field) || typeof field.name !== "string") continue;
+      fields[field.name] = field.name.split("#").pop() === "password" ? admin.password : admin.email;
+    }
+    // The flow state rides the sealed `_zflow` cookie the jar above carries;
+    // the submit body is the action and this step's fields.
+    step = await flow(`/flow/${encodeURIComponent(String(step.id))}/submit`, {
+      action: "submit",
+      fields,
     });
   }
-  return apiError(`${method} proof`, res);
+  throw new ZitadelError("E_AUTH", "The local admin login did not complete", {
+    details: { last_step: isObject(step.step) ? step.step.name : undefined },
+  });
 }
 
 /** Writes owner-only, failing quietly when another run got there first. */
