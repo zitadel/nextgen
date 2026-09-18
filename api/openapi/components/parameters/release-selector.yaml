@@ -1,0 +1,16 @@
+name: X-Zitadel-Release
+in: header
+required: false
+description: |
+  Pins the configuration release that serves this request. Omitted or
+  `latest` means the release the resolved environment currently runs. An
+  explicit release id must belong to the project and have a deployment on
+  the resolved environment, otherwise the request is rejected.
+
+  The environment itself is never selected by the client: it follows from
+  the request's `Origin` (a preview environment claims its origins; `live`
+  serves the rest). A frontend preview deployment built against a specific
+  configuration release sends that id here so the two roll out together.
+schema:
+  type: string
+  example: rel_01KX3RG8A7F0N9WD3P2E4YM5C1

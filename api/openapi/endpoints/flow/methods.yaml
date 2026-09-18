@@ -16,6 +16,8 @@ post:
   tags:
     - Flows
   security: []
+  parameters:
+    - $ref: ../../components/parameters/release-selector.yaml
   requestBody:
     required: true
     content:
@@ -28,6 +30,10 @@ post:
       headers:
         Set-Cookie:
           $ref: ../../components/headers/set-cookie-flow.yaml
+        X-Zitadel-Environment:
+          $ref: ../../components/headers/x-zitadel-environment.yaml
+        X-Zitadel-Release:
+          $ref: ../../components/headers/x-zitadel-release.yaml
       content:
         application/json:
           schema:

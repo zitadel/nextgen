@@ -93,6 +93,21 @@ func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDep
 	return r, ht.ErrNotImplemented
 }
 
+// CreateEnvironment implements createEnvironment operation.
+//
+// Creates a preview environment, or renews the one already carrying this
+// name: its expiry moves to now plus `ttl` and its origins are replaced.
+// `zitadel preview` calls this before every deployment to a preview, so
+// the preview is upserted rather than created once.
+// A preview shares every piece of the project's data with `live`. It only
+// differs in which release it runs, and in which request origins resolve
+// to it.
+//
+// POST /environments
+func (UnimplementedHandler) CreateEnvironment(ctx context.Context, req *CreateEnvironmentRequest, params CreateEnvironmentParams) (r CreateEnvironmentRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateFlow implements createFlow operation.
 //
 // Resolves a flow definition based on purpose + audience context and returns
@@ -106,7 +121,7 @@ func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDep
 // cookie. The browser sends it automatically on subsequent requests.
 //
 // POST /flow
-func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowRequest) (r CreateFlowRes, _ error) {
+func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowRequest, params CreateFlowParams) (r CreateFlowRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -623,7 +638,8 @@ func (UnimplementedHandler) ListDeployments(ctx context.Context, params ListDepl
 
 // ListEnvironments implements listEnvironments operation.
 //
-// Lists the project's environments ordered by name.
+// Lists the project's environments ordered by name: `live` plus every
+// preview, expired ones included until garbage collection removes them.
 //
 // GET /environments
 func (UnimplementedHandler) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (r ListEnvironmentsRes, _ error) {

@@ -2,7 +2,8 @@ get:
   operationId: listEnvironments
   summary: List environments
   description: |
-    Lists the project's environments ordered by name.
+    Lists the project's environments ordered by name: `live` plus every
+    preview, expired ones included until garbage collection removes them.
   tags:
     - Environments
   parameters:
@@ -21,3 +22,51 @@ get:
             $ref: list-environments-response.yaml
     default:
       $ref: listEnvironments-error-response.yaml
+post:
+  operationId: createEnvironment
+  summary: Create or renew a preview environment
+  description: |
+    Creates a preview environment, or renews the one already carrying this
+    name: its expiry moves to now plus `ttl` and its origins are replaced.
+    `zitadel preview` calls this before every deployment to a preview, so
+    the preview is upserted rather than created once.
+
+    A preview shares every piece of the project's data with `live`. It only
+    differs in which release it runs, and in which request origins resolve
+    to it.
+  tags:
+    - Environments
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - environment.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-environment-request.yaml
+        examples:
+          pullRequest:
+            summary: A preview for pull request 42
+            value:
+              name: preview-pr-42
+              ttl: 7d
+              origins:
+                - https://my-app-git-feat-sso-acme.vercel.app
+  responses:
+    '201':
+      description: The preview environment was created.
+      content:
+        application/json:
+          schema:
+            $ref: environment.yaml
+    '200':
+      description: A preview with this name already existed and was renewed.
+      content:
+        application/json:
+          schema:
+            $ref: environment.yaml
+    default:
+      $ref: createEnvironment-error-response.yaml

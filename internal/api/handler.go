@@ -39,6 +39,9 @@ type Handler struct {
 	// personalTeams is optional (see WithPersonalTeamEnsurer); nil skips the
 	// exchange-time ensure.
 	personalTeams service.PersonalTeamEnsurer
+	// runtimeResolver is optional (see WithRuntimeResolver); nil skips
+	// environment and release resolution on public requests.
+	runtimeResolver *service.RuntimeResolver
 }
 
 func NewHandler(

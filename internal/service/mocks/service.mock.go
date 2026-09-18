@@ -4726,6 +4726,44 @@ func (c *MockAllStatementsPersistCatalogVersionCall) DoAndReturn(f func(context.
 	return c
 }
 
+// RenewEnvironment mocks base method.
+func (m *MockAllStatements) RenewEnvironment(ctx context.Context, entity *domain.Environment) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RenewEnvironment", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RenewEnvironment indicates an expected call of RenewEnvironment.
+func (mr *MockAllStatementsMockRecorder) RenewEnvironment(ctx, entity any) *MockAllStatementsRenewEnvironmentCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenewEnvironment", reflect.TypeOf((*MockAllStatements)(nil).RenewEnvironment), ctx, entity)
+	return &MockAllStatementsRenewEnvironmentCall{Call: call}
+}
+
+// MockAllStatementsRenewEnvironmentCall wrap *gomock.Call
+type MockAllStatementsRenewEnvironmentCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsRenewEnvironmentCall) Return(arg0 error) *MockAllStatementsRenewEnvironmentCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsRenewEnvironmentCall) Do(f func(context.Context, *domain.Environment) error) *MockAllStatementsRenewEnvironmentCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsRenewEnvironmentCall) DoAndReturn(f func(context.Context, *domain.Environment) error) *MockAllStatementsRenewEnvironmentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RevokeAuthzAssignment mocks base method.
 func (m *MockAllStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()

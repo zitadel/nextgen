@@ -13,11 +13,34 @@ const (
 const (
 	EnvironmentNameMaxLength = 63
 	EnvironmentNamePattern   = `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`
+
+	// LiveEnvironmentName is the one environment every project has: the
+	// configuration the project serves by default. Every other environment
+	// is a preview that shares the project's data and expires on its own.
+	LiveEnvironmentName = "live"
+
+	// EnvironmentMaxOrigins bounds the origins a preview environment may
+	// claim, so a request's Origin can be matched by a linear scan.
+	EnvironmentMaxOrigins = 16
 )
 
 var environmentNameRegex = regexp.MustCompile(EnvironmentNamePattern)
 
-var DefaultEnvironmentNames = []string{"dev", "staging", "prod"}
+// DefaultEnvironmentNames are the environments seeded with every project.
+// Only live: previews are created on demand by `zitadel preview`.
+var DefaultEnvironmentNames = []string{LiveEnvironmentName}
+
+// EnvironmentClass says what kind of runtime slot an environment is. Live is
+// the project's default configuration; preview is an ephemeral slot for
+// trying a release against the project's real data before it goes live.
+//
+//go:generate go tool enumer -type EnvironmentClass -transform snake -trimprefix EnvironmentClass -sql
+type EnvironmentClass uint8
+
+const (
+	EnvironmentClassLive EnvironmentClass = iota
+	EnvironmentClassPreview
+)
 
 func ErrEnvironmentNameInvalid() Error {
 	return newError(
@@ -27,8 +50,19 @@ func ErrEnvironmentNameInvalid() Error {
 	)
 }
 
+func ErrEnvironmentInvalid(details any) Error {
+	return newError(PrefixEnvironment.ErrorCodePrefix("invalid"), "environment: invalid", details, nil)
+}
+
 func ErrEnvironmentNotFound() Error {
 	return newError(PrefixEnvironment.ErrorCodePrefix("not_found"), "environment not found", nil, nil)
+}
+
+// ErrEnvironmentExpired reports a preview environment whose expires_at has
+// passed. It still exists until garbage collection removes it, but nothing
+// resolves to it any more.
+func ErrEnvironmentExpired() Error {
+	return newError(PrefixEnvironment.ErrorCodePrefix("expired"), "the preview environment has expired", nil, nil)
 }
 
 func ErrEnvironmentProjectNotFound() Error {
@@ -43,6 +77,14 @@ type Environment struct {
 	ProjectID string
 	ID        string
 	Name      string
+	Class     EnvironmentClass
+	// ExpiresAt is set on preview environments only. Renewed on every
+	// deploy to the environment; nil means the environment never expires.
+	ExpiresAt *time.Time
+	// Origins are the request origins that resolve to this environment.
+	// A request whose Origin matches none of any preview's origins is served
+	// by live, so live itself carries no origins.
+	Origins   []string
 	CreatedAt time.Time
 	// CurrentDeploymentID points at the deployment this environment runs,
 	// nil until something is deployed. Written only by CreateDeployment, in
@@ -50,6 +92,7 @@ type Environment struct {
 	CurrentDeploymentID *string
 }
 
+// NewEnvironment builds a live-class environment.
 func NewEnvironment(projectID, name string) (*Environment, error) {
 	name, err := ValidateEnvironmentName(name)
 	if err != nil {
@@ -58,7 +101,52 @@ func NewEnvironment(projectID, name string) (*Environment, error) {
 	return &Environment{
 		ProjectID: projectID,
 		Name:      name,
+		Class:     EnvironmentClassLive,
 	}, nil
+}
+
+// NewPreviewEnvironment builds a preview-class environment that expires at
+// expiresAt and serves requests arriving from origins.
+func NewPreviewEnvironment(projectID, name string, expiresAt time.Time, origins []string) (*Environment, error) {
+	name, err := ValidateEnvironmentName(name)
+	if err != nil {
+		return nil, err
+	}
+	if name == LiveEnvironmentName {
+		return nil, ErrEnvironmentInvalid("the live environment cannot be a preview")
+	}
+	if expiresAt.IsZero() {
+		return nil, ErrEnvironmentInvalid("a preview environment needs expires_at")
+	}
+	normalized, err := ValidateEnvironmentOrigins(origins)
+	if err != nil {
+		return nil, err
+	}
+	return &Environment{
+		ProjectID: projectID,
+		Name:      name,
+		Class:     EnvironmentClassPreview,
+		ExpiresAt: &expiresAt,
+		Origins:   normalized,
+	}, nil
+}
+
+// Expired reports whether a preview environment's expires_at has passed.
+// Live never expires.
+func (e *Environment) Expired(now time.Time) bool {
+	return e.ExpiresAt != nil && !now.Before(*e.ExpiresAt)
+}
+
+// ServesOrigin reports whether origin is one of the environment's origins.
+// Origins are stored lowercased, so the comparison lowercases the input.
+func (e *Environment) ServesOrigin(origin string) bool {
+	origin = strings.ToLower(strings.TrimSpace(origin))
+	for _, candidate := range e.Origins {
+		if candidate == origin {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateEnvironmentName returns the trimmed name, or
@@ -71,6 +159,40 @@ func ValidateEnvironmentName(name string) (string, error) {
 	return name, nil
 }
 
+// ValidateEnvironmentOrigins trims, lowercases and deduplicates origins, and
+// rejects anything that is not a bare scheme://host[:port].
+func ValidateEnvironmentOrigins(origins []string) ([]string, error) {
+	if len(origins) > EnvironmentMaxOrigins {
+		return nil, ErrEnvironmentInvalid("too many origins")
+	}
+	out := make([]string, 0, len(origins))
+	seen := make(map[string]bool, len(origins))
+	for _, raw := range origins {
+		origin := strings.ToLower(strings.TrimSpace(raw))
+		if origin == "" {
+			continue
+		}
+		var host string
+		switch {
+		case strings.HasPrefix(origin, "https://"):
+			host = strings.TrimPrefix(origin, "https://")
+		case strings.HasPrefix(origin, "http://"):
+			host = strings.TrimPrefix(origin, "http://")
+		default:
+			return nil, ErrEnvironmentInvalid("origin must start with http:// or https://: " + origin)
+		}
+		if host == "" || strings.ContainsAny(host, "/?#") {
+			return nil, ErrEnvironmentInvalid("origin must be scheme://host[:port]: " + origin)
+		}
+		if seen[origin] {
+			continue
+		}
+		seen[origin] = true
+		out = append(out, origin)
+	}
+	return out, nil
+}
+
 type EnvironmentField uint8
 
 const (
@@ -78,6 +200,8 @@ const (
 	EnvironmentFieldProjectID
 	EnvironmentFieldID
 	EnvironmentFieldName
+	EnvironmentFieldClass
+	EnvironmentFieldExpiresAt
 	EnvironmentFieldCreatedAt
 	EnvironmentFieldCurrentDeploymentID
 )

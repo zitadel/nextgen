@@ -322,6 +322,149 @@ func decodeCreateDeploymentParams(args [0]string, argsEscaped bool, r *http.Requ
 	return params, nil
 }
 
+// CreateEnvironmentParams is parameters of createEnvironment operation.
+type CreateEnvironmentParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+}
+
+func unpackCreateEnvironmentParams(packed middleware.Parameters) (params CreateEnvironmentParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	return params
+}
+
+func decodeCreateEnvironmentParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateEnvironmentParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// CreateFlowParams is parameters of createFlow operation.
+type CreateFlowParams struct {
+	// Pins the configuration release that serves this request. Omitted or
+	// `latest` means the release the resolved environment currently runs. An
+	// explicit release id must belong to the project and have a deployment on
+	// the resolved environment, otherwise the request is rejected.
+	// The environment itself is never selected by the client: it follows from
+	// the request's `Origin` (a preview environment claims its origins; `live`
+	// serves the rest). A frontend preview deployment built against a specific
+	// configuration release sends that id here so the two roll out together.
+	XZitadelRelease OptString `json:",omitempty,omitzero"`
+}
+
+func unpackCreateFlowParams(packed middleware.Parameters) (params CreateFlowParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Zitadel-Release",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.XZitadelRelease = v.(OptString)
+		}
+	}
+	return params
+}
+
+func decodeCreateFlowParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateFlowParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode header: X-Zitadel-Release.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Zitadel-Release",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotXZitadelReleaseVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotXZitadelReleaseVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.XZitadelRelease.SetTo(paramsDotXZitadelReleaseVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Zitadel-Release",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // CreateGrantParams is parameters of createGrant operation.
 type CreateGrantParams struct {
 	// The unique identifier of the project.

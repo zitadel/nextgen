@@ -1,0 +1,9 @@
+type: string
+enum:
+  - live
+  - preview
+example: preview
+description: |
+  What kind of runtime slot an environment is. `live` is the one default
+  environment every project has; `preview` is an ephemeral environment that
+  shares the project's data and expires on its own.

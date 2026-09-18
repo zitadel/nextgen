@@ -132,6 +132,9 @@ type JSONSchemaStatements interface {
 type EnvironmentStatements interface {
 	Statements
 	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
+	// RenewEnvironment rewrites a preview environment's expires_at and
+	// origins. Answers database.NoRowFoundError for an unknown environment.
+	RenewEnvironment(ctx context.Context, entity *domain.Environment) error
 	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
 	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
 }

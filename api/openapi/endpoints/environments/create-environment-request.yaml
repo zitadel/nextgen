@@ -1,0 +1,35 @@
+type: object
+description: |
+  A preview environment to create, or to renew when one with this name
+  already exists. Only previews can be created: `live` exists from the moment
+  the project does.
+required:
+  - name
+properties:
+  name:
+    description: |
+      The preview's handle. `zitadel preview` derives it from the branch or
+      pull request (`preview-pr-42`). Creating a name that already exists
+      renews that preview instead of failing.
+    $ref: ../../components/schemas/environment-name.yaml
+  class:
+    description: Only `preview` is accepted; omitted means `preview`.
+    $ref: ../../components/schemas/environment-class.yaml
+  ttl:
+    type: string
+    description: |
+      How long the preview lives from now, as a Go duration (`168h`) or a
+      day count (`7d`). Omitted means 7 days; the maximum is 30 days.
+      Renewed on every create call, so a preview in use never expires.
+    example: 7d
+  origins:
+    type: array
+    maxItems: 16
+    description: |
+      The request origins (`scheme://host[:port]`) this preview serves. A
+      request whose `Origin` matches one of them resolves to this preview
+      instead of `live`. Replaced wholesale on renew.
+    items:
+      type: string
+    example:
+      - https://my-app-git-feat-sso-acme.vercel.app

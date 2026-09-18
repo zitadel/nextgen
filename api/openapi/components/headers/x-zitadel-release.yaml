@@ -1,0 +1,8 @@
+description: |
+  The id of the configuration release that served this request: the one
+  pinned by `X-Zitadel-Release`, else the environment's current deployment.
+  Absent when the environment has nothing deployed yet and the newest
+  revisions served the request.
+schema:
+  type: string
+  example: rel_01KX3RG8A7F0N9WD3P2E4YM5C1

@@ -67,7 +67,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			service.NewGrantService(h.EnsureServiceDB(t), service.StatementsUserRefResolver{Pool: h.EnsureServiceDB(t)}, platform.ID),
 			h.EnsureServiceDB(t),
 			platform.ID,
-		)
+		).WithRuntimeResolver(service.NewRuntimeResolver(h.EnsureServiceDB(t)))
 	}
 	return h.handler.value
 }

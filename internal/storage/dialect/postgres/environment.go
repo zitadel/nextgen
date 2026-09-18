@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	createEnvironmentStmt = `INSERT INTO zitadel_nextgen.environments (project_id, id, name) VALUES ($1, $2, $3) RETURNING created_at`
-	environmentQuery      = `SELECT project_id, id, name, created_at, current_deployment_id FROM zitadel_nextgen.environments`
+	createEnvironmentStmt = `INSERT INTO zitadel_nextgen.environments (project_id, id, name, class, expires_at, origins)` +
+		` VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`
+	renewEnvironmentStmt = `UPDATE zitadel_nextgen.environments SET expires_at = $3, origins = $4 WHERE project_id = $1 AND id = $2`
+	environmentQuery     = `SELECT project_id, id, name, class, expires_at, origins, created_at, current_deployment_id FROM zitadel_nextgen.environments`
 )
 
 type environmentStatements struct{ statement }
@@ -28,14 +30,35 @@ func (es environmentStatements) CreateEnvironment(ctx context.Context, entity *d
 	if err := ensureManagedID(&entity.ID, domain.PrefixEnvironment); err != nil {
 		return err
 	}
+	origins, err := environment.MarshalOrigins(entity.Origins)
+	if err != nil {
+		return err
+	}
 	return withTransaction(ctx, es.client, func(ctx context.Context, tx queryExecutor) error {
-		if err := tx.QueryRow(ctx, createEnvironmentStmt, entity.ProjectID, entity.ID, entity.Name).
+		if err := tx.QueryRow(ctx, createEnvironmentStmt,
+			entity.ProjectID, entity.ID, entity.Name, entity.Class.String(), entity.ExpiresAt, nullJSONBytes(origins)).
 			Scan(&entity.CreatedAt); err != nil {
 			return wrapError(err)
 		}
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindEnvironment, entity.ProjectID, entity.ID))
 	})
+}
+
+// RenewEnvironment implements [service.EnvironmentStatements].
+func (es environmentStatements) RenewEnvironment(ctx context.Context, entity *domain.Environment) error {
+	origins, err := environment.MarshalOrigins(entity.Origins)
+	if err != nil {
+		return err
+	}
+	tag, err := es.client.Exec(ctx, renewEnvironmentStmt, entity.ProjectID, entity.ID, entity.ExpiresAt, nullJSONBytes(origins))
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return new(database.NoRowFoundError)
+	}
+	return nil
 }
 
 // GetEnvironmentByName implements [service.EnvironmentStatements].
@@ -89,11 +112,34 @@ func (es environmentStatements) ListEnvironments(ctx context.Context, filter *da
 }
 
 func (es environmentStatements) scanEnvironment(row pgx.CollectableRow) (*domain.Environment, error) {
-	entity := new(domain.Environment)
-	if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Name, &entity.CreatedAt, &entity.CurrentDeploymentID); err != nil {
+	var (
+		entity  domain.Environment
+		class   string
+		origins []byte
+	)
+	if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Name, &class, &entity.ExpiresAt, &origins, &entity.CreatedAt, &entity.CurrentDeploymentID); err != nil {
 		return nil, err
 	}
-	return entity, nil
+	parsedClass, err := domain.EnvironmentClassString(class)
+	if err != nil {
+		return nil, err
+	}
+	entity.Class = parsedClass
+	parsedOrigins, err := environment.UnmarshalOrigins(origins)
+	if err != nil {
+		return nil, err
+	}
+	entity.Origins = parsedOrigins
+	return &entity, nil
+}
+
+// nullJSONBytes stores an absent JSON document as NULL rather than an empty
+// (and invalid) jsonb literal.
+func nullJSONBytes(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
 }
 
 var _ service.EnvironmentStatements = (*environmentStatements)(nil)

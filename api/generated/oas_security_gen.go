@@ -87,6 +87,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateDeploymentOperation: []string{
 		"deployment.write",
 	},
+	CreateEnvironmentOperation: []string{
+		"environment.write",
+	},
 	CreateFlowDefinitionOperation: []string{
 		"flow_definition.write",
 	},

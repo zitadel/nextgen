@@ -8810,6 +8810,199 @@ func (s *CreateDeploymentRequest) SetExpectedCurrentDeploymentID(val OptNilDeplo
 	s.ExpectedCurrentDeploymentID = val
 }
 
+type CreateEnvironmentCreated Environment
+
+func (*CreateEnvironmentCreated) createEnvironmentRes() {}
+
+// CreateEnvironmentErrorResponse represents sum type.
+type CreateEnvironmentErrorResponse struct {
+	Type             CreateEnvironmentErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// CreateEnvironmentErrorResponseType is oneOf type of CreateEnvironmentErrorResponse.
+type CreateEnvironmentErrorResponseType string
+
+// Possible values for CreateEnvironmentErrorResponseType.
+const (
+	AuthUnauthorizedCreateEnvironmentErrorResponse CreateEnvironmentErrorResponseType = "auth.unauthorized"
+	InternalCreateEnvironmentErrorResponse         CreateEnvironmentErrorResponseType = "internal"
+	ReqInvalidCreateEnvironmentErrorResponse       CreateEnvironmentErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether CreateEnvironmentErrorResponse is AuthUnauthorized.
+func (s CreateEnvironmentErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateEnvironmentErrorResponse
+}
+
+// IsInternal reports whether CreateEnvironmentErrorResponse is Internal.
+func (s CreateEnvironmentErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateEnvironmentErrorResponse
+}
+
+// IsReqInvalid reports whether CreateEnvironmentErrorResponse is ReqInvalid.
+func (s CreateEnvironmentErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateEnvironmentErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateEnvironmentErrorResponse to AuthUnauthorized.
+func (s *CreateEnvironmentErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateEnvironmentErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateEnvironmentErrorResponse is AuthUnauthorized.
+func (s CreateEnvironmentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateEnvironmentErrorResponse(v AuthUnauthorized) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateEnvironmentErrorResponse to Internal.
+func (s *CreateEnvironmentErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateEnvironmentErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateEnvironmentErrorResponse is Internal.
+func (s CreateEnvironmentErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from Internal.
+func NewInternalCreateEnvironmentErrorResponse(v Internal) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets CreateEnvironmentErrorResponse to ReqInvalid.
+func (s *CreateEnvironmentErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateEnvironmentErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateEnvironmentErrorResponse is ReqInvalid.
+func (s CreateEnvironmentErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from ReqInvalid.
+func NewReqInvalidCreateEnvironmentErrorResponse(v ReqInvalid) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateEnvironmentErrorResponseStatusCode wraps CreateEnvironmentErrorResponse with StatusCode.
+type CreateEnvironmentErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateEnvironmentErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateEnvironmentErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateEnvironmentErrorResponseStatusCode) GetResponse() CreateEnvironmentErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateEnvironmentErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateEnvironmentErrorResponseStatusCode) SetResponse(val CreateEnvironmentErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateEnvironmentErrorResponseStatusCode) createEnvironmentRes() {}
+
+type CreateEnvironmentOK Environment
+
+func (*CreateEnvironmentOK) createEnvironmentRes() {}
+
+// A preview environment to create, or to renew when one with this name
+// already exists. Only previews can be created: `live` exists from the moment
+// the project does.
+// Ref: #
+type CreateEnvironmentRequest struct {
+	// The preview's handle. `zitadel preview` derives it from the branch or
+	// pull request (`preview-pr-42`). Creating a name that already exists
+	// renews that preview instead of failing.
+	Name EnvironmentName `json:"name"`
+	// Only `preview` is accepted; omitted means `preview`.
+	Class OptEnvironmentClass `json:"class"`
+	// How long the preview lives from now, as a Go duration (`168h`) or a
+	// day count (`7d`). Omitted means 7 days; the maximum is 30 days.
+	// Renewed on every create call, so a preview in use never expires.
+	TTL OptString `json:"ttl"`
+	// The request origins (`scheme://host[:port]`) this preview serves. A
+	// request whose `Origin` matches one of them resolves to this preview
+	// instead of `live`. Replaced wholesale on renew.
+	Origins []string `json:"origins"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateEnvironmentRequest) GetName() EnvironmentName {
+	return s.Name
+}
+
+// GetClass returns the value of Class.
+func (s *CreateEnvironmentRequest) GetClass() OptEnvironmentClass {
+	return s.Class
+}
+
+// GetTTL returns the value of TTL.
+func (s *CreateEnvironmentRequest) GetTTL() OptString {
+	return s.TTL
+}
+
+// GetOrigins returns the value of Origins.
+func (s *CreateEnvironmentRequest) GetOrigins() []string {
+	return s.Origins
+}
+
+// SetName sets the value of Name.
+func (s *CreateEnvironmentRequest) SetName(val EnvironmentName) {
+	s.Name = val
+}
+
+// SetClass sets the value of Class.
+func (s *CreateEnvironmentRequest) SetClass(val OptEnvironmentClass) {
+	s.Class = val
+}
+
+// SetTTL sets the value of TTL.
+func (s *CreateEnvironmentRequest) SetTTL(val OptString) {
+	s.TTL = val
+}
+
+// SetOrigins sets the value of Origins.
+func (s *CreateEnvironmentRequest) SetOrigins(val []string) {
+	s.Origins = val
+}
+
 // CreateFlowDefinitionErrorResponse represents sum type.
 type CreateFlowDefinitionErrorResponse struct {
 	Type                     CreateFlowDefinitionErrorResponseType // switch on this field
@@ -14696,18 +14889,29 @@ func (s *EnvProjectNotFoundDetails) init() EnvProjectNotFoundDetails {
 }
 
 // A runtime slot on a project (ADR 035).
-// Identity plus what runs there: `current_deployment` names the release the
-// environment currently runs. The deployment history lives at
-// `GET /deployments`; environment lifecycle (create, rename, retire) arrives
-// with its own ADR. Until then every project is seeded with a fixed set of
-// environments at creation and the set cannot be changed.
+// Every project has exactly one `live` environment: the configuration the
+// project serves by default. Any other environment is a `preview` — an
+// ephemeral slot that shares all of the project's data (users, sessions,
+// credentials) and only differs in which release it runs. A request is
+// served by the preview whose `origins` contain the request's `Origin`, and
+// by `live` when none matches.
+// `current_deployment` names the release the environment currently runs. The
+// deployment history lives at `GET /deployments`.
 // Ref: #
 type Environment struct {
 	// The opaque, immutable resource id.
 	ID string `json:"id"`
 	// The project this environment is a runtime slot of.
-	ProjectID ProjectID       `json:"project_id"`
-	Name      EnvironmentName `json:"name"`
+	ProjectID ProjectID        `json:"project_id"`
+	Name      EnvironmentName  `json:"name"`
+	Class     EnvironmentClass `json:"class"`
+	// When a preview environment stops resolving requests and becomes
+	// eligible for garbage collection. Renewed on every deploy to it. `null`
+	// on `live`, which never expires.
+	ExpiresAt NilDateTime `json:"expires_at"`
+	// The request origins (`scheme://host[:port]`, lowercased) served by this
+	// environment. Empty on `live`: it serves every origin no preview claims.
+	Origins []string `json:"origins"`
 	// When the environment was created.
 	CreatedAt time.Time `json:"created_at"`
 	// The deployment this environment currently runs, or `null` while nothing
@@ -14728,6 +14932,21 @@ func (s *Environment) GetProjectID() ProjectID {
 // GetName returns the value of Name.
 func (s *Environment) GetName() EnvironmentName {
 	return s.Name
+}
+
+// GetClass returns the value of Class.
+func (s *Environment) GetClass() EnvironmentClass {
+	return s.Class
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *Environment) GetExpiresAt() NilDateTime {
+	return s.ExpiresAt
+}
+
+// GetOrigins returns the value of Origins.
+func (s *Environment) GetOrigins() []string {
+	return s.Origins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -14755,6 +14974,21 @@ func (s *Environment) SetName(val EnvironmentName) {
 	s.Name = val
 }
 
+// SetClass sets the value of Class.
+func (s *Environment) SetClass(val EnvironmentClass) {
+	s.Class = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *Environment) SetExpiresAt(val NilDateTime) {
+	s.ExpiresAt = val
+}
+
+// SetOrigins sets the value of Origins.
+func (s *Environment) SetOrigins(val []string) {
+	s.Origins = val
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *Environment) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -14766,6 +15000,51 @@ func (s *Environment) SetCurrentDeployment(val NilCurrentDeployment) {
 }
 
 func (*Environment) getEnvironmentByNameRes() {}
+
+// What kind of runtime slot an environment is. `live` is the one default
+// environment every project has; `preview` is an ephemeral environment that
+// shares the project's data and expires on its own.
+// Ref: #
+type EnvironmentClass string
+
+const (
+	EnvironmentClassLive    EnvironmentClass = "live"
+	EnvironmentClassPreview EnvironmentClass = "preview"
+)
+
+// AllValues returns all EnvironmentClass values.
+func (EnvironmentClass) AllValues() []EnvironmentClass {
+	return []EnvironmentClass{
+		EnvironmentClassLive,
+		EnvironmentClassPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EnvironmentClass) MarshalText() ([]byte, error) {
+	switch s {
+	case EnvironmentClassLive:
+		return []byte(s), nil
+	case EnvironmentClassPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EnvironmentClass) UnmarshalText(data []byte) error {
+	switch EnvironmentClass(data) {
+	case EnvironmentClassLive:
+		*s = EnvironmentClassLive
+		return nil
+	case EnvironmentClassPreview:
+		*s = EnvironmentClassPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #
@@ -15213,10 +15492,11 @@ func (s *EnvironmentCreatedEventDelegationType) UnmarshalText(data []byte) error
 }
 
 // Allowlisted fields for `environment.created`. The environment id is already
-// the event's `entity_id`, so the name is the only field carried here.
+// the event's `entity_id`, so only the name and class are carried here.
 // Ref: #
 type EnvironmentCreatedPayload struct {
-	Name OptString `json:"name"`
+	Name  OptString                         `json:"name"`
+	Class OptEnvironmentCreatedPayloadClass `json:"class"`
 }
 
 // GetName returns the value of Name.
@@ -15224,9 +15504,60 @@ func (s *EnvironmentCreatedPayload) GetName() OptString {
 	return s.Name
 }
 
+// GetClass returns the value of Class.
+func (s *EnvironmentCreatedPayload) GetClass() OptEnvironmentCreatedPayloadClass {
+	return s.Class
+}
+
 // SetName sets the value of Name.
 func (s *EnvironmentCreatedPayload) SetName(val OptString) {
 	s.Name = val
+}
+
+// SetClass sets the value of Class.
+func (s *EnvironmentCreatedPayload) SetClass(val OptEnvironmentCreatedPayloadClass) {
+	s.Class = val
+}
+
+type EnvironmentCreatedPayloadClass string
+
+const (
+	EnvironmentCreatedPayloadClassLive    EnvironmentCreatedPayloadClass = "live"
+	EnvironmentCreatedPayloadClassPreview EnvironmentCreatedPayloadClass = "preview"
+)
+
+// AllValues returns all EnvironmentCreatedPayloadClass values.
+func (EnvironmentCreatedPayloadClass) AllValues() []EnvironmentCreatedPayloadClass {
+	return []EnvironmentCreatedPayloadClass{
+		EnvironmentCreatedPayloadClassLive,
+		EnvironmentCreatedPayloadClassPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EnvironmentCreatedPayloadClass) MarshalText() ([]byte, error) {
+	switch s {
+	case EnvironmentCreatedPayloadClassLive:
+		return []byte(s), nil
+	case EnvironmentCreatedPayloadClassPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EnvironmentCreatedPayloadClass) UnmarshalText(data []byte) error {
+	switch EnvironmentCreatedPayloadClass(data) {
+	case EnvironmentCreatedPayloadClassLive:
+		*s = EnvironmentCreatedPayloadClassLive
+		return nil
+	case EnvironmentCreatedPayloadClassPreview:
+		*s = EnvironmentCreatedPayloadClassPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 type EnvironmentName string
@@ -19211,13 +19542,25 @@ func (*FlowResponse) getFlowStepRes() {}
 
 // FlowResponseHeaders wraps FlowResponse with response headers.
 type FlowResponseHeaders struct {
-	SetCookie OptString
-	Response  FlowResponse
+	SetCookie           OptString
+	XZitadelEnvironment OptString
+	XZitadelRelease     OptString
+	Response            FlowResponse
 }
 
 // GetSetCookie returns the value of SetCookie.
 func (s *FlowResponseHeaders) GetSetCookie() OptString {
 	return s.SetCookie
+}
+
+// GetXZitadelEnvironment returns the value of XZitadelEnvironment.
+func (s *FlowResponseHeaders) GetXZitadelEnvironment() OptString {
+	return s.XZitadelEnvironment
+}
+
+// GetXZitadelRelease returns the value of XZitadelRelease.
+func (s *FlowResponseHeaders) GetXZitadelRelease() OptString {
+	return s.XZitadelRelease
 }
 
 // GetResponse returns the value of Response.
@@ -19228,6 +19571,16 @@ func (s *FlowResponseHeaders) GetResponse() FlowResponse {
 // SetSetCookie sets the value of SetCookie.
 func (s *FlowResponseHeaders) SetSetCookie(val OptString) {
 	s.SetCookie = val
+}
+
+// SetXZitadelEnvironment sets the value of XZitadelEnvironment.
+func (s *FlowResponseHeaders) SetXZitadelEnvironment(val OptString) {
+	s.XZitadelEnvironment = val
+}
+
+// SetXZitadelRelease sets the value of XZitadelRelease.
+func (s *FlowResponseHeaders) SetXZitadelRelease(val OptString) {
+	s.XZitadelRelease = val
 }
 
 // SetResponse sets the value of Response.
@@ -28260,6 +28613,51 @@ func (o NilCurrentDeployment) Or(d CurrentDeployment) CurrentDeployment {
 	return d
 }
 
+// NewNilDateTime returns new NilDateTime with value set to v.
+func NewNilDateTime(v time.Time) NilDateTime {
+	return NilDateTime{
+		Value: v,
+	}
+}
+
+// NilDateTime is nullable time.Time.
+type NilDateTime struct {
+	Value time.Time
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilDateTime) SetTo(v time.Time) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilDateTime) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilDateTime) SetToNull() {
+	o.Null = true
+	var v time.Time
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilDateTime) Get() (v time.Time, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // Merged schema.
 // Ref: #
 type NotImplemented struct {
@@ -30822,6 +31220,52 @@ func (o OptEnvProjectNotFoundDetails) Or(d EnvProjectNotFoundDetails) EnvProject
 	return d
 }
 
+// NewOptEnvironmentClass returns new OptEnvironmentClass with value set to v.
+func NewOptEnvironmentClass(v EnvironmentClass) OptEnvironmentClass {
+	return OptEnvironmentClass{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvironmentClass is optional EnvironmentClass.
+type OptEnvironmentClass struct {
+	Value EnvironmentClass
+	Set   bool
+}
+
+// IsSet returns true if OptEnvironmentClass was set.
+func (o OptEnvironmentClass) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvironmentClass) Reset() {
+	var v EnvironmentClass
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvironmentClass) SetTo(v EnvironmentClass) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvironmentClass) Get() (v EnvironmentClass, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvironmentClass) Or(d EnvironmentClass) EnvironmentClass {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptEnvironmentCreatedEventDelegationType returns new OptEnvironmentCreatedEventDelegationType with value set to v.
 func NewOptEnvironmentCreatedEventDelegationType(v EnvironmentCreatedEventDelegationType) OptEnvironmentCreatedEventDelegationType {
 	return OptEnvironmentCreatedEventDelegationType{
@@ -30862,6 +31306,52 @@ func (o OptEnvironmentCreatedEventDelegationType) Get() (v EnvironmentCreatedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvironmentCreatedEventDelegationType) Or(d EnvironmentCreatedEventDelegationType) EnvironmentCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvironmentCreatedPayloadClass returns new OptEnvironmentCreatedPayloadClass with value set to v.
+func NewOptEnvironmentCreatedPayloadClass(v EnvironmentCreatedPayloadClass) OptEnvironmentCreatedPayloadClass {
+	return OptEnvironmentCreatedPayloadClass{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvironmentCreatedPayloadClass is optional EnvironmentCreatedPayloadClass.
+type OptEnvironmentCreatedPayloadClass struct {
+	Value EnvironmentCreatedPayloadClass
+	Set   bool
+}
+
+// IsSet returns true if OptEnvironmentCreatedPayloadClass was set.
+func (o OptEnvironmentCreatedPayloadClass) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvironmentCreatedPayloadClass) Reset() {
+	var v EnvironmentCreatedPayloadClass
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvironmentCreatedPayloadClass) SetTo(v EnvironmentCreatedPayloadClass) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvironmentCreatedPayloadClass) Get() (v EnvironmentCreatedPayloadClass, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvironmentCreatedPayloadClass) Or(d EnvironmentCreatedPayloadClass) EnvironmentCreatedPayloadClass {
 	if v, ok := o.Get(); ok {
 		return v
 	}

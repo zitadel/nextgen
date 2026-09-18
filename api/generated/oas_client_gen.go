@@ -93,6 +93,18 @@ type Invoker interface {
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
+	// CreateEnvironment invokes createEnvironment operation.
+	//
+	// Creates a preview environment, or renews the one already carrying this
+	// name: its expiry moves to now plus `ttl` and its origins are replaced.
+	// `zitadel preview` calls this before every deployment to a preview, so
+	// the preview is upserted rather than created once.
+	// A preview shares every piece of the project's data with `live`. It only
+	// differs in which release it runs, and in which request origins resolve
+	// to it.
+	//
+	// POST /environments
+	CreateEnvironment(ctx context.Context, request *CreateEnvironmentRequest, params CreateEnvironmentParams) (CreateEnvironmentRes, error)
 	// CreateFlow invokes createFlow operation.
 	//
 	// Resolves a flow definition based on purpose + audience context and returns
@@ -106,7 +118,7 @@ type Invoker interface {
 	// cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
-	CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error)
+	CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateFlowDefinition invokes createFlowDefinition operation.
 	//
 	// Publishes a new flow definition revision.
@@ -503,7 +515,8 @@ type Invoker interface {
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
 	// ListEnvironments invokes listEnvironments operation.
 	//
-	// Lists the project's environments ordered by name.
+	// Lists the project's environments ordered by name: `live` plus every
+	// preview, expired ones included until garbage collection removes them.
 	//
 	// GET /environments
 	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
@@ -1479,6 +1492,152 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 	return result, nil
 }
 
+// CreateEnvironment invokes createEnvironment operation.
+//
+// Creates a preview environment, or renews the one already carrying this
+// name: its expiry moves to now plus `ttl` and its origins are replaced.
+// `zitadel preview` calls this before every deployment to a preview, so
+// the preview is upserted rather than created once.
+// A preview shares every piece of the project's data with `live`. It only
+// differs in which release it runs, and in which request origins resolve
+// to it.
+//
+// POST /environments
+func (c *Client) CreateEnvironment(ctx context.Context, request *CreateEnvironmentRequest, params CreateEnvironmentParams) (CreateEnvironmentRes, error) {
+	res, err := c.sendCreateEnvironment(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendCreateEnvironment(ctx context.Context, request *CreateEnvironmentRequest, params CreateEnvironmentParams) (res CreateEnvironmentRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createEnvironment"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/environments"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateEnvironmentOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/environments"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateEnvironmentRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CreateEnvironmentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateEnvironmentResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // CreateFlow invokes createFlow operation.
 //
 // Resolves a flow definition based on purpose + audience context and returns
@@ -1492,12 +1651,12 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // cookie. The browser sends it automatically on subsequent requests.
 //
 // POST /flow
-func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error) {
-	res, err := c.sendCreateFlow(ctx, request)
+func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error) {
+	res, err := c.sendCreateFlow(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest) (res CreateFlowRes, err error) {
+func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (res CreateFlowRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -1554,6 +1713,23 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 	}
 	if err := encodeCreateFlowRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Zitadel-Release",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.XZitadelRelease.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
 	}
 
 	stage = "SendRequest"
@@ -6897,7 +7073,8 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 
 // ListEnvironments invokes listEnvironments operation.
 //
-// Lists the project's environments ordered by name.
+// Lists the project's environments ordered by name: `live` plus every
+// preview, expired ones included until garbage collection removes them.
 //
 // GET /environments
 func (c *Client) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error) {

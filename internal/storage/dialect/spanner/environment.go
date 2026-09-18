@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	createEnvironmentStmt = `INSERT INTO environments (project_id, id, name) VALUES (@p1, @p2, @p3) THEN RETURN created_at`
-	environmentQuery      = `SELECT project_id, id, name, created_at, current_deployment_id FROM environments`
+	createEnvironmentStmt = `INSERT INTO environments (project_id, id, name, class, expires_at, origins)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6) THEN RETURN created_at`
+	renewEnvironmentStmt = `UPDATE environments SET expires_at = @p3, origins = @p4 WHERE project_id = @p1 AND id = @p2`
+	environmentQuery     = `SELECT project_id, id, name, class, expires_at, origins, created_at, current_deployment_id FROM environments`
 )
 
 type environmentStatements struct{ statement }
@@ -33,8 +35,17 @@ func (es environmentStatements) CreateEnvironment(ctx context.Context, entity *d
 	if err := ensureManagedID(&entity.ID, domain.PrefixEnvironment); err != nil {
 		return err
 	}
+	rawOrigins, err := environment.MarshalOrigins(entity.Origins)
+	if err != nil {
+		return err
+	}
+	origins, err := encodeNullJSON(rawOrigins)
+	if err != nil {
+		return err
+	}
 	return withTransaction(ctx, es.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createEnvironmentStmt, entity.ProjectID, entity.ID, entity.Name).statement()
+		stmt := buildStatement(createEnvironmentStmt,
+			entity.ProjectID, entity.ID, entity.Name, entity.Class.String(), spannerNullTimePtr(entity.ExpiresAt), origins).statement()
 		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 				if err := row.Columns(&entity.CreatedAt); err != nil {
@@ -49,6 +60,29 @@ func (es environmentStatements) CreateEnvironment(ctx context.Context, entity *d
 		}
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindEnvironment, entity.ProjectID, entity.ID))
+	})
+}
+
+// RenewEnvironment implements [service.EnvironmentStatements].
+func (es environmentStatements) RenewEnvironment(ctx context.Context, entity *domain.Environment) error {
+	rawOrigins, err := environment.MarshalOrigins(entity.Origins)
+	if err != nil {
+		return err
+	}
+	origins, err := encodeNullJSON(rawOrigins)
+	if err != nil {
+		return err
+	}
+	return withTransaction(ctx, es.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(renewEnvironmentStmt, entity.ProjectID, entity.ID, spannerNullTimePtr(entity.ExpiresAt), origins).statement()
+		affected, err := tx.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return new(database.NoRowFoundError)
+		}
+		return nil
 	})
 }
 
@@ -110,19 +144,48 @@ func (es environmentStatements) scanEnvironment(row *spanner.Row) (*domain.Envir
 		projectID         string
 		id                string
 		name              string
+		class             string
+		expiresAt         spanner.NullTime
+		origins           spanner.NullJSON
 		createdAt         time.Time
 		currentDeployment spanner.NullString
 	)
-	if err := row.Columns(&projectID, &id, &name, &createdAt, &currentDeployment); err != nil {
+	if err := row.Columns(&projectID, &id, &name, &class, &expiresAt, &origins, &createdAt, &currentDeployment); err != nil {
 		return nil, err
 	}
-	return &domain.Environment{
+	parsedClass, err := domain.EnvironmentClassString(class)
+	if err != nil {
+		return nil, err
+	}
+	rawOrigins, err := decodeNullJSON(origins)
+	if err != nil {
+		return nil, err
+	}
+	parsedOrigins, err := environment.UnmarshalOrigins(rawOrigins)
+	if err != nil {
+		return nil, err
+	}
+	entity := &domain.Environment{
 		ProjectID:           projectID,
 		ID:                  id,
 		Name:                name,
+		Class:               parsedClass,
+		Origins:             parsedOrigins,
 		CreatedAt:           createdAt.UTC(),
 		CurrentDeploymentID: spannerNullStringPtr(currentDeployment),
-	}, nil
+	}
+	if expiresAt.Valid {
+		t := expiresAt.Time.UTC()
+		entity.ExpiresAt = &t
+	}
+	return entity, nil
+}
+
+func spannerNullTimePtr(t *time.Time) spanner.NullTime {
+	if t == nil {
+		return spanner.NullTime{Valid: false}
+	}
+	return spanner.NullTime{Time: t.UTC(), Valid: true}
 }
 
 var _ service.EnvironmentStatements = (*environmentStatements)(nil)

@@ -162,7 +162,7 @@ func TestClaimHappyPath(t *testing.T) {
 	createResp, err := platClient.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(platform.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)

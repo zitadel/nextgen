@@ -21,6 +21,10 @@ type CreateDeploymentRes interface {
 	createDeploymentRes()
 }
 
+type CreateEnvironmentRes interface {
+	createEnvironmentRes()
+}
+
 type CreateFlowDefinitionRes interface {
 	createFlowDefinitionRes()
 }

@@ -24,11 +24,19 @@ const (
 	flowCookieMaxAgeSeconds = 600
 )
 
-func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
+func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, params api.CreateFlowParams) (api.CreateFlowRes, error) {
 	audit.BindPublicRequest(ctx, string(req.ProjectID), "", "")
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
+	}
+
+	// Which environment and release serve this request. Logged and echoed
+	// in the response headers; the flow definition itself still resolves
+	// to the newest revision until release pinning lands (#536).
+	runtime, err := h.resolveRuntime(ctx, string(req.ProjectID), params.XZitadelRelease)
+	if err != nil {
+		return nil, err
 	}
 
 	resolveReq := service.ResolveFlowRequest{
@@ -84,10 +92,17 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	}
 
 	resp := h.buildFlowResponse(ctx, result, false)
-	return &api.FlowResponseHeaders{
+	headers := &api.FlowResponseHeaders{
 		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
 		Response:  resp,
-	}, nil
+	}
+	if runtime != nil {
+		headers.XZitadelEnvironment = api.NewOptString(runtime.Environment.Name)
+		if runtime.Release != nil {
+			headers.XZitadelRelease = api.NewOptString(runtime.Release.ID)
+		}
+	}
+	return headers, nil
 }
 
 func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {

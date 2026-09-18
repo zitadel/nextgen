@@ -73,6 +73,18 @@ type Handler interface {
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
+	// CreateEnvironment implements createEnvironment operation.
+	//
+	// Creates a preview environment, or renews the one already carrying this
+	// name: its expiry moves to now plus `ttl` and its origins are replaced.
+	// `zitadel preview` calls this before every deployment to a preview, so
+	// the preview is upserted rather than created once.
+	// A preview shares every piece of the project's data with `live`. It only
+	// differs in which release it runs, and in which request origins resolve
+	// to it.
+	//
+	// POST /environments
+	CreateEnvironment(ctx context.Context, req *CreateEnvironmentRequest, params CreateEnvironmentParams) (CreateEnvironmentRes, error)
 	// CreateFlow implements createFlow operation.
 	//
 	// Resolves a flow definition based on purpose + audience context and returns
@@ -86,7 +98,7 @@ type Handler interface {
 	// cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
-	CreateFlow(ctx context.Context, req *CreateFlowRequest) (CreateFlowRes, error)
+	CreateFlow(ctx context.Context, req *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateFlowDefinition implements createFlowDefinition operation.
 	//
 	// Publishes a new flow definition revision.
@@ -483,7 +495,8 @@ type Handler interface {
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
 	// ListEnvironments implements listEnvironments operation.
 	//
-	// Lists the project's environments ordered by name.
+	// Lists the project's environments ordered by name: `live` plus every
+	// preview, expired ones included until garbage collection removes them.
 	//
 	// GET /environments
 	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)

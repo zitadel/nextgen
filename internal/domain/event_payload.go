@@ -182,7 +182,8 @@ type BrandingPayload struct {
 type BrandingCreatedPayload = BrandingPayload
 
 type EnvironmentPayload struct {
-	Name string `json:"name,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Class string `json:"class,omitempty"`
 }
 
 type EnvironmentCreatedPayload = EnvironmentPayload

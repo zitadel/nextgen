@@ -2,16 +2,23 @@ title: Environment
 description: |
   A runtime slot on a project (ADR 035).
 
-  Identity plus what runs there: `current_deployment` names the release the
-  environment currently runs. The deployment history lives at
-  `GET /deployments`; environment lifecycle (create, rename, retire) arrives
-  with its own ADR. Until then every project is seeded with a fixed set of
-  environments at creation and the set cannot be changed.
+  Every project has exactly one `live` environment: the configuration the
+  project serves by default. Any other environment is a `preview` — an
+  ephemeral slot that shares all of the project's data (users, sessions,
+  credentials) and only differs in which release it runs. A request is
+  served by the preview whose `origins` contain the request's `Origin`, and
+  by `live` when none matches.
+
+  `current_deployment` names the release the environment currently runs. The
+  deployment history lives at `GET /deployments`.
 type: object
 required:
   - id
   - project_id
   - name
+  - class
+  - expires_at
+  - origins
   - created_at
   - current_deployment
 properties:
@@ -27,6 +34,30 @@ properties:
   name:
     readOnly: true
     $ref: ../../components/schemas/environment-name.yaml
+  class:
+    readOnly: true
+    $ref: ../../components/schemas/environment-class.yaml
+  expires_at:
+    readOnly: true
+    description: |
+      When a preview environment stops resolving requests and becomes
+      eligible for garbage collection. Renewed on every deploy to it. `null`
+      on `live`, which never expires.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+    example: '2026-09-25T00:00:00Z'
+  origins:
+    readOnly: true
+    description: |
+      The request origins (`scheme://host[:port]`, lowercased) served by this
+      environment. Empty on `live`: it serves every origin no preview claims.
+    type: array
+    items:
+      type: string
+    example:
+      - https://my-app-git-feat-sso-acme.vercel.app
   created_at:
     readOnly: true
     type: string
