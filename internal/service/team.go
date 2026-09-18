@@ -278,6 +278,13 @@ func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) erro
 		if !changed {
 			return nil
 		}
+		ownsAProject, err := tx.Statements().HasActiveOwningTeamGrant(ctx, teamID)
+		if err != nil {
+			return err
+		}
+		if ownsAProject {
+			return domain.ErrTeamOwnsProject()
+		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeTeamDeactivated,
 			Category:   domain.EventCategoryAdmin,
