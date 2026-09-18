@@ -668,7 +668,7 @@ func TestCallback(t *testing.T) {
 				conn.ClaimMapping, conn.VerifiedClaims = mapping, verified
 				return conn
 			},
-			req:  CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			req:  CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
 			want: wantIdentity,
 		},
 		{
@@ -678,7 +678,7 @@ func TestCallback(t *testing.T) {
 				conn.ClaimMapping, conn.VerifiedClaims = mapping, verified
 				return conn
 			},
-			req:  CallbackRequest{Code: "the-code", Nonce: "the-nonce", ClientSecret: "the-secret"},
+			req:  CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", ClientSecret: "the-secret"},
 			want: wantIdentity,
 		},
 		{
@@ -689,7 +689,7 @@ func TestCallback(t *testing.T) {
 				conn.VerifiedClaims = map[string]VerificationSource{"email": {Kind: VerifyByStrategy}}
 				return conn
 			},
-			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
+			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
 				SupplementaryFetch: func(ctx context.Context, in StrategyInput) (StrategyResult, error) {
 					assert.Equal(t, "idprev_1", in.Connection.RevisionID)
 					assert.Equal(t, "the-access-token", in.AccessToken)
@@ -717,7 +717,7 @@ func TestCallback(t *testing.T) {
 				claims["email_verified"] = false
 				return p.ceremony(t, claims, userinfo)
 			},
-			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
+			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
 				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
 					return StrategyResult{Claims: map[string]any{"email_verified": true}}, nil
 				}},
@@ -731,7 +731,7 @@ func TestCallback(t *testing.T) {
 		{
 			name: "a strategy failure ends the attempt",
 			conn: func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
-			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
+			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
 				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
 					return StrategyResult{}, errors.New("emails: status 500")
 				}},
@@ -745,7 +745,7 @@ func TestCallback(t *testing.T) {
 				conn.SubjectClaim = "oid"
 				return conn
 			},
-			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
 			wantErr:      domain.ErrIDPSubjectInvalid(nil),
 			wantCauseMsg: "subject claim oid is absent",
 		},
@@ -758,7 +758,7 @@ func TestCallback(t *testing.T) {
 					_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
 				}
 			},
-			req:     CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			req:     CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
 			wantErr: domain.ErrIDPExchangeFailed(nil),
 		},
 		{
@@ -771,14 +771,31 @@ func TestCallback(t *testing.T) {
 			},
 			// No handler: the provider fails the test on any request.
 			handler:      func(p *provider) http.HandlerFunc { return nil },
-			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
 			wantErr:      domain.ErrInternal(nil),
 			wantCauseMsg: "callback: email is verified by the strategy, but none is passed",
 		},
 		{
+			name: "a client built with another redirect uri is a wiring error",
+			conn: func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
+			// No handler: the provider fails the test on any request.
+			handler:      func(p *provider) http.HandlerFunc { return nil },
+			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: "https://other.example.test/callback", RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			wantErr:      domain.ErrInternal(nil),
+			wantCauseMsg: "callback: client redirect uri differs from the one in the authorize request",
+		},
+		{
+			name:         "a client built from another revision is a wiring error",
+			conn:         func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
+			handler:      func(p *provider) http.HandlerFunc { return nil },
+			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_2", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			wantErr:      domain.ErrInternal(nil),
+			wantCauseMsg: "callback: client revision differs from the one in the authorize request",
+		},
+		{
 			name:         "an empty code is a wiring error",
 			conn:         func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
-			req:          CallbackRequest{Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
+			req:          CallbackRequest{Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
 			wantErr:      domain.ErrInternal(nil),
 			wantCauseMsg: "callback: code is empty",
 		},
@@ -938,7 +955,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		email    = "planted@example.test"
 		query    = "tenant=planted-query"
 	)
-	req := CallbackRequest{Code: code, Nonce: "the-nonce", PKCEVerifier: verifier, ClientSecret: secret}
+	req := CallbackRequest{Code: code, Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: verifier, ClientSecret: secret}
 	tokenResponse := func(t *testing.T, p *provider, w http.ResponseWriter, claims map[string]any) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{"access_token":%q,"token_type":"bearer","id_token":%q}`, access, sign(t, p.key, jose.RS256, "k1", claims))

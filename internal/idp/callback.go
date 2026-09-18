@@ -30,10 +30,15 @@ const iatTolerance = time.Minute
 type CallbackRequest struct {
 	// Code is the authorization code from the provider's redirect.
 	Code string
-	// Nonce and PKCEVerifier are what the state record stored at authorize.
-	// PKCEVerifier is empty when the connection disables PKCE.
+	// Nonce, PKCEVerifier, RedirectURI, and RevisionID are what the state
+	// record stored at authorize. PKCEVerifier is empty when the
+	// connection disables PKCE. The client must be built from the same
+	// redirect URI and revision, so the exchange is pinned to the
+	// authorize request the provider saw.
 	Nonce        string
 	PKCEVerifier string
+	RedirectURI  string
+	RevisionID   string
 	// ClientSecret is the resolved value of the connection's reference,
 	// for this call only.
 	ClientSecret string
@@ -91,6 +96,12 @@ type StrategyResult struct {
 func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (ExternalIdentity, error) {
 	if req.Code == "" {
 		return ExternalIdentity{}, domain.ErrInternal(errors.New("callback: code is empty"))
+	}
+	if req.RedirectURI != c.redirectURI {
+		return ExternalIdentity{}, domain.ErrInternal(errors.New("callback: client redirect uri differs from the one in the authorize request"))
+	}
+	if req.RevisionID != c.conn.RevisionID {
+		return ExternalIdentity{}, domain.ErrInternal(errors.New("callback: client revision differs from the one in the authorize request"))
 	}
 	if err := requireStrategy(c.conn, req.SupplementaryFetch); err != nil {
 		return ExternalIdentity{}, err
