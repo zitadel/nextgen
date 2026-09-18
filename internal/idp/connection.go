@@ -76,6 +76,9 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 	if err := requireTLS(oidc); err != nil {
 		return Connection{}, err
 	}
+	if err := requireAllOrNoEndpoints(oidc); err != nil {
+		return Connection{}, err
+	}
 
 	conn := Connection{
 		RevisionID:   revisionID,
@@ -127,6 +130,31 @@ func requireTLS(oidc *oidcBody) error {
 		return domain.ErrIDPEndpointCleartext("userinfo_endpoint")
 	}
 	return nil
+}
+
+// requireAllOrNoEndpoints enforces the two supported shapes:
+// 1. no endpoint set: fetched from the discovery document.
+// 2. every endpoint the connection needs is set: requires no discovery.
+func requireAllOrNoEndpoints(oidc *oidcBody) error {
+	endpoints := map[string]string{
+		"authorization_endpoint": oidc.AuthorizationEndpoint,
+		"token_endpoint":         oidc.TokenEndpoint,
+		"jwks_uri":               oidc.JWKSURI,
+	}
+	if !oidc.IDTokenMapping {
+		endpoints["userinfo_endpoint"] = oidc.UserinfoEndpoint
+	}
+	var missing []string
+	for name, value := range endpoints {
+		if value == "" {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 || len(missing) == len(endpoints) {
+		return nil
+	}
+	slices.Sort(missing)
+	return domain.ErrIDPEndpointsPartial(missing)
 }
 
 // validEndpoint reports whether an endpoint is unset or matches the schema

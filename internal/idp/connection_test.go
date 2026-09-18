@@ -95,7 +95,10 @@ func TestParseConnection(t *testing.T) {
 				"display_name": "Local",
 				"oidc": {
 					"issuer": "http://localhost:8080",
+					"authorization_endpoint": "http://localhost:8080/authorize",
 					"token_endpoint": "http://127.0.0.1:8080/token",
+					"userinfo_endpoint": "http://localhost:8080/userinfo",
+					"jwks_uri": "http://localhost:8080/keys",
 					"client_id": "client",
 					"client_secret": "${{ LOCAL_SECRET }}",
 					"scopes": ["openid"]
@@ -111,7 +114,10 @@ func TestParseConnection(t *testing.T) {
 					TokenEndpointAuthMethod: ClientSecretBasic,
 					Scopes:                  []string{"openid"},
 					PKCEEnabled:             true,
+					AuthorizationEndpoint:   "http://localhost:8080/authorize",
 					TokenEndpoint:           "http://127.0.0.1:8080/token",
+					UserinfoEndpoint:        "http://localhost:8080/userinfo",
+					JWKSURI:                 "http://localhost:8080/keys",
 				},
 			},
 		},
@@ -172,6 +178,57 @@ func TestParseConnection(t *testing.T) {
 			}`,
 			wantErr:      new(domain.ErrIDPEndpointCleartext("issuer")),
 			wantCauseMsg: "issuer is not https",
+		},
+		{
+			name: "a partial endpoint set is rejected",
+			body: `{
+				"slug": "google",
+				"protocol": "oidc",
+				"display_name": "Google",
+				"oidc": {
+					"issuer": "https://accounts.example.test",
+					"jwks_uri": "https://accounts.example.test/keys",
+					"client_id": "client",
+					"client_secret": "${{ GOOGLE_SECRET }}",
+					"scopes": ["openid"]
+				}
+			}`,
+			wantErr:      new(domain.ErrIDPEndpointsPartial([]string{"authorization_endpoint", "token_endpoint", "userinfo_endpoint"})),
+			wantCauseMsg: "missing endpoints: authorization_endpoint, token_endpoint, userinfo_endpoint",
+		},
+		{
+			name: "id_token mapping needs no userinfo endpoint in a full set",
+			body: `{
+				"slug": "custom",
+				"protocol": "oidc",
+				"display_name": "Custom",
+				"oidc": {
+					"issuer": "https://idp.example.test",
+					"id_token_mapping": true,
+					"authorization_endpoint": "https://idp.example.test/authorize",
+					"token_endpoint": "https://idp.example.test/token",
+					"jwks_uri": "https://idp.example.test/keys",
+					"client_id": "client",
+					"client_secret": "${{ CUSTOM_SECRET }}",
+					"scopes": ["openid"]
+				}
+			}`,
+			want: Connection{
+				RevisionID:   "idprev_1",
+				SubjectClaim: "sub",
+				OIDC: OIDCConnection{
+					Issuer:                  "https://idp.example.test",
+					ClientID:                "client",
+					ClientSecretRef:         "${{ CUSTOM_SECRET }}",
+					TokenEndpointAuthMethod: ClientSecretBasic,
+					Scopes:                  []string{"openid"},
+					PKCEEnabled:             true,
+					AuthorizationEndpoint:   "https://idp.example.test/authorize",
+					TokenEndpoint:           "https://idp.example.test/token",
+					JWKSURI:                 "https://idp.example.test/keys",
+					IDTokenMapping:          true,
+				},
+			},
 		},
 		{
 			name: "an oauth2 body is refused",

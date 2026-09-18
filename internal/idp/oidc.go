@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/zitadel/oidc/v3/pkg/client"
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
 	"golang.org/x/oauth2"
 
@@ -29,8 +28,9 @@ func SigningAlgorithms() []string {
 }
 
 // OIDCConnection is the engine's view of the OIDC block of a connection
-// revision. Each endpoint field overrides the discovered one; empty means it
-// comes from the issuer's discovery document.
+// revision. The endpoint fields are all set or all empty:
+//   - set: no discovery call needed.
+//   - empty: fetch the endpoints from the discovery document.
 type OIDCConnection struct {
 	Issuer   string
 	ClientID string
@@ -62,115 +62,35 @@ const (
 	ClientSecretPost  TokenEndpointAuthMethod = "client_secret_post"
 )
 
-// Endpoints is the resolved set the ceremony uses. Userinfo is empty when
-// the connection maps claims from the id_token.
-type Endpoints struct {
-	Authorization string
-	Token         string
-	Userinfo      string
-	JWKS          string
-}
-
 // OIDCClient is a relying party built for one attempt against one connection
 // revision.
 type OIDCClient struct {
 	conn        Connection
 	redirectURI string
 	party       rp.RelyingParty
-	endpoints   Endpoints
+	verifier    *rp.IDTokenVerifier
+	// userinfo is recorded here because the static constructor has no
+	// place for it. Empty under id_token_mapping.
+	userinfo string
 }
 
-// NewOIDCClient resolves every endpoint the ceremony needs and builds the
-// relying party over them. Both the `authorize` and the `callback` step use it,
-// so a misconfiguration surfaces before the user is redirected rather than
-// after they are authenticated at the provider. Discovery is fetched once, only
-// when an override is missing, so a fully overridden connection makes no
-// request. httpClient must be the hardened egress client: every URL fetched
-// here is tenant-authored (ADR 061).
+// NewOIDCClient builds the relying party for a connection. Both the
+// `authorize` and the `callback` steps use it, so a misconfiguration surfaces
+// before the user is redirected rather than after they are authenticated at
+// the provider. httpClient must be the hardened egress client: every URL
+// fetched here is tenant-authored (ADR 061).
 func NewOIDCClient(ctx context.Context, conn Connection, redirectURI string, httpClient *http.Client) (*OIDCClient, error) {
 	// A nil client would only fail once a fetch happens, deep inside the
-	// library; a fully overridden connection would hide the wiring bug.
+	// library; a connection with endpoints set would hide the wiring bug.
 	if httpClient == nil {
 		return nil, domain.ErrInternal(errors.New("idp: http client is nil"))
 	}
-	endpoints, err := resolveEndpoints(ctx, conn.OIDC, httpClient)
-	if err != nil {
-		return nil, err
+	// ParseConnection guarantees the endpoints are either all set or all
+	// empty, so checking one of them is enough to pick the constructor.
+	if conn.OIDC.AuthorizationEndpoint == "" {
+		return newDiscoveredClient(ctx, conn, redirectURI, httpClient)
 	}
-	// The static constructor: it takes the endpoints as given instead of
-	// running discovery itself, which is what lets overrides skip the fetch.
-	// The secret is absent by design; the `authorize` request needs none, and
-	// the callback resolves it per attempt.
-	party, err := rp.NewRelyingPartyOAuth(&oauth2.Config{
-		ClientID:    conn.OIDC.ClientID,
-		RedirectURL: redirectURI,
-		Scopes:      conn.OIDC.Scopes,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  endpoints.Authorization,
-			TokenURL: endpoints.Token,
-		},
-	}, rp.WithHTTPClient(httpClient))
-	if err != nil {
-		// Only a PKCE-from-discovery option fails here, and none is passed.
-		return nil, domain.ErrInternal(err)
-	}
-	return &OIDCClient{conn: conn, redirectURI: redirectURI, party: party, endpoints: endpoints}, nil
-}
-
-func resolveEndpoints(ctx context.Context, conn OIDCConnection, httpClient *http.Client) (Endpoints, error) {
-	endpoints := Endpoints{
-		Authorization: conn.AuthorizationEndpoint,
-		Token:         conn.TokenEndpoint,
-		JWKS:          conn.JWKSURI,
-	}
-	needsUserinfo := !conn.IDTokenMapping
-	if needsUserinfo {
-		endpoints.Userinfo = conn.UserinfoEndpoint
-	}
-	// When there are overrides set, they take precedence over discovery.
-	// A connection that overrides all the endpoints does not need a discovery call.
-	if endpoints.Authorization != "" && endpoints.Token != "" && endpoints.JWKS != "" &&
-		(!needsUserinfo || endpoints.Userinfo != "") {
-		return endpoints, nil
-	}
-	discovered, err := client.Discover(ctx, conn.Issuer, httpClient)
-	if err != nil {
-		return Endpoints{}, domain.ErrIDPDiscoveryFailed(err)
-	}
-	if err := overrideOrDiscovered(&endpoints.Authorization, discovered.AuthorizationEndpoint, "authorization_endpoint"); err != nil {
-		return Endpoints{}, err
-	}
-	if err := overrideOrDiscovered(&endpoints.Token, discovered.TokenEndpoint, "token_endpoint"); err != nil {
-		return Endpoints{}, err
-	}
-	if err := overrideOrDiscovered(&endpoints.JWKS, discovered.JwksURI, "jwks_uri"); err != nil {
-		return Endpoints{}, err
-	}
-	if needsUserinfo {
-		if err := overrideOrDiscovered(&endpoints.Userinfo, discovered.UserinfoEndpoint, "userinfo_endpoint"); err != nil {
-			return Endpoints{}, err
-		}
-	}
-	return endpoints, nil
-}
-
-// overrideOrDiscovered keeps the override in dst, takes the discovered value
-// when there is none, and fails when neither names the endpoint. A
-// discovered value passes the same pattern the schema enforces on an
-// override: the library only checks the document's issuer, so without this
-// a document could send the browser to a cleartext or relative URL.
-func overrideOrDiscovered(dst *string, discovered, name string) error {
-	if *dst != "" {
-		return nil
-	}
-	if discovered == "" {
-		return domain.ErrIDPDiscoveryFailed(fmt.Errorf("missing %s in discovery", name))
-	}
-	if !endpointPattern.MatchString(discovered) {
-		return domain.ErrIDPDiscoveryFailed(fmt.Errorf("%s in discovery is not an https endpoint", name))
-	}
-	*dst = discovered
-	return nil
+	return newStaticClient(conn, redirectURI, httpClient)
 }
 
 // RelyingParty exposes the underlying library client.
@@ -178,7 +98,88 @@ func (c *OIDCClient) RelyingParty() rp.RelyingParty {
 	return c.party
 }
 
-// Endpoints returns the resolved endpoint set.
-func (c *OIDCClient) Endpoints() Endpoints {
-	return c.endpoints
+// UserinfoEndpoint returns the userinfo URL, or empty when the connection
+// maps claims from the id_token.
+func (c *OIDCClient) UserinfoEndpoint() string {
+	return c.userinfo
+}
+
+// IDTokenVerifier returns a copy of the verifier for this connection: issuer,
+// client id, key set, and the fixed allowlist. The callback sets the
+// per-attempt nonce and clock offset on its copy.
+func (c *OIDCClient) IDTokenVerifier() rp.IDTokenVerifier {
+	return *c.verifier
+}
+
+// newDiscoveredClient builds the relying party from the issuer's discovery
+// document, which supplies the endpoints and the jwks_uri.
+func newDiscoveredClient(ctx context.Context, conn Connection, redirectURI string, httpClient *http.Client) (*OIDCClient, error) {
+	party, err := rp.NewRelyingPartyOIDC(ctx, conn.OIDC.Issuer, conn.OIDC.ClientID, "", redirectURI, conn.OIDC.Scopes,
+		rp.WithHTTPClient(httpClient),
+		rp.WithVerifierOpts(rp.WithSupportedSigningAlgorithms(SigningAlgorithms()...)))
+	if err != nil {
+		// The constructor fails only on discovery: fetch, parse, or issuer.
+		return nil, domain.ErrIDPDiscoveryFailed(err)
+	}
+	// The library takes the document's URLs as given. The ones it exposes are
+	// re-checked here against the pattern the schema enforces on stored
+	// endpoints, so a document cannot send the browser to a cleartext or
+	// relative URL. jwks_uri is not exposed: the library keeps it inside its
+	// key set, so a cleartext or missing jwks_uri surfaces at the callback's
+	// first verification instead. Closing that needs an endpoint getter
+	// upstream.
+	if err := validDiscovered("authorization_endpoint", party.OAuthConfig().Endpoint.AuthURL); err != nil {
+		return nil, err
+	}
+	if err := validDiscovered("token_endpoint", party.OAuthConfig().Endpoint.TokenURL); err != nil {
+		return nil, err
+	}
+	c := &OIDCClient{conn: conn, redirectURI: redirectURI, party: party, verifier: party.IDTokenVerifier()}
+	if !conn.OIDC.IDTokenMapping {
+		if err := validDiscovered("userinfo_endpoint", party.UserinfoEndpoint()); err != nil {
+			return nil, err
+		}
+		c.userinfo = party.UserinfoEndpoint()
+	}
+	return c, nil
+}
+
+// newStaticClient builds the relying party from the configured endpoints and
+// makes no discovery call.
+func newStaticClient(conn Connection, redirectURI string, httpClient *http.Client) (*OIDCClient, error) {
+	// The client secret is excluded as the `authorize` request needs none,
+	// and the callback resolves it per attempt.
+	party, err := rp.NewRelyingPartyOAuth(&oauth2.Config{
+		ClientID:    conn.OIDC.ClientID,
+		RedirectURL: redirectURI,
+		Scopes:      conn.OIDC.Scopes,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  conn.OIDC.AuthorizationEndpoint,
+			TokenURL: conn.OIDC.TokenEndpoint,
+		},
+	}, rp.WithHTTPClient(httpClient))
+	if err != nil {
+		// Only a PKCE-from-discovery option fails here, and none is passed.
+		return nil, domain.ErrInternal(err)
+	}
+	// The static constructor takes no issuer and no jwks_uri, so the
+	// verifier it builds has an empty issuer and a key set with no URL. The
+	// engine builds its own from the connection, so the callback verifies
+	// id_tokens the same way in both modes.
+	verifier := rp.NewIDTokenVerifier(conn.OIDC.Issuer, conn.OIDC.ClientID,
+		rp.NewRemoteKeySet(httpClient, conn.OIDC.JWKSURI),
+		rp.WithSupportedSigningAlgorithms(SigningAlgorithms()...))
+	return &OIDCClient{conn: conn, redirectURI: redirectURI, party: party, verifier: verifier, userinfo: conn.OIDC.UserinfoEndpoint}, nil
+}
+
+// validDiscovered fails when a discovery document omits a necessary endpoint or
+// names one that is not https.
+func validDiscovered(name, value string) error {
+	if value == "" {
+		return domain.ErrIDPDiscoveryFailed(fmt.Errorf("missing %s in discovery", name))
+	}
+	if !endpointPattern.MatchString(value) {
+		return domain.ErrIDPDiscoveryFailed(fmt.Errorf("%s in discovery is not an https endpoint", name))
+	}
+	return nil
 }

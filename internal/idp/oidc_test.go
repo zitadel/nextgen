@@ -30,12 +30,18 @@ func discoveryHandler(t *testing.T) http.HandlerFunc {
 	}
 }
 
+// wantEndpoints is what the built client exposes; the library keeps a
+// discovered jwks_uri private, so that one is not observable here.
+type wantEndpoints struct {
+	authorization, token, userinfo string
+}
+
 func TestNewOIDCClient(t *testing.T) {
-	overrides := OIDCConnection{
-		AuthorizationEndpoint: "https://override.example.test/authorize",
-		TokenEndpoint:         "https://override.example.test/token",
-		UserinfoEndpoint:      "https://override.example.test/userinfo",
-		JWKSURI:               "https://override.example.test/keys",
+	manual := OIDCConnection{
+		AuthorizationEndpoint: "https://manual.example.test/authorize",
+		TokenEndpoint:         "https://manual.example.test/token",
+		UserinfoEndpoint:      "https://manual.example.test/userinfo",
+		JWKSURI:               "https://manual.example.test/keys",
 	}
 
 	tests := []struct {
@@ -45,7 +51,7 @@ func TestNewOIDCClient(t *testing.T) {
 		conn    func(issuer string) OIDCConnection
 		// timeout bounds the call; zero means none.
 		timeout time.Duration
-		want    func(issuer string) Endpoints
+		want    func(issuer string) wantEndpoints
 		// wantErr is the domain kind. wantCause is matched against its
 		// log-only parent; wantCauseMsg pins a cause that has no sentinel.
 		wantErr      error
@@ -56,61 +62,34 @@ func TestNewOIDCClient(t *testing.T) {
 			name:    "discovery supplies every endpoint",
 			handler: discoveryHandler(t),
 			conn:    func(issuer string) OIDCConnection { return OIDCConnection{Issuer: issuer} },
-			want: func(issuer string) Endpoints {
-				return Endpoints{
-					Authorization: issuer + "/authorize",
-					Token:         issuer + "/token",
-					Userinfo:      issuer + "/userinfo",
-					JWKS:          issuer + "/keys",
-				}
+			want: func(issuer string) wantEndpoints {
+				return wantEndpoints{issuer + "/authorize", issuer + "/token", issuer + "/userinfo"}
 			},
 		},
 		{
-			name:    "an override wins over the discovered value",
-			handler: discoveryHandler(t),
-			conn: func(issuer string) OIDCConnection {
-				return OIDCConnection{Issuer: issuer, JWKSURI: overrides.JWKSURI}
+			name: "a document without userinfo serves an id_token mapping connection",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				issuer := "http://" + r.Host
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"issuer":"` + issuer + `",` +
+					`"authorization_endpoint":"` + issuer + `/authorize",` +
+					`"token_endpoint":"` + issuer + `/token",` +
+					`"jwks_uri":"` + issuer + `/keys"}`))
 			},
-			want: func(issuer string) Endpoints {
-				return Endpoints{
-					Authorization: issuer + "/authorize",
-					Token:         issuer + "/token",
-					Userinfo:      issuer + "/userinfo",
-					JWKS:          overrides.JWKSURI,
-				}
+			conn: func(issuer string) OIDCConnection { return OIDCConnection{Issuer: issuer, IDTokenMapping: true} },
+			want: func(issuer string) wantEndpoints {
+				return wantEndpoints{issuer + "/authorize", issuer + "/token", ""}
 			},
 		},
 		{
-			name: "overriding every endpoint skips discovery",
+			name: "setting every endpoint skips discovery",
 			conn: func(issuer string) OIDCConnection {
-				conn := overrides
+				conn := manual
 				conn.Issuer = issuer
 				return conn
 			},
-			want: func(string) Endpoints {
-				return Endpoints{
-					Authorization: overrides.AuthorizationEndpoint,
-					Token:         overrides.TokenEndpoint,
-					Userinfo:      overrides.UserinfoEndpoint,
-					JWKS:          overrides.JWKSURI,
-				}
-			},
-		},
-		{
-			name: "id_token mapping needs no userinfo endpoint",
-			conn: func(issuer string) OIDCConnection {
-				conn := overrides
-				conn.Issuer = issuer
-				conn.UserinfoEndpoint = ""
-				conn.IDTokenMapping = true
-				return conn
-			},
-			want: func(string) Endpoints {
-				return Endpoints{
-					Authorization: overrides.AuthorizationEndpoint,
-					Token:         overrides.TokenEndpoint,
-					JWKS:          overrides.JWKSURI,
-				}
+			want: func(string) wantEndpoints {
+				return wantEndpoints{manual.AuthorizationEndpoint, manual.TokenEndpoint, manual.UserinfoEndpoint}
 			},
 		},
 		{
@@ -209,13 +188,20 @@ func TestNewOIDCClient(t *testing.T) {
 			}
 			require.NoError(t, err)
 			want := tt.want(srv.URL)
-			assert.Equal(t, want, c.Endpoints())
-			config := c.RelyingParty().OAuthConfig()
-			assert.Equal(t, want.Authorization, config.Endpoint.AuthURL)
-			assert.Equal(t, want.Token, config.Endpoint.TokenURL)
+			party := c.RelyingParty()
+			config := party.OAuthConfig()
+			assert.Equal(t, want.authorization, config.Endpoint.AuthURL)
+			assert.Equal(t, want.token, config.Endpoint.TokenURL)
+			assert.Equal(t, want.userinfo, c.UserinfoEndpoint())
 			assert.Equal(t, "client", config.ClientID)
 			assert.Equal(t, redirectURI, config.RedirectURL)
 			assert.Equal(t, []string{"openid"}, config.Scopes)
+			// Both modes hand the callback the same verifier shape.
+			verifier := c.IDTokenVerifier()
+			assert.Equal(t, srv.URL, verifier.Issuer)
+			assert.Equal(t, "client", verifier.ClientID)
+			assert.Equal(t, SigningAlgorithms(), verifier.SupportedSignAlgs)
+			assert.NotNil(t, verifier.KeySet)
 		})
 	}
 }

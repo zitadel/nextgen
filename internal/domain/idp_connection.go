@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // PrefixIDPConnection namespaces connection ids ("idp_01KWH3B..."), the id an
 // identity link references. Revisions carry their own prefix, registered with
@@ -53,6 +56,12 @@ func ErrIDPScopesMissingOpenID() Error {
 // localhost. field is the schema field name; the URL itself never appears.
 func ErrIDPEndpointCleartext(field string) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoint_cleartext"), "identity provider connection: an endpoint is not https", map[string]any{"field": field}, fmt.Errorf("%s is not https", field))
+}
+
+// ErrIDPEndpointsPartial rejects an OIDC block that names some of the
+// endpoints the connection needs but not all.
+func ErrIDPEndpointsPartial(missing []string) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoints_partial"), "identity provider connection: the endpoints are partially set", map[string]any{"missing": missing}, fmt.Errorf("missing endpoints: %s", strings.Join(missing, ", ")))
 }
 
 // ErrIDPOAuth2Unsupported refuses a stored oauth2 connection: the schema
