@@ -8,10 +8,7 @@ brand, while Zitadel guards the credentials, sessions, and tokens underneath.
 > surface, so it ships as a preview in its own repository and is intended to
 > merge back into [zitadel/zitadel](https://github.com/zitadel/zitadel) as the
 > foundation of a future major version. APIs, CLI flags, package surfaces, and
-> docs are still in flux. Create-first, claim-later is the product direction,
-> and `zitadel claim` ships in this repo
-> ([ADR 046](docs/adrs/046-claim-lifecycle-v2.md)). The full story is in
-> [VISION.md](VISION.md).
+> docs are still in flux. The full story is in [VISION.md](VISION.md).
 
 ## Workflow front doors
 
@@ -55,54 +52,56 @@ cd myapp
 npx @zitadel/cli@alpha doctor
 ```
 
-Pick a server before running `setup` — it can't be changed on this app
-afterward. Use `--server local` for local dev, or point at a hosted Zitadel
-Cloud instance if you intend to claim the project later and attach it to your
-team:
+Choose whether to run Zitadel locally or in Zitadel Cloud. This choice cannot
+currently be changed for the app after running `setup`.
+
+For local development:
 
 ```sh
-npx @zitadel/cli@alpha start                # local dev only
-npx @zitadel/cli@alpha setup --server local  # or --server https://api.zitadel.cloud
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-Open http://localhost:3000/login and register your first user. `setup` walks
-through the scaffold choices (such as which framework and use case) and
-writes the app into the current directory; pass `--skip-install` if you want
-to install dependencies yourself. With `--server local`, the managed Zitadel
-runtime stores its metadata and data under `.zitadel/local/`; `stop`
-preserves that data and `reset --force` deletes it — none of that applies
-against a hosted server, which has no local runtime to manage.
+To start directly in Zitadel Cloud:
 
-### Claim your project (Zitadel Cloud only)
+```sh
+npx @zitadel/cli@alpha setup --server https://api.zitadel.cloud
+npm run dev
+```
 
-If you set up against Zitadel Cloud above, attach the project to your team
-once the app is up:
+Open http://localhost:3000/login and register the first user of your app.
+`setup` walks you through the scaffold choices, such as your framework and use
+case, and writes the app into the current directory. Pass `--skip-install` if
+you want to install the dependencies yourself.
+
+With `--server local`, Zitadel stores its data under `.zitadel/local/`. Running
+`stop` preserves that data, while `reset --force` deletes it. These commands do
+not apply when using Zitadel Cloud.
+
+### Claim your Cloud Project
+
+Zitadel Cloud lets you build and test a working authentication flow without
+creating a Zitadel account first. This gives you a quick way to evaluate Zitadel
+before committing to it.
+
+Claiming connects the Project to your Zitadel account and establishes who owns
+it. Claim your Project when you want to manage it through the Zitadel Console
+and invite colleagues to manage it with you.
 
 ```sh
 npx @zitadel/cli@alpha claim
 ```
 
-This opens a browser so you can sign in with your own Zitadel account (not
-one of the app's end users) and attach the project to your team. The link
-prints before any browser opens, so it works over SSH or headless too
-(`--no-open`); nothing about the running project changes. Claiming only
-works within 14 days of running `setup` — after that, `setup` a fresh
-project instead.
+This opens Zitadel in your browser, where you can register or sign in. The
+Project is then attached to your Team.
 
-> **Trying this before deploying to Zitadel Cloud:** claiming needs a server
-> with a platform project bootstrapped, which Zitadel Cloud has by default.
-> To exercise the same flow locally today, run the Docker deploy with the
-> platform project enabled and use `http://localhost:8080` as the `--server`
-> above — see [docker-compose.md](docs/quick-start/docker-compose.md)
-> and [configuration.md § Platform](docs/quick-start/configuration.md#platform).
-> This box goes away once claiming against Zitadel Cloud is verified
-> end to end.
+Your existing Project, application configuration, and authentication flow stay
+the same after claiming. You do not need to set them up again.
 
-<!-- Claiming is a strong signal for adoption, so once the cloud path above is
-verified end to end, this is proposed to become the primary customer quick
-start — author a project locally, connect it to an app, claim it on Zitadel
-Cloud — rather than a separate section. -->
+You must claim the Project within 14 days of running `setup`. Once that period
+expires, the Project can no longer be claimed and you will need to run `setup`
+again to create a new one.
 
 ## Manual Docker quick start
 
