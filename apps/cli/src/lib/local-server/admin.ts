@@ -35,6 +35,12 @@ const ADMIN_TEAM_ID = "team_localadmin";
 export const LOCAL_ADMIN_EMAIL = "admin@zitadel.localhost";
 const PBKDF2_ROUNDS = 210_000;
 const MAX_FLOW_STEPS = 6;
+/**
+ * Every call here runs after the server answered `/healthz`, so a stalled
+ * request means the server is wedged rather than still starting. Without a
+ * bound, `zitadel start` would hang on a socket that never answers.
+ */
+const REQUEST_TIMEOUT_MS = 10_000;
 
 export type LocalAdmin = {
   email: string;
@@ -51,7 +57,12 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
   } catch {
     return undefined;
   }
-  const parsed: unknown = JSON.parse(raw);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw malformedAdminFile(error);
+  }
   if (
     !isObject(parsed) ||
     typeof parsed.email !== "string" ||
@@ -59,11 +70,16 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     typeof parsed.user_id !== "string" ||
     typeof parsed.team_id !== "string"
   ) {
-    throw new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
-      hint: "Delete .zitadel/local/ and run `zitadel start` again.",
-    });
+    throw malformedAdminFile();
   }
   return parsed as LocalAdmin;
+}
+
+function malformedAdminFile(cause?: unknown): ZitadelError {
+  return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
+    hint: "Delete .zitadel/local/ and run `zitadel start` again.",
+    ...(cause ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } } : {}),
+  });
 }
 
 /**
@@ -78,7 +94,7 @@ export async function ensureLocalAdmin(
   await mkdir(join(cwd, LOCAL_RUNTIME_DIR), { recursive: true, mode: 0o700 });
   let admin = await readLocalAdmin(cwd);
   if (!admin) {
-    admin = {
+    const candidate: LocalAdmin = {
       // A fixed, clearly-local identity rather than anything inferred from
       // Git config, which can carry a stale, work, or noreply address.
       email: LOCAL_ADMIN_EMAIL,
@@ -86,11 +102,28 @@ export async function ensureLocalAdmin(
       user_id: ADMIN_USER_ID,
       team_id: ADMIN_TEAM_ID,
     };
-    await writePrivate(join(cwd, LOCAL_ADMIN_FILE), `${JSON.stringify(admin, null, 2)}\n`);
+    // Exclusive create, so two concurrent `zitadel start` runs in one directory
+    // cannot each mint a password and leave the bootstrap document holding the
+    // hash of the one that lost. The loser reads the winner's credential.
+    admin =
+      (await writePrivateIfAbsent(
+        join(cwd, LOCAL_ADMIN_FILE),
+        `${JSON.stringify(candidate, null, 2)}\n`,
+      ))
+        ? candidate
+        : ((await readLocalAdmin(cwd)) ?? candidate);
   }
 
+  // Readable beyond the owner, unlike admin.json: the docker runtime mounts
+  // this document into a container that runs as the host user only when the
+  // CLI can map one (never as root, never without a uid), and an unreadable
+  // file fails the server's bootstrap import at startup. It carries a PBKDF2
+  // hash, never the password.
   const userFile = join(cwd, LOCAL_ADMIN_USER_FILE);
-  await writePrivate(userFile, `${JSON.stringify(bootstrapUserDocument(admin), null, 2)}\n`);
+  await writeFile(userFile, `${JSON.stringify(bootstrapUserDocument(admin), null, 2)}\n`, {
+    mode: 0o644,
+  });
+  await chmod(userFile, 0o644).catch(() => undefined);
   return { admin, userFile };
 }
 
@@ -110,7 +143,10 @@ export async function claimProjectAsAdmin(input: {
   projectId: string;
   projectSecret: string;
   admin: LocalAdmin;
-}): Promise<{ team_id: string; claimed_at: string }> {
+  // `claimed_at` is absent when the project was already claimed: the 409 body
+  // names the owning team but not when it happened, and inventing a local
+  // timestamp would disagree with the grant this record mirrors.
+}): Promise<{ team_id: string; claimed_at?: string }> {
   const { serverUrl, projectId, projectSecret, admin } = input;
   const origin = new URL(serverUrl).origin;
   const project = encodeURIComponent(projectId);
@@ -122,7 +158,7 @@ export async function claimProjectAsAdmin(input: {
   if (init.status === 409 && isObject(init.body) && isObject(init.body.details)) {
     const teamId = init.body.details.team_id;
     if (typeof teamId === "string") {
-      return { team_id: teamId, claimed_at: new Date().toISOString() };
+      return { team_id: teamId };
     }
   }
   if (!init.ok || !isObject(init.body) || typeof init.body.challenge_id !== "string") {
@@ -182,7 +218,7 @@ function ab64(bytes: Buffer): string {
 
 async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): Promise<string> {
   const { handoffToken, projectId, publishableKey } = await adminHandoff(serverUrl, admin);
-  const res = await fetch(
+  const res = await bounded(
     `${serverUrl}/sessions/exchange?project_id=${encodeURIComponent(projectId)}`,
     {
       method: "POST",
@@ -224,7 +260,10 @@ async function adminHandoff(
       "E_VALIDATION",
       "The local server does not host the platform project, so the local admin cannot sign in",
       {
-        hint: "Restart it with `zitadel start` so it boots with the platform project and the local admin.",
+        // `zitadel start` adopts a healthy running server untouched, so it
+        // cannot fix this on its own: the instance has to stop first.
+        hint: "Stop it with `zitadel stop`, then run `zitadel start` so it boots with the platform project and the local admin.",
+        nextCommands: ["zitadel stop", "zitadel start"],
         details: { server_url: serverUrl, console_project_id: isObject(runtime) ? runtime.console_project_id : undefined },
       },
     );
@@ -234,7 +273,7 @@ async function adminHandoff(
   let flowCookie: string | undefined;
 
   const flow = async (path: string, body: Record<string, unknown>) => {
-    const res = await fetch(`${serverUrl}${path}`, {
+    const res = await bounded(`${serverUrl}${path}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -274,8 +313,9 @@ async function adminHandoff(
       if (!isObject(field) || typeof field.name !== "string") continue;
       fields[field.name] = field.name.split("#").pop() === "password" ? admin.password : admin.email;
     }
+    // The flow state rides the sealed `_zflow` cookie the jar above carries;
+    // the submit body is the action and this step's fields.
     step = await flow(`/flow/${encodeURIComponent(String(step.id))}/submit`, {
-      session_token: step.session_token,
       action: "submit",
       fields,
     });
@@ -285,16 +325,32 @@ async function adminHandoff(
   });
 }
 
-async function writePrivate(path: string, content: string): Promise<void> {
-  await writeFile(path, content, { mode: 0o600 });
+/** Writes owner-only, failing quietly when another run got there first. */
+async function writePrivateIfAbsent(path: string, content: string): Promise<boolean> {
+  try {
+    await writeFile(path, content, { mode: 0o600, flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
   await chmod(path, 0o600).catch(() => undefined);
+  return true;
 }
 
 type JsonResponse = { ok: boolean; status: number; body: unknown };
 
 async function fetchJson(url: string, init: RequestInit): Promise<JsonResponse> {
-  const res = await fetch(url, init);
+  const res = await bounded(url, init);
   return { ok: res.ok, status: res.status, body: await safeJson(res) };
+}
+
+/**
+ * Every request here runs against an already-healthy local server, so a stall
+ * is a wedged server rather than a slow start. Bounding each one keeps
+ * `zitadel start` from hanging on a socket that accepts and never answers.
+ */
+async function bounded(url: string, init: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
 }
 
 async function safeJson(res: Response): Promise<unknown> {

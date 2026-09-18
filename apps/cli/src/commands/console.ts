@@ -42,6 +42,14 @@ export default class Console extends BaseCommand {
       source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
     });
 
+    // The link is minted against the runtime this directory started, so a
+    // server override would be silently ignored: say so instead.
+    if (this.meta.serverFlag) {
+      throw new ZitadelError("E_VALIDATION", "`console` does not take --server", {
+        hint: "It signs in to the local runtime started from this directory; run it without --server.",
+      });
+    }
+
     const admin = await readLocalAdmin(cwd);
     if (!admin) {
       throw new ZitadelError("E_VALIDATION", "No local admin in this directory", {

@@ -379,7 +379,10 @@ function readyData(
     ],
     next_commands: [
       publicCliCommand("setup --server local", cliVersion),
-      ...(console ? [publicCliCommand("console", cliVersion)] : []),
+      // Only when a link could actually be minted: `zitadel console` mints
+      // the same way, so suggesting it after a failure sends the caller at a
+      // command that fails again.
+      ...(console?.sign_in_url ? [publicCliCommand("console", cliVersion)] : []),
     ],
   };
 }

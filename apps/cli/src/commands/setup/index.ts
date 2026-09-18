@@ -456,10 +456,24 @@ export default class Setup extends BaseCommand {
             projectSecret: project.project_secret,
             admin,
           });
-          const secret = await readZitadelSecret(cwd);
-          await writeZitadelSecret(cwd, { ...secret, ...owner });
-          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
-          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+          // Only a claim this run completed carries the platform's own
+          // timestamp. Without it the record would name a team but no claim
+          // time, which `isAttached` reads as a half-written attachment, so
+          // leave the secret alone and let the claim nudge stand.
+          if (owner.claimed_at === undefined || owner.team_id !== admin.team_id) {
+            consola.info(
+              `Project already belongs to team ${owner.team_id}; leaving the local record unchanged.`,
+            );
+          } else {
+            const secret = await readZitadelSecret(cwd);
+            await writeZitadelSecret(cwd, {
+              ...secret,
+              team_id: owner.team_id,
+              claimed_at: owner.claimed_at,
+            });
+            ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+            consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+          }
         } catch (error) {
           consola.warn(
             `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
