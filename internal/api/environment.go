@@ -201,7 +201,8 @@ func environmentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrEnvironmentExpired().Code:
 		return errorResponseWithStatusCode(http.StatusGone, err)
-	case domain.ErrEnvironmentPermissionDenied().Code:
+	case domain.ErrEnvironmentPermissionDenied().Code,
+		domain.ErrEnvironmentOriginNotServed(domain.EnvironmentOriginNotServedDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)

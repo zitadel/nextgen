@@ -82,7 +82,8 @@ when none or several candidates run it the request is refused with
 what a deployment gets. The Vercel build sets the preview name
 (`zitadel preview` output → `NEXT_PUBLIC_ZITADEL_ENVIRONMENT` →
 `configureZitadel({ environment })`), so every preview deployment carries
-it, and a local run of the app uses a preview the same way. A preview
+it. A local run of the app uses a preview the same way, from an origin the
+preview serves (`http://*.app.localhost:3000` in the local setup). A preview
 created with an exact `--origin` (for example `https://$VERCEL_BRANCH_URL`)
 resolves on the literal tier and needs no header.
 
@@ -95,9 +96,11 @@ are normalised by the platform.
 Every public request is served by one environment and one release:
 
 1. **Environment.** `X-Zitadel-Environment` names one (`live` or a
-   preview; unknown `404 env.not_found`, expired `env.expired`); the
-   origin still has to pass the project allowlist but is not matched
-   against the environment's origins. Without the header, the request
+   preview; unknown `404 env.not_found`, expired `410 env.expired`). The
+   named environment must serve the request origin (`403
+   env.origin_not_served`), so the header settles which candidate on a
+   shared pattern is meant but never lets the production origin reach a
+   preview; live with no origins registered serves all. Without the header, the request
    `Origin` decides: a preview whose `origins` cover it serves it, a
    wildcard match needs the release header (above), no match or no
    origin means `live`.

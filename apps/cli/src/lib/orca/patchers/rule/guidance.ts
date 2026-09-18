@@ -160,7 +160,7 @@ npx @zitadel/cli@alpha preview --name "$VERCEL_GIT_COMMIT_REF" --json > /tmp/pre
   && next build
 \`\`\`
 
-\`NEXT_PUBLIC_ZITADEL_ENVIRONMENT\` names the preview the deployment was built for: every preview deployment shares the \`https://*.vercel.app\` pattern from \`zitadel.json\`, so the name is what selects the right one. Locally, run the app against a preview the same way: \`NEXT_PUBLIC_ZITADEL_ENVIRONMENT=preview-<name> npm run dev\` after sourcing \`.env.preview\`. \`NEXT_PUBLIC_ZITADEL_RELEASE\` pins a release on top (useful on live). Provide \`ZITADEL_PROJECT_SECRET\` (from \`.zitadel/secret\`) and \`ZITADEL_URL\` as Vercel environment variables.`;
+\`NEXT_PUBLIC_ZITADEL_ENVIRONMENT\` names the preview the deployment was built for: every preview deployment shares the \`https://*.vercel.app\` pattern from \`zitadel.json\`, so the name is what selects the right one. Locally, run the app against a preview the same way: \`NEXT_PUBLIC_ZITADEL_ENVIRONMENT=preview-<name> npm run dev\` after sourcing \`.env.preview\`, opened from an origin the preview serves (the pattern in \`zitadel.json\`); the production origin never reaches a preview. \`NEXT_PUBLIC_ZITADEL_RELEASE\` pins a release on top (useful on live). Provide \`ZITADEL_PROJECT_SECRET\` (from \`.zitadel/secret\`) and \`ZITADEL_URL\` as Vercel environment variables.`;
 }
 
 /** Full-file header used when `AGENTS.md` does not exist yet. */

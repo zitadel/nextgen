@@ -9,9 +9,10 @@ description: |
 
   A frontend preview deployment sends the preview it was built for, which
   is what selects the right one when several previews share one origin
-  pattern (such as `https://*.vercel.app`), and what lets a local run of
-  the app use a preview at all. The request still has to come from an
-  origin the project allows.
+  pattern (such as `https://*.vercel.app`). Naming an environment never
+  widens where it is reachable from: the request origin must be one the
+  environment serves (its `origins`), else `env.origin_not_served`, and
+  one the project allows.
 
   An unknown name is rejected with `env.not_found`, an expired preview
   with `env.expired`.

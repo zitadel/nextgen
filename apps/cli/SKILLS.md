@@ -301,7 +301,9 @@ docker --image <ref>` remains the explicit image override for debugging.
   scaffold reads `NEXT_PUBLIC_ZITADEL_ENVIRONMENT`), which is required when
   the preview is reached through a shared pattern and is how a local run
   uses a preview: `NEXT_PUBLIC_ZITADEL_ENVIRONMENT=preview-<name> npm run
-  dev` after sourcing `.env.preview`. `configureZitadel({ release })` pins a
+  dev` after sourcing `.env.preview`, from an origin the preview serves
+  (naming a preview never widens its origins; the production origin
+  answers `403 env.origin_not_served`). `configureZitadel({ release })` pins a
   release on top, mostly for live. Ship the same release afterwards with
   `deploy --env production --release <id>`.
 - `plan` — validate config and preview the sync diff without mutating anything.

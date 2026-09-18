@@ -10577,6 +10577,7 @@ type CreateFlowErrorResponse struct {
 	EnvAmbiguous           EnvAmbiguous
 	EnvExpired             EnvExpired
 	EnvNotFound            EnvNotFound
+	EnvOriginNotServed     EnvOriginNotServed
 	EnvReleaseRequired     EnvReleaseRequired
 	EvtInvalid             EvtInvalid
 	FlowdefNotFound        FlowdefNotFound
@@ -10606,6 +10607,7 @@ const (
 	EnvAmbiguousCreateFlowErrorResponse           CreateFlowErrorResponseType = "env.ambiguous"
 	EnvExpiredCreateFlowErrorResponse             CreateFlowErrorResponseType = "env.expired"
 	EnvNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "env.not_found"
+	EnvOriginNotServedCreateFlowErrorResponse     CreateFlowErrorResponseType = "env.origin_not_served"
 	EnvReleaseRequiredCreateFlowErrorResponse     CreateFlowErrorResponseType = "env.release_required"
 	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
 	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
@@ -10656,6 +10658,11 @@ func (s CreateFlowErrorResponse) IsEnvExpired() bool {
 // IsEnvNotFound reports whether CreateFlowErrorResponse is EnvNotFound.
 func (s CreateFlowErrorResponse) IsEnvNotFound() bool {
 	return s.Type == EnvNotFoundCreateFlowErrorResponse
+}
+
+// IsEnvOriginNotServed reports whether CreateFlowErrorResponse is EnvOriginNotServed.
+func (s CreateFlowErrorResponse) IsEnvOriginNotServed() bool {
+	return s.Type == EnvOriginNotServedCreateFlowErrorResponse
 }
 
 // IsEnvReleaseRequired reports whether CreateFlowErrorResponse is EnvReleaseRequired.
@@ -10875,6 +10882,27 @@ func (s CreateFlowErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
 func NewEnvNotFoundCreateFlowErrorResponse(v EnvNotFound) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEnvNotFound(v)
+	return s
+}
+
+// SetEnvOriginNotServed sets CreateFlowErrorResponse to EnvOriginNotServed.
+func (s *CreateFlowErrorResponse) SetEnvOriginNotServed(v EnvOriginNotServed) {
+	s.Type = EnvOriginNotServedCreateFlowErrorResponse
+	s.EnvOriginNotServed = v
+}
+
+// GetEnvOriginNotServed returns EnvOriginNotServed and true boolean if CreateFlowErrorResponse is EnvOriginNotServed.
+func (s CreateFlowErrorResponse) GetEnvOriginNotServed() (v EnvOriginNotServed, ok bool) {
+	if !s.IsEnvOriginNotServed() {
+		return v, false
+	}
+	return s.EnvOriginNotServed, true
+}
+
+// NewEnvOriginNotServedCreateFlowErrorResponse returns new CreateFlowErrorResponse from EnvOriginNotServed.
+func NewEnvOriginNotServedCreateFlowErrorResponse(v EnvOriginNotServed) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetEnvOriginNotServed(v)
 	return s
 }
 
@@ -16416,6 +16444,59 @@ func (s *EnvNotFound) SetDetails(val OptEnvNotFoundDetails) {
 type EnvNotFoundDetails map[string]jx.Raw
 
 func (s *EnvNotFoundDetails) init() EnvNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EnvOriginNotServed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvOriginNotServedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvOriginNotServed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvOriginNotServed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvOriginNotServed) GetDetails() OptEnvOriginNotServedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvOriginNotServed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvOriginNotServed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvOriginNotServed) SetDetails(val OptEnvOriginNotServedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvOriginNotServedDetails map[string]jx.Raw
+
+func (s *EnvOriginNotServedDetails) init() EnvOriginNotServedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -33093,6 +33174,52 @@ func (o OptEnvNotFoundDetails) Get() (v EnvNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvNotFoundDetails) Or(d EnvNotFoundDetails) EnvNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvOriginNotServedDetails returns new OptEnvOriginNotServedDetails with value set to v.
+func NewOptEnvOriginNotServedDetails(v EnvOriginNotServedDetails) OptEnvOriginNotServedDetails {
+	return OptEnvOriginNotServedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvOriginNotServedDetails is optional EnvOriginNotServedDetails.
+type OptEnvOriginNotServedDetails struct {
+	Value EnvOriginNotServedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvOriginNotServedDetails was set.
+func (o OptEnvOriginNotServedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvOriginNotServedDetails) Reset() {
+	var v EnvOriginNotServedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvOriginNotServedDetails) SetTo(v EnvOriginNotServedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvOriginNotServedDetails) Get() (v EnvOriginNotServedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvOriginNotServedDetails) Or(d EnvOriginNotServedDetails) EnvOriginNotServedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

@@ -89,6 +89,23 @@ func ErrEnvironmentReleaseRequired(details EnvironmentAmbiguousDetails) Error {
 	return newError(PrefixEnvironment.ErrorCodePrefix("release_required"), "this origin is served by a preview environment; send X-Zitadel-Environment with the preview the deployment was built for, or X-Zitadel-Release with its release", details, nil)
 }
 
+// EnvironmentOriginNotServedDetails names the environment a request asked
+// for and the origin it came from, with the origins the environment serves.
+type EnvironmentOriginNotServedDetails struct {
+	Environment string   `json:"environment"`
+	Origin      string   `json:"origin"`
+	Origins     []string `json:"origins"`
+}
+
+// ErrEnvironmentOriginNotServed reports a request that named an environment
+// (X-Zitadel-Environment) from an origin that environment does not serve.
+// Naming a preview never widens where it can be reached from: a production
+// deployment cannot be pointed at a preview, and a preview deployment only
+// reaches the preview whose origins cover it.
+func ErrEnvironmentOriginNotServed(details EnvironmentOriginNotServedDetails) Error {
+	return newError(PrefixEnvironment.ErrorCodePrefix("origin_not_served"), "The environment does not serve the request origin. Register the origin on the environment (zitadel preview --origin, or the entry's issuer_pattern in zitadel.json) and deploy again.", details, nil)
+}
+
 func ErrEnvironmentProjectNotFound() Error {
 	return newError(PrefixEnvironment.ErrorCodePrefix("project_not_found"), "project not found", nil, nil)
 }

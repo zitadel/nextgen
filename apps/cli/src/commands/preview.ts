@@ -153,7 +153,7 @@ export default class Preview extends BaseCommand {
       origins.length > 0
         ? `Requests from ${origins.join(", ")} are served by this preview; everything else stays on live.`
         : "No origin registered yet: add an issuer_pattern to the environment in zitadel.json (for example https://*.vercel.app) or re-run with --origin <frontend origin>.",
-      `Point a frontend at this preview regardless of origin with NEXT_PUBLIC_ZITADEL_ENVIRONMENT=${preview.name} (configureZitadel({ environment }), sent as X-Zitadel-Environment); X-Zitadel-Release: ${release.id} pins the release on top.`,
+      `A frontend served from one of those origins names this preview with NEXT_PUBLIC_ZITADEL_ENVIRONMENT=${preview.name} (configureZitadel({ environment }), sent as X-Zitadel-Environment); X-Zitadel-Release: ${release.id} pins the release on top.`,
       `When it looks right, ship the same release: zitadel deploy --release ${release.id}.`,
     ];
     return this.emit({

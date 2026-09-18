@@ -11,6 +11,7 @@ content:
         - $ref: '../../components/schemas/errors/env-ambiguous.yaml'
         - $ref: '../../components/schemas/errors/env-expired.yaml'
         - $ref: '../../components/schemas/errors/env-not_found.yaml'
+        - $ref: '../../components/schemas/errors/env-origin_not_served.yaml'
         - $ref: '../../components/schemas/errors/env-release_required.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
@@ -36,6 +37,7 @@ content:
           env.ambiguous: '../../components/schemas/errors/env-ambiguous.yaml'
           env.expired: '../../components/schemas/errors/env-expired.yaml'
           env.not_found: '../../components/schemas/errors/env-not_found.yaml'
+          env.origin_not_served: '../../components/schemas/errors/env-origin_not_served.yaml'
           env.release_required: '../../components/schemas/errors/env-release_required.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
@@ -87,6 +89,11 @@ content:
         value:
           code: env.not_found
           message: 'environment not found'
+      env.origin_not_served:
+        summary: env.origin_not_served
+        value:
+          code: env.origin_not_served
+          message: 'The environment does not serve the request origin. Register the origin on the environment (zitadel preview --origin, or the entry''s issuer_pattern in zitadel.json) and deploy again.'
       env.release_required:
         summary: env.release_required
         value:

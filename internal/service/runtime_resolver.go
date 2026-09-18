@@ -100,7 +100,7 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID string, selecto
 		err    error
 	)
 	if name := strings.TrimSpace(selector.Environment); name != "" {
-		env, err = r.selectEnvironment(ctx, stmts, projectID, name)
+		env, err = r.selectEnvironment(ctx, stmts, projectID, name, selector.Origin)
 		source = RuntimeEnvironmentSourceSelector
 	} else {
 		env, source, err = r.resolveEnvironment(ctx, stmts, projectID, selector.Origin, strings.TrimSpace(selector.Release))
@@ -186,11 +186,13 @@ func (r *RuntimeResolver) checkOriginAllowed(ctx context.Context, stmts AllState
 // selectEnvironment answers a request that names its environment. The name
 // must be one of the project's environments; an expired preview is refused
 // rather than silently served by live, so a stale deployment fails loudly.
-// The request origin is not matched against the environment's origins: the
-// project's origin allowlist already gates it, and naming the environment
-// is exactly what a deployment does when its origin is not specific enough
-// (a shared wildcard, or a local run of the app against a preview).
-func (r *RuntimeResolver) selectEnvironment(ctx context.Context, stmts AllStatements, projectID, name string) (*domain.Environment, error) {
+// The environment must also serve the request origin: naming it settles
+// which of several candidates on a shared pattern the request means, it
+// never widens where the environment can be reached from, so a production
+// deployment cannot be pointed at a preview. Live with no origins registered
+// serves every origin, as it does when nothing names it; a request without
+// an origin (server to server) is not gated.
+func (r *RuntimeResolver) selectEnvironment(ctx context.Context, stmts AllStatements, projectID, name, origin string) (*domain.Environment, error) {
 	env, err := stmts.GetEnvironmentByName(ctx, projectID, name)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -200,6 +202,15 @@ func (r *RuntimeResolver) selectEnvironment(ctx context.Context, stmts AllStatem
 	}
 	if env.Expired(r.now()) {
 		return nil, domain.ErrEnvironmentExpired()
+	}
+	origin = strings.ToLower(strings.TrimSpace(origin))
+	servesAll := env.Class == domain.EnvironmentClassLive && len(env.Origins) == 0
+	if origin != "" && !servesAll && !env.ServesOrigin(origin) {
+		return nil, domain.ErrEnvironmentOriginNotServed(domain.EnvironmentOriginNotServedDetails{
+			Environment: env.Name,
+			Origin:      origin,
+			Origins:     env.Origins,
+		})
 	}
 	return env, nil
 }
