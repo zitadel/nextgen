@@ -38,6 +38,35 @@ export async function signIn(
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 }
 
+/**
+ * Makes a seeded user an admin of the instance's project, through the API.
+ *
+ * A seeded user can sign in to the console but holds no grant, and the console
+ * lists only the projects a person can act on (`GET /users/me/projects`,
+ * #1237) — so without this the project pill and the Projects screen are
+ * honestly empty. The grant is the same one Settings → Admins creates.
+ *
+ * Written with the boot-captured project secret from the test process, never
+ * from the page: the browser must not see it (see the credential-leak spec).
+ */
+export async function grantProjectAdmin(
+  handle: { baseUrl: string; projectId: string; projectSecret: string },
+  userId: string,
+): Promise<void> {
+  const query = new URLSearchParams({ project_id: handle.projectId });
+  const response = await fetch(`${handle.baseUrl}/grants?${query.toString()}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${handle.projectSecret}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ principal_type: "user", principal_id: userId, relation: "admin" }),
+  });
+  if (!response.ok) {
+    throw new Error(`POST /grants answered ${response.status}: ${await response.text()}`);
+  }
+}
+
 /** Copy the route error boundaries render; none of it should appear on a pass. */
 const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
 
