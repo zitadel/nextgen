@@ -106,9 +106,15 @@ keeps being served by it regardless of origin.
   `origins`). Projects seed only `live`.
 - `POST /configuration-releases` — bundle constructor: `.zitadel/` in,
   release out; unchanged resources reuse their newest revision.
-- `POST /flow` — resolves environment and release, logs, echoes headers. The
-  flow definition itself still resolves to the newest revision; pinning from
-  the release is #536.
+- `POST /flow` — resolves environment and release, logs, echoes headers, and
+  puts the resolution on the request context. The flow definition resolves
+  among the release's pinned revisions (by name or audience), the release id
+  is sealed into the flow state, and branding on every step of the attempt
+  reads the release's pointer. An environment with nothing deployed serves
+  the newest revisions.
+- `zitadel setup` — after scaffolding, builds the first release from
+  `.zitadel/` and deploys it to `live` on development and, when configured,
+  production; failure is a warning pointing at `zitadel deploy`.
 - `zitadel deploy [--env] [--release]` — bundle → release → deploy to `live`
   of the target project.
 - `zitadel preview [--name] [--origin …] [--ttl]` — bundle → release →
@@ -123,8 +129,8 @@ keeps being served by it regardless of origin.
 Listed here rather than wired, so the prototype keeps one resolution point.
 Each reads project configuration and today serves the newest revision:
 
-- `POST /flow/{id}/submit`, `GET /flow/{id}` — should stay bound to the
-  release the flow started on (pin it in the sealed state).
+- Pivots inside a running flow (child definitions by name) — still the
+  newest revision, not the sealed release's.
 - `POST /sessions/exchange` — the schema revision the user was created with.
 - `GET /sessions/me`, `/users/me` — user schema for rendering.
 - Branding inside flow responses (`resolveBranding`) — the release's

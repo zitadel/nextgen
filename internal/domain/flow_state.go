@@ -23,6 +23,13 @@ type FlowState struct {
 	// reshape in-flight data.
 	UserSchemaURL string
 
+	// ReleaseID is the configuration release the flow started on, when the
+	// request resolved to one (ADR 035). Every step of the attempt reads
+	// release-pinned configuration (branding, for one) from it, so a
+	// deployment mid-attempt leaves the attempt on what it started with.
+	// Empty when the environment had nothing deployed at start.
+	ReleaseID string
+
 	// FlowProgress is the user's current progress: which definition is
 	// running, which step is being shown, and what's been collected so
 	// far. Promoted to the top level so callers read e.g.

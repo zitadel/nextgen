@@ -31,13 +31,14 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
 	}
 
-	// Which environment and release serve this request. Logged and echoed
-	// in the response headers; the flow definition itself still resolves
-	// to the newest revision until release pinning lands (#536).
+	// Which environment and release serve this request. Logged, echoed in
+	// the response headers, and pinned for the attempt.
 	runtime, err := h.resolveRuntime(ctx, string(req.ProjectID), params.XZitadelRelease)
 	if err != nil {
 		return nil, err
 	}
+	// Downstream reads (flow definition, branding) pin to this release.
+	ctx = service.WithRuntimeResolution(ctx, runtime)
 
 	resolveReq := service.ResolveFlowRequest{
 		ProjectID: string(req.ProjectID),
@@ -308,7 +309,7 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
 		Step:      toFlowStep(result.Step),
-		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State.ProjectID)),
+		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State)),
 	}
 	if terminal && result.State.RedirectURI != nil {
 		if u, err := parseURI(*result.State.RedirectURI); err == nil {

@@ -26,19 +26,20 @@ import (
 // the resolution itself happens once the project is known, inside the
 // handler, because the project id arrives in the request body.
 //
-// Wired into POST /flow today. Every other public endpoint that reads
-// project configuration has to resolve the same way before configuration
-// stops being "the newest revision"; they are listed here rather than wired,
-// so the prototype keeps one resolution point:
+// Wired into POST /flow today: the resolution rides the context
+// (service.WithRuntimeResolution), the flow definition resolves among the
+// release's pinned revisions, the release id is sealed into the flow state,
+// and branding on every step of the attempt reads the release's pointer.
+// Every other public endpoint that reads project configuration has to
+// resolve the same way before configuration stops being "the newest
+// revision"; they are listed here rather than wired, so the prototype keeps
+// one resolution point:
 //
-//   - POST /flow/{id}/submit and GET /flow/{id}: the flow's revisions are
-//     pinned in the sealed state at start, so these keep serving the release
-//     the flow started on (ADR 035: an in-flight attempt stays bound).
 //   - POST /sessions/exchange: the schema revision the session's user was
 //     created against.
 //   - GET /sessions/me and the /users/me family: user schema for rendering.
-//   - branding reads inside flow responses (resolveBranding): today the
-//     newest branding revision, tomorrow the release's branding pointer.
+//   - pivots inside a running flow (child definitions by name) still resolve
+//     the newest revision rather than the sealed release's.
 //   - the console runtime document (/console/runtime.json).
 
 type runtimeOriginKey struct{}

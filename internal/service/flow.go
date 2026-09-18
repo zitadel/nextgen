@@ -86,11 +86,68 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
+// Resolve picks the definition that serves the request. When the request
+// resolved to a release (see WithRuntimeResolution), only the revisions
+// that release pins are candidates: by name, the one pinned under that
+// handle; by audience, the pinned set scored as usual. A release pinning
+// no flow definition falls back to the newest revisions, as does a request
+// without a release.
 func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
+	pinned := PinnedRevisions(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)
+	if len(pinned) > 0 {
+		return s.resolvePinned(ctx, req, pinned)
+	}
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
 	return s.resolveByAudience(ctx, req)
+}
+
+// resolvePinned resolves among the flow definitions a release pins.
+func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest, pinned map[string]string) (*domain.FlowDefinition, error) {
+	if req.Name != nil {
+		revisionID, ok := pinned[*req.Name]
+		if !ok {
+			return nil, domain.ErrFlowDefinitionNotFound()
+		}
+		def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.ProjectID, revisionID)
+		if err != nil {
+			return nil, err
+		}
+		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
+			return nil, domain.ErrFlowDefinitionNotFound()
+		}
+		if !flowServesPurpose(def, req.Purpose) {
+			return nil, domain.ErrFlowDefinitionPurposeMismatch()
+		}
+		return def, nil
+	}
+
+	var best *domain.FlowDefinition
+	bestScore := -1
+	for _, revisionID := range pinned {
+		def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.ProjectID, revisionID)
+		if err != nil {
+			return nil, err
+		}
+		if def.Status != domain.FlowDefinitionStatusActive || !flowServesPurpose(def, req.Purpose) {
+			continue
+		}
+		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
+			continue
+		}
+		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
+			continue
+		}
+		score := flowAudienceScore(def, req.Hint)
+		if score > bestScore || (score == bestScore && flowCreatedAfter(def, best)) {
+			best, bestScore = def, score
+		}
+	}
+	if best == nil {
+		return nil, domain.ErrFlowDefinitionNotFound()
+	}
+	return best, nil
 }
 
 func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
@@ -251,6 +308,11 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, err
 	}
 	result.State.ID = flowID
+	// The release this attempt started on rides in the sealed state, so a
+	// deployment mid-attempt does not change the configuration under it.
+	if release := ReleaseFromContext(ctx); release != nil {
+		result.State.ReleaseID = release.ID
+	}
 
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }

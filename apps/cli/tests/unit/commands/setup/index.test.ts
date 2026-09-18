@@ -313,15 +313,20 @@ describe("setup command pre-flight", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { status: string; warnings: string[] };
     expect(json.status).toBe("ok");
-    expect(json.warnings).toHaveLength(1);
+    // The mock server has no release endpoints, so the initial-release step
+    // adds its own warning; only the design warning is under test here.
+    const designWarnings = json.warnings.filter((w) =>
+      w.includes(".zitadel/branding/branding.json"),
+    );
+    expect(designWarnings).toHaveLength(1);
     // The wrapper setup scaffolds around the widget is full-width, so the
     // brand pane does render in the page we just wrote. Telling the user it
     // shows the compact mark "instead" sends them hunting a rendering bug
     // that isn't happening — the warning states the container-width contract
     // and the branding.json fix for the narrow case.
-    expect(json.warnings[0]).not.toMatch(/this app/i);
-    expect(json.warnings[0]).toContain("container is wide");
-    expect(json.warnings[0]).toContain(".zitadel/branding/branding.json");
+    expect(designWarnings[0]).not.toMatch(/this app/i);
+    expect(designWarnings[0]).toContain("container is wide");
+    expect(designWarnings[0]).toContain(".zitadel/branding/branding.json");
   });
 
   it("warns in page posture too — the collapse is a container query, not a posture", async () => {
@@ -360,9 +365,9 @@ describe("setup command pre-flight", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { status: string; warnings: string[] };
     expect(json.status).toBe("ok");
-    expect(json.warnings).toHaveLength(1);
-    expect(json.warnings[0]).toContain("The split design");
-    expect(json.warnings[0]).toContain(".zitadel/branding/branding.json");
+    const designWarnings = json.warnings.filter((w) => w.includes("The split design"));
+    expect(designWarnings).toHaveLength(1);
+    expect(designWarnings[0]).toContain(".zitadel/branding/branding.json");
   });
 });
 

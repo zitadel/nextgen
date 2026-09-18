@@ -51,6 +51,13 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
+import {
+  buildRelease,
+  connectEnvironment,
+  deployRelease,
+  LIVE_ENVIRONMENT,
+  syncLiveOrigins,
+} from "../../lib/ship";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
@@ -453,6 +460,49 @@ export default class Setup extends BaseCommand {
       files_written_count: allFilesWritten.length,
     });
 
+    // The scaffolded configuration becomes the first release, live on every
+    // project setup created: development always, production when the wizard
+    // configured one (previews share its project). Until this runs an
+    // environment has nothing deployed and serves the newest revisions,
+    // which is the same content — so a failure here is a warning with the
+    // command that finishes the job, not a failed setup.
+    const initialReleases: Record<string, { release_id: string; deployment_id: string }> = {};
+    const releaseWarnings: string[] = [];
+    if (!dryRun) {
+      const targets = ["development", ...(environments.production ? ["production"] : [])];
+      for (const name of targets) {
+        try {
+          consola.start(`Building the initial release for ${name}`);
+          const { target, client } = await connectEnvironment({
+            cwd,
+            name,
+            env: this.meta.env,
+            serverFlag: name === "development" ? this.meta.serverFlag : undefined,
+          });
+          if (name !== "development") {
+            await syncLiveOrigins({ client, target });
+          }
+          const message = "initial release from zitadel setup";
+          const release = await buildRelease({ cwd, client, target, message });
+          const deployment = await deployRelease({
+            client,
+            target,
+            environment: LIVE_ENVIRONMENT,
+            releaseID: release.id,
+            message,
+          });
+          initialReleases[name] = { release_id: release.id, deployment_id: deployment.id };
+        } catch (error) {
+          const cause = toZitadelError(error);
+          const warning =
+            `The initial release for ${name} was not deployed: ${cause.message}. ` +
+            `Run \`zitadel deploy --env ${name}\` to deploy it.`;
+          releaseWarnings.push(warning);
+          consola.warn(warning);
+        }
+      }
+    }
+
     if (!dryRun) {
       // Record what was actually scaffolded so `doctor` can later verify the
       // app files without guessing from current templates (missing vs edited
@@ -536,7 +586,7 @@ export default class Setup extends BaseCommand {
     // branding's absence read as a rendering bug. Keyed to the design alone:
     // the collapse is a container query, so posture doesn't decide it (see
     // `designWarnings`).
-    const warnings = designWarnings(answers.design);
+    const warnings = [...designWarnings(answers.design), ...releaseWarnings];
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, framework.id);
       const sections = buildSummary({
@@ -587,6 +637,10 @@ export default class Setup extends BaseCommand {
         project: { project_id: project.id, issuer },
         framework: framework.id,
         server: answers.server,
+        // The first release of the scaffolded configuration, live on each
+        // project setup created; absent for an environment when the
+        // deployment failed (see `warnings`).
+        releases: initialReleases,
         files_written: allFilesWritten.map((file) => relativeDisplay(cwd, file)),
         // Typed per-artifact rows for the scaffolded app files (the sync
         // resources continue to report through files_written): one row per
