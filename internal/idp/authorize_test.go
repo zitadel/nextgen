@@ -17,7 +17,7 @@ import (
 
 const redirectURI = "https://app.example.test/__nextgen/idp/callback"
 
-func TestOIDCClientAuthorize(t *testing.T) {
+func TestNewAuthorizeRedirect(t *testing.T) {
 	// Every endpoint is overridden, so construction makes no request; the
 	// server fails the test if one arrives.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +149,7 @@ func TestOIDCClientAuthorize(t *testing.T) {
 			c, err := NewOIDCClient(context.Background(), tt.conn(base), redirectURI, srv.Client())
 			require.NoError(t, err)
 
-			got, err := c.Authorize(tt.req)
+			got, err := NewAuthorizeRedirect(c, tt.req)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -168,7 +168,7 @@ func TestOIDCClientAuthorize(t *testing.T) {
 
 // TestOIDCClientAuthorizeViaDiscovery covers the other construction path:
 // no override, so the authorize URL is the one discovery named.
-func TestOIDCClientAuthorizeViaDiscovery(t *testing.T) {
+func TestNewAuthorizeRedirectViaDiscovery(t *testing.T) {
 	srv := httptest.NewServer(discoveryHandler(t))
 	t.Cleanup(srv.Close)
 	conn := Connection{
@@ -183,7 +183,7 @@ func TestOIDCClientAuthorizeViaDiscovery(t *testing.T) {
 	c, err := NewOIDCClient(context.Background(), conn, redirectURI, srv.Client())
 	require.NoError(t, err)
 
-	got, err := c.Authorize(AuthorizeRequest{State: "state-1", Nonce: "nonce-1", PKCEVerifier: "verifier-1"})
+	got, err := NewAuthorizeRedirect(c, AuthorizeRequest{State: "state-1", Nonce: "nonce-1", PKCEVerifier: "verifier-1"})
 
 	require.NoError(t, err)
 	u, err := url.Parse(got.URL)

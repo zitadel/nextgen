@@ -128,15 +128,15 @@ func newDiscoveredClient(ctx context.Context, conn Connection, redirectURI strin
 	// key set, so a cleartext or missing jwks_uri surfaces at the callback's
 	// first verification instead. Closing that needs an endpoint getter
 	// upstream.
-	if err := validDiscovered("authorization_endpoint", party.OAuthConfig().Endpoint.AuthURL); err != nil {
+	if err := validateDiscoveredEndpoint("authorization_endpoint", party.OAuthConfig().Endpoint.AuthURL); err != nil {
 		return nil, err
 	}
-	if err := validDiscovered("token_endpoint", party.OAuthConfig().Endpoint.TokenURL); err != nil {
+	if err := validateDiscoveredEndpoint("token_endpoint", party.OAuthConfig().Endpoint.TokenURL); err != nil {
 		return nil, err
 	}
 	c := &OIDCClient{conn: conn, redirectURI: redirectURI, party: party, verifier: party.IDTokenVerifier()}
 	if !conn.OIDC.IDTokenMapping {
-		if err := validDiscovered("userinfo_endpoint", party.UserinfoEndpoint()); err != nil {
+		if err := validateDiscoveredEndpoint("userinfo_endpoint", party.UserinfoEndpoint()); err != nil {
 			return nil, err
 		}
 		c.userinfo = party.UserinfoEndpoint()
@@ -172,9 +172,9 @@ func newStaticClient(conn Connection, redirectURI string, httpClient *http.Clien
 	return &OIDCClient{conn: conn, redirectURI: redirectURI, party: party, verifier: verifier, userinfo: conn.OIDC.UserinfoEndpoint}, nil
 }
 
-// validDiscovered fails when a discovery document omits a necessary endpoint or
-// names one that is not https.
-func validDiscovered(name, value string) error {
+// validateDiscoveredEndpoint fails when a discovery document omits a
+// necessary endpoint or names one that is not https.
+func validateDiscoveredEndpoint(name, value string) error {
 	if value == "" {
 		return domain.ErrIDPDiscoveryFailed(fmt.Errorf("missing %s in discovery", name))
 	}

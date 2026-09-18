@@ -59,11 +59,12 @@ var reservedAuthorizeParameters = []string{
 	"client_assertion",
 }
 
-// Authorize builds the authorize URL for one attempt. The engine sets every
-// protocol parameter itself: client_id, redirect_uri, response_type=code,
-// scope, state, nonce, and an S256 code challenge when PKCE is enabled. The
-// connection's static parameters follow, minus the reserved keys.
-func (c *OIDCClient) Authorize(req AuthorizeRequest) (AuthorizeRedirect, error) {
+// NewAuthorizeRedirect builds the authorize URL for one attempt. The engine
+// sets every protocol parameter itself: client_id, redirect_uri,
+// response_type=code, scope, state, nonce, and an S256 code challenge when
+// PKCE is enabled. The connection's static parameters follow, minus the
+// reserved keys.
+func NewAuthorizeRedirect(c *OIDCClient, req AuthorizeRequest) (AuthorizeRedirect, error) {
 	if req.State == "" {
 		return AuthorizeRedirect{}, domain.ErrInternal(errors.New("authorize request: state is empty"))
 	}
