@@ -134,6 +134,32 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 	return r, ht.ErrNotImplemented
 }
 
+// CreateIdp implements createIdp operation.
+//
+// Creates or revises a connection document. If the slug does not already
+// exist, a new connection is created. If a connection with that slug already
+// exists, a revision is created.
+// A revision gets a new `revision_id` and does not modify the connection
+// `id`, so identity links that reference the connection keep resolving while
+// releases and auth attempts stay pinned to the revision they captured.
+// Identity fields are fixed for the life of the connection and a revision
+// that changes one is rejected: `protocol`, `subject_claim`, and the
+// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
+// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+// account a stored subject belongs to, so changing one would silently
+// repoint existing identities at a different provider.
+// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
+// OIDC connection, `sub` is used as the default value. If a revision updates
+// `subject_claim` to a different value than the one set during creation, the
+// request is rejected.
+// The document is validated against the `idp-connection.json` schema before
+// anything is stored.
+//
+// POST /idps
+func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (r CreateIdpRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateProject implements createProject operation.
 //
 // Create project.
@@ -418,6 +444,28 @@ func (UnimplementedHandler) GetHealth(ctx context.Context) (r GetHealthRes, _ er
 	return r, ht.ErrNotImplemented
 }
 
+// GetIdpById implements getIdpById operation.
+//
+// Reads a connection by its id, at its newest revision.
+// `GET /idps/{id}/revisions` lists every revision of the connection.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /idps/{id}
+func (UnimplementedHandler) GetIdpById(ctx context.Context, params GetIdpByIdParams) (r GetIdpByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetIdpRevisionById implements getIdpRevisionById operation.
+//
+// Reads one revision of a connection by its `revision_id`, the value an auth
+// attempt or a release pins.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /idps/revisions/{revision_id}
+func (UnimplementedHandler) GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (r GetIdpRevisionByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetLive implements getLive operation.
 //
 // Check whether the server is started.
@@ -601,6 +649,17 @@ func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params List
 	return r, ht.ErrNotImplemented
 }
 
+// ListIdpRevisions implements listIdpRevisions operation.
+//
+// Returns every revision of one connection, newest first, paginated with a
+// cursor. The order is fixed, so there is no `sorting`.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /idps/{id}/revisions
+func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (r ListIdpRevisionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListMyProjects implements listMyProjects operation.
 //
 // The projects the signed-in user holds an active grant on, either directly or
@@ -710,6 +769,16 @@ func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserReq
 //
 // POST /grants/query
 func (UnimplementedHandler) QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (r QueryGrantsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryIdps implements queryIdps operation.
+//
+// Returns the identity provider connections of a project, paginated with a
+// cursor. One row per connection, carrying its newest revision.
+//
+// POST /idps/query
+func (UnimplementedHandler) QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (r QueryIdpsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

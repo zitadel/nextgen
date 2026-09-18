@@ -23,6 +23,8 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      idp.read: Permission to read identity provider connections
+      idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
@@ -66,6 +68,8 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      idp.read: Permission to read identity provider connections
+      idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
