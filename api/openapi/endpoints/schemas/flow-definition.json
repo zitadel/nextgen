@@ -175,6 +175,125 @@
         "name"
       ],
       "additionalProperties": false,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "sso_providers"
+            ],
+            "properties": {
+              "sso_providers": {
+                "minItems": 1
+              }
+            },
+            "anyOf": [
+              {
+                "not": {
+                  "required": [
+                    "transitions"
+                  ]
+                }
+              },
+              {
+                "properties": {
+                  "transitions": {
+                    "not": {
+                      "required": [
+                        "callback"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "required": [
+              "complete"
+            ],
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ],
+                "properties": {
+                  "fields": {
+                    "minItems": 1
+                  }
+                }
+              },
+              {
+                "required": [
+                  "actions"
+                ],
+                "properties": {
+                  "actions": {
+                    "minItems": 1
+                  }
+                }
+              },
+              {
+                "required": [
+                  "sso_providers"
+                ],
+                "properties": {
+                  "sso_providers": {
+                    "minItems": 1
+                  }
+                }
+              },
+              {
+                "required": [
+                  "gates"
+                ],
+                "properties": {
+                  "gates": {
+                    "minProperties": 1
+                  }
+                }
+              },
+              {
+                "required": [
+                  "transitions"
+                ],
+                "properties": {
+                  "transitions": {
+                    "minProperties": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "not": {
+              "required": [
+                "complete"
+              ]
+            },
+            "properties": {
+              "fields": {
+                "maxItems": 0
+              },
+              "actions": {
+                "maxItems": 0
+              },
+              "sso_providers": {
+                "maxItems": 0
+              },
+              "gates": {
+                "maxProperties": 0
+              },
+              "transitions": {
+                "not": {
+                  "required": [
+                    "callback"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
       "description": "A step in a flow definition. This is the admin-authored configuration,\nnot the runtime payload sent to the frontend.\n\nSteps are schema-driven: `fields` references properties from the flow's\nuser schema, and the engine resolves field metadata (type, validation,\nimplicit outcomes) from schema annotations at runtime.\n\nA step with only `complete` set is a terminal step. All other steps are\nrendered to the frontend as capability payloads.\n",
       "properties": {
         "name": {
@@ -239,18 +358,11 @@
         },
         "sso_providers": {
           "type": "array",
-          "description": "List of connection slugs offered on this step. Each entry must match\nthe `slug` of a connection in the project; the connection supplies the\ndisplay name and template at render time. When non-empty, the step\nmust define a `transitions.callback` entry — the engine handles the\nreserved `sso` action transparently and fires `callback` on this step\nwhen the IdP returns.\n",
+          "description": "Available SSO identity providers for this step.",
           "items": {
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9_-]*$",
-            "maxLength": 64
+            "$ref": "#/$defs/SsoProvider"
           },
           "default": [],
-          "uniqueItems": true,
-          "example": [
-            "google",
-            "github"
-          ],
           "examples": [
             [
               {
@@ -264,8 +376,7 @@
         "on_success": {
           "type": "string",
           "enum": [
-            "create_user",
-            "create_user_with_sso"
+            "create_user"
           ],
           "description": "Server-side mutation to execute when this step completes successfully.\nRuns after field validation passes, before the transition fires.\n\n- create_user: creates the user record (registration flows)\n",
           "examples": [
@@ -334,7 +445,21 @@
                 "description": "Local re-purposing. When set, taking this transition changes the\nflow's current purpose to this value — the dispatch mode a step's\nchallenges run under — while the flow's original purpose stays\npinned. Must be a purpose this definition serves, and `target`\nmust be that purpose's entry step. Mutually exclusive with\n`action`: a transition either re-purposes within this flow or\ntargets another flow, never both.\nExample: a \"Sign up\" navigation on the login identifier step\n(`{ target: register, purpose: register }`).\n"
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "not": {
+              "required": [
+                "purpose",
+                "action"
+              ],
+              "properties": {
+                "purpose": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "examples": [
             {
@@ -435,6 +560,39 @@
             {
               "site_key": "0x4AAAAAAA-example-site-key"
             }
+          ]
+        }
+      }
+    },
+    "SsoProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "template"
+      ],
+      "description": "An available SSO identity provider.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Provider instance identifier.",
+          "examples": [
+            "google"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the provider.",
+          "examples": [
+            "Google"
+          ]
+        },
+        "template": {
+          "type": "string",
+          "description": "Template hint for rendering (logo, colors).",
+          "examples": [
+            "google"
           ]
         }
       }

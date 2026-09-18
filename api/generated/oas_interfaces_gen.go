@@ -193,6 +193,10 @@ type ListFlowDefinitionsRes interface {
 	listFlowDefinitionsRes()
 }
 
+type ListMyProjectsRes interface {
+	listMyProjectsRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }

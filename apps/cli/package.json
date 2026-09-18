@@ -30,7 +30,9 @@
   "oclif": {
     "bin": "zitadel",
     "dirname": "zitadel",
+    "description": "Manage your Zitadel project and local identity server from the command line.",
     "commands": "./dist/commands",
+    "helpClass": "./dist/lib/oclif/help",
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",

@@ -16,7 +16,7 @@ import {
   readRuntimeMetadata,
   runtimeSummary,
 } from "../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import {
   hasZitadelConfig,
@@ -37,6 +37,8 @@ import { publicCliCommand } from "../lib/public-cli";
  */
 export default class Status extends BaseCommand {
   static override description = "Summarize the local Zitadel server and project state.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 3;
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Status);

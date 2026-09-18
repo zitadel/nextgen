@@ -23,7 +23,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
@@ -55,6 +55,8 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  */
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 3;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: Flags.string({ description: "Container image to check." }),

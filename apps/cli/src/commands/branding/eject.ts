@@ -19,7 +19,7 @@ import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO } from "../../lib/branding/designs";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
 import {
   normalizePublicCliJson,
@@ -41,6 +41,8 @@ import {
 export default class BrandingEject extends BaseCommand {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
+  static override group = CommandGroups.configuration;
+  static override groupOrder = 4;
   static override flags = {
     design: Flags.string({
       description: `Design to start from (default: ${DEFAULT_BRANDING_DESIGN}).`,
