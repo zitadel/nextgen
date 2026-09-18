@@ -24727,13 +24727,25 @@ type IdentifierChallengePayload struct{}
 // Identifier-specific factor metadata.
 // Ref: #
 type IdentifierFactorPayload struct {
+	// Always `identifier`; the discriminator of the payload union.
+	Method FactorMethod `json:"method"`
 	// The identified user ID.
 	UserID UserID `json:"user_id"`
+}
+
+// GetMethod returns the value of Method.
+func (s *IdentifierFactorPayload) GetMethod() FactorMethod {
+	return s.Method
 }
 
 // GetUserID returns the value of UserID.
 func (s *IdentifierFactorPayload) GetUserID() UserID {
 	return s.UserID
+}
+
+// SetMethod sets the value of Method.
+func (s *IdentifierFactorPayload) SetMethod(val FactorMethod) {
+	s.Method = val
 }
 
 // SetUserID sets the value of UserID.
@@ -24742,10 +24754,17 @@ func (s *IdentifierFactorPayload) SetUserID(val UserID) {
 }
 
 // Proof for `identifier` method.
+// A project decides for itself which attributes identify a user — a login flow
+// step collects `email`, `username`, `phone`, or several of them — so the proof
+// names the attribute the value belongs to rather than the server assuming one.
+// The attribute must be registered unique for the project; a value matching only
+// a non-unique property resolves nobody.
 // Ref: #
 type IdentifierProof struct {
-	// The login name or email being identified.
+	// The value being identified, as the user typed it.
 	LoginName string `json:"login_name"`
+	// The user attribute `login_name` is a value of.
+	AttributeName string `json:"attribute_name"`
 }
 
 // GetLoginName returns the value of LoginName.
@@ -24753,9 +24772,19 @@ func (s *IdentifierProof) GetLoginName() string {
 	return s.LoginName
 }
 
+// GetAttributeName returns the value of AttributeName.
+func (s *IdentifierProof) GetAttributeName() string {
+	return s.AttributeName
+}
+
 // SetLoginName sets the value of LoginName.
 func (s *IdentifierProof) SetLoginName(val string) {
 	s.LoginName = val
+}
+
+// SetAttributeName sets the value of AttributeName.
+func (s *IdentifierProof) SetAttributeName(val string) {
+	s.AttributeName = val
 }
 
 // Ref: #
@@ -40719,6 +40748,8 @@ func (s *PasskeyChallengePayloadPublicKeyUserVerification) UnmarshalText(data []
 // Passkey-specific factor metadata including credential and verification details.
 // Ref: #
 type PasskeyFactorPayload struct {
+	// Always `passkey`; the discriminator of the payload union.
+	Method FactorMethod `json:"method"`
 	// The credential ID that was used.
 	CredentialID string `json:"credential_id"`
 	// Whether user verification was performed (PIN/biometric).
@@ -40729,6 +40760,11 @@ type PasskeyFactorPayload struct {
 	BackupState OptBool `json:"backup_state"`
 	// Authenticator attachment modality.
 	AuthenticatorAttachment OptPasskeyFactorPayloadAuthenticatorAttachment `json:"authenticator_attachment"`
+}
+
+// GetMethod returns the value of Method.
+func (s *PasskeyFactorPayload) GetMethod() FactorMethod {
+	return s.Method
 }
 
 // GetCredentialID returns the value of CredentialID.
@@ -40754,6 +40790,11 @@ func (s *PasskeyFactorPayload) GetBackupState() OptBool {
 // GetAuthenticatorAttachment returns the value of AuthenticatorAttachment.
 func (s *PasskeyFactorPayload) GetAuthenticatorAttachment() OptPasskeyFactorPayloadAuthenticatorAttachment {
 	return s.AuthenticatorAttachment
+}
+
+// SetMethod sets the value of Method.
+func (s *PasskeyFactorPayload) SetMethod(val FactorMethod) {
+	s.Method = val
 }
 
 // SetCredentialID sets the value of CredentialID.
@@ -40872,9 +40913,23 @@ func (s *PasskeyProofPasskeyAssertion) init() PasskeyProofPasskeyAssertion {
 // Ref: #
 type PasswordChallengePayload struct{}
 
-// Password authentication has no additional metadata beyond the base factor fields.
+// Password authentication carries no metadata beyond the discriminator the
+// `payload` union resolves on.
 // Ref: #
-type PasswordFactorPayload struct{}
+type PasswordFactorPayload struct {
+	// Always `password`; the discriminator of the payload union.
+	Method FactorMethod `json:"method"`
+}
+
+// GetMethod returns the value of Method.
+func (s *PasswordFactorPayload) GetMethod() FactorMethod {
+	return s.Method
+}
+
+// SetMethod sets the value of Method.
+func (s *PasswordFactorPayload) SetMethod(val FactorMethod) {
+	s.Method = val
+}
 
 // Proof for `password` method.
 // Ref: #
