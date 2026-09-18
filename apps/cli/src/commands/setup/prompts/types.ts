@@ -39,10 +39,22 @@ export type SetupAnswers = {
 /** One environment as answered in the wizard, before projects exist. */
 export type EnvironmentAnswer = {
   name: string;
-  /** Server origin or `local`. */
+  /**
+   * Server origin or `local`. Ignored when `sharesProjectOf` is set: the
+   * environment then lives wherever that project lives.
+   */
   server: string;
-  /** Own project with its own users, created by setup, instead of sharing. */
+  /**
+   * Own project with its own users, created by setup. Neither this nor
+   * `sharesProjectOf` means the development project (the one setup creates
+   * first).
+   */
   isolated: boolean;
+  /**
+   * Name of the environment whose project this one shares: previews live
+   * on production's project so they run against real-shaped data.
+   */
+  sharesProjectOf?: string;
   /**
    * Where the frontend runs for this environment: bare origins or a
    * leftmost-label wildcard (`https://*.vercel.app`). Registered on the

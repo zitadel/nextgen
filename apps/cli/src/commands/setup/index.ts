@@ -275,10 +275,10 @@ export default class Setup extends BaseCommand {
     const projectName = defaultProjectName(cwd, framework.id);
     // Register the app's own origin so the backend's origin check allows
     // requests the dev proxy forwards from it — plus the origins of every
-    // environment that shares this project, so previews and production
-    // deployments are allowed from the start.
-    const sharedOrigins = (answers.environments ?? [])
-      .filter((answer) => !answer.isolated)
+    // environment that shares this (the development) project.
+    const declared = answers.environments ?? [];
+    const sharedOrigins = declared
+      .filter((answer) => !answer.isolated && !answer.sharesProjectOf)
       .flatMap((answer) => answer.origins ?? []);
     const project = dryRun
       ? dryRunProject(issuer)
@@ -304,14 +304,31 @@ export default class Setup extends BaseCommand {
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
 
-    // Every declared environment maps to a project on a server. Shared ones
-    // reuse the project just created; isolated ones get their own project
-    // (an empty user base) on their server, created right here so the map
-    // written to zitadel.json never names a project that does not exist.
+    // Every declared environment maps to a project on a server. Plain ones
+    // reuse the development project just created; isolated ones (production)
+    // get their own project on their server, created right here so the map
+    // written to zitadel.json never names a project that does not exist;
+    // sharing ones (preview) point at the project of the environment they
+    // name and only add their origins to it.
     const environments: Record<string, { server: string; project: string; origins?: string[] }> =
       {};
     const isolatedSecrets: Array<{ name: string; secret: CreateProject201 }> = [];
-    for (const answer of answers.environments ?? []) {
+    for (const answer of declared) {
+      if (answer.sharesProjectOf) {
+        const host = environments[answer.sharesProjectOf];
+        if (!host) {
+          throw new ZitadelError(
+            "E_VALIDATION",
+            `Environment "${answer.name}" shares the project of "${answer.sharesProjectOf}", which is not configured`,
+          );
+        }
+        environments[answer.name] = {
+          server: host.server,
+          project: host.project,
+          origins: answer.origins,
+        };
+        continue;
+      }
       if (!answer.isolated) {
         environments[answer.name] = {
           server: answer.server,
@@ -320,6 +337,14 @@ export default class Setup extends BaseCommand {
         };
         continue;
       }
+      // The project's allowlist takes the origins of every environment that
+      // will share it, so previews are allowed from the first deployment.
+      const projectOrigins = [
+        ...(answer.origins ?? []),
+        ...declared
+          .filter((other) => other.sharesProjectOf === answer.name)
+          .flatMap((other) => other.origins ?? []),
+      ];
       const isolated = dryRun
         ? dryRunProject(issuer)
         : await createProjectWithLocalHint(
@@ -327,10 +352,10 @@ export default class Setup extends BaseCommand {
             answer.server,
             this.meta.cliVersion,
             `${projectName}-${answer.name}`,
-            answer.origins?.length ? answer.origins : [issuer],
+            projectOrigins.length > 0 ? [...new Set(projectOrigins)] : [issuer],
             { ...retryOptionsFromFlags(flags), framework: framework.id },
           );
-      consola.success(`Created isolated project ${isolated.id} for ${answer.name}`);
+      consola.success(`Created ${answer.name} project ${isolated.id} on ${answer.server}`);
       environments[answer.name] = {
         server: answer.server,
         project: isolated.id,

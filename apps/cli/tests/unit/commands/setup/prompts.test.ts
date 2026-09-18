@@ -139,16 +139,16 @@ describe("ServerPrompt", () => {
     // The text prompt must not fire when the user picks the detected server.
     expect(text).not.toHaveBeenCalled();
 
-    // The detected URL sits between the Cloud row and the "Custom URL"
-    // sentinel, and is the preselected answer — the user just ran
-    // `zitadel start`, so local is almost certainly what they want.
+    // The detected URL leads the list, ahead of the Cloud row and the
+    // "Custom URL" sentinel, and is the preselected answer — the question is
+    // about local development and the user just ran `zitadel start`.
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       initialValue: "http://localhost:8080",
     });
     const values = selectOptionsFromFirstCall().map((option) => option.value);
     expect(values).toEqual([
-      "https://api.zitadel.cloud",
       "http://localhost:8080",
+      "https://api.zitadel.cloud",
       "__custom__",
     ]);
   });

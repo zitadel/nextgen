@@ -35,22 +35,22 @@ export class ServerPrompt implements SetupPrompt {
     const detected = await detectLocalServer(ctx.cwd);
 
     const choice = await select({
-      message: "Which server should zitadel.json point to?",
+      message: "Which Zitadel server does local development use?",
       options: [
-        {
-          value: DEFAULT_SERVER,
-          label: "Zitadel Cloud (api.zitadel.cloud)",
-          hint: "recommended for real projects",
-        },
         ...(detected
           ? [
               {
                 value: detected,
                 label: `Local Zitadel server (${detected})`,
-                hint: "detected — started with zitadel start",
+                hint: "detected — started with zitadel start; recommended",
               },
             ]
           : []),
+        {
+          value: DEFAULT_SERVER,
+          label: "Zitadel Cloud (api.zitadel.cloud)",
+          hint: detected ? "no local server" : "run `zitadel start` for a local one",
+        },
         { value: CUSTOM, label: "Custom URL (self-hosted)" },
       ],
       initialValue: detected ?? answers.server ?? DEFAULT_SERVER,

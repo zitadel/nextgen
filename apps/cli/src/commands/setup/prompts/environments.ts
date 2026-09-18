@@ -1,74 +1,84 @@
-import { multiselect, select, text } from "@clack/prompts";
+import { confirm, select, text } from "@clack/prompts";
 
 import { DEFAULT_SERVER } from "../../../lib/server";
 import { bail } from "./cancel";
 import type { EnvironmentAnswer, PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
-const SAME_SERVER = "__same__";
+const SAME_AS_LOCAL = "__local__";
 const CUSTOM = "__custom__";
+const LATER = "__later__";
+
+/** Vercel preview deployments: `<app>-<branch>-<team>.vercel.app`. */
+export const DEFAULT_PREVIEW_ORIGIN_PATTERN = "https://*.vercel.app";
 
 /**
- * "Which environments does this app run in?" — maps each frontend
- * environment to a project on a server, written to `zitadel.json`.
+ * Where the app runs beyond the developer's machine, written to
+ * `zitadel.json` as the `environments` map.
  *
- * `development` is always present and points at the setup server and the
- * project setup creates. `preview` and `production` are offered on top;
- * each picks a server and whether it shares the project (same users as
- * development, the recommended shape) or gets an isolated project of its own
- * (an empty user base, for destructive testing). Previews on the server are
- * created later by `zitadel preview`; nothing is provisioned here beyond the
- * isolated projects, which setup creates right after the main one.
+ * The usual shape: `development` talks to the local server (the one chosen
+ * just before this prompt) on its own project, so local testing never
+ * touches real users. `production` talks to Zitadel Cloud or a self-hosted
+ * server on a project of its own, created by setup. `preview` deployments
+ * share production's project — they exist to try a configuration release
+ * against real-shaped data — and only differ in the origin they are served
+ * from, which is a per-deployment hostname on hosting platforms, hence a
+ * wildcard pattern.
+ *
+ * Production can be deferred (`later`): the map then holds `development`
+ * only and the entry is added by hand when the production server is known.
  */
 export class EnvironmentsPrompt implements SetupPrompt {
-  async ask(answers: SetupAnswers, _ctx: PromptContext): Promise<SetupAnswers> {
-    const picked = await multiselect({
-      message: "Which environments does this app run in?",
-      options: [
-        {
-          value: "development",
-          label: "development",
-          hint: `local app, ${answers.server}`,
-        },
-        {
-          value: "preview",
-          label: "preview",
-          hint: "per-branch / pull-request deployments (Vercel previews and the like)",
-        },
-        { value: "production", label: "production", hint: "the real thing" },
-      ],
-      initialValues: ["development", "preview", "production"],
-      required: true,
-    });
-    bail(picked);
-    const names = (picked as string[]).filter((name) => name !== "development");
+  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
+    const development: EnvironmentAnswer = {
+      name: "development",
+      server: answers.server,
+      isolated: false,
+    };
 
-    const environments: EnvironmentAnswer[] = [
-      { name: "development", server: answers.server, isolated: false },
-    ];
-    for (const name of names) {
-      environments.push(await askEnvironment(name, answers.server));
+    const production = await askProduction(answers.server, ctx);
+    if (!production) {
+      return { ...answers, environments: [development] };
+    }
+    const environments: EnvironmentAnswer[] = [development, production];
+
+    const preview = await askPreview();
+    if (preview) {
+      environments.push(preview);
     }
     return { ...answers, environments };
   }
 }
 
-async function askEnvironment(name: string, setupServer: string): Promise<EnvironmentAnswer> {
+async function askProduction(
+  localServer: string,
+  ctx: PromptContext,
+): Promise<EnvironmentAnswer | undefined> {
   const serverChoice = await select({
-    message: `Which server does ${name} use?`,
+    message: "Where does production run? (Zitadel server)",
     options: [
-      { value: SAME_SERVER, label: `Same as development (${setupServer})` },
-      ...(setupServer === DEFAULT_SERVER
-        ? []
-        : [{ value: DEFAULT_SERVER, label: "Zitadel Cloud (api.zitadel.cloud)" }]),
-      { value: CUSTOM, label: "Custom URL (self-hosted)" },
+      {
+        value: DEFAULT_SERVER,
+        label: "Zitadel Cloud (api.zitadel.cloud)",
+        hint: "recommended",
+      },
+      { value: CUSTOM, label: "Self-hosted server (URL)" },
+      {
+        value: SAME_AS_LOCAL,
+        label: `Same server as development (${localServer})`,
+        hint: "own project, so production data stays apart from local testing",
+      },
+      { value: LATER, label: "Decide later", hint: "only development is configured now" },
     ],
-    initialValue: SAME_SERVER,
+    initialValue: DEFAULT_SERVER,
   });
   bail(serverChoice);
-  let server = setupServer;
+  if (serverChoice === LATER) {
+    return undefined;
+  }
+  let server = localServer;
   if (serverChoice === CUSTOM) {
     const custom = await text({
-      message: `Server URL for ${name}`,
+      message: "Production server URL",
       placeholder: "https://zitadel.internal",
       validate: (value) => {
         try {
@@ -81,56 +91,47 @@ async function askEnvironment(name: string, setupServer: string): Promise<Enviro
     });
     bail(custom);
     server = custom as string;
-  } else if (serverChoice !== SAME_SERVER) {
+  } else if (serverChoice !== SAME_AS_LOCAL) {
     server = serverChoice as string;
   }
 
-  const projectChoice = await select({
-    message: `Should ${name} share users with development?`,
-    options: [
-      {
-        value: "shared",
-        label: "Shared — same project, same users",
-        hint: "recommended: previews test against real-shaped data",
-      },
-      {
-        value: "isolated",
-        label: "Isolated — its own project, empty user base",
-        hint: "good for destructive tests; setup creates the project now",
-      },
-    ],
-    initialValue: "shared",
+  const origin = await text({
+    message: "Where is the production app served from? (origin, leave empty to add later)",
+    placeholder: "https://app.example.com",
+    validate: (value) => (value ? validateOriginPattern(value) : undefined),
   });
-  bail(projectChoice);
-
-  // Where the frontend runs for this environment. The server only serves
-  // flows to origins on the project's allowlist, and previews on hosting
-  // platforms get a fresh hostname per deployment, so previews take a
-  // wildcard pattern (one host label) rather than a fixed origin.
-  const origins: string[] = [];
-  if (name === "preview") {
-    const pattern = await text({
-      message: "Where do preview deployments run? (origin pattern, * matches one host label)",
-      placeholder: DEFAULT_PREVIEW_ORIGIN_PATTERN,
-      initialValue: DEFAULT_PREVIEW_ORIGIN_PATTERN,
-      validate: validateOriginPattern,
-    });
-    bail(pattern);
-    if (String(pattern).trim() !== "") origins.push(String(pattern).trim());
-  } else {
-    const origin = await text({
-      message: `Where does ${name} run? (origin, leave empty to add later)`,
-      placeholder: `https://${name === "production" ? "app" : name}.example.com`,
-      validate: (value) => (value ? validateOriginPattern(value) : undefined),
-    });
-    bail(origin);
-    if (String(origin ?? "").trim() !== "") origins.push(String(origin).trim());
-  }
-  return { name, server, isolated: projectChoice === "isolated", origins };
+  bail(origin);
+  const origins = String(origin ?? "").trim() === "" ? [] : [String(origin).trim()];
+  void ctx;
+  return { name: "production", server, isolated: true, origins };
 }
 
-/** Vercel preview deployments: `<app>-<branch>-<team>.vercel.app`. */
-export const DEFAULT_PREVIEW_ORIGIN_PATTERN = "https://*.vercel.app";
+async function askPreview(): Promise<EnvironmentAnswer | undefined> {
+  const wanted = await confirm({
+    message:
+      "Use preview environments? Each branch or pull request gets its own configuration on production's project (same users, same data).",
+    initialValue: true,
+  });
+  bail(wanted);
+  if (!wanted) {
+    return undefined;
+  }
+  const pattern = await text({
+    message: "Where are preview deployments served from? (origin pattern, * matches one host label)",
+    placeholder: DEFAULT_PREVIEW_ORIGIN_PATTERN,
+    initialValue: DEFAULT_PREVIEW_ORIGIN_PATTERN,
+    validate: validateOriginPattern,
+  });
+  bail(pattern);
+  const origins = String(pattern).trim() === "" ? [] : [String(pattern).trim()];
+  return {
+    name: "preview",
+    server: "",
+    isolated: false,
+    sharesProjectOf: "production",
+    origins,
+  };
+}
 
 /**
  * Mirrors the server's origin-pattern rule: `scheme://host[:port]` where the

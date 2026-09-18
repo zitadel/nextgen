@@ -248,6 +248,16 @@ docker --image <ref>` remains the explicit image override for debugging.
 
 ### Configuration commands
 
+- Environments (interactive `setup` only): after the local server question,
+  setup asks where production runs (Zitadel Cloud, a self-hosted URL, the
+  same server as development, or later) and the production app origin, then
+  whether to use preview environments and the origin pattern their
+  deployments are served from (default `https://*.vercel.app`). Result in
+  `zitadel.json`: `development` on its own project on the local server,
+  `production` on its own project on the production server (credential in
+  `.zitadel/secret.production`), `preview` on production's project with the
+  pattern as `issuer_pattern`. Non-interactive runs configure `development`
+  only; add the other entries to `zitadel.json` by hand.
 - `deploy` — package `.zitadel/` into a release on the server
   (`POST /configuration-releases`: unchanged resources reuse their newest
   revision, changed ones get a new revision, and the set is pinned as one

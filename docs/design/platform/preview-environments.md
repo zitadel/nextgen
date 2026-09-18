@@ -113,8 +113,10 @@ keeps being served by it regardless of origin.
   of the target project.
 - `zitadel preview [--name] [--origin …] [--ttl]` — bundle → release →
   upsert `preview-<name>` → deploy there.
-- `zitadel setup` — asks which environments the app runs in and whether each
-  shares the project or gets an isolated one; writes the map above.
+- `zitadel setup` — asks for the local server (development, own project),
+  then the production server and app origin (own project, secret in
+  `.zitadel/secret.production`), then whether previews are used and their
+  origin pattern (production's project); writes the map above.
 
 ## Endpoints that also need resolution (not wired)
 
