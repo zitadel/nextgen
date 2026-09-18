@@ -24,8 +24,12 @@ describe("brandingConfigSchema", () => {
     const result = brandingConfigSchema.safeParse({
       ...base,
       $schema: "../meta/branding.json",
-      logo_url: "https://cdn.example.com/logo.svg",
-      hero_url: "https://cdn.example.com/hero.png",
+      logo_url: "https://cdn.example.com:8443/logo.svg",
+      hero_url: "https://cdn.example.com:8443/hero.png",
+      typography: {
+        font_family: "Inter, ui-sans-serif, sans-serif",
+        font_url: "https://fonts.example.com:8443/css2",
+      },
     });
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });

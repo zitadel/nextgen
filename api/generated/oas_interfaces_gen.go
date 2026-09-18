@@ -73,6 +73,10 @@ type DeleteUserByIDRes interface {
 	deleteUserByIDRes()
 }
 
+type DeleteVariableRes interface {
+	deleteVariableRes()
+}
+
 type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
 }
@@ -167,6 +171,14 @@ type GetTeamRes interface {
 
 type GetUserByIDRes interface {
 	getUserByIDRes()
+}
+
+type GetVariableRes interface {
+	getVariableRes()
+}
+
+type GetVariablesRes interface {
+	getVariablesRes()
 }
 
 type InitClaimRes interface {
@@ -271,6 +283,10 @@ type SubmitFlowStepRes interface {
 
 type UpdateTeamRes interface {
 	updateTeamRes()
+}
+
+type UpdateVariablesRes interface {
+	updateVariablesRes()
 }
 
 type VerifyChallengeProofRes interface {
