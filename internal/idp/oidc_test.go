@@ -188,8 +188,7 @@ func TestNewOIDCClient(t *testing.T) {
 			}
 			require.NoError(t, err)
 			want := tt.want(srv.URL)
-			party := c.RelyingParty()
-			config := party.OAuthConfig()
+			config := c.party.OAuthConfig()
 			assert.Equal(t, want.authorization, config.Endpoint.AuthURL)
 			assert.Equal(t, want.token, config.Endpoint.TokenURL)
 			assert.Equal(t, want.userinfo, c.UserinfoEndpoint())

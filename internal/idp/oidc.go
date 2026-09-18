@@ -67,8 +67,11 @@ const (
 type OIDCClient struct {
 	conn        Connection
 	redirectURI string
-	party       rp.RelyingParty
-	verifier    *rp.IDTokenVerifier
+	// party is OAuth2-only in static mode, so rp.CodeExchange would skip
+	// id_token verification; the callback exchanges through its own config
+	// and verifies with verifier.
+	party    rp.RelyingParty
+	verifier *rp.IDTokenVerifier
 	// userinfo is recorded here because the static constructor has no
 	// place for it. Empty under id_token_mapping.
 	userinfo string
@@ -91,11 +94,6 @@ func NewOIDCClient(ctx context.Context, conn Connection, redirectURI string, htt
 		return newDiscoveredClient(ctx, conn, redirectURI, httpClient)
 	}
 	return newStaticClient(conn, redirectURI, httpClient)
-}
-
-// RelyingParty exposes the underlying library client.
-func (c *OIDCClient) RelyingParty() rp.RelyingParty {
-	return c.party
 }
 
 // UserinfoEndpoint returns the userinfo URL, or empty when the connection
