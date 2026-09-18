@@ -81,10 +81,17 @@ type Handler interface {
 	//
 	// Bind a user or team to `project.viewer`, `project.editor`, or
 	// `project.admin` on the project identified by the `project-id` header.
-	// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-	// created here — claim owns that path. An unrevoked grant with the same
-	// principal and relation occupies the unique key even after `expires_at`;
-	// DELETE it before re-creating.
+	// Name the principal with `user` (`user_id` or `identifier`) or `team`
+	// (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+	// (`project.team`) grants are not created here — claim owns that path. An
+	// unrevoked grant with the same principal and relation occupies the unique
+	// key even after `expires_at`; DELETE it before re-creating.
+	// Create does not accept `expand`; the 201 `user` / `team` are refs only.
+	// Creating by `user.identifier` is accepted with 201 whether or not
+	// a user matched: the server may write nothing, and a duplicate
+	// returns the existing grant. Granting the session caller's own
+	// resolved user is `grant.invalid`. Other locators still 404 / 409
+	// when the principal is missing or the tuple already exists.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). Session callers are authorized as
 	// the human against the target project (home may differ). CSRF/Origin
@@ -346,6 +353,10 @@ type Handler interface {
 	// `resource_scope_index`; project scope is required on the query (same as
 	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
 	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	// `expand=principal` adds envelope fields on `user` or `team` and requires
+	// `user.read` and `team.read` in addition to `project.read` for project
+	// secrets. A user-bound Console session that already passed the project
+	// Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
@@ -615,11 +626,12 @@ type Handler interface {
 	// DELETE before re-granting. Project-secret setup (`sk_proj`) and
 	// owning-team (`relation=team`) rows are not returned. Grants are not in
 	// `resource_scope_index`; project scope is required on the query (same as
-	// get). Requires `project.read`. `expand: ["principal"]` additionally
-	// requires `user.read` and `team.read` for project secrets (documented on
-	// the expand enum; those scopes cannot be ANDed onto this security block
-	// because they are body-conditional). A user-bound Console session that
-	// already passed the project Check may expand without those scopes.
+	// get). Requires `project.read`. `expand: ["principal"]` adds envelope
+	// fields on `user` / `team` and additionally requires `user.read` and
+	// `team.read` for project secrets (documented on the expand enum; those
+	// scopes cannot be ANDed onto this security block because they are
+	// body-conditional). A user-bound Console session that already passed
+	// the project Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
