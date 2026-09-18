@@ -104,6 +104,10 @@ const ${elementName} = dynamic(
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",
+      // Pins the configuration release this deployment was built against
+      // (set by zitadel preview in the build); empty means the release the
+      // environment currently runs.
+      release: process.env.NEXT_PUBLIC_ZITADEL_RELEASE || undefined,
     });
     return function ${elementName}Element() {${localesComment}
       return (
@@ -170,6 +174,10 @@ const ZitadelSession = dynamic(
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",
+      // Pins the configuration release this deployment was built against
+      // (set by zitadel preview in the build); empty means the release the
+      // environment currently runs.
+      release: process.env.NEXT_PUBLIC_ZITADEL_RELEASE || undefined,
     });
     return function ZitadelSessionElement() {
       return (

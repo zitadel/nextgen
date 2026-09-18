@@ -85,7 +85,7 @@ func NewRuntimeResolver(v2Pool *DB) *RuntimeResolver {
 // "latest" or no selector means the environment's current deployment.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID string, selector RuntimeSelector) (*RuntimeResolution, error) {
 	stmts := r.v2Pool.Statements()
-	env, source, err := r.resolveEnvironment(ctx, stmts, projectID, selector.Origin)
+	env, source, err := r.resolveEnvironment(ctx, stmts, projectID, selector.Origin, strings.TrimSpace(selector.Release))
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID string, selecto
 	return resolution, nil
 }
 
-func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllStatements, projectID, origin string) (*domain.Environment, RuntimeEnvironmentSource, error) {
+func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllStatements, projectID, origin, releaseSelector string) (*domain.Environment, RuntimeEnvironmentSource, error) {
 	origin = strings.ToLower(strings.TrimSpace(origin))
 	if origin != "" {
 		// A project has few environments, so one page covers them; the
@@ -159,13 +159,29 @@ func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllState
 			return nil, "", domain.ErrInternal(err).WithMessage("failed to list preview environments")
 		}
 		now := r.now()
+		var candidates []*domain.Environment
 		for _, env := range result.Items {
 			if env.Expired(now) {
 				continue
 			}
 			if env.ServesOrigin(origin) {
-				return env, RuntimeEnvironmentSourceOrigin, nil
+				candidates = append(candidates, env)
 			}
+		}
+		switch len(candidates) {
+		case 0:
+		case 1:
+			return candidates[0], RuntimeEnvironmentSourceOrigin, nil
+		default:
+			// Several previews cover this origin — a wildcard such as
+			// https://*.vercel.app shared by every branch's preview. Never
+			// pick one by name: the release the client pinned says which
+			// preview it was built against.
+			chosen, err := r.disambiguate(ctx, stmts, projectID, candidates, releaseSelector)
+			if err != nil {
+				return nil, "", err
+			}
+			return chosen, RuntimeEnvironmentSourceOrigin, nil
 		}
 	}
 	live, err := stmts.GetEnvironmentByName(ctx, projectID, domain.LiveEnvironmentName)
@@ -176,6 +192,40 @@ func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllState
 		return nil, "", domain.ErrInternal(err).WithMessage("failed to read the live environment")
 	}
 	return live, RuntimeEnvironmentSourceDefault, nil
+}
+
+// disambiguate picks, among previews that all cover the request origin,
+// the one currently running the release the client pinned. Without a
+// selector, or with one that none or several of them run, the request is
+// refused: silently serving one of them would hand a preview deployment
+// another branch's configuration.
+func (r *RuntimeResolver) disambiguate(ctx context.Context, stmts AllStatements, projectID string, candidates []*domain.Environment, releaseSelector string) (*domain.Environment, error) {
+	names := make([]string, len(candidates))
+	for i, env := range candidates {
+		names[i] = env.Name
+	}
+	details := domain.EnvironmentAmbiguousDetails{Candidates: names}
+	if releaseSelector == "" || releaseSelector == ReleaseSelectorLatest {
+		return nil, domain.ErrEnvironmentAmbiguous(details)
+	}
+	var matches []*domain.Environment
+	for _, env := range candidates {
+		if env.CurrentDeploymentID == nil {
+			continue
+		}
+		dep, err := stmts.GetDeploymentByID(ctx, projectID, *env.CurrentDeploymentID)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to read a preview's current deployment")
+		}
+		if dep.ReleaseID == releaseSelector {
+			matches = append(matches, env)
+		}
+	}
+	if len(matches) != 1 {
+		details.ReleaseID = releaseSelector
+		return nil, domain.ErrEnvironmentAmbiguous(details)
+	}
+	return matches[0], nil
 }
 
 // deploymentOf finds the newest deployment of releaseID on environmentID,

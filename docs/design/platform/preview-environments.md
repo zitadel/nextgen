@@ -57,17 +57,27 @@ matches `my-app-feat-sso-acme.vercel.app`, not `vercel.app` nor
 `a.b.vercel.app`. Scheme and port are literal. One matcher
 (`domain.MatchOrigin`) serves both lists.
 
-Consequence worth deciding: a wildcard shared by several previews makes the
-first match (by name) win. Per-PR previews therefore want a per-branch origin
-(Vercel's `VERCEL_BRANCH_URL` is stable per branch) passed as `--origin` from
-CI, while the wildcard suits one shared preview or the allowlist.
+Several previews covering one origin (the wildcard shared by every branch's
+preview) are never resolved by name. The request's `X-Zitadel-Release` picks
+the preview whose current deployment is that release; without it, or when
+none or several candidates run it, the request is refused with
+`400 env.ambiguous` listing the candidates. The Vercel build sets the
+release id (`zitadel preview` output → `NEXT_PUBLIC_ZITADEL_RELEASE` →
+`configureZitadel({ release })`), so every preview deployment carries it.
+Passing `--origin https://$VERCEL_BRANCH_URL` from CI additionally gives
+each preview an exact origin and avoids the ambiguity altogether.
+
+Hostname parsing (branch or commit in the Vercel URL) was rejected: the
+deployment URL carries a deployment hash, not the commit, and branch slugs
+are normalised by the platform.
 
 ## Resolution at runtime
 
 Every public request is served by one environment and one release:
 
 1. **Environment, from the request `Origin`.** A preview whose `origins`
-   cover the origin serves it. No match, or no origin: `live`. The client
+   cover the origin serves it; several candidates are settled by the
+   release header (above). No match, or no origin: `live`. The client
    never names the environment.
 2. **Release.** `X-Zitadel-Release` pins one; it must belong to the project
    and have a deployment on the resolved environment, else `400 rel.invalid`

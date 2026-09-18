@@ -478,6 +478,11 @@ type CreateFlowParams struct {
 	// the request's `Origin` (a preview environment claims its origins; `live`
 	// serves the rest). A frontend preview deployment built against a specific
 	// configuration release sends that id here so the two roll out together.
+	// When several previews claim the same origin (a shared wildcard such as
+	// `https://*.vercel.app`), this header is what picks one: the preview whose
+	// current deployment is this release serves the request. Without it, or
+	// when none or several of them run it, the request is refused with
+	// `env.ambiguous` rather than served by an arbitrary preview.
 	XZitadelRelease OptString `json:",omitempty,omitzero"`
 }
 

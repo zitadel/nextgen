@@ -8,6 +8,7 @@ content:
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/env-ambiguous.yaml'
         - $ref: '../../components/schemas/errors/env-not_found.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
@@ -28,6 +29,7 @@ content:
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          env.ambiguous: '../../components/schemas/errors/env-ambiguous.yaml'
           env.not_found: '../../components/schemas/errors/env-not_found.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
@@ -62,6 +64,11 @@ content:
         value:
           code: enc_key.not_found
           message: 'encryption key not found'
+      env.ambiguous:
+        summary: env.ambiguous
+        value:
+          code: env.ambiguous
+          message: 'several preview environments serve this origin; send X-Zitadel-Release with the release the deployment was built against'
       env.not_found:
         summary: env.not_found
         value:

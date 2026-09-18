@@ -10569,6 +10569,7 @@ type CreateFlowErrorResponse struct {
 	EncKeyDecryptFailed    EncKeyDecryptFailed
 	EncKeyEncryptFailed    EncKeyEncryptFailed
 	EncKeyNotFound         EncKeyNotFound
+	EnvAmbiguous           EnvAmbiguous
 	EnvNotFound            EnvNotFound
 	EvtInvalid             EvtInvalid
 	FlowdefNotFound        FlowdefNotFound
@@ -10593,6 +10594,7 @@ const (
 	EncKeyDecryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
+	EnvAmbiguousCreateFlowErrorResponse           CreateFlowErrorResponseType = "env.ambiguous"
 	EnvNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "env.not_found"
 	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
 	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
@@ -10626,6 +10628,11 @@ func (s CreateFlowErrorResponse) IsEncKeyEncryptFailed() bool {
 // IsEncKeyNotFound reports whether CreateFlowErrorResponse is EncKeyNotFound.
 func (s CreateFlowErrorResponse) IsEncKeyNotFound() bool {
 	return s.Type == EncKeyNotFoundCreateFlowErrorResponse
+}
+
+// IsEnvAmbiguous reports whether CreateFlowErrorResponse is EnvAmbiguous.
+func (s CreateFlowErrorResponse) IsEnvAmbiguous() bool {
+	return s.Type == EnvAmbiguousCreateFlowErrorResponse
 }
 
 // IsEnvNotFound reports whether CreateFlowErrorResponse is EnvNotFound.
@@ -10772,6 +10779,27 @@ func (s CreateFlowErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool)
 func NewEncKeyNotFoundCreateFlowErrorResponse(v EncKeyNotFound) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetEnvAmbiguous sets CreateFlowErrorResponse to EnvAmbiguous.
+func (s *CreateFlowErrorResponse) SetEnvAmbiguous(v EnvAmbiguous) {
+	s.Type = EnvAmbiguousCreateFlowErrorResponse
+	s.EnvAmbiguous = v
+}
+
+// GetEnvAmbiguous returns EnvAmbiguous and true boolean if CreateFlowErrorResponse is EnvAmbiguous.
+func (s CreateFlowErrorResponse) GetEnvAmbiguous() (v EnvAmbiguous, ok bool) {
+	if !s.IsEnvAmbiguous() {
+		return v, false
+	}
+	return s.EnvAmbiguous, true
+}
+
+// NewEnvAmbiguousCreateFlowErrorResponse returns new CreateFlowErrorResponse from EnvAmbiguous.
+func NewEnvAmbiguousCreateFlowErrorResponse(v EnvAmbiguous) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetEnvAmbiguous(v)
 	return s
 }
 
@@ -16006,6 +16034,59 @@ func (s *EncKeyUnknownAlg) SetDetails(val OptEncKeyUnknownAlgDetails) {
 type EncKeyUnknownAlgDetails map[string]jx.Raw
 
 func (s *EncKeyUnknownAlgDetails) init() EncKeyUnknownAlgDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EnvAmbiguous struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvAmbiguousDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvAmbiguous) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvAmbiguous) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvAmbiguous) GetDetails() OptEnvAmbiguousDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvAmbiguous) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvAmbiguous) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvAmbiguous) SetDetails(val OptEnvAmbiguousDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvAmbiguousDetails map[string]jx.Raw
+
+func (s *EnvAmbiguousDetails) init() EnvAmbiguousDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -32559,6 +32640,52 @@ func (o OptEncKeyUnknownAlgDetails) Get() (v EncKeyUnknownAlgDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEncKeyUnknownAlgDetails) Or(d EncKeyUnknownAlgDetails) EncKeyUnknownAlgDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvAmbiguousDetails returns new OptEnvAmbiguousDetails with value set to v.
+func NewOptEnvAmbiguousDetails(v EnvAmbiguousDetails) OptEnvAmbiguousDetails {
+	return OptEnvAmbiguousDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvAmbiguousDetails is optional EnvAmbiguousDetails.
+type OptEnvAmbiguousDetails struct {
+	Value EnvAmbiguousDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvAmbiguousDetails was set.
+func (o OptEnvAmbiguousDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvAmbiguousDetails) Reset() {
+	var v EnvAmbiguousDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvAmbiguousDetails) SetTo(v EnvAmbiguousDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvAmbiguousDetails) Get() (v EnvAmbiguousDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvAmbiguousDetails) Or(d EnvAmbiguousDetails) EnvAmbiguousDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

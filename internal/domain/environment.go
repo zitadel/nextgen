@@ -65,6 +65,21 @@ func ErrEnvironmentExpired() Error {
 	return newError(PrefixEnvironment.ErrorCodePrefix("expired"), "the preview environment has expired", nil, nil)
 }
 
+// EnvironmentAmbiguousDetails names the previews that all claim a request's
+// origin, and the release selector (if any) that failed to single one out.
+type EnvironmentAmbiguousDetails struct {
+	Candidates []string `json:"candidates"`
+	ReleaseID  string   `json:"release_id,omitempty"`
+}
+
+// ErrEnvironmentAmbiguous reports a request origin covered by several preview
+// environments with no release selector that picks exactly one of them. The
+// frontend deployment fixes it by sending X-Zitadel-Release with the release
+// it was built against (or the preview registers a more specific origin).
+func ErrEnvironmentAmbiguous(details EnvironmentAmbiguousDetails) Error {
+	return newError(PrefixEnvironment.ErrorCodePrefix("ambiguous"), "several preview environments serve this origin; send X-Zitadel-Release with the release the deployment was built against", details, nil)
+}
+
 func ErrEnvironmentProjectNotFound() Error {
 	return newError(PrefixEnvironment.ErrorCodePrefix("project_not_found"), "project not found", nil, nil)
 }

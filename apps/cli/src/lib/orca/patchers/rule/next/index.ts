@@ -197,7 +197,11 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       ? { kind: "write", path: join(appDir, "../custom-elements.d.ts"), contents: dts.contents }
       : undefined,
     // Next.js exposes NEXT_PUBLIC_-prefixed vars to client code.
-    { kind: "merge-env", path: ".env.example", entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
+    {
+      kind: "merge-env",
+      path: ".env.example",
+      entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: "", NEXT_PUBLIC_ZITADEL_RELEASE: "" },
+    },
     {
       kind: "merge-env",
       path: ".env.local",

@@ -124,6 +124,8 @@ Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (cr
 export function readmeGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
   const apply = publicCliCommand("apply", ctx.cliVersion);
+  const deploy = publicCliCommand("deploy --env production", ctx.cliVersion);
+  const preview = publicCliCommand("preview", ctx.cliVersion);
   return `## Authentication (Zitadel)
 
 Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/login (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
@@ -133,7 +135,26 @@ To change what the login collects or how sign-in works, edit the files under \`.
 \`\`\`sh
 ${plan}
 ${apply}
-\`\`\``;
+\`\`\`
+
+### Shipping configuration
+
+\`zitadel.json\` maps each environment this app runs in (\`development\`, \`preview\`, \`production\`) to a Zitadel project. Configuration ships as a release:
+
+\`\`\`sh
+${preview}                      # try the current .zitadel/ on a preview environment
+${deploy}     # make it live
+\`\`\`
+
+On Vercel, run the preview from the build so the frontend and its configuration roll out together. Build command:
+
+\`\`\`sh
+npx @zitadel/cli@alpha preview --name "$VERCEL_GIT_COMMIT_REF" --origin "https://$VERCEL_BRANCH_URL" --json > /tmp/preview.json \\
+  && export NEXT_PUBLIC_ZITADEL_RELEASE="$(node -p 'require("/tmp/preview.json").data.release.id')" \\
+  && next build
+\`\`\`
+
+\`NEXT_PUBLIC_ZITADEL_RELEASE\` pins the release the deployment was built against: when several previews share the \`https://*.vercel.app\` pattern from \`zitadel.json\`, it is what selects the right one. Provide \`ZITADEL_PROJECT_SECRET\` (from \`.zitadel/secret\`) and \`ZITADEL_URL\` as Vercel environment variables.`;
 }
 
 /** Full-file header used when `AGENTS.md` does not exist yet. */
