@@ -104,8 +104,11 @@ const ${elementName} = dynamic(
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",
-      // Pins the configuration release this deployment was built against
-      // (set by zitadel preview in the build); empty means the release the
+      // Names the server environment this deployment is served by (a
+      // preview's name, printed by zitadel preview); empty means the one
+      // the request origin resolves to.
+      environment: process.env.NEXT_PUBLIC_ZITADEL_ENVIRONMENT || undefined,
+      // Pins the configuration release on top; empty means the release the
       // environment currently runs.
       release: process.env.NEXT_PUBLIC_ZITADEL_RELEASE || undefined,
     });
@@ -174,8 +177,11 @@ const ZitadelSession = dynamic(
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",
-      // Pins the configuration release this deployment was built against
-      // (set by zitadel preview in the build); empty means the release the
+      // Names the server environment this deployment is served by (a
+      // preview's name, printed by zitadel preview); empty means the one
+      // the request origin resolves to.
+      environment: process.env.NEXT_PUBLIC_ZITADEL_ENVIRONMENT || undefined,
+      // Pins the configuration release on top; empty means the release the
       // environment currently runs.
       release: process.env.NEXT_PUBLIC_ZITADEL_RELEASE || undefined,
     });

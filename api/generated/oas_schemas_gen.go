@@ -10575,6 +10575,7 @@ type CreateFlowErrorResponse struct {
 	EncKeyEncryptFailed    EncKeyEncryptFailed
 	EncKeyNotFound         EncKeyNotFound
 	EnvAmbiguous           EnvAmbiguous
+	EnvExpired             EnvExpired
 	EnvNotFound            EnvNotFound
 	EnvReleaseRequired     EnvReleaseRequired
 	EvtInvalid             EvtInvalid
@@ -10603,6 +10604,7 @@ const (
 	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
 	EnvAmbiguousCreateFlowErrorResponse           CreateFlowErrorResponseType = "env.ambiguous"
+	EnvExpiredCreateFlowErrorResponse             CreateFlowErrorResponseType = "env.expired"
 	EnvNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "env.not_found"
 	EnvReleaseRequiredCreateFlowErrorResponse     CreateFlowErrorResponseType = "env.release_required"
 	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
@@ -10644,6 +10646,11 @@ func (s CreateFlowErrorResponse) IsEncKeyNotFound() bool {
 // IsEnvAmbiguous reports whether CreateFlowErrorResponse is EnvAmbiguous.
 func (s CreateFlowErrorResponse) IsEnvAmbiguous() bool {
 	return s.Type == EnvAmbiguousCreateFlowErrorResponse
+}
+
+// IsEnvExpired reports whether CreateFlowErrorResponse is EnvExpired.
+func (s CreateFlowErrorResponse) IsEnvExpired() bool {
+	return s.Type == EnvExpiredCreateFlowErrorResponse
 }
 
 // IsEnvNotFound reports whether CreateFlowErrorResponse is EnvNotFound.
@@ -10826,6 +10833,27 @@ func (s CreateFlowErrorResponse) GetEnvAmbiguous() (v EnvAmbiguous, ok bool) {
 func NewEnvAmbiguousCreateFlowErrorResponse(v EnvAmbiguous) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEnvAmbiguous(v)
+	return s
+}
+
+// SetEnvExpired sets CreateFlowErrorResponse to EnvExpired.
+func (s *CreateFlowErrorResponse) SetEnvExpired(v EnvExpired) {
+	s.Type = EnvExpiredCreateFlowErrorResponse
+	s.EnvExpired = v
+}
+
+// GetEnvExpired returns EnvExpired and true boolean if CreateFlowErrorResponse is EnvExpired.
+func (s CreateFlowErrorResponse) GetEnvExpired() (v EnvExpired, ok bool) {
+	if !s.IsEnvExpired() {
+		return v, false
+	}
+	return s.EnvExpired, true
+}
+
+// NewEnvExpiredCreateFlowErrorResponse returns new CreateFlowErrorResponse from EnvExpired.
+func NewEnvExpiredCreateFlowErrorResponse(v EnvExpired) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetEnvExpired(v)
 	return s
 }
 
@@ -16176,6 +16204,59 @@ func (s *EnvAmbiguous) SetDetails(val OptEnvAmbiguousDetails) {
 type EnvAmbiguousDetails map[string]jx.Raw
 
 func (s *EnvAmbiguousDetails) init() EnvAmbiguousDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EnvExpired struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvExpiredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvExpired) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvExpired) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvExpired) GetDetails() OptEnvExpiredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvExpired) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvExpired) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvExpired) SetDetails(val OptEnvExpiredDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvExpiredDetails map[string]jx.Raw
+
+func (s *EnvExpiredDetails) init() EnvExpiredDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -32828,6 +32909,52 @@ func (o OptEnvAmbiguousDetails) Get() (v EnvAmbiguousDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvAmbiguousDetails) Or(d EnvAmbiguousDetails) EnvAmbiguousDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvExpiredDetails returns new OptEnvExpiredDetails with value set to v.
+func NewOptEnvExpiredDetails(v EnvExpiredDetails) OptEnvExpiredDetails {
+	return OptEnvExpiredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvExpiredDetails is optional EnvExpiredDetails.
+type OptEnvExpiredDetails struct {
+	Value EnvExpiredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvExpiredDetails was set.
+func (o OptEnvExpiredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvExpiredDetails) Reset() {
+	var v EnvExpiredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvExpiredDetails) SetTo(v EnvExpiredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvExpiredDetails) Get() (v EnvExpiredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvExpiredDetails) Or(d EnvExpiredDetails) EnvExpiredDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

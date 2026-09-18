@@ -155,12 +155,12 @@ ${deploy}     # make it live
 On Vercel, run the preview from the build so the frontend and its configuration roll out together. Build command:
 
 \`\`\`sh
-npx @zitadel/cli@alpha preview --name "$VERCEL_GIT_COMMIT_REF" --origin "https://$VERCEL_BRANCH_URL" --json > /tmp/preview.json \\
-  && export NEXT_PUBLIC_ZITADEL_RELEASE="$(node -p 'require("/tmp/preview.json").data.release.id')" \\
+npx @zitadel/cli@alpha preview --name "$VERCEL_GIT_COMMIT_REF" --json > /tmp/preview.json \\
+  && export NEXT_PUBLIC_ZITADEL_ENVIRONMENT="$(node -p 'require("/tmp/preview.json").data.target')" \\
   && next build
 \`\`\`
 
-\`NEXT_PUBLIC_ZITADEL_RELEASE\` pins the release the deployment was built against: when several previews share the \`https://*.vercel.app\` pattern from \`zitadel.json\`, it is what selects the right one. Provide \`ZITADEL_PROJECT_SECRET\` (from \`.zitadel/secret\`) and \`ZITADEL_URL\` as Vercel environment variables.`;
+\`NEXT_PUBLIC_ZITADEL_ENVIRONMENT\` names the preview the deployment was built for: every preview deployment shares the \`https://*.vercel.app\` pattern from \`zitadel.json\`, so the name is what selects the right one. Locally, run the app against a preview the same way: \`NEXT_PUBLIC_ZITADEL_ENVIRONMENT=preview-<name> npm run dev\` after sourcing \`.env.preview\`. \`NEXT_PUBLIC_ZITADEL_RELEASE\` pins a release on top (useful on live). Provide \`ZITADEL_PROJECT_SECRET\` (from \`.zitadel/secret\`) and \`ZITADEL_URL\` as Vercel environment variables.`;
 }
 
 /** Full-file header used when `AGENTS.md` does not exist yet. */

@@ -470,23 +470,44 @@ func decodeCreateEnvironmentParams(args [0]string, argsEscaped bool, r *http.Req
 
 // CreateFlowParams is parameters of createFlow operation.
 type CreateFlowParams struct {
+	// Names the environment that serves this request: `live` or a preview
+	// environment of the project. Omitted, the environment follows from the
+	// request's `Origin` (a preview environment claims its origins; `live`
+	// serves the rest).
+	// A frontend preview deployment sends the preview it was built for, which
+	// is what selects the right one when several previews share one origin
+	// pattern (such as `https://*.vercel.app`), and what lets a local run of
+	// the app use a preview at all. The request still has to come from an
+	// origin the project allows.
+	// An unknown name is rejected with `env.not_found`, an expired preview
+	// with `env.expired`.
+	XZitadelEnvironment OptString `json:",omitempty,omitzero"`
 	// Pins the configuration release that serves this request. Omitted or
 	// `latest` means the release the resolved environment currently runs. An
 	// explicit release id must belong to the project and have a deployment on
 	// the resolved environment, otherwise the request is rejected.
-	// The environment itself is never selected by the client: it follows from
-	// the request's `Origin` (a preview environment claims its origins; `live`
-	// serves the rest). A frontend preview deployment built against a specific
-	// configuration release sends that id here so the two roll out together.
-	// When several previews claim the same origin (a shared wildcard such as
-	// `https://*.vercel.app`), this header is what picks one: the preview whose
-	// current deployment is this release serves the request. Without it, or
-	// when none or several of them run it, the request is refused with
-	// `env.ambiguous` rather than served by an arbitrary preview.
+	// The environment is the one `X-Zitadel-Environment` names or, without it,
+	// the one the request's `Origin` resolves to. A frontend deployment built
+	// against a specific configuration release sends that id here so the two
+	// roll out together, typically on `live`.
+	// A request that reaches a preview through a shared origin pattern (such
+	// as `https://*.vercel.app`) without naming its environment must carry this
+	// header: the preview whose current deployment is this release serves it.
+	// Without either header the request is refused with `env.release_required`;
+	// when none or several previews run the release, with `env.ambiguous`.
 	XZitadelRelease OptString `json:",omitempty,omitzero"`
 }
 
 func unpackCreateFlowParams(packed middleware.Parameters) (params CreateFlowParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Zitadel-Environment",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.XZitadelEnvironment = v.(OptString)
+		}
+	}
 	{
 		key := middleware.ParameterKey{
 			Name: "X-Zitadel-Release",
@@ -501,6 +522,45 @@ func unpackCreateFlowParams(packed middleware.Parameters) (params CreateFlowPara
 
 func decodeCreateFlowParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateFlowParams, _ error) {
 	h := uri.NewHeaderDecoder(r.Header)
+	// Decode header: X-Zitadel-Environment.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Zitadel-Environment",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotXZitadelEnvironmentVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotXZitadelEnvironmentVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.XZitadelEnvironment.SetTo(paramsDotXZitadelEnvironmentVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Zitadel-Environment",
+			In:   "header",
+			Err:  err,
+		}
+	}
 	// Decode header: X-Zitadel-Release.
 	if err := func() error {
 		cfg := uri.HeaderParameterDecodingConfig{

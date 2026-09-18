@@ -57,7 +57,7 @@ var (
 		"GET": "Authorization",
 	}
 	rn13AllowedHeaders = map[string]string{
-		"POST": "Content-Type,X-Zitadel-Release",
+		"POST": "Content-Type,X-Zitadel-Environment,X-Zitadel-Release",
 	}
 	rn76AllowedHeaders = map[string]string{
 		"POST": "Content-Type,Origin",

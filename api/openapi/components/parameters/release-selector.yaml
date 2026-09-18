@@ -7,16 +7,16 @@ description: |
   explicit release id must belong to the project and have a deployment on
   the resolved environment, otherwise the request is rejected.
 
-  The environment itself is never selected by the client: it follows from
-  the request's `Origin` (a preview environment claims its origins; `live`
-  serves the rest). A frontend preview deployment built against a specific
-  configuration release sends that id here so the two roll out together.
+  The environment is the one `X-Zitadel-Environment` names or, without it,
+  the one the request's `Origin` resolves to. A frontend deployment built
+  against a specific configuration release sends that id here so the two
+  roll out together, typically on `live`.
 
-  When several previews claim the same origin (a shared wildcard such as
-  `https://*.vercel.app`), this header is what picks one: the preview whose
-  current deployment is this release serves the request. Without it, or
-  when none or several of them run it, the request is refused with
-  `env.ambiguous` rather than served by an arbitrary preview.
+  A request that reaches a preview through a shared origin pattern (such
+  as `https://*.vercel.app`) without naming its environment must carry this
+  header: the preview whose current deployment is this release serves it.
+  Without either header the request is refused with `env.release_required`;
+  when none or several previews run the release, with `env.ambiguous`.
 schema:
   type: string
   example: rel_01KX3RG8A7F0N9WD3P2E4YM5C1

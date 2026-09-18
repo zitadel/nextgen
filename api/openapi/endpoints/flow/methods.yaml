@@ -17,6 +17,7 @@ post:
     - Flows
   security: []
   parameters:
+    - $ref: ../../components/parameters/environment-selector.yaml
     - $ref: ../../components/parameters/release-selector.yaml
   requestBody:
     required: true

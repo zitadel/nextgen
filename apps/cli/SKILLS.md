@@ -263,8 +263,9 @@ docker --image <ref>` remains the explicit image override for debugging.
   `.zitadel/secret.production`), `preview` on production's project with the
   pattern as `issuer_pattern`. Setup also writes a gitignored
   `.env.<environment>` per environment beyond development (`ZITADEL_*` for
-  that project plus the framework's public variables; `NEXT_PUBLIC_ZITADEL_RELEASE`
-  left empty to pin later). Run the app as that environment locally with
+  that project plus the framework's public variables;
+  `NEXT_PUBLIC_ZITADEL_ENVIRONMENT` and `NEXT_PUBLIC_ZITADEL_RELEASE` left
+  empty to fill per deployment). Run the app as that environment locally with
   `(set -a; . ./.env.preview; set +a; npm run dev)`, or copy the values
   into the hosting platform. Non-interactive runs configure `development`
   only; add the other entries to `zitadel.json` by hand.
@@ -294,9 +295,14 @@ docker --image <ref>` remains the explicit image override for debugging.
   (`PATCH /projects/{id}` `preview_origins`), so the repository decides which
   origins may run the project's flows. `--name` defaults to the current git
   branch. Emits
-  `data.release_header` (`X-Zitadel-Release: <id>`) — a frontend can pin the
-  release explicitly via `configureZitadel({ release })` regardless of
-  origin. Ship the same release afterwards with
+  `data.environment_header` (`X-Zitadel-Environment: preview-<name>`) and
+  `data.release_header` (`X-Zitadel-Release: <id>`). A frontend deployment
+  names its preview via `configureZitadel({ environment })` (the Next
+  scaffold reads `NEXT_PUBLIC_ZITADEL_ENVIRONMENT`), which is required when
+  the preview is reached through a shared pattern and is how a local run
+  uses a preview: `NEXT_PUBLIC_ZITADEL_ENVIRONMENT=preview-<name> npm run
+  dev` after sourcing `.env.preview`. `configureZitadel({ release })` pins a
+  release on top, mostly for live. Ship the same release afterwards with
   `deploy --env production --release <id>`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.

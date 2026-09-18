@@ -1,4 +1,10 @@
-import { getApiAuthToken, getApiReleaseSelector, RELEASE_HEADER } from "./auth";
+import {
+  ENVIRONMENT_HEADER,
+  getApiAuthToken,
+  getApiEnvironmentSelector,
+  getApiReleaseSelector,
+  RELEASE_HEADER,
+} from "./auth";
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -45,9 +51,14 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
   }
-  // The release selector rides on every public call so a frontend preview
-  // deployment built against one configuration release keeps being served
-  // by it; the server ignores it on operations that resolve no release.
+  // The environment and release selectors ride on every public call so a
+  // frontend preview deployment keeps being served by the preview (and
+  // release) it was built for; the server ignores them on operations that
+  // resolve neither.
+  const environment = getApiEnvironmentSelector();
+  if (environment && !headers.has(ENVIRONMENT_HEADER)) {
+    headers.set(ENVIRONMENT_HEADER, environment);
+  }
   const release = getApiReleaseSelector();
   if (release && !headers.has(RELEASE_HEADER)) {
     headers.set(RELEASE_HEADER, release);

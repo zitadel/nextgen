@@ -9,6 +9,7 @@ content:
         - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../components/schemas/errors/env-ambiguous.yaml'
+        - $ref: '../../components/schemas/errors/env-expired.yaml'
         - $ref: '../../components/schemas/errors/env-not_found.yaml'
         - $ref: '../../components/schemas/errors/env-release_required.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
@@ -33,6 +34,7 @@ content:
           enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
           env.ambiguous: '../../components/schemas/errors/env-ambiguous.yaml'
+          env.expired: '../../components/schemas/errors/env-expired.yaml'
           env.not_found: '../../components/schemas/errors/env-not_found.yaml'
           env.release_required: '../../components/schemas/errors/env-release_required.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
@@ -74,7 +76,12 @@ content:
         summary: env.ambiguous
         value:
           code: env.ambiguous
-          message: 'several preview environments serve this origin; send X-Zitadel-Release with the release the deployment was built against'
+          message: 'several preview environments serve this origin; send X-Zitadel-Environment with the preview the deployment was built for, or X-Zitadel-Release with its release'
+      env.expired:
+        summary: env.expired
+        value:
+          code: env.expired
+          message: 'the preview environment has expired'
       env.not_found:
         summary: env.not_found
         value:
@@ -84,7 +91,7 @@ content:
         summary: env.release_required
         value:
           code: env.release_required
-          message: 'this origin is served by a preview environment; send X-Zitadel-Release with the release the deployment was built against'
+          message: 'this origin is served by a preview environment; send X-Zitadel-Environment with the preview the deployment was built for, or X-Zitadel-Release with its release'
       evt.invalid:
         summary: evt.invalid
         value:

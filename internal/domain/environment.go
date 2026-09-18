@@ -73,19 +73,20 @@ type EnvironmentAmbiguousDetails struct {
 }
 
 // ErrEnvironmentAmbiguous reports a request origin covered by several preview
-// environments with no release selector that picks exactly one of them. The
-// frontend deployment fixes it by sending X-Zitadel-Release with the release
-// it was built against (or the preview registers a more specific origin).
+// environments whose release selector picks none or several of them. The
+// frontend deployment fixes it by naming its preview (X-Zitadel-Environment)
+// or the release it was built against (X-Zitadel-Release).
 func ErrEnvironmentAmbiguous(details EnvironmentAmbiguousDetails) Error {
-	return newError(PrefixEnvironment.ErrorCodePrefix("ambiguous"), "several preview environments serve this origin; send X-Zitadel-Release with the release the deployment was built against", details, nil)
+	return newError(PrefixEnvironment.ErrorCodePrefix("ambiguous"), "several preview environments serve this origin; send X-Zitadel-Environment with the preview the deployment was built for, or X-Zitadel-Release with its release", details, nil)
 }
 
 // ErrEnvironmentReleaseRequired reports a request that reached a preview
-// through a wildcard origin without naming the release it was built
-// against. Such deployments always pin their release (X-Zitadel-Release),
-// so which previews happen to exist never changes what one of them gets.
+// through a wildcard origin without naming the preview or the release it
+// was built against. Such deployments always say which (X-Zitadel-Environment
+// or X-Zitadel-Release), so which previews happen to exist never changes
+// what one of them gets.
 func ErrEnvironmentReleaseRequired(details EnvironmentAmbiguousDetails) Error {
-	return newError(PrefixEnvironment.ErrorCodePrefix("release_required"), "this origin is served by a preview environment; send X-Zitadel-Release with the release the deployment was built against", details, nil)
+	return newError(PrefixEnvironment.ErrorCodePrefix("release_required"), "this origin is served by a preview environment; send X-Zitadel-Environment with the preview the deployment was built for, or X-Zitadel-Release with its release", details, nil)
 }
 
 func ErrEnvironmentProjectNotFound() Error {

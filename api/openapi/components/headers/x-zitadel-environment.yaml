@@ -1,6 +1,7 @@
 description: |
-  The name of the environment that served this request, resolved from the
-  request's `Origin`: a preview whose origins matched, else `live`.
+  The name of the environment that served this request: the one
+  `X-Zitadel-Environment` named or, without it, the one resolved from the
+  request's `Origin` (a preview whose origins matched, else `live`).
 schema:
   type: string
   example: preview-pr-42

@@ -1611,6 +1611,10 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "X-Zitadel-Environment",
+					In:   "header",
+				}: params.XZitadelEnvironment,
+				{
 					Name: "X-Zitadel-Release",
 					In:   "header",
 				}: params.XZitadelRelease,

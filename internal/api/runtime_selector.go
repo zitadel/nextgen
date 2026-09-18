@@ -15,7 +15,9 @@ import (
 // Environment and release resolution (ADR 035, environments discovery).
 //
 // Every public request of a project is served by exactly one environment and
-// one configuration release. The environment follows from the request's
+// one configuration release. The environment is the one the client names
+// with X-Zitadel-Environment (a frontend preview deployment names the
+// preview it was built for) or, without it, follows from the request's
 // Origin: a preview environment claims the origins of the frontend preview
 // deployments built for it, and live serves every origin no preview claims.
 // The release is the environment's current deployment unless the client pins
@@ -89,18 +91,20 @@ func (h *Handler) WithRuntimeResolver(r *service.RuntimeResolver) *Handler {
 
 // resolveRuntime answers which environment and release serve this request
 // and logs the answer. Nil resolution means the resolver is not wired.
-func (h *Handler) resolveRuntime(ctx context.Context, projectID string, releaseSelector oasapi.OptString) (*service.RuntimeResolution, error) {
+func (h *Handler) resolveRuntime(ctx context.Context, projectID string, environmentSelector, releaseSelector oasapi.OptString) (*service.RuntimeResolution, error) {
 	if h.runtimeResolver == nil {
 		return nil, nil
 	}
 	selector := service.RuntimeSelector{
-		Origin:  runtimeOriginFromContext(ctx),
-		Release: releaseSelector.Or(""),
+		Origin:      runtimeOriginFromContext(ctx),
+		Environment: environmentSelector.Or(""),
+		Release:     releaseSelector.Or(""),
 	}
 	resolution, err := h.runtimeResolver.Resolve(ctx, projectID, selector)
 	logger := zlog.GetLoggingContext(ctx).With(
 		slog.String("project_id", projectID),
 		slog.String("origin", selector.Origin),
+		slog.String("environment_selector", selector.Environment),
 		slog.String("release_selector", selector.Release),
 	)
 	if err != nil {

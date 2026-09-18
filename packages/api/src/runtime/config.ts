@@ -30,13 +30,21 @@ export interface ZitadelConfig {
   publishableKey?: string;
 
   /**
+   * Environment to name on every request, sent as the
+   * `X-Zitadel-Environment` header: `live` or a preview environment of the
+   * project. Use the preview a frontend preview deployment was built for
+   * (`zitadel preview` prints it), so the deployment is served by that
+   * preview whatever its origin. Omitted, the server resolves the
+   * environment from the request's origin.
+   */
+  environment?: string;
+
+  /**
    * Configuration release to pin on every request, sent as the
-   * `X-Zitadel-Release` header. Use the release id a frontend preview
-   * deployment was built against (`zitadel preview` prints it), so the
-   * frontend and its configuration roll out together. Omitted, or `latest`,
-   * the environment the request resolves to serves its current release.
-   * The environment itself is never chosen here: it follows from the
-   * request's origin.
+   * `X-Zitadel-Release` header. Use the release id a deployment was built
+   * against, so the frontend and its configuration roll out together.
+   * Omitted, or `latest`, the environment the request resolves to serves
+   * its current release.
    */
   release?: string;
 }
@@ -57,6 +65,9 @@ export interface ZitadelProject {
 
   /** The project's publishable key (ADR 036), sent as the bearer when set. */
   readonly publishableKey?: string;
+
+  /** The environment named on every request, when set. */
+  readonly environment?: string;
 
   /** The configuration release pinned on every request, when set. */
   readonly release?: string;
@@ -116,6 +127,7 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
       existing.projectId === config.projectId &&
       existing.url === config.url &&
       existing.publishableKey === config.publishableKey &&
+      existing.environment === config.environment &&
       existing.release === config.release
     ) {
       setProxyPath(resolvedProxyPath);
@@ -134,6 +146,7 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
     projectId: config.projectId,
     url: config.url,
     publishableKey: config.publishableKey,
+    environment: config.environment,
     release: config.release,
   });
   writeSlot(project);
@@ -159,6 +172,7 @@ export function getApi(project: ZitadelProject): ZitadelApi {
     api = createZitadelClient({
       baseUrl: project.proxyPath,
       token: project.publishableKey,
+      environment: project.environment,
       release: project.release,
     });
     apiCache.set(project, api);

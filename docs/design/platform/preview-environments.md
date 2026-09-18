@@ -73,17 +73,18 @@ matches `my-app-feat-sso-acme.vercel.app`, not `vercel.app` nor
 (`domain.MatchOrigin`) serves both lists.
 
 A preview reached through a wildcard (the pattern shared by every branch's
-preview) is never resolved by name, and not even when it is the only
-candidate: the request must carry `X-Zitadel-Release`, else
-`400 env.release_required`. The header picks the preview whose current
-deployment is that release; when none or several candidates run it the
-request is refused with `400 env.ambiguous`. Which previews happen to exist
-therefore never changes what a deployment gets. The Vercel build sets the
-release id (`zitadel preview` output → `NEXT_PUBLIC_ZITADEL_RELEASE` →
-`configureZitadel({ release })`), so every preview deployment carries it.
-A preview created with an exact `--origin` (for example
-`https://$VERCEL_BRANCH_URL`) resolves on the literal tier and needs no
-header.
+preview) is never picked by origin alone, and not even when it is the only
+candidate: the request must name its environment (`X-Zitadel-Environment`)
+or its release (`X-Zitadel-Release`), else `400 env.release_required`. The
+release header picks the preview whose current deployment is that release;
+when none or several candidates run it the request is refused with
+`400 env.ambiguous`. Which previews happen to exist therefore never changes
+what a deployment gets. The Vercel build sets the preview name
+(`zitadel preview` output → `NEXT_PUBLIC_ZITADEL_ENVIRONMENT` →
+`configureZitadel({ environment })`), so every preview deployment carries
+it, and a local run of the app uses a preview the same way. A preview
+created with an exact `--origin` (for example `https://$VERCEL_BRANCH_URL`)
+resolves on the literal tier and needs no header.
 
 Hostname parsing (branch or commit in the Vercel URL) was rejected: the
 deployment URL carries a deployment hash, not the commit, and branch slugs
@@ -93,10 +94,13 @@ are normalised by the platform.
 
 Every public request is served by one environment and one release:
 
-1. **Environment, from the request `Origin`.** A preview whose `origins`
-   cover the origin serves it; several candidates are settled by the
-   release header (above). No match, or no origin: `live`. The client
-   never names the environment.
+1. **Environment.** `X-Zitadel-Environment` names one (`live` or a
+   preview; unknown `404 env.not_found`, expired `env.expired`); the
+   origin still has to pass the project allowlist but is not matched
+   against the environment's origins. Without the header, the request
+   `Origin` decides: a preview whose `origins` cover it serves it, a
+   wildcard match needs the release header (above), no match or no
+   origin means `live`.
 2. **Release.** `X-Zitadel-Release` pins one; it must belong to the project
    and have a deployment on the resolved environment, else `400 rel.invalid`
    (`404 rel.not_found` for an unknown id). Absent or `latest`: the
@@ -106,9 +110,10 @@ Every public request is served by one environment and one release:
 Both are logged (`resolved runtime environment and release`) and echoed as
 `X-Zitadel-Environment` / `X-Zitadel-Release` on `POST /flow`.
 
-`configureZitadel({ release })` in the SDK sends the header on every call,
-so a frontend preview deployment built against a configuration release
-keeps being served by it regardless of origin.
+`configureZitadel({ environment, release })` in the SDK sends the headers
+on every call: a frontend preview deployment names the preview it was built
+for and is served by it regardless of origin; the release pin is for a
+deployment that must stay on one release, typically on live.
 
 ## What is wired
 

@@ -46,10 +46,16 @@ export class NextPatcher extends AbstractRulePatcher {
   }
 
   protected override publicEnv(projectId: string): Record<string, string> {
-    // NEXT_PUBLIC_ZITADEL_RELEASE pins the configuration release a
-    // deployment was built against; empty means the environment's current
-    // one. `zitadel preview` prints the id to put here.
-    return { NEXT_PUBLIC_ZITADEL_PROJECT_ID: projectId, NEXT_PUBLIC_ZITADEL_RELEASE: "" };
+    // NEXT_PUBLIC_ZITADEL_ENVIRONMENT names the server environment a
+    // deployment is served by (a preview's name, printed by `zitadel
+    // preview`); empty means the one the request origin resolves to.
+    // NEXT_PUBLIC_ZITADEL_RELEASE pins the configuration release on top;
+    // empty means the environment's current one.
+    return {
+      NEXT_PUBLIC_ZITADEL_PROJECT_ID: projectId,
+      NEXT_PUBLIC_ZITADEL_ENVIRONMENT: "",
+      NEXT_PUBLIC_ZITADEL_RELEASE: "",
+    };
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
@@ -207,7 +213,11 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "merge-env",
       path: ".env.example",
-      entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: "", NEXT_PUBLIC_ZITADEL_RELEASE: "" },
+      entries: {
+        NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
+        NEXT_PUBLIC_ZITADEL_ENVIRONMENT: "",
+        NEXT_PUBLIC_ZITADEL_RELEASE: "",
+      },
     },
     {
       kind: "merge-env",

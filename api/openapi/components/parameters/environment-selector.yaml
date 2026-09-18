@@ -1,0 +1,20 @@
+name: X-Zitadel-Environment
+in: header
+required: false
+description: |
+  Names the environment that serves this request: `live` or a preview
+  environment of the project. Omitted, the environment follows from the
+  request's `Origin` (a preview environment claims its origins; `live`
+  serves the rest).
+
+  A frontend preview deployment sends the preview it was built for, which
+  is what selects the right one when several previews share one origin
+  pattern (such as `https://*.vercel.app`), and what lets a local run of
+  the app use a preview at all. The request still has to come from an
+  origin the project allows.
+
+  An unknown name is rejected with `env.not_found`, an expired preview
+  with `env.expired`.
+schema:
+  type: string
+  example: preview-feat-sso

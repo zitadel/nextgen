@@ -17,14 +17,15 @@ import (
 const ReleaseSelectorLatest = "latest"
 
 // RuntimeSelector is what a public request carries that decides which
-// environment and release serve it. The environment is never chosen by the
-// client: it follows from the request's Origin. The release may be pinned by
-// the client (`X-Zitadel-Release`) to an id already deployed to that
-// environment, which is how a frontend preview deployment selects the
-// configuration release it was built against.
+// environment and release serve it. The environment follows from the
+// request's Origin unless the client names one (`X-Zitadel-Environment`),
+// which is how a frontend preview deployment selects the preview it was
+// built for. The release may be pinned on top (`X-Zitadel-Release`) to an
+// id already deployed to that environment.
 type RuntimeSelector struct {
-	Origin  string
-	Release string
+	Origin      string
+	Environment string
+	Release     string
 }
 
 // RuntimeResolution is the answer: the environment the request belongs to,
@@ -42,6 +43,8 @@ type RuntimeResolution struct {
 type RuntimeEnvironmentSource string
 
 const (
+	// RuntimeEnvironmentSourceSelector: the client named the environment.
+	RuntimeEnvironmentSourceSelector RuntimeEnvironmentSource = "selector"
 	// RuntimeEnvironmentSourceOrigin: the request's Origin matched a
 	// preview environment's origins.
 	RuntimeEnvironmentSourceOrigin RuntimeEnvironmentSource = "origin"
@@ -80,16 +83,28 @@ func NewRuntimeResolver(v2Pool *DB) *RuntimeResolver {
 
 // Resolve walks request -> environment -> deployment -> release.
 //
-// Environment: the Origin is matched against every unexpired preview of the
-// project; no match means live. Release: an explicit selector must name a
-// release of the project that has a deployment on the resolved environment;
-// "latest" or no selector means the environment's current deployment.
+// Environment: an explicit selector names one of the project's environments
+// (a preview must not have expired). Otherwise the Origin is matched against
+// every unexpired preview of the project; no match means live. Release: an
+// explicit selector must name a release of the project that has a deployment
+// on the resolved environment; "latest" or no selector means the
+// environment's current deployment.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID string, selector RuntimeSelector) (*RuntimeResolution, error) {
 	stmts := r.v2Pool.Statements()
 	if err := r.checkOriginAllowed(ctx, stmts, projectID, selector.Origin); err != nil {
 		return nil, err
 	}
-	env, source, err := r.resolveEnvironment(ctx, stmts, projectID, selector.Origin, strings.TrimSpace(selector.Release))
+	var (
+		env    *domain.Environment
+		source RuntimeEnvironmentSource
+		err    error
+	)
+	if name := strings.TrimSpace(selector.Environment); name != "" {
+		env, err = r.selectEnvironment(ctx, stmts, projectID, name)
+		source = RuntimeEnvironmentSourceSelector
+	} else {
+		env, source, err = r.resolveEnvironment(ctx, stmts, projectID, selector.Origin, strings.TrimSpace(selector.Release))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +181,27 @@ func (r *RuntimeResolver) checkOriginAllowed(ctx context.Context, stmts AllState
 		"origin":  origin,
 		"allowed": project.PreviewOrigins,
 	})
+}
+
+// selectEnvironment answers a request that names its environment. The name
+// must be one of the project's environments; an expired preview is refused
+// rather than silently served by live, so a stale deployment fails loudly.
+// The request origin is not matched against the environment's origins: the
+// project's origin allowlist already gates it, and naming the environment
+// is exactly what a deployment does when its origin is not specific enough
+// (a shared wildcard, or a local run of the app against a preview).
+func (r *RuntimeResolver) selectEnvironment(ctx context.Context, stmts AllStatements, projectID, name string) (*domain.Environment, error) {
+	env, err := stmts.GetEnvironmentByName(ctx, projectID, name)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrEnvironmentNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the selected environment")
+	}
+	if env.Expired(r.now()) {
+		return nil, domain.ErrEnvironmentExpired()
+	}
+	return env, nil
 }
 
 // resolveEnvironment picks the environment for an origin. An environment

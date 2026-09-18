@@ -33,7 +33,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 
 	// Which environment and release serve this request. Logged, echoed in
 	// the response headers, and pinned for the attempt.
-	runtime, err := h.resolveRuntime(ctx, string(req.ProjectID), params.XZitadelRelease)
+	runtime, err := h.resolveRuntime(ctx, string(req.ProjectID), params.XZitadelEnvironment, params.XZitadelRelease)
 	if err != nil {
 		return nil, err
 	}

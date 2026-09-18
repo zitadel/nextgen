@@ -1895,6 +1895,20 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest,
 	h := uri.NewHeaderEncoder(r.Header)
 	{
 		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Zitadel-Environment",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.XZitadelEnvironment.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
 			Name:    "X-Zitadel-Release",
 			Explode: false,
 		}
