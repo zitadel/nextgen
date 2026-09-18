@@ -105,11 +105,12 @@ func TestEnvironmentStatements_ListIsProjectScopedInNameOrder(t *testing.T) {
 		projectID := ensureEnvironmentProject(t, d.stmts)
 		otherProject := ensureEnvironmentProject(t, d.stmts)
 
-		for _, name := range domain.DefaultEnvironmentNames {
+		names := []string{"preview-pr-42", "live", "preview-feat-sso"}
+		for _, name := range names {
 			createEnvironment(t, d.stmts, projectID, name)
 		}
-		want := slices.Sorted(slices.Values(domain.DefaultEnvironmentNames))
-		require.NotEqual(t, domain.DefaultEnvironmentNames, want, "fixture must not create in name order, or it proves nothing")
+		want := slices.Sorted(slices.Values(names))
+		require.NotEqual(t, names, want, "fixture must not create in name order, or it proves nothing")
 		createEnvironment(t, d.stmts, otherProject, "prod")
 
 		result, err := d.stmts.ListEnvironments(

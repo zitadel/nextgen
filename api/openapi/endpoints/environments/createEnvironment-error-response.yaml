@@ -5,12 +5,24 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/env-invalid.yaml'
+        - $ref: '../../components/schemas/errors/env-name_invalid.yaml'
+        - $ref: '../../components/schemas/errors/env-not_found.yaml'
+        - $ref: '../../components/schemas/errors/env-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/env-project_not_found.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          env.invalid: '../../components/schemas/errors/env-invalid.yaml'
+          env.name_invalid: '../../components/schemas/errors/env-name_invalid.yaml'
+          env.not_found: '../../components/schemas/errors/env-not_found.yaml'
+          env.permission_denied: '../../components/schemas/errors/env-permission_denied.yaml'
+          env.project_not_found: '../../components/schemas/errors/env-project_not_found.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -19,6 +31,36 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      env.invalid:
+        summary: env.invalid
+        value:
+          code: env.invalid
+          message: 'environment: invalid'
+      env.name_invalid:
+        summary: env.name_invalid
+        value:
+          code: env.name_invalid
+          message: 'The environment name is invalid. Expected 1-63 characters of lowercase letters, digits and hyphens, starting and ending with a letter or digit.'
+      env.not_found:
+        summary: env.not_found
+        value:
+          code: env.not_found
+          message: 'environment not found'
+      env.permission_denied:
+        summary: env.permission_denied
+        value:
+          code: env.permission_denied
+          message: 'the environment management API requires the project secret'
+      env.project_not_found:
+        summary: env.project_not_found
+        value:
+          code: env.project_not_found
+          message: 'project not found'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:

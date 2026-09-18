@@ -49,6 +49,27 @@ type Handler interface {
 	//
 	// POST /branding
 	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
+	// CreateConfigurationRelease implements createConfigurationRelease operation.
+	//
+	// The CLI's entry point for shipping configuration: takes the contents of
+	// `.zitadel/` as authored on disk and turns it into a release in one call.
+	// For every resource in the bundle the server compares the content against
+	// the project's newest revision of that resource. Unchanged content reuses
+	// the existing revision; changed content allocates a new one. Handle
+	// references between resources (a flow definition's `user_schema` naming a
+	// schema by `objectType`) are resolved to the revision ids the same bundle
+	// produced. The resulting set of revisions is assembled into a release —
+	// `POST /releases` with the pointers filled in — so submitting an unchanged
+	// bundle twice answers `200` with the release that already pins it.
+	// Building a release does not deploy it. Follow up with `POST /deployments`
+	// to make it live on an environment.
+	// Prototype note: revision allocation and release assembly are not yet one
+	// transaction. A failure mid-way can leave freshly allocated revisions
+	// behind without a release pinning them; they are inert until a later
+	// bundle includes them (ADR 035).
+	//
+	// POST /configuration-releases
+	CreateConfigurationRelease(ctx context.Context, req *ConfigurationBundle, params CreateConfigurationReleaseParams) (CreateConfigurationReleaseRes, error)
 	// CreateDeployment implements createDeployment operation.
 	//
 	// Makes a release live on an environment by recording a deployment. The two

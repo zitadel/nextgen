@@ -8,6 +8,7 @@ content:
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/env-not_found.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
         - $ref: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
@@ -16,6 +17,8 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+        - $ref: '../../components/schemas/errors/rel-invalid.yaml'
+        - $ref: '../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
       discriminator:
@@ -25,6 +28,7 @@ content:
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          env.not_found: '../../components/schemas/errors/env-not_found.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
           flowdef.purpose_mismatch: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
@@ -33,6 +37,8 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+          rel.invalid: '../../components/schemas/errors/rel-invalid.yaml'
+          rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
@@ -56,6 +62,11 @@ content:
         value:
           code: enc_key.not_found
           message: 'encryption key not found'
+      env.not_found:
+        summary: env.not_found
+        value:
+          code: env.not_found
+          message: 'environment not found'
       evt.invalid:
         summary: evt.invalid
         value:
@@ -96,6 +107,16 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
+      rel.invalid:
+        summary: rel.invalid
+        value:
+          code: rel.invalid
+          message: 'release: invalid'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
       req.invalid:
         summary: req.invalid
         value:

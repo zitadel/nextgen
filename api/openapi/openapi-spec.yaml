@@ -158,6 +158,8 @@ paths:
     $ref: endpoints/releases/methods.yaml
   /releases/{release_id}:
     $ref: endpoints/releases/by_id/methods.yaml
+  /configuration-releases:
+    $ref: endpoints/configuration_releases/methods.yaml
   /grants:
     $ref: endpoints/grants/methods.yaml
   /grants/query:

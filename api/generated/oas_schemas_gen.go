@@ -7208,6 +7208,112 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 	s.Scale = val
 }
 
+// Merged schema.
+// Ref: #
+type BrndInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBrndInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *BrndInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BrndInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BrndInvalid) GetDetails() OptBrndInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *BrndInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BrndInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BrndInvalid) SetDetails(val OptBrndInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type BrndInvalidDetails map[string]jx.Raw
+
+func (s *BrndInvalidDetails) init() BrndInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type BrndMissingProjectID struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBrndMissingProjectIDDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *BrndMissingProjectID) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BrndMissingProjectID) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BrndMissingProjectID) GetDetails() OptBrndMissingProjectIDDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *BrndMissingProjectID) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BrndMissingProjectID) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BrndMissingProjectID) SetDetails(val OptBrndMissingProjectIDDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type BrndMissingProjectIDDetails map[string]jx.Raw
+
+func (s *BrndMissingProjectIDDetails) init() BrndMissingProjectIDDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type ChallengeID string
 
 type ChallengeNonce string
@@ -8164,6 +8270,183 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 	return s
 }
 
+// The contents of a project's `.zitadel/` directory as authored on disk, plus
+// the metadata to record on the resulting release.
+// Cross-resource references use handles, not revision ids: a flow definition's
+// `user_schema` names a schema by its `objectType`. The server resolves each
+// handle against the schemas in this bundle (or, failing that, the project's
+// newest revision of that object type) before persisting.
+// Ref: #
+type ConfigurationBundle struct {
+	// User schemas, one per `.zitadel/schemas/*.json`.
+	Schemas []UserSchema `json:"schemas"`
+	// Flow definitions, one per `.zitadel/flows/*.json`.
+	FlowDefinitions []FlowDefinition `json:"flow_definitions"`
+	// The flow-definition dialect the definitions were authored against.
+	FlowSchemaURI OptSchemaURI `json:"flow_schema_uri"`
+	// The branding descriptor from `.zitadel/branding/branding.json`, with its
+	// template inlined. A project has one branding, so at most one entry.
+	Brandings []Branding `json:"brandings"`
+	// A short summary of what the release changes.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetSchemas returns the value of Schemas.
+func (s *ConfigurationBundle) GetSchemas() []UserSchema {
+	return s.Schemas
+}
+
+// GetFlowDefinitions returns the value of FlowDefinitions.
+func (s *ConfigurationBundle) GetFlowDefinitions() []FlowDefinition {
+	return s.FlowDefinitions
+}
+
+// GetFlowSchemaURI returns the value of FlowSchemaURI.
+func (s *ConfigurationBundle) GetFlowSchemaURI() OptSchemaURI {
+	return s.FlowSchemaURI
+}
+
+// GetBrandings returns the value of Brandings.
+func (s *ConfigurationBundle) GetBrandings() []Branding {
+	return s.Brandings
+}
+
+// GetMessage returns the value of Message.
+func (s *ConfigurationBundle) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *ConfigurationBundle) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *ConfigurationBundle) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetSchemas sets the value of Schemas.
+func (s *ConfigurationBundle) SetSchemas(val []UserSchema) {
+	s.Schemas = val
+}
+
+// SetFlowDefinitions sets the value of FlowDefinitions.
+func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
+	s.FlowDefinitions = val
+}
+
+// SetFlowSchemaURI sets the value of FlowSchemaURI.
+func (s *ConfigurationBundle) SetFlowSchemaURI(val OptSchemaURI) {
+	s.FlowSchemaURI = val
+}
+
+// SetBrandings sets the value of Brandings.
+func (s *ConfigurationBundle) SetBrandings(val []Branding) {
+	s.Brandings = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ConfigurationBundle) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *ConfigurationBundle) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *ConfigurationBundle) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
+// The release assembled from a configuration bundle, plus what happened to
+// each resource in it: whether its content matched the project's newest
+// revision (reused) or a new revision was allocated (created).
+// Ref: #
+type ConfigurationReleaseResponse struct {
+	Release Release `json:"release"`
+	// One entry per resource in the bundle, in pointer order.
+	Revisions []ConfigurationReleaseResponseRevisionsItem `json:"revisions"`
+}
+
+// GetRelease returns the value of Release.
+func (s *ConfigurationReleaseResponse) GetRelease() Release {
+	return s.Release
+}
+
+// GetRevisions returns the value of Revisions.
+func (s *ConfigurationReleaseResponse) GetRevisions() []ConfigurationReleaseResponseRevisionsItem {
+	return s.Revisions
+}
+
+// SetRelease sets the value of Release.
+func (s *ConfigurationReleaseResponse) SetRelease(val Release) {
+	s.Release = val
+}
+
+// SetRevisions sets the value of Revisions.
+func (s *ConfigurationReleaseResponse) SetRevisions(val []ConfigurationReleaseResponseRevisionsItem) {
+	s.Revisions = val
+}
+
+type ConfigurationReleaseResponseRevisionsItem struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// The resource's handle (`objectType`, `name` or `default`).
+	Handle string `json:"handle"`
+	// The revision the release pins for this resource.
+	RevisionID string `json:"revision_id"`
+	// `true` when this call allocated the revision because the bundled
+	// content differed from the project's newest one; `false` when the
+	// newest revision already matched and was reused.
+	Created bool `json:"created"`
+}
+
+// GetKind returns the value of Kind.
+func (s *ConfigurationReleaseResponseRevisionsItem) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetHandle returns the value of Handle.
+func (s *ConfigurationReleaseResponseRevisionsItem) GetHandle() string {
+	return s.Handle
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *ConfigurationReleaseResponseRevisionsItem) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetCreated returns the value of Created.
+func (s *ConfigurationReleaseResponseRevisionsItem) GetCreated() bool {
+	return s.Created
+}
+
+// SetKind sets the value of Kind.
+func (s *ConfigurationReleaseResponseRevisionsItem) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetHandle sets the value of Handle.
+func (s *ConfigurationReleaseResponseRevisionsItem) SetHandle(val string) {
+	s.Handle = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *ConfigurationReleaseResponseRevisionsItem) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetCreated sets the value of Created.
+func (s *ConfigurationReleaseResponseRevisionsItem) SetCreated(val bool) {
+	s.Created = val
+}
+
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
 	Type              CreateAuthAttemptErrorResponseType // switch on this field
@@ -8383,6 +8666,754 @@ func (s *CreateAuthAttemptRequest) SetChallengeNonce(val OptChallengeNonce) {
 func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
+
+type CreateConfigurationReleaseCreated ConfigurationReleaseResponse
+
+func (*CreateConfigurationReleaseCreated) createConfigurationReleaseRes() {}
+
+// CreateConfigurationReleaseErrorResponse represents sum type.
+type CreateConfigurationReleaseErrorResponse struct {
+	Type                     CreateConfigurationReleaseErrorResponseType // switch on this field
+	AuthUnauthorized         AuthUnauthorized
+	BrndInvalid              BrndInvalid
+	BrndMissingProjectID     BrndMissingProjectID
+	EvtInvalid               EvtInvalid
+	FlowdefInvalid           FlowdefInvalid
+	FlowdefRevisionConflict  FlowdefRevisionConflict
+	Internal                 Internal
+	SchAlreadyExists         SchAlreadyExists
+	SchFetchDenied           SchFetchDenied
+	SchFetchDowngrade        SchFetchDowngrade
+	SchFetchTimeout          SchFetchTimeout
+	SchFetchTooLarge         SchFetchTooLarge
+	SchFetchTooManyRedirects SchFetchTooManyRedirects
+	SchInvalidRequest        SchInvalidRequest
+	SchNotFound              SchNotFound
+	SchRevisionConflict      SchRevisionConflict
+	FlowdefMissingProjectID  FlowdefMissingProjectID
+	RelInvalid               RelInvalid
+	RelNotFound              RelNotFound
+	RelPermissionDenied      RelPermissionDenied
+	RelProjectNotFound       RelProjectNotFound
+	RelRevisionNotFound      RelRevisionNotFound
+	RelRevisionUnpinnable    RelRevisionUnpinnable
+	ReqInvalid               ReqInvalid
+	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
+}
+
+// CreateConfigurationReleaseErrorResponseType is oneOf type of CreateConfigurationReleaseErrorResponse.
+type CreateConfigurationReleaseErrorResponseType string
+
+// Possible values for CreateConfigurationReleaseErrorResponseType.
+const (
+	AuthUnauthorizedCreateConfigurationReleaseErrorResponse         CreateConfigurationReleaseErrorResponseType = "auth.unauthorized"
+	BrndInvalidCreateConfigurationReleaseErrorResponse              CreateConfigurationReleaseErrorResponseType = "brnd.invalid"
+	BrndMissingProjectIDCreateConfigurationReleaseErrorResponse     CreateConfigurationReleaseErrorResponseType = "brnd.missing_project_id"
+	EvtInvalidCreateConfigurationReleaseErrorResponse               CreateConfigurationReleaseErrorResponseType = "evt.invalid"
+	FlowdefInvalidCreateConfigurationReleaseErrorResponse           CreateConfigurationReleaseErrorResponseType = "flowdef.invalid"
+	FlowdefRevisionConflictCreateConfigurationReleaseErrorResponse  CreateConfigurationReleaseErrorResponseType = "flowdef.revision_conflict"
+	InternalCreateConfigurationReleaseErrorResponse                 CreateConfigurationReleaseErrorResponseType = "internal"
+	SchAlreadyExistsCreateConfigurationReleaseErrorResponse         CreateConfigurationReleaseErrorResponseType = "sch.already_exists"
+	SchFetchDeniedCreateConfigurationReleaseErrorResponse           CreateConfigurationReleaseErrorResponseType = "sch.fetch_denied"
+	SchFetchDowngradeCreateConfigurationReleaseErrorResponse        CreateConfigurationReleaseErrorResponseType = "sch.fetch_downgrade"
+	SchFetchTimeoutCreateConfigurationReleaseErrorResponse          CreateConfigurationReleaseErrorResponseType = "sch.fetch_timeout"
+	SchFetchTooLargeCreateConfigurationReleaseErrorResponse         CreateConfigurationReleaseErrorResponseType = "sch.fetch_too_large"
+	SchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse CreateConfigurationReleaseErrorResponseType = "sch.fetch_too_many_redirects"
+	SchInvalidRequestCreateConfigurationReleaseErrorResponse        CreateConfigurationReleaseErrorResponseType = "sch.invalid_request"
+	SchNotFoundCreateConfigurationReleaseErrorResponse              CreateConfigurationReleaseErrorResponseType = "sch.not_found"
+	SchRevisionConflictCreateConfigurationReleaseErrorResponse      CreateConfigurationReleaseErrorResponseType = "sch.revision_conflict"
+	FlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse  CreateConfigurationReleaseErrorResponseType = "flowdef.missing_project_id"
+	RelInvalidCreateConfigurationReleaseErrorResponse               CreateConfigurationReleaseErrorResponseType = "rel.invalid"
+	RelNotFoundCreateConfigurationReleaseErrorResponse              CreateConfigurationReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedCreateConfigurationReleaseErrorResponse      CreateConfigurationReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundCreateConfigurationReleaseErrorResponse       CreateConfigurationReleaseErrorResponseType = "rel.project_not_found"
+	RelRevisionNotFoundCreateConfigurationReleaseErrorResponse      CreateConfigurationReleaseErrorResponseType = "rel.revision_not_found"
+	RelRevisionUnpinnableCreateConfigurationReleaseErrorResponse    CreateConfigurationReleaseErrorResponseType = "rel.revision_unpinnable"
+	ReqInvalidCreateConfigurationReleaseErrorResponse               CreateConfigurationReleaseErrorResponseType = "req.invalid"
+	FlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse CreateConfigurationReleaseErrorResponseType = "flowdef.schema_fetch_failed"
+)
+
+// IsAuthUnauthorized reports whether CreateConfigurationReleaseErrorResponse is AuthUnauthorized.
+func (s CreateConfigurationReleaseErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateConfigurationReleaseErrorResponse
+}
+
+// IsBrndInvalid reports whether CreateConfigurationReleaseErrorResponse is BrndInvalid.
+func (s CreateConfigurationReleaseErrorResponse) IsBrndInvalid() bool {
+	return s.Type == BrndInvalidCreateConfigurationReleaseErrorResponse
+}
+
+// IsBrndMissingProjectID reports whether CreateConfigurationReleaseErrorResponse is BrndMissingProjectID.
+func (s CreateConfigurationReleaseErrorResponse) IsBrndMissingProjectID() bool {
+	return s.Type == BrndMissingProjectIDCreateConfigurationReleaseErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateConfigurationReleaseErrorResponse is EvtInvalid.
+func (s CreateConfigurationReleaseErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateConfigurationReleaseErrorResponse
+}
+
+// IsFlowdefInvalid reports whether CreateConfigurationReleaseErrorResponse is FlowdefInvalid.
+func (s CreateConfigurationReleaseErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidCreateConfigurationReleaseErrorResponse
+}
+
+// IsFlowdefRevisionConflict reports whether CreateConfigurationReleaseErrorResponse is FlowdefRevisionConflict.
+func (s CreateConfigurationReleaseErrorResponse) IsFlowdefRevisionConflict() bool {
+	return s.Type == FlowdefRevisionConflictCreateConfigurationReleaseErrorResponse
+}
+
+// IsInternal reports whether CreateConfigurationReleaseErrorResponse is Internal.
+func (s CreateConfigurationReleaseErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchAlreadyExists reports whether CreateConfigurationReleaseErrorResponse is SchAlreadyExists.
+func (s CreateConfigurationReleaseErrorResponse) IsSchAlreadyExists() bool {
+	return s.Type == SchAlreadyExistsCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchFetchDenied reports whether CreateConfigurationReleaseErrorResponse is SchFetchDenied.
+func (s CreateConfigurationReleaseErrorResponse) IsSchFetchDenied() bool {
+	return s.Type == SchFetchDeniedCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchFetchDowngrade reports whether CreateConfigurationReleaseErrorResponse is SchFetchDowngrade.
+func (s CreateConfigurationReleaseErrorResponse) IsSchFetchDowngrade() bool {
+	return s.Type == SchFetchDowngradeCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchFetchTimeout reports whether CreateConfigurationReleaseErrorResponse is SchFetchTimeout.
+func (s CreateConfigurationReleaseErrorResponse) IsSchFetchTimeout() bool {
+	return s.Type == SchFetchTimeoutCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchFetchTooLarge reports whether CreateConfigurationReleaseErrorResponse is SchFetchTooLarge.
+func (s CreateConfigurationReleaseErrorResponse) IsSchFetchTooLarge() bool {
+	return s.Type == SchFetchTooLargeCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchFetchTooManyRedirects reports whether CreateConfigurationReleaseErrorResponse is SchFetchTooManyRedirects.
+func (s CreateConfigurationReleaseErrorResponse) IsSchFetchTooManyRedirects() bool {
+	return s.Type == SchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchInvalidRequest reports whether CreateConfigurationReleaseErrorResponse is SchInvalidRequest.
+func (s CreateConfigurationReleaseErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchNotFound reports whether CreateConfigurationReleaseErrorResponse is SchNotFound.
+func (s CreateConfigurationReleaseErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundCreateConfigurationReleaseErrorResponse
+}
+
+// IsSchRevisionConflict reports whether CreateConfigurationReleaseErrorResponse is SchRevisionConflict.
+func (s CreateConfigurationReleaseErrorResponse) IsSchRevisionConflict() bool {
+	return s.Type == SchRevisionConflictCreateConfigurationReleaseErrorResponse
+}
+
+// IsFlowdefMissingProjectID reports whether CreateConfigurationReleaseErrorResponse is FlowdefMissingProjectID.
+func (s CreateConfigurationReleaseErrorResponse) IsFlowdefMissingProjectID() bool {
+	return s.Type == FlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse
+}
+
+// IsRelInvalid reports whether CreateConfigurationReleaseErrorResponse is RelInvalid.
+func (s CreateConfigurationReleaseErrorResponse) IsRelInvalid() bool {
+	return s.Type == RelInvalidCreateConfigurationReleaseErrorResponse
+}
+
+// IsRelNotFound reports whether CreateConfigurationReleaseErrorResponse is RelNotFound.
+func (s CreateConfigurationReleaseErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateConfigurationReleaseErrorResponse
+}
+
+// IsRelPermissionDenied reports whether CreateConfigurationReleaseErrorResponse is RelPermissionDenied.
+func (s CreateConfigurationReleaseErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedCreateConfigurationReleaseErrorResponse
+}
+
+// IsRelProjectNotFound reports whether CreateConfigurationReleaseErrorResponse is RelProjectNotFound.
+func (s CreateConfigurationReleaseErrorResponse) IsRelProjectNotFound() bool {
+	return s.Type == RelProjectNotFoundCreateConfigurationReleaseErrorResponse
+}
+
+// IsRelRevisionNotFound reports whether CreateConfigurationReleaseErrorResponse is RelRevisionNotFound.
+func (s CreateConfigurationReleaseErrorResponse) IsRelRevisionNotFound() bool {
+	return s.Type == RelRevisionNotFoundCreateConfigurationReleaseErrorResponse
+}
+
+// IsRelRevisionUnpinnable reports whether CreateConfigurationReleaseErrorResponse is RelRevisionUnpinnable.
+func (s CreateConfigurationReleaseErrorResponse) IsRelRevisionUnpinnable() bool {
+	return s.Type == RelRevisionUnpinnableCreateConfigurationReleaseErrorResponse
+}
+
+// IsReqInvalid reports whether CreateConfigurationReleaseErrorResponse is ReqInvalid.
+func (s CreateConfigurationReleaseErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateConfigurationReleaseErrorResponse
+}
+
+// IsFlowdefSchemaFetchFailed reports whether CreateConfigurationReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s CreateConfigurationReleaseErrorResponse) IsFlowdefSchemaFetchFailed() bool {
+	return s.Type == FlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateConfigurationReleaseErrorResponse to AuthUnauthorized.
+func (s *CreateConfigurationReleaseErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateConfigurationReleaseErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateConfigurationReleaseErrorResponse is AuthUnauthorized.
+func (s CreateConfigurationReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateConfigurationReleaseErrorResponse(v AuthUnauthorized) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetBrndInvalid sets CreateConfigurationReleaseErrorResponse to BrndInvalid.
+func (s *CreateConfigurationReleaseErrorResponse) SetBrndInvalid(v BrndInvalid) {
+	s.Type = BrndInvalidCreateConfigurationReleaseErrorResponse
+	s.BrndInvalid = v
+}
+
+// GetBrndInvalid returns BrndInvalid and true boolean if CreateConfigurationReleaseErrorResponse is BrndInvalid.
+func (s CreateConfigurationReleaseErrorResponse) GetBrndInvalid() (v BrndInvalid, ok bool) {
+	if !s.IsBrndInvalid() {
+		return v, false
+	}
+	return s.BrndInvalid, true
+}
+
+// NewBrndInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from BrndInvalid.
+func NewBrndInvalidCreateConfigurationReleaseErrorResponse(v BrndInvalid) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetBrndInvalid(v)
+	return s
+}
+
+// SetBrndMissingProjectID sets CreateConfigurationReleaseErrorResponse to BrndMissingProjectID.
+func (s *CreateConfigurationReleaseErrorResponse) SetBrndMissingProjectID(v BrndMissingProjectID) {
+	s.Type = BrndMissingProjectIDCreateConfigurationReleaseErrorResponse
+	s.BrndMissingProjectID = v
+}
+
+// GetBrndMissingProjectID returns BrndMissingProjectID and true boolean if CreateConfigurationReleaseErrorResponse is BrndMissingProjectID.
+func (s CreateConfigurationReleaseErrorResponse) GetBrndMissingProjectID() (v BrndMissingProjectID, ok bool) {
+	if !s.IsBrndMissingProjectID() {
+		return v, false
+	}
+	return s.BrndMissingProjectID, true
+}
+
+// NewBrndMissingProjectIDCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from BrndMissingProjectID.
+func NewBrndMissingProjectIDCreateConfigurationReleaseErrorResponse(v BrndMissingProjectID) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetBrndMissingProjectID(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateConfigurationReleaseErrorResponse to EvtInvalid.
+func (s *CreateConfigurationReleaseErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateConfigurationReleaseErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateConfigurationReleaseErrorResponse is EvtInvalid.
+func (s CreateConfigurationReleaseErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateConfigurationReleaseErrorResponse(v EvtInvalid) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetFlowdefInvalid sets CreateConfigurationReleaseErrorResponse to FlowdefInvalid.
+func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidCreateConfigurationReleaseErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefInvalid.
+func (s CreateConfigurationReleaseErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidCreateConfigurationReleaseErrorResponse(v FlowdefInvalid) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
+// SetFlowdefRevisionConflict sets CreateConfigurationReleaseErrorResponse to FlowdefRevisionConflict.
+func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefRevisionConflict(v FlowdefRevisionConflict) {
+	s.Type = FlowdefRevisionConflictCreateConfigurationReleaseErrorResponse
+	s.FlowdefRevisionConflict = v
+}
+
+// GetFlowdefRevisionConflict returns FlowdefRevisionConflict and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefRevisionConflict.
+func (s CreateConfigurationReleaseErrorResponse) GetFlowdefRevisionConflict() (v FlowdefRevisionConflict, ok bool) {
+	if !s.IsFlowdefRevisionConflict() {
+		return v, false
+	}
+	return s.FlowdefRevisionConflict, true
+}
+
+// NewFlowdefRevisionConflictCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefRevisionConflict.
+func NewFlowdefRevisionConflictCreateConfigurationReleaseErrorResponse(v FlowdefRevisionConflict) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetFlowdefRevisionConflict(v)
+	return s
+}
+
+// SetInternal sets CreateConfigurationReleaseErrorResponse to Internal.
+func (s *CreateConfigurationReleaseErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateConfigurationReleaseErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateConfigurationReleaseErrorResponse is Internal.
+func (s CreateConfigurationReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from Internal.
+func NewInternalCreateConfigurationReleaseErrorResponse(v Internal) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchAlreadyExists sets CreateConfigurationReleaseErrorResponse to SchAlreadyExists.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchAlreadyExists(v SchAlreadyExists) {
+	s.Type = SchAlreadyExistsCreateConfigurationReleaseErrorResponse
+	s.SchAlreadyExists = v
+}
+
+// GetSchAlreadyExists returns SchAlreadyExists and true boolean if CreateConfigurationReleaseErrorResponse is SchAlreadyExists.
+func (s CreateConfigurationReleaseErrorResponse) GetSchAlreadyExists() (v SchAlreadyExists, ok bool) {
+	if !s.IsSchAlreadyExists() {
+		return v, false
+	}
+	return s.SchAlreadyExists, true
+}
+
+// NewSchAlreadyExistsCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchAlreadyExists.
+func NewSchAlreadyExistsCreateConfigurationReleaseErrorResponse(v SchAlreadyExists) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchAlreadyExists(v)
+	return s
+}
+
+// SetSchFetchDenied sets CreateConfigurationReleaseErrorResponse to SchFetchDenied.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
+	s.Type = SchFetchDeniedCreateConfigurationReleaseErrorResponse
+	s.SchFetchDenied = v
+}
+
+// GetSchFetchDenied returns SchFetchDenied and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchDenied.
+func (s CreateConfigurationReleaseErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
+	if !s.IsSchFetchDenied() {
+		return v, false
+	}
+	return s.SchFetchDenied, true
+}
+
+// NewSchFetchDeniedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchDenied.
+func NewSchFetchDeniedCreateConfigurationReleaseErrorResponse(v SchFetchDenied) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchFetchDenied(v)
+	return s
+}
+
+// SetSchFetchDowngrade sets CreateConfigurationReleaseErrorResponse to SchFetchDowngrade.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
+	s.Type = SchFetchDowngradeCreateConfigurationReleaseErrorResponse
+	s.SchFetchDowngrade = v
+}
+
+// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchDowngrade.
+func (s CreateConfigurationReleaseErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
+	if !s.IsSchFetchDowngrade() {
+		return v, false
+	}
+	return s.SchFetchDowngrade, true
+}
+
+// NewSchFetchDowngradeCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchDowngrade.
+func NewSchFetchDowngradeCreateConfigurationReleaseErrorResponse(v SchFetchDowngrade) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchFetchDowngrade(v)
+	return s
+}
+
+// SetSchFetchTimeout sets CreateConfigurationReleaseErrorResponse to SchFetchTimeout.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
+	s.Type = SchFetchTimeoutCreateConfigurationReleaseErrorResponse
+	s.SchFetchTimeout = v
+}
+
+// GetSchFetchTimeout returns SchFetchTimeout and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchTimeout.
+func (s CreateConfigurationReleaseErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
+	if !s.IsSchFetchTimeout() {
+		return v, false
+	}
+	return s.SchFetchTimeout, true
+}
+
+// NewSchFetchTimeoutCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchTimeout.
+func NewSchFetchTimeoutCreateConfigurationReleaseErrorResponse(v SchFetchTimeout) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchFetchTimeout(v)
+	return s
+}
+
+// SetSchFetchTooLarge sets CreateConfigurationReleaseErrorResponse to SchFetchTooLarge.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
+	s.Type = SchFetchTooLargeCreateConfigurationReleaseErrorResponse
+	s.SchFetchTooLarge = v
+}
+
+// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchTooLarge.
+func (s CreateConfigurationReleaseErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
+	if !s.IsSchFetchTooLarge() {
+		return v, false
+	}
+	return s.SchFetchTooLarge, true
+}
+
+// NewSchFetchTooLargeCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchTooLarge.
+func NewSchFetchTooLargeCreateConfigurationReleaseErrorResponse(v SchFetchTooLarge) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchFetchTooLarge(v)
+	return s
+}
+
+// SetSchFetchTooManyRedirects sets CreateConfigurationReleaseErrorResponse to SchFetchTooManyRedirects.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
+	s.Type = SchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse
+	s.SchFetchTooManyRedirects = v
+}
+
+// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchTooManyRedirects.
+func (s CreateConfigurationReleaseErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
+	if !s.IsSchFetchTooManyRedirects() {
+		return v, false
+	}
+	return s.SchFetchTooManyRedirects, true
+}
+
+// NewSchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchTooManyRedirects.
+func NewSchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse(v SchFetchTooManyRedirects) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchFetchTooManyRedirects(v)
+	return s
+}
+
+// SetSchInvalidRequest sets CreateConfigurationReleaseErrorResponse to SchInvalidRequest.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestCreateConfigurationReleaseErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if CreateConfigurationReleaseErrorResponse is SchInvalidRequest.
+func (s CreateConfigurationReleaseErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestCreateConfigurationReleaseErrorResponse(v SchInvalidRequest) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchInvalidRequest(v)
+	return s
+}
+
+// SetSchNotFound sets CreateConfigurationReleaseErrorResponse to SchNotFound.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundCreateConfigurationReleaseErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if CreateConfigurationReleaseErrorResponse is SchNotFound.
+func (s CreateConfigurationReleaseErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchNotFound.
+func NewSchNotFoundCreateConfigurationReleaseErrorResponse(v SchNotFound) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchRevisionConflict sets CreateConfigurationReleaseErrorResponse to SchRevisionConflict.
+func (s *CreateConfigurationReleaseErrorResponse) SetSchRevisionConflict(v SchRevisionConflict) {
+	s.Type = SchRevisionConflictCreateConfigurationReleaseErrorResponse
+	s.SchRevisionConflict = v
+}
+
+// GetSchRevisionConflict returns SchRevisionConflict and true boolean if CreateConfigurationReleaseErrorResponse is SchRevisionConflict.
+func (s CreateConfigurationReleaseErrorResponse) GetSchRevisionConflict() (v SchRevisionConflict, ok bool) {
+	if !s.IsSchRevisionConflict() {
+		return v, false
+	}
+	return s.SchRevisionConflict, true
+}
+
+// NewSchRevisionConflictCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchRevisionConflict.
+func NewSchRevisionConflictCreateConfigurationReleaseErrorResponse(v SchRevisionConflict) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetSchRevisionConflict(v)
+	return s
+}
+
+// SetFlowdefMissingProjectID sets CreateConfigurationReleaseErrorResponse to FlowdefMissingProjectID.
+func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
+	s.Type = FlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse
+	s.FlowdefMissingProjectID = v
+}
+
+// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefMissingProjectID.
+func (s CreateConfigurationReleaseErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
+	if !s.IsFlowdefMissingProjectID() {
+		return v, false
+	}
+	return s.FlowdefMissingProjectID, true
+}
+
+// NewFlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefMissingProjectID.
+func NewFlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse(v FlowdefMissingProjectID) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetFlowdefMissingProjectID(v)
+	return s
+}
+
+// SetRelInvalid sets CreateConfigurationReleaseErrorResponse to RelInvalid.
+func (s *CreateConfigurationReleaseErrorResponse) SetRelInvalid(v RelInvalid) {
+	s.Type = RelInvalidCreateConfigurationReleaseErrorResponse
+	s.RelInvalid = v
+}
+
+// GetRelInvalid returns RelInvalid and true boolean if CreateConfigurationReleaseErrorResponse is RelInvalid.
+func (s CreateConfigurationReleaseErrorResponse) GetRelInvalid() (v RelInvalid, ok bool) {
+	if !s.IsRelInvalid() {
+		return v, false
+	}
+	return s.RelInvalid, true
+}
+
+// NewRelInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelInvalid.
+func NewRelInvalidCreateConfigurationReleaseErrorResponse(v RelInvalid) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetRelInvalid(v)
+	return s
+}
+
+// SetRelNotFound sets CreateConfigurationReleaseErrorResponse to RelNotFound.
+func (s *CreateConfigurationReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateConfigurationReleaseErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateConfigurationReleaseErrorResponse is RelNotFound.
+func (s CreateConfigurationReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelNotFound.
+func NewRelNotFoundCreateConfigurationReleaseErrorResponse(v RelNotFound) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets CreateConfigurationReleaseErrorResponse to RelPermissionDenied.
+func (s *CreateConfigurationReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedCreateConfigurationReleaseErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if CreateConfigurationReleaseErrorResponse is RelPermissionDenied.
+func (s CreateConfigurationReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedCreateConfigurationReleaseErrorResponse(v RelPermissionDenied) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetRelPermissionDenied(v)
+	return s
+}
+
+// SetRelProjectNotFound sets CreateConfigurationReleaseErrorResponse to RelProjectNotFound.
+func (s *CreateConfigurationReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
+	s.Type = RelProjectNotFoundCreateConfigurationReleaseErrorResponse
+	s.RelProjectNotFound = v
+}
+
+// GetRelProjectNotFound returns RelProjectNotFound and true boolean if CreateConfigurationReleaseErrorResponse is RelProjectNotFound.
+func (s CreateConfigurationReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
+	if !s.IsRelProjectNotFound() {
+		return v, false
+	}
+	return s.RelProjectNotFound, true
+}
+
+// NewRelProjectNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelProjectNotFound.
+func NewRelProjectNotFoundCreateConfigurationReleaseErrorResponse(v RelProjectNotFound) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetRelProjectNotFound(v)
+	return s
+}
+
+// SetRelRevisionNotFound sets CreateConfigurationReleaseErrorResponse to RelRevisionNotFound.
+func (s *CreateConfigurationReleaseErrorResponse) SetRelRevisionNotFound(v RelRevisionNotFound) {
+	s.Type = RelRevisionNotFoundCreateConfigurationReleaseErrorResponse
+	s.RelRevisionNotFound = v
+}
+
+// GetRelRevisionNotFound returns RelRevisionNotFound and true boolean if CreateConfigurationReleaseErrorResponse is RelRevisionNotFound.
+func (s CreateConfigurationReleaseErrorResponse) GetRelRevisionNotFound() (v RelRevisionNotFound, ok bool) {
+	if !s.IsRelRevisionNotFound() {
+		return v, false
+	}
+	return s.RelRevisionNotFound, true
+}
+
+// NewRelRevisionNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelRevisionNotFound.
+func NewRelRevisionNotFoundCreateConfigurationReleaseErrorResponse(v RelRevisionNotFound) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetRelRevisionNotFound(v)
+	return s
+}
+
+// SetRelRevisionUnpinnable sets CreateConfigurationReleaseErrorResponse to RelRevisionUnpinnable.
+func (s *CreateConfigurationReleaseErrorResponse) SetRelRevisionUnpinnable(v RelRevisionUnpinnable) {
+	s.Type = RelRevisionUnpinnableCreateConfigurationReleaseErrorResponse
+	s.RelRevisionUnpinnable = v
+}
+
+// GetRelRevisionUnpinnable returns RelRevisionUnpinnable and true boolean if CreateConfigurationReleaseErrorResponse is RelRevisionUnpinnable.
+func (s CreateConfigurationReleaseErrorResponse) GetRelRevisionUnpinnable() (v RelRevisionUnpinnable, ok bool) {
+	if !s.IsRelRevisionUnpinnable() {
+		return v, false
+	}
+	return s.RelRevisionUnpinnable, true
+}
+
+// NewRelRevisionUnpinnableCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelRevisionUnpinnable.
+func NewRelRevisionUnpinnableCreateConfigurationReleaseErrorResponse(v RelRevisionUnpinnable) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetRelRevisionUnpinnable(v)
+	return s
+}
+
+// SetReqInvalid sets CreateConfigurationReleaseErrorResponse to ReqInvalid.
+func (s *CreateConfigurationReleaseErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateConfigurationReleaseErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateConfigurationReleaseErrorResponse is ReqInvalid.
+func (s CreateConfigurationReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from ReqInvalid.
+func NewReqInvalidCreateConfigurationReleaseErrorResponse(v ReqInvalid) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetFlowdefSchemaFetchFailed sets CreateConfigurationReleaseErrorResponse to FlowdefSchemaFetchFailed.
+func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
+	s.Type = FlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse
+	s.FlowdefSchemaFetchFailed = v
+}
+
+// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s CreateConfigurationReleaseErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
+	if !s.IsFlowdefSchemaFetchFailed() {
+		return v, false
+	}
+	return s.FlowdefSchemaFetchFailed, true
+}
+
+// NewFlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefSchemaFetchFailed.
+func NewFlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse(v FlowdefSchemaFetchFailed) CreateConfigurationReleaseErrorResponse {
+	var s CreateConfigurationReleaseErrorResponse
+	s.SetFlowdefSchemaFetchFailed(v)
+	return s
+}
+
+// CreateConfigurationReleaseErrorResponseStatusCode wraps CreateConfigurationReleaseErrorResponse with StatusCode.
+type CreateConfigurationReleaseErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateConfigurationReleaseErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateConfigurationReleaseErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateConfigurationReleaseErrorResponseStatusCode) GetResponse() CreateConfigurationReleaseErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateConfigurationReleaseErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateConfigurationReleaseErrorResponseStatusCode) SetResponse(val CreateConfigurationReleaseErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateConfigurationReleaseErrorResponseStatusCode) createConfigurationReleaseRes() {}
+
+type CreateConfigurationReleaseOK ConfigurationReleaseResponse
+
+func (*CreateConfigurationReleaseOK) createConfigurationReleaseRes() {}
 
 type CreateDeploymentCreated Deployment
 
@@ -8816,10 +9847,16 @@ func (*CreateEnvironmentCreated) createEnvironmentRes() {}
 
 // CreateEnvironmentErrorResponse represents sum type.
 type CreateEnvironmentErrorResponse struct {
-	Type             CreateEnvironmentErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                CreateEnvironmentErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EnvInvalid          EnvInvalid
+	EnvNameInvalid      EnvNameInvalid
+	EnvNotFound         EnvNotFound
+	EnvPermissionDenied EnvPermissionDenied
+	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
 }
 
 // CreateEnvironmentErrorResponseType is oneOf type of CreateEnvironmentErrorResponse.
@@ -8827,14 +9864,50 @@ type CreateEnvironmentErrorResponseType string
 
 // Possible values for CreateEnvironmentErrorResponseType.
 const (
-	AuthUnauthorizedCreateEnvironmentErrorResponse CreateEnvironmentErrorResponseType = "auth.unauthorized"
-	InternalCreateEnvironmentErrorResponse         CreateEnvironmentErrorResponseType = "internal"
-	ReqInvalidCreateEnvironmentErrorResponse       CreateEnvironmentErrorResponseType = "req.invalid"
+	AuthUnauthorizedCreateEnvironmentErrorResponse    CreateEnvironmentErrorResponseType = "auth.unauthorized"
+	EnvInvalidCreateEnvironmentErrorResponse          CreateEnvironmentErrorResponseType = "env.invalid"
+	EnvNameInvalidCreateEnvironmentErrorResponse      CreateEnvironmentErrorResponseType = "env.name_invalid"
+	EnvNotFoundCreateEnvironmentErrorResponse         CreateEnvironmentErrorResponseType = "env.not_found"
+	EnvPermissionDeniedCreateEnvironmentErrorResponse CreateEnvironmentErrorResponseType = "env.permission_denied"
+	EnvProjectNotFoundCreateEnvironmentErrorResponse  CreateEnvironmentErrorResponseType = "env.project_not_found"
+	EvtInvalidCreateEnvironmentErrorResponse          CreateEnvironmentErrorResponseType = "evt.invalid"
+	InternalCreateEnvironmentErrorResponse            CreateEnvironmentErrorResponseType = "internal"
+	ReqInvalidCreateEnvironmentErrorResponse          CreateEnvironmentErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether CreateEnvironmentErrorResponse is AuthUnauthorized.
 func (s CreateEnvironmentErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateEnvironmentErrorResponse
+}
+
+// IsEnvInvalid reports whether CreateEnvironmentErrorResponse is EnvInvalid.
+func (s CreateEnvironmentErrorResponse) IsEnvInvalid() bool {
+	return s.Type == EnvInvalidCreateEnvironmentErrorResponse
+}
+
+// IsEnvNameInvalid reports whether CreateEnvironmentErrorResponse is EnvNameInvalid.
+func (s CreateEnvironmentErrorResponse) IsEnvNameInvalid() bool {
+	return s.Type == EnvNameInvalidCreateEnvironmentErrorResponse
+}
+
+// IsEnvNotFound reports whether CreateEnvironmentErrorResponse is EnvNotFound.
+func (s CreateEnvironmentErrorResponse) IsEnvNotFound() bool {
+	return s.Type == EnvNotFoundCreateEnvironmentErrorResponse
+}
+
+// IsEnvPermissionDenied reports whether CreateEnvironmentErrorResponse is EnvPermissionDenied.
+func (s CreateEnvironmentErrorResponse) IsEnvPermissionDenied() bool {
+	return s.Type == EnvPermissionDeniedCreateEnvironmentErrorResponse
+}
+
+// IsEnvProjectNotFound reports whether CreateEnvironmentErrorResponse is EnvProjectNotFound.
+func (s CreateEnvironmentErrorResponse) IsEnvProjectNotFound() bool {
+	return s.Type == EnvProjectNotFoundCreateEnvironmentErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateEnvironmentErrorResponse is EvtInvalid.
+func (s CreateEnvironmentErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateEnvironmentErrorResponse
 }
 
 // IsInternal reports whether CreateEnvironmentErrorResponse is Internal.
@@ -8865,6 +9938,132 @@ func (s CreateEnvironmentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorize
 func NewAuthUnauthorizedCreateEnvironmentErrorResponse(v AuthUnauthorized) CreateEnvironmentErrorResponse {
 	var s CreateEnvironmentErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEnvInvalid sets CreateEnvironmentErrorResponse to EnvInvalid.
+func (s *CreateEnvironmentErrorResponse) SetEnvInvalid(v EnvInvalid) {
+	s.Type = EnvInvalidCreateEnvironmentErrorResponse
+	s.EnvInvalid = v
+}
+
+// GetEnvInvalid returns EnvInvalid and true boolean if CreateEnvironmentErrorResponse is EnvInvalid.
+func (s CreateEnvironmentErrorResponse) GetEnvInvalid() (v EnvInvalid, ok bool) {
+	if !s.IsEnvInvalid() {
+		return v, false
+	}
+	return s.EnvInvalid, true
+}
+
+// NewEnvInvalidCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from EnvInvalid.
+func NewEnvInvalidCreateEnvironmentErrorResponse(v EnvInvalid) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetEnvInvalid(v)
+	return s
+}
+
+// SetEnvNameInvalid sets CreateEnvironmentErrorResponse to EnvNameInvalid.
+func (s *CreateEnvironmentErrorResponse) SetEnvNameInvalid(v EnvNameInvalid) {
+	s.Type = EnvNameInvalidCreateEnvironmentErrorResponse
+	s.EnvNameInvalid = v
+}
+
+// GetEnvNameInvalid returns EnvNameInvalid and true boolean if CreateEnvironmentErrorResponse is EnvNameInvalid.
+func (s CreateEnvironmentErrorResponse) GetEnvNameInvalid() (v EnvNameInvalid, ok bool) {
+	if !s.IsEnvNameInvalid() {
+		return v, false
+	}
+	return s.EnvNameInvalid, true
+}
+
+// NewEnvNameInvalidCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from EnvNameInvalid.
+func NewEnvNameInvalidCreateEnvironmentErrorResponse(v EnvNameInvalid) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetEnvNameInvalid(v)
+	return s
+}
+
+// SetEnvNotFound sets CreateEnvironmentErrorResponse to EnvNotFound.
+func (s *CreateEnvironmentErrorResponse) SetEnvNotFound(v EnvNotFound) {
+	s.Type = EnvNotFoundCreateEnvironmentErrorResponse
+	s.EnvNotFound = v
+}
+
+// GetEnvNotFound returns EnvNotFound and true boolean if CreateEnvironmentErrorResponse is EnvNotFound.
+func (s CreateEnvironmentErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
+	if !s.IsEnvNotFound() {
+		return v, false
+	}
+	return s.EnvNotFound, true
+}
+
+// NewEnvNotFoundCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from EnvNotFound.
+func NewEnvNotFoundCreateEnvironmentErrorResponse(v EnvNotFound) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetEnvNotFound(v)
+	return s
+}
+
+// SetEnvPermissionDenied sets CreateEnvironmentErrorResponse to EnvPermissionDenied.
+func (s *CreateEnvironmentErrorResponse) SetEnvPermissionDenied(v EnvPermissionDenied) {
+	s.Type = EnvPermissionDeniedCreateEnvironmentErrorResponse
+	s.EnvPermissionDenied = v
+}
+
+// GetEnvPermissionDenied returns EnvPermissionDenied and true boolean if CreateEnvironmentErrorResponse is EnvPermissionDenied.
+func (s CreateEnvironmentErrorResponse) GetEnvPermissionDenied() (v EnvPermissionDenied, ok bool) {
+	if !s.IsEnvPermissionDenied() {
+		return v, false
+	}
+	return s.EnvPermissionDenied, true
+}
+
+// NewEnvPermissionDeniedCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from EnvPermissionDenied.
+func NewEnvPermissionDeniedCreateEnvironmentErrorResponse(v EnvPermissionDenied) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetEnvPermissionDenied(v)
+	return s
+}
+
+// SetEnvProjectNotFound sets CreateEnvironmentErrorResponse to EnvProjectNotFound.
+func (s *CreateEnvironmentErrorResponse) SetEnvProjectNotFound(v EnvProjectNotFound) {
+	s.Type = EnvProjectNotFoundCreateEnvironmentErrorResponse
+	s.EnvProjectNotFound = v
+}
+
+// GetEnvProjectNotFound returns EnvProjectNotFound and true boolean if CreateEnvironmentErrorResponse is EnvProjectNotFound.
+func (s CreateEnvironmentErrorResponse) GetEnvProjectNotFound() (v EnvProjectNotFound, ok bool) {
+	if !s.IsEnvProjectNotFound() {
+		return v, false
+	}
+	return s.EnvProjectNotFound, true
+}
+
+// NewEnvProjectNotFoundCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from EnvProjectNotFound.
+func NewEnvProjectNotFoundCreateEnvironmentErrorResponse(v EnvProjectNotFound) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetEnvProjectNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateEnvironmentErrorResponse to EvtInvalid.
+func (s *CreateEnvironmentErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateEnvironmentErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateEnvironmentErrorResponse is EvtInvalid.
+func (s CreateEnvironmentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateEnvironmentErrorResponse returns new CreateEnvironmentErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateEnvironmentErrorResponse(v EvtInvalid) CreateEnvironmentErrorResponse {
+	var s CreateEnvironmentErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -9370,6 +10569,7 @@ type CreateFlowErrorResponse struct {
 	EncKeyDecryptFailed    EncKeyDecryptFailed
 	EncKeyEncryptFailed    EncKeyEncryptFailed
 	EncKeyNotFound         EncKeyNotFound
+	EnvNotFound            EnvNotFound
 	EvtInvalid             EvtInvalid
 	FlowdefNotFound        FlowdefNotFound
 	FlowdefPurposeMismatch FlowdefPurposeMismatch
@@ -9378,6 +10578,8 @@ type CreateFlowErrorResponse struct {
 	Internal               Internal
 	TknInvalid             TknInvalid
 	TknInvalidTknid        TknInvalidTknid
+	RelInvalid             RelInvalid
+	RelNotFound            RelNotFound
 	ReqInvalid             ReqInvalid
 	EncKeyUnknownAlg       EncKeyUnknownAlg
 }
@@ -9391,6 +10593,7 @@ const (
 	EncKeyDecryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
+	EnvNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "env.not_found"
 	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
 	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
 	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
@@ -9399,6 +10602,8 @@ const (
 	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
 	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	RelInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.invalid"
+	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
 )
@@ -9421,6 +10626,11 @@ func (s CreateFlowErrorResponse) IsEncKeyEncryptFailed() bool {
 // IsEncKeyNotFound reports whether CreateFlowErrorResponse is EncKeyNotFound.
 func (s CreateFlowErrorResponse) IsEncKeyNotFound() bool {
 	return s.Type == EncKeyNotFoundCreateFlowErrorResponse
+}
+
+// IsEnvNotFound reports whether CreateFlowErrorResponse is EnvNotFound.
+func (s CreateFlowErrorResponse) IsEnvNotFound() bool {
+	return s.Type == EnvNotFoundCreateFlowErrorResponse
 }
 
 // IsEvtInvalid reports whether CreateFlowErrorResponse is EvtInvalid.
@@ -9459,6 +10669,16 @@ func (s CreateFlowErrorResponse) IsTknInvalid() bool {
 // IsTknInvalidTknid reports whether CreateFlowErrorResponse is TknInvalidTknid.
 func (s CreateFlowErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidCreateFlowErrorResponse
+}
+
+// IsRelInvalid reports whether CreateFlowErrorResponse is RelInvalid.
+func (s CreateFlowErrorResponse) IsRelInvalid() bool {
+	return s.Type == RelInvalidCreateFlowErrorResponse
+}
+
+// IsRelNotFound reports whether CreateFlowErrorResponse is RelNotFound.
+func (s CreateFlowErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateFlowErrorResponse
 }
 
 // IsReqInvalid reports whether CreateFlowErrorResponse is ReqInvalid.
@@ -9552,6 +10772,27 @@ func (s CreateFlowErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool)
 func NewEncKeyNotFoundCreateFlowErrorResponse(v EncKeyNotFound) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetEnvNotFound sets CreateFlowErrorResponse to EnvNotFound.
+func (s *CreateFlowErrorResponse) SetEnvNotFound(v EnvNotFound) {
+	s.Type = EnvNotFoundCreateFlowErrorResponse
+	s.EnvNotFound = v
+}
+
+// GetEnvNotFound returns EnvNotFound and true boolean if CreateFlowErrorResponse is EnvNotFound.
+func (s CreateFlowErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
+	if !s.IsEnvNotFound() {
+		return v, false
+	}
+	return s.EnvNotFound, true
+}
+
+// NewEnvNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from EnvNotFound.
+func NewEnvNotFoundCreateFlowErrorResponse(v EnvNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetEnvNotFound(v)
 	return s
 }
 
@@ -9720,6 +10961,48 @@ func (s CreateFlowErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, ok boo
 func NewTknInvalidTknidCreateFlowErrorResponse(v TknInvalidTknid) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetTknInvalidTknid(v)
+	return s
+}
+
+// SetRelInvalid sets CreateFlowErrorResponse to RelInvalid.
+func (s *CreateFlowErrorResponse) SetRelInvalid(v RelInvalid) {
+	s.Type = RelInvalidCreateFlowErrorResponse
+	s.RelInvalid = v
+}
+
+// GetRelInvalid returns RelInvalid and true boolean if CreateFlowErrorResponse is RelInvalid.
+func (s CreateFlowErrorResponse) GetRelInvalid() (v RelInvalid, ok bool) {
+	if !s.IsRelInvalid() {
+		return v, false
+	}
+	return s.RelInvalid, true
+}
+
+// NewRelInvalidCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelInvalid.
+func NewRelInvalidCreateFlowErrorResponse(v RelInvalid) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelInvalid(v)
+	return s
+}
+
+// SetRelNotFound sets CreateFlowErrorResponse to RelNotFound.
+func (s *CreateFlowErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateFlowErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateFlowErrorResponse is RelNotFound.
+func (s CreateFlowErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNotFound.
+func NewRelNotFoundCreateFlowErrorResponse(v RelNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNotFound(v)
 	return s
 }
 
@@ -14721,6 +16004,112 @@ func (s *EncKeyUnknownAlg) SetDetails(val OptEncKeyUnknownAlgDetails) {
 type EncKeyUnknownAlgDetails map[string]jx.Raw
 
 func (s *EncKeyUnknownAlgDetails) init() EncKeyUnknownAlgDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EnvInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvInvalid) GetDetails() OptEnvInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvInvalid) SetDetails(val OptEnvInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvInvalidDetails map[string]jx.Raw
+
+func (s *EnvInvalidDetails) init() EnvInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EnvNameInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvNameInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvNameInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvNameInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvNameInvalid) GetDetails() OptEnvNameInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvNameInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvNameInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvNameInvalid) SetDetails(val OptEnvNameInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvNameInvalidDetails map[string]jx.Raw
+
+func (s *EnvNameInvalidDetails) init() EnvNameInvalidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -30254,6 +31643,98 @@ func (o OptBrandingTypography) Or(d BrandingTypography) BrandingTypography {
 	return d
 }
 
+// NewOptBrndInvalidDetails returns new OptBrndInvalidDetails with value set to v.
+func NewOptBrndInvalidDetails(v BrndInvalidDetails) OptBrndInvalidDetails {
+	return OptBrndInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrndInvalidDetails is optional BrndInvalidDetails.
+type OptBrndInvalidDetails struct {
+	Value BrndInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBrndInvalidDetails was set.
+func (o OptBrndInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrndInvalidDetails) Reset() {
+	var v BrndInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrndInvalidDetails) SetTo(v BrndInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrndInvalidDetails) Get() (v BrndInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrndInvalidDetails) Or(d BrndInvalidDetails) BrndInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrndMissingProjectIDDetails returns new OptBrndMissingProjectIDDetails with value set to v.
+func NewOptBrndMissingProjectIDDetails(v BrndMissingProjectIDDetails) OptBrndMissingProjectIDDetails {
+	return OptBrndMissingProjectIDDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrndMissingProjectIDDetails is optional BrndMissingProjectIDDetails.
+type OptBrndMissingProjectIDDetails struct {
+	Value BrndMissingProjectIDDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBrndMissingProjectIDDetails was set.
+func (o OptBrndMissingProjectIDDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrndMissingProjectIDDetails) Reset() {
+	var v BrndMissingProjectIDDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrndMissingProjectIDDetails) SetTo(v BrndMissingProjectIDDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrndMissingProjectIDDetails) Get() (v BrndMissingProjectIDDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrndMissingProjectIDDetails) Or(d BrndMissingProjectIDDetails) BrndMissingProjectIDDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptChallengeNonce returns new OptChallengeNonce with value set to v.
 func NewOptChallengeNonce(v ChallengeNonce) OptChallengeNonce {
 	return OptChallengeNonce{
@@ -31076,6 +32557,98 @@ func (o OptEncKeyUnknownAlgDetails) Get() (v EncKeyUnknownAlgDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEncKeyUnknownAlgDetails) Or(d EncKeyUnknownAlgDetails) EncKeyUnknownAlgDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvInvalidDetails returns new OptEnvInvalidDetails with value set to v.
+func NewOptEnvInvalidDetails(v EnvInvalidDetails) OptEnvInvalidDetails {
+	return OptEnvInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvInvalidDetails is optional EnvInvalidDetails.
+type OptEnvInvalidDetails struct {
+	Value EnvInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvInvalidDetails was set.
+func (o OptEnvInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvInvalidDetails) Reset() {
+	var v EnvInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvInvalidDetails) SetTo(v EnvInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvInvalidDetails) Get() (v EnvInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvInvalidDetails) Or(d EnvInvalidDetails) EnvInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvNameInvalidDetails returns new OptEnvNameInvalidDetails with value set to v.
+func NewOptEnvNameInvalidDetails(v EnvNameInvalidDetails) OptEnvNameInvalidDetails {
+	return OptEnvNameInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvNameInvalidDetails is optional EnvNameInvalidDetails.
+type OptEnvNameInvalidDetails struct {
+	Value EnvNameInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvNameInvalidDetails was set.
+func (o OptEnvNameInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvNameInvalidDetails) Reset() {
+	var v EnvNameInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvNameInvalidDetails) SetTo(v EnvNameInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvNameInvalidDetails) Get() (v EnvNameInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvNameInvalidDetails) Or(d EnvNameInvalidDetails) EnvNameInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

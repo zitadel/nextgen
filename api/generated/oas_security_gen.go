@@ -84,6 +84,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateBrandingOperation: []string{
 		"branding.write",
 	},
+	CreateConfigurationReleaseOperation: []string{
+		"release.write",
+	},
 	CreateDeploymentOperation: []string{
 		"deployment.write",
 	},

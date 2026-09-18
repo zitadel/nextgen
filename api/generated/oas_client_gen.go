@@ -69,6 +69,27 @@ type Invoker interface {
 	//
 	// POST /branding
 	CreateBranding(ctx context.Context, request *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
+	// CreateConfigurationRelease invokes createConfigurationRelease operation.
+	//
+	// The CLI's entry point for shipping configuration: takes the contents of
+	// `.zitadel/` as authored on disk and turns it into a release in one call.
+	// For every resource in the bundle the server compares the content against
+	// the project's newest revision of that resource. Unchanged content reuses
+	// the existing revision; changed content allocates a new one. Handle
+	// references between resources (a flow definition's `user_schema` naming a
+	// schema by `objectType`) are resolved to the revision ids the same bundle
+	// produced. The resulting set of revisions is assembled into a release —
+	// `POST /releases` with the pointers filled in — so submitting an unchanged
+	// bundle twice answers `200` with the release that already pins it.
+	// Building a release does not deploy it. Follow up with `POST /deployments`
+	// to make it live on an environment.
+	// Prototype note: revision allocation and release assembly are not yet one
+	// transaction. A failure mid-way can leave freshly allocated revisions
+	// behind without a release pinning them; they are inert until a later
+	// bundle includes them (ADR 035).
+	//
+	// POST /configuration-releases
+	CreateConfigurationRelease(ctx context.Context, request *ConfigurationBundle, params CreateConfigurationReleaseParams) (CreateConfigurationReleaseRes, error)
 	// CreateDeployment invokes createDeployment operation.
 	//
 	// Makes a release live on an environment by recording a deployment. The two
@@ -1327,6 +1348,161 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateBrandingResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// CreateConfigurationRelease invokes createConfigurationRelease operation.
+//
+// The CLI's entry point for shipping configuration: takes the contents of
+// `.zitadel/` as authored on disk and turns it into a release in one call.
+// For every resource in the bundle the server compares the content against
+// the project's newest revision of that resource. Unchanged content reuses
+// the existing revision; changed content allocates a new one. Handle
+// references between resources (a flow definition's `user_schema` naming a
+// schema by `objectType`) are resolved to the revision ids the same bundle
+// produced. The resulting set of revisions is assembled into a release —
+// `POST /releases` with the pointers filled in — so submitting an unchanged
+// bundle twice answers `200` with the release that already pins it.
+// Building a release does not deploy it. Follow up with `POST /deployments`
+// to make it live on an environment.
+// Prototype note: revision allocation and release assembly are not yet one
+// transaction. A failure mid-way can leave freshly allocated revisions
+// behind without a release pinning them; they are inert until a later
+// bundle includes them (ADR 035).
+//
+// POST /configuration-releases
+func (c *Client) CreateConfigurationRelease(ctx context.Context, request *ConfigurationBundle, params CreateConfigurationReleaseParams) (CreateConfigurationReleaseRes, error) {
+	res, err := c.sendCreateConfigurationRelease(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendCreateConfigurationRelease(ctx context.Context, request *ConfigurationBundle, params CreateConfigurationReleaseParams) (res CreateConfigurationReleaseRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createConfigurationRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/configuration-releases"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateConfigurationReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/configuration-releases"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateConfigurationReleaseRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CreateConfigurationReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateConfigurationReleaseResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

@@ -1,0 +1,39 @@
+title: ConfigurationRelease
+type: object
+description: |
+  The release assembled from a configuration bundle, plus what happened to
+  each resource in it: whether its content matched the project's newest
+  revision (reused) or a new revision was allocated (created).
+required:
+  - release
+  - revisions
+properties:
+  release:
+    $ref: ../releases/release.yaml
+  revisions:
+    type: array
+    description: One entry per resource in the bundle, in pointer order.
+    items:
+      type: object
+      required:
+        - kind
+        - handle
+        - revision_id
+        - created
+      properties:
+        kind:
+          $ref: ../../components/schemas/release-pointer-kind.yaml
+        handle:
+          type: string
+          description: The resource's handle (`objectType`, `name` or `default`).
+          example: human-user
+        revision_id:
+          type: string
+          description: The revision the release pins for this resource.
+          example: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+        created:
+          type: boolean
+          description: |
+            `true` when this call allocated the revision because the bundled
+            content differed from the project's newest one; `false` when the
+            newest revision already matched and was reused.

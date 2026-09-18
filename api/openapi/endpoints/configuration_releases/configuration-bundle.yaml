@@ -1,0 +1,47 @@
+type: object
+description: |
+  The contents of a project's `.zitadel/` directory as authored on disk, plus
+  the metadata to record on the resulting release.
+
+  Cross-resource references use handles, not revision ids: a flow definition's
+  `user_schema` names a schema by its `objectType`. The server resolves each
+  handle against the schemas in this bundle (or, failing that, the project's
+  newest revision of that object type) before persisting.
+properties:
+  schemas:
+    type: array
+    maxItems: 50
+    description: User schemas, one per `.zitadel/schemas/*.json`.
+    items:
+      $ref: ../schemas/user-schema.yaml
+  flow_definitions:
+    type: array
+    maxItems: 50
+    description: Flow definitions, one per `.zitadel/flows/*.json`.
+    items:
+      $ref: ../../components/flows/flow-definition.yaml
+  flow_schema_uri:
+    description: The flow-definition dialect the definitions were authored against.
+    $ref: ../../components/schemas/schema-uri.yaml
+  brandings:
+    type: array
+    maxItems: 1
+    description: |
+      The branding descriptor from `.zitadel/branding/branding.json`, with its
+      template inlined. A project has one branding, so at most one entry.
+    items:
+      $ref: ../../components/flows/branding.yaml
+  message:
+    type: string
+    maxLength: 1024
+    description: A short summary of what the release changes.
+    example: add phone_number to human-user
+  git_sha:
+    type: string
+    maxLength: 64
+    description: The source commit the caller was operating from.
+    example: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+  git_dirty:
+    type: boolean
+    default: false
+    description: Set when the working tree had uncommitted changes.
