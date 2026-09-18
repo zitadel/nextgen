@@ -308,12 +308,21 @@ func TestGrantCreateLocators(t *testing.T) {
 
 	t.Run("unknown identifier is accepted without a row", func(t *testing.T) {
 		t.Parallel()
-		before, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		// Own project: sibling t.Parallel() creates on the shared project
+		// would otherwise make a global QueryGrants length assertion race.
+		isolated, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		isolatedClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, isolatedClient, isolated)
+		isolatedParams := api.CreateGrantParams{ProjectID: api.ProjectID(isolated.ID)}
+
+		before, err := isolatedClient.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(isolated.ID)})
 		require.NoError(t, err)
 		listedBefore, ok := before.(*api.QueryGrantsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, before))
 
-		resp, err := client.CreateGrant(t.Context(), userIdentifierGrant("nobody@example.com", api.CreateGrantRequestRelationViewer), params)
+		resp, err := isolatedClient.CreateGrant(t.Context(), userIdentifierGrant("nobody@example.com", api.CreateGrantRequestRelationViewer), isolatedParams)
 		require.NoError(t, err)
 		created, ok := resp.(*api.Grant)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -322,14 +331,14 @@ func TestGrantCreateLocators(t *testing.T) {
 		assert.True(t, strings.HasPrefix(string(created.User.Value.UserID), "user_"))
 		assert.False(t, created.User.Value.Identifier.IsSet())
 
-		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+		getResp, err := isolatedClient.GetGrant(t.Context(), api.GetGrantParams{
 			ID:        created.ID,
-			ProjectID: api.ProjectID(project.ID),
+			ProjectID: api.ProjectID(isolated.ID),
 		})
 		require.NoError(t, err)
 		assertGrantNotFound(t, getResp)
 
-		after, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		after, err := isolatedClient.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(isolated.ID)})
 		require.NoError(t, err)
 		listedAfter, ok := after.(*api.QueryGrantsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, after))
