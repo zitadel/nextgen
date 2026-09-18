@@ -134,8 +134,14 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	switch req.GetOneOf().Type {
 	case api.IdentifierProofVerifyChallengeRequestSum:
 		p := req.GetOneOf().IdentifierProof
+		// Which attribute identifies a user is the project's decision, not the
+		// server's: a flow step collects `email`, `username` or whatever else
+		// the schema registers unique, and the proof says which one this value
+		// is. Assuming a default here would sign the wrong deployment's users
+		// out of their own instance.
 		return service.UserProof{
-			LoginName: p.GetLoginName(),
+			LoginName:     p.GetLoginName(),
+			AttributeName: p.GetAttributeName(),
 		}, nil
 	case api.PasswordProofVerifyChallengeRequestSum:
 		p := req.GetOneOf().PasswordProof
