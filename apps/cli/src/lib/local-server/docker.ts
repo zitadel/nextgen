@@ -14,12 +14,17 @@ export type DockerResult = {
   stderr: string;
 };
 
+/** Where the local admin's bootstrap user document is mounted in the container. */
+const CONTAINER_ADMIN_USER_FILE = "/var/lib/zitadel/bootstrap/admin-user.json";
+
 export type DockerRunSpec = {
   containerName: string;
   image: string;
   port: number;
   dataDir: string;
   identity?: ContainerIdentity;
+  /** Host path of the local admin's bootstrap user document. */
+  userFile?: string;
 };
 
 export function dockerRunArgs(spec: DockerRunSpec): string[] {
@@ -41,6 +46,17 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
     "--env",
     `NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:${spec.port}`,
   ];
+  // The platform project and the local admin travel together: the admin is a
+  // user of that project. A caller that wants a bare single-project instance
+  // (test harnesses) starts without a user file and gets neither.
+  if (spec.userFile) {
+    args.push(
+      "--env",
+      "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true",
+      "--volume",
+      `${spec.userFile}:${CONTAINER_ADMIN_USER_FILE}:ro`,
+    );
+  }
 
   if (spec.identity) {
     args.push(
@@ -54,6 +70,10 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
   }
 
   args.push(spec.image);
+  // The image's CMD is `--migrate`; passing arguments replaces it, so keep it.
+  if (spec.userFile) {
+    args.push("--migrate", "--user-file", CONTAINER_ADMIN_USER_FILE);
+  }
   return args;
 }
 

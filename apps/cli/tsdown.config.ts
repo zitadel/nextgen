@@ -25,6 +25,7 @@ export default defineConfig({
     "commands/setup": "src/commands/setup/index.ts",
     "commands/apply": "src/commands/apply.ts",
     "commands/claim": "src/commands/claim.ts",
+    "commands/console": "src/commands/console.ts",
     "commands/plan": "src/commands/plan.ts",
     "commands/doctor": "src/commands/doctor/index.ts",
     "commands/logs": "src/commands/logs.ts",

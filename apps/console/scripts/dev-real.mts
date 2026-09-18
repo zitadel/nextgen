@@ -62,11 +62,12 @@ const claimMode = process.argv.includes("--claim");
 /** The well-known platform project id (`domain.PlatformProjectID`). */
 const PLATFORM_PROJECT_ID = "proj_platform";
 
-if (claimMode) {
-  // Read by the server through the CLI's `start`, which inherits this process's
-  // environment (`packages/testing/src/cli.ts` merges `process.env`).
-  process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = "true";
-}
+// Read by the server through the CLI's `start`, which inherits this process's
+// environment (`packages/testing/src/cli.ts` merges `process.env`). Set either
+// way: `zitadel start` bootstraps the platform project by default, and that
+// pins the console's default project to `proj_platform` — which would leave
+// DEV_USER, seeded in the project this script bootstraps, unable to sign in.
+process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = claimMode ? "true" : "false";
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay

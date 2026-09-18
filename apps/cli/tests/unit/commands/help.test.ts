@@ -27,6 +27,7 @@ Local server commands
   status:         Summarize the local Zitadel server and project state
   logs:           Show local Zitadel server logs
   reset:          Delete the local Zitadel server runtime and data
+  console:        Open the local console, signed in as the local admin created by \`zitadel start\`
 
 Configuration commands
   plan:           Validate config without mutation and preview the sync diff

@@ -30,6 +30,8 @@ import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
+import { claimProjectAsAdmin, readLocalAdmin } from "../../lib/local-server/admin";
+import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -43,6 +45,7 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
+import { PLATFORM_PROJECT_ID } from "../../lib/local-server/platform";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
@@ -432,11 +435,64 @@ export default class Setup extends BaseCommand {
     // computes the same date the platform will hold the user to. A dry run
     // gets the generic wording: its stand-in project has a fixed past
     // created_at, and no real window started anyway.
+    // On a CLI-managed local server the developer already exists as the local
+    // admin, so the project is attached to their team right away and
+    // `zitadel claim` has nothing left to do. Claiming an anonymous project
+    // stays a cloud journey.
+    let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
+    if (!dryRun && serverKind.value(answers.server) === "local") {
+      // The runtime document naming the platform project does not prove a
+      // claim can complete (a deployment can pin that project without the
+      // platform bootstrap, which leaves the admin without a personal team),
+      // so attaching the project is best-effort: on failure the project stays
+      // unclaimed and setup falls back to the usual claim nudge instead of
+      // failing after it has already written the app files. Reading the admin
+      // belongs inside the guard for the same reason — a malformed
+      // `admin.json` must not fail a setup that already wrote the app.
+      try {
+        const admin = await readLocalAdmin(cwd);
+        if (admin && (await localServerHostsPlatform(answers.server))) {
+          const owner = await claimProjectAsAdmin({
+            serverUrl: answers.server,
+            projectId: project.id,
+            projectSecret: project.project_secret,
+            admin,
+          });
+          // Only a claim this run completed carries the platform's own
+          // timestamp. Without it the record would name a team but no claim
+          // time, which `isAttached` reads as a half-written attachment, so
+          // leave the secret alone and let the claim nudge stand. The team is
+          // whichever one the platform attached the project to — the admin's
+          // earliest active membership, which need not be the team its
+          // bootstrap document named.
+          if (owner.claimed_at === undefined) {
+            consola.info(
+              `Project already belongs to team ${owner.team_id}; leaving the local record unchanged.`,
+            );
+          } else {
+            const secret = await readZitadelSecret(cwd);
+            await writeZitadelSecret(cwd, {
+              ...secret,
+              team_id: owner.team_id,
+              claimed_at: owner.claimed_at,
+            });
+            ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+            consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+          }
+        }
+      } catch (error) {
+        consola.warn(
+          `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
+        );
+      }
+    }
+
     const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
-      claimState({ secret: {}, server: answers.server }).kind === "detached" ||
-      (serverKind.value(answers.server) === "local" &&
-        (dryRun || (await localServerHostsPlatform(answers.server))));
+      !ownedByLocalAdmin &&
+      (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+        (serverKind.value(answers.server) === "local" &&
+          (dryRun || (await localServerHostsPlatform(answers.server)))));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
@@ -593,7 +649,7 @@ export async function localServerHostsPlatform(
       return false;
     }
     const doc = (await res.json()) as { console_project_id?: unknown };
-    return doc.console_project_id === "proj_platform";
+    return doc.console_project_id === PLATFORM_PROJECT_ID;
   } catch {
     return false;
   }

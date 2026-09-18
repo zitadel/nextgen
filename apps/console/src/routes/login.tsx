@@ -39,10 +39,21 @@ import { useTheme } from "../theme";
  * the sign-in screen follows the same preference as the rest of the console.
  */
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { next?: string; handoff?: string } => ({
     next: sanitizeNextPath(typeof search.next === "string" ? search.next : undefined),
+    handoff: typeof search.handoff === "string" ? search.handoff : undefined,
   }),
   beforeLoad: async ({ search }) => {
+    // A sign-in link (`/login?handoff=<token>`) printed by the CLI carries a
+    // one-time handoff token; trade it for the session cookie before deciding
+    // whether to show the widget. Only on a loopback console: the link is a
+    // bearer credential for whoever minted it, so honouring it on a deployed
+    // console would let a crafted link silently sign a visitor into the
+    // link-maker's session. Minting one requires an account on the server that
+    // issued it, which for a developer's own local instance is the developer.
+    if (search.handoff && isLoopbackConsole()) {
+      await exchangeLinkHandoff(search.handoff);
+    }
     const session = await fetchSession();
     if (session) {
       // Already signed in — skip the widget. `next` is router-relative by
@@ -53,6 +64,40 @@ export const Route = createFileRoute("/login")({
   },
   component: LoginScreen,
 });
+
+/**
+ * Whether this console is served from the developer's own machine, which is
+ * where `zitadel start` prints sign-in links. `localhost`, the `127.0.0.0/8`
+ * block, and `[::1]` (how WHATWG URLs spell IPv6 loopback).
+ */
+function isLoopbackConsole(): boolean {
+  const { hostname } = window.location;
+  return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
+}
+
+/**
+ * Exchanges a sign-in link's handoff token for the `__nextgen_session`
+ * cookie, the same `POST /sessions/exchange` the widget calls at the end of a
+ * login flow. Failures fall through to the normal sign-in widget.
+ */
+async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
+  const projectId = getConsoleProjectId();
+  if (!projectId) return;
+  const publishableKey = getPublishableKey();
+  try {
+    await fetch(`${apiBase}/sessions/exchange?project_id=${encodeURIComponent(projectId)}`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        ...(publishableKey ? { authorization: `Bearer ${publishableKey}` } : {}),
+      },
+      body: JSON.stringify({ handoff_token: handoffToken }),
+    });
+  } catch {
+    // Fall through to the widget.
+  }
+}
 
 function LoginScreen() {
   const { next } = Route.useSearch();

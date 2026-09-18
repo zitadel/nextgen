@@ -62,5 +62,30 @@ describe("local server Docker helpers", () => {
       "ghcr.io/zitadel/nextgen:test",
     ]);
     expect(args.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
+    // No local admin to import, so the container boots a bare instance.
+    expect(args.join(" ")).not.toContain("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT");
+    expect(args).not.toContain("--user-file");
+  });
+
+  it("mounts the local admin document and boots the platform project with it", () => {
+    const args = dockerRunArgs({
+      containerName: "zitadel-server-test",
+      image: "ghcr.io/zitadel/nextgen:test",
+      port: 8090,
+      dataDir: "/tmp/app/.zitadel/local/nextgen-data",
+      userFile: "/tmp/app/.zitadel/local/admin-user.json",
+    });
+
+    expect(args).toContain("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true");
+    const mount = args[args.indexOf("--volume", args.indexOf("--env")) + 1];
+    expect(mount).toBe("/tmp/app/.zitadel/local/admin-user.json:/var/lib/zitadel/bootstrap/admin-user.json:ro");
+    // The image's own CMD is replaced, so the migrate default is passed again.
+    expect(args.slice(-3)).toEqual([
+      "--migrate",
+      "--user-file",
+      "/var/lib/zitadel/bootstrap/admin-user.json",
+    ]);
+    // The image still precedes the server arguments.
+    expect(args[args.length - 4]).toBe("ghcr.io/zitadel/nextgen:test");
   });
 });
