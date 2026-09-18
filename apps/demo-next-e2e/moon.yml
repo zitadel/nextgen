@@ -42,6 +42,11 @@ tasks:
       # UIs stay off to pin that path.
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+      # `zitadel start` bootstraps the platform project by default, which pins
+      # the deployment's default project to proj_platform. This suite's users
+      # are seeded in the project the harness bootstraps, so they must stay the
+      # deployment's default.
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
     options:
       cache: false
       runInCI: false
