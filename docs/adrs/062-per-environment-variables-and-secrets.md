@@ -113,10 +113,6 @@ name would have to be rewritten with every rename or block renaming outright.
 The name is resolved to the ID once, at the API edge, and a name no environment
 answers to is `env.not_found` rather than a scope that holds nothing.
 
-Once deployments land, this scope should be expanded to optionally contain the
-deployment-ID. That way the variables in a deployment are snapshot and cannot
-accidentally be changed by modifying a variable of another deployment.
-
 In the future there will probably be a need for more levels in the scope. E.g.:
 configuration at a team/user-schema level. These are deliberately left out at
 the moment because it is cheap to add them later but adding them now would
