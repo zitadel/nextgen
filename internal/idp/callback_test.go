@@ -75,7 +75,7 @@ func newProvider(t *testing.T) *provider {
 
 // client builds the engine client for the fake provider with every endpoint
 // overridden, so no discovery runs.
-func (p *provider) client(t *testing.T, authMethod TokenEndpointAuthMethod, pkce bool) *OIDCClient {
+func (p *provider) client(t *testing.T, authMethod TokenEndpointAuthMethod, pkce, idTokenMapping bool) *OIDCClient {
 	conn := Connection{RevisionID: "idprev_1", OIDC: OIDCConnection{
 		Issuer:                  p.srv.URL,
 		ClientID:                "client",
@@ -84,8 +84,9 @@ func (p *provider) client(t *testing.T, authMethod TokenEndpointAuthMethod, pkce
 		PKCEEnabled:             pkce,
 		AuthorizationEndpoint:   p.srv.URL + "/authorize",
 		TokenEndpoint:           p.srv.URL + "/token",
+		UserinfoEndpoint:        p.srv.URL + "/userinfo",
 		JWKSURI:                 p.srv.URL + "/keys",
-		IDTokenMapping:          true,
+		IDTokenMapping:          idTokenMapping,
 	}}
 	c, err := NewOIDCClient(context.Background(), conn, redirectURI, &http.Client{Transport: taggedTransport{next: p.srv.Client().Transport}})
 	require.NoError(t, err)
@@ -242,7 +243,7 @@ func TestExchange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newProvider(t)
 			p.handler = tt.handler
-			c := p.client(t, tt.authMethod, tt.pkce)
+			c := p.client(t, tt.authMethod, tt.pkce, true)
 
 			ctx := context.Background()
 			if tt.timeout > 0 {
@@ -467,7 +468,7 @@ func TestVerifyIDToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newProvider(t)
 			p.keysStatus = tt.keysStatus
-			c := p.client(t, ClientSecretBasic, true)
+			c := p.client(t, ClientSecretBasic, true, true)
 			token := &oauth2.Token{AccessToken: "the-access-token", TokenType: "bearer"}
 			if tt.token != nil {
 				token = tokenWithIDToken(tt.token(t, p))
@@ -491,6 +492,105 @@ func TestVerifyIDToken(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "user-1", claims.Subject)
 			assert.Equal(t, "the-nonce", claims.Nonce)
+		})
+	}
+}
+
+func TestExtractClaims(t *testing.T) {
+	// The claim set both sources serve. The id is a JSON number above 2^53,
+	// which float64 would round.
+	const body = `{"sub":"user-1","email":"ada@example.test","email_verified":true,"id":9007199254740993}`
+	want := map[string]any{
+		"sub":            "user-1",
+		"email":          "ada@example.test",
+		"email_verified": true,
+		"id":             json.Number("9007199254740993"),
+	}
+	userinfo := func(status int, body string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/userinfo", r.URL.Path)
+			assert.Equal(t, http.MethodGet, r.Method)
+			assert.Equal(t, "Bearer the-access-token", r.Header.Get("Authorization"))
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte(body))
+		}
+	}
+
+	tests := []struct {
+		name           string
+		idTokenMapping bool
+		// handler serves userinfo; nil fails the test on any request.
+		handler http.HandlerFunc
+		want    map[string]any
+		// wantErr is the domain kind. wantCause is matched against its
+		// log-only parent; wantCauseMsg pins a cause that has no sentinel.
+		wantErr      error
+		wantCause    error
+		wantCauseMsg string
+	}{
+		{
+			name:           "id_token_mapping reads the id_token payload and makes no request",
+			idTokenMapping: true,
+			want:           want,
+		},
+		{
+			name:    "userinfo is fetched with the access token",
+			handler: userinfo(http.StatusOK, body),
+			want:    want,
+		},
+		{
+			name:         "a userinfo sub other than the id_token's fails",
+			handler:      userinfo(http.StatusOK, `{"sub":"user-2","email":"ada@example.test"}`),
+			wantErr:      domain.ErrIDPUserinfoFailed(nil),
+			wantCause:    rp.ErrUserInfoSubNotMatching,
+			wantCauseMsg: "sub from userinfo does not match the sub from the id_token",
+		},
+		{
+			name:         "a non-2xx userinfo status fails",
+			handler:      userinfo(http.StatusUnauthorized, `{"error":"invalid_token"}`),
+			wantErr:      domain.ErrIDPUserinfoFailed(nil),
+			wantCauseMsg: "userinfo: unexpected status 401",
+		},
+		{
+			name:         "a userinfo body that is not a JSON object fails",
+			handler:      userinfo(http.StatusOK, `"ada@example.test"`),
+			wantErr:      domain.ErrIDPUserinfoFailed(nil),
+			wantCauseMsg: "json: cannot unmarshal string into Go value of type map[string]interface {}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newProvider(t)
+			p.handler = tt.handler
+			c := p.client(t, ClientSecretBasic, true, tt.idTokenMapping)
+			claims := p.claims()
+			claims["email"] = "ada@example.test"
+			claims["email_verified"] = true
+			claims["id"] = json.Number("9007199254740993")
+			token := tokenWithIDToken(sign(t, p.key, jose.RS256, "k1", claims))
+			idToken, err := c.verifyIDToken(context.Background(), token, "the-nonce")
+			require.NoError(t, err)
+
+			got, err := c.extractClaims(context.Background(), token, idToken)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Equal(t, tt.wantErr.Error(), err.Error())
+				de, ok := errors.AsType[domain.Error](err)
+				require.True(t, ok)
+				if tt.wantCause != nil {
+					assert.ErrorIs(t, de.Parent, tt.wantCause)
+				}
+				if tt.wantCauseMsg != "" {
+					assert.EqualError(t, de.Parent, tt.wantCauseMsg)
+				}
+				return
+			}
+			require.NoError(t, err)
+			for name, value := range tt.want {
+				assert.Equal(t, value, got[name], name)
+			}
 		})
 	}
 }

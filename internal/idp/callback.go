@@ -1,9 +1,15 @@
 package idp
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
@@ -81,6 +87,61 @@ func (c *OIDCClient) verifyIDToken(ctx context.Context, token *oauth2.Token, non
 	claims, err := rp.VerifyTokens[*oidc.IDTokenClaims](ctx, token.AccessToken, raw, &verifier)
 	if err != nil {
 		return nil, domain.ErrIDPIDTokenInvalid(err)
+	}
+	return claims, nil
+}
+
+// extractClaims returns the claim set the connection maps from: the
+// id_token payload when id_token_mapping is set, otherwise the userinfo
+// response. Numbers stay json.Number so a subject like 9007199254740993
+// keeps its exact digits.
+func (c *OIDCClient) extractClaims(ctx context.Context, token *oauth2.Token, idToken *oidc.IDTokenClaims) (map[string]any, error) {
+	if c.conn.OIDC.IDTokenMapping {
+		// verifyIDToken accepted the token, so it has three segments.
+		raw, _ := token.Extra("id_token").(string)
+		payload, err := base64.RawURLEncoding.DecodeString(strings.Split(raw, ".")[1])
+		if err != nil {
+			return nil, domain.ErrIDPIDTokenInvalid(err)
+		}
+		claims, err := decodeClaims(bytes.NewReader(payload))
+		if err != nil {
+			return nil, domain.ErrIDPIDTokenInvalid(err)
+		}
+		return claims, nil
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.userinfo, nil)
+	if err != nil {
+		return nil, domain.ErrInternal(err)
+	}
+	req.Header.Set("Authorization", token.Type()+" "+token.AccessToken)
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.party.HttpClient().Do(req)
+	if err != nil {
+		return nil, domain.ErrIDPUserinfoFailed(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, domain.ErrIDPUserinfoFailed(fmt.Errorf("userinfo: unexpected status %d", resp.StatusCode))
+	}
+	claims, err := decodeClaims(resp.Body)
+	if err != nil {
+		return nil, domain.ErrIDPUserinfoFailed(err)
+	}
+	// OIDC Core 5.3.2: without this, a provider mixup could attach another
+	// subject's claims to this attempt.
+	if claims["sub"] != idToken.Subject {
+		return nil, domain.ErrIDPUserinfoFailed(rp.ErrUserInfoSubNotMatching)
+	}
+	return claims, nil
+}
+
+// decodeClaims decodes one JSON object with numbers kept as json.Number.
+func decodeClaims(r io.Reader) (map[string]any, error) {
+	dec := json.NewDecoder(r)
+	dec.UseNumber()
+	var claims map[string]any
+	if err := dec.Decode(&claims); err != nil {
+		return nil, err
 	}
 	return claims, nil
 }

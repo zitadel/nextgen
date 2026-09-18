@@ -79,3 +79,10 @@ func ErrIDPExchangeFailed(cause error) Error {
 func ErrIDPIDTokenInvalid(cause error) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("id_token_invalid"), "identity provider connection: the id_token is invalid", nil, cause)
 }
+
+// ErrIDPUserinfoFailed reports a userinfo response the engine cannot take
+// claims from: no answer, a non-2xx status, a body that is not a JSON
+// object, or a sub other than the id_token's.
+func ErrIDPUserinfoFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("userinfo_failed"), "identity provider connection: the userinfo request failed", nil, cause)
+}
