@@ -17,7 +17,7 @@ export default class Deploy extends BaseCommand {
   static override description =
     "Build a release from .zitadel/ and make it live on an environment's project.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 1;
+  static override groupOrder = 3;
   static override examples = [
     "<%= config.bin %> deploy",
     "<%= config.bin %> deploy --env production --message 'add phone_number to human-user'",

@@ -24,7 +24,7 @@ import { readZitadelSecret } from "../../lib/project";
 export default class SchemasList extends BaseCommand {
   static override description = "List revisions of a user-schema by objectType.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 3;
+  static override groupOrder = 5;
   static override flags = {
     "object-type": Flags.string({
       char: "t",

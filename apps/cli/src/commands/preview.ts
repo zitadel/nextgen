@@ -32,7 +32,7 @@ export default class Preview extends BaseCommand {
   static override description =
     "Build a release from .zitadel/ and deploy it to a preview environment.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 2;
+  static override groupOrder = 4;
   static override examples = [
     "<%= config.bin %> preview",
     "<%= config.bin %> preview --name pr-42 --origin https://my-app-git-feat-sso-acme.vercel.app",

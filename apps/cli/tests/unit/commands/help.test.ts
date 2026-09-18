@@ -31,6 +31,8 @@ Local server commands
 Configuration commands
   plan:           Validate config without mutation and preview the sync diff
   apply:          Validate and upload repo config to the platform
+  deploy:         Build a release from .zitadel/ and make it live on an environment's project
+  preview:        Build a release from .zitadel/ and deploy it to a preview environment
   schemas list:   List revisions of a user-schema by objectType
   branding eject: Take ownership of the login template
 
