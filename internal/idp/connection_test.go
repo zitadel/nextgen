@@ -47,12 +47,14 @@ func TestParseConnection(t *testing.T) {
 			},
 		},
 		{
-			name: "explicit values win over the defaults",
+			name: "explicit values win over the defaults, and a verified_claims false is dropped",
 			body: `{
 				"slug": "entra",
 				"protocol": "oidc",
 				"display_name": "Entra",
 				"subject_claim": "oid",
+				"claim_mapping": {"email": "email", "givenName": "name"},
+				"verified_claims": {"email": "email_verified", "givenName": true, "phone": "$supplementary_fetch", "familyName": false},
 				"oidc": {
 					"issuer": "https://accounts.example.test",
 					"jwks_uri": "https://accounts.example.test/keys",
@@ -71,6 +73,12 @@ func TestParseConnection(t *testing.T) {
 			want: Connection{
 				RevisionID:   "idprev_1",
 				SubjectClaim: "oid",
+				ClaimMapping: map[string]string{"email": "email", "givenName": "name"},
+				VerifiedClaims: map[string]VerificationSource{
+					"email":     {Kind: VerifyByClaim, Claim: "email_verified"},
+					"givenName": {Kind: VerifyByTrust},
+					"phone":     {Kind: VerifyByStrategy},
+				},
 				OIDC: OIDCConnection{
 					Issuer:                    "https://accounts.example.test",
 					ClientID:                  "client",

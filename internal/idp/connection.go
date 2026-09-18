@@ -18,22 +18,58 @@ var (
 
 // Connection is the engine's view of a pinned connection revision: the body
 // decoded, defaults applied, and the rules an attempt relies on re-checked.
-// Claim mapping, verification, and provisioning are read by the callback
-// tickets and are not part of this view yet.
+// Provisioning is read by identity resolution and is not part of this view
+// yet.
 type Connection struct {
 	RevisionID string
 	// SubjectClaim names the claim carrying the provider's stable subject.
 	// Defaults to sub for OIDC.
 	SubjectClaim string
-	OIDC         OIDCConnection
+	// ClaimMapping maps a user-schema property name to the provider claim.
+	ClaimMapping map[string]string
+	// VerifiedClaims maps a user-schema property name to the source that
+	// decides whether the property arrived verified.
+	VerifiedClaims map[string]VerificationSource
+	OIDC           OIDCConnection
 }
+
+// VerificationSource is a verified_claims value in typed form. The stored
+// value is a boolean, a $-pointer, or a claim name; Kind says which, so the
+// callback switches on it instead of re-inspecting the raw JSON.
+type VerificationSource struct {
+	Kind VerificationKind
+	// Claim is the provider claim read when Kind is VerifyByClaim.
+	Claim string
+}
+
+// VerificationKind is the form a verified_claims value takes.
+type VerificationKind string
+
+const (
+	// VerifyByClaim is a stored claim name such as "email_verified": the
+	// property is verified when that claim arrives as the boolean true or
+	// the string "true".
+	VerifyByClaim VerificationKind = "claim"
+	// VerifyByTrust is the stored boolean true: the provider's word is
+	// taken, so the property is verified on every attempt.
+	VerifyByTrust VerificationKind = "trust"
+	// VerifyByStrategy is the stored "$supplementary_fetch": the property
+	// is verified when the selected strategy reports its mapped claim as
+	// verified.
+	VerifyByStrategy VerificationKind = "strategy"
+)
+
+// strategyPointer is the only $-value the schema defines.
+const strategyPointer = "$supplementary_fetch"
 
 // connectionBody mirrors the stored revision. Pointers mark the fields whose
 // absence means "apply the engine default".
 type connectionBody struct {
-	Protocol     string    `json:"protocol"`
-	SubjectClaim string    `json:"subject_claim"`
-	OIDC         *oidcBody `json:"oidc"`
+	Protocol       string            `json:"protocol"`
+	SubjectClaim   string            `json:"subject_claim"`
+	ClaimMapping   map[string]string `json:"claim_mapping"`
+	VerifiedClaims map[string]any    `json:"verified_claims"`
+	OIDC           *oidcBody         `json:"oidc"`
 }
 
 type oidcBody struct {
@@ -81,8 +117,10 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 	}
 
 	conn := Connection{
-		RevisionID:   revisionID,
-		SubjectClaim: stored.SubjectClaim,
+		RevisionID:     revisionID,
+		SubjectClaim:   stored.SubjectClaim,
+		ClaimMapping:   stored.ClaimMapping,
+		VerifiedClaims: parseVerifiedClaims(stored.VerifiedClaims),
 		OIDC: OIDCConnection{
 			Issuer:                    oidc.Issuer,
 			ClientID:                  oidc.ClientID,
@@ -109,6 +147,34 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 		conn.OIDC.PKCEEnabled = *oidc.PKCEEnabled
 	}
 	return conn, nil
+}
+
+// parseVerifiedClaims turns each raw verified_claims value into a
+// VerificationSource. The schema's rules are not re-checked: an unknown $
+// value read as a claim name matches nothing, and a value that is neither a
+// string nor true is dropped, so either evaluates as unverified, the same as
+// an absent entry.
+func parseVerifiedClaims(stored map[string]any) map[string]VerificationSource {
+	// An absent block stays nil, as ClaimMapping does.
+	if stored == nil {
+		return nil
+	}
+	sources := make(map[string]VerificationSource, len(stored))
+	for property, value := range stored {
+		switch v := value.(type) {
+		case bool:
+			if v {
+				sources[property] = VerificationSource{Kind: VerifyByTrust}
+			}
+		case string:
+			if v == strategyPointer {
+				sources[property] = VerificationSource{Kind: VerifyByStrategy}
+				continue
+			}
+			sources[property] = VerificationSource{Kind: VerifyByClaim, Claim: v}
+		}
+	}
+	return sources
 }
 
 // requireTLS re-checks the schema's URL patterns on every endpoint the block
