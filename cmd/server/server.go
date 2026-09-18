@@ -281,6 +281,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	environmentService := service.NewEnvironmentService(serviceDBPool)
+	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
@@ -379,6 +380,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			keyService,
 			claimService,
 			grantService,
+			variableService,
 			serviceDBPool,
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
