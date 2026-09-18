@@ -1,6 +1,7 @@
 ---
 "@zitadel/server": minor
 "@zitadel/api": minor
+"@zitadel/config": patch
 ---
 
 The identity provider connection endpoints are now part of the API contract, and the generated clients carry them.
