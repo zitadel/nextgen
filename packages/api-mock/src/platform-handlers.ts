@@ -613,6 +613,7 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
+        preview_origins: project.previewOrigins,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
       };
@@ -621,6 +622,37 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // PATCH /projects/:project_id — name and origin allowlist. The CLI's
+    // deploy/preview sync the allowlist from zitadel.json through this.
+    http.patch("*/projects/:project_id", async ({ params, request }) => {
+      const path = parse(GetProjectParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      if (typeof raw.name === "string" && raw.name.trim() !== "") {
+        project.name = raw.name.trim();
+      }
+      if (Array.isArray(raw.preview_origins)) {
+        project.previewOrigins = raw.preview_origins.filter((o): o is string => typeof o === "string");
+      }
+      project.updatedAt = nowIso();
+      return HttpResponse.json({
+        id: project.id,
+        name: project.name,
+        preview_origins: project.previewOrigins,
+        created_at: project.createdAt,
+        updated_at: project.updatedAt,
+      });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
@@ -1031,6 +1063,141 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // POST /configuration-releases — the bundle constructor the CLI's
+    // `setup`, `deploy` and `preview` ship through. Mints a revision per
+    // bundled resource (schemas first, so a flow's `user_schema` handle
+    // resolves to the schema id minted in the same bundle) and pins them in
+    // a release. No content comparison: every call mints, which is enough
+    // for the CLI's state bookkeeping under test.
+    http.post("*/configuration-releases", async ({ request }) => {
+      const query = queryRecord(request);
+      const projectId = query.project_id ?? "";
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const now = nowIso();
+      const pointers: Array<{ kind: string; handle: string; revision_id: string }> = [];
+      const revisions: Array<{ kind: string; handle: string; revision_id: string; created: boolean }> = [];
+      const schemaIdByHandle = new Map<string, string>();
+      for (const schema of (raw.schemas as GetSchemaById200Schema[] | undefined) ?? []) {
+        const id = `sch_${shortId()}`;
+        const handle = schemaObjectType(schema) ?? id;
+        store.schemas.set(id, {
+          id,
+          projectId,
+          objectType: schemaObjectType(schema),
+          createdAt: now,
+          seq: ++store.lastSeq,
+          body: schema,
+        });
+        schemaIdByHandle.set(handle, id);
+        pointers.push({ kind: "schema", handle, revision_id: id });
+        revisions.push({ kind: "schema", handle, revision_id: id, created: true });
+      }
+      for (const flow of (raw.flow_definitions as Array<Record<string, unknown>> | undefined) ?? []) {
+        const id = `flowdef_${shortId()}`;
+        const handle = String(flow.name ?? id);
+        const userSchema = typeof flow.user_schema === "string" ? flow.user_schema : "";
+        const body = { ...flow, user_schema: schemaIdByHandle.get(userSchema) ?? userSchema };
+        store.flowDefinitions.set(id, {
+          id,
+          projectId,
+          status: "active",
+          createdAt: now,
+          updatedAt: now,
+          seq: ++store.lastSeq,
+          body,
+        });
+        pointers.push({ kind: "flow_definition", handle, revision_id: id });
+        revisions.push({ kind: "flow_definition", handle, revision_id: id, created: true });
+      }
+      for (const _branding of (raw.brandings as unknown[] | undefined) ?? []) {
+        const id = `brnd_${shortId()}`;
+        pointers.push({ kind: "branding", handle: "default", revision_id: id });
+        revisions.push({ kind: "branding", handle: "default", revision_id: id, created: true });
+      }
+      if (pointers.length === 0) {
+        return HttpResponse.json(errorBody("rel.invalid", "the bundle is empty"), { status: 400 });
+      }
+      const releaseId = `rel_${shortId()}`;
+      return HttpResponse.json(
+        {
+          release: {
+            id: releaseId,
+            project_id: projectId,
+            metadata: {
+              message: typeof raw.message === "string" ? raw.message : null,
+              git_sha: typeof raw.git_sha === "string" ? raw.git_sha : null,
+              git_dirty: raw.git_dirty === true,
+              created_at: now,
+              created_by: null,
+              created_by_type: null,
+            },
+            pointers,
+          },
+          revisions,
+        },
+        { status: 201 },
+      );
+    }),
+
+    // POST /deployments — records the release as live on the named
+    // environment. The mock keeps no environment state; it answers the
+    // record the CLI reads back.
+    http.post("*/deployments", async ({ request }) => {
+      const query = queryRecord(request);
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const now = nowIso();
+      return HttpResponse.json(
+        {
+          id: `dep_${shortId()}`,
+          project_id: query.project_id ?? "",
+          environment_id: `env_${String(raw.environment ?? "live")}`,
+          release_id: String(raw.release_id ?? ""),
+          deployed_at: now,
+          metadata: {
+            reason: String(raw.reason ?? "deploy"),
+            message: typeof raw.message === "string" ? raw.message : null,
+            source_environment_id: null,
+            source_environment_name: null,
+            deployed_by: null,
+            deployed_by_type: null,
+          },
+        },
+        { status: 201 },
+      );
+    }),
+
+    // POST /environments — creates or renews a preview (or sets live's
+    // origins). Stateless in the mock: the answer echoes the request.
+    http.post("*/environments", async ({ request }) => {
+      const query = queryRecord(request);
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const name = String(raw.name ?? "");
+      const isLive = name === "live";
+      const now = nowIso();
+      return HttpResponse.json(
+        {
+          id: `env_${shortId()}`,
+          project_id: query.project_id ?? "",
+          name,
+          class: isLive ? "live" : "preview",
+          expires_at: isLive ? null : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          origins: Array.isArray(raw.origins) ? raw.origins : [],
+          created_at: now,
+          current_deployment: null,
+        },
+        { status: isLive ? 200 : 201 },
+      );
     }),
   ];
 }

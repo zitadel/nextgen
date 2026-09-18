@@ -10576,6 +10576,7 @@ type CreateFlowErrorResponse struct {
 	EncKeyNotFound         EncKeyNotFound
 	EnvAmbiguous           EnvAmbiguous
 	EnvNotFound            EnvNotFound
+	EnvReleaseRequired     EnvReleaseRequired
 	EvtInvalid             EvtInvalid
 	FlowdefNotFound        FlowdefNotFound
 	FlowdefPurposeMismatch FlowdefPurposeMismatch
@@ -10603,6 +10604,7 @@ const (
 	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
 	EnvAmbiguousCreateFlowErrorResponse           CreateFlowErrorResponseType = "env.ambiguous"
 	EnvNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "env.not_found"
+	EnvReleaseRequiredCreateFlowErrorResponse     CreateFlowErrorResponseType = "env.release_required"
 	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
 	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
 	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
@@ -10647,6 +10649,11 @@ func (s CreateFlowErrorResponse) IsEnvAmbiguous() bool {
 // IsEnvNotFound reports whether CreateFlowErrorResponse is EnvNotFound.
 func (s CreateFlowErrorResponse) IsEnvNotFound() bool {
 	return s.Type == EnvNotFoundCreateFlowErrorResponse
+}
+
+// IsEnvReleaseRequired reports whether CreateFlowErrorResponse is EnvReleaseRequired.
+func (s CreateFlowErrorResponse) IsEnvReleaseRequired() bool {
+	return s.Type == EnvReleaseRequiredCreateFlowErrorResponse
 }
 
 // IsEvtInvalid reports whether CreateFlowErrorResponse is EvtInvalid.
@@ -10840,6 +10847,27 @@ func (s CreateFlowErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
 func NewEnvNotFoundCreateFlowErrorResponse(v EnvNotFound) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEnvNotFound(v)
+	return s
+}
+
+// SetEnvReleaseRequired sets CreateFlowErrorResponse to EnvReleaseRequired.
+func (s *CreateFlowErrorResponse) SetEnvReleaseRequired(v EnvReleaseRequired) {
+	s.Type = EnvReleaseRequiredCreateFlowErrorResponse
+	s.EnvReleaseRequired = v
+}
+
+// GetEnvReleaseRequired returns EnvReleaseRequired and true boolean if CreateFlowErrorResponse is EnvReleaseRequired.
+func (s CreateFlowErrorResponse) GetEnvReleaseRequired() (v EnvReleaseRequired, ok bool) {
+	if !s.IsEnvReleaseRequired() {
+		return v, false
+	}
+	return s.EnvReleaseRequired, true
+}
+
+// NewEnvReleaseRequiredCreateFlowErrorResponse returns new CreateFlowErrorResponse from EnvReleaseRequired.
+func NewEnvReleaseRequiredCreateFlowErrorResponse(v EnvReleaseRequired) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetEnvReleaseRequired(v)
 	return s
 }
 
@@ -16413,6 +16441,59 @@ func (s *EnvProjectNotFound) SetDetails(val OptEnvProjectNotFoundDetails) {
 type EnvProjectNotFoundDetails map[string]jx.Raw
 
 func (s *EnvProjectNotFoundDetails) init() EnvProjectNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EnvReleaseRequired struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEnvReleaseRequiredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EnvReleaseRequired) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EnvReleaseRequired) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EnvReleaseRequired) GetDetails() OptEnvReleaseRequiredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EnvReleaseRequired) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EnvReleaseRequired) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EnvReleaseRequired) SetDetails(val OptEnvReleaseRequiredDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EnvReleaseRequiredDetails map[string]jx.Raw
+
+func (s *EnvReleaseRequiredDetails) init() EnvReleaseRequiredDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -32977,6 +33058,52 @@ func (o OptEnvProjectNotFoundDetails) Get() (v EnvProjectNotFoundDetails, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvProjectNotFoundDetails) Or(d EnvProjectNotFoundDetails) EnvProjectNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEnvReleaseRequiredDetails returns new OptEnvReleaseRequiredDetails with value set to v.
+func NewOptEnvReleaseRequiredDetails(v EnvReleaseRequiredDetails) OptEnvReleaseRequiredDetails {
+	return OptEnvReleaseRequiredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEnvReleaseRequiredDetails is optional EnvReleaseRequiredDetails.
+type OptEnvReleaseRequiredDetails struct {
+	Value EnvReleaseRequiredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEnvReleaseRequiredDetails was set.
+func (o OptEnvReleaseRequiredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEnvReleaseRequiredDetails) Reset() {
+	var v EnvReleaseRequiredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEnvReleaseRequiredDetails) SetTo(v EnvReleaseRequiredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEnvReleaseRequiredDetails) Get() (v EnvReleaseRequiredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEnvReleaseRequiredDetails) Or(d EnvReleaseRequiredDetails) EnvReleaseRequiredDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

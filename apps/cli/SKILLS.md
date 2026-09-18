@@ -90,8 +90,13 @@ The groups below mirror the ones `zitadel --help` prints.
   middleware, `.zitadel/**`, env templates). Setup writes the versioned local
   default user schema and login flow into
   `.zitadel/schemas/default-human-user.json` and
-  `.zitadel/flows/default-login.json`, uploads them through the schema and flow
-  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty. Agents
+  `.zitadel/flows/default-login.json` (the flow names its schema by handle,
+  `objectType`), then ships them as the project's first release
+  (`POST /configuration-releases` + a deployment to `live`) and records the
+  minted revision ids in `.zitadel/state.json`, so `plan` is immediately
+  empty. `data.releases` names the release and deployment per environment;
+  a failed development release fails setup, a failed production one is a
+  warning pointing at `deploy --env production`. Agents
   must pass `--framework` when scaffolding into a fresh directory; interactive
   humans can omit it and choose from the prompt. Supported floors: Next.js 15+
   and React 18+ — `setup` and `doctor` fail with `E_UNSUPPORTED_PROJECT_SHAPE`

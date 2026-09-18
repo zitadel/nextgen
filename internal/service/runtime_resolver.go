@@ -208,23 +208,30 @@ func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllState
 			wildcard = append(wildcard, env)
 		}
 	}
-	for _, candidates := range [][]*domain.Environment{exact, wildcard} {
-		switch len(candidates) {
-		case 0:
-			continue
-		case 1:
-			return candidates[0], RuntimeEnvironmentSourceOrigin, nil
-		default:
-			// Several environments cover this origin — a wildcard such as
-			// https://*.vercel.app shared by every branch's preview. Never
-			// pick one by name: the release the client pinned says which
-			// one it was built against.
-			chosen, err := r.disambiguate(ctx, stmts, projectID, candidates, releaseSelector)
-			if err != nil {
-				return nil, "", err
-			}
-			return chosen, RuntimeEnvironmentSourceOrigin, nil
+	switch len(exact) {
+	case 0:
+	case 1:
+		return exact[0], RuntimeEnvironmentSourceOrigin, nil
+	default:
+		// Two environments naming the same origin literally is a
+		// configuration clash; the pinned release still settles it.
+		chosen, err := r.disambiguate(ctx, stmts, projectID, exact, releaseSelector)
+		if err != nil {
+			return nil, "", err
 		}
+		return chosen, RuntimeEnvironmentSourceOrigin, nil
+	}
+	if len(wildcard) > 0 {
+		// A wildcard such as https://*.vercel.app is shared by every
+		// branch's preview, and which previews exist changes by the hour.
+		// A deployment reached through one must say which release it was
+		// built against — even while it happens to be the only candidate,
+		// so that the next branch's preview does not change what it gets.
+		chosen, err := r.disambiguate(ctx, stmts, projectID, wildcard, releaseSelector)
+		if err != nil {
+			return nil, "", err
+		}
+		return chosen, RuntimeEnvironmentSourceOrigin, nil
 	}
 	if live == nil {
 		return nil, "", domain.ErrEnvironmentNotFound()
@@ -232,11 +239,12 @@ func (r *RuntimeResolver) resolveEnvironment(ctx context.Context, stmts AllState
 	return live, RuntimeEnvironmentSourceDefault, nil
 }
 
-// disambiguate picks, among previews that all cover the request origin,
-// the one currently running the release the client pinned. Without a
-// selector, or with one that none or several of them run, the request is
-// refused: silently serving one of them would hand a preview deployment
-// another branch's configuration.
+// disambiguate picks, among previews that cover the request origin, the
+// one currently running the release the client pinned. Without a selector
+// the request is refused (env.release_required); with one that none or
+// several of them run it is refused too (env.ambiguous). Silently serving
+// one of them would hand a preview deployment another branch's
+// configuration.
 func (r *RuntimeResolver) disambiguate(ctx context.Context, stmts AllStatements, projectID string, candidates []*domain.Environment, releaseSelector string) (*domain.Environment, error) {
 	names := make([]string, len(candidates))
 	for i, env := range candidates {
@@ -244,7 +252,7 @@ func (r *RuntimeResolver) disambiguate(ctx context.Context, stmts AllStatements,
 	}
 	details := domain.EnvironmentAmbiguousDetails{Candidates: names}
 	if releaseSelector == "" || releaseSelector == ReleaseSelectorLatest {
-		return nil, domain.ErrEnvironmentAmbiguous(details)
+		return nil, domain.ErrEnvironmentReleaseRequired(details)
 	}
 	var matches []*domain.Environment
 	for _, env := range candidates {

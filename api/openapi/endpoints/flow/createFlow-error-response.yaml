@@ -10,6 +10,7 @@ content:
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../components/schemas/errors/env-ambiguous.yaml'
         - $ref: '../../components/schemas/errors/env-not_found.yaml'
+        - $ref: '../../components/schemas/errors/env-release_required.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
         - $ref: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
@@ -33,6 +34,7 @@ content:
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
           env.ambiguous: '../../components/schemas/errors/env-ambiguous.yaml'
           env.not_found: '../../components/schemas/errors/env-not_found.yaml'
+          env.release_required: '../../components/schemas/errors/env-release_required.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
           flowdef.purpose_mismatch: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
@@ -78,6 +80,11 @@ content:
         value:
           code: env.not_found
           message: 'environment not found'
+      env.release_required:
+        summary: env.release_required
+        value:
+          code: env.release_required
+          message: 'this origin is served by a preview environment; send X-Zitadel-Release with the release the deployment was built against'
       evt.invalid:
         summary: evt.invalid
         value:

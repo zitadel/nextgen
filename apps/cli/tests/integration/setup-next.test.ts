@@ -183,7 +183,10 @@ describe("Next setup integration", () => {
     };
     expect(flow.name).toBe("default-login");
     expect(flow.status).toBe("active");
-    expect(flow.user_schema).toBe(schemaId);
+    // The file references the schema by handle; the release constructor
+    // resolves it to the revision pinned in the same release, so the same
+    // files deploy to any project.
+    expect(flow.user_schema).toBe("human-user");
     // The editor pointer survives the upload/write-back round-trip: the
     // server ignores it and sync treats it as noise, so it stays on disk.
     expect((flow as { $schema?: string }).$schema).toBe("../meta/flow-definition.json");
@@ -344,13 +347,13 @@ describe("Next setup integration", () => {
     const planOutput = `${planAfterEdit.stdout}\n${planAfterEdit.stderr}`;
     expect(planOutput).toContain("company");
     expect(planOutput).toContain("will publish a new revision");
-    expect(planOutput).toContain("user_schema will be re-pinned to the new revision");
     expect(planOutput).not.toContain("audience");
     expect(planOutput).not.toContain("x-audit");
 
-    // The Elina journey: use the new field in the register step and publish
-    // schema + flow in ONE apply — the CLI re-pins user_schema to the freshly
-    // minted revision id so the flow update validates against it.
+    // The Elina journey: use the new field in the register step and ship
+    // schema + flow in ONE deploy. The flow references the schema by handle,
+    // so the release constructor pins it to the freshly minted revision —
+    // nothing in the file has to be rewritten.
     const editedFlowPath = join(cwd, ".zitadel/flows/default-login.json");
     const editedFlow = JSON.parse(await readFile(editedFlowPath, "utf8")) as {
       user_schema: string;
@@ -360,14 +363,29 @@ describe("Next setup integration", () => {
     registerStep?.fields?.push("company");
     await writeFile(editedFlowPath, `${JSON.stringify(editedFlow, null, 2)}\n`);
 
-    const singleApply = await cli(["apply", "--cwd", cwd, "--json"]);
-    expect(singleApply.exitCode).toBe(0);
-    const singleApplyJson = parseJson(singleApply.stdout) as {
+    const deploy = await cli(["deploy", "--cwd", cwd, "--json"]);
+    expect(deploy.exitCode, deploy.stdout).toBe(0);
+    const deployJson = parseJson(deploy.stdout) as {
       status: string;
-      data: { synced: boolean; files_updated: string[] };
+      data: {
+        target: string;
+        release: {
+          id: string;
+          revisions: Array<{ kind: string; handle: string; revision_id: string; created: boolean }>;
+          files_updated: string[];
+        };
+      };
     };
-    expect(singleApplyJson.status).toBe("ok");
-    expect(singleApplyJson.data.files_updated).toContain(".zitadel/flows/default-login.json");
+    expect(deployJson.status).toBe("ok");
+    expect(deployJson.data.target).toBe("live");
+    expect(deployJson.data.release.id).toMatch(/^rel_/);
+    expect(deployJson.data.release.revisions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "schema", handle: "human-user" }),
+        expect.objectContaining({ kind: "flow_definition", handle: "default-login" }),
+      ]),
+    );
+    expect(deployJson.data.release.files_updated).toContain(".zitadel/flows/default-login.json");
 
     const stateAfter = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
       resources: Record<string, { id?: string; previousId?: string }>;
@@ -375,16 +393,16 @@ describe("Next setup integration", () => {
     const newSchemaId = stateAfter.resources[".zitadel/schemas/default-human-user.json"]?.id;
     expect(newSchemaId).toMatch(/^sch_/);
     expect(newSchemaId).not.toBe(schemaId);
-    const repinnedFlow = JSON.parse(await readFile(editedFlowPath, "utf8")) as {
+    const shippedFlow = JSON.parse(await readFile(editedFlowPath, "utf8")) as {
       user_schema: string;
       steps: Array<{ name: string; fields?: string[] }>;
     };
-    expect(repinnedFlow.user_schema).toBe(newSchemaId);
-    expect(repinnedFlow.steps.find((s) => s.name === "register")?.fields).toContain("company");
+    expect(shippedFlow.user_schema).toBe("human-user");
+    expect(shippedFlow.steps.find((s) => s.name === "register")?.fields).toContain("company");
 
-    const planAfterApply = await cli(["plan", "--cwd", cwd, "--json"]);
-    expect(planAfterApply.exitCode).toBe(0);
-    expect((parseJson(planAfterApply.stdout) as { data: { total: number } }).data.total).toBe(0);
+    const planAfterDeploy = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(planAfterDeploy.exitCode).toBe(0);
+    expect((parseJson(planAfterDeploy.stdout) as { data: { total: number } }).data.total).toBe(0);
   });
 
   it("refuses setup below the Next 15 floor with an explicit error", async () => {
@@ -449,10 +467,11 @@ describe("Next setup integration", () => {
 
   it("releases the already-initialized marker when resource seeding fails so a rerun can complete", async () => {
     const cwd = await createNextProject();
-    // First attempt: the platform rejects the schema upload after the
-    // project was already created and zitadel.json was written.
+    // First attempt: the platform rejects the first release (the upload of
+    // the scaffolded configuration) after the project was already created
+    // and zitadel.json was written.
     server.use(
-      http.post("*/schemas", () =>
+      http.post("*/configuration-releases", () =>
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
       ),
     );
@@ -613,26 +632,15 @@ describe("Next setup integration", () => {
   });
 
   it("ejects and publishes the selected design when --design is passed", async () => {
-    // The shared platform mock has no branding routes yet, so this test
-    // carries its own: capture the publish, echo the canonical envelope.
+    // The branding ships inside the first release's bundle; capture what the
+    // bundle carried without replacing the mock's constructor.
     const brandingBodies: Array<Record<string, unknown>> = [];
-    server.use(
-      http.post("*/branding", async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>;
-        brandingBodies.push(body);
-        return HttpResponse.json(
-          { id: "brandrev_setup_1", created_at: "2026-08-04T00:00:00.000Z", branding: body },
-          { status: 201 },
-        );
-      }),
-      http.get("*/branding/:id", ({ params }) =>
-        HttpResponse.json({
-          id: params.id,
-          created_at: "2026-08-04T00:00:00.000Z",
-          branding: brandingBodies.at(-1) ?? {},
-        }),
-      ),
-    );
+    server.events.on("request:start", async ({ request }) => {
+      if (request.method === "POST" && new URL(request.url).pathname === "/configuration-releases") {
+        const bundle = (await request.clone().json()) as { brandings?: Array<Record<string, unknown>> };
+        brandingBodies.push(...(bundle.brandings ?? []));
+      }
+    });
 
     const cwd = await createNextProject();
     const setup = await cli([
@@ -673,7 +681,7 @@ describe("Next setup integration", () => {
     const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
       resources: Record<string, { id?: string }>;
     };
-    expect(state.resources[".zitadel/branding/branding.json"]?.id).toBe("brandrev_setup_1");
+    expect(state.resources[".zitadel/branding/branding.json"]?.id).toMatch(/^brnd_/);
     const plan = await cli(["plan", "--cwd", cwd, "--json"]);
     expect(plan.exitCode).toBe(0);
     expect((parseJson(plan.stdout) as { data: { total: number } }).data.total).toBe(0);

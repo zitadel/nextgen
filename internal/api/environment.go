@@ -196,7 +196,8 @@ func environmentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrEnvironmentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrEnvironmentNameInvalid().Code, domain.ErrEnvironmentInvalid(nil).Code,
-		domain.ErrEnvironmentAmbiguous(domain.EnvironmentAmbiguousDetails{}).Code:
+		domain.ErrEnvironmentAmbiguous(domain.EnvironmentAmbiguousDetails{}).Code,
+		domain.ErrEnvironmentReleaseRequired(domain.EnvironmentAmbiguousDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrEnvironmentExpired().Code:
 		return errorResponseWithStatusCode(http.StatusGone, err)

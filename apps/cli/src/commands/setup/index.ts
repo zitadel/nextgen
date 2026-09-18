@@ -413,14 +413,32 @@ export default class Setup extends BaseCommand {
     for (const file of result.filesSkipped) {
       consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
     }
+    // Setup is not atomic: the patcher already wrote `zitadel.json` (the
+    // marker the already-initialized guard skips on) and `.zitadel/secret`.
+    // A failure from here until the development project runs its first
+    // release removes both so a rerun starts a fresh setup instead of being
+    // skipped forever with no login flow anywhere; the half-provisioned
+    // project has no usable resources, so its credentials are not worth
+    // keeping.
+    const failSetup = async (error: unknown, what: string): Promise<never> => {
+      await rm(join(cwd, "zitadel.json"), { force: true });
+      await rm(join(cwd, ".zitadel/secret"), { force: true });
+      const cause = toZitadelError(error);
+      throw new ZitadelError(cause.code, `${what} failed: ${cause.message}`, {
+        hint:
+          "The project was created but its configuration did not reach it. " +
+          "Re-run `zitadel setup` to start over (add --force to overwrite partially " +
+          "written .zitadel files).",
+        nextCommands: ["zitadel setup --force"],
+        details: cause.details,
+      });
+    };
     let resourceResult: MaterializeSetupResourcesResult;
     try {
       resourceResult = dryRun
         ? { filesWritten: [] }
         : await materializeSetupResources({
             cwd,
-            client: createZitadelClient({ baseUrl: answers.server, token: project.project_secret }),
-            projectId: project.id,
             force,
             preset: answers.preset,
             useCase: answers.useCase,
@@ -428,23 +446,7 @@ export default class Setup extends BaseCommand {
             cliVersion: this.meta.cliVersion,
           });
     } catch (error) {
-      // Setup is not atomic: the patcher already wrote `zitadel.json` (the
-      // marker the already-initialized guard skips on) and `.zitadel/secret`.
-      // Remove both so a rerun starts a fresh setup instead of being skipped
-      // forever with no default schema or login flow anywhere. The
-      // half-provisioned project has no usable resources, so its credentials
-      // are not worth keeping.
-      await rm(join(cwd, "zitadel.json"), { force: true });
-      await rm(join(cwd, ".zitadel/secret"), { force: true });
-      const cause = toZitadelError(error);
-      throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
-        hint:
-          "The project was created but its default schema/flow upload did not finish. " +
-          "Re-run `zitadel setup` to start over (add --force to overwrite partially " +
-          "written .zitadel files).",
-        nextCommands: ["zitadel setup --force"],
-        details: cause.details,
-      });
+      return failSetup(error, "Default resource setup");
     }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
@@ -462,10 +464,11 @@ export default class Setup extends BaseCommand {
 
     // The scaffolded configuration becomes the first release, live on every
     // project setup created: development always, production when the wizard
-    // configured one (previews share its project). Until this runs an
-    // environment has nothing deployed and serves the newest revisions,
-    // which is the same content — so a failure here is a warning with the
-    // command that finishes the job, not a failed setup.
+    // configured one (previews share its project). This is also the upload:
+    // the release constructor mints the revisions from the files, so the
+    // development release failing means the app has no login flow anywhere
+    // and setup fails like any other provisioning step. Production is
+    // best-effort — a warning names the command that finishes the job.
     const initialReleases: Record<string, { release_id: string; deployment_id: string }> = {};
     const releaseWarnings: string[] = [];
     if (!dryRun) {
@@ -493,6 +496,9 @@ export default class Setup extends BaseCommand {
           });
           initialReleases[name] = { release_id: release.id, deployment_id: deployment.id };
         } catch (error) {
+          if (name === "development") {
+            return failSetup(error, "The initial release for development");
+          }
           const cause = toZitadelError(error);
           const warning =
             `The initial release for ${name} was not deployed: ${cause.message}. ` +

@@ -1,22 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { consola } from "consola";
-
-import type {
-  CreateBranding201,
-  CreateBrandingBody,
-  CreateFlowDefinition201,
-  CreateSchema201,
-  CreateSchemaBody,
-  GetSchemaById200,
-} from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_BRANDING_CONFIG_PATH,
   DEFAULT_BRANDING_TEMPLATE_PATH,
   DEFAULT_FLOW_CONFIG_PATH,
-  DEFAULT_FLOW_SCHEMA_URI,
   DEFAULT_SCHEMA_CONFIG_PATH,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
@@ -31,14 +19,10 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
-import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
-
-import { BRANDING_DIR, toBrandingWireBody } from "./branding";
+import { BRANDING_DIR } from "./branding";
 import { FLOWS_DIR } from "./flows";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
-import { hashForState, writeBackResource } from "./sync";
-import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { ZitadelError } from "./errors";
 
@@ -47,29 +31,28 @@ export type MaterializeSetupResourcesResult = {
 };
 
 /**
- * Scaffolds the versioned local default resources for a new project, uploads
- * them through the schema/flow APIs, and seeds `.zitadel/state.json` with the
- * IDs, hashes, and flow metadata the sync engine expects. Setup calls this only
- * after the framework patcher has created `.zitadel/{flows,schemas}` and the
- * initial state file.
+ * Scaffolds the versioned local default resources for a new project under
+ * `.zitadel/`: the user schema, the login flow, optionally a branding design,
+ * and the folder READMEs. Files only — nothing is uploaded here. The first
+ * release setup builds right after (`POST /configuration-releases`) mints the
+ * revisions on every project the app uses and records their ids in
+ * `.zitadel/state.json`, exactly as a later `zitadel deploy` would.
  *
- * The schema is uploaded without an `$id`: the server assigns an opaque id on
- * `POST /schemas`, and the flow file can only be rendered after that id comes
- * back because `flow_definition.user_schema` must reference it.
+ * The flow references its schema by handle (the schema's `objectType`); the
+ * release constructor resolves it to the schema revision pinned in the same
+ * release, so the files are portable across projects.
  */
 export async function materializeSetupResources(opts: {
   cwd: string;
-  client: ZitadelClient;
-  projectId: string;
   force: boolean;
   /** Sign-in preset (flow + auth methods) to scaffold; defaults to password-first. */
   preset?: SetupPreset;
   /** Use case (schema field set) to scaffold; defaults to minimal. */
   useCase?: SetupUseCase;
   /**
-   * Login design to eject into `.zitadel/branding/` and publish as branding
-   * revision 1. When absent, no branding files are scaffolded and the login
-   * renders the built-in template (the `branding eject` command opts in later).
+   * Login design to eject into `.zitadel/branding/`. When absent, no branding
+   * files are scaffolded and the login renders the built-in template (the
+   * `branding eject` command opts in later).
    */
   design?: string;
   /**
@@ -89,84 +72,19 @@ export async function materializeSetupResources(opts: {
 
   const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({ preset, useCase }) as {
     $id?: string;
+    objectType?: string;
   } & Record<string, unknown>;
   void _templateId;
+  const schemaHandle = requiredString(schemaBody.objectType, "default schema objectType");
 
-  const schemaWritten = await writeResourceFile(
-    opts.cwd,
-    DEFAULT_SCHEMA_CONFIG_PATH,
-    schemaBody,
-    opts.force,
-  );
-  if (schemaWritten) {
+  if (await writeResourceFile(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, schemaBody, opts.force)) {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = (await opts.client.createSchema(schemaBody as CreateSchemaBody, {
-    project_id: opts.projectId,
-  })) as CreateSchema201;
-  const schemaId = requiredString(schema.id, "created schema id");
-  // Reconcile the just-written file with the server's stored body so local
-  // config matches live state from the first second; a fetch failure keeps
-  // the template body and its hash (parity is best-effort at setup).
-  let schemaHash = hashForState({ normalize: normalizeSchemaBody }, schemaBody);
-  try {
-    // The response is the `{id, schema, metadata}` envelope; the local config
-    // file keeps only the customer-authored document.
-    const canonical = (
-      (await opts.client.getSchemaById(
-        encodeURIComponent(schemaId),
-      )) as unknown as GetSchemaById200
-    ).schema;
-    const written = await writeBackResource(
-      opts.cwd,
-      DEFAULT_SCHEMA_CONFIG_PATH,
-      { normalize: normalizeSchemaBody },
-      canonical,
-    );
-    schemaHash = written.hash;
-  } catch (err) {
-    consola.debug(`fetch created schema ${schemaId} during setup failed:`, err);
-  }
-  await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: schemaId,
-    hash: schemaHash,
-  });
-
-  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
-
-  const flowWritten = await writeResourceFile(
-    opts.cwd,
-    DEFAULT_FLOW_CONFIG_PATH,
-    flowBody,
-    opts.force,
-  );
-  if (flowWritten) {
+  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaHandle, preset, useCase });
+  if (await writeResourceFile(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, flowBody, opts.force)) {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
-
-  const flow = (await opts.client.createFlowDefinition({
-    project_id: opts.projectId,
-    schema_uri: DEFAULT_FLOW_SCHEMA_URI,
-    flow_definition: flowBody,
-  })) as CreateFlowDefinition201;
-
-  let flowHash = hashForState({ normalize: normalizeFlowBody }, flowBody);
-  if (flow.flow_definition) {
-    const written = await writeBackResource(
-      opts.cwd,
-      DEFAULT_FLOW_CONFIG_PATH,
-      { normalize: normalizeFlowBody, normalizeWrite: normalizeFlowBody },
-      flow.flow_definition as object,
-    );
-    flowHash = written.hash;
-  }
-  await updateState(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, {
-    id: requiredString(flow.id, "created flow definition id"),
-    hash: flowHash,
-    name: flowBody.name,
-    status: flowBody.status,
-  });
 
   if (opts.design) {
     await mkdir(join(opts.cwd, BRANDING_DIR), { recursive: true });
@@ -179,16 +97,6 @@ export async function materializeSetupResources(opts: {
     if (await writeRawFile(opts.cwd, DEFAULT_BRANDING_TEMPLATE_PATH, template, opts.force)) {
       filesWritten.push(join(opts.cwd, DEFAULT_BRANDING_TEMPLATE_PATH));
     }
-
-    const brandingNormalize = (data: object): object => toBrandingWireBody(opts.cwd, data);
-    const created = (await opts.client.createBranding(
-      brandingNormalize(descriptor) as CreateBrandingBody,
-      { project_id: opts.projectId },
-    )) as CreateBranding201;
-    await updateState(opts.cwd, DEFAULT_BRANDING_CONFIG_PATH, {
-      id: requiredString(created.id, "created branding revision id"),
-      hash: hashForState({ normalize: brandingNormalize }, descriptor),
-    });
 
     const brandingReadme = join(BRANDING_DIR, "README.md");
     if (
@@ -299,7 +207,7 @@ function requiredString(value: unknown, label: string): string {
   if (typeof value === "string" && value.length > 0) {
     return value;
   }
-  throw new ZitadelError("E_VALIDATION", `Missing ${label} in server response.`);
+  throw new ZitadelError("E_VALIDATION", `Missing ${label}.`);
 }
 
 function isErrno(error: unknown, code: string): boolean {

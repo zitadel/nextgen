@@ -2,19 +2,15 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { ZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_SCHEMA_CONFIG_PATH,
 } from "@zitadel/config/defaults";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { materializeSetupResources } from "../../../src/lib/setup-resources";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
-import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
@@ -38,159 +34,58 @@ afterEach(async () => {
 });
 
 describe("materializeSetupResources", () => {
-  it("persists schema state before creating the flow so apply can recover partial setup", async () => {
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockRejectedValue(new Error("flow create failed")),
-    } as unknown as ZitadelClient;
+  it("writes the schema and a flow that references it by handle, uploading nothing", async () => {
+    await materializeSetupResources({ cwd, cliVersion: TEST_CLI_VERSION, force: false });
 
-    await expect(
-      materializeSetupResources({
-        cwd,
-        cliVersion: TEST_CLI_VERSION,
-        client,
-        projectId: "project_123",
-        force: false,
-      }),
-    ).rejects.toThrow("flow create failed");
-
-    const state = JSON.parse(
-      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
-    ) as ZitadelState;
-    expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]).toMatchObject({
-      id: "sch_01KWHF",
-      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
-    });
-  });
-
-  it("reuses the server-returned schema id as user_schema on the flow", async () => {
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockImplementation(async (body: {
-        flow_definition: { user_schema: string };
-      }) => ({
-        id: "flow_01KWHG",
-        status: "active",
-        flow_definition: body.flow_definition,
-      })),
-    } as unknown as ZitadelClient;
-
-    await materializeSetupResources({
-      cwd,
-      cliVersion: TEST_CLI_VERSION,
-      client,
-      projectId: "project_123",
-      force: false,
-    });
+    const schemaFile = JSON.parse(
+      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
+    ) as { objectType: string; $id?: string };
+    expect(schemaFile.objectType).toBe("human-user");
+    // The server assigns the schema id when the first release is built.
+    expect(schemaFile).not.toHaveProperty("$id");
 
     const flowFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
     ) as { user_schema: string };
-    expect(flowFile.user_schema).toBe("sch_01KWHF");
+    // The handle, not a revision id: the release constructor resolves it,
+    // so the same files deploy to any project.
+    expect(flowFile.user_schema).toBe("human-user");
+
+    // No revisions exist yet, so state stays empty until the first release.
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources).toEqual({});
   });
 
-  it("reconciles the schema file with the server's stored body and seeds its hash", async () => {
-    const canonical = {
-      objectType: "human-user",
-      kind: "user-schema",
-      title: "ServerCanonicalTitle",
-      properties: { email: { type: "string", "x-audit": false } },
-    };
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      // `GET /schemas/{id}` serves the `{id, schema, metadata}` envelope;
-      // write-back must unwrap the document before it reaches disk.
-      getSchemaById: vi.fn().mockResolvedValue({
-        id: "sch_01KWHF",
-        schema: canonical,
-        metadata: { created_at: "2026-01-01T00:00:00Z" },
-      }),
-      createFlowDefinition: vi.fn().mockResolvedValue({
-        id: "flow_01KWHG",
-        status: "active",
-      }),
-    } as unknown as ZitadelClient;
+  it("refuses to overwrite an existing resource file without --force", async () => {
+    await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
+    await writeFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "{}\n");
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+    await expect(
+      materializeSetupResources({ cwd, cliVersion: TEST_CLI_VERSION, force: false }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
 
+    await materializeSetupResources({ cwd, cliVersion: TEST_CLI_VERSION, force: true });
     const schemaFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
-    ) as Record<string, unknown>;
-    // The file holds the server's stored body VERBATIM: the server keeps
-    // schema bytes as uploaded, so a spelled-out meta-schema default must
-    // survive write-back or the next revision would publish without it.
-    expect(schemaFile.title).toBe("ServerCanonicalTitle");
-    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-audit": false } });
-
-    const state = JSON.parse(
-      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
-    ) as ZitadelState;
-    expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]?.hash).toBe(
-      hashForState({ normalize: normalizeSchemaBody }, schemaFile),
-    );
-  });
-
-  it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockImplementation(async (body: {
-        flow_definition: Record<string, unknown>;
-      }) => ({
-        id: "flow_01KWHG",
-        status: "active",
-        flow_definition: { audience: {}, ...body.flow_definition },
-      })),
-    } as unknown as ZitadelClient;
-
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
-
-    const flowFile = JSON.parse(
-      await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
-    ) as Record<string, unknown>;
-    expect(flowFile).not.toHaveProperty("audience");
-
-    const state = JSON.parse(
-      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
-    ) as ZitadelState;
-    expect(state.resources[DEFAULT_FLOW_CONFIG_PATH]?.hash).toBe(
-      hashForState({ normalize: normalizeFlowBody }, flowFile),
-    );
+    ) as { objectType: string };
+    expect(schemaFile.objectType).toBe("human-user");
   });
 
   it("scaffolds the business use case's companyName into the written schema and register step", async () => {
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockImplementation(async (body: {
-        flow_definition: Record<string, unknown>;
-      }) => ({
-        id: "flow_01KWHG",
-        status: "active",
-        flow_definition: body.flow_definition,
-      })),
-    } as unknown as ZitadelClient;
-
     await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
-      client,
-      projectId: "project_123",
       force: false,
       useCase: "business",
     });
 
-    // The composed schema field set reaches the uploaded body and the written
-    // file — this is the one seam the config-package matrix can't cover.
-    const schemaBody = vi.mocked(client.createSchema).mock.calls[0]?.[0] as {
-      properties: Record<string, unknown>;
-      required: string[];
-    };
-    expect(schemaBody.properties).toHaveProperty("companyName");
-    expect(schemaBody.required).toEqual(["email"]);
-
     const schemaFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
-    ) as { properties: Record<string, unknown> };
+    ) as { properties: Record<string, unknown>; required: string[] };
     expect(schemaFile.properties).toHaveProperty("companyName");
+    expect(schemaFile.required).toEqual(["email"]);
 
     // The register step's fields are derived from the same use case.
     const flowFile = JSON.parse(
@@ -201,19 +96,9 @@ describe("materializeSetupResources", () => {
   });
 
   it("writes schemas and flows READMEs the first time", async () => {
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockResolvedValue({
-        id: "flow_01KWHG",
-        status: "active",
-      }),
-    } as unknown as ZitadelClient;
-
     const result = await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
-      client,
-      projectId: "project_123",
       force: false,
     });
 
@@ -239,19 +124,10 @@ describe("materializeSetupResources", () => {
   it("preserves an existing README so a developer's edits are not overwritten", async () => {
     await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
     await writeFile(join(cwd, SCHEMAS_DIR, "README.md"), "# custom README\n");
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockResolvedValue({
-        id: "flow_01KWHG",
-        status: "active",
-      }),
-    } as unknown as ZitadelClient;
 
     const result = await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
-      client,
-      projectId: "project_123",
       force: false,
     });
 
@@ -262,56 +138,26 @@ describe("materializeSetupResources", () => {
 });
 
 describe("materializeSetupResources branding design", () => {
-  it("scaffolds the design files and publishes branding revision 1", async () => {
+  it("scaffolds the design files with the template as a file reference", async () => {
     const { DEFAULT_BRANDING_CONFIG_PATH, DEFAULT_BRANDING_TEMPLATE_PATH, getDefaultBrandingConfig } =
       await import("@zitadel/config/defaults");
-    const createBranding = vi.fn().mockResolvedValue({
-      id: "brnd_01KWHH",
-      created_at: "2026-07-20T00:00:00Z",
-      branding: {},
-    });
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
-      createBranding,
-    } as unknown as ZitadelClient;
 
     await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
-      client,
-      projectId: "project_123",
       force: false,
       design: "split",
     });
-
-    // The wire body carries the inlined template, not the file reference.
-    const [wireBody, params] = createBranding.mock.calls[0] as [
-      Record<string, unknown>,
-      Record<string, unknown>,
-    ];
-    expect(wireBody.layout).toBe("split");
-    expect(String(wireBody.liquid_template)).toContain('class="zl-split"');
-    expect(wireBody).not.toHaveProperty("liquid_template_file");
-    expect(wireBody).not.toHaveProperty("$schema");
-    expect(params).toEqual({ project_id: "project_123" });
 
     const descriptor = JSON.parse(
       await readFile(join(cwd, DEFAULT_BRANDING_CONFIG_PATH), "utf8"),
     ) as Record<string, unknown>;
     expect(descriptor.$schema).toBe("../meta/branding.json");
+    expect(descriptor.layout).toBe("split");
     expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     const template = await readFile(join(cwd, DEFAULT_BRANDING_TEMPLATE_PATH), "utf8");
     expect(template).toBe(getDefaultBrandingConfig("split").template);
-
-    const state = JSON.parse(
-      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
-    ) as ZitadelState;
-    expect(state.resources[DEFAULT_BRANDING_CONFIG_PATH]).toMatchObject({
-      id: "brnd_01KWHH",
-      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
-    });
 
     const brandingReadme = await readFile(join(cwd, ".zitadel/branding/README.md"), "utf8");
     expect(brandingReadme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
@@ -319,19 +165,10 @@ describe("materializeSetupResources branding design", () => {
   });
 
   it("scaffolds no branding files when no design is chosen", async () => {
-    const createBranding = vi.fn();
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
-      createBranding,
-    } as unknown as ZitadelClient;
+    await materializeSetupResources({ cwd, cliVersion: TEST_CLI_VERSION, force: false });
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
-
-    expect(createBranding).not.toHaveBeenCalled();
-    const state = JSON.parse(
-      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
-    ) as ZitadelState;
-    expect(Object.keys(state.resources)).not.toContain(".zitadel/branding/branding.json");
+    await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 });

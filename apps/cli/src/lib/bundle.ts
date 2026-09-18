@@ -145,7 +145,8 @@ function resolveSchemaHandle(
   const known = byID.get(value);
   if (known) return known;
   if (handles.includes(value)) return value;
-  if (/^sch_[A-Za-z0-9]+$/.test(value) && handles.length === 1) return handles[0]!;
+  const [only] = handles;
+  if (only !== undefined && handles.length === 1 && /^sch_[A-Za-z0-9]+$/.test(value)) return only;
   return value;
 }
 
@@ -170,7 +171,13 @@ export async function recordBundleRevisions(
     if (!resource) {
       continue;
     }
-    const entry: { id: string; hash: string; name?: string; projects: Record<string, string> } = {
+    const entry: {
+      id: string;
+      hash: string;
+      name?: string;
+      status?: string;
+      projects: Record<string, string>;
+    } = {
       id: revision.revision_id,
       hash: resource.hash,
       projects: {
@@ -180,6 +187,10 @@ export async function recordBundleRevisions(
     };
     if (resource.kind === "flow_definition") {
       entry.name = resource.handle;
+      const status = (resource.body as { status?: unknown }).status;
+      if (typeof status === "string") {
+        entry.status = status;
+      }
     }
     await updateState(cwd, resource.path, entry);
     updated.push(resource.path);

@@ -495,6 +495,60 @@ async function startCreateProjectCaptureServer(): Promise<{
       );
       return;
     }
+    // Setup ships the scaffolded files as the first release: the bundle
+    // constructor, the deployment to live, and the project read the origin
+    // sync does first. Minimal answers; nothing under test here reads them
+    // beyond the ids.
+    if (req.method === "GET" && path === "/projects/proj_test") {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "proj_test",
+          name: "demo",
+          preview_origins: [],
+          created_at: "2026-06-01T00:00:00.000Z",
+          updated_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/configuration-releases") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          release: {
+            id: "rel_test",
+            project_id: "proj_test",
+            metadata: { git_dirty: false, created_at: "2026-06-01T00:00:00.000Z" },
+            pointers: [
+              { kind: "schema", handle: "human-user", revision_id: "sch_test" },
+              { kind: "flow_definition", handle: "default-login", revision_id: "flow_test" },
+            ],
+          },
+          revisions: [
+            { kind: "schema", handle: "human-user", revision_id: "sch_test", created: true },
+            {
+              kind: "flow_definition",
+              handle: "default-login",
+              revision_id: "flow_test",
+              created: true,
+            },
+          ],
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/deployments") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "dep_test",
+          project_id: "proj_test",
+          environment_id: "env_live",
+          release_id: "rel_test",
+          deployed_at: "2026-06-01T00:00:00.000Z",
+          metadata: { reason: "deploy" },
+        }),
+      );
+      return;
+    }
     res.writeHead(404).end();
   });
   servers.push(server);
