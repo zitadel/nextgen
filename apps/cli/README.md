@@ -132,6 +132,9 @@ which ships in this package.
 * [`zitadel grants get ID`](#zitadel-grants-get-id)
 * [`zitadel grants list`](#zitadel-grants-list)
 * [`zitadel help [COMMAND]`](#zitadel-help-command)
+* [`zitadel idps create`](#zitadel-idps-create)
+* [`zitadel idps get ID`](#zitadel-idps-get-id)
+* [`zitadel idps list`](#zitadel-idps-list)
 * [`zitadel logs`](#zitadel-logs)
 * [`zitadel plan`](#zitadel-plan)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
@@ -1003,6 +1006,163 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.49/src/commands/help.ts)_
+
+## `zitadel idps create`
+
+Create an identity provider connection.
+
+```
+USAGE
+  $ zitadel idps create [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--data <value> | --file
+    <value>] [-e development|preview|production]
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+RAW BODY FLAGS
+  --data=<value>  Whole body as a JSON object, instead of the field flags.
+  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Create an identity provider connection.
+
+EXAMPLES
+  $ zitadel idps create --data '{...}' --json
+
+  $ zitadel idps create --file ./identity provider connection.json
+```
+
+## `zitadel idps get ID`
+
+Get one identity provider connection by id.
+
+```
+USAGE
+  $ zitadel idps get ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
+    development|preview|production]
+
+ARGUMENTS
+  ID  identity provider connection id
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Fields to show, comma-separated dot-paths.
+                              Defaults to the resource's own; `--json` is
+                              unaffected.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one identity provider connection by id.
+
+EXAMPLES
+  $ zitadel idps get <id>
+
+  $ zitadel idps get <id> --json
+```
+
+## `zitadel idps list`
+
+List idps.
+
+```
+USAGE
+  $ zitadel idps list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
+    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
+    [--sort <value>] [-e development|preview|production]
+
+FLAGS
+  -a, --all
+      Fetch every page instead of one.
+
+  -c, --cwd=<value>
+      Project directory to operate on.
+
+  -e, --environment=<option>
+      Target environment (default: development).
+      <options: development|preview|production>
+
+  -n, --non-interactive
+      Disable prompts. Required when scripting or running as an agent.
+
+  -s, --server=<value>
+      Override the resolved server URL.
+
+  --debug
+      Debug logging.
+
+  --dry-run
+      Preview without mutating files or the platform.
+
+  --fields=<value>
+      Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
+      Defaults to the resource's own columns; `--json` is unaffected.
+
+  --filter=<value>...
+      Filter as field=operation:value (operation defaults to equals). Fields: slug
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), created_at (equals|not_equals|contains|not_co
+      ntains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).
+
+  --limit=<value>
+      Page size (server default 20, max 100).
+
+  --page-token=<value>
+      Continue from a previous page's next_page_token.
+
+  --plain
+      Tab-separated rows with no header, for piping. Implied when stdout is not a
+      terminal.
+
+  --sort=<value>
+      Sort as field:direction (asc|desc). Fields: slug, created_at.
+
+  --[no-]telemetry
+      Send anonymous usage analytics. Disable with --no-telemetry.
+
+  --verbose
+      Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List idps.
+
+EXAMPLES
+  $ zitadel idps list --json
+
+  $ zitadel idps list --all --json
+
+  $ zitadel idps list --filter slug=equals:<value> --sort slug:desc
+```
 
 ## `zitadel logs`
 
@@ -2073,7 +2233,7 @@ ALIASES
 
 ## `zitadel users create`
 
-Create a user.
+Create an user.
 
 ```
 USAGE
@@ -2110,7 +2270,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Create a user.
+  Create an user.
 
 EXAMPLES
   $ zitadel users create --schema <schema> --attributes <key>=<value> --json
@@ -2122,7 +2282,7 @@ EXAMPLES
 
 ## `zitadel users delete ID`
 
-Delete a user by id.
+Delete an user by id.
 
 ```
 USAGE
@@ -2152,7 +2312,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Delete a user by id.
+  Delete an user by id.
 
 EXAMPLES
   $ zitadel users delete <id> --force --json
@@ -2286,7 +2446,7 @@ EXAMPLES
 
 ## `zitadel users update ID`
 
-Update a user by id.
+Update an user by id.
 
 ```
 USAGE
@@ -2324,7 +2484,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Update a user by id.
+  Update an user by id.
 
 EXAMPLES
   $ zitadel users update <id> --data '{...}' --json

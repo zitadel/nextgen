@@ -6,7 +6,7 @@ import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { readRawBody } from "../body";
 import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample } from "../fields";
-import { dryRunResult, idArg, idName, parseOrThrow } from "../shared";
+import { article, dryRunResult, idArg, idName, parseOrThrow } from "../shared";
 import type {
   CreateSpec,
   Json,
@@ -53,7 +53,9 @@ const describeWrite = <Ctx, Spec extends { readonly schema: CreateSpec<Ctx>["sch
   const target = verb === "create" ? topic : `${topic} update <id>`;
   return {
     description:
-      verb === "create" ? `Create a ${resource.singular}.` : `Update a ${resource.singular} by id.`,
+      verb === "create"
+        ? `Create ${article(resource.singular)} ${resource.singular}.`
+        : `Update ${article(resource.singular)} ${resource.singular} by id.`,
     examples: [
       ...(example
         ? [`<%= config.bin %> ${target.replace(topic, `${topic} ${verb}`)} ${example} --json`]

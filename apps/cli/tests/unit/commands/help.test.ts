@@ -54,6 +54,9 @@ Resource commands
   grants delete:         Delete a grant by id
   grants get:            Get one grant by id
   grants list:           List grants
+  idps create:           Create an identity provider connection
+  idps get:              Get one identity provider connection by id
+  idps list:             List idps
   projects get:          Get one project by id
   projects list:         List projects
   projects update:       Update a project by id
@@ -65,11 +68,11 @@ Resource commands
   teams get:             Get one team by id
   teams list:            List teams
   teams update:          Update a team by id
-  users create:          Create a user
-  users delete:          Delete a user by id
+  users create:          Create an user
+  users delete:          Delete an user by id
   users get:             Get one user by id
   users list:            List users
-  users update:          Update a user by id
+  users update:          Update an user by id
 
 Additional commands
   autocomplete:          Display autocomplete installation instructions

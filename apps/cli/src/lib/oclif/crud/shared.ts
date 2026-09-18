@@ -21,6 +21,15 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
 export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string =>
   String(args[idName(resource)]);
 
+/**
+ * The indefinite article for a noun phrase, so a generated description reads
+ * as English: "an identity provider connection", not "a identity provider
+ * connection". Vowel letter rather than vowel sound, which is right for every
+ * resource noun here and wrong only for words like "hour".
+ */
+export const article = (phrase: string): string =>
+  "aeiou".includes(phrase[0]?.toLowerCase() ?? "") ? "an" : "a";
+
 export const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
 /**

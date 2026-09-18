@@ -1,7 +1,7 @@
 # CLI Resource Commands
 
 > **Status:** Proposed — eleven resources; see the table below. The decisions
-> are [ADR 062](../../adrs/062-cli-resource-commands.md), the implementation is
+> are [ADR 064](../../adrs/064-cli-resource-commands.md), the implementation is
 > [#1210](https://github.com/zitadel/nextgen/pull/1210).
 > **Context:** The imperative surface for runtime resources that
 > [README.md](README.md#what-lives-in-zitadel-and-what-doesnt) reserves for
@@ -68,7 +68,7 @@ their revisions, so `schemas get human-user` returns the current revision of
 that object type and `flow-definitions get default-login` the newest revision
 of that flow. A prefixed id or a URI is still fetched directly. There is no
 endpoint for either lookup yet, so each entry resolves the reference with one
-filtered list of its own; see ADR 062 §12.
+filtered list of its own; see ADR 064 §12.
 
 ## Anatomy
 

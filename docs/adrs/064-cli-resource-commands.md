@@ -1,4 +1,4 @@
-# ADR 062: CLI Resource Commands
+# ADR 064: CLI Resource Commands
 
 > **Status:** Proposed
 > **Date:** 2026-09-14
@@ -55,6 +55,7 @@ create user` and not `zitadel user create`.
 | `users` | `list` `get` `create` `update` `delete` |
 | `teams` | `list` `get` `create` `update` `deactivate` |
 | `grants` | `list` `get` `create` `delete` |
+| `idps` | `list` `get` `create` |
 | `projects` | `list` `get` `update` |
 | `sessions` | `list` `get` `revoke` |
 | `events` | `list` `get` |
@@ -268,9 +269,16 @@ Where the API has a route for it this costs nothing. `environments get` calls
 resource resolves the reference itself with one filtered list, and that
 resolution lives in the resource's own entry rather than in the generic
 machinery. It is a workaround. It decides from the shape of the argument which
-kind of reference it was given, which is a rule the server never promised. An
-endpoint that fetches by correlation value would delete it, and is recorded
-below.
+kind of reference it was given, which is a rule the server never promised.
+
+[ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) is the end of
+it. If accepted, every revisioned resource gets a fixed `id` shared by all its
+revisions plus a `revision_id` per revision, `GET /<kind>/{id}` returns the
+newest revision, and the list drops its `revisions` parameter because it
+returns each resource once. At that point the CLI's guessing goes away: `get`
+takes the fixed id and needs no rule about id shapes, and the
+`revisions: latest` defaults below are deleted rather than reconfigured. Until
+those routes exist, the CLI matches the API it has.
 
 ### 13. Credentials never reach a command line
 
@@ -339,9 +347,17 @@ makes a CLI surface diverge from the API it fronts.
 
 ## Non-goals
 
-IdP and app management stay experimental under [ADR
-007](007-gitops-configuration-surface.md): their server contracts are not real
-yet, and neither is in the registry. This ADR does not change that.
+App management stays experimental under [ADR
+007](007-gitops-configuration-surface.md): its server contract is not real yet,
+and it is not in the registry. Identity provider connections are no longer in
+that position — #1217 defines the contract, so `idps` is a resource here like
+any other, and ADR 007's experimental note no longer covers it.
+
+The revision routes those connections carry
+([ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)) are out of
+scope. `GET /idps/{id}/revisions` is a listing under one resource, and the
+grammar has no verb for that. Inventing one for a single resource is what §4
+rules out, so the shape needs deciding before any resource gets it.
 
 Conventions that belong to the whole CLI rather than to this surface are out of
 scope and deferred. Those are `-h` not working, the absence of `--quiet`, the
@@ -360,8 +376,11 @@ Recorded here because §14 makes them the API's problem, not the CLI's:
   exactly this). Not a defect, but worth revisiting per resource as use cases
   appear; `users` by email below is the concrete one today.
 - No endpoint fetches a schema by object type or a flow by name, so §12
-  resolves those with a filtered list and a rule about how ids look. A route
-  such as `GET /schemas/by-object-type/{objectType}` would remove the rule.
+  resolves those with a filtered list and a rule about how ids look.
+  [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) resolves this
+  properly if accepted; it also says the `revisions` parameter this surface
+  relies on is removed once the revision routes exist, so the defaults below
+  are temporary by design rather than by neglect.
 - `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
   accepted ADR names the command; this one produces a different spelling for
   the same data. It needs one owner's decision, not two documents.

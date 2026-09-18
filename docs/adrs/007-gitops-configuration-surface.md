@@ -6,7 +6,7 @@
 
 > **Superseded in part.** ADR 035 (Environment Releases for Configuration Resources) replaces the per-resource `plan` / `apply` orchestration described here with atomic release construction (`POST /configuration-releases`) and a separate deployment step (`POST /environments/{env}/deployments`). `zitadel apply` becomes `zitadel deploy`; `zitadel plan` is removed. The higher-level premise — repo files describe configuration, secrets stay out of VCS — is unchanged.
 
-> **Runtime resources.** [ADR 062](062-cli-resource-commands.md) proposes an imperative `zitadel <resource> <verb>` surface for the runtime resources this ADR leaves to server APIs. It is not accepted yet; if it is, the experimental status of IdP and app management below is still unchanged, because neither is in its registry.
+> **Runtime resources.** [ADR 064](064-cli-resource-commands.md) proposes an imperative `zitadel <resource> <verb>` surface for the runtime resources this ADR leaves to server APIs. It is not accepted yet; if it is, the experimental status of IdP and app management below is still unchanged, because neither is in its registry.
 
 ## Decision
 
