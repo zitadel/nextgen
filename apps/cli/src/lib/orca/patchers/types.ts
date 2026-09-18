@@ -51,6 +51,13 @@ export type PatchContext = PatchView &
      * that existed before the record, so legacy restores stay full-page.
      */
     posture?: ScaffoldPosture;
+    /**
+     * The app's environments and where each points, written to
+     * `zitadel.json` as the `environments` map. Absent means the patcher
+     * writes only the `development` issuer (and the preview issuer pattern),
+     * with every environment implicitly on the top-level server and project.
+     */
+    environments?: Readonly<Record<string, { server: string; project: string }>>;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */

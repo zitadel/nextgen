@@ -248,6 +248,29 @@ docker --image <ref>` remains the explicit image override for debugging.
 
 ### Configuration commands
 
+- `deploy` — package `.zitadel/` into a release on the server
+  (`POST /configuration-releases`: unchanged resources reuse their newest
+  revision, changed ones get a new revision, and the set is pinned as one
+  release) and make it live. `--env <name>` picks the entry of
+  `zitadel.json`'s `environments` map (default `development`) — each entry is
+  a project on a server; the release lands on that project's `live`
+  environment, the configuration every request is served by unless a
+  preview claims its origin. `--release <id>` deploys an existing release
+  instead of packaging. `--message` is recorded on release and deployment.
+  Emits `data.release.revisions` (`{kind, handle, revision_id, created}`) and
+  `data.deployment`; `.zitadel/state.json` is updated with the pinned ids so
+  `plan` stays empty afterwards.
+- `preview` — same packaging, but deploys to a **preview environment**:
+  `preview-<name>` on the target project, created or renewed on every run
+  (`--ttl`, default 7d), sharing every user and session with the project and
+  differing only in the release it serves. Requests reach it by origin:
+  pass `--origin <frontend origin>` (repeatable) for the frontend preview
+  deployment whose requests should resolve to it; anything else stays on
+  `live`. `--name` defaults to the current git branch. Emits
+  `data.release_header` (`X-Zitadel-Release: <id>`) — a frontend can pin the
+  release explicitly via `configureZitadel({ release })` regardless of
+  origin. Ship the same release afterwards with
+  `deploy --env production --release <id>`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking

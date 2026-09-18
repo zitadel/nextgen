@@ -314,12 +314,23 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
-  const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
+  const environments: Record<string, Record<string, unknown>> = {
+    development: { issuer: ctx.issuer },
+  };
   if (ctx.project.preview_origins.length > 0) {
     // preview_origins are already full origins (scheme://host[:port]); don't
     // prepend a scheme or it doubles up (https://http://localhost:3000).
     environments.preview = {
       issuer_pattern: [...ctx.project.preview_origins],
+    };
+  }
+  // Each declared environment maps to a project on a server. `local` stays
+  // the literal so the CLI resolves the managed runtime at invocation time.
+  for (const [name, target] of Object.entries(ctx.environments ?? {})) {
+    environments[name] = {
+      ...(environments[name] ?? {}),
+      server: target.server === "local" ? "local" : resolveServerOrigin(target.server),
+      project: target.project,
     };
   }
   return {

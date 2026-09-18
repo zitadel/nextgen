@@ -18,7 +18,7 @@
  */
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
 
-import { setApiAuthToken } from "./auth";
+import { setApiAuthToken, setApiReleaseSelector } from "./auth";
 import { setProxyPath } from "./base-url";
 
 /**
@@ -41,6 +41,13 @@ export type ZitadelClientOptions = {
    * mutation.
    */
   token?: string;
+  /**
+   * Configuration release to pin on every request (`X-Zitadel-Release`):
+   * a release id already deployed to the environment the request resolves
+   * to, or `latest`. Optional — omitted, the environment's current release
+   * serves the request.
+   */
+  release?: string;
 };
 
 /**
@@ -66,6 +73,7 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       return (...args: unknown[]) => {
         setProxyPath(baseUrl);
         setApiAuthToken(opts.token);
+        setApiReleaseSelector(opts.release);
         return (value as (...a: unknown[]) => unknown)(...args);
       };
     },

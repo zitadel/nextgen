@@ -117,11 +117,13 @@ which ships in this package.
 * [`zitadel branding eject`](#zitadel-branding-eject)
 * [`zitadel claim`](#zitadel-claim)
 * [`zitadel commands`](#zitadel-commands)
+* [`zitadel deploy`](#zitadel-deploy)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel help [COMMAND]`](#zitadel-help-command)
 * [`zitadel logs`](#zitadel-logs)
 * [`zitadel plan`](#zitadel-plan)
+* [`zitadel preview`](#zitadel-preview)
 * [`zitadel reset`](#zitadel-reset)
 * [`zitadel schemas list`](#zitadel-schemas-list)
 * [`zitadel search`](#zitadel-search)
@@ -297,6 +299,48 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/4.1.55/src/commands/commands.ts)_
 
+## `zitadel deploy`
+
+Build a release from .zitadel/ and make it live on an environment's project.
+
+```
+USAGE
+  $ zitadel deploy [--json] [-c <value>] [-s <value>] [-n] [-f]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>] [-m <value>]
+    [--release <value>]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -e, --env=<value>      [default: development] Environment from zitadel.json
+                         whose project receives the release (default:
+                         development).
+  -f, --force            Overwrite protected files on conflict.
+  -m, --message=<value>  Summary recorded on the release and the deployment.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --release=<value>  Deploy an existing release id instead of packaging
+                         .zitadel/.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Build a release from .zitadel/ and make it live on an environment's project.
+
+EXAMPLES
+  $ zitadel deploy
+
+  $ zitadel deploy --env production --message 'add phone_number to human-user'
+
+  $ zitadel deploy --env production --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+```
+
 ## `zitadel doctor`
 
 Verify local runtime and project state.
@@ -441,6 +485,54 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Validate config without mutation and preview the sync diff.
+```
+
+## `zitadel preview`
+
+Build a release from .zitadel/ and deploy it to a preview environment.
+
+```
+USAGE
+  $ zitadel preview [--json] [-c <value>] [-s <value>] [-n] [-f]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>] [-n <value>]
+    [-o <value>...] [--ttl <value>] [-m <value>] [--release <value>]
+
+FLAGS
+  -c, --cwd=<value>        Project directory to operate on.
+  -e, --env=<value>        Environment from zitadel.json whose project hosts the
+                           preview (default: preview, falling back to
+                           development).
+  -f, --force              Overwrite protected files on conflict.
+  -m, --message=<value>    Summary recorded on the release and the deployment.
+  -n, --name=<value>       Preview name; prefixed with preview- on the server.
+                           Defaults to the current git branch.
+  -n, --non-interactive    Disable prompts. Required when scripting or running
+                           as an agent.
+  -o, --origin=<value>...  Frontend origin (scheme://host[:port]) whose requests
+                           resolve to this preview. Repeatable.
+  -s, --server=<value>     Override the resolved server URL.
+      --debug              Debug logging.
+      --dry-run            Preview without mutating files or the platform.
+      --release=<value>    Deploy an existing release id instead of packaging
+                           .zitadel/.
+      --[no-]telemetry     Send anonymous usage analytics. Disable with
+                           --no-telemetry.
+      --ttl=<value>        How long the preview lives from now, as 7d or 168h
+                           (default: 7d, max 30d).
+      --verbose            Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Build a release from .zitadel/ and deploy it to a preview environment.
+
+EXAMPLES
+  $ zitadel preview
+
+  $ zitadel preview --name pr-42 --origin https://my-app-git-feat-sso-acme.vercel.app
+
+  $ zitadel preview --name pr-42 --ttl 3d --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1
 ```
 
 ## `zitadel reset`

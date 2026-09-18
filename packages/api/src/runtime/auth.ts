@@ -17,3 +17,25 @@ export function getApiAuthToken(): string | undefined {
 export function setApiAuthToken(token: string | undefined): void {
   apiAuthToken = token;
 }
+
+/**
+ * The request header that pins which configuration release serves a public
+ * request. `latest` (or absent) means the release the resolved environment
+ * currently runs; a release id must already be deployed to that environment.
+ */
+export const RELEASE_HEADER = "X-Zitadel-Release";
+
+/**
+ * Module-global release selector, sent as {@link RELEASE_HEADER} on every
+ * generated request while set. Same lifecycle as the bearer token: the
+ * client factory sets it per call from the handle it was built for.
+ */
+let apiReleaseSelector: string | undefined;
+
+export function getApiReleaseSelector(): string | undefined {
+  return apiReleaseSelector;
+}
+
+export function setApiReleaseSelector(release: string | undefined): void {
+  apiReleaseSelector = release;
+}

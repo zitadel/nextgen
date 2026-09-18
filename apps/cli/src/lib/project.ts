@@ -129,6 +129,24 @@ export async function writeZitadelSecret(cwd: string, secret: ZitadelSecret): Pr
 }
 
 /**
+ * Writes the credentials of an isolated environment's project to
+ * `.zitadel/secret.<name>`, with the same atomic temp-then-rename and `0600`
+ * mode as {@link writeZitadelSecret}. Read back by `resolveEnvironmentTarget`
+ * when a command targets that environment.
+ */
+export async function writeEnvironmentSecret(
+  cwd: string,
+  name: string,
+  secret: ZitadelSecret,
+): Promise<void> {
+  const path = join(cwd, `.zitadel/secret.${name}`);
+  const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+  await writeFile(tmp, `${stableStringify(secret)}\n`, { mode: 0o600 });
+  await chmod(tmp, 0o600).catch(() => undefined);
+  await rename(tmp, path);
+}
+
+/**
  * Reads the configured renderer id from a parsed `zitadel.json`, normalising the
  * legacy `default` alias to `react` and falling back to `react` when unset. The
  * value is validated downstream by `getRenderer`, so callers need not re-check.

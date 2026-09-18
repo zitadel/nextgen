@@ -28,6 +28,17 @@ export interface ZitadelConfig {
    * proxy instead.
    */
   publishableKey?: string;
+
+  /**
+   * Configuration release to pin on every request, sent as the
+   * `X-Zitadel-Release` header. Use the release id a frontend preview
+   * deployment was built against (`zitadel preview` prints it), so the
+   * frontend and its configuration roll out together. Omitted, or `latest`,
+   * the environment the request resolves to serves its current release.
+   * The environment itself is never chosen here: it follows from the
+   * request's origin.
+   */
+  release?: string;
 }
 
 /**
@@ -46,6 +57,9 @@ export interface ZitadelProject {
 
   /** The project's publishable key (ADR 036), sent as the bearer when set. */
   readonly publishableKey?: string;
+
+  /** The configuration release pinned on every request, when set. */
+  readonly release?: string;
 }
 
 export type { ZitadelApi };
@@ -101,7 +115,8 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
       existing.proxyPath === resolvedProxyPath &&
       existing.projectId === config.projectId &&
       existing.url === config.url &&
-      existing.publishableKey === config.publishableKey
+      existing.publishableKey === config.publishableKey &&
+      existing.release === config.release
     ) {
       setProxyPath(resolvedProxyPath);
       return existing;
@@ -119,6 +134,7 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
     projectId: config.projectId,
     url: config.url,
     publishableKey: config.publishableKey,
+    release: config.release,
   });
   writeSlot(project);
   setProxyPath(resolvedProxyPath);
@@ -140,7 +156,11 @@ export function getApi(project: ZitadelProject): ZitadelApi {
     // The publishable key (when the handle carries one) rides as the bearer
     // on every call from this client — the ADR 036 public-plane credential.
     // Handles without a key produce a token-less client, exactly as before.
-    api = createZitadelClient({ baseUrl: project.proxyPath, token: project.publishableKey });
+    api = createZitadelClient({
+      baseUrl: project.proxyPath,
+      token: project.publishableKey,
+      release: project.release,
+    });
     apiCache.set(project, api);
   }
   return api;

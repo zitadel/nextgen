@@ -43,7 +43,7 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { hasZitadelConfig, hasZitadelSecret, writeEnvironmentSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
@@ -299,6 +299,32 @@ export default class Setup extends BaseCommand {
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
 
+    // Every declared environment maps to a project on a server. Shared ones
+    // reuse the project just created; isolated ones get their own project
+    // (an empty user base) on their server, created right here so the map
+    // written to zitadel.json never names a project that does not exist.
+    const environments: Record<string, { server: string; project: string }> = {};
+    const isolatedSecrets: Array<{ name: string; secret: CreateProject201 }> = [];
+    for (const answer of answers.environments ?? []) {
+      if (!answer.isolated) {
+        environments[answer.name] = { server: answer.server, project: project.id };
+        continue;
+      }
+      const isolated = dryRun
+        ? dryRunProject(issuer)
+        : await createProjectWithLocalHint(
+            createZitadelClient({ baseUrl: answer.server }),
+            answer.server,
+            this.meta.cliVersion,
+            `${projectName}-${answer.name}`,
+            issuer,
+            { ...retryOptionsFromFlags(flags), framework: framework.id },
+          );
+      consola.success(`Created isolated project ${isolated.id} for ${answer.name}`);
+      environments[answer.name] = { server: answer.server, project: isolated.id };
+      isolatedSecrets.push({ name: answer.name, secret: isolated });
+    }
+
     // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
     // route-based app gets embeddable cards inside its own layout (ADR 044).
     const posture = derivePosture(framework.id, scaffoldedFramework);
@@ -313,9 +339,22 @@ export default class Setup extends BaseCommand {
       posture,
       preset: answers.preset,
       useCase: answers.useCase,
+      ...(answers.environments ? { environments } : {}),
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
+    if (!dryRun) {
+      for (const { name, secret } of isolatedSecrets) {
+        await writeEnvironmentSecret(cwd, name, {
+          project_id: secret.id,
+          project_secret: secret.project_secret,
+          preview_secret: secret.preview_secret,
+          preview_origins: secret.preview_origins,
+          created_at: secret.created_at,
+        });
+        consola.info(`Wrote the ${name} project secret (${stylePath(`.zitadel/secret.${name}`)})`);
+      }
+    }
     for (const file of result.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
       if (sentence) consola.info(sentence);

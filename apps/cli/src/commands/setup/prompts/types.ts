@@ -27,6 +27,22 @@ export type SetupAnswers = {
    * the same choice after setup).
    */
   design?: BrandingDesign;
+  /**
+   * The environments the app runs in and where each points, from the
+   * {@link import("./environments").EnvironmentsPrompt}. Absent (flags or
+   * non-interactive runs) means the patcher writes its default map: every
+   * environment on the setup server sharing the one project.
+   */
+  environments?: EnvironmentAnswer[];
+};
+
+/** One environment as answered in the wizard, before projects exist. */
+export type EnvironmentAnswer = {
+  name: string;
+  /** Server origin or `local`. */
+  server: string;
+  /** Own project with its own users, created by setup, instead of sharing. */
+  isolated: boolean;
 };
 
 /** Read-only facts a prompt may need. */

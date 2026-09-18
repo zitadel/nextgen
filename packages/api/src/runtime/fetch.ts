@@ -1,4 +1,4 @@
-import { getApiAuthToken } from "./auth";
+import { getApiAuthToken, getApiReleaseSelector, RELEASE_HEADER } from "./auth";
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -44,6 +44,13 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   const headers = new Headers(options.headers);
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
+  }
+  // The release selector rides on every public call so a frontend preview
+  // deployment built against one configuration release keeps being served
+  // by it; the server ignores it on operations that resolve no release.
+  const release = getApiReleaseSelector();
+  if (release && !headers.has(RELEASE_HEADER)) {
+    headers.set(RELEASE_HEADER, release);
   }
 
   const res = await fetch(url, { ...options, headers });
