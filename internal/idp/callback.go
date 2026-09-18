@@ -20,11 +20,10 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// clockSkew is the offset the oidc verifier applies to the time claims. An
-// iat up to one minute in the future is accepted, which covers a provider
-// clock running ahead. An exp less than one minute away is rejected, the
-// same as an expired one.
-const clockSkew = time.Minute
+// iatTolerance accepts an iat up to one minute in the future, in case the
+// provider's clock runs ahead. The oidc verifier uses one offset for both
+// time claims, so an exp less than one minute away is also rejected.
+const iatTolerance = time.Minute
 
 // CallbackRequest carries what the callback route hands the engine for one
 // attempt.
@@ -193,7 +192,7 @@ func (c *OIDCClient) verifyIDToken(ctx context.Context, token *oauth2.Token, non
 	// while the key set and its JWKS cache are shared.
 	verifier := c.IDTokenVerifier()
 	verifier.Nonce = func(context.Context) string { return nonce }
-	verifier.Offset = clockSkew
+	verifier.Offset = iatTolerance
 	// Checks the signature, iss, aud with azp, exp and iat, nonce, and
 	// at_hash when present.
 	claims, err := rp.VerifyTokens[*oidc.IDTokenClaims](ctx, token.AccessToken, raw, &verifier)

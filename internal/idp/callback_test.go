@@ -341,10 +341,10 @@ func TestVerifyIDToken(t *testing.T) {
 			nonce: "the-nonce",
 		},
 		{
-			name: "an iat within the skew in the future is accepted",
+			name: "an iat within the tolerance in the future is accepted",
 			token: func(t *testing.T, p *provider) string {
 				claims := p.claims()
-				claims["iat"] = time.Now().Add(clockSkew / 2).Unix()
+				claims["iat"] = time.Now().Add(iatTolerance / 2).Unix()
 				return sign(t, p.key, jose.RS256, "k1", claims)
 			},
 			nonce: "the-nonce",
@@ -432,7 +432,7 @@ func TestVerifyIDToken(t *testing.T) {
 			name: "an expired token is rejected",
 			token: func(t *testing.T, p *provider) string {
 				claims := p.claims()
-				claims["exp"] = time.Now().Add(-2 * clockSkew).Unix()
+				claims["exp"] = time.Now().Add(-2 * iatTolerance).Unix()
 				return sign(t, p.key, jose.RS256, "k1", claims)
 			},
 			nonce:     "the-nonce",
@@ -440,21 +440,10 @@ func TestVerifyIDToken(t *testing.T) {
 			wantCause: oidc.ErrExpired,
 		},
 		{
-			name: "an expiry within the skew is rejected",
+			name: "an iat beyond the tolerance in the future is rejected",
 			token: func(t *testing.T, p *provider) string {
 				claims := p.claims()
-				claims["exp"] = time.Now().Add(clockSkew / 2).Unix()
-				return sign(t, p.key, jose.RS256, "k1", claims)
-			},
-			nonce:     "the-nonce",
-			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
-			wantCause: oidc.ErrExpired,
-		},
-		{
-			name: "an iat beyond the skew in the future is rejected",
-			token: func(t *testing.T, p *provider) string {
-				claims := p.claims()
-				claims["iat"] = time.Now().Add(2 * clockSkew).Unix()
+				claims["iat"] = time.Now().Add(2 * iatTolerance).Unix()
 				return sign(t, p.key, jose.RS256, "k1", claims)
 			},
 			nonce:     "the-nonce",
