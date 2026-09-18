@@ -45,6 +45,7 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
+import { PLATFORM_PROJECT_ID } from "../../lib/local-server/platform";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
@@ -649,7 +650,7 @@ export async function localServerHostsPlatform(
       return false;
     }
     const doc = (await res.json()) as { console_project_id?: unknown };
-    return doc.console_project_id === "proj_platform";
+    return doc.console_project_id === PLATFORM_PROJECT_ID;
   } catch {
     return false;
   }
