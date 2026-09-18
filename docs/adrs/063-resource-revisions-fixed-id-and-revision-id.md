@@ -1,4 +1,4 @@
-# ADR 062: Resource Revisions: Fixed Id and Revision Id
+# ADR 063: Resource Revisions: Fixed Id and Revision Id
 
 > **Status:** Proposed  
 > **Date:** 2026-09-16  

@@ -271,6 +271,13 @@ describe("meta-schemas", () => {
     expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
+    expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
+    expect(check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } })).toBe(
+      true,
+    );
+    expect(
+      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" } }),
+    ).toBe(true);
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.
     expect(check({ logo_url: "http://localhost:3000/logo.svg" })).toBe(true);

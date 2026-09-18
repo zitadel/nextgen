@@ -23,10 +23,14 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      idp.read: Permission to read identity provider connections
+      idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
       events.read: Permission to list and get project audit events
+      variable.read: Permission to read project variables (a secret's value is never returned)
+      variable.write: Permission to create and manage project variables and secrets
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
@@ -66,10 +70,14 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      idp.read: Permission to read identity provider connections
+      idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
       events.read: Permission to list and get project audit events
+      variable.read: Permission to read project variables (a secret's value is never returned)
+      variable.write: Permission to create and manage project variables and secrets
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)

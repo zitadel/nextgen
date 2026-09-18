@@ -3,7 +3,7 @@
 > **Status:** Accepted
 > **Date:** 2026-07-07
 > **Context:** Multi-environment lifecycle for source-controlled configuration
-> **Amended by:** [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md) (fixed `id` plus `revision_id` on every revisioned resource; a pointer pins `revision_id`)
+> **Amended by:** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (fixed `id` plus `revision_id` on every revisioned resource; a pointer pins `revision_id`)
 
 ## Status quo
 
@@ -76,7 +76,7 @@ For example, release `rel_01KX3RG8A7F0N9WD3P2E4YM5C1` might contain:
 | app       | `name` = `web`               | `app_01KWJC2B78ZQ…`        |
 | policy    | `name` = `password`          | `pol_01KWHF3XY6RN…`        |
 
-> Amended by [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md): the Revision column is the revision's `revision_id`, and the idp handle is `slug`, not `name`.
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): the Revision column is the revision's `revision_id`, and the idp handle is `slug`, not `name`.
 
 The "handle" is the field each resource kind uses as its stable identifier across revisions. For example, schemas use `objectType`.
 
@@ -144,7 +144,7 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 | `GET /releases`                | List releases in the project, newest first. Each entry carries audit metadata; pointer tuples are omitted (fetch via `GET /releases/{release_id}`).                         |
 | `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{id}`, `GET /flow_definitions/{id}`, …). |
 
-> Amended by [ADR 062](062-resource-revisions-fixed-id-and-revision-id.md): a pinned revision is fetched through `GET /<kind>/revisions/{revision_id}`, since get-by-id returns the newest revision.
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a pinned revision is fetched through `GET /<kind>/revisions/{revision_id}`, since get-by-id returns the newest revision.
 
 A release owns pointers and audit metadata, not content. Per-kind endpoints stay the single source of truth for resource bytes; a release is the immutable snapshot of *which* revisions belong together. Consumers that need content (e.g. `zitadel status` diffing against local, or a UI rendering a release preview) resolve each pointer themselves. This keeps releases lightweight and avoids duplicating resource storage.
 

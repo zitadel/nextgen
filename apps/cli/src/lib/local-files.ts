@@ -36,6 +36,7 @@ export type FileReferenceContext = { readonly cwd: string; readonly baseDir: str
 type Path = ReadonlyArray<string | number>;
 
 type Container = Record<string, unknown> | unknown[];
+const omittedReference = Symbol("omittedReference");
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -66,13 +67,40 @@ function setChild(node: Container, key: string | number, value: unknown): void {
   }
 }
 
-/** A file's content, or undefined when it cannot be read. */
+/** A file's content, or undefined when it is absent. */
 function readIfPresent(path: string): string | undefined {
   try {
     return readFileSync(path, "utf8");
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+      return undefined;
+    }
+    throw error;
   }
+}
+
+function readFileReference(
+  path: string,
+  ref: string,
+  options: { readonly onMissing: "throw" | "omit" },
+): string | typeof omittedReference {
+  let content: string | undefined;
+  try {
+    content = readIfPresent(path);
+  } catch {
+    throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
+      hint: "Create the referenced file or fix the path.",
+    });
+  }
+  if (content !== undefined) {
+    return content;
+  }
+  if (options.onMissing === "omit") {
+    return omittedReference;
+  }
+  throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
+    hint: "Create the referenced file or fix the path.",
+  });
 }
 
 /** Whether `path` is `root` itself or lies beneath it. */
@@ -189,22 +217,16 @@ export function inlineFileReferences<T>(
   const inline = (node: unknown): unknown => {
     if (isFileReference(node)) {
       const ref = node[FILE_REFERENCE_KEY];
-      const content = readIfPresent(resolveFileReference(context, ref));
-      if (content === undefined && options.onMissing === "throw") {
-        throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
-          hint: "Create the referenced file or fix the path.",
-        });
-      }
-      return content;
+      return readFileReference(resolveFileReference(context, ref), ref, options);
     }
     if (Array.isArray(node)) {
-      return node.map(inline).filter((item) => item !== undefined);
+      return node.map(inline).filter((item) => item !== omittedReference);
     }
     if (isPlainObject(node)) {
       const out: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(node)) {
         const inlined = inline(value);
-        if (inlined !== undefined) {
+        if (inlined !== omittedReference) {
           out[key] = inlined;
         }
       }
