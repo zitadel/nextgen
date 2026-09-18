@@ -45,9 +45,13 @@ export const Route = createFileRoute("/login")({
   }),
   beforeLoad: async ({ search }) => {
     // A sign-in link (`/login?handoff=<token>`) printed by the CLI carries a
-    // one-time handoff token; trade it for the session cookie before
-    // deciding whether to show the widget.
-    if (search.handoff) {
+    // one-time handoff token; trade it for the session cookie before deciding
+    // whether to show the widget. Only on a loopback console: the link is a
+    // bearer credential for whoever minted it, so honouring it on a deployed
+    // console would let a crafted link silently sign a visitor into the
+    // link-maker's session. Minting one requires an account on the server that
+    // issued it, which for a developer's own local instance is the developer.
+    if (search.handoff && isLoopbackConsole()) {
       await exchangeLinkHandoff(search.handoff);
     }
     const session = await fetchSession();
@@ -60,6 +64,16 @@ export const Route = createFileRoute("/login")({
   },
   component: LoginScreen,
 });
+
+/**
+ * Whether this console is served from the developer's own machine, which is
+ * where `zitadel start` prints sign-in links. `localhost`, the `127.0.0.0/8`
+ * block, and `[::1]` (how WHATWG URLs spell IPv6 loopback).
+ */
+function isLoopbackConsole(): boolean {
+  const { hostname } = window.location;
+  return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
+}
 
 /**
  * Exchanges a sign-in link's handoff token for the `__nextgen_session`

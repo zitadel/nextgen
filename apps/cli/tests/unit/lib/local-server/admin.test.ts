@@ -47,9 +47,11 @@ describe("local admin", () => {
     expect(admin.email).toBe(LOCAL_ADMIN_EMAIL);
     expect(admin.password.length).toBeGreaterThanOrEqual(32);
     expect(userFile).toBe(join(cwd, LOCAL_ADMIN_USER_FILE));
-    // Both files hold credential material: owner-only.
+    // The password lives here, so it stays owner-only.
     expect((await stat(join(cwd, LOCAL_ADMIN_FILE))).mode & 0o777).toBe(0o600);
-    expect((await stat(userFile)).mode & 0o777).toBe(0o600);
+    // The bootstrap document carries only a hash, and the docker runtime
+    // mounts it into a container that may run as another user.
+    expect((await stat(userFile)).mode & 0o777).toBe(0o644);
 
     const doc = JSON.parse(await readFile(userFile, "utf8")) as {
       header: Record<string, string>;
@@ -84,5 +86,18 @@ describe("local admin", () => {
 
     expect(second.admin).toEqual(first.admin);
     expect(await readLocalAdmin(cwd)).toEqual(first.admin);
+  });
+
+  // Two starts in one directory must not each mint a password: the server would
+  // import one hash while the CLI kept the other credential, and every console
+  // handoff would fail.
+  it("mints one credential when two starts race", async () => {
+    const cwd = await tempCwd();
+
+    const [first, second] = await Promise.all([ensureLocalAdmin(cwd), ensureLocalAdmin(cwd)]);
+
+    const stored = await readLocalAdmin(cwd);
+    expect(first.admin).toEqual(stored);
+    expect(second.admin).toEqual(stored);
   });
 });

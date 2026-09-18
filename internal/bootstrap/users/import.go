@@ -70,7 +70,7 @@ func importFile(
 	if err != nil {
 		return err
 	}
-	attrs, err := buildCreateAttributes(doc.Attributes, schema)
+	attrs, err := buildCreateAttributes(doc.Attributes, schema, doc.Header.TeamID)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,11 @@ func importFile(
 // identifier resolution looks the value up in the unique-attributes registry.
 // `username` stays project-unique regardless, as it always was for bootstrap
 // users.
-func buildCreateAttributes(attrs map[domain.AttributeKey]json.RawMessage, schema map[string]any) (domain.CreateAttributes, error) {
+func buildCreateAttributes(
+	attrs map[domain.AttributeKey]json.RawMessage,
+	schema map[string]any,
+	teamID string,
+) (domain.CreateAttributes, error) {
 	out := make(domain.CreateAttributes, 0, len(attrs))
 	for key, raw := range attrs {
 		value, err := decodeScalar(raw, key)
@@ -124,6 +128,13 @@ func buildCreateAttributes(attrs map[domain.AttributeKey]json.RawMessage, schema
 			return nil, err
 		}
 		scope := uniqueScopeFromSchema(schema, key)
+		// A team-scoped attribute on a document with no team would be stored
+		// under the empty team, which the users table reads as project-wide:
+		// it would claim the value at a scope the schema never asked for, so
+		// leave it unregistered instead.
+		if scope == domain.AttributeUniquenessTeam && teamID == "" {
+			scope = domain.AttributeUniquenessUnspecified
+		}
 		if key == attrKeyUsername {
 			scope = domain.AttributeUniquenessProject
 		}
@@ -155,10 +166,18 @@ func loadUserSchema(ctx context.Context, stmts service.AllStatements, h Header) 
 	return schema, nil
 }
 
-// uniqueScopeFromSchema maps a top-level property's `x-unique` annotation to
-// its uniqueness scope, the same rule domain.CreateAttributesFromMap applies.
+// uniqueScopeFromSchema maps a property's `x-unique` annotation to its
+// uniqueness scope, the same rule domain.CreateAttributesFromMap applies.
+// Bootstrap attribute keys are flattened dotted paths, so a nested property
+// is addressed the way the recursive walk addresses it: every node but the
+// last sits behind its own `properties` object.
 func uniqueScopeFromSchema(schema map[string]any, key domain.AttributeKey) domain.AttributeUniqueness {
-	scope, _ := maputil.GetNested[string](schema, []string{"properties", string(key), domain.SchemaAnnotationUnique})
+	path := make([]string, 0, len(key.Nodes())*2+1)
+	for _, node := range key.Nodes() {
+		path = append(path, "properties", node)
+	}
+	path = append(path, domain.SchemaAnnotationUnique)
+	scope, _ := maputil.GetNested[string](schema, path)
 	switch scope {
 	case domain.SchemaUniqueScopeProject:
 		return domain.AttributeUniquenessProject

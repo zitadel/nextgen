@@ -240,11 +240,15 @@ The groups below mirror the ones `zitadel --help` prints.
   console sign-in link and reports it as `data.console.sign_in_url` with
   `data.console.signed_in_as`; if no link can be minted (for example a data
   directory from before the local admin existed), `data.console.error` and
-  `data.console.hint` say why and `start` still succeeds.
+  `data.console.hint` say why, `start` still succeeds, and `zitadel console`
+  drops out of `next_commands`. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`
+  opts out of both the platform project and the local admin, for harnesses that
+  want a bare single-project server; `data.console` is then absent.
 - `console` — print (and, interactively, open) a fresh one-time sign-in link
   for the local console as the local admin: `data.sign_in_url`,
   `data.signed_in_as`, `data.browser_opened`. Each link works once; run the
-  command again for a new one. Fails with `E_VALIDATION` when `start` never
+  command again for a new one. The console honours the link only when it is
+  served from loopback, since the token signs in whoever opens it. Fails with `E_VALIDATION` when `start` never
   created a local admin in this directory. Flags: `--no-open`.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered

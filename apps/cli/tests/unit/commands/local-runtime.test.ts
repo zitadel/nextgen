@@ -342,6 +342,7 @@ describe("local runtime commands", () => {
       data: {
         runtime: { backend: string; pid: number; log_path: string; server_package: string };
         urls: { api: string };
+        console: { signed_in_as: string; sign_in_url?: string; error?: string; hint?: string };
         next_commands: string[];
       };
     };
@@ -354,9 +355,17 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.runtime.pid).toBeGreaterThan(0);
     binaryPids.push(envelope.data.runtime.pid);
+    // The fake server hosts no platform project, so no sign-in link can be
+    // minted: the envelope says why and stops advertising `zitadel console`,
+    // which would fail the same way.
+    expect(envelope.data.console).toMatchObject({
+      signed_in_as: expect.any(String),
+      error: expect.stringContaining("platform project"),
+      hint: expect.stringContaining("zitadel stop"),
+    });
+    expect(envelope.data.console.sign_in_url).toBeUndefined();
     expect(envelope.data.next_commands).toEqual([
       expectedPublicCliCommand("setup --server local"),
-      expectedPublicCliCommand("console"),
     ]);
 
     const runtime = await readRuntimeMetadata(cwd);
@@ -406,6 +415,38 @@ describe("local runtime commands", () => {
     expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
   });
 
+  // The platform project and the local admin travel together, and a harness
+  // that wants a bare single-project instance opts out of both
+  // (apps/console-e2e's real and embedded lanes do).
+  it("start creates no local admin when the platform bootstrap is opted out", async () => {
+    const cwd = await tempProject("zitadel-start-no-platform-");
+    const fake = await fakeServerBinary();
+    const port = await freePort();
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false",
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { runtime: { pid: number }; console?: unknown; next_commands: string[] };
+    };
+    expect(envelope.status).toBe("ok");
+    binaryPids.push(envelope.data.runtime.pid);
+    // No admin, so nothing to sign in as and nothing to suggest.
+    expect(envelope.data.console).toBeUndefined();
+    expect(envelope.data.next_commands).toEqual([
+      expectedPublicCliCommand("setup --server local"),
+    ]);
+    await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
+    // And the server is started without the bootstrap user document.
+    const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
+    expect(commandLine?.command ?? "").not.toContain("--user-file");
+  });
+
   it("start fails if its spawned binary exits even when another health server appears", async () => {
     const cwd = await tempProject("zitadel-start-dead-pid-");
     const fake = await fakeExitingServerWithForeignHealth();
@@ -445,9 +486,10 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
+    // As in the binary case: no platform project on the fake server, so no
+    // link and no `console` suggestion.
     expect(envelope.data.next_commands).toEqual([
       expectedPublicCliCommand("setup --server local"),
-      expectedPublicCliCommand("console"),
     ]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");

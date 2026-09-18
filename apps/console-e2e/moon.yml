@@ -95,6 +95,11 @@ tasks:
       # e2e-real, 8093 console-e2e e2e-real, 8094 console dev-real.
       EMBEDDED_ZITADEL_PORT: "8095"
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # Same opt-out as the real lane: this suite signs in users seeded in the
+      # harness's own project, and a platform project would take over the
+      # console and hosted-login default, so those sign-ins would run against
+      # a project the seeded user does not exist in.
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
       # Both surfaces stay on (the server defaults): they are what this lane
       # tests. Contrast e2e-real above, which switches them off.
     options:
