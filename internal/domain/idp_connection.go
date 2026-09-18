@@ -69,3 +69,17 @@ func ErrIDPEndpointsPartial(missing []string) Error {
 func ErrIDPOAuth2Unsupported() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("oauth2_unsupported"), "identity provider connection: the oauth2 protocol is not supported yet", nil, nil)
 }
+
+// The callback errors below end an attempt after the user authenticated at
+// the provider. Each is a distinct kind, so the log tells the steps apart; the
+// user sees the generic exchange-failure error. cause is log-only and may
+// carry provider-served text, never a token, secret, or claim value.
+
+// ErrIDPExchangeFailed reports that the code exchange yielded no token. One
+// code covers the whole step, as discovery_failed does: the token endpoint
+// answered with an error such as invalid_grant or with a non-conformant
+// body, or no answer arrived because the address was denied, the connection
+// failed, or an egress cap struck.
+func ErrIDPExchangeFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("exchange_failed"), "identity provider connection: the code exchange failed", nil, cause)
+}
