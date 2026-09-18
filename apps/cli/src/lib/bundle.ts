@@ -53,16 +53,24 @@ export async function buildConfigurationBundle(cwd: string): Promise<Configurati
   const resources: BundledResource[] = [];
 
   const schemaHandleByID = new Map<string, string>();
+  const schemaHandles: string[] = [];
   const schemas: object[] = [];
   for (const [relPath, body] of await readJsonDir(cwd, SCHEMAS_DIR)) {
     const objectType = (body as { objectType?: unknown }).objectType;
     if (typeof objectType !== "string" || objectType === "") {
       continue;
     }
-    const recordedID = state.resources[relPath]?.id;
-    if (recordedID) {
-      schemaHandleByID.set(recordedID, objectType);
+    // Every id this schema file has ever been known by, on any project: a
+    // flow file pins whichever one the last sync or deploy wrote.
+    const entry = state.resources[relPath];
+    for (const known of [
+      entry?.id,
+      entry?.previousId,
+      ...Object.values(entry?.projects ?? {}),
+    ]) {
+      if (known) schemaHandleByID.set(known, objectType);
     }
+    schemaHandles.push(objectType);
     schemas.push(body);
     resources.push({
       kind: "schema",
@@ -81,7 +89,7 @@ export async function buildConfigurationBundle(cwd: string): Promise<Configurati
     }
     const wire: Record<string, unknown> = { ...(body as Record<string, unknown>) };
     if (typeof wire.user_schema === "string") {
-      wire.user_schema = schemaHandleByID.get(wire.user_schema) ?? wire.user_schema;
+      wire.user_schema = resolveSchemaHandle(wire.user_schema, schemaHandleByID, schemaHandles);
     }
     flows.push(wire);
     resources.push({
@@ -121,16 +129,40 @@ export async function buildConfigurationBundle(cwd: string): Promise<Configurati
 }
 
 /**
+ * Turns a flow's `user_schema` into the handle the bundle pins it under.
+ * The file holds whatever id the last sync or deploy wrote, which may be a
+ * revision on another project; any id a local schema file was ever known
+ * by maps back to that file's `objectType`. An opaque id nothing local
+ * answers to, with exactly one local schema, still resolves to it — the
+ * file was scaffolded against that schema and only the id went stale.
+ * Anything else (a handle already, or a foreign URL) passes through.
+ */
+function resolveSchemaHandle(
+  value: string,
+  byID: ReadonlyMap<string, string>,
+  handles: readonly string[],
+): string {
+  const known = byID.get(value);
+  if (known) return known;
+  if (handles.includes(value)) return value;
+  if (/^sch_[A-Za-z0-9]+$/.test(value) && handles.length === 1) return handles[0]!;
+  return value;
+}
+
+/**
  * Records the revision ids the server pinned back into `.zitadel/state.json`,
  * so `plan` stays empty after a deploy and a later `apply` does not republish
- * what the release already pins.
+ * what the release already pins. Ids are project-local, so each is also
+ * recorded under the project it belongs to.
  */
 export async function recordBundleRevisions(
   cwd: string,
+  projectId: string,
   resources: ReadonlyArray<BundledResource>,
   revisions: ReadonlyArray<{ kind: string; handle: string; revision_id: string }>,
 ): Promise<string[]> {
   const updated: string[] = [];
+  const state = await readState(cwd);
   for (const revision of revisions) {
     const resource = resources.find(
       (r) => r.kind === revision.kind && r.handle === revision.handle,
@@ -138,9 +170,13 @@ export async function recordBundleRevisions(
     if (!resource) {
       continue;
     }
-    const entry: { id: string; hash: string; name?: string } = {
+    const entry: { id: string; hash: string; name?: string; projects: Record<string, string> } = {
       id: revision.revision_id,
       hash: resource.hash,
+      projects: {
+        ...(state.resources[resource.path]?.projects ?? {}),
+        [projectId]: revision.revision_id,
+      },
     };
     if (resource.kind === "flow_definition") {
       entry.name = resource.handle;

@@ -12,6 +12,13 @@ export type ResourceEntry = {
   name?: string;
   status?: string;
   previousId?: string;
+  /**
+   * The revision id this file resolved to on each project it was deployed
+   * to, keyed by project id. `zitadel.json` may map environments to
+   * different projects, and a revision id is project-local, so `id` alone
+   * (the last one written) cannot say what the file is called elsewhere.
+   */
+  projects?: Record<string, string>;
 };
 
 /**

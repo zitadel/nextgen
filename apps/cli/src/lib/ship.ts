@@ -51,7 +51,12 @@ export async function buildRelease(opts: {
   const result = (await opts.client.createConfigurationRelease(body, {
     project_id: opts.target.projectId,
   })) as CreateConfigurationRelease201;
-  const filesUpdated = await recordBundleRevisions(opts.cwd, bundle.resources, result.revisions);
+  const filesUpdated = await recordBundleRevisions(
+    opts.cwd,
+    opts.target.projectId,
+    bundle.resources,
+    result.revisions,
+  );
   const created = result.revisions.filter((r) => r.created).length;
   consola.success(
     `Release ${result.release.id} (${result.revisions.length} resource${result.revisions.length === 1 ? "" : "s"}, ${created} new revision${created === 1 ? "" : "s"})`,
