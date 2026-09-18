@@ -73,8 +73,11 @@ func (h *Handler) resolveBranding(ctx context.Context, state *domain.FlowState) 
 		return defaultBranding()
 	}
 	projectID := state.ProjectID
-	branding, err := h.pinnedBranding(ctx, state)
-	if err == nil && branding == nil {
+	branding, pinnedByRelease, err := h.pinnedBranding(ctx, state)
+	// A release is a complete snapshot: one that pins no branding means the
+	// built-in default, never the newest revision (which may belong to a
+	// preview). Only an attempt with no release at all reads the newest.
+	if err == nil && branding == nil && !pinnedByRelease {
 		branding, err = h.brandingService.GetLatest(ctx, projectID)
 	}
 	if err != nil {
@@ -95,23 +98,28 @@ func (h *Handler) resolveBranding(ctx context.Context, state *domain.FlowState) 
 }
 
 // pinnedBranding reads the branding revision the attempt's release pins.
-// Nil with no error means the attempt has no release, or the release pins
-// no branding, and the caller falls back to the newest revision.
-func (h *Handler) pinnedBranding(ctx context.Context, state *domain.FlowState) (*domain.Branding, error) {
+// The boolean reports whether a release governs the attempt at all: nil
+// branding with true means the release pins none (serve the default), with
+// false means there is no release (serve the newest revision).
+func (h *Handler) pinnedBranding(ctx context.Context, state *domain.FlowState) (*domain.Branding, bool, error) {
 	release := service.ReleaseFromContext(ctx)
 	if release == nil && state.ReleaseID != "" && h.releaseService != nil {
 		loaded, err := h.releaseService.Get(ctx, state.ProjectID, state.ReleaseID)
 		if err != nil {
-			return nil, err
+			return nil, true, err
 		}
 		release = loaded
+	}
+	if release == nil {
+		return nil, false, nil
 	}
 	pinned := service.PinnedRevisions(release, domain.ReleasePointerKindBranding)
 	revisionID, ok := pinned[domain.ReleaseBrandingHandle]
 	if !ok {
-		return nil, nil
+		return nil, true, nil
 	}
-	return h.brandingService.Get(ctx, state.ProjectID, revisionID)
+	branding, err := h.brandingService.Get(ctx, state.ProjectID, revisionID)
+	return branding, true, err
 }
 
 // defaultBranding is the fallback when a project has no stored branding
