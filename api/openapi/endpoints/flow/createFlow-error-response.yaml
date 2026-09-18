@@ -18,6 +18,8 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+        - $ref: '../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
         - $ref: '../../components/schemas/errors/rel-invalid.yaml'
         - $ref: '../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
@@ -39,6 +41,8 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+          proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
+          proj.origin_not_allowed: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
           rel.invalid: '../../components/schemas/errors/rel-invalid.yaml'
           rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
@@ -114,6 +118,16 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
+      proj.origin_not_allowed:
+        summary: proj.origin_not_allowed
+        value:
+          code: proj.origin_not_allowed
+          message: 'The request origin is not allowed for this project. Add it to the project''s origins (an environment''s issuer or issuer_pattern in zitadel.json) and deploy again.'
       rel.invalid:
         summary: rel.invalid
         value:

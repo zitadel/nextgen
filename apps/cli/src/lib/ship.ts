@@ -201,6 +201,50 @@ export async function syncProjectOrigins(opts: {
   return { origins: wanted, changed: true };
 }
 
+/**
+ * Adds origins to the project's allowlist that it does not cover yet — the
+ * `--origin` values a preview is created for, which zitadel.json does not
+ * know about. A wildcard already on the allowlist covers its matches, so
+ * only genuinely new entries are appended.
+ */
+export async function ensureOriginsAllowed(opts: {
+  client: ZitadelClient;
+  target: EnvironmentTarget;
+  origins: readonly string[];
+}): Promise<string[]> {
+  if (opts.origins.length === 0) {
+    return [];
+  }
+  const current = (await opts.client.getProject(opts.target.projectId)).preview_origins ?? [];
+  if (current.length === 0) {
+    // An empty allowlist allows every origin; adding one would narrow it.
+    return [];
+  }
+  const missing = opts.origins.filter((origin) => !current.some((allowed) => originCovers(allowed, origin)));
+  if (missing.length === 0) {
+    return [];
+  }
+  await opts.client.patchProject(opts.target.projectId, {
+    preview_origins: [...current, ...missing],
+  });
+  consola.info(`Allowed origins  +${missing.join(", ")}`);
+  return missing;
+}
+
+/** Client-side mirror of the server's origin matcher (leftmost-label wildcard). */
+function originCovers(pattern: string, origin: string): boolean {
+  const p = pattern.toLowerCase();
+  const o = origin.toLowerCase();
+  if (!p.includes("*")) return p === o;
+  const [scheme, host] = p.split("://");
+  const [oScheme, oHost] = o.split("://");
+  if (!host?.startsWith("*.") || scheme !== oScheme || !oHost) return false;
+  const suffix = host.slice(1);
+  if (!oHost.endsWith(suffix)) return false;
+  const label = oHost.slice(0, -suffix.length);
+  return label !== "" && !/[.:/]/.test(label);
+}
+
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) return false;
   const sorted = [...a].sort();

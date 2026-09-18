@@ -10584,6 +10584,8 @@ type CreateFlowErrorResponse struct {
 	Internal               Internal
 	TknInvalid             TknInvalid
 	TknInvalidTknid        TknInvalidTknid
+	ProjNotFound           ProjNotFound
+	ProjOriginNotAllowed   ProjOriginNotAllowed
 	RelInvalid             RelInvalid
 	RelNotFound            RelNotFound
 	ReqInvalid             ReqInvalid
@@ -10609,6 +10611,8 @@ const (
 	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
 	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
 	RelInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.invalid"
 	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
@@ -10681,6 +10685,16 @@ func (s CreateFlowErrorResponse) IsTknInvalid() bool {
 // IsTknInvalidTknid reports whether CreateFlowErrorResponse is TknInvalidTknid.
 func (s CreateFlowErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidCreateFlowErrorResponse
+}
+
+// IsProjNotFound reports whether CreateFlowErrorResponse is ProjNotFound.
+func (s CreateFlowErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCreateFlowErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateFlowErrorResponse is ProjOriginNotAllowed.
+func (s CreateFlowErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateFlowErrorResponse
 }
 
 // IsRelInvalid reports whether CreateFlowErrorResponse is RelInvalid.
@@ -10994,6 +11008,48 @@ func (s CreateFlowErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, ok boo
 func NewTknInvalidTknidCreateFlowErrorResponse(v TknInvalidTknid) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetTknInvalidTknid(v)
+	return s
+}
+
+// SetProjNotFound sets CreateFlowErrorResponse to ProjNotFound.
+func (s *CreateFlowErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCreateFlowErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CreateFlowErrorResponse is ProjNotFound.
+func (s CreateFlowErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjNotFound.
+func NewProjNotFoundCreateFlowErrorResponse(v ProjNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets CreateFlowErrorResponse to ProjOriginNotAllowed.
+func (s *CreateFlowErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateFlowErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateFlowErrorResponse is ProjOriginNotAllowed.
+func (s CreateFlowErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateFlowErrorResponse(v ProjOriginNotAllowed) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjOriginNotAllowed(v)
 	return s
 }
 
@@ -39246,6 +39302,52 @@ func (o OptProjNotFoundDetails) Or(d ProjNotFoundDetails) ProjNotFoundDetails {
 	return d
 }
 
+// NewOptProjOriginNotAllowedDetails returns new OptProjOriginNotAllowedDetails with value set to v.
+func NewOptProjOriginNotAllowedDetails(v ProjOriginNotAllowedDetails) OptProjOriginNotAllowedDetails {
+	return OptProjOriginNotAllowedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjOriginNotAllowedDetails is optional ProjOriginNotAllowedDetails.
+type OptProjOriginNotAllowedDetails struct {
+	Value ProjOriginNotAllowedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjOriginNotAllowedDetails was set.
+func (o OptProjOriginNotAllowedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjOriginNotAllowedDetails) Reset() {
+	var v ProjOriginNotAllowedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjOriginNotAllowedDetails) SetTo(v ProjOriginNotAllowedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjOriginNotAllowedDetails) Get() (v ProjOriginNotAllowedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjOriginNotAllowedDetails) Or(d ProjOriginNotAllowedDetails) ProjOriginNotAllowedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjPermissionDeniedDetails returns new OptProjPermissionDeniedDetails with value set to v.
 func NewOptProjPermissionDeniedDetails(v ProjPermissionDeniedDetails) OptProjPermissionDeniedDetails {
 	return OptProjPermissionDeniedDetails{
@@ -43893,6 +43995,59 @@ func (*ProjNotFound) initClaimRes() {}
 type ProjNotFoundDetails map[string]jx.Raw
 
 func (s *ProjNotFoundDetails) init() ProjNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjOriginNotAllowed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjOriginNotAllowedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjOriginNotAllowed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjOriginNotAllowed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjOriginNotAllowed) GetDetails() OptProjOriginNotAllowedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjOriginNotAllowed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjOriginNotAllowed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjOriginNotAllowed) SetDetails(val OptProjOriginNotAllowedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjOriginNotAllowedDetails map[string]jx.Raw
+
+func (s *ProjOriginNotAllowedDetails) init() ProjOriginNotAllowedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

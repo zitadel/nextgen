@@ -24,6 +24,13 @@ func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
 }
 
+// ErrProjectOriginNotAllowed reports a public request from an origin the
+// project's allowlist does not cover. The details name the origin and the
+// allowlist so a developer can see which entry is missing.
+func ErrProjectOriginNotAllowed(details any) Error {
+	return newError(PrefixProject.ErrorCodePrefix("origin_not_allowed"), "The request origin is not allowed for this project. Add it to the project's origins (an environment's issuer or issuer_pattern in zitadel.json) and deploy again.", details, nil)
+}
+
 // ErrProjectInvalidPreviewOrigin reports a preview_origins entry that is
 // neither a bare origin nor a leftmost-label wildcard pattern.
 func ErrProjectInvalidPreviewOrigin(details any) Error {

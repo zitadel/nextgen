@@ -86,6 +86,9 @@ func NewRuntimeResolver(v2Pool *DB) *RuntimeResolver {
 // "latest" or no selector means the environment's current deployment.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID string, selector RuntimeSelector) (*RuntimeResolution, error) {
 	stmts := r.v2Pool.Statements()
+	if err := r.checkOriginAllowed(ctx, stmts, projectID, selector.Origin); err != nil {
+		return nil, err
+	}
 	env, source, err := r.resolveEnvironment(ctx, stmts, projectID, selector.Origin, strings.TrimSpace(selector.Release))
 	if err != nil {
 		return nil, err
@@ -136,6 +139,33 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID string, selecto
 	resolution.Release = release
 	resolution.ReleaseSource = RuntimeReleaseSourceSelector
 	return resolution, nil
+}
+
+// checkOriginAllowed refuses a browser request whose Origin the project's
+// allowlist does not cover. The allowlist is the union of every
+// environment's issuer and issuer_pattern in zitadel.json, so an origin
+// missing there is a deployment nobody declared. An empty allowlist allows
+// every origin (development and tests), and a request without an Origin
+// (server to server, curl) is not a browser and is not gated here.
+func (r *RuntimeResolver) checkOriginAllowed(ctx context.Context, stmts AllStatements, projectID, origin string) error {
+	origin = strings.ToLower(strings.TrimSpace(origin))
+	if origin == "" {
+		return nil
+	}
+	project, err := stmts.GetProjectByID(ctx, projectID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrProjectNotFound()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to read the project for its origin allowlist")
+	}
+	if len(project.PreviewOrigins) == 0 || domain.MatchAnyOrigin(project.PreviewOrigins, origin) {
+		return nil
+	}
+	return domain.ErrProjectOriginNotAllowed(map[string]any{
+		"origin":  origin,
+		"allowed": project.PreviewOrigins,
+	})
 }
 
 // resolveEnvironment picks the environment for an origin. An environment

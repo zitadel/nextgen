@@ -15,6 +15,7 @@ import {
   buildRelease,
   connectEnvironment,
   deployRelease,
+  ensureOriginsAllowed,
   ensurePreviewEnvironment,
   previewEnvironmentName,
   syncProjectOrigins,
@@ -119,6 +120,11 @@ export default class Preview extends BaseCommand {
     }
 
     const allowed = await syncProjectOrigins({ cwd, client, target });
+    // Explicit --origin values are not in zitadel.json, so the allowlist
+    // sync above does not know them; add what it does not cover.
+    if (explicit.length > 0) {
+      allowed.origins.push(...(await ensureOriginsAllowed({ client, target, origins: explicit })));
+    }
     const release = await buildRelease({
       cwd,
       client,
