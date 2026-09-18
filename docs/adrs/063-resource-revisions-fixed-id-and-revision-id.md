@@ -149,16 +149,17 @@ The newest revision of a resource is the row with the greatest `created_at`
 among the rows that share its `id`. Nothing records it separately. A write
 appends a row and never updates one.
 
-`created_at` must be a total order within a resource. Each kind holds that
-with a unique index on `(project_id, id, created_at)`, so a second write in
-the same instant is rejected rather than picked arbitrarily. Schemas and
-flow definitions have that index on the handle today, and their migrations
-move it to `id`.
+Two revisions of one resource with the same `created_at` have no newest, so
+each kind rules that out with a unique index on
+`(project_id, id, created_at)`. A second write in the same instant fails
+instead of one of the two being picked at random. Schemas and flow
+definitions have this index today, keyed on the handle rather than `id`.
+Their migrations move it to `id`.
 
 The list and the get find the newest revision with an anti-join: a row is
 newest if no row with the same `id` has a greater `created_at`. The
 revisions list is the same table filtered by `id` and sorted by `created_at`
-descending. Connections use the same shape (#1002).
+descending. Connections use the same shape.
 
 ## Migration
 
@@ -207,12 +208,16 @@ that call returns not found. The client reads the row through
   field name everywhere.
 - Every revisioned row carries two ids, and the prefix registry gains one
   entry per kind.
-- The newest revision is derived on every read by the anti-join, and its
-  cost grows with the number of revisions a resource has. The handle repeats
-  on every row, so its pairing with `id` is held by code, not by a
-  constraint. Two revises of one resource in flight at once both succeed and
-  the later `created_at` wins. A caller that must revise only from a known
-  head has no way to say so.
+- Every list and get computes the newest revision with the anti-join. The
+  more revisions a resource has, the more rows that check reads.
+- The handle is stored on every revision row. No constraint stops two rows
+  with the same `id` from carrying different handles. The code keeps them
+  equal.
+- Two revises of one resource at the same time both succeed. The one with
+  the later `created_at` is the newest. The other caller also gets a success
+  response, and nothing in it says its revision was superseded at once. A
+  caller cannot ask to revise only if the newest is still the revision it
+  read.
 - For schemas, flow definitions and branding, get-by-id is the per-revision
   read today, because their `id` names a revision. Once `id` is fixed, each
   migration ticket adds the two revision routes for its kind. Connections
