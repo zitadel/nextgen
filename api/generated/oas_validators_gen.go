@@ -5527,6 +5527,17 @@ func (s ListFlowDefinitionsPurpose) Validate() error {
 	}
 }
 
+func (s ListFlowDefinitionsRevisions) Validate() error {
+	switch s {
+	case "all":
+		return nil
+	case "latest":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *ListMyProjectsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

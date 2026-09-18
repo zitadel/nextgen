@@ -79,11 +79,18 @@ type ProjectStatements interface {
 // 	Transactioner[FlowDefinitionStatements]
 // }
 
+// FlowDefinitionQueryOptions carries query modes for ListFlowDefinitions that
+// are not column predicates. Column predicates stay in Filter / ListOptions.
+type FlowDefinitionQueryOptions struct {
+	// LatestRevisionPerName keeps only the newest revision of each name.
+	LatestRevisionPerName bool
+}
+
 type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
+	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], opts FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
 
