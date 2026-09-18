@@ -100,7 +100,7 @@ describe("resource registry", () => {
     }
     // Guard against this check quietly covering nothing, which is what it did
     // when the registry shape changed underneath it.
-    expect(checked).toBe(5);
+    expect(checked).toBe(6);
   });
 });
 

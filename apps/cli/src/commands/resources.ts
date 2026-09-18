@@ -17,11 +17,13 @@ import {
   GetBrandingByIdResponse,
   GetEnvironmentByNameResponse,
   GetFlowDefinitionResponse,
+  CreateIdpBody,
   GetGrantResponse,
   GetProjectResponse,
   GetSessionResponse,
   GetReleaseByIdResponse,
   GetSchemaByIdResponse,
+  GetIdpByIdResponse,
   GetTeamResponse,
   GetUserByIDResponse,
   ListBrandingResponse,
@@ -31,6 +33,8 @@ import {
   ListReleasesResponse,
   ListSchemasResponse,
   QueryGrantsResponse,
+  QueryIdpsBody,
+  QueryIdpsResponse,
   QueryProjectsResponse,
   QuerySessionsResponse,
   QueryTeamsResponse,
@@ -38,6 +42,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   CreateGrantBody as CreateGrantBodyT,
+  CreateIdpBody as CreateIdpBodyT,
   CreateTeamBody as CreateTeamBodyT,
   CreateUserBody as CreateUserBodyT,
   ListEnvironmentsParams,
@@ -48,6 +53,7 @@ import type {
   PatchProjectBody as PatchProjectBodyT,
   PatchUserByIDBody as PatchUserByIDBodyT,
   QueryGrantsBody as QueryGrantsBodyT,
+  QueryIdpsBody as QueryIdpsBodyT,
   QueryProjectsBody as QueryProjectsBodyT,
   QuerySessionsBody as QuerySessionsBodyT,
   QueryTeamsBody as QueryTeamsBodyT,
@@ -297,6 +303,42 @@ export const RESOURCES = {
     },
     delete: {
       call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
+    },
+  },
+
+  // Identity provider connections (#1217). They carry ADR 063's shape already:
+  // a fixed `id` shared by every revision, and a `revision_id` per revision.
+  // The revision routes are not modelled here — the CLI has no grammar for a
+  // sub-resource listing yet, so `idps revisions` is deliberately absent.
+  idps: {
+    group: CommandGroups.resources,
+    singular: "identity provider connection",
+    idField: "id",
+    columns: ["id", "slug", "definition.protocol", "definition.display_name", "created_at"],
+    heading: "slug",
+    detail: ["id", "revision_id", "slug", "created_at", "updated_at"],
+    list: {
+      items: "idps",
+      body: QueryIdpsBody,
+      response: QueryIdpsResponse,
+      filters: [
+        { field: "slug", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["slug", "created_at"],
+      call: ({ client, projectId }, body) =>
+        client.queryIdps(body as QueryIdpsBodyT, { project_id: projectId }),
+    },
+    get: {
+      call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
+      response: GetIdpByIdResponse,
+    },
+    create: {
+      // The body nests everything under `idp`, so there are no field flags to
+      // generate; `--data` and `--file` carry it.
+      schema: CreateIdpBody,
+      call: ({ client, projectId }, body) =>
+        client.createIdp(body as CreateIdpBodyT, { project_id: projectId }),
     },
   },
 

@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { ZitadelError } from "../../../errors";
 import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
-import { capitalize, dryRunResult, idArg, idValue } from "../shared";
+import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
 
 /** Past tense reported beside the id, per verb. */
 const PAST: Readonly<Record<string, string>> = {
@@ -34,7 +34,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
   }: OperationDefinition<Ctx, DeleteSpec<Ctx>>): OperationStatics {
     const verb = spec.verb ?? "delete";
     return {
-      description: `${capitalize(verb)} a ${resource.singular} by id.`,
+      description: `${capitalize(verb)} ${article(resource.singular)} ${resource.singular} by id.`,
       examples: [`<%= config.bin %> ${topic} ${verb} <id> --force --json`],
       // `--force` is per command, not global: here it permits a deletion,
       // where on `setup` the same name permits overwriting a file.

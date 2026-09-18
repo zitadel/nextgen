@@ -27,7 +27,7 @@ import { RESOURCES } from "../../../src/commands/resources";
  * therefore not a judgement call and accept no exclusion — see the test below.
  *
  * The converse does not hold. Several resources here still list through `GET`
- * (recorded as an open question in ADR 062), so a collection without a query
+ * (recorded as an open question in ADR 064), so a collection without a query
  * endpoint may or may not be a resource, and that is where a person decides.
  */
 const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
@@ -44,6 +44,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
+  variables: "per-environment configuration (ADR 062), authored in .zitadel/ and deployed",
 };
 
 /**
@@ -82,9 +83,24 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   beginUserPasskeyRegistration: "WebAuthn registration needs an authenticator, which a terminal is not",
   finishUserPasskeyRegistration: "WebAuthn registration needs an authenticator, which a terminal is not",
 
+  // Per-environment variables and secrets (ADR 062) are configuration: they
+  // are authored in `.zitadel/` and shipped through a release, so the CLI does
+  // not write them, and there is no read worth a command that `deploy` does
+  // not already cover.
+  getVariables: "per-environment configuration, authored in .zitadel/ and deployed",
+  getVariable: "per-environment configuration, authored in .zitadel/ and deployed",
+  updateVariables: "per-environment configuration, authored in .zitadel/ and deployed",
+  deleteVariable: "per-environment configuration, authored in .zitadel/ and deployed",
+
+  // ADR 063's revision routes. The CLI has no grammar for a sub-resource
+  // listing (`idps revisions <id>`) and inventing verbs for one resource is
+  // what ADR 064 §4 rules out, so these wait for that shape to be decided.
+  listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
+  getIdpRevisionById: "reads one revision by revision id; same shape question as above",
+
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
-  setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 062 §12)",
+  setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 064 §12)",
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
 };
