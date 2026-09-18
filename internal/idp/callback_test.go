@@ -705,6 +705,30 @@ func TestCallback(t *testing.T) {
 			},
 		},
 		{
+			name: "a claim entry reads a verification claim the strategy emits",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, true)
+				conn.ClaimMapping = mapping
+				conn.VerifiedClaims = map[string]VerificationSource{"email": {Kind: VerifyByClaim, Claim: "email_verified"}}
+				return conn
+			},
+			handler: func(p *provider) http.HandlerFunc {
+				claims := profile(p)
+				claims["email_verified"] = false
+				return p.ceremony(t, claims, userinfo)
+			},
+			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
+				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
+					return StrategyResult{Claims: map[string]any{"email_verified": true}}, nil
+				}},
+			want: ExternalIdentity{
+				Subject:    "user-1",
+				Claims:     map[string]any{"email": "ada@example.test", "givenName": "Ada"},
+				Verified:   map[string]bool{"email": true},
+				RevisionID: "idprev_1",
+			},
+		},
+		{
 			name: "a strategy failure ends the attempt",
 			conn: func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
 			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
