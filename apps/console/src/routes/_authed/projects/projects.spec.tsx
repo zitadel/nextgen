@@ -14,7 +14,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
-const PROJECTS_URL = "http://localhost/api/projects/query";
+// `GET /users/me/projects`: the projects the signed-in person can act on, read
+// with the session cookie (#1237). Not `POST /projects/query`, which the server
+// pins to the calling credential's one home project.
+const PROJECTS_URL = "http://localhost/api/users/me/projects";
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
@@ -48,7 +51,7 @@ async function renderProjects() {
 describe("projects screen", () => {
   it("renders the heading and a project row", async () => {
     server.use(
-      http.post(PROJECTS_URL, () =>
+      http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
             { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
@@ -64,9 +67,45 @@ describe("projects screen", () => {
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
+  it("lists a project somebody else granted access to", async () => {
+    // The person owns nothing here: the row exists only because the query
+    // answers with grants rather than with the console's own project.
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_theirs", name: "Granted to me", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("link", { name: "Granted to me" })).toHaveAttribute(
+      "href",
+      "/projects/proj_theirs",
+    );
+  });
+
+  it("never asks the scope-pinned project query", async () => {
+    let pinned = 0;
+    server.use(
+      http.post("http://localhost/api/projects/query", () => {
+        pinned += 1;
+        return HttpResponse.json({ projects: [] });
+      }),
+      http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [] })),
+    );
+    await renderProjects();
+
+    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    expect(pinned).toBe(0);
+  });
+
   it("offers View project from the row menu", async () => {
     server.use(
-      http.post(PROJECTS_URL, () =>
+      http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
             { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
@@ -82,25 +121,29 @@ describe("projects screen", () => {
   });
 
   it("says so when there are no projects", async () => {
-    server.use(http.post(PROJECTS_URL, () => HttpResponse.json({ projects: [] })));
+    server.use(http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [] })));
     await renderProjects();
 
     expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
   });
 
   it("appends the next page and drops the button when the list is complete", async () => {
-    let call = 0;
+    // Keyed on the cursor rather than on call order: the shell's project pill
+    // reads the same endpoint, so "the first call" is not reliably the loader's.
+    const cursors: string[] = [];
     server.use(
-      http.post(PROJECTS_URL, () => {
-        call += 1;
-        return call === 1
-          ? HttpResponse.json({
-              projects: [{ id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" }],
-              next_page_token: "page-2",
-            })
-          : HttpResponse.json({
-              projects: [{ id: "proj_2", name: "Delta", created_at: "2026-07-09T09:00:00Z", updated_at: "2026-07-09T09:00:00Z" }],
-            });
+      http.get(PROJECTS_URL, ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get("page_token");
+        if (cursor === null) {
+          return HttpResponse.json({
+            projects: [{ id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" }],
+            next_page_token: "page-2",
+          });
+        }
+        cursors.push(cursor);
+        return HttpResponse.json({
+          projects: [{ id: "proj_2", name: "Delta", created_at: "2026-07-09T09:00:00Z", updated_at: "2026-07-09T09:00:00Z" }],
+        });
       }),
     );
     await renderProjects();
@@ -110,6 +153,8 @@ describe("projects screen", () => {
 
     expect(await screen.findByRole("link", { name: "Delta" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "River" })).toBeInTheDocument();
+    // The cursor rides as a query parameter now that the read is a GET.
+    expect(cursors).toEqual(["page-2"]);
     // Absent rather than disabled: its absence is how the screen says the list
     // is complete (design decisions log D5 — no total count to show instead).
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
