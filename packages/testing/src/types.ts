@@ -110,10 +110,12 @@ export interface MintedSession {
 export interface SeedSessionInput extends SeedUserInput {
   /** Mint for an existing user instead of seeding a fresh one. */
   user?: SeededUser;
+  /** Specific flow definition; the project default when omitted. */
+  flowDefinitionName?: string;
   /**
-   * Origin header for the session exchange (must be on the project's
-   * allowlist). Defaults to the handle's registered app origin; the Playwright
-   * fixtures pass the suite's baseURL.
+   * Origin header for the flow calls (must be on the project's allowlist).
+   * Defaults to the handle's registered app origin; the Playwright fixtures
+   * pass the suite's baseURL.
    */
   origin?: string;
 }
