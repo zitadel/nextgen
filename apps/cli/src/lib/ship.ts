@@ -152,8 +152,14 @@ export async function syncProjectOrigins(opts: {
   target: EnvironmentTarget;
 }): Promise<{ origins: string[]; changed: boolean }> {
   const config = await readZitadelConfig(opts.cwd);
-  const secret = await readZitadelSecret(opts.cwd);
-  const wanted = projectOriginsFromConfig(config, opts.target.projectId, secret.project_id);
+  // The project an entry without `project` belongs to: the top-level one,
+  // else the one in .zitadel/secret (absent in CI, where the env secret
+  // stands in and zitadel.json always names the project).
+  let defaultProjectId = typeof config.project === "string" ? config.project : "";
+  if (defaultProjectId === "") {
+    defaultProjectId = (await readZitadelSecret(opts.cwd)).project_id;
+  }
+  const wanted = projectOriginsFromConfig(config, opts.target.projectId, defaultProjectId);
   if (wanted.length === 0) {
     return { origins: [], changed: false };
   }

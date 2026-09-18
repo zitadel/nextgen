@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
@@ -103,6 +103,26 @@ export async function resolveEnvironmentTarget(opts: {
     serverFlag: opts.serverFlag,
     environment: opts.name,
   });
+  // CI has no .zitadel/secret: the credential arrives as ZITADEL_PROJECT_SECRET
+  // (and ZITADEL_PROJECT_ID when zitadel.json does not name the project).
+  const envSecret = opts.env.ZITADEL_PROJECT_SECRET?.trim();
+  const envProject = opts.env.ZITADEL_PROJECT_ID?.trim();
+  if (envSecret) {
+    const projectId = entry?.project ?? envProject ?? (typeof config.project === "string" ? config.project : undefined);
+    if (!projectId) {
+      throw new ZitadelError("E_VALIDATION", "ZITADEL_PROJECT_SECRET is set but no project id is known", {
+        hint: `Set "project" on the "${opts.name}" entry in zitadel.json, or ZITADEL_PROJECT_ID.`,
+      });
+    }
+    return {
+      name: opts.name,
+      server: server.value,
+      serverOrigin: server.origin,
+      projectId,
+      token: envSecret,
+      entry: entry ?? {},
+    };
+  }
   const secret = await readZitadelSecret(opts.cwd);
   const projectId = entry?.project ?? secret.project_id;
   const token = await resolveEnvironmentToken(opts.cwd, opts.name, projectId, secret);
@@ -186,17 +206,24 @@ async function resolveEnvironmentToken(
   if (projectId === secret.project_id) {
     return secret.project_secret;
   }
-  try {
-    const raw = parseJsonObject(
-      await readFile(environmentSecretPath(cwd, name), "utf8"),
-      `.zitadel/secret.${name}`,
-    );
-    if (raw.project_id === projectId && typeof raw.project_secret === "string") {
-      return raw.project_secret;
-    }
-  } catch (error) {
-    if (!isNotFound(error)) {
-      throw error;
+  // Setup writes `.zitadel/secret.<env>` for the environment that created an
+  // isolated project, but several environments may point at that project
+  // (preview and production sharing one), so any secret file holding the
+  // project's credential serves — the environment's own name first.
+  const candidates = [name, ...(await siblingSecretNames(cwd, name))];
+  for (const candidate of candidates) {
+    try {
+      const raw = parseJsonObject(
+        await readFile(environmentSecretPath(cwd, candidate), "utf8"),
+        `.zitadel/secret.${candidate}`,
+      );
+      if (raw.project_id === projectId && typeof raw.project_secret === "string") {
+        return raw.project_secret;
+      }
+    } catch (error) {
+      if (!isNotFound(error)) {
+        throw error;
+      }
     }
   }
   throw new ZitadelError(
@@ -205,10 +232,26 @@ async function resolveEnvironmentToken(
     {
       hint:
         `The environment points at a project other than the one in .zitadel/secret. ` +
-        `Expected its secret at .zitadel/secret.${name} — setup writes it when it creates an isolated project.`,
+        `Expected its secret in a .zitadel/secret.<environment> file (setup writes one when it creates an isolated project), ` +
+        `or pass it as ZITADEL_PROJECT_SECRET.`,
       details: { environment: name, project_id: projectId },
     },
   );
+}
+
+async function siblingSecretNames(cwd: string, except: string): Promise<string[]> {
+  try {
+    return (await readdir(join(cwd, ".zitadel")))
+      .filter((file) => file.startsWith("secret.") && !file.endsWith(".tmp"))
+      .map((file) => file.slice("secret.".length))
+      .filter((candidate) => candidate !== "" && candidate !== except)
+      .sort();
+  } catch (error) {
+    if (isNotFound(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 function isNotFound(error: unknown): boolean {
