@@ -264,9 +264,16 @@ docker --image <ref>` remains the explicit image override for debugging.
   `preview-<name>` on the target project, created or renewed on every run
   (`--ttl`, default 7d), sharing every user and session with the project and
   differing only in the release it serves. Requests reach it by origin:
-  pass `--origin <frontend origin>` (repeatable) for the frontend preview
-  deployment whose requests should resolve to it; anything else stays on
-  `live`. `--name` defaults to the current git branch. Emits
+  the preview serves the origins its `zitadel.json` entry declares
+  (`environments.preview.issuer_pattern`, typically the wildcard
+  `https://*.vercel.app` setup writes — `*` covers one host label, so every
+  preview deployment of the app matches); `--origin` (repeatable) overrides
+  them for one run. Anything else stays on `live`. Both `deploy` and
+  `preview` first sync the project's origin allowlist to the union of every
+  environment's `issuer` / `issuer_pattern` in `zitadel.json`
+  (`PATCH /projects/{id}` `preview_origins`), so the repository decides which
+  origins may run the project's flows. `--name` defaults to the current git
+  branch. Emits
   `data.release_header` (`X-Zitadel-Release: <id>`) — a frontend can pin the
   release explicitly via `configureZitadel({ release })` regardless of
   origin. Ship the same release afterwards with

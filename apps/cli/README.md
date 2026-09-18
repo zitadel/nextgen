@@ -508,8 +508,10 @@ FLAGS
                            Defaults to the current git branch.
   -n, --non-interactive    Disable prompts. Required when scripting or running
                            as an agent.
-  -o, --origin=<value>...  Frontend origin (scheme://host[:port]) whose requests
-                           resolve to this preview. Repeatable.
+  -o, --origin=<value>...  Frontend origin or wildcard pattern
+                           (https://*.vercel.app) whose requests resolve to this
+                           preview. Repeatable. Defaults to the environment's
+                           issuer / issuer_pattern in zitadel.json.
   -s, --server=<value>     Override the resolved server URL.
       --debug              Debug logging.
       --dry-run            Preview without mutating files or the platform.

@@ -1,7 +1,11 @@
 import { Flags } from "@oclif/core";
 
 import { gitBranch } from "../lib/bundle";
-import { DEFAULT_ENVIRONMENT, readEnvironmentEntries } from "../lib/environments";
+import {
+  DEFAULT_ENVIRONMENT,
+  originsForEntry,
+  readEnvironmentEntries,
+} from "../lib/environments";
 import { ZitadelError } from "../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
@@ -13,6 +17,7 @@ import {
   deployRelease,
   ensurePreviewEnvironment,
   previewEnvironmentName,
+  syncProjectOrigins,
 } from "../lib/ship";
 
 /**
@@ -53,7 +58,7 @@ export default class Preview extends BaseCommand {
       char: "o",
       multiple: true,
       description:
-        "Frontend origin (scheme://host[:port]) whose requests resolve to this preview. Repeatable.",
+        "Frontend origin or wildcard pattern (https://*.vercel.app) whose requests resolve to this preview. Repeatable. Defaults to the environment's issuer / issuer_pattern in zitadel.json.",
     }),
     ttl: Flags.string({
       description: "How long the preview lives from now, as 7d or 168h (default: 7d, max 30d).",
@@ -88,14 +93,17 @@ export default class Preview extends BaseCommand {
     if (previewName === "preview-") {
       throw new ZitadelError("E_VALIDATION", `"${rawName}" leaves no characters for a preview name`);
     }
-    const origins = (flags.origin ?? []).map((origin) => origin.trim()).filter(Boolean);
-
     const { target, client } = await connectEnvironment({
       cwd,
       name: envName,
       env: this.meta.env,
       serverFlag: this.meta.serverFlag,
     });
+    // Explicit --origin wins; otherwise the preview serves whatever origins
+    // the zitadel.json entry declares (the `https://*.vercel.app` pattern
+    // setup wrote, typically).
+    const explicit = (flags.origin ?? []).map((origin) => origin.trim()).filter(Boolean);
+    const origins = explicit.length > 0 ? explicit : originsForEntry(target.entry);
     if (dryRun) {
       return this.emit({
         status: "skipped",
@@ -110,6 +118,7 @@ export default class Preview extends BaseCommand {
       });
     }
 
+    const allowed = await syncProjectOrigins({ cwd, client, target });
     const release = await buildRelease({
       cwd,
       client,
@@ -137,7 +146,7 @@ export default class Preview extends BaseCommand {
         (preview.expires_at ? ` until ${preview.expires_at}.` : "."),
       origins.length > 0
         ? `Requests from ${origins.join(", ")} are served by this preview; everything else stays on live.`
-        : "No origin registered yet: re-run with --origin <frontend origin> so requests from that deployment resolve to this preview.",
+        : "No origin registered yet: add an issuer_pattern to the environment in zitadel.json (for example https://*.vercel.app) or re-run with --origin <frontend origin>.",
       `To pin a specific release from the frontend regardless of origin, send the X-Zitadel-Release: ${release.id} header (configureZitadel({ release })).`,
       `When it looks right, ship the same release: zitadel deploy --release ${release.id}.`,
     ];
@@ -148,6 +157,7 @@ export default class Preview extends BaseCommand {
         server: target.server,
         project_id: target.projectId,
         target: preview.name,
+        allowed_origins: allowed.origins,
         preview,
         release,
         deployment,

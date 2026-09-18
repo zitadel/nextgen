@@ -106,6 +106,21 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 			allowed: []string{"http://localhost:3000"},
 		},
 		{
+			name:    "wildcard covers one host label",
+			origin:  "https://my-app-git-feat-sso-acme.vercel.app",
+			allowed: []string{"http://localhost:3000", "https://*.vercel.app"},
+		},
+		{
+			name:    "wildcard does not cover the bare domain",
+			origin:  "https://vercel.app",
+			allowed: []string{"https://*.vercel.app"},
+			wantErr: true,
+			wantInError: []string{
+				`"https://vercel.app"`,
+				"https://*.vercel.app",
+			},
+		},
+		{
 			name:    "loopback spellings are not aliased",
 			origin:  "http://127.0.0.1:3000",
 			allowed: []string{"http://localhost:3000", "https://app.example.com"},

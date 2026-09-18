@@ -14,7 +14,7 @@ import (
 const (
 	projectsTable         = "projects"
 	createProjectStmt     = `INSERT INTO projects (id, name, preview_origins) VALUES (@p1, @p2, @p3) THEN RETURN id, created_at, updated_at`
-	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, preview_origins, created_at, updated_at`
+	updateProjectStmt     = `UPDATE projects SET name = @p2, preview_origins = @p3, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, preview_origins, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
 	projectQuery          = "SELECT id, name, preview_origins, created_at, updated_at FROM projects"
 )
@@ -77,10 +77,14 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 }
 
 // UpdateProject implements [service.ProjectStatements].
-// Only the name is updated; preview origins are left untouched. The whole row is
-// read back onto the project.
+// Name and preview origins are written; the whole row is read back onto the
+// project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
-	stmt := buildStatement(updateProjectStmt, project.ID, project.Name).statement()
+	previewOrigins, err := encodePreviewOrigins(project.PreviewOrigins)
+	if err != nil {
+		return err
+	}
+	stmt := buildStatement(updateProjectStmt, project.ID, project.Name, previewOrigins).statement()
 	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		updated, err := collectOneRow(iter, ps.scanProject)
 		if err != nil {

@@ -137,16 +137,10 @@ func (e *Environment) Expired(now time.Time) bool {
 	return e.ExpiresAt != nil && !now.Before(*e.ExpiresAt)
 }
 
-// ServesOrigin reports whether origin is one of the environment's origins.
-// Origins are stored lowercased, so the comparison lowercases the input.
+// ServesOrigin reports whether origin is covered by one of the environment's
+// origins, which may be wildcard patterns (see MatchOrigin).
 func (e *Environment) ServesOrigin(origin string) bool {
-	origin = strings.ToLower(strings.TrimSpace(origin))
-	for _, candidate := range e.Origins {
-		if candidate == origin {
-			return true
-		}
-	}
-	return false
+	return MatchAnyOrigin(e.Origins, origin)
 }
 
 // ValidateEnvironmentName returns the trimmed name, or
@@ -159,8 +153,8 @@ func ValidateEnvironmentName(name string) (string, error) {
 	return name, nil
 }
 
-// ValidateEnvironmentOrigins trims, lowercases and deduplicates origins, and
-// rejects anything that is not a bare scheme://host[:port].
+// ValidateEnvironmentOrigins normalises and deduplicates origins, each a
+// bare origin or a leftmost-label wildcard pattern (NormalizeOriginPattern).
 func ValidateEnvironmentOrigins(origins []string) ([]string, error) {
 	if len(origins) > EnvironmentMaxOrigins {
 		return nil, ErrEnvironmentInvalid("too many origins")
@@ -168,21 +162,12 @@ func ValidateEnvironmentOrigins(origins []string) ([]string, error) {
 	out := make([]string, 0, len(origins))
 	seen := make(map[string]bool, len(origins))
 	for _, raw := range origins {
-		origin := strings.ToLower(strings.TrimSpace(raw))
-		if origin == "" {
+		if strings.TrimSpace(raw) == "" {
 			continue
 		}
-		var host string
-		switch {
-		case strings.HasPrefix(origin, "https://"):
-			host = strings.TrimPrefix(origin, "https://")
-		case strings.HasPrefix(origin, "http://"):
-			host = strings.TrimPrefix(origin, "http://")
-		default:
-			return nil, ErrEnvironmentInvalid("origin must start with http:// or https://: " + origin)
-		}
-		if host == "" || strings.ContainsAny(host, "/?#") {
-			return nil, ErrEnvironmentInvalid("origin must be scheme://host[:port]: " + origin)
+		origin, err := NormalizeOriginPattern(raw)
+		if err != nil {
+			return nil, ErrEnvironmentInvalid(err.Error())
 		}
 		if seen[origin] {
 			continue

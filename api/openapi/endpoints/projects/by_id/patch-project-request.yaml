@@ -5,3 +5,23 @@ properties:
     oneOf:
       - type: 'null'
       - type: string
+  preview_origins:
+    type: array
+    maxItems: 64
+    items:
+      type: string
+    description: |
+      Replaces the origins allowed to run the project's flows. Each entry is a
+      bare origin (`https://app.example.com`, `http://localhost:3000`) or a
+      leftmost-label wildcard (`https://*.vercel.app`) covering every
+      single-label subdomain, which is how one entry admits every preview
+      deployment of a hosting platform. An empty list allows every origin.
+      Omitted, the allowlist is left unchanged.
+
+      The CLI derives this list from the `issuer` and `issuer_pattern`
+      entries of the environments in `zitadel.json`, so the repository stays
+      the source of truth.
+    example:
+      - http://localhost:3000
+      - https://*.vercel.app
+      - https://app.example.com

@@ -114,6 +114,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 			return nil
 		},
 	)
+	statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Name: "old"}, nil)
 	statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
 
 	const baseURL = "https://example.com/api/schemas"
@@ -121,7 +122,8 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	require.NoError(t, err)
 	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
 
-	_, err = svc.Update(t.Context(), "proj_1", "renamed")
+	renamed := "renamed"
+	_, err = svc.Update(t.Context(), "proj_1", service.ProjectPatch{Name: &renamed})
 	require.NoError(t, err)
 	require.NotNil(t, gotEvent)
 	assert.Equal(t, domain.EventTypeProjectUpdated, gotEvent.EventType)

@@ -24,6 +24,12 @@ func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
 }
 
+// ErrProjectInvalidPreviewOrigin reports a preview_origins entry that is
+// neither a bare origin nor a leftmost-label wildcard pattern.
+func ErrProjectInvalidPreviewOrigin(details any) Error {
+	return newError(PrefixProject.ErrorCodePrefix("preview_origin_invalid"), "The preview origin is invalid. Expected scheme://host[:port] or a wildcard like https://*.vercel.app.", details, nil)
+}
+
 func ErrProjectMissingID() Error {
 	return newError(PrefixProject.ErrorCodePrefix("missing_id"), "project: missing id", nil, nil)
 }

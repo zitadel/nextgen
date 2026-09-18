@@ -274,7 +274,12 @@ export default class Setup extends BaseCommand {
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
     const projectName = defaultProjectName(cwd, framework.id);
     // Register the app's own origin so the backend's origin check allows
-    // requests the dev proxy forwards from it.
+    // requests the dev proxy forwards from it — plus the origins of every
+    // environment that shares this project, so previews and production
+    // deployments are allowed from the start.
+    const sharedOrigins = (answers.environments ?? [])
+      .filter((answer) => !answer.isolated)
+      .flatMap((answer) => answer.origins ?? []);
     const project = dryRun
       ? dryRunProject(issuer)
       : await createProjectWithLocalHint(
@@ -282,7 +287,7 @@ export default class Setup extends BaseCommand {
           answers.server,
           this.meta.cliVersion,
           projectName,
-          issuer,
+          [...new Set([issuer, ...sharedOrigins])],
           {
             // Resolved values, not raw flags: the wizard may have picked the
             // preset, design, or dev port interactively, and the retry must
@@ -303,11 +308,16 @@ export default class Setup extends BaseCommand {
     // reuse the project just created; isolated ones get their own project
     // (an empty user base) on their server, created right here so the map
     // written to zitadel.json never names a project that does not exist.
-    const environments: Record<string, { server: string; project: string }> = {};
+    const environments: Record<string, { server: string; project: string; origins?: string[] }> =
+      {};
     const isolatedSecrets: Array<{ name: string; secret: CreateProject201 }> = [];
     for (const answer of answers.environments ?? []) {
       if (!answer.isolated) {
-        environments[answer.name] = { server: answer.server, project: project.id };
+        environments[answer.name] = {
+          server: answer.server,
+          project: project.id,
+          origins: answer.origins,
+        };
         continue;
       }
       const isolated = dryRun
@@ -317,11 +327,15 @@ export default class Setup extends BaseCommand {
             answer.server,
             this.meta.cliVersion,
             `${projectName}-${answer.name}`,
-            issuer,
+            answer.origins?.length ? answer.origins : [issuer],
             { ...retryOptionsFromFlags(flags), framework: framework.id },
           );
       consola.success(`Created isolated project ${isolated.id} for ${answer.name}`);
-      environments[answer.name] = { server: answer.server, project: isolated.id };
+      environments[answer.name] = {
+        server: answer.server,
+        project: isolated.id,
+        origins: answer.origins,
+      };
       isolatedSecrets.push({ name: answer.name, secret: isolated });
     }
 
@@ -726,13 +740,13 @@ async function createProjectWithLocalHint(
   server: string,
   cliVersion: string,
   projectName: string,
-  issuer: string,
+  previewOrigins: string[],
   retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
     // API contract requires a project name; generated TS models may lag
     // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, preview_origins: [issuer], seed_defaults: false } as {
+    const payload = { name: projectName, preview_origins: previewOrigins, seed_defaults: false } as {
       name: string;
       preview_origins: string[];
       seed_defaults: false;

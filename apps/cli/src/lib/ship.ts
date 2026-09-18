@@ -7,7 +7,12 @@ import type {
 import { consola } from "consola";
 
 import { buildConfigurationBundle, recordBundleRevisions } from "./bundle";
-import { resolveEnvironmentTarget, type EnvironmentTarget } from "./environments";
+import {
+  projectOriginsFromConfig,
+  resolveEnvironmentTarget,
+  type EnvironmentTarget,
+} from "./environments";
+import { readZitadelConfig, readZitadelSecret } from "./project";
 
 /** The name of the environment every project serves by default. */
 export const LIVE_ENVIRONMENT = "live";
@@ -131,6 +136,40 @@ export async function connectEnvironment(opts: {
   consola.info(`Project     ${target.projectId}`);
   const client = createZitadelClient({ baseUrl: target.server, token: target.token });
   return { target, client };
+}
+
+/**
+ * Makes the project's origin allowlist match `zitadel.json`: the union of
+ * every environment entry's `issuer` and `issuer_pattern` that points at the
+ * target project. The repository is the source of truth for which origins
+ * may run the project's flows; a wildcard entry such as
+ * `https://*.vercel.app` admits every preview deployment. No entry declares
+ * an origin: the allowlist is left alone rather than cleared.
+ */
+export async function syncProjectOrigins(opts: {
+  cwd: string;
+  client: ZitadelClient;
+  target: EnvironmentTarget;
+}): Promise<{ origins: string[]; changed: boolean }> {
+  const config = await readZitadelConfig(opts.cwd);
+  const secret = await readZitadelSecret(opts.cwd);
+  const wanted = projectOriginsFromConfig(config, opts.target.projectId, secret.project_id);
+  if (wanted.length === 0) {
+    return { origins: [], changed: false };
+  }
+  const current = (await opts.client.getProject(opts.target.projectId)).preview_origins ?? [];
+  if (sameSet(current, wanted)) {
+    return { origins: current, changed: false };
+  }
+  await opts.client.patchProject(opts.target.projectId, { preview_origins: wanted });
+  consola.info(`Allowed origins  ${wanted.join(", ")}`);
+  return { origins: wanted, changed: true };
+}
+
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sorted = [...a].sort();
+  return [...b].sort().every((value, i) => value === sorted[i]);
 }
 
 /** `preview-<slug>`: lowercased, non-alphanumerics collapsed to hyphens. */

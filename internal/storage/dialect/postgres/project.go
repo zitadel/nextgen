@@ -76,13 +76,17 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	return project, nil
 }
 
-const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, preview_origins, created_at, updated_at`
+const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, preview_origins = $3, updated_at = now() WHERE id = $1 RETURNING id, name, preview_origins, created_at, updated_at`
 
 // UpdateProject implements [service.ProjectStatements].
-// Only the name is updated; preview origins are left untouched. The whole row is
-// read back onto the project.
+// Name and preview origins are written; the whole row is read back onto the
+// project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
-	return wrapError(ps.client.QueryRow(ctx, updateProjectStmt, project.ID, project.Name).
+	origins := project.PreviewOrigins
+	if origins == nil {
+		origins = []string{}
+	}
+	return wrapError(ps.client.QueryRow(ctx, updateProjectStmt, project.ID, project.Name, origins).
 		Scan(&project.ID, &project.Name, &project.PreviewOrigins, &project.CreatedAt, &project.UpdatedAt))
 }
 

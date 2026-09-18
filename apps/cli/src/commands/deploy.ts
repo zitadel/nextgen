@@ -3,7 +3,13 @@ import { Flags } from "@oclif/core";
 import { DEFAULT_ENVIRONMENT } from "../lib/environments";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { publicCliCommand } from "../lib/public-cli";
-import { buildRelease, connectEnvironment, deployRelease, LIVE_ENVIRONMENT } from "../lib/ship";
+import {
+  buildRelease,
+  connectEnvironment,
+  deployRelease,
+  LIVE_ENVIRONMENT,
+  syncProjectOrigins,
+} from "../lib/ship";
 
 /**
  * `zitadel deploy` — build a release from `.zitadel/` and make it live.
@@ -62,6 +68,7 @@ export default class Deploy extends BaseCommand {
       });
     }
 
+    const origins = await syncProjectOrigins({ cwd, client, target });
     const release = await buildRelease({
       cwd,
       client,
@@ -84,6 +91,7 @@ export default class Deploy extends BaseCommand {
         server: target.server,
         project_id: target.projectId,
         target: LIVE_ENVIRONMENT,
+        allowed_origins: origins,
         release,
         deployment,
         next_actions: [

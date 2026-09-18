@@ -49,7 +49,7 @@ type ProjectService interface {
 	// Update updates the name of a project.
 	// Returns domain.ErrProjectMissingID or domain.ErrProjectNameInvalid for validation failures.
 	// Returns domain.ErrProjectNotFound when no project with the given ID exists; other failures return domain.ErrInternal.
-	Update(ctx context.Context, id, name string) (*domain.Project, error)
+	Update(ctx context.Context, id string, patch ProjectPatch) (*domain.Project, error)
 
 	// List returns projects matching the request, ordered and paginated with an
 	// opaque cursor token. The returned NextPageToken is empty when the last page
@@ -347,19 +347,62 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	return nil, nil
 }
 
-func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
+// ProjectPatch is what PATCH /projects/{id} may change. Nil fields are
+// left as they are; a non-nil empty PreviewOrigins clears the allowlist,
+// which allows every origin.
+type ProjectPatch struct {
+	Name           *string
+	PreviewOrigins *[]string
+}
+
+func (s *projectService) Update(ctx context.Context, id string, patch ProjectPatch) (*domain.Project, error) {
 	if id == "" {
 		return nil, domain.ErrProjectMissingID()
 	}
-	name = strings.TrimSpace(name)
-	if name == "" {
+	if patch.Name == nil && patch.PreviewOrigins == nil {
 		return nil, domain.ErrProjectNameInvalid()
 	}
-	project := &domain.Project{
-		ID:   id,
-		Name: name,
+	var name string
+	if patch.Name != nil {
+		name = strings.TrimSpace(*patch.Name)
+		if name == "" {
+			return nil, domain.ErrProjectNameInvalid()
+		}
 	}
+	var origins []string
+	if patch.PreviewOrigins != nil {
+		origins = make([]string, 0, len(*patch.PreviewOrigins))
+		seen := make(map[string]bool, len(*patch.PreviewOrigins))
+		for _, raw := range *patch.PreviewOrigins {
+			if strings.TrimSpace(raw) == "" {
+				continue
+			}
+			origin, err := domain.NormalizeOriginPattern(raw)
+			if err != nil {
+				return nil, domain.ErrProjectInvalidPreviewOrigin(err.Error())
+			}
+			if !seen[origin] {
+				seen[origin] = true
+				origins = append(origins, origin)
+			}
+		}
+	}
+
+	var project *domain.Project
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// Read the row first so a partial patch keeps the other field: the
+		// update statement writes both columns.
+		current, err := tx.Statements().GetProjectByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		project = current
+		if patch.Name != nil {
+			project.Name = name
+		}
+		if patch.PreviewOrigins != nil {
+			project.PreviewOrigins = origins
+		}
 		if err := tx.Statements().UpdateProject(ctx, project); err != nil {
 			return err
 		}

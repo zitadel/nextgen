@@ -17,7 +17,7 @@ VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
 
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = ?`
 
-	updateProjectStmt = `UPDATE projects SET name = ?, updated_at = ? WHERE id = ?
+	updateProjectStmt = `UPDATE projects SET name = ?, preview_origins = ?, updated_at = ? WHERE id = ?
 RETURNING id, name, preview_origins, created_at, updated_at`
 
 	projectQuery = `SELECT id, name, preview_origins, created_at, updated_at FROM projects`
@@ -88,8 +88,12 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 
 // UpdateProject implements [service.ProjectStatements].
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
+	origins, err := encodeJSON(project.PreviewOrigins)
+	if err != nil {
+		return err
+	}
 	now := nowUnixNano()
-	row := ps.client.QueryRow(ctx, updateProjectStmt, project.Name, now, project.ID)
+	row := ps.client.QueryRow(ctx, updateProjectStmt, project.Name, origins, now, project.ID)
 	return wrapError(ps.scanProjectRow(row, project))
 }
 

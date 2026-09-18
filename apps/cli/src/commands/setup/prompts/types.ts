@@ -43,6 +43,12 @@ export type EnvironmentAnswer = {
   server: string;
   /** Own project with its own users, created by setup, instead of sharing. */
   isolated: boolean;
+  /**
+   * Where the frontend runs for this environment: bare origins or a
+   * leftmost-label wildcard (`https://*.vercel.app`). Registered on the
+   * project's origin allowlist and written to `zitadel.json`.
+   */
+  origins?: string[];
 };
 
 /** Read-only facts a prompt may need. */

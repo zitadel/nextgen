@@ -41,12 +41,33 @@ normally a project on the CLI-managed local server.
 A release is still an immutable bundle of revisions (ADR 035) and a
 deployment still activates a release on an environment. Neither changed.
 
+## Origins
+
+Two lists on the server, both fed from `zitadel.json`:
+
+- **Project `preview_origins`** — which origins may run the project's flows
+  at all. `deploy` and `preview` set it to the union of every environment
+  entry's `issuer` / `issuer_pattern` that points at the project
+  (`PATCH /projects/{id}`). Empty means allow all.
+- **Preview environment `origins`** — which of those origins a preview
+  serves. Defaults to the entry's `issuer_pattern`; `--origin` overrides.
+
+Entries are bare origins or leftmost-label wildcards: `https://*.vercel.app`
+matches `my-app-feat-sso-acme.vercel.app`, not `vercel.app` nor
+`a.b.vercel.app`. Scheme and port are literal. One matcher
+(`domain.MatchOrigin`) serves both lists.
+
+Consequence worth deciding: a wildcard shared by several previews makes the
+first match (by name) win. Per-PR previews therefore want a per-branch origin
+(Vercel's `VERCEL_BRANCH_URL` is stable per branch) passed as `--origin` from
+CI, while the wildcard suits one shared preview or the allowlist.
+
 ## Resolution at runtime
 
 Every public request is served by one environment and one release:
 
 1. **Environment, from the request `Origin`.** A preview whose `origins`
-   contain the origin serves it. No match, or no origin: `live`. The client
+   cover the origin serves it. No match, or no origin: `live`. The client
    never names the environment.
 2. **Release.** `X-Zitadel-Release` pins one; it must belong to the project
    and have a deployment on the resolved environment, else `400 rel.invalid`

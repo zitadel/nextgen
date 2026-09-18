@@ -57,7 +57,9 @@ export type PatchContext = PatchView &
      * writes only the `development` issuer (and the preview issuer pattern),
      * with every environment implicitly on the top-level server and project.
      */
-    environments?: Readonly<Record<string, { server: string; project: string }>>;
+    environments?: Readonly<
+      Record<string, { server: string; project: string; origins?: readonly string[] }>
+    >;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */

@@ -7,6 +7,7 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/proj-preview_origin_invalid.yaml'
         - $ref: '../../../components/schemas/errors/proj-missing_id.yaml'
         - $ref: '../../../components/schemas/errors/proj-name_invalid.yaml'
         - $ref: '../../../components/schemas/errors/proj-not_found.yaml'
@@ -18,6 +19,7 @@ content:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          proj.preview_origin_invalid: '../../../components/schemas/errors/proj-preview_origin_invalid.yaml'
           proj.missing_id: '../../../components/schemas/errors/proj-missing_id.yaml'
           proj.name_invalid: '../../../components/schemas/errors/proj-name_invalid.yaml'
           proj.not_found: '../../../components/schemas/errors/proj-not_found.yaml'
@@ -39,6 +41,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      proj.preview_origin_invalid:
+        summary: proj.preview_origin_invalid
+        value:
+          code: proj.preview_origin_invalid
+          message: 'The preview origin is invalid. Expected scheme://host[:port] or a wildcard like https://*.vercel.app.'
       proj.missing_id:
         summary: proj.missing_id
         value:

@@ -375,23 +375,23 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	return out
 }
 
-// validateOriginAgainstProject returns an error if the origin is not in the
-// project's PreviewOrigins allowlist. An empty allowlist means allow all
-// (development/test mode).
+// validateOriginAgainstProject returns an error if the origin is not covered
+// by the project's PreviewOrigins allowlist. An empty allowlist means allow
+// all (development/test mode). Entries are bare origins or leftmost-label
+// wildcards (`https://*.vercel.app`), see domain.MatchOrigin.
 //
-// Matching is deliberately exact — no loopback aliasing between localhost,
-// 127.0.0.1, and [::1]. The WebAuthn RP ID derives from the origin hostname
-// (passkeyRPFromOrigin), so a passkey registered under one loopback spelling
-// can never assert under another; aliasing here would replace this clear 400
-// with a confusing "no passkey found" during the ceremony.
+// Matching is deliberately literal on scheme and port — no loopback aliasing
+// between localhost, 127.0.0.1, and [::1]. The WebAuthn RP ID derives from
+// the origin hostname (passkeyRPFromOrigin), so a passkey registered under
+// one loopback spelling can never assert under another; aliasing here would
+// replace this clear 400 with a confusing "no passkey found" during the
+// ceremony.
 func validateOriginAgainstProject(originStr string, project *domain.Project) error {
 	if len(project.PreviewOrigins) == 0 {
 		return nil
 	}
-	for _, allowed := range project.PreviewOrigins {
-		if allowed == originStr {
-			return nil
-		}
+	if domain.MatchAnyOrigin(project.PreviewOrigins, originStr) {
+		return nil
 	}
 	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
 		originStr, strings.Join(project.PreviewOrigins, ", "))

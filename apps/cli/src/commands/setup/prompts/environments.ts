@@ -102,5 +102,47 @@ async function askEnvironment(name: string, setupServer: string): Promise<Enviro
     initialValue: "shared",
   });
   bail(projectChoice);
-  return { name, server, isolated: projectChoice === "isolated" };
+
+  // Where the frontend runs for this environment. The server only serves
+  // flows to origins on the project's allowlist, and previews on hosting
+  // platforms get a fresh hostname per deployment, so previews take a
+  // wildcard pattern (one host label) rather than a fixed origin.
+  const origins: string[] = [];
+  if (name === "preview") {
+    const pattern = await text({
+      message: "Where do preview deployments run? (origin pattern, * matches one host label)",
+      placeholder: DEFAULT_PREVIEW_ORIGIN_PATTERN,
+      initialValue: DEFAULT_PREVIEW_ORIGIN_PATTERN,
+      validate: validateOriginPattern,
+    });
+    bail(pattern);
+    if (String(pattern).trim() !== "") origins.push(String(pattern).trim());
+  } else {
+    const origin = await text({
+      message: `Where does ${name} run? (origin, leave empty to add later)`,
+      placeholder: `https://${name === "production" ? "app" : name}.example.com`,
+      validate: (value) => (value ? validateOriginPattern(value) : undefined),
+    });
+    bail(origin);
+    if (String(origin ?? "").trim() !== "") origins.push(String(origin).trim());
+  }
+  return { name, server, isolated: projectChoice === "isolated", origins };
+}
+
+/** Vercel preview deployments: `<app>-<branch>-<team>.vercel.app`. */
+export const DEFAULT_PREVIEW_ORIGIN_PATTERN = "https://*.vercel.app";
+
+/**
+ * Mirrors the server's origin-pattern rule: `scheme://host[:port]` where the
+ * host may start with `*.` to cover one label.
+ */
+export function validateOriginPattern(value: string | undefined): string | undefined {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (!/^https?:\/\//.test(raw)) return "Must start with http:// or https://";
+  const host = raw.replace(/^https?:\/\//, "");
+  if (host === "" || /[/?#@ ]/.test(host)) return "Must be scheme://host[:port], no path";
+  if (host.includes("*") && !/^\*\.[^*.][^*]*$/.test(host)) {
+    return "A wildcard must be the whole leftmost label, like https://*.vercel.app";
+  }
+  return undefined;
 }

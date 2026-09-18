@@ -12376,7 +12376,9 @@ func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
-	// Origins which are allowed for previewing and testing the project.
+	// Origins which are allowed for previewing and testing the project: bare
+	// origins (`http://localhost:3000`) or leftmost-label wildcards
+	// (`https://*.vercel.app`). An empty list allows every origin.
 	PreviewOrigins []string `json:"preview_origins"`
 	// Whether the server should provision fallback default user schema and flow
 	// resources for the project. CLI-managed projects set this to false and
@@ -39158,6 +39160,52 @@ func (o OptProjPermissionDeniedDetails) Or(d ProjPermissionDeniedDetails) ProjPe
 	return d
 }
 
+// NewOptProjPreviewOriginInvalidDetails returns new OptProjPreviewOriginInvalidDetails with value set to v.
+func NewOptProjPreviewOriginInvalidDetails(v ProjPreviewOriginInvalidDetails) OptProjPreviewOriginInvalidDetails {
+	return OptProjPreviewOriginInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjPreviewOriginInvalidDetails is optional ProjPreviewOriginInvalidDetails.
+type OptProjPreviewOriginInvalidDetails struct {
+	Value ProjPreviewOriginInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjPreviewOriginInvalidDetails was set.
+func (o OptProjPreviewOriginInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjPreviewOriginInvalidDetails) Reset() {
+	var v ProjPreviewOriginInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjPreviewOriginInvalidDetails) SetTo(v ProjPreviewOriginInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjPreviewOriginInvalidDetails) Get() (v ProjPreviewOriginInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjPreviewOriginInvalidDetails) Or(d ProjPreviewOriginInvalidDetails) ProjPreviewOriginInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjectCreatedEventDelegationType returns new OptProjectCreatedEventDelegationType with value set to v.
 func NewOptProjectCreatedEventDelegationType(v ProjectCreatedEventDelegationType) OptProjectCreatedEventDelegationType {
 	return OptProjectCreatedEventDelegationType{
@@ -42779,15 +42827,16 @@ func (*PatchProjectBadRequest) patchProjectRes() {}
 
 // PatchProjectErrorResponse represents sum type.
 type PatchProjectErrorResponse struct {
-	Type                 PatchProjectErrorResponseType // switch on this field
-	AuthUnauthorized     AuthUnauthorized
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	ProjMissingID        ProjMissingID
-	ProjNameInvalid      ProjNameInvalid
-	ProjNotFound         ProjNotFound
-	ProjPermissionDenied ProjPermissionDenied
-	ReqInvalid           ReqInvalid
+	Type                     PatchProjectErrorResponseType // switch on this field
+	AuthUnauthorized         AuthUnauthorized
+	EvtInvalid               EvtInvalid
+	Internal                 Internal
+	ProjPreviewOriginInvalid ProjPreviewOriginInvalid
+	ProjMissingID            ProjMissingID
+	ProjNameInvalid          ProjNameInvalid
+	ProjNotFound             ProjNotFound
+	ProjPermissionDenied     ProjPermissionDenied
+	ReqInvalid               ReqInvalid
 }
 
 // PatchProjectErrorResponseType is oneOf type of PatchProjectErrorResponse.
@@ -42795,14 +42844,15 @@ type PatchProjectErrorResponseType string
 
 // Possible values for PatchProjectErrorResponseType.
 const (
-	AuthUnauthorizedPatchProjectErrorResponse     PatchProjectErrorResponseType = "auth.unauthorized"
-	EvtInvalidPatchProjectErrorResponse           PatchProjectErrorResponseType = "evt.invalid"
-	InternalPatchProjectErrorResponse             PatchProjectErrorResponseType = "internal"
-	ProjMissingIDPatchProjectErrorResponse        PatchProjectErrorResponseType = "proj.missing_id"
-	ProjNameInvalidPatchProjectErrorResponse      PatchProjectErrorResponseType = "proj.name_invalid"
-	ProjNotFoundPatchProjectErrorResponse         PatchProjectErrorResponseType = "proj.not_found"
-	ProjPermissionDeniedPatchProjectErrorResponse PatchProjectErrorResponseType = "proj.permission_denied"
-	ReqInvalidPatchProjectErrorResponse           PatchProjectErrorResponseType = "req.invalid"
+	AuthUnauthorizedPatchProjectErrorResponse         PatchProjectErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchProjectErrorResponse               PatchProjectErrorResponseType = "evt.invalid"
+	InternalPatchProjectErrorResponse                 PatchProjectErrorResponseType = "internal"
+	ProjPreviewOriginInvalidPatchProjectErrorResponse PatchProjectErrorResponseType = "proj.preview_origin_invalid"
+	ProjMissingIDPatchProjectErrorResponse            PatchProjectErrorResponseType = "proj.missing_id"
+	ProjNameInvalidPatchProjectErrorResponse          PatchProjectErrorResponseType = "proj.name_invalid"
+	ProjNotFoundPatchProjectErrorResponse             PatchProjectErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedPatchProjectErrorResponse     PatchProjectErrorResponseType = "proj.permission_denied"
+	ReqInvalidPatchProjectErrorResponse               PatchProjectErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether PatchProjectErrorResponse is AuthUnauthorized.
@@ -42818,6 +42868,11 @@ func (s PatchProjectErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether PatchProjectErrorResponse is Internal.
 func (s PatchProjectErrorResponse) IsInternal() bool {
 	return s.Type == InternalPatchProjectErrorResponse
+}
+
+// IsProjPreviewOriginInvalid reports whether PatchProjectErrorResponse is ProjPreviewOriginInvalid.
+func (s PatchProjectErrorResponse) IsProjPreviewOriginInvalid() bool {
+	return s.Type == ProjPreviewOriginInvalidPatchProjectErrorResponse
 }
 
 // IsProjMissingID reports whether PatchProjectErrorResponse is ProjMissingID.
@@ -42905,6 +42960,27 @@ func (s PatchProjectErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalPatchProjectErrorResponse(v Internal) PatchProjectErrorResponse {
 	var s PatchProjectErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetProjPreviewOriginInvalid sets PatchProjectErrorResponse to ProjPreviewOriginInvalid.
+func (s *PatchProjectErrorResponse) SetProjPreviewOriginInvalid(v ProjPreviewOriginInvalid) {
+	s.Type = ProjPreviewOriginInvalidPatchProjectErrorResponse
+	s.ProjPreviewOriginInvalid = v
+}
+
+// GetProjPreviewOriginInvalid returns ProjPreviewOriginInvalid and true boolean if PatchProjectErrorResponse is ProjPreviewOriginInvalid.
+func (s PatchProjectErrorResponse) GetProjPreviewOriginInvalid() (v ProjPreviewOriginInvalid, ok bool) {
+	if !s.IsProjPreviewOriginInvalid() {
+		return v, false
+	}
+	return s.ProjPreviewOriginInvalid, true
+}
+
+// NewProjPreviewOriginInvalidPatchProjectErrorResponse returns new PatchProjectErrorResponse from ProjPreviewOriginInvalid.
+func NewProjPreviewOriginInvalidPatchProjectErrorResponse(v ProjPreviewOriginInvalid) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetProjPreviewOriginInvalid(v)
 	return s
 }
 
@@ -43049,6 +43125,16 @@ func (*PatchProjectNotFound) patchProjectRes() {}
 type PatchProjectRequest struct {
 	// The name of the project.
 	Name OptNilString `json:"name"`
+	// Replaces the origins allowed to run the project's flows. Each entry is a
+	// bare origin (`https://app.example.com`, `http://localhost:3000`) or a
+	// leftmost-label wildcard (`https://*.vercel.app`) covering every
+	// single-label subdomain, which is how one entry admits every preview
+	// deployment of a hosting platform. An empty list allows every origin.
+	// Omitted, the allowlist is left unchanged.
+	// The CLI derives this list from the `issuer` and `issuer_pattern`
+	// entries of the environments in `zitadel.json`, so the repository stays
+	// the source of truth.
+	PreviewOrigins []string `json:"preview_origins"`
 }
 
 // GetName returns the value of Name.
@@ -43056,9 +43142,19 @@ func (s *PatchProjectRequest) GetName() OptNilString {
 	return s.Name
 }
 
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *PatchProjectRequest) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
 // SetName sets the value of Name.
 func (s *PatchProjectRequest) SetName(val OptNilString) {
 	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *PatchProjectRequest) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
 }
 
 type PatchProjectUnauthorized ErrorDetails
@@ -43720,6 +43816,59 @@ func (*ProjPermissionDenied) getClaimStatusRes() {}
 type ProjPermissionDeniedDetails map[string]jx.Raw
 
 func (s *ProjPermissionDeniedDetails) init() ProjPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjPreviewOriginInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjPreviewOriginInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjPreviewOriginInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjPreviewOriginInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjPreviewOriginInvalid) GetDetails() OptProjPreviewOriginInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjPreviewOriginInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjPreviewOriginInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjPreviewOriginInvalid) SetDetails(val OptProjPreviewOriginInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjPreviewOriginInvalidDetails map[string]jx.Raw
+
+func (s *ProjPreviewOriginInvalidDetails) init() ProjPreviewOriginInvalidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

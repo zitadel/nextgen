@@ -297,6 +297,7 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_aaa",
 			projectName: "updated project name",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").Return(&domain.Project{ID: "proj_aaa", Name: "old"}, nil)
 				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, project *domain.Project) error {
 						project.CreatedAt = createdAt
@@ -323,6 +324,7 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_aaa",
 			projectName: "  updated project name  ",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").Return(&domain.Project{ID: "proj_aaa", Name: "old"}, nil)
 				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, project *domain.Project) error {
 						project.CreatedAt = createdAt
@@ -353,8 +355,8 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_missing",
 			projectName: "updated project name",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).
-					Return(database.NewNoRowFoundError(nil))
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_missing").
+					Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrProjectNotFound(),
 		},
@@ -363,6 +365,7 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_aaa",
 			projectName: "updated project name",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").Return(&domain.Project{ID: "proj_aaa", Name: "old"}, nil)
 				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
@@ -376,7 +379,7 @@ func TestProjectService_Update(t *testing.T) {
 			svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 			tc.setupStmt(statements)
 
-			got, err := svc.Update(context.Background(), tc.id, tc.projectName)
+			got, err := svc.Update(context.Background(), tc.id, service.ProjectPatch{Name: &tc.projectName})
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)

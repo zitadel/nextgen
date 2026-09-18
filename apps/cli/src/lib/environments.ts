@@ -24,7 +24,9 @@ export type EnvironmentEntry = {
   server?: string;
   /** Project id on that server. Absent means the top-level project. */
   project?: string;
-  issuer?: string;
+  /** Fixed origin(s) the frontend is served from in this environment. */
+  issuer?: string | string[];
+  /** Origin patterns (`https://*.vercel.app`) for per-deployment hostnames. */
   issuer_pattern?: string[];
 };
 
@@ -57,6 +59,9 @@ export function readEnvironmentEntries(
     if (typeof raw.server === "string") entry.server = raw.server;
     if (typeof raw.project === "string") entry.project = raw.project;
     if (typeof raw.issuer === "string") entry.issuer = raw.issuer;
+    else if (Array.isArray(raw.issuer)) {
+      entry.issuer = raw.issuer.filter((v): v is string => typeof v === "string");
+    }
     if (Array.isArray(raw.issuer_pattern)) {
       entry.issuer_pattern = raw.issuer_pattern.filter((v): v is string => typeof v === "string");
     }
@@ -109,6 +114,62 @@ export async function resolveEnvironmentTarget(opts: {
     token,
     entry: entry ?? {},
   };
+}
+
+/**
+ * The origins an environment's frontend is served from: its fixed `issuer`
+ * origin(s) plus its `issuer_pattern` wildcards, normalised to origins
+ * (scheme + host[:port], lowercased), deduplicated, in declaration order.
+ */
+export function originsForEntry(entry: EnvironmentEntry): string[] {
+  const raw = [
+    ...(typeof entry.issuer === "string" ? [entry.issuer] : (entry.issuer ?? [])),
+    ...(entry.issuer_pattern ?? []),
+  ];
+  const out: string[] = [];
+  for (const value of raw) {
+    const origin = toOrigin(value);
+    if (origin && !out.includes(origin)) out.push(origin);
+  }
+  return out;
+}
+
+/**
+ * Every origin the named project must allow: the union over the entries of
+ * `zitadel.json` that point at it. `defaultProjectId` is the project an
+ * entry without `project` belongs to (the one in `.zitadel/secret`).
+ */
+export function projectOriginsFromConfig(
+  config: Record<string, unknown>,
+  projectId: string,
+  defaultProjectId: string,
+): string[] {
+  const out: string[] = [];
+  for (const entry of Object.values(readEnvironmentEntries(config))) {
+    if ((entry.project ?? defaultProjectId) !== projectId) continue;
+    for (const origin of originsForEntry(entry)) {
+      if (!out.includes(origin)) out.push(origin);
+    }
+  }
+  return out;
+}
+
+/**
+ * `https://App.Example.com/path` → `https://app.example.com`. A wildcard
+ * pattern cannot go through `URL`, so it is trimmed of any trailing path.
+ */
+function toOrigin(value: string): string | undefined {
+  const trimmed = value.trim().toLowerCase();
+  if (!/^https?:\/\//.test(trimmed)) return undefined;
+  if (trimmed.includes("*")) {
+    const slash = trimmed.indexOf("/", "https://".length);
+    return slash === -1 ? trimmed : trimmed.slice(0, slash);
+  }
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Path of the credential file setup writes for an isolated environment. */

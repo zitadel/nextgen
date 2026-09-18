@@ -12831,18 +12831,18 @@ func (c *MockProjectServiceListAuthorizedCall) DoAndReturn(f func(context.Contex
 }
 
 // Update mocks base method.
-func (m *MockProjectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
+func (m *MockProjectService) Update(ctx context.Context, id string, patch service.ProjectPatch) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, id, name)
+	ret := m.ctrl.Call(m, "Update", ctx, id, patch)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockProjectServiceMockRecorder) Update(ctx, id, name any) *MockProjectServiceUpdateCall {
+func (mr *MockProjectServiceMockRecorder) Update(ctx, id, patch any) *MockProjectServiceUpdateCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockProjectService)(nil).Update), ctx, id, name)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockProjectService)(nil).Update), ctx, id, patch)
 	return &MockProjectServiceUpdateCall{Call: call}
 }
 
@@ -12858,13 +12858,13 @@ func (c *MockProjectServiceUpdateCall) Return(arg0 *domain.Project, arg1 error) 
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceUpdateCall) Do(f func(context.Context, string, string) (*domain.Project, error)) *MockProjectServiceUpdateCall {
+func (c *MockProjectServiceUpdateCall) Do(f func(context.Context, string, service.ProjectPatch) (*domain.Project, error)) *MockProjectServiceUpdateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceUpdateCall) DoAndReturn(f func(context.Context, string, string) (*domain.Project, error)) *MockProjectServiceUpdateCall {
+func (c *MockProjectServiceUpdateCall) DoAndReturn(f func(context.Context, string, service.ProjectPatch) (*domain.Project, error)) *MockProjectServiceUpdateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

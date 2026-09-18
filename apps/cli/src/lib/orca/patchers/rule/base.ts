@@ -327,11 +327,24 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
   // Each declared environment maps to a project on a server. `local` stays
   // the literal so the CLI resolves the managed runtime at invocation time.
   for (const [name, target] of Object.entries(ctx.environments ?? {})) {
-    environments[name] = {
+    const entry: Record<string, unknown> = {
       ...(environments[name] ?? {}),
       server: target.server === "local" ? "local" : resolveServerOrigin(target.server),
       project: target.project,
     };
+    // A wildcard is an `issuer_pattern`; a fixed origin is the `issuer`.
+    // Previews on hosting platforms get a new hostname per deployment, so
+    // their entry replaces the placeholder pattern setup derived from the
+    // project's origins.
+    const origins = [...(target.origins ?? [])];
+    if (origins.length > 0) {
+      const patterns = origins.filter((o) => o.includes("*"));
+      const fixed = origins.filter((o) => !o.includes("*"));
+      if (patterns.length > 0) entry.issuer_pattern = patterns;
+      else delete entry.issuer_pattern;
+      if (fixed.length > 0) entry.issuer = fixed.length === 1 ? fixed[0] : fixed;
+    }
+    environments[name] = entry;
   }
   return {
     $schema: "https://schemas.zitadel.com/v2/project.schema.json",

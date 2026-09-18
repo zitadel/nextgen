@@ -10,7 +10,9 @@ properties:
     items:
       type: string
     description: |
-      Origins which are allowed for previewing and testing the project.
+      Origins which are allowed for previewing and testing the project: bare
+      origins (`http://localhost:3000`) or leftmost-label wildcards
+      (`https://*.vercel.app`). An empty list allows every origin.
   seed_defaults:
     type: boolean
     default: true

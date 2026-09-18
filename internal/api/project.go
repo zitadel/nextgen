@@ -63,9 +63,17 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
 		return nil, err
 	}
-	// An absent or null name leaves nothing to write; Update rejects the empty
-	// string with proj.name_invalid, the 400 the contract declares.
-	project, err := h.projectService.Update(ctx, projectID, req.Name.Or(""))
+	patch := service.ProjectPatch{}
+	if name, ok := req.Name.Get(); ok {
+		patch.Name = &name
+	}
+	// Present means replace, absent means keep: an empty list is a real
+	// value here (allow every origin), so nil and [] must stay distinct.
+	if req.PreviewOrigins != nil {
+		origins := req.PreviewOrigins
+		patch.PreviewOrigins = &origins
+	}
+	project, err := h.projectService.Update(ctx, projectID, patch)
 	if err != nil {
 		return nil, err
 	}
