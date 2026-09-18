@@ -141,14 +141,34 @@ row. The ADR 035 example reads, for the kinds that exist:
 
 Prefix tokens are domain constants registered per ADR 047.
 
+### 7. The newest revision
+
+Each kind stores one row per revision in one table. A row carries the
+resource `id`, the `revision_id`, the handle, the content and `created_at`.
+The newest revision of a resource is the row with the greatest `created_at`
+among the rows that share its `id`. Nothing records it separately. A write
+appends a row and never updates one.
+
+`created_at` must be a total order within a resource. Each kind holds that
+with a unique index on `(project_id, id, created_at)`, so a second write in
+the same instant is rejected rather than picked arbitrarily. Schemas and
+flow definitions have that index on the handle today, and their migrations
+move it to `id`.
+
+The list and the get find the newest revision with an anti-join: a row is
+newest if no row with the same `id` has a greater `created_at`. The
+revisions list is the same table filtered by `id` and sorted by `created_at`
+descending. Connections use the same shape (#1002).
+
 ## Migration
 
 Connections already have the two ids. The three older kinds should adopt this
-as well. Each migration is its own ticket. Each adds the two revision routes
-for its kind, switches the existence check at release creation from
-get-by-id to a lookup by `revision_id`, and has that lookup record the
-resource `id` on the pointer. The first migration adds the `id` field to the
-pointer. Until a kind migrates, its pointers carry no `id`:
+as well. Each migration is its own ticket. Each adds a `revision_id` column
+and a fixed `id` to its table, adds the two revision routes for its kind,
+switches the existence check at release creation from get-by-id to a lookup
+by `revision_id`, and has that lookup record the resource `id` on the
+pointer. The first migration adds the `id` field to the pointer. Until a
+kind migrates, its pointers carry no `id`:
 
 - **Flow definitions.** `id` becomes fixed per `name` and each write allocates
   a `revision_id`. The list filtered by `name` returns the newest revision of
@@ -187,6 +207,12 @@ that call returns not found. The client reads the row through
   field name everywhere.
 - Every revisioned row carries two ids, and the prefix registry gains one
   entry per kind.
+- The newest revision is derived on every read by the anti-join, and its
+  cost grows with the number of revisions a resource has. The handle repeats
+  on every row, so its pairing with `id` is held by code, not by a
+  constraint. Two revises of one resource in flight at once both succeed and
+  the later `created_at` wins. A caller that must revise only from a known
+  head has no way to say so.
 - For schemas, flow definitions and branding, get-by-id is the per-revision
   read today, because their `id` names a revision. Once `id` is fixed, each
   migration ticket adds the two revision routes for its kind. Connections
