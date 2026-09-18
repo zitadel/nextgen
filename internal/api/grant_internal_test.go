@@ -120,6 +120,30 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 	})
 }
 
+func TestGrantCallerUserID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("user session copies principal id", func(t *testing.T) {
+		ctx := WithScopeContext(t.Context(), ScopeContext{
+			ProjectID:     "proj_platform",
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		})
+		assert.Equal(t, "user_alice", grantCallerUserID(ctx))
+	})
+	t.Run("project secret is empty", func(t *testing.T) {
+		ctx := WithScopeContext(t.Context(), ScopeContext{
+			ProjectID:     "proj_customer",
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_customer",
+		})
+		assert.Empty(t, grantCallerUserID(ctx))
+	})
+	t.Run("missing scope is empty", func(t *testing.T) {
+		assert.Empty(t, grantCallerUserID(t.Context()))
+	})
+}
+
 func TestGrantResponse_UserAndTeam(t *testing.T) {
 	asgn := &domain.AuthzAssignment{
 		ID:            "asgn_1",

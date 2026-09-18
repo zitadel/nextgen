@@ -315,30 +315,81 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		assert.Equal(t, userID, got.Assignment.PrincipalID)
 	})
 
-	t.Run("identifier miss is not found", func(t *testing.T) {
+	t.Run("identifier duplicate returns the existing grant", func(t *testing.T) {
+		t.Parallel()
+		existing := testManagedGrant("asgn_existing", userID)
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectIdentifierSchema(s, schemaDoc)
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
+				ProjectID: grantPlatformProjID,
+				ID:        userID,
+				Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
+			}, nil)
+			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).
+				Return(database.NewUniqueError("authz_assignments", "authz_assignments_unique_active", nil))
+			s.EXPECT().ListAuthzAssignments(gomock.Any(), "proj_customer", domain.AuthzPrincipalTypeUser, userID, false).
+				Return([]*domain.AuthzAssignment{existing}, nil)
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID:  "proj_customer",
+			Identifier: "alice@acme.com",
+			Relation:   "viewer",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "asgn_existing", got.Assignment.ID)
+		assert.Equal(t, userID, got.Assignment.PrincipalID)
+	})
+
+	t.Run("identifier self-grant is invalid", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
-				Items: []*domain.JSONSchema{{
-					ProjectID: grantPlatformProjID,
-					URL:       "https://s/human",
-					Kind:      domain.JSONSchemaKindUserSchema,
-					Schema:    []byte(schemaDoc),
-				}},
+			expectIdentifierSchema(s, schemaDoc)
+			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
+				ProjectID: grantPlatformProjID,
+				ID:        userID,
+				Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
 			}, nil)
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID:    "proj_customer",
+			Identifier:   "alice@acme.com",
+			Relation:     "admin",
+			CallerUserID: userID,
+		})
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
+		assert.Nil(t, got)
+		var de domain.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, "you cannot grant access to yourself", de.Message)
+	})
+
+	t.Run("identifier miss is accepted without a write", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectIdentifierSchema(s, schemaDoc)
 			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).
 				Return(nil, database.NewNoRowFoundError(nil))
+			s.EXPECT().NewManagedID(string(domain.PrefixAuthzAssignment)).Return("asgn_neutral", nil)
+			s.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_neutral", nil)
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
 			ProjectID:  "proj_customer",
 			Identifier: "missing@acme.com",
 			Relation:   "viewer",
 		})
-		require.ErrorIs(t, err, domain.ErrGrantPrincipalNotFound())
-		assert.Nil(t, got)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "asgn_neutral", got.Assignment.ID)
+		assert.Equal(t, "proj_customer", got.Assignment.ProjectID)
+		assert.Equal(t, "viewer", got.Assignment.Relation)
+		require.NotNil(t, got.User)
+		assert.Equal(t, "user_neutral", got.User.UserID)
+		assert.Empty(t, got.User.Identifier)
+		assert.Nil(t, got.Team)
 	})
 
-	t.Run("ambiguous identifier is not found", func(t *testing.T) {
+	t.Run("ambiguous identifier is accepted without a write", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
@@ -363,14 +414,19 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
 				ID: "user_username_match", Metadata: domain.UserMetadata{Status: domain.UserStatusActive},
 			}, nil)
+			s.EXPECT().NewManagedID(string(domain.PrefixAuthzAssignment)).Return("asgn_ambiguous", nil)
+			s.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_ambiguous", nil)
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
 			ProjectID:  "proj_customer",
 			Identifier: "alice",
 			Relation:   "viewer",
 		})
-		require.ErrorIs(t, err, domain.ErrGrantPrincipalNotFound())
-		assert.Nil(t, got)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "asgn_ambiguous", got.Assignment.ID)
+		require.NotNil(t, got.User)
+		assert.Equal(t, "user_ambiguous", got.User.UserID)
 	})
 
 	t.Run("identifier skips unique value on undesignated schema", func(t *testing.T) {
@@ -544,6 +600,37 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			Relation:  "viewer",
 		})
 		require.ErrorIs(t, err, domain.ErrGrantInvalid())
+		assert.Nil(t, got)
+	})
+
+	t.Run("user_id miss is not found", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetResourceScope(gomock.Any(), userID).
+				Return(nil, database.NewNoRowFoundError(nil))
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID: "proj_customer",
+			UserID:    userID,
+			Relation:  "viewer",
+		})
+		require.ErrorIs(t, err, domain.ErrGrantPrincipalNotFound())
+		assert.Nil(t, got)
+	})
+
+	t.Run("user_id unique is already exists", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectActiveUserPrincipal(s, userID)
+			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).
+				Return(database.NewUniqueError("authz_assignments", "authz_assignments_unique_active", nil))
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID: "proj_customer",
+			UserID:    userID,
+			Relation:  "viewer",
+		})
+		require.ErrorIs(t, err, domain.ErrGrantAlreadyExists())
 		assert.Nil(t, got)
 	})
 }
@@ -850,6 +937,17 @@ func schemaURLEquals(t *testing.T, filter database.Filter[domain.UserField]) []s
 func expectHydrateTeam(s *servicemocks.MockAllStatements, teamID string) {
 	s.EXPECT().ListTeams(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Team]{
 		Items: []*domain.Team{{ID: teamID}},
+	}, nil)
+}
+
+func expectIdentifierSchema(s *servicemocks.MockAllStatements, schemaDoc string) {
+	s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+		Items: []*domain.JSONSchema{{
+			ProjectID: grantPlatformProjID,
+			URL:       "https://s/human",
+			Kind:      domain.JSONSchemaKindUserSchema,
+			Schema:    []byte(schemaDoc),
+		}},
 	}, nil)
 }
 

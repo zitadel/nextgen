@@ -306,11 +306,115 @@ func TestGrantCreateLocators(t *testing.T) {
 		assert.Equal(t, team.Name, created.Team.Value.Name.Or(""))
 	})
 
-	t.Run("unknown identifier is principal not found", func(t *testing.T) {
+	t.Run("unknown identifier is accepted without a row", func(t *testing.T) {
 		t.Parallel()
+		before, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		listedBefore, ok := before.(*api.QueryGrantsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, before))
+
 		resp, err := client.CreateGrant(t.Context(), userIdentifierGrant("nobody@example.com", api.CreateGrantRequestRelationViewer), params)
 		require.NoError(t, err)
+		created, ok := resp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.True(t, strings.HasPrefix(created.ID, "asgn_"), created.ID)
+		require.True(t, created.User.IsSet())
+		assert.True(t, strings.HasPrefix(string(created.User.Value.UserID), "user_"))
+		assert.False(t, created.User.Value.Identifier.IsSet())
+
+		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+			ID:        created.ID,
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		assertGrantNotFound(t, getResp)
+
+		after, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		listedAfter, ok := after.(*api.QueryGrantsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, after))
+		assert.Len(t, listedAfter.Grants, len(listedBefore.Grants))
+		for _, g := range listedAfter.Grants {
+			assert.NotEqual(t, created.ID, g.ID)
+		}
+	})
+
+	t.Run("repeat identifier returns the existing grant", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		user, ok := userResp.(*api.User)
+		require.True(t, ok, helpers.MustMarshal(t, userResp))
+		require.True(t, user.Identifier.IsSet())
+
+		req := userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationEditor)
+		first, err := client.CreateGrant(t.Context(), req, params)
+		require.NoError(t, err)
+		created, ok := first.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, first))
+
+		second, err := client.CreateGrant(t.Context(), req, params)
+		require.NoError(t, err)
+		again, ok := second.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, second))
+		assert.Equal(t, created.ID, again.ID)
+		assert.Equal(t, api.UserID(userID), again.User.Value.UserID)
+
+		listed, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
+			Filter: []api.QueryGrantsRequestFilterItem{{
+				Field:     api.GrantFilterFieldUserID,
+				Operation: api.FilterOperationEquals,
+				Value:     api.NewOptFilterValue(api.NewStringFilterValue(userID)),
+			}},
+		}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		page, ok := listed.(*api.QueryGrantsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, listed))
+		require.Len(t, page.Grants, 1)
+		assert.Equal(t, created.ID, page.Grants[0].ID)
+	})
+
+	t.Run("own identifier is grant.invalid", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectViewer(t, project.ID, userID)
+		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		user, ok := userResp.(*api.User)
+		require.True(t, ok, helpers.MustMarshal(t, userResp))
+		require.True(t, user.Identifier.IsSet())
+
+		sessionClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		sessionClient.SetSessionToken(platformSessionCookie(t, userID).Value)
+
+		resp, err := sessionClient.CreateGrant(t.Context(), userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationAdmin), params)
+		require.NoError(t, err)
+		bad, ok := resp.(*api.CreateGrantBadRequest)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("grant.invalid"), bad.Code)
+		assert.Equal(t, "you cannot grant access to yourself", bad.Message)
+	})
+
+	t.Run("unknown user_id is principal not found", func(t *testing.T) {
+		t.Parallel()
+		resp, err := client.CreateGrant(t.Context(), userIDGrant("user_01hzzzzzzzzzzzzzzzzzzzzzzz", api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
 		assertGrantPrincipalNotFound(t, resp)
+	})
+
+	t.Run("duplicate user_id is already exists", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		req := userIDGrant(userID, api.CreateGrantRequestRelationViewer)
+		first, err := client.CreateGrant(t.Context(), req, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.Grant{}, first, helpers.MustMarshal(t, first))
+
+		second, err := client.CreateGrant(t.Context(), req, params)
+		require.NoError(t, err)
+		assertGrantAlreadyExists(t, second)
 	})
 
 	t.Run("both user and team is invalid", func(t *testing.T) {

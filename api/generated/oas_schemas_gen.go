@@ -52221,8 +52221,11 @@ type UserLocator struct {
 	// Platform-homed user id (`user_<opaque>`). The user must be active.
 	UserID OptUserID `json:"user_id"`
 	// The user schema's designated identifier (`x-identifier`), looked
-	// up in the platform project. Exactly one active match is required;
-	// zero or several resolve as not found.
+	// up in the platform project. Create accepts this locator with
+	// HTTP 201 whether or not a user matched: a miss or several matches
+	// still return a Grant and write nothing; a duplicate returns the
+	// existing grant. The server logs the lookup outcome. Granting the
+	// session caller's own resolved user is `grant.invalid`.
 	Identifier OptString `json:"identifier"`
 }
 

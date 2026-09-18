@@ -18,11 +18,20 @@ func (h *Handler) CreateGrant(ctx context.Context, req *api.CreateGrantRequest, 
 	if err != nil {
 		return nil, err
 	}
+	input.CallerUserID = grantCallerUserID(ctx)
 	grant, err := h.grantService.Create(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 	return grantResponse(grant)
+}
+
+func grantCallerUserID(ctx context.Context) string {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType != domain.AuthzPrincipalTypeUser {
+		return ""
+	}
+	return scope.PrincipalID
 }
 
 func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.GetGrantRes, error) {
