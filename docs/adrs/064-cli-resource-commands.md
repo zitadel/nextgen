@@ -381,6 +381,12 @@ Recorded here because §14 makes them the API's problem, not the CLI's:
   properly if accepted; it also says the `revisions` parameter this surface
   relies on is removed once the revision routes exist, so the defaults below
   are temporary by design rather than by neglect.
+- Variables ([ADR 062](062-per-environment-variables-and-secrets.md)) are a
+  management resource this surface does not cover. A variable has no id, the
+  list is a map keyed by name rather than rows, and the write is one merge over
+  the whole map where `null` removes. Commands for them would need an upsert
+  verb and map rendering, which is a shape decision rather than a registry
+  entry — `gh variable set` is the shape to copy if we want it.
 - `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
   accepted ADR names the command; this one produces a different spelling for
   the same data. It needs one owner's decision, not two documents.

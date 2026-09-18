@@ -44,7 +44,15 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
-  variables: "per-environment configuration (ADR 062), authored in .zitadel/ and deployed",
+  // Variables are a management resource (ADR 062), not file-authored: only the
+  // `${{ NAME }}` placeholders live in `.zitadel/`. They are excluded because
+  // they do not fit this surface's grammar, not because they are configuration.
+  // A variable has no id, the list returns a map keyed by name rather than
+  // rows, and the write is one RFC 7386 merge over the whole map where `null`
+  // removes. That is an upsert on a collection, so it would need a `set` verb
+  // and map rendering, which no other resource has. `gh` models them the same
+  // way, with `gh variable set` rather than create and update.
+  variables: "a management resource, but keyed by name with a merge write; needs a shape decision",
 };
 
 /**
