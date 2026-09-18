@@ -51,6 +51,13 @@ tasks:
       # Neighbors: 8092 demo-next-e2e e2e-real, 8094 console dev-real.
       REAL_ZITADEL_PORT: "8093"
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # A bare single-project instance, the shape this suite asserts: its
+      # operator and colleague are users of the bootstrapped project, and a
+      # platform project would make them ineligible as grant principals
+      # (`grant.principal_not_found`, see create-grant-request.yaml). `zitadel
+      # start` creates one by default for the local-admin journey; this lane
+      # opts out, so it keeps exercising an ordinary project's Admins screen.
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
       # Vite serves the console and proxies its API requests. The binary
       # embeds the /ui/* surfaces, but this suite must exercise the
       # Vite-served console, so keep both server surfaces off.
