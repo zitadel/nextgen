@@ -631,6 +631,7 @@ var (
 	codeFlowDefinitionNotFound        = domain.ErrFlowDefinitionNotFound().Code
 	codeFlowDefinitionPurposeMismatch = domain.ErrFlowDefinitionPurposeMismatch().Code
 	codeFlowDefinitionInvalid         = domain.ErrFlowDefinitionInvalid(nil, nil).Code
+	codeFlowDefinitionRevisionTaken   = domain.ErrFlowDefinitionRevisionConflict().Code
 	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
 	codeFlowDefinitionDenied          = domain.ErrFlowDefinitionPermissionDenied().Code
@@ -646,6 +647,8 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case codeFlowDefinitionInvalid:
 		return errorResponseWithDetails(err, http.StatusBadRequest)
+	case codeFlowDefinitionRevisionTaken:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case codeFlowDefinitionDenied:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:

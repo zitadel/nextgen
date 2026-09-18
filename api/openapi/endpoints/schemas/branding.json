@@ -20,23 +20,31 @@
       "default": "centered"
     },
     "liquid_template": {
-      "type": "string",
-      "maxLength": 131072,
-      "description": "The LiquidJS template for rendering this step. The orchestrator renders\nit into its Shadow DOM with the capability dictionaries as context.\n"
+      "description": "The LiquidJS template for rendering this step. The orchestrator renders\nit into its Shadow DOM with the capability dictionaries as context.\n",
+      "x-local": "file",
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 131072
+        },
+        {
+          "$ref": "#/$defs/LocalFileReference"
+        }
+      ]
     },
     "logo_url": {
       "type": "string",
       "format": "uri",
       "maxLength": 2048,
       "description": "Fallback mark, used only when neither `theme.light.logo_url` nor\n`theme.dark.logo_url` is set. Prefer the per-side marks — one file\ncannot serve both surfaces.\n",
-      "pattern": "^([hH][tT][tT][pP][sS]://|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+      "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
     },
     "hero_url": {
       "type": "string",
       "format": "uri",
       "maxLength": 2048,
       "description": "Hero/background image URL, used by the split layout.",
-      "pattern": "^([hH][tT][tT][pP][sS]://|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+      "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
     },
     "theme": {
       "$ref": "#/$defs/BrandingTheme"
@@ -46,22 +54,23 @@
     },
     "shape": {
       "$ref": "#/$defs/BrandingShape"
-    },
-    "liquid_template_file": {
-      "type": "string",
-      "description": "Path to the LiquidJS template file, relative to this descriptor. The\nCLI inlines the file content into `liquid_template` when publishing,\nand writes server state back to the file. Mutually exclusive with\n`liquid_template`.\n",
-      "examples": [
-        "./login.liquid"
-      ]
     }
   },
-  "not": {
-    "required": [
-      "liquid_template",
-      "liquid_template_file"
-    ]
-  },
   "$defs": {
+    "LocalFileReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$file"
+      ],
+      "properties": {
+        "$file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the file whose content is this value, relative to the file holding the reference. The CLI inlines it before upload."
+        }
+      }
+    },
     "BrandingTheme": {
       "type": "object",
       "additionalProperties": false,
@@ -97,7 +106,7 @@
           "format": "uri",
           "maxLength": 2048,
           "description": "The mark for this surface. A logo is never recoloured, so each side\ncarries its own file. Absent means no mark on this side, unless the\ntop-level `logo_url` is the only one set.\n",
-          "pattern": "^([hH][tT][tT][pP][sS]://|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))",
+          "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))",
           "examples": [
             "https://cdn.example.com/logo-on-light.svg"
           ]
@@ -184,6 +193,11 @@
     "BrandingTypography": {
       "type": "object",
       "additionalProperties": false,
+      "dependentRequired": {
+        "font_url": [
+          "font_family"
+        ]
+      },
       "description": "The typeface the login surface renders in. One face covers both body and\nheadings; separate heading and mono faces are not modelled yet.\n",
       "properties": {
         "font_family": {
@@ -201,7 +215,7 @@
           "format": "uri",
           "maxLength": 2048,
           "description": "Stylesheet that loads `font_family` — a Google Fonts CSS URL, for\nexample. Must be https; unlike the logo and hero assets there is no\nloopback carve-out. Rejected without `font_family`, which would name\nnothing to paint with.\n\nStored but not applied to an embedded widget: the embedding page loads\nthe face, and Zitadel does not inject a stylesheet into a document it\ndoes not own.\n",
-          "pattern": "^[hH][tT][tT][pP][sS]://",
+          "pattern": "^[hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)",
           "examples": [
             "https://fonts.googleapis.com/css2?family=Inter&display=swap"
           ]

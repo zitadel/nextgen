@@ -658,7 +658,7 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/branding/login.liquid");
 
     // The wire body inlines the template under `liquid_template`; the local
-    // descriptor keeps the file reference — the dialect's two carriers.
+    // descriptor keeps the `$file` reference in the same key.
     expect(brandingBodies).toHaveLength(1);
     expect(brandingBodies[0]).toMatchObject({ layout: "split" });
     expect(typeof brandingBodies[0]?.liquid_template).toBe("string");
@@ -666,7 +666,7 @@ describe("Next setup integration", () => {
     const descriptor = JSON.parse(
       await readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8"),
     ) as Record<string, unknown>;
-    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     // Sync state pins the published revision, so the first plan is empty —
     // the ejected design converges exactly like schemas and flows.

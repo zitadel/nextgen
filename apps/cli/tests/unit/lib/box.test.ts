@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { command, renderBoxActions, wrapForBox } from "../../../src/lib/box";
-
-const ESC = "\\u001B";
-const stripAnsi = (s: string): string => s.replaceAll(new RegExp(`${ESC}\\[[0-9;]*m`, "g"), "");
+import { stripAnsi } from "../../helpers/run-cli";
 
 describe("wrapForBox", () => {
   it("wraps prose so no line exceeds the terminal minus the frame", () => {

@@ -101,7 +101,7 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["oidc missing client_secret", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined } }, false],
   ["literal client_secret in block", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "leak" } }, false],
   ["client_secret reference with text around it", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "a8f3c1-${{ TAIL }}" } }, false],
-  ["client_secret_env twin (ADR 061)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" } }, false],
+  ["client_secret_env twin (ADR 062)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" } }, false],
   ["client_id as a variable reference", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: "${{ ID }}" } }, true],
   ["camelCase leftover (clientId)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined, clientId: "c" } }, false],
   ["secret_strategy not shipped", { ...root, protocol: "oidc", oidc: { ...oidcBlock, secret_strategy: "static" } }, false],
@@ -267,13 +267,33 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("validates against the shipped meta-schema", () => {
-    // on_success carries create_user_with_sso and sso_providers is a slug
-    // list (area 2, Rendering from the Connection).
+  it("fails against the shipped meta-schema only on the two documented deltas", () => {
+    // The on_success enum gains create_user_with_sso, and sso_providers
+    // becomes a slug list (area 2, Rendering from the Connection). The editor
+    // schema mirrors the API until #1031 and #1037 change both together.
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta,
     );
-    expect(validate(flow), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate(flow)).toBe(false);
+    for (const err of validate.errors ?? []) {
+      const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
+      const slugList = err.keyword === "type" && err.instancePath.includes("/sso_providers/");
+      expect(onSuccess || slugList, `${err.instancePath} ${err.keyword}`).toBe(true);
+    }
+  });
+
+  it("validates once both deltas land in the meta-schema", () => {
+    const patched = structuredClone(flowMeta) as {
+      $defs: {
+        FlowDefinitionStep: {
+          properties: { on_success: { enum: string[] }; sso_providers: { items: object } };
+        };
+      };
+    };
+    const step = patched.$defs.FlowDefinitionStep.properties;
+    step.on_success.enum.push("create_user_with_sso");
+    step.sso_providers.items = { type: "string", minLength: 1 };
+    expect(ajv().compile(patched)(flow)).toBe(true);
   });
 
   it("every step carrying sso_providers routes all three outcomes", () => {
