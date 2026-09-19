@@ -97,6 +97,12 @@ type Config struct {
 	// call graph walk, so the handler set subsumes the service union.
 	HandlerPkgPath  string
 	HandlerTypeName string
+	// ExtraMethods are concrete "<Type>.<Method>" entry points in EntryPkgPath
+	// analyzed in their own right and keyed the same way. They cover code
+	// that runs for an operation without being reachable from its handler:
+	// an ogen middleware that resolves the request before dispatch raises
+	// errors the operation answers with, yet no handler call leads to it.
+	ExtraMethods []string
 }
 
 func (c *Config) withDefaults() {
@@ -369,7 +375,44 @@ func (a *analyzer) run() (map[string]Method, error) {
 	for _, m := range a.analyzeHandler() {
 		out[m.Key()] = m
 	}
+	for _, m := range a.analyzeExtraMethods() {
+		out[m.Key()] = m
+	}
 	return out, nil
+}
+
+// analyzeExtraMethods treats each configured concrete method of the entry
+// package as an entry point.
+func (a *analyzer) analyzeExtraMethods() []Method {
+	var methods []Method
+	for _, key := range a.cfg.ExtraMethods {
+		typeName, methodName, ok := strings.Cut(key, ".")
+		if !ok {
+			continue
+		}
+		method := Method{Interface: typeName, Name: methodName, Unimplemented: true}
+		for _, p := range a.pkgs {
+			if p.PkgPath != a.cfg.EntryPkgPath {
+				continue
+			}
+			tn, ok := p.Types.Scope().Lookup(typeName).(*types.TypeName)
+			if !ok {
+				break
+			}
+			sel := types.NewMethodSet(types.NewPointer(tn.Type())).Lookup(p.Types, methodName)
+			if sel == nil {
+				break
+			}
+			fn, _ := sel.Obj().(*types.Func)
+			if fn == nil || a.funcs[fn.Origin()] == nil {
+				break
+			}
+			method.Errors = a.funcErrors(fn, nil, 0).sorted()
+			method.Unimplemented = false
+		}
+		methods = append(methods, method)
+	}
+	return methods
 }
 
 // analyzeHandler treats each exported method on the API handler type as an

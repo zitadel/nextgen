@@ -175,7 +175,10 @@ func main() {
 
 	// Step 4: Infer each service method's error set from its implementation,
 	// then hold the hand-written "errors:" comments up against it.
-	analyzed, err := erroranalysis.Analyze(erroranalysis.Config{Dir: moduleRoot})
+	analyzed, err := erroranalysis.Analyze(erroranalysis.Config{
+		Dir:          moduleRoot,
+		ExtraMethods: []string{runtimeResolverMethod},
+	})
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "❌ Error analyzing service error paths: %v\n", err)
 		if !generatedClientExists(moduleRoot) {
@@ -229,6 +232,16 @@ func main() {
 				continue
 			}
 			errFuncs = append(errFuncs, method.errorFuncs...)
+		}
+
+		// The runtime middleware resolves these operations before dispatch and
+		// answers with its own errors; no handler call reaches it.
+		if runtimeResolvedOperations[endpoint.operationID] {
+			if method, ok := allMethods[runtimeResolverMethod]; ok {
+				errFuncs = append(errFuncs, method.errorFuncs...)
+			} else {
+				fmt.Printf("⚠️  %s not analyzed, %s misses the runtime resolution errors\n", runtimeResolverMethod, endpoint.operationID)
+			}
 		}
 
 		// Nothing to walk — an operation specced before its handler exists, or
@@ -848,6 +861,18 @@ type serviceMethod struct {
 // surfaces as `internal` on any endpoint. The service-level analysis cannot see
 // that — it is a property of the HTTP boundary — so it is added here.
 var boundaryErrors = []string{"domain.ErrInternal"}
+
+// runtimeResolverMethod is the service method api.WithRuntimeResolution
+// calls before dispatching the operations in runtimeResolvedOperations.
+// Analyzed as an entry point of its own (Config.ExtraMethods) because the
+// middleware is outside every handler's call graph.
+const runtimeResolverMethod = "RuntimeResolver.Resolve"
+
+// runtimeResolvedOperations are the operations api.WithRuntimeResolution
+// resolves (see runtimeProjectID there); keep the two in step.
+var runtimeResolvedOperations = map[string]bool{
+	"createFlow": true,
+}
 
 // transportErrors are raised by OgenErrorHandler for a request that never
 // reaches a handler at all, so no walk of the handler call graph can see them:
