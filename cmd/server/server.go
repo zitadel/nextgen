@@ -382,11 +382,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).
-			WithRuntimeResolver(service.NewRuntimeResolver(serviceDBPool)),
+		).WithPersonalTeamEnsurer(personalTeams),
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
+			api.WithRuntimeResolution(service.NewRuntimeResolver(serviceDBPool)),
 			// logging is done at net/http level
 		),
 		oasapi.WithMeterProvider(telemetry.MeterProvider()),
@@ -704,7 +704,6 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
 			middleware.WithLogging,
 			api.WithRequestHostMiddleware,
-			middleware.WithRequestOriginMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
 			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },

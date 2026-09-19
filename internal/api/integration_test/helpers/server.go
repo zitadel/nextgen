@@ -33,6 +33,9 @@ func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 		h.generatedServer.value, err = generated.NewServer(
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
+			generated.WithMiddleware(
+				api.WithRuntimeResolution(service.NewRuntimeResolver(h.EnsureServiceDB(t))),
+			),
 			generated.WithErrorHandler(api.OgenErrorHandler),
 		)
 		require.NoError(t, err)
@@ -67,7 +70,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			service.NewGrantService(h.EnsureServiceDB(t), service.StatementsUserRefResolver{Pool: h.EnsureServiceDB(t)}, platform.ID),
 			h.EnsureServiceDB(t),
 			platform.ID,
-		).WithRuntimeResolver(service.NewRuntimeResolver(h.EnsureServiceDB(t)))
+		)
 	}
 	return h.handler.value
 }

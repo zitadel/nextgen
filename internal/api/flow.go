@@ -24,21 +24,17 @@ const (
 	flowCookieMaxAgeSeconds = 600
 )
 
-func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, params api.CreateFlowParams) (api.CreateFlowRes, error) {
+func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, _ api.CreateFlowParams) (api.CreateFlowRes, error) {
 	audit.BindPublicRequest(ctx, string(req.ProjectID), "", "")
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
 	}
 
-	// Which environment and release serve this request. Logged, echoed in
-	// the response headers, and pinned for the attempt.
-	runtime, err := h.resolveRuntime(ctx, string(req.ProjectID), params.XZitadelEnvironment, params.XZitadelRelease)
-	if err != nil {
-		return nil, err
-	}
-	// Downstream reads (flow definition, branding) pin to this release.
-	ctx = service.WithRuntimeResolution(ctx, runtime)
+	// Which environment and release serve this request, resolved by
+	// middleware.WithRuntimeResolution; echoed in the response headers.
+	// Downstream reads (flow definition, branding) pin to it via the context.
+	runtime := service.RuntimeResolutionFromContext(ctx)
 
 	resolveReq := service.ResolveFlowRequest{
 		ProjectID: string(req.ProjectID),
