@@ -26,6 +26,11 @@ export type FileOp =
       readonly kind: "merge-env";
       readonly path: string;
       readonly entries: Readonly<Record<string, string>>;
+      /**
+       * Lines written as `# ` comments above the entries the first time any of
+       * them is added; a file that already carries the first line keeps it.
+       */
+      readonly comment?: ReadonlyArray<string>;
     }
   | {
       readonly kind: "merge-json";
