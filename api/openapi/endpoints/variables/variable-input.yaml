@@ -1,0 +1,25 @@
+title: VariableInput
+description: |
+  One entry of an update. A bare scalar enters a non-secret value, an object
+  states the flag explicitly, and `null` removes the name.
+
+  The shorthand exists because most variables are not secrets and spelling
+  `{"value": …, "secret": false}` for each of them is noise. Making a value
+  secret is therefore always deliberate: it cannot happen by writing a plain
+  scalar.
+
+  `null` is the RFC 7386 merge-patch convention: the name is removed at the
+  owner this request addresses, and at no other, which is what lets one request
+  enter, replace and remove names together. Removing a name the owner does not
+  hold is not an error, because a patch states what the owner holds afterwards
+  and that name is already absent. `DELETE /variables/{variable_name}`
+  addresses one name deliberately and still answers `var.not_found` there.
+
+  A null is a removal wherever it appears, so a body built from client state in
+  which an unset field serializes to `null` removes that variable instead of
+  leaving it alone. A secret removed this way cannot be recovered, since its
+  value reads back nowhere. Send only the names the request means to change.
+oneOf:
+  - type: 'null'
+  - $ref: variable-scalar.yaml
+  - $ref: secret-variable-input.yaml

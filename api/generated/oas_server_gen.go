@@ -105,6 +105,29 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateIdp implements createIdp operation.
+	//
+	// Creates or revises a connection document. If the slug does not already
+	// exist, a new connection is created. If a connection with that slug already
+	// exists, a revision is created.
+	// A revision gets a new `revision_id` and does not modify the connection
+	// `id`, so identity links that reference the connection keep resolving while
+	// releases and auth attempts stay pinned to the revision they captured.
+	// Identity fields are fixed for the life of the connection and a revision
+	// that changes one is rejected: `protocol`, `subject_claim`, and the
+	// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
+	// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+	// account a stored subject belongs to, so changing one would silently
+	// repoint existing identities at a different provider.
+	// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
+	// OIDC connection, `sub` is used as the default value. If a revision updates
+	// `subject_claim` to a different value than the one set during creation, the
+	// request is rejected.
+	// The document is validated against the `idp-connection.json` schema before
+	// anything is stored.
+	//
+	// POST /idps
+	CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
 	// CreateProject implements createProject operation.
 	//
 	// Create project.
@@ -204,6 +227,15 @@ type Handler interface {
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
+	// DeleteVariable implements deleteVariable operation.
+	//
+	// Removes the variable this owner entered under this name.
+	// A variable is deletable only by the owner that entered it. Deleting a name
+	// another owner of the same project holds answers `var.not_found` and leaves
+	// that owner's value standing.
+	//
+	// DELETE /variables/{variable_name}
+	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
 	// ExchangeHandoff implements exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -326,6 +358,22 @@ type Handler interface {
 	//
 	// GET /healthz
 	GetHealth(ctx context.Context) (GetHealthRes, error)
+	// GetIdpById implements getIdpById operation.
+	//
+	// Reads a connection by its id, at its newest revision.
+	// `GET /idps/{id}/revisions` lists every revision of the connection.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /idps/{id}
+	GetIdpById(ctx context.Context, params GetIdpByIdParams) (GetIdpByIdRes, error)
+	// GetIdpRevisionById implements getIdpRevisionById operation.
+	//
+	// Reads one revision of a connection by its `revision_id`, the value an auth
+	// attempt or a release pins.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /idps/revisions/{revision_id}
+	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive implements getLive operation.
 	//
 	// Check whether the server is started.
@@ -403,6 +451,30 @@ type Handler interface {
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
+	// GetVariable implements getVariable operation.
+	//
+	// Reads one variable by name from the owner this request addresses — one
+	// environment of the project with `environment_name`, the project level
+	// itself without it.
+	// A name that owner has not entered answers `var.not_found`, even when
+	// another owner of the same project holds it: nothing is inherited. A secret
+	// is found but not disclosed: the response is `{"secret": true}`.
+	//
+	// GET /variables/{variable_name}
+	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
+	// GetVariables implements getVariables operation.
+	//
+	// Returns the variables entered at the owner this request addresses, keyed by
+	// name — one environment of the project with `environment_name`, the project
+	// level itself without it.
+	// Owners are separate, not a ladder: an environment does not inherit the
+	// project's variables and the project does not see its environments'. Reading
+	// everything a project holds therefore means reading each owner in turn.
+	// Secret values are not returned. A secret appears as `{"secret": true}`,
+	// which says a value is held without disclosing it.
+	//
+	// GET /variables
+	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
 	// InitClaim implements initClaim operation.
 	//
 	// Starts a claim challenge for an unclaimed project. Authenticated by the
@@ -461,6 +533,14 @@ type Handler interface {
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListIdpRevisions implements listIdpRevisions operation.
+	//
+	// Returns every revision of one connection, newest first, paginated with a
+	// cursor. The order is fixed, so there is no `sorting`.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /idps/{id}/revisions
+	ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error)
 	// ListMyProjects implements listMyProjects operation.
 	//
 	// The projects the signed-in user holds an active grant on, either directly or
@@ -546,6 +626,13 @@ type Handler interface {
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
+	// QueryIdps implements queryIdps operation.
+	//
+	// Returns the identity provider connections of a project, paginated with a
+	// cursor. One row per connection, carrying its newest revision.
+	//
+	// POST /idps/query
+	QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
 	// QueryProjects implements queryProjects operation.
 	//
 	// Query projects.
@@ -639,6 +726,25 @@ type Handler interface {
 	//
 	// PATCH /teams/{team_id}
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
+	// UpdateVariables implements updateVariables operation.
+	//
+	// Enters, replaces and removes variables at the owner this request
+	// addresses.
+	// Every name in the body is applied at exactly that owner — the project, or
+	// the environment named by `environment_name` — and reaches no other. Names
+	// not in the body are untouched.
+	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
+	// stores the value encrypted under the project's active `secret` key, after
+	// which it can be referenced but not read back. `null` removes the name from
+	// this owner (RFC 7386), which is how several variables are removed in one
+	// request; removing a name this owner does not hold is a no-op rather than an
+	// error.
+	// The body is applied whole or not at all, so a rejected request leaves the
+	// owner exactly as it was. Writing the same name and owner twice replaces the
+	// value rather than duplicating it, which makes a retry safe.
+	//
+	// PATCH /variables
+	UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

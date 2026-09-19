@@ -39,6 +39,12 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Identity Providers
+    description: |
+      External login providers a project offers, each published as a
+      revisioned connection document and referenced by its slug from user
+      schemas and flow definitions. Create-or-revise, query, read by id, and
+      revision reads. A slug resolves through the query.
   - name: Releases
     description: |
       Immutable, project-scoped configuration snapshots. A release pins one
@@ -64,6 +70,20 @@ tags:
       identity, session, admin, and entity events; filter by `category` /
       `event_type`. Response items are a discriminated Event union on
       `event_type` with typed payloads per docs/design/api/events-catalog.md.
+  - name: Variables
+    description: |
+      Named values a project enters and references from configuration documents
+      as `${{ NAME }}` (ADR 062). A variable belongs to the project or to one of
+      its environments, which is how a value that must differ per environment
+      reaches a release that is promoted between them unchanged.
+
+      Those owners are separate rather than a hierarchy: a variable is read,
+      written and deleted at exactly the owner a request addresses, and nothing
+      is inherited in either direction.
+
+      Secrets are the same resource with the value stored encrypted: same
+      names, same references, same endpoints. They are write-only — a read says
+      that a secret is held, never what it is.
 
 paths:
   /healthz:
@@ -154,6 +174,16 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /idps:
+    $ref: endpoints/idps/methods.yaml
+  /idps/query:
+    $ref: endpoints/idps/query/methods.yaml
+  /idps/{id}:
+    $ref: endpoints/idps/by_id/methods.yaml
+  /idps/{id}/revisions:
+    $ref: endpoints/idps/by_id/revisions/methods.yaml
+  /idps/revisions/{revision_id}:
+    $ref: endpoints/idps/revisions/by_id/methods.yaml
   /releases:
     $ref: endpoints/releases/methods.yaml
   /releases/{release_id}:
@@ -168,6 +198,10 @@ paths:
     $ref: endpoints/events/methods.yaml
   /events/{id}:
     $ref: endpoints/events/by_id/methods.yaml
+  /variables:
+    $ref: endpoints/variables/methods.yaml
+  /variables/{variable_name}:
+    $ref: endpoints/variables/by_name/methods.yaml
 
 components:
   securitySchemes:

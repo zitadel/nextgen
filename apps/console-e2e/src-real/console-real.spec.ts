@@ -1,6 +1,6 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary, grantProjectAdmin, signIn } from "./support";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -9,7 +9,15 @@ test("shows the bootstrapped project in the list and detail views", async ({
   zitadel,
   seed,
 }) => {
-  await signIn(page, await seed.user());
+  // The list is the projects this person can act on (`GET /users/me/projects`),
+  // so the operator needs a grant on the project before it shows up — being
+  // able to sign in to it is not access to it.
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  await signIn(page, operator);
+
+  // The pill reads the same query, with the session cookie alone.
+  await expect(page.getByRole("button", { name: "Switch project" })).not.toHaveText("No projects");
 
   await page.goto("/projects");
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
@@ -71,10 +79,12 @@ test("keeps the project credential out of browser requests and resources", async
     );
   });
 
-  const responsePromise = page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return url.pathname.startsWith("/api/projects/");
-  });
+  // The Projects screen's own read. It is session-authenticated, so the browser
+  // request carries no bearer — and the proxy adding one on the way through
+  // must not show up here either.
+  const responsePromise = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/users/me/projects",
+  );
 
   await page.goto("/projects");
   const response = await responsePromise;
