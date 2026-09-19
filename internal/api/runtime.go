@@ -3,11 +3,9 @@ package api
 import (
 	"context"
 	"log/slog"
-	"net/http"
-	"net/url"
-	"strings"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -24,9 +22,9 @@ import (
 // one with X-Zitadel-Release, which must already be deployed to that
 // environment.
 //
-// WithRuntimeSelectorMiddleware records the request origin for the handlers;
-// the resolution itself happens once the project is known, inside the
-// handler, because the project id arrives in the request body.
+// middleware.WithRequestOriginMiddleware records the request origin for the
+// handlers; the resolution itself happens once the project is known, inside
+// the handler, because the project id arrives in the request body.
 //
 // Wired into POST /flow today: the resolution rides the context
 // (service.WithRuntimeResolution), the flow definition resolves among the
@@ -44,42 +42,6 @@ import (
 //     the newest revision rather than the sealed release's.
 //   - the console runtime document (/console/runtime.json).
 
-type runtimeOriginKey struct{}
-
-// WithRuntimeSelectorMiddleware records the request's origin, taken from the
-// Origin header or, failing that, the origin of the Referer, so handlers can
-// resolve the environment a public request belongs to.
-func WithRuntimeSelectorMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := requestOrigin(r)
-		if origin != "" {
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), runtimeOriginKey{}, origin)))
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func requestOrigin(r *http.Request) string {
-	if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" && origin != "null" {
-		return strings.ToLower(origin)
-	}
-	referer := strings.TrimSpace(r.Header.Get("Referer"))
-	if referer == "" {
-		return ""
-	}
-	u, err := url.Parse(referer)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return ""
-	}
-	return strings.ToLower(u.Scheme + "://" + u.Host)
-}
-
-func runtimeOriginFromContext(ctx context.Context) string {
-	v, _ := ctx.Value(runtimeOriginKey{}).(string)
-	return v
-}
-
 // WithRuntimeResolver wires the environment and release resolver. A
 // chainable setter rather than a constructor parameter so the existing
 // NewHandler call sites stay untouched; without it, public requests skip
@@ -95,8 +57,9 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID string, environm
 	if h.runtimeResolver == nil {
 		return nil, nil
 	}
+	origin, _ := middleware.RequestOriginFromContext(ctx)
 	selector := service.RuntimeSelector{
-		Origin:      runtimeOriginFromContext(ctx),
+		Origin:      origin,
 		Environment: environmentSelector.Or(""),
 		Release:     releaseSelector.Or(""),
 	}
