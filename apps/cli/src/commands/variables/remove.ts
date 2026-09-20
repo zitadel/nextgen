@@ -33,9 +33,14 @@ export default class VariablesRemove extends BaseCommand {
     const { args, flags } = await this.parse(VariablesRemove);
     // `--environment` names the owner on the platform, not a `zitadel.json`
     // block. `toMeta` forwards a `flags.environment` to the server resolver,
-    // where a matching `environments.<name>.server` would redirect the request
-    // to another server; withhold it so the server resolves exactly as it does
-    // for a command that has no such flag.
+    // where a matching `environments.<name>.server` would redirect the request,
+    // so the owner name is withheld and the server resolves exactly as it does
+    // for a command carrying no such flag — the same resolution `plan` and
+    // `apply` use by default, which is what keeps a variable and the document
+    // referencing it on one platform. It does not make resolution independent
+    // of `zitadel.json`: an `environments.development.server` override still
+    // applies, as it does to every other command. The resolved server is
+    // printed below so the target is never silent.
     await this.toMeta({ ...flags, environment: undefined });
     const { cwd, source, nonInteractive, dryRun } = this.meta;
     const environment = flags.environment;
@@ -47,6 +52,7 @@ export default class VariablesRemove extends BaseCommand {
 
     const secret = await readZitadelSecret(cwd);
     consola.info(`Project       ${secret.project_id}`);
+    consola.info(`Server        ${source}`);
     consola.info(`Environment   ${ownerLabel(environment)}`);
 
     if (!nonInteractive) {

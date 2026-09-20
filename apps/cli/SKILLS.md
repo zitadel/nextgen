@@ -98,7 +98,7 @@ The groups below mirror the ones `zitadel --help` prints.
   below them instead of degrading silently (an unparseable version passes).
   Flags:
   `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
-react` (selects the Next.js auth-page renderer; accepted for any framework
+  react` (selects the Next.js auth-page renderer; accepted for any framework
   and recorded in `zitadel.json` branding, but only Next varies its generated
   templates by it; the planned `web-component` renderer is not yet available
   and is rejected if passed), `--dev-port` (dev-server port, also the issuer
