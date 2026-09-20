@@ -16,30 +16,34 @@ Usage
   zitadel <command> [flags]
 
 Project commands
-  setup:          Create a Zitadel project and scaffold local auth
-  claim:          Claim this project to make it permanent
-  doctor:         Verify local runtime and project state
-  eject:          Remove managed files and local Zitadel state
+  setup:            Create a Zitadel project and scaffold local auth
+  claim:            Claim this project to make it permanent
+  doctor:           Verify local runtime and project state
+  eject:            Remove managed files and local Zitadel state
 
 Local server commands
-  start:          Start a local Zitadel server
-  stop:           Stop the local Zitadel server
-  status:         Summarize the local Zitadel server and project state
-  logs:           Show local Zitadel server logs
-  reset:          Delete the local Zitadel server runtime and data
+  start:            Start a local Zitadel server
+  stop:             Stop the local Zitadel server
+  status:           Summarize the local Zitadel server and project state
+  logs:             Show local Zitadel server logs
+  reset:            Delete the local Zitadel server runtime and data
 
 Configuration commands
-  plan:           Validate config without mutation and preview the sync diff
-  apply:          Validate and upload repo config to the platform
-  schemas list:   List revisions of a user-schema by objectType
-  branding eject: Take ownership of the login template
+  plan:             Validate config without mutation and preview the sync diff
+  apply:            Validate and upload repo config to the platform
+  schemas list:     List revisions of a user-schema by objectType
+  branding eject:   Take ownership of the login template
+  variables list:   List the variables entered on an environment or the project
+  variables set:    Set one variable on an environment or the project
+  variables remove: Remove one variable from an environment or the project
+  variables import: Import a .env-style file into an environment or the project
 
 Additional commands
-  autocomplete:   Display autocomplete installation instructions
-  commands:       List all zitadel commands
-  search:         Search for a command
-  version:        Show the CLI version
-  which:          Show which plugin a command is in
+  autocomplete:     Display autocomplete installation instructions
+  commands:         List all zitadel commands
+  search:           Search for a command
+  version:          Show the CLI version
+  which:            Show which plugin a command is in
 
 Flags
   --help      Show help for command
