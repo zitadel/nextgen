@@ -40,11 +40,10 @@
 > §Context's rule that a user may belong to many teams.
 >
 > **Proposed amendment — [ADR 064](064-background-jobs.md):**
-> if ADR 064 is accepted, the [§Non-goals](#non-goals) statement that there is
-> no scheduled-task infrastructure (all TTLs are read-time filtering) no longer
-> holds for instance scheduling. Automated expiry and deletion of unclaimed
-> projects remains a non-goal of this claim contract. Do not implement a
-> sweeper from this ADR alone.
+> if ADR 064 is accepted, unclaimed-project **deletion** can run as a
+> periodic job on that runtime. This claim contract still does not add that
+> sweeper. The 14-day claim *window* stays a read of `projects.created_at` at
+> claim time. Do not implement a deleter from this ADR alone.
 >
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
