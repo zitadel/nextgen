@@ -31,16 +31,11 @@ export default class VariablesDelete extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariablesDelete);
-    // `--environment` names the owner on the platform, not a `zitadel.json`
-    // block. `toMeta` forwards a `flags.environment` to the server resolver,
-    // where a matching `environments.<name>.server` would redirect the request,
-    // so the owner name is withheld and the server resolves exactly as it does
-    // for a command carrying no such flag — the same resolution `plan` and
-    // `apply` use by default, which is what keeps a variable and the document
-    // referencing it on one platform. It does not make resolution independent
-    // of `zitadel.json`: an `environments.development.server` override still
-    // applies, as it does to every other command. The resolved server is
-    // printed below so the target is never silent.
+    // Which server and which environment are independent: the CLI talks to one
+    // instance, and its environments live inside that instance. `--environment`
+    // names the owner there, so it is withheld from `toMeta`, which would
+    // otherwise pass it to the server resolver and let a `zitadel.json`
+    // `environments.<name>.server` entry redirect the request.
     await this.toMeta({ ...flags, environment: undefined });
     const { cwd, source, nonInteractive, dryRun } = this.meta;
     const environment = flags.environment;
