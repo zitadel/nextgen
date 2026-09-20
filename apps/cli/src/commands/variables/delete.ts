@@ -9,28 +9,28 @@ import { assertVariableName, environmentParam, ownerLabel } from "../../lib/vari
 import { readZitadelSecret } from "../../lib/project";
 
 /**
- * The `variables remove` topic command — remove one variable from one owner.
+ * The `variables delete` topic command — remove one variable from one owner.
  *
  * A variable is removable only by the owner that entered it: removing a name
  * another owner of the same project holds answers `var.not_found` and leaves
  * that owner's value standing (ADR 062 §4).
  */
-export default class VariablesRemove extends BaseCommand {
-  static override description = "Remove one variable from an environment or the project.";
+export default class VariablesDelete extends BaseCommand {
+  static override description = "Delete one variable from an environment or the project.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 7;
   static override args = {
-    name: Args.string({ required: true, description: "Variable name to remove." }),
+    name: Args.string({ required: true, description: "Variable name to delete." }),
   };
   static override flags = {
     environment: Flags.string({
       char: "e",
-      description: "Environment to remove from. Omit to remove at the project level.",
+      description: "Environment to delete from. Omit to delete at the project level.",
     }),
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariablesRemove);
+    const { args, flags } = await this.parse(VariablesDelete);
     // `--environment` names the owner on the platform, not a `zitadel.json`
     // block. `toMeta` forwards a `flags.environment` to the server resolver,
     // where a matching `environments.<name>.server` would redirect the request,
@@ -56,7 +56,7 @@ export default class VariablesRemove extends BaseCommand {
     consola.info(`Environment   ${ownerLabel(environment)}`);
 
     if (!nonInteractive) {
-      const ok = await confirm({ message: `Remove ${name} from ${where}?` });
+      const ok = await confirm({ message: `Delete ${name} from ${where}?` });
       if (isCancel(ok) || !ok) {
         return this.emit({
           status: "skipped",
@@ -83,7 +83,7 @@ export default class VariablesRemove extends BaseCommand {
     return this.emit({
       status: "ok",
       data: { environment: environment ?? null, name },
-      pretty: `Removed ${name} from ${where}`,
+      pretty: `Deleted ${name} from ${where}`,
     });
   }
 }

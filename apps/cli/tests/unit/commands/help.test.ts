@@ -35,7 +35,7 @@ Configuration commands
   branding eject:   Take ownership of the login template
   variables list:   List the variables entered on an environment or the project
   variables set:    Set one variable on an environment or the project
-  variables remove: Remove one variable from an environment or the project
+  variables delete: Delete one variable from an environment or the project
   variables import: Import a .env-style file into an environment or the project
 
 Additional commands

@@ -133,7 +133,7 @@ which ships in this package.
 - [`zitadel uninstall`](#zitadel-uninstall)
 - [`zitadel variables import`](#zitadel-variables-import)
 - [`zitadel variables list`](#zitadel-variables-list)
-- [`zitadel variables remove NAME`](#zitadel-variables-remove-name)
+- [`zitadel variables delete NAME`](#zitadel-variables-delete-name)
 - [`zitadel variables set NAME`](#zitadel-variables-set-name)
 - [`zitadel version`](#zitadel-version)
 - [`zitadel which`](#zitadel-which)
@@ -798,21 +798,21 @@ DESCRIPTION
   List the variables entered on an environment or the project.
 ```
 
-## `zitadel variables remove NAME`
+## `zitadel variables delete NAME`
 
-Remove one variable from an environment or the project.
+Delete one variable from an environment or the project.
 
 ```
 USAGE
-  $ zitadel variables remove NAME [--json] [-c <value>] [-s <value>] [-n] [-f]
+  $ zitadel variables delete NAME [--json] [-c <value>] [-s <value>] [-n] [-f]
     [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>]
 
 ARGUMENTS
-  NAME  Variable name to remove.
+  NAME  Variable name to delete.
 
 FLAGS
   -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Environment to remove from. Omit to remove at the
+  -e, --environment=<value>  Environment to delete from. Omit to delete at the
                              project level.
   -f, --force                Overwrite protected files on conflict.
   -n, --non-interactive      Disable prompts. Required when scripting or running
@@ -828,7 +828,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Remove one variable from an environment or the project.
+  Delete one variable from an environment or the project.
 ```
 
 ## `zitadel variables set NAME`

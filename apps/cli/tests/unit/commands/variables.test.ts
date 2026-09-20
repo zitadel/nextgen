@@ -300,7 +300,7 @@ describe("variables set", () => {
   });
 });
 
-describe("variables remove", () => {
+describe("variables delete", () => {
   it("deletes the name at the addressed owner", async () => {
     const cwd = await makeProject();
     let path = "";
@@ -315,7 +315,7 @@ describe("variables remove", () => {
 
     const res = await runCliForTest([
       "variables",
-      "remove",
+      "delete",
       "SUPPORT_EMAIL",
       "-e",
       "prod",
@@ -340,7 +340,7 @@ describe("variables remove", () => {
 
     const res = await runCliForTest([
       "variables",
-      "remove",
+      "delete",
       "SUPPORT_EMAIL",
       "--non-interactive",
       "--dry-run",

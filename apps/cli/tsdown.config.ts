@@ -37,7 +37,7 @@ export default defineConfig({
     "commands/branding/eject": "src/commands/branding/eject.ts",
     "commands/variables/list": "src/commands/variables/list.ts",
     "commands/variables/set": "src/commands/variables/set.ts",
-    "commands/variables/remove": "src/commands/variables/remove.ts",
+    "commands/variables/delete": "src/commands/variables/delete.ts",
     "commands/variables/import": "src/commands/variables/import.ts",
     "lib/oclif/help": "src/lib/oclif/help.ts",
   },

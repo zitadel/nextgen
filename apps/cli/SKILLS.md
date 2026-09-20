@@ -279,7 +279,7 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`
   or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
-- `variables list|set|remove|import` — manage the per-environment variables and
+- `variables list|set|delete|import` — manage the per-environment variables and
   secrets a configuration document references as `${{ NAME }}`. `--environment`
   (`-e`) names the owner and addresses the project level when omitted; owners do
   not inherit from one another, so a value that has to hold on several
@@ -288,7 +288,7 @@ docker --image <ref>` remains the explicit image override for debugging.
   stores it encrypted, after which it can be replaced but never read back
   (`list` reports it as held, and `--json` omits the value key entirely).
   `import --file <path>` sends a whole `.env`-style file as one patch, applied
-  whole or not at all. There is no `pull`. `set`, `remove` and `import` honour
+  whole or not at all. There is no `pull`. `set`, `delete` and `import` honour
   `--dry-run` and send no request.
 
 ## Golden path
