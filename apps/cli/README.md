@@ -112,26 +112,31 @@ which ships in this package.
 <summary>Full command reference</summary>
 
 <!-- commands -->
-* [`zitadel apply`](#zitadel-apply)
-* [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
-* [`zitadel branding eject`](#zitadel-branding-eject)
-* [`zitadel claim`](#zitadel-claim)
-* [`zitadel commands`](#zitadel-commands)
-* [`zitadel doctor`](#zitadel-doctor)
-* [`zitadel eject`](#zitadel-eject)
-* [`zitadel help [COMMAND]`](#zitadel-help-command)
-* [`zitadel logs`](#zitadel-logs)
-* [`zitadel plan`](#zitadel-plan)
-* [`zitadel reset`](#zitadel-reset)
-* [`zitadel schemas list`](#zitadel-schemas-list)
-* [`zitadel search`](#zitadel-search)
-* [`zitadel setup`](#zitadel-setup)
-* [`zitadel start`](#zitadel-start)
-* [`zitadel status`](#zitadel-status)
-* [`zitadel stop`](#zitadel-stop)
-* [`zitadel uninstall`](#zitadel-uninstall)
-* [`zitadel version`](#zitadel-version)
-* [`zitadel which`](#zitadel-which)
+
+- [`zitadel apply`](#zitadel-apply)
+- [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
+- [`zitadel branding eject`](#zitadel-branding-eject)
+- [`zitadel claim`](#zitadel-claim)
+- [`zitadel commands`](#zitadel-commands)
+- [`zitadel doctor`](#zitadel-doctor)
+- [`zitadel eject`](#zitadel-eject)
+- [`zitadel help [COMMAND]`](#zitadel-help-command)
+- [`zitadel logs`](#zitadel-logs)
+- [`zitadel plan`](#zitadel-plan)
+- [`zitadel reset`](#zitadel-reset)
+- [`zitadel schemas list`](#zitadel-schemas-list)
+- [`zitadel search`](#zitadel-search)
+- [`zitadel setup`](#zitadel-setup)
+- [`zitadel start`](#zitadel-start)
+- [`zitadel status`](#zitadel-status)
+- [`zitadel stop`](#zitadel-stop)
+- [`zitadel uninstall`](#zitadel-uninstall)
+- [`zitadel variables import`](#zitadel-variables-import)
+- [`zitadel variables list`](#zitadel-variables-list)
+- [`zitadel variables remove NAME`](#zitadel-variables-remove-name)
+- [`zitadel variables set NAME`](#zitadel-variables-set-name)
+- [`zitadel version`](#zitadel-version)
+- [`zitadel which`](#zitadel-which)
 
 ## `zitadel apply`
 
@@ -730,6 +735,137 @@ ALIASES
   $ zitadel uninstall
 ```
 
+## `zitadel variables import`
+
+Import a .env-style file into an environment or the project.
+
+```
+USAGE
+  $ zitadel variables import --file <value> [--json] [-c <value>] [-s <value>]
+    [-n] [-f] [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>]
+    [--secret]
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to write to. Omit to write at the
+                             project level.
+  -f, --force                Overwrite protected files on conflict.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --file=<value>         (required) Path to the .env-style file to read.
+      --secret               Store every imported value encrypted.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Import a .env-style file into an environment or the project.
+```
+
+## `zitadel variables list`
+
+List the variables entered on an environment or the project.
+
+```
+USAGE
+  $ zitadel variables list [--json] [-c <value>] [-s <value>] [-n] [-f]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>]
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to read. Omit to read the project
+                             level.
+  -f, --force                Overwrite protected files on conflict.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the variables entered on an environment or the project.
+```
+
+## `zitadel variables remove NAME`
+
+Remove one variable from an environment or the project.
+
+```
+USAGE
+  $ zitadel variables remove NAME [--json] [-c <value>] [-s <value>] [-n] [-f]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>]
+
+ARGUMENTS
+  NAME  Variable name to remove.
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to remove from. Omit to remove at the
+                             project level.
+  -f, --force                Overwrite protected files on conflict.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove one variable from an environment or the project.
+```
+
+## `zitadel variables set NAME`
+
+Set one variable on an environment or the project.
+
+```
+USAGE
+  $ zitadel variables set NAME [--json] [-c <value>] [-s <value>] [-n] [-f]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>] [--secret]
+
+ARGUMENTS
+  NAME  Variable name (letters, digits and underscores).
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to write to. Omit to write at the
+                             project level.
+  -f, --force                Overwrite protected files on conflict.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --secret               Store the value encrypted. It can be replaced later
+                             but never read back.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Set one variable on an environment or the project.
+```
+
 ## `zitadel version`
 
 ```
@@ -784,6 +920,7 @@ EXAMPLES
 ```
 
 _See code: [@oclif/plugin-which](https://github.com/oclif/plugin-which/blob/3.2.55/src/commands/which.ts)_
+
 <!-- commandsstop -->
 
 </details>

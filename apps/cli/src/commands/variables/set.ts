@@ -41,8 +41,13 @@ export default class VariablesSet extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariablesSet);
-    await this.toMeta(flags);
-    const { cwd, source, nonInteractive, cliVersion } = this.meta;
+    // `--environment` names the owner on the platform, not a `zitadel.json`
+    // block. `toMeta` forwards a `flags.environment` to the server resolver,
+    // where a matching `environments.<name>.server` would redirect the request
+    // to another server; withhold it so the server resolves exactly as it does
+    // for a command that has no such flag.
+    await this.toMeta({ ...flags, environment: undefined });
+    const { cwd, source, nonInteractive, dryRun, cliVersion } = this.meta;
     const environment = flags.environment;
     const name = args.name;
 
@@ -63,14 +68,19 @@ export default class VariablesSet extends BaseCommand {
         hint: `Pipe the value in: ${pipeHint(name, cliVersion)}`,
       });
     }
+    // An empty string is a value the scalar schema accepts, and `import`
+    // already sends `A=` as one. Only an absent input is an error, which the
+    // stdin guard above and the prompt's own cancel signal cover, so `""`
+    // passes through rather than being rejected as missing.
     const value = nonInteractive
       ? await readStdin(process.stdin)
       : await promptValue(name, flags.secret);
-    if (value === "") {
-      throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
-        hint: nonInteractive
-          ? `Pipe the value in: ${pipeHint(name, cliVersion)}`
-          : "Enter a value at the prompt.",
+
+    if (dryRun) {
+      return this.emit({
+        status: "skipped",
+        reason: "dry-run",
+        data: { environment: environment ?? null, name, secret: flags.secret },
       });
     }
 

@@ -102,7 +102,10 @@ export function renderVariableTable(rows: ReadonlyArray<VariableRow>): string {
  * stored.
  */
 export function parseEnvFile(contents: string): Record<string, string> {
-  const values: Record<string, string> = {};
+  // Null-prototype: `__proto__` satisfies the platform's `^\w+$` name grammar,
+  // and assigning it on an ordinary object would invoke the prototype setter
+  // and drop the line while still reporting success.
+  const values: Record<string, string> = Object.create(null) as Record<string, string>;
   for (const raw of contents.split(/\r?\n/)) {
     const line = raw.trim();
     if (line === "" || line.startsWith("#")) {
@@ -146,11 +149,15 @@ export async function readEnvFile(path: string): Promise<Record<string, string>>
 }
 
 /**
- * Names the platform accepts, from ADR 062 §2: letters, digits and
- * underscores. Checked before the patch so one bad line in a `.env` file is
+ * Names the platform accepts, from `variable-name.yaml`: word characters only,
+ * which is exactly what the `${{ NAME }}` reference syntax can address
+ * (ADR 062 §2). Checked before the patch so one bad line in a `.env` file is
  * named locally rather than failing the whole transaction at the edge.
  */
 const VARIABLE_NAME = /^\w+$/;
+
+/** Longest name the same schema accepts. */
+const VARIABLE_NAME_MAX = 255;
 
 /** Reject a name the platform would refuse, naming it. */
 export function assertVariableName(name: string): void {
@@ -158,6 +165,13 @@ export function assertVariableName(name: string): void {
     throw new ZitadelError("E_VALIDATION", `Invalid variable name ${JSON.stringify(name)}.`, {
       hint: "A variable name contains only letters, digits and underscores.",
     });
+  }
+  if (name.length > VARIABLE_NAME_MAX) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `Variable name is ${name.length} characters; the limit is ${VARIABLE_NAME_MAX}.`,
+      { hint: "Shorten the name." },
+    );
   }
 }
 

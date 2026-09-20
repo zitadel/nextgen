@@ -98,7 +98,7 @@ The groups below mirror the ones `zitadel --help` prints.
   below them instead of degrading silently (an unparseable version passes).
   Flags:
   `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
-  react` (selects the Next.js auth-page renderer; accepted for any framework
+react` (selects the Next.js auth-page renderer; accepted for any framework
   and recorded in `zitadel.json` branding, but only Next varies its generated
   templates by it; the planned `web-component` renderer is not yet available
   and is rejected if passed), `--dev-port` (dev-server port, also the issuer
@@ -279,6 +279,17 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`
   or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
+- `variables list|set|remove|import` — manage the per-environment variables and
+  secrets a configuration document references as `${{ NAME }}`. `--environment`
+  (`-e`) names the owner and addresses the project level when omitted; owners do
+  not inherit from one another, so a value that has to hold on several
+  environments is entered on each. `set` takes its value from a prompt or from
+  stdin and never from a flag, so a credential never reaches `argv`; `--secret`
+  stores it encrypted, after which it can be replaced but never read back
+  (`list` reports it as held, and `--json` omits the value key entirely).
+  `import --file <path>` sends a whole `.env`-style file as one patch, applied
+  whole or not at all. There is no `pull`. `set`, `remove` and `import` honour
+  `--dry-run` and send no request.
 
 ## Golden path
 

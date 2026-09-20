@@ -43,6 +43,11 @@ describe("assertVariableName", () => {
       expect(() => assertVariableName(bad)).toThrow(/Invalid variable name/);
     }
   });
+
+  it("enforces the schema's 255-character cap locally", () => {
+    expect(() => assertVariableName("A".repeat(255))).not.toThrow();
+    expect(() => assertVariableName("A".repeat(256))).toThrow(/the limit is 255/);
+  });
 });
 
 describe("ownerLabel", () => {
@@ -131,6 +136,19 @@ describe("parseEnvFile", () => {
 
   it("ignores a line with no assignment", () => {
     expect(parseEnvFile("noequals\n=novalue\nA=1")).toEqual({ A: "1" });
+  });
+
+  it("keeps __proto__ as an own property rather than losing it", () => {
+    const parsed = parseEnvFile("__proto__=payload\nA=1");
+
+    expect(Object.hasOwn(parsed, "__proto__")).toBe(true);
+    expect(Object.keys(parsed).sort()).toEqual(["A", "__proto__"]);
+    expect(parsed["__proto__"]).toBe("payload");
+    expect(({} as Record<string, unknown>)["payload"]).toBeUndefined();
+  });
+
+  it("keeps an empty value, which the scalar schema accepts", () => {
+    expect(parseEnvFile("A=\n")).toEqual({ A: "" });
   });
 });
 

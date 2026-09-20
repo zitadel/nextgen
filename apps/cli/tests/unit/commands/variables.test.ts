@@ -117,6 +117,34 @@ describe("variables list", () => {
     expect(json.data.count).toBe(0);
   });
 
+  it("does not let the owner name pick a different server", async () => {
+    const cwd = await makeProject();
+    // `zitadel.json` names one server for the project and another under the
+    // environment called "prod". The owner flag must not reach the server
+    // resolver, or `-e prod` would silently address the second one. No
+    // `--server` here: that flag short-circuits resolution and would hide it.
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj_test",
+        server: SERVER,
+        environments: { prod: { server: "https://elsewhere.example" } },
+      }),
+    );
+    let hit = "";
+    server.use(
+      http.get("*/variables", ({ request }) => {
+        hit = new URL(request.url).origin;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await runCliForTest(["variables", "list", "-e", "prod", "--cwd", cwd, "--json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(hit).toBe(SERVER);
+  });
+
   it("rejects an environment name the platform's grammar refuses", async () => {
     const cwd = await makeProject();
 
@@ -214,6 +242,61 @@ describe("variables set", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).not.toContain("s3cr3t-value");
     expect(res.stderr).not.toContain("s3cr3t-value");
+  });
+
+  it("sends no request under --dry-run", async () => {
+    const cwd = await makeProject();
+    let called = false;
+    server.use(
+      http.patch("*/variables", () => {
+        called = true;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await withStdin("value", () =>
+      runCliForTest(["variables", "set", "TOKEN", "--non-interactive", "--dry-run", ...base(cwd)]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(called).toBe(false);
+    const json = parseJson(res.stdout) as { status: string; reason: string };
+    expect(json.status).toBe("skipped");
+    expect(json.reason).toBe("dry-run");
+  });
+
+  it("sets an empty value, which the scalar schema accepts", async () => {
+    const cwd = await makeProject();
+    let body: Record<string, unknown> = {};
+    server.use(
+      http.patch("*/variables", async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await withStdin("", () =>
+      runCliForTest(["variables", "set", "EMPTY", "--non-interactive", ...base(cwd)]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({ EMPTY: { value: "", secret: false } });
+  });
+
+  it("rejects a name longer than the schema allows", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "variables",
+      "set",
+      "A".repeat(256),
+      "--non-interactive",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).toBe("E_VALIDATION");
   });
 });
 

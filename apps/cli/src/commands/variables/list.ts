@@ -28,7 +28,12 @@ export default class VariablesList extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(VariablesList);
-    await this.toMeta(flags);
+    // `--environment` names the owner on the platform, not a `zitadel.json`
+    // block. `toMeta` forwards a `flags.environment` to the server resolver,
+    // where a matching `environments.<name>.server` would redirect the request
+    // to another server; withhold it so the server resolves exactly as it does
+    // for a command that has no such flag.
+    await this.toMeta({ ...flags, environment: undefined });
     const { cwd, source } = this.meta;
     const environment = flags.environment;
 
