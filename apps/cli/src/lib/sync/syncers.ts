@@ -1,13 +1,9 @@
-import { writeFileSync } from "node:fs";
-
 import type {
   CreateBranding201,
   CreateBrandingBody,
   CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
   GetBrandingById200,
-  UpdateFlowDefinition200,
-  UpdateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
@@ -22,8 +18,8 @@ import { validateLoginTemplate } from "@zitadel/config/template";
 
 import {
   BRANDING_DIR,
+  assertNoLegacyTemplateKey,
   readDescriptorTemplate,
-  resolveTemplatePath,
   toBrandingWireBody,
   toLocalBrandingBody,
 } from "../branding";
@@ -48,8 +44,8 @@ export function makeSyncers(opts: {
   projectId: string;
   env: EnvLookup;
   /**
-   * Project root. The branding syncer resolves `liquid_template_file`
-   * references against it when inlining templates for hashing and upload.
+   * Project root. The branding syncer resolves `$file` references against it
+   * when inlining templates for hashing and upload.
    */
   cwd: string;
 }): ReadonlyArray<ResourceSyncer> {
@@ -156,11 +152,16 @@ class SchemaSyncer implements ResourceSyncer {
   }
 }
 
+/**
+ * Flow definitions are revisioned like schemas: every edit publishes a new
+ * immutable revision via `POST /flow_definitions`, no update or delete. The
+ * revisions of one flow share its `name`; the runtime serves the newest.
+ */
 class FlowDefinitionSyncer implements ResourceSyncer {
   readonly kind = "flow";
   readonly directory = FLOWS_DIR;
-  readonly mutable = true;
-  readonly revisioned = false;
+  readonly mutable = false;
+  readonly revisioned = true;
   readonly normalize = normalizeFlowBody;
   // For flows the comparison form doubles as the file form: everything it
   // strips (envelope keys, the empty `audience` echo) is transport noise.
@@ -187,7 +188,8 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   /**
-   * Wraps the bare on-disk flow body in the spec's create-envelope
+   * `POST /flow_definitions` publishes a new immutable revision and returns
+   * its id. Wraps the bare on-disk flow body in the spec's create-envelope
    * (`api/openapi/components/flows/flow-definition-create-request.yaml`)
    * before sending. The file on disk stays bare so it is human-editable;
    * only the wire request carries `project_id` and the surrounding
@@ -202,22 +204,18 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     return { id: result.id, canonical: result.flow_definition as object };
   }
 
-  /**
-   * PUT completely replaces the flow definition. The wire request wraps the
-   * bare on-disk flow in the `{ flow_definition }` update envelope
-   * (`api/openapi/components/flows/flow-definition-update-request.yaml`); the
-   * file on disk stays bare so it is human-editable. Flat-by-id: no
-   * `project_id` query — authz resolves the project from RSI.
-   */
-  async update(id: string, data: object): Promise<{ canonical?: object }> {
-    const result = (await this.client.updateFlowDefinition(id, {
-      flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition,
-    })) as UpdateFlowDefinition200;
-    return { canonical: result.flow_definition as object };
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "flows are revisioned — edit publishes a new revision, not an update",
+    );
   }
 
   async delete(id: string): Promise<void> {
-    await this.client.deleteFlowDefinition(id);
+    // Flow revisions are immutable on the platform; removing the local file
+    // does not retire them. The newest revision of the name keeps being
+    // served — publish a new revision to change what users see.
+    throw new ZitadelError("E_NOT_IMPLEMENTED", `flow delete is not supported (${id})`);
   }
 
   /**
@@ -238,7 +236,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
  * edit publishes a new revision via `POST /branding`, no update or delete.
  * Unlike schemas, nothing references branding revisions, so a revise never
  * triggers re-pinning. The descriptor keeps the template in a sibling
- * `.liquid` file (`liquid_template_file`); this syncer inlines it for
+ * `.liquid` file behind a `$file` reference; this syncer inlines it for
  * hashing and upload and splits it back out on write-back.
  */
 class BrandingSyncer implements ResourceSyncer {
@@ -269,6 +267,7 @@ class BrandingSyncer implements ResourceSyncer {
    * cannot run (its save gate is lexical; see ADR 040).
    */
   validate(data: object): void {
+    assertNoLegacyTemplateKey(data);
     const result = brandingConfigSchema.safeParse(data);
     if (!result.success) {
       throw new ZitadelError("E_VALIDATION", "Branding file is not a valid branding descriptor", {
@@ -324,15 +323,10 @@ class BrandingSyncer implements ResourceSyncer {
   }
 
   private canonicalToLocal(canonicalWire: object, localData: object): object {
-    const local = localData as { liquid_template_file?: unknown };
-    const template = (canonicalWire as { liquid_template?: unknown }).liquid_template;
-    if (typeof local.liquid_template_file === "string" && typeof template === "string") {
-      const path = resolveTemplatePath(this.cwd, local.liquid_template_file);
-      if (readDescriptorTemplate(this.cwd, localData) !== template) {
-        writeFileSync(path, template);
-        consola.info(`Updated ${local.liquid_template_file} from the server's canonical response`);
-      }
+    const { document, written } = toLocalBrandingBody(this.cwd, canonicalWire, localData);
+    for (const ref of written) {
+      consola.info(`Updated ${ref} from the server's canonical response`);
     }
-    return toLocalBrandingBody(canonicalWire, localData);
+    return document;
   }
 }

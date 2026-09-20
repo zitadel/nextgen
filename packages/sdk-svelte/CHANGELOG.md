@@ -1,5 +1,32 @@
 # @zitadel/sdk-svelte
 
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- Updated dependencies [[`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea), [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab)]:
+  - @zitadel/api@1.0.0-alpha.22
+  - @zitadel/components@1.0.0-alpha.22
+  - @zitadel/sdk-core@1.0.0-alpha.22
+
+## 1.0.0-alpha.21
+
+### Patch Changes
+
+- Updated dependencies [[`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b), [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060)]:
+  - @zitadel/api@1.0.0-alpha.21
+  - @zitadel/components@1.0.0-alpha.21
+  - @zitadel/sdk-core@1.0.0-alpha.21
+
+## 1.0.0-alpha.20
+
+### Patch Changes
+
+- Updated dependencies [[`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b)]:
+  - @zitadel/components@1.0.0-alpha.20
+  - @zitadel/api@1.0.0-alpha.20
+  - @zitadel/sdk-core@1.0.0-alpha.20
+
 ## 0.1.0-alpha.19
 
 ### Minor Changes

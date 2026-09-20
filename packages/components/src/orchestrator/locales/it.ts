@@ -108,8 +108,8 @@ export const it: Locale = {
   "password.action.register.link": "Registrati",
 
   "register.title": "Crea il tuo account",
-  // Vuoto per design — la scheda di registrazione non ha sottotitolo (Figma 6593:141743).
-  "register.description": "",
+  // Vuoto per design — la scheda di registrazione non ha sottotitolo.
+  "register.description": "Inserisci i tuoi dati per iniziare",
   "register.field.email": "E-mail",
   "register.field.email.placeholder": "tu@esempio.com",
   "register.field.password": "Password",

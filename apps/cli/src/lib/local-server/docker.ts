@@ -36,6 +36,10 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
     `NEXTGEN_SERVER_ADDRESS=:${CONTAINER_HTTP_PORT}`,
     "--env",
     `NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`,
+    // Browser-facing URLs (claim, dashboard) must use the host-visible port
+    // published above, not the cloud default the server config falls back to.
+    "--env",
+    `NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:${spec.port}`,
   ];
 
   if (spec.identity) {

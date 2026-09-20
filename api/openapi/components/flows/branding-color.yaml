@@ -1,0 +1,30 @@
+type: string
+minLength: 1
+maxLength: 128
+description: |
+  A colour on a theme side: hex (`#4F46E5`), a CSS colour name, or a colour
+  function — `rgb()`, `rgba()`, `hsl()`, `hsla()`, `hwb()`, `lab()`, `lch()`,
+  `oklab()`, `oklch()`, `color()` or `color-mix()`. `url()` and `var()` are
+  rejected: the value is written into a stylesheet, so only forms that resolve
+  to a colour are stored.
+
+  The pattern pins the shape — no semicolons, braces, comment markers or
+  backslashes, so a value cannot leave its declaration whatever it spells.
+  Which names CSS actually knows is the browser's business: an unrecognised
+  one is stored and paints nothing, rather than being refused here.
+pattern: '^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]{3,24}|[a-zA-Z][a-zA-Z-]{2,12}\((?:[0-9a-zA-Z%.,+/# -]|[a-zA-Z][a-zA-Z-]{2,12}\([0-9a-zA-Z%.,+/# -]*\))*\))$'
+examples:
+  # One per accepted form, so the list reads as the grammar rather than as a
+  # palette. Every entry is checked against the gate itself by
+  # TestBrandingColorExamplesAreValid.
+  - '#4F46E5' # six-digit hex
+  - '#fff' # shorthand
+  - '#4F46E5CC' # hex carrying alpha
+  - rebeccapurple # a CSS colour name
+  - currentColor # inherits the surrounding text colour
+  - transparent
+  - rgb(79 70 229) # space-separated arguments
+  - rgba(79 70 229 / 50%) # alpha after the slash
+  - oklch(0.7 0.15 250) # a wide-gamut colour space
+  # Quoted: an unquoted ` #` would start a YAML comment and truncate the value.
+  - 'color-mix(in oklab, #4F46E5 40%, white)'

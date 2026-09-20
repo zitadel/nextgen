@@ -17,6 +17,7 @@ import {
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
 } from "./command-telemetry";
+import type { CommandGroup } from "./groups";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -39,6 +40,15 @@ import type {
 export abstract class BaseCommand extends Command {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
+
+  /**
+   * The group the root help lists this command under (see `lib/oclif/groups`).
+   * Every product command must set it; the root-help test fails otherwise.
+   */
+  static group?: CommandGroup;
+
+  /** Position within {@link group} on the root help, lowest first. */
+  static groupOrder?: number;
 
   /** Flags shared by every command, inherited via oclif `baseFlags`. */
   static override baseFlags = {

@@ -1,5 +1,65 @@
 # @zitadel/api
 
+## 1.0.0-alpha.22
+
+### Minor Changes
+
+- [#1093](https://github.com/zitadel/nextgen/pull/1093) [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definitions are revisioned: `POST /flow_definitions` publishes a new
+  revision on every call, so a repeated `name` no longer returns 409, and
+  `GET /flow_definitions` accepts a `name` filter that lists one flow's
+  revisions newest first.
+
+- [#1155](https://github.com/zitadel/nextgen/pull/1155) [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab) Thanks [@vitorbari](https://github.com/vitorbari)! - The events API defines the `release.created` event type and its payload.
+
+  The payload carries the release's `content_hash`, its audit metadata (`message`, `git_sha`, `git_dirty`) and the `(kind, handle, revision_id)` tuples the release pins, so an audit stream answers what a release changed without reading the releases table. Nothing emits the event until `POST /releases` is implemented.
+
+## 1.0.0-alpha.21
+
+### Minor Changes
+
+- [#1085](https://github.com/zitadel/nextgen/pull/1085) [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b) Thanks [@livio-a](https://github.com/livio-a)! - Session responses identify their user through a resolved **user ref** derived
+  from the user schema's own `x-identifier`/`x-display` designations (ADR 058),
+  replacing the convention-resolved flat `name`/`email` fields this supersedes
+  (see the earlier `GET /sessions/me` identity changeset). Rendering follows one
+  chain everywhere: `display`, falling back to `identifier`, then `user_id`.
+  - `@zitadel/server`: `GET /sessions/me`, session get, and query sessions embed
+    `user` (`{user_id, identifier, identifier_property, display}`), the list
+    path hydrated with one batch resolution per page — listed sessions now carry
+    user identity at all. The conventional attribute-name resolver
+    (`name`/`givenName`+`familyName`/`email`) is removed.
+  - `@zitadel/api`: the regenerated client types the new `user` ref component.
+  - `@zitadel/components`: `<zitadel-session>`/`<zitadel-logout>` render from
+    the ref; the `zitadel-signout` detail is now `{display, identifier}`;
+    logout templates substitute `{{display}}`/`{{identifier}}` (the old
+    `{{name}}`/`{{email}}` tokens keep filling as aliases).
+  - `@zitadel/sdk-core` (and every SPA SDK via the shared contract):
+    `NextgenSession`/`ClientSession` become `{userId, identifier,
+identifierProperty, display}`; JWT-claim identities map `name` → `display`
+    and `email` → `identifier`.
+  - `@zitadel/sdk-next` / `@zitadel/sdk-nuxt`: server and client session reads
+    return the new shape.
+  - `@zitadel/cli`: scaffolded Nuxt auth plugins emit the new fields.
+
+  **Breaking:** the flat `name`/`email` session fields and the old SDK session
+  shape are gone. An unknown property is dropped rather than rejected, so a
+  client left on the old fields reads silently empty values instead of failing
+  loudly — update server, SDKs, and app chrome together.
+
+- [#1092](https://github.com/zitadel/nextgen/pull/1092) [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060) Thanks [@livio-a](https://github.com/livio-a)! - User responses carry the derived identity of ADR 058 §3a: the envelope
+  gains read-only `identifier`, `identifier_property`, and `display`,
+  resolved live from each user's own schema designations
+  (`x-identifier`/`x-display`) on every read path — query users (one batch
+  resolution per page), get by id, `users/me`, and the create read-back.
+  Clients render `display`, falling back to `identifier`, then `id`, with
+  zero designation logic of their own. The embedded console (shipped inside
+  `@zitadel/server`) renders them: the users list gains a leading **User**
+  identity column on exactly that chain plus a dedicated role-named
+  **Identifier** column (platform-derived, outside the schema-driven column
+  set), the user detail heads with the identity, and the console's
+  convention-based display-name guesser is removed.
+
+## 1.0.0-alpha.20
+
 ## 0.1.0-alpha.19
 
 ### Minor Changes

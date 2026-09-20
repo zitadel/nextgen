@@ -44,12 +44,13 @@ describe("makeSyncers", () => {
     expect(typeof schema.fetch).toBe("function");
   });
 
-  it("configures the flow syncer (mutable, FLOWS_DIR)", () => {
+  it("configures the flow syncer (revisioned, FLOWS_DIR)", () => {
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     expect(flow.kind).toBe("flow");
     expect(flow.directory).toBe(FLOWS_DIR);
-    expect(flow.mutable).toBe(true);
+    expect(flow.mutable).toBe(false);
+    expect(flow.revisioned).toBe(true);
     expect(typeof flow.fetch).toBe("function");
   });
 });
@@ -236,44 +237,12 @@ describe("FlowDefinitionSyncer", () => {
     });
   });
 
-  it("update PUTs the `{flow_definition}` envelope without a project_id query param", async () => {
-    let receivedBody: unknown;
-    let receivedProjectId: string | null = "unset";
-    server.use(
-      http.put(`${BASE}/flow_definitions/flow-id-1`, async ({ request }) => {
-        receivedProjectId = new URL(request.url).searchParams.get("project_id");
-        receivedBody = await request.json();
-        return HttpResponse.json({
-          id: "flow-id-1",
-          flow_definition: { status: "active", version: 3, audience: {} },
-        });
-      }),
-    );
+  it("update and delete throw E_NOT_IMPLEMENTED (revisioned resource)", async () => {
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-    const result = await flow.update("flow-id-1", { status: "active", version: 3 });
-
-    expect(receivedProjectId).toBeNull();
-    expect(receivedBody).toEqual({ flow_definition: { status: "active", version: 3 } });
-    expect(result.canonical).toEqual({ status: "active", version: 3, audience: {} });
-  });
-
-  it("delete DELETEs /flow_definitions/:id without a project_id query param", async () => {
-    let hits = 0;
-    let receivedProjectId: string | null = "unset";
-    server.use(
-      http.delete(`${BASE}/flow_definitions/flow-id-1`, ({ request }) => {
-        receivedProjectId = new URL(request.url).searchParams.get("project_id");
-        hits += 1;
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
-
-    await flow.delete("flow-id-1");
-
-    expect(hits).toBe(1);
-    expect(receivedProjectId).toBeNull();
+    // No handler is registered, so a request here would fail as unhandled.
+    await expect(flow.update("flow-id-1", { status: "active" })).rejects.toThrow(/revisioned/);
+    await expect(flow.delete("flow-id-1")).rejects.toThrow(ZitadelError);
   });
 
   it("fetch unwraps the detail envelope without sending project_id", async () => {
@@ -320,7 +289,7 @@ describe("BrandingSyncer", () => {
   const descriptor = {
     $schema: "../meta/branding.json",
     layout: "split",
-    liquid_template_file: "./login.liquid",
+    liquid_template: { $file: "./login.liquid" },
     logo_url: "https://cdn.example.com/logo.svg",
   };
 
@@ -347,7 +316,7 @@ describe("BrandingSyncer", () => {
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
     expect(() =>
-      branding.validate({ ...descriptor, liquid_template_file: "./missing.liquid" }),
+      branding.validate({ ...descriptor, liquid_template: { $file: "./missing.liquid" } }),
     ).toThrow(ZitadelError);
   });
 
@@ -356,7 +325,7 @@ describe("BrandingSyncer", () => {
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
     expect(() =>
-      branding.validate({ ...descriptor, liquid_template_file: "../../../../etc/passwd" }),
+      branding.validate({ ...descriptor, liquid_template: { $file: "../../../../etc/passwd" } }),
     ).toThrow(ZitadelError);
   });
 
@@ -367,13 +336,24 @@ describe("BrandingSyncer", () => {
     expect(() => branding.validate(descriptor)).toThrow(ZitadelError);
   });
 
-  it("validate throws E_VALIDATION when both template carriers are present", async () => {
+  it("validate accepts an inline template string", async () => {
     const cwd = await makeBrandingProject();
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
     expect(() =>
       branding.validate({ ...descriptor, liquid_template: VALID_TEMPLATE }),
-    ).toThrow(ZitadelError);
+    ).not.toThrow();
+  });
+
+  it("validate rejects the old liquid_template_file key with a migration hint", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+    const { liquid_template: _reference, ...legacy } = descriptor;
+    void _reference;
+
+    expect(() =>
+      branding.validate({ ...legacy, liquid_template_file: "./login.liquid" }),
+    ).toThrow(/liquid_template_file is no longer supported/);
   });
 
   it("validate throws E_VALIDATION on non-https asset URLs (server parity)", async () => {
@@ -488,7 +468,7 @@ describe("BrandingSyncer", () => {
     expect(result.id).toBe("brnd-1");
     expect(result.canonical).toEqual({
       layout: "split",
-      liquid_template_file: "./login.liquid",
+      liquid_template: { $file: "./login.liquid" },
       logo_url: "https://cdn.example.com/logo.svg",
     });
   });

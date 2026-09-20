@@ -10,6 +10,7 @@ type statements struct {
 	cryptoKeyStatements
 	jsonSchemaStatements
 	environmentStatements
+	releaseStatements
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
@@ -21,6 +22,7 @@ type statements struct {
 	userPasskeyStatements
 	userRecoveryCodesStatements
 	brandingStatements
+	variableStatements
 	claimStatements
 	resourceScopeStatements
 	authzAssignmentStatements
@@ -44,6 +46,7 @@ func newStatements(db queryExecutor) statements {
 		cryptoKeyStatements:           newCryptoKeyStatements(db),
 		jsonSchemaStatements:          newJSONSchemaStatements(db),
 		environmentStatements:         newEnvironmentStatements(db),
+		releaseStatements:             newReleaseStatements(db),
 		teamStatements:                newTeamStatements(db),
 		teamMembershipStatements:      newTeamMembershipStatements(db),
 		tokenStatements:               newTokenStatements(db),
@@ -55,6 +58,7 @@ func newStatements(db queryExecutor) statements {
 		userPasskeyStatements:         newUserPasskeyStatements(db),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(db),
 		brandingStatements:            newBrandingStatements(db),
+		variableStatements:            newVariableStatements(db),
 		claimStatements:               newClaimStatements(db),
 		resourceScopeStatements:       newResourceScopeStatements(db),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(db),

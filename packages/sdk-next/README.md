@@ -62,7 +62,7 @@ import { auth } from "@zitadel/sdk-next/server";
 export default async function Page() {
   const session = await auth();
   if (!session.isAuthenticated) return <p>Not signed in</p>;
-  return <p>Hello {session.session.email}</p>;
+  return <p>Hello {session.session.display ?? session.session.identifier}</p>;
 }
 ```
 
@@ -128,7 +128,7 @@ import { useAuth } from '@zitadel/sdk-next/react';
 
 export function UserBadge() {
   const auth = useAuth();
-  return <span>{auth.isAuthenticated ? auth.session.email : 'Guest'}</span>;
+  return <span>{auth.isAuthenticated ? (auth.session.display ?? auth.session.identifier) : 'Guest'}</span>;
 }
 ```
 
@@ -162,7 +162,7 @@ export function HeaderNav() {
   if (error) return <span role="alert">Session unavailable</span>;
   if (!auth) return null;
   return auth.isAuthenticated ? (
-    <a href="/profile">{auth.session.name ?? auth.session.email ?? 'Account'}</a>
+    <a href="/profile">{auth.session.display ?? auth.session.identifier ?? 'Account'}</a>
   ) : (
     <a href="/login">Sign in</a>
   );

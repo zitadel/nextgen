@@ -236,7 +236,7 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 		hasher.EXPECT().Hash(gomock.Any()).Return("hashed:pw", nil)
 		handler := service.NewFlowCreateUserHandler(
 			hasher,
-			service.NewUserService(pool, pool.Statements(), hasher),
+			service.NewUserService(pool, pool.Statements(), hasher, service.StatementsUserRefResolver{Pool: pool}),
 			pool.Statements(),
 			pool,
 		)

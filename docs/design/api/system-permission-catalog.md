@@ -243,13 +243,13 @@ grant them via `team.write`.
 
 ### Identity providers
 
-> **Verb model:** manage — `write` = create + update (no `idp.create`); `delete` separate. No `idp.manage` permission.
+> **Verb model:** manage — `write` = create + update (no `idp.create`); `delete` separate. No `idp.manage` permission. Update is a revise: a connection is a chain of immutable revisions, so `write` publishes one rather than editing in place.
 
-| Permission | Endpoints | Notes |
-|---|---|---|
-| `idp.read` | `GET /idps/{id}` | |
-| `idp.write` | `POST /idps`, `PATCH /idps/{id}` | Create + manage. |
-| `idp.delete` | `DELETE /idps/{id}` | |
+| Permission | Endpoints | Notes                                                                                                                                                         |
+|---|---|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `idp.read` | `POST /idps/query`, `GET /idps/{id}`, `GET /idps/{id}/revisions`, `GET /idps/revisions/{revision_id}` | Get + list; list is project-scoped. Config files reference a connection by `slug`; the query resolves one with `equals` on `slug`, as teams resolve a name. Revision reads carry the same scope as the get. |
+| `idp.write` | `POST /idps` | Create + revise: the `slug` in the submitted document decides whether it creates a connection or appends a revision to an existing connection in the project. |
+| `idp.delete` | `DELETE /idps/{id}` | **Not yet exposed** — target shape.                                                                                                                           |
 
 ### App groups
 
@@ -296,13 +296,13 @@ not yet exposed.
 
 ### Flow definitions
 
-> **Verb model:** manage — `write` = create + update; `delete` separate (already in OpenAPI). No `flow_definition.manage` permission.
+> **Verb model:** manage — `write` = create, and every create publishes a new revision; `delete` has no endpoint. No `flow_definition.manage` permission.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `flow_definition.read` | `GET /flow_definitions`, `GET /flow_definitions/{id}` | Get + list. Validate / simulate read-only probes are **planned**, not yet exposed. |
-| `flow_definition.write` | `POST /flow_definitions`, `PUT /flow_definitions/{id}`, `POST /flow_definitions/{id}/activate`, `POST /flow_definitions/{id}/deactivate` | Create + manage + lifecycle. |
-| `flow_definition.delete` | `DELETE /flow_definitions/{id}` | |
+| `flow_definition.write` | `POST /flow_definitions` | Publishes a new revision. A revision's status is fixed at creation, so there are no lifecycle verbs. |
+| `flow_definition.delete` | — | `DELETE /flow_definitions/{id}` was removed in [#530](https://github.com/zitadel/nextgen/issues/530); the scope stays until retirement is decided ([#536](https://github.com/zitadel/nextgen/issues/536)). |
 
 ### Sessions
 

@@ -1,0 +1,4 @@
+type: string
+description: The opaque, immutable identifier of a release.
+pattern: '^rel_[a-zA-Z0-9_-]+$'
+example: rel_01KX3RG8A7F0N9WD3P2E4YM5C1

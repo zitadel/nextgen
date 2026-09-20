@@ -42,8 +42,22 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  await expect(page).toHaveURL(/\/ui\/console\/$/);
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  // `/` has no screen of its own and lands on Teams, so the redirect having run
+  // is what proves the console booted.
+  await expect(page).toHaveURL(/\/ui\/console\/teams\?status=active$/);
+  // The shell, not the screen: this lane carries no project secret, so the
+  // Teams list itself fails closed until session-derived authorization lands
+  // (Console ADR 0003). The sidebar renders either way, and it is what shows the
+  // signed-in console was reached.
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+
+  // The project pill is the one management read that does resolve here: `GET
+  // /users/me/projects` is authenticated by the session cookie alone (#1237).
+  // It used to ask `POST /projects/query`, which only accepts a project secret,
+  // and stayed a skeleton for good on this lane. A seeded user holds no grant,
+  // so the honest answer is the empty state — what matters is that it is an
+  // answer.
+  await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("No projects");
 });
 
 test("targets the origin root, never an /api prefix", async ({ page }) => {

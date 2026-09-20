@@ -6,10 +6,10 @@ content:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
-        - $ref: '../../components/schemas/errors/flowdef-already_exists.yaml'
         - $ref: '../../components/schemas/errors/flowdef-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
         - $ref: '../../components/schemas/errors/flowdef-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/flowdef-revision_conflict.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/sch-not_found.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
@@ -19,10 +19,10 @@ content:
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
-          flowdef.already_exists: '../../components/schemas/errors/flowdef-already_exists.yaml'
           flowdef.invalid: '../../components/schemas/errors/flowdef-invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
           flowdef.permission_denied: '../../components/schemas/errors/flowdef-permission_denied.yaml'
+          flowdef.revision_conflict: '../../components/schemas/errors/flowdef-revision_conflict.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           sch.not_found: '../../components/schemas/errors/sch-not_found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
@@ -38,11 +38,6 @@ content:
         value:
           code: evt.invalid
           message: 'event: invalid'
-      flowdef.already_exists:
-        summary: flowdef.already_exists
-        value:
-          code: flowdef.already_exists
-          message: 'flow definition: already exists'
       flowdef.invalid:
         summary: flowdef.invalid
         value:
@@ -58,6 +53,11 @@ content:
         value:
           code: flowdef.permission_denied
           message: 'flow definition: the flow definition management API requires the project secret'
+      flowdef.revision_conflict:
+        summary: flowdef.revision_conflict
+        value:
+          code: flowdef.revision_conflict
+          message: 'flow definition: another revision of the same flow was created at the same instant'
       internal:
         summary: internal
         value:

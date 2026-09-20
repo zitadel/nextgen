@@ -59,8 +59,8 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 }
 
 // QueryUsers is the users list (ADR 031). It carries no project parameter: the
-// oauth2 principal (the project secret the CLI's status probe sends) is the
-// only authority for which project's users are served, so the scope check is
+// credential's home project (oauth2 secret or user-bound session) is the
+// only authority for which project's users are served. The scope check is
 // what keeps a browser-plane preview secret out. Results are newest-first
 // unless the request sorts otherwise.
 func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
@@ -239,6 +239,57 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	return domainUserToApiUser(user)
 }
 
+func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, params api.PatchUserByIDParams) (api.PatchUserByIDRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
+	if err != nil {
+		return nil, err
+	}
+
+	input := service.PatchUserInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+	}
+	if req.Schema.IsSet() {
+		input.SchemaURL = new(req.Schema.Value)
+	}
+	if req.Attributes.IsSet() {
+		attributes, err := convertUsingJson[map[string]any](req.Attributes.Value)
+		if err != nil {
+			return nil, err
+		}
+		input.Attributes = *attributes
+	}
+
+	user, err := h.userService.PatchUser(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainUserToApiUser(user)
+}
+
+func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	if !ok {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+
+	attributes, err := convertUsingJson[map[string]any](req.Attributes)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := h.userService.PatchMyUser(ctx, service.PatchMyUserInput{
+		SessionToken: sessionToken,
+		Attributes:   *attributes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return domainUserToApiUser(user)
+}
+
 func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
 	if err != nil {
@@ -276,6 +327,22 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 
 // ------------------ Mappers ---------------
 
+// userRefToAPI maps the resolved reference (ADR 058 §3): identifier and
+// identifier_property travel together, display independently; empty means
+// absent on the wire. Lives with the user mapping because every
+// user-linked resource embeds the same reference.
+func userRefToAPI(ref domain.UserRef) api.UserRef {
+	out := api.UserRef{UserID: api.UserID(ref.UserID)}
+	if ref.Identifier != "" {
+		out.Identifier = api.NewOptString(ref.Identifier)
+		out.IdentifierProperty = api.NewOptString(ref.IdentifierProperty)
+	}
+	if ref.Display != "" {
+		out.Display = api.NewOptString(ref.Display)
+	}
+	return out
+}
+
 func domainUserToApiUser(user *domain.User) (*api.User, error) {
 	userData, err := user.Attributes.ToMap()
 	if err != nil {
@@ -304,6 +371,19 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 			Status:               api.UserMetadataStatus(user.Metadata.Status),
 			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
 		},
+	}
+
+	// The derived identity of ADR 058 §3a: identifier and identifier_property
+	// travel together, display independently; empty means absent on the wire
+	// (the userRefToAPI pairing rule).
+	if user.Ref != nil {
+		if user.Ref.Identifier != "" {
+			out.Identifier = api.NewOptString(user.Ref.Identifier)
+			out.IdentifierProperty = api.NewOptString(user.Ref.IdentifierProperty)
+		}
+		if user.Ref.Display != "" {
+			out.Display = api.NewOptString(user.Ref.Display)
+		}
 	}
 
 	// Nil means the read was not asked for memberships, so the property stays
@@ -352,6 +432,8 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrUserAlreadyExists().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrUserConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

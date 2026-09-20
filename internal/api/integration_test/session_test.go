@@ -86,6 +86,24 @@ func TestQuerySessions(t *testing.T) {
 		assert.Equal(t, active.ID, ids[0], "the last-created session must sort first")
 	})
 
+	// The #869 acceptance: listed rows carry the linked user's resolved
+	// reference (ADR 058 §4), batch-hydrated — the seeded default schema
+	// designates email as identifier and no display properties.
+	t.Run("rows carry resolved user refs", func(t *testing.T) {
+		for _, session := range querySessions(t, &api.QuerySessionsRequest{}).Sessions {
+			if string(session.SessionID) != active.ID {
+				assert.False(t, session.User.Set, "anonymous session %s must carry no user ref", session.SessionID)
+				continue
+			}
+			require.True(t, session.User.Set, "the authenticated session must carry a user ref")
+			ref := session.User.Value
+			assert.Equal(t, userID, string(ref.UserID))
+			assert.Equal(t, "email", ref.IdentifierProperty.Value)
+			assert.NotEmpty(t, ref.Identifier.Value, "the designated email must resolve as the identifier")
+			assert.False(t, ref.Display.Set, "the default schema designates no display properties")
+		}
+	})
+
 	for _, tc := range []struct {
 		state string
 		want  *domain.Session

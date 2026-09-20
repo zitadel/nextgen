@@ -30,7 +30,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // The top-level surfaces with a design hand-off, in the order the design puts
 // them. `User schemas` nests beneath `Users` (`Schema directory` frame) rather
 // than adding a second top-level row.
-const NAV_ORDER = ["Projects", "Teams", "Users"];
+const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
@@ -46,18 +46,24 @@ const NEVER_SHOWN = [
 // A path pattern rather than an absolute URL: this spec imports the router
 // statically, so `api/zitadel.ts` evaluates its base URL before `vi.stubEnv`
 // could run — the request goes to the relative default.
+//
+// `GET /users/me/projects` is the authorized-projects query (#1228): what the
+// signed-in person can act on, read with the session cookie.
+const MY_PROJECTS = "*/api/users/me/projects";
 const server = setupServer(
-  http.post("*/api/projects/query", () =>
+  http.get(MY_PROJECTS, () =>
     HttpResponse.json({ projects: [{ id: "proj_1", name: "console-dev" }] }),
   ),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 function renderShell(path = "/") {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
+  return router;
 }
 
 describe("app shell navigation", () => {
@@ -134,6 +140,20 @@ describe("settings view", () => {
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
   });
+
+  it("drops the context bar in the settings view", async () => {
+    // The settings frames draw no bar. Its project switcher and theme toggle
+    // are portal chrome; the sidebar keeps a trigger of its own, so the
+    // collapse is not lost with them.
+    renderShell("/settings");
+    await screen.findByRole("link", { name: "Back to app" });
+
+    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Dark" })).not.toBeInTheDocument();
+    // The sidebar keeps its own triggers (header row and rail), so the
+    // collapse survives the bar going away.
+    expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
+  });
 });
 
 describe("theme toggle", () => {
@@ -156,11 +176,108 @@ describe("theme toggle", () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
   });
   it("names the project from the API rather than a hardcoded label", async () => {
-    // The switcher used to hardcode "River". `queryProjects` remains scope-pinned
-    // until root ADR 053 lands, so this normally resolves to one entry.
+    // The switcher used to hardcode "River".
     renderShell();
     const switcher = await screen.findByRole("button", { name: "Switch project" });
     await vi.waitFor(() => expect(switcher).toHaveTextContent("console-dev"));
     expect(switcher).not.toHaveTextContent("River");
+  });
+});
+
+/**
+ * The pill shows the projects the signed-in person can act on (#1237). It used
+ * to ask `POST /projects/query`, which the server pins to the calling
+ * credential's home project: one row at most, the platform project for a
+ * browser session, and a refusal on the embedded console, where the pill stayed
+ * a skeleton for good.
+ */
+describe("project pill", () => {
+  it("shows a project somebody else granted, not the console's own", async () => {
+    // Nothing ties this id to `getConsoleProjectId()`: the grant is the only
+    // reason it is listed, and that is reason enough to show it.
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({ projects: [{ id: "proj_theirs", name: "Granted to me" }] }),
+      ),
+    );
+    renderShell();
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("Granted to me"));
+  });
+
+  it("shows the first of several and lists them all as labels", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    renderShell();
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
+    expect(pill).not.toHaveTextContent("Delta");
+
+    await userEvent.click(pill);
+    const list = within(await screen.findByRole("list", { name: "Switch project" }));
+    expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "River",
+      "Delta",
+    ]);
+    // Display only: there is no selected-project state to change, so a row that
+    // looked pressable would promise a switch the console cannot make. Each row
+    // is a link to the project instead — navigation, not selection.
+    expect(list.queryAllByRole("button")).toEqual([]);
+    expect(list.getByRole("link", { name: "River" })).toHaveAttribute("href", "/projects/proj_1");
+    expect(list.getByRole("link", { name: "Delta" })).toHaveAttribute("href", "/projects/proj_2");
+    expect(list.getByText("River").closest("li")).toHaveAttribute("aria-current", "true");
+    expect(list.getByText("Delta").closest("li")).not.toHaveAttribute("aria-current");
+  });
+
+  it("opens the project and closes the list when a row is followed", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({ projects: [{ id: "proj_1", name: "River" }] }),
+      ),
+    );
+    const router = renderShell();
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
+    await userEvent.click(pill);
+    const list = within(await screen.findByRole("list", { name: "Switch project" }));
+    await userEvent.click(list.getByRole("link", { name: "River" }));
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects/proj_1"));
+    expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
+    // Following a row changes the page, not the pill: nothing was selected.
+    expect(pill).toHaveTextContent("River");
+  });
+
+  it("says there are no projects instead of loading forever", async () => {
+    server.use(http.get(MY_PROJECTS, () => HttpResponse.json({ projects: [] })));
+    renderShell();
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("No projects"));
+
+    await userEvent.click(pill);
+    const list = within(await screen.findByRole("list", { name: "Switch project" }));
+    expect(list.getByText("No projects")).toBeInTheDocument();
+  });
+
+  it("falls back to the same empty state when the query fails", async () => {
+    // The chrome is not worth an error boundary: a failed read degrades to the
+    // empty pill rather than taking every screen down with it.
+    server.use(http.get(MY_PROJECTS, () => new HttpResponse(null, { status: 500 })));
+    renderShell();
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("No projects"));
   });
 });

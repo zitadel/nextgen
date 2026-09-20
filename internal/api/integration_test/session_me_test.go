@@ -18,7 +18,8 @@ import (
 // TestGetMySession_Identity drives the HTTP path a signed-in app takes after
 // login: exchange a handoff token for the __nextgen_session cookie, then read
 // GET /sessions/me and assert the session identity payload carries the user's
-// name and email hydrated from the conventional user-schema attributes.
+// resolved reference, derived from the schema's x-identifier/x-display
+// designations (ADR 058).
 func TestGetMySession_Identity(t *testing.T) {
 	t.Parallel()
 
@@ -30,18 +31,27 @@ func TestGetMySession_Identity(t *testing.T) {
 	projectSecret, err := harness.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
-	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	userSchemaURL := harness.CreateUserSchema(t, project, `{
+		"title": "SessionMeIdentitySchema",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://session-me.example.com/schemas/human-user.json",
+		"kind": "user-schema",
+		"type": "object",
+		"x-identifier": "email",
+		"x-display": ["givenName", "familyName"],
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project"},
+			"givenName": {"type": "string"},
+			"familyName": {"type": "string"}
+		}
+	}`)
 
 	// The user-id schema (components/schemas/user-id.yaml) requires the
 	// `user_` prefix; ogen response validation enforces it.
 	const userID = "user_session-me-test"
-	// camelCase name parts: the shape the shipped presets actually collect
-	// (packages/config/defaults/*.json) — regression guard for the identity
-	// resolution reading only snake_case.
 	attrs := make(domain.CreateAttributes, 0, 3)
 	for key, value := range map[domain.AttributeKey]any{
-		"email":      "ada@example.com",
 		"givenName":  "Ada",
 		"familyName": "Lovelace",
 	} {
@@ -49,6 +59,9 @@ func TestGetMySession_Identity(t *testing.T) {
 		require.NoError(t, err)
 		attrs = append(attrs, *attr)
 	}
+	emailAttr, err := domain.NewCreateAttribute("email", "ada@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	attrs = append(attrs, *emailAttr)
 	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
 		ProjectID:  project.ID,
 		SchemaURL:  userSchemaURL,
@@ -107,13 +120,19 @@ func TestGetMySession_Identity(t *testing.T) {
 
 	var got struct {
 		UserID string `json:"user_id"`
-		Name   string `json:"name"`
-		Email  string `json:"email"`
+		User   struct {
+			UserID             string `json:"user_id"`
+			Identifier         string `json:"identifier"`
+			IdentifierProperty string `json:"identifier_property"`
+			Display            string `json:"display"`
+		} `json:"user"`
 	}
 	require.NoError(t, json.NewDecoder(meResp.Body).Decode(&got))
 	require.Equal(t, userID, got.UserID)
-	require.Equal(t, "Ada Lovelace", got.Name)
-	require.Equal(t, "ada@example.com", got.Email)
+	require.Equal(t, userID, got.User.UserID)
+	require.Equal(t, "ada@example.com", got.User.Identifier)
+	require.Equal(t, "email", got.User.IdentifierProperty)
+	require.Equal(t, "Ada Lovelace", got.User.Display)
 }
 
 // TestGetMySession_ExpiredSessionIsSignedOut pins the cross-layer contract the

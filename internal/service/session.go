@@ -26,20 +26,14 @@ type SessionService interface {
 	Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error)
 	Exchange(ctx context.Context, input ExchangeInput) (*domain.Session, error)
 	// Get retrieves a session by ID within a project. When the input sets
-	// WithUserIdentity, the linked user's identity attributes are hydrated
-	// onto Session.User (absent users degrade to a session without identity).
-	// errors: domain.ErrSessionNotFound, domain.ErrInternal
+	// WithUserIdentity, the linked user's resolved reference (ADR 058 §3) is
+	// hydrated onto Session.User (absent users degrade to a session without
+	// a ref). errors: domain.ErrSessionNotFound, domain.ErrInternal
 	Get(ctx context.Context, input GetSessionInput) (*domain.Session, error)
 	// List returns the project's sessions matching the input's filters,
 	// errors: domain.ErrProjectMissingID, domain.ErrRequestInvalid, domain.ErrNotImplemented, domain.ErrInternal
 	List(ctx context.Context, input ListSessionInput) (*ListSessionsResponse, error)
 	Delete(ctx context.Context, input DeleteSessionInput) error
-}
-
-// UserIdentityReader is the secondary port Get uses to hydrate the identity
-// attributes of a session's linked user.
-type UserIdentityReader interface {
-	GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error)
 }
 
 type CreateSessionInput struct {
@@ -58,9 +52,8 @@ type ExchangeInput struct {
 type GetSessionInput struct {
 	ProjectID string
 	SessionID string
-	// WithUserIdentity hydrates the linked user's identity attributes
-	// (domain.IdentityAttributeKeys) onto Session.User. Set by reads that
-	// render the signed-in identity (GET /sessions/me).
+	// WithUserIdentity resolves the linked user's reference (ADR 058 §3)
+	// onto Session.User. Set by reads that render the signed-in identity.
 	WithUserIdentity bool
 }
 
@@ -87,7 +80,7 @@ type DeleteSessionInput struct {
 
 type sessionService struct {
 	v2Pool StatementPool
-	users  UserIdentityReader
+	refs   UserRefResolver
 	cfg    SessionConfig
 }
 
@@ -164,15 +157,15 @@ func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domai
 	if !input.WithUserIdentity || session.UserID == nil {
 		return session, nil
 	}
-	user, err := s.users.GetIdentity(ctx, input.ProjectID, *session.UserID, domain.IdentityAttributeKeys...)
+	refs, err := s.refs.ResolveUserRefs(ctx, input.ProjectID, []string{*session.UserID})
 	if err != nil {
-		// A session may outlive its user; render it without an identity then.
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return session, nil
-		}
-		return nil, domain.ErrInternal(err).WithMessage("Failed to load the session user.")
+		return nil, domain.ErrInternal(err).WithMessage("Failed to resolve the session user.")
 	}
-	session.User = user
+	// A session may outlive its user; the ref is then absent and the
+	// session renders with its user id only.
+	if ref, ok := refs[*session.UserID]; ok {
+		session.User = &ref
+	}
 	return session, nil
 }
 
@@ -214,10 +207,42 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) (*Lis
 		return nil, mapListError(err, "failed to list sessions")
 	}
 
+	if err := s.resolvePageUserRefs(ctx, input.ProjectID, result.Items); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("Failed to resolve the sessions' users.")
+	}
+
 	return &ListSessionsResponse{
 		Sessions:      result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+// resolvePageUserRefs hydrates the page's user references with one batch
+// resolution (ADR 058 §4 — list endpoints must not resolve per row).
+// Sessions whose user is gone keep a nil ref and render by user id.
+func (s *sessionService) resolvePageUserRefs(ctx context.Context, projectID string, sessions []*domain.Session) error {
+	userIDs := make([]string, 0, len(sessions))
+	for _, session := range sessions {
+		if session.UserID != nil {
+			userIDs = append(userIDs, *session.UserID)
+		}
+	}
+	if len(userIDs) == 0 {
+		return nil
+	}
+	refs, err := s.refs.ResolveUserRefs(ctx, projectID, userIDs)
+	if err != nil {
+		return err
+	}
+	for _, session := range sessions {
+		if session.UserID == nil {
+			continue
+		}
+		if ref, ok := refs[*session.UserID]; ok {
+			session.User = &ref
+		}
+	}
+	return nil
 }
 
 // sessionSortField maps an API sort field name to its [domain.SessionField].
@@ -393,10 +418,10 @@ func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, 
 	return audit.Emit(ctx, stmts, spec)
 }
 
-func NewSessionService(v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {
+func NewSessionService(v2Pool StatementPool, refs UserRefResolver, cfg SessionConfig) SessionService {
 	return &sessionService{
 		v2Pool: v2Pool,
-		users:  users,
+		refs:   refs,
 		cfg:    cfg,
 	}
 }

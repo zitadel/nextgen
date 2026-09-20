@@ -128,6 +128,27 @@ var environmentAccess = resourceAccess{
 	denied:    domain.ErrEnvironmentPermissionDenied,
 }
 
+// variableAccess gates the project's variables and secrets (ADR 062). Like
+// grants and events, a variable has no minted id and no resource_scope_index
+// row — it is addressed by name under the project_id the request carries — so
+// every op is project-scoped and there is no kind to check.
+var variableAccess = resourceAccess{
+	readMiss:  domain.ErrVariableNotFound,
+	writeMiss: domain.ErrVariableNotFound,
+	denied:    domain.ErrVariablePermissionDenied,
+}
+
+// releaseAccess gates the project's release snapshots (ADR 035, #531).
+// Create and get are project-scoped: both carry a project_id and the get
+// filters its lookup by it, so no route resolves a path id through RSI and the
+// kind is only used to narrow a partial-access list.
+var releaseAccess = resourceAccess{
+	kind:      domain.ResourceKindRelease,
+	readMiss:  domain.ErrReleaseNotFound,
+	writeMiss: domain.ErrReleaseProjectNotFound,
+	denied:    domain.ErrReleasePermissionDenied,
+}
+
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
 // project-scoped (no RSI kind); credential ceiling is project.write like other
 // management resources until #420 mints a fine-grained events relation.
@@ -137,8 +158,8 @@ var eventsAccess = resourceAccess{
 	denied:    domain.ErrEventPermissionDenied,
 }
 
-// grantAccess gates create/get/revoke. Grants are not in resource_scope_index;
-// every op takes project_id from the header (same as events).
+// grantAccess gates create/get/query/revoke. Grants are not in resource_scope_index;
+// every op takes project_id from the query (same as events).
 var grantAccess = resourceAccess{
 	readMiss:  domain.ErrGrantNotFound,
 	writeMiss: domain.ErrGrantNotFound,
@@ -308,18 +329,33 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
 		return resolver.DecisionUnspecified, errAuthzNoScope
 	}
-	if !hasOperatorProjectWrite(scope.Scope) {
-		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
-		if scope.ProjectID == "" || scope.ProjectID != projectID {
-			return resolver.DecisionUnspecified, errAuthzNoScope
-		}
-		return resolver.DecisionUnspecified, errAuthzPreviewDenied
+	if err := credentialCeiling(scope, projectID); err != nil {
+		return resolver.DecisionUnspecified, err
 	}
 	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
 	if err != nil {
 		return resolver.DecisionUnspecified, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
 	return dec, nil
+}
+
+// credentialCeiling is the pre-resolver gate on the credential plane.
+// Empty home fails closed. Users skip the secret write ceiling; secrets
+// still need project.write (ADR 053 §5).
+func credentialCeiling(scope ScopeContext, targetProjectID string) error {
+	if scope.ProjectID == "" {
+		return errAuthzNoScope
+	}
+	if scope.PrincipalType == domain.AuthzPrincipalTypeUser {
+		return nil
+	}
+	if hasOperatorProjectWrite(scope.Scope) {
+		return nil
+	}
+	if scope.ProjectID != targetProjectID {
+		return errAuthzNoScope
+	}
+	return errAuthzPreviewDenied
 }
 
 // hasOperatorProjectWrite is the credential-plane ceiling: only the full
@@ -334,38 +370,29 @@ func hasOperatorProjectWrite(granted []string) bool {
 	return false
 }
 
-// requireMembershipRead gates the membership reads — `expand: ["teams"]` and a
-// `team_id` filter on the users query, and GET /users/{user_id}/teams — because
-// reading users is not reading team memberships (system-permission-catalog.md).
-//
-// The operator fallback is interim: no token carries team_membership.read yet
-// (ADR 036), so requiring it outright would reject every caller.
-// TODO(#420): drop it once granular scopes are minted.
-func requireMembershipRead(ctx context.Context) error {
-	scope, ok := GetScopeContext(ctx)
-	if ok && (slices.Contains(scope.Scope, "team_membership.read") || hasOperatorProjectWrite(scope.Scope)) {
-		return nil
-	}
-	// The sentinel's own message names the project secret, which is not what
-	// this gate is about; WithMessage keeps the code so errors.Is still matches.
-	return domain.ErrUserPermissionDenied().
-		WithMessage("reading a user's team memberships requires team_membership.read")
+func hasGranularOrOperator(ctx context.Context, scope string) bool {
+	sc, ok := GetScopeContext(ctx)
+	return ok && (slices.Contains(sc.Scope, scope) || hasOperatorProjectWrite(sc.Scope))
 }
 
-// requireTeamRead gates `expand: ["lifecycle_owner_team"]` on the users query.
-// The id is already on every user; resolving it to the team's name and status
-// reads the team resource, which user.read does not cover
-// (system-permission-catalog.md).
-//
-// Same interim fallback as requireMembershipRead, for the same reason: team.read
-// is not minted yet (ADR 036). TODO(#420): drop it once granular scopes are.
-func requireTeamRead(ctx context.Context) error {
-	scope, ok := GetScopeContext(ctx)
-	if ok && (slices.Contains(scope.Scope, "team.read") || hasOperatorProjectWrite(scope.Scope)) {
+// requireExpandScope gates an ADR 059 expand that reads a related resource.
+// The operator project.write fallback is interim until #420 mints granular
+// scopes. WithMessage keeps the sentinel code so errors.Is still matches.
+func requireExpandScope(ctx context.Context, scope string, denied func() domain.Error, msg string) error {
+	if hasGranularOrOperator(ctx, scope) {
 		return nil
 	}
-	return domain.ErrUserPermissionDenied().
-		WithMessage("expanding a user's lifecycle owner team requires team.read")
+	return denied().WithMessage(msg)
+}
+
+func requireMembershipRead(ctx context.Context) error {
+	return requireExpandScope(ctx, "team_membership.read", domain.ErrUserPermissionDenied,
+		"reading a user's team memberships requires team_membership.read")
+}
+
+func requireTeamRead(ctx context.Context) error {
+	return requireExpandScope(ctx, "team.read", domain.ErrUserPermissionDenied,
+		"expanding a user's lifecycle owner team requires team.read")
 }
 
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {

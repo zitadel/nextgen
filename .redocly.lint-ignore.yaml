@@ -8,3 +8,30 @@ api/openapi/endpoints/schemas/user-schema.yaml:
     # a data-format migration.
     - '#/properties/objectType'
     - '#/properties/metaSchema'
+api/openapi/endpoints/schemas/sso-auth-method.yaml:
+  no-required-schema-properties-undefined:
+    # `providers` is defined at the schema root; the if/then/else arms only
+    # require or forbid it depending on `enabled`, which is what gives editors
+    # a precise error instead of an "all arms failed" oneOf.
+    - '#/then/required/0'
+    - '#/else/not/required/0'
+api/openapi/openapi-spec.yaml:
+  no-ambiguous-paths:
+    # Redocly compares templates and does not know the id format. Exactly one
+    # request fits both `/idps/{id}/revisions` and
+    # `/idps/revisions/{revision_id}`: `/idps/revisions/revisions`, with `{id}`
+    # set to the literal `revisions`. No minted connection id is that literal,
+    # because ids carry the `idp_` prefix, and the generated router matches the
+    # literal before `{id}`, so such a request is a 404 on the revision read.
+    # ADR 063 gives every revisioned kind this pair.
+    - '#/paths/~1idps~1revisions~1{revision_id}'
+api/openapi/components/flows/flow-definition-step.yaml:
+  no-required-schema-properties-undefined:
+    # Every name is a step property defined at the schema root; each arm of the
+    # rejection `not` only tests whether it is present, which is how the dialect
+    # states the step shapes the engine cannot run without breaking codegen.
+    - '#/not/anyOf/0/anyOf/0/not/required/0'
+    - '#/not/anyOf/0/anyOf/1/properties/transitions/not/required/0'
+    - '#/not/anyOf/1/required/0'
+    - '#/not/anyOf/2/not/required/0'
+    - '#/not/anyOf/2/properties/transitions/not/required/0'

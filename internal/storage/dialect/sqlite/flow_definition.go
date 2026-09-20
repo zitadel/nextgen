@@ -18,12 +18,23 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = ? AND id = ?`
 
-	updateFlowDefinitionStmt = `UPDATE flow_definitions SET
-name = ?, schema_version = ?, status = ?, purposes = ?, definition = ?, updated_at = ?
-WHERE project_id = ? AND id = ? RETURNING created_at, updated_at`
-
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at
 FROM flow_definitions`
+
+	// latestRevisionPerName keeps only the newest revision of each flow name.
+	//
+	// The uniqueness of (project_id, name, created_at) makes created_at a
+	// total order within a name, so no tiebreak belongs in here.
+	//
+	// The sub-query deliberately carries no authz predicate, so "newest" is
+	// the newest revision that exists rather than the newest the caller may
+	// read: a caller granted only a superseded revision sees it under
+	// revisions=all and sees nothing for that flow under revisions=latest.
+	// Which revision is current is a property of the flow, not of the reader.
+	latestRevisionPerName = `NOT EXISTS (SELECT 1 FROM flow_definitions AS newer` +
+		` WHERE newer.project_id = flow_definitions.project_id` +
+		` AND newer.name = flow_definitions.name` +
+		` AND newer.created_at > flow_definitions.created_at)`
 )
 
 type flowDefinitionStatements struct{ statement }
@@ -85,27 +96,6 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, pro
 	return def, nil
 }
 
-// UpdateFlowDefinition implements [service.FlowDefinitionStatements].
-func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	content, err := flowdefinition.Marshal(entity)
-	if err != nil {
-		return err
-	}
-	var defStr sql.NullString
-	if len(content) > 0 {
-		defStr = sql.NullString{String: string(content), Valid: true}
-	}
-	purposes, err := encodeJSON(flowdefinition.PurposeStrings(entity))
-	if err != nil {
-		return wrapError(err)
-	}
-	now := nowUnixNano()
-	return scanFlowDefinitionTimestamps(entity, f.client.QueryRow(ctx, updateFlowDefinitionStmt,
-		entity.Name, entity.SchemaVersion, entity.Status.String(), purposes, defStr, now,
-		entity.ProjectID, entity.ID,
-	))
-}
-
 func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition, row *sql.Row) error {
 	var createdNano, updatedNano int64
 	if err := row.Scan(&createdNano, &updatedNano); err != nil {
@@ -117,11 +107,16 @@ func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition, row *sql.Row) e
 }
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
-func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], queryOpts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 	opts := flowdefinition.EnsureListOptions(filter)
 
+	var conjuncts []string
+	if queryOpts.LatestRevisionPerName {
+		conjuncts = append(conjuncts, latestRevisionPerName)
+	}
+
 	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id"); err != nil {
+	if err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id", conjuncts...); err != nil {
 		return nil, err
 	}
 	rows, err := f.client.Query(ctx, compiler.String(), compiler.args...)

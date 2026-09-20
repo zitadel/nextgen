@@ -1,6 +1,12 @@
 import { createZitadelClient } from "@zitadel/api/client";
 
-import { claimAction, claimCommand, claimState, type ClaimState } from "../lib/claim-state";
+import {
+  claimAction,
+  claimCommand,
+  claimState,
+  claimWindowClosedAction,
+  type ClaimState,
+} from "../lib/claim-state";
 import { isProcessRunning } from "../lib/local-server/binary";
 import { inspectContainer } from "../lib/local-server/docker";
 import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
@@ -10,7 +16,7 @@ import {
   readRuntimeMetadata,
   runtimeSummary,
 } from "../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import {
   hasZitadelConfig,
@@ -31,6 +37,8 @@ import { publicCliCommand } from "../lib/public-cli";
  */
 export default class Status extends BaseCommand {
   static override description = "Summarize the local Zitadel server and project state.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 3;
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Status);
@@ -223,8 +231,22 @@ function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion:
   }
   // Additive to the journey staging rather than a stage of its own: attaching a
   // team is orthogonal to whether login works yet, so it appends to whichever
-  // stage the user is in instead of displacing it.
-  const claim = project.claim?.kind === "detached" ? [claimAction(cliVersion)] : [];
+  // stage the user is in instead of displacing it. A closed window flips the
+  // nudge to reconciliation wording, which still tells the user to run
+  // `claim`: the local record may be stale (claimed from another machine
+  // reads detached), and the server resolves the grant before the window,
+  // so the command is the authoritative check, never a guaranteed failure.
+  const claim =
+    project.claim?.kind === "detached"
+      ? project.claim.claimable
+        ? [
+            claimAction(
+              cliVersion,
+              project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
+            ),
+          ]
+        : [claimWindowClosedAction(cliVersion)]
+      : [];
   if (users === "none") {
     return [verifyLoginAction(project.issuer), ...claim];
   }
@@ -253,6 +275,10 @@ function nextCommandsFor(
     );
   } else {
     commands.push(publicCliCommand("doctor", cliVersion));
+    // Suggested even when the local record says the window has closed: the
+    // record can be stale (claimed from another machine reads detached), and
+    // `claim` is the safe reconciliation — the server checks the grant
+    // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
       commands.push(claimCommand(cliVersion));
     }

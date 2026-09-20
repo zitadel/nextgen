@@ -40,6 +40,9 @@ func (stubProjectService) Update(context.Context, string, string) (*domain.Proje
 func (stubProjectService) List(context.Context, service.ListProjectsRequest) (*service.ListProjectsResponse, error) {
 	return nil, domain.ErrProjectMissingID()
 }
+func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	return nil, domain.ErrSessionTokenInvalid()
+}
 func (stubProjectService) Delete(context.Context, string) error { return nil }
 
 var _ service.ProjectService = stubProjectService{}
@@ -59,6 +62,7 @@ func TestProjectErrorResponse(t *testing.T) {
 		{"missing_id", domain.ErrProjectMissingID(), http.StatusBadRequest},
 		{"already_claimed", domain.ErrProjectAlreadyClaimed(), http.StatusConflict},
 		{"claim_expired", domain.ErrProjectClaimExpired(), http.StatusGone},
+		{"claim_window_expired", domain.ErrProjectClaimWindowExpired(), http.StatusGone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

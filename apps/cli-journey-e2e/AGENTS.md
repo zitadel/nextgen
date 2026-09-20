@@ -64,8 +64,10 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   ephemeral-range ports get taken as outbound source ports by the parallel
   suites' npm traffic in the meantime (the why and the block layout are
   documented in that file).
-- Passkey coverage is required in CI. `JOURNEY_ENABLE_PASSKEY=0` is only a local
-  debugging escape hatch.
+- Passkey coverage is required in CI, and rides the `passkey-first` preset lane:
+  the shipped `password-first` default flow offers no passkey action, so the
+  passkey journey is registered only for that preset.
+  `JOURNEY_ENABLE_PASSKEY=0` is only a local debugging escape hatch.
 - Keep diagnostics focused. Upload logs, setup JSON, lockfiles, Playwright
   traces/reports, and metadata; do not upload generated `node_modules` or
   `.next` directories.

@@ -27,7 +27,9 @@ const SECRET = {
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
   preview_origins: [],
-  created_at: "2026-01-01T00:00:00.000Z",
+  // Recent, so the claim window reads as open; the closed-window test writes
+  // its own stale timestamp.
+  created_at: new Date(Date.now() - 60_000).toISOString(),
 };
 
 const tempDirs: string[] = [];
@@ -102,8 +104,37 @@ describe("status command", () => {
         next_commands: string[];
       };
     };
-    expect(json.data.project.claim).toEqual({ kind: "detached" });
-    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
+    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // Once the locally recorded creation time says the 14-day window has
+  // passed, the nudge flips to reconciliation wording. The claim command
+  // stays suggested: the local record can be stale (claimed from another
+  // machine reads detached) and the server resolves the grant before the
+  // window, so running claim is the safe authoritative check.
+  it("switches to reconciliation guidance once the claim window has closed", async () => {
+    const cwd = await configuredProject();
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({ ...SECRET, created_at: "2026-01-01T00:00:00.000Z" }),
+    );
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: {
+        project: { claim?: { kind: string; claimable?: boolean } };
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+    expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: false });
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain("claim window has closed");
+    expect(actions).toContain("no longer be claimed");
+    expect(actions).not.toContain("its data may be lost");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
@@ -128,7 +159,7 @@ describe("status command", () => {
       team_id: "team-001",
       claimed_at: "2026-01-02T00:00:00.000Z",
     });
-    expect(json.data.next_actions.join("\n")).not.toContain("temporary until you attach");
+    expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
     expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
   });
 
@@ -306,7 +337,7 @@ describe("status command", () => {
     const actions = json.data.next_actions.join("\n");
     expect(actions).not.toContain("register a user");
     expect(actions).not.toContain("Customize what you ask for");
-    expect(actions).toContain("temporary until you attach it to a team");
+    expect(actions).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 });

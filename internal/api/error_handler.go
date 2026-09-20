@@ -119,8 +119,12 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return brandingErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEnvironment.ErrorCodePrefix("")):
 		return environmentErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
+		return releaseErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEvent.ErrorCodePrefix("")):
 		return eventErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixVariable.ErrorCodePrefix("")):
+		return variableErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
@@ -197,10 +201,8 @@ func isSecurityError(err error) bool {
 }
 
 // securityErrorDetails maps an ogen security failure to the auth.unauthorized
-// wire contract. Operations secured by the session cookie use the normalized
-// message from their OpenAPI 401 descriptions; ogen reports an absent
-// credential without naming the scheme, so the operation decides (ADR 030,
-// Decision 4).
+// wire contract. Session-only ops use sessionUnauthorizedMessage; dual-scheme
+// ops stay on the default unauthorized message (ADR 030, Decision 4).
 func securityErrorDetails(err error) api.ErrorDetails {
 	unauthorized := domain.ErrAuthUnauthorized(err)
 	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {

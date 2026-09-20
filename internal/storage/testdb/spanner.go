@@ -15,7 +15,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"google.golang.org/api/option"
-	"google.golang.org/grpc"
+	"google.golang.org/grpc" //egress:allow test database helper dialing the local Spanner emulator
 	"google.golang.org/grpc/credentials/insecure"
 )
 

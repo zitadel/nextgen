@@ -35,8 +35,10 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
 
   await page.waitForURL("**/admin", { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
-  // SessionDetails component fetches /sessions/me and renders identity + details.
-  await expect(page.getByText(/Signed in as user_/)).toBeVisible({ timeout: 10_000 });
+  // SessionDetails fetches /sessions/me and renders the user ref: the mock
+  // schema designates no display for this identity, so the line shows the
+  // signed-in identifier.
+  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Session details")).toBeVisible();
 
   const sessionCookie = (await page.context().cookies()).find(
@@ -45,9 +47,11 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   expect(sessionCookie?.value).toBeTruthy();
   expect(sessionCookie?.httpOnly).toBe(true);
 
-  // Layout-seeded auth state: the client UserBadge shows the email that
-  // auth()'s /sessions/me validation resolved server-side.
-  await expect(page.getByText(email)).toBeVisible();
+  // Layout-seeded auth state: the client UserBadge renders the user ref's
+  // identifier that auth()'s /sessions/me validation resolved server-side.
+  // The identity line renders the same identifier, so match the badge as the
+  // first occurrence rather than expecting a unique text node.
+  await expect(page.getByText(email, { exact: true }).first()).toBeVisible();
 
   // Leak guard: the raw session token must never appear anywhere in the
   // server's response for the page — not in the HTML and not in the inlined

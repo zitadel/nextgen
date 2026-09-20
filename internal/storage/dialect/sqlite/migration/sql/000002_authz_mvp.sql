@@ -201,6 +201,14 @@ CREATE INDEX idx_authz_assignments_principal_project
     WHERE revoked_at IS NULL;
 -- +goose StatementEnd
 
+-- ADR 053 §6: authorized-projects discovery starts from the principal and has
+-- no project to anchor on, so the project column comes last here.
+-- +goose StatementBegin
+CREATE INDEX idx_authz_assignments_principal
+    ON authz_assignments (principal_type, principal_id, project_id)
+    WHERE revoked_at IS NULL;
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 CREATE INDEX idx_authz_assignments_delegation
     ON authz_assignments (project_id, delegation_id)
@@ -349,6 +357,9 @@ DROP INDEX IF EXISTS authz_assignments_unique_active;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_authz_assignments_delegation;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_authz_assignments_principal;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_authz_assignments_principal_project;

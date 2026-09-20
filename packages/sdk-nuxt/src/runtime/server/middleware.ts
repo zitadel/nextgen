@@ -278,7 +278,12 @@ async function validateOpaqueSessionToken(
   token: string,
   issuerUrl: string,
   timeoutMs: number,
-): Promise<{ userId?: string } | null> {
+): Promise<{
+  userId?: string;
+  identifier: string | null;
+  identifierProperty: string | null;
+  display: string | null;
+} | null> {
   try {
     const res = await fetch(`${issuerUrl}/sessions/me`, {
       method: "GET",
@@ -286,8 +291,16 @@ async function validateOpaqueSessionToken(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as { user_id?: string };
-    return { userId: body.user_id };
+    const body = (await res.json()) as {
+      user_id?: string;
+      user?: { identifier?: string; identifier_property?: string; display?: string };
+    };
+    return {
+      userId: body.user_id,
+      identifier: body.user?.identifier ?? null,
+      identifierProperty: body.user?.identifier_property ?? null,
+      display: body.user?.display ?? null,
+    };
   } catch {
     return null;
   }
@@ -383,8 +396,9 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
       isAuthenticated: true,
       session: {
         userId: payload.sub,
-        email: payload.email ?? null,
-        name: payload.name ?? null,
+        identifier: payload.email ?? null,
+        identifierProperty: null,
+        display: payload.name ?? null,
         token,
       },
     };
@@ -407,8 +421,9 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
         isAuthenticated: true,
         session: {
           userId: opaqueResult.userId,
-          email: null,
-          name: null,
+          identifier: opaqueResult.identifier,
+          identifierProperty: opaqueResult.identifierProperty,
+          display: opaqueResult.display,
           token: cookieToken,
         },
       };

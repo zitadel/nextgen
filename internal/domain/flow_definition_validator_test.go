@@ -1068,7 +1068,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, callback)`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)`, nil),
 		},
 		{
 			name: "invalid flow - duplicate step names",

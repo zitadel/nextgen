@@ -1,0 +1,61 @@
+title: ReleaseMetadata
+type: object
+description: |
+  Who assembled the release, when, and from what source. Set when the release
+  is assembled and never mutated afterwards.
+required:
+  - git_dirty
+  - created_at
+properties:
+  message:
+    description: |
+      A short caller-supplied summary of what the release changes, analogous to
+      a git commit message.
+    oneOf:
+      - type: string
+        maxLength: 1024
+      - type: 'null'
+    example: add phone_number to human-user
+  git_sha:
+    description: |
+      The source commit the caller was operating from. Recording it on both
+      releases is what lets two releases be diffed at field level in the
+      source repository they were built from.
+    oneOf:
+      - type: string
+        maxLength: 64
+      - type: 'null'
+    example: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+  git_dirty:
+    type: boolean
+    default: false
+    description: |
+      True when the working tree had uncommitted changes at construction time.
+      `git_sha` still points at HEAD, but the release content does not
+      correspond to that commit exactly, so consumers of the git-diff mechanism
+      should skip it when either side is dirty.
+  created_at:
+    type: string
+    format: date-time
+    description: When the release was assembled.
+    example: '2026-07-14T09:11:00Z'
+  created_by:
+    description: |
+      The identity that assembled the release. Absent when the caller is a
+      machine principal carrying no user identity, which is the common case for
+      releases constructed from CI or the CLI.
+    oneOf:
+      - type: string
+      - type: 'null'
+    example: user_01KX3RG8A7F0N9WD3P2E4YM5C1
+  created_by_type:
+    description: What kind of principal `created_by` names.
+    oneOf:
+      - type: string
+        enum:
+          - human
+          - service
+          - system
+          - agent
+      - type: 'null'
+    example: human

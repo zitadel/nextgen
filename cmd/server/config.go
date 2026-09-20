@@ -7,6 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -19,10 +20,14 @@ type Config struct {
 	Database        database.Config        `mapstructure:"database"`
 	PasswordHasher  crypto.HashConfig      `mapstructure:"password_hasher"`
 	Schema          SchemaConfig           `mapstructure:"schema"`
+	Keys            KeysConfig             `mapstructure:"keys"`
 	Session         service.SessionConfig  `mapstructure:"session"`
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
 	Events          EventsConfig           `mapstructure:"events"`
+	// HTTPClient configures the hardened egress client used for every fetch
+	// of a URL a platform user can inject (see the egress-policy ADR).
+	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.
@@ -38,11 +43,13 @@ type EventsConfig struct {
 type PlatformConfig struct {
 	// ProjectID pins a standalone deployment's default project to an existing
 	// project (an id of the form "proj_<...>"). When empty (the default), the
-	// deployment tracks its first-created project — the one the customer's
-	// `zitadel setup` creates. The server never creates that project itself; a
-	// configured id that does not exist is a startup error. Leave empty when
-	// BootstrapProject is set — the platform project's id is server-owned
-	// (domain.PlatformProjectID), not operator-authored. (#605)
+	// deployment tracks its first-created project other than the built-in
+	// platform row — the one the customer's `zitadel setup` creates; the
+	// platform project is infrastructure and only becomes the default through
+	// this pin or BootstrapProject. The server never creates that project
+	// itself; a configured id that does not exist is a startup error. Leave
+	// empty when BootstrapProject is set — the platform project's id is
+	// server-owned (domain.PlatformProjectID), not operator-authored. (#605)
 	ProjectID string `mapstructure:"project_id"`
 
 	// BootstrapProject, when true, ensures the well-known platform project
@@ -95,6 +102,8 @@ func (c Config) Validate() error {
 	for _, validate := range []func() error{
 		c.Session.Validate,
 		c.Platform.Validate,
+		c.HTTPClient.Validate,
+		c.Schema.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
@@ -127,16 +136,59 @@ type ServerConfig struct {
 	// files exist in the master key directory, the newest file is used for
 	// encryption.
 	MasterKeys map[string]*MasterKeyConfig `mapstructure:"master_keys"`
+	// GenerateMasterKey allows the server to mint a master key when it starts
+	// with none configured and none in the master key directory. It defaults to
+	// true, which is what makes a first local start work with no configuration
+	// at all.
+	//
+	// Turn it off wherever a generated key would be the wrong answer rather
+	// than a convenience: on ephemeral storage every instance would mint its
+	// own key, and project KEKs wrapped by one of them cannot be unwrapped by
+	// the next. With it off, a missing key fails the start instead, which is
+	// the failure that can still be recovered from.
+	GenerateMasterKey bool `mapstructure:"generate_master_key"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
 	LoginEnabled   bool   `mapstructure:"login_enabled"`
 	LoginPath      string `mapstructure:"login_path"`
+	// PublicBase is the origin this deployment is reachable at from a browser.
+	// It only feeds user-facing URLs (claim and dashboard); schema identity
+	// stays on schema.builtin_public_base, which is an identifier namespace,
+	// not an address.
+	PublicBase string `mapstructure:"public_base"`
+}
+
+// KeysConfig sizes the in-process key caches. Both are read-through and hold
+// values, so the only cost of a larger cache is memory; the only cost of a
+// smaller one is a database read on the miss.
+type KeysConfig struct {
+	// CrypterLRUCacheSize bounds the cache of resolved crypters held by key id
+	// and algorithm. A key's material never changes, so an entry never needs
+	// invalidating.
+	CrypterLRUCacheSize int `mapstructure:"crypter_lru_cache_size"`
+	// SigningKeyLRUCacheSize bounds the cache of active signing keys held by
+	// project and purpose. Nothing retires a signing key today; once something
+	// does, this cache needs an eviction path (see GetProjectSigningKey).
+	SigningKeyLRUCacheSize int `mapstructure:"signing_key_lru_cache_size"`
 }
 
 type SchemaConfig struct {
 	BuiltinPublicBase string `mapstructure:"builtin_public_base"`
 	LRUCacheSize      int    `mapstructure:"lru_cache_size"`
+	// ResolveTimeout bounds one whole schema ingest including every $ref it
+	// follows, so recursion depth cannot multiply the per-request
+	// httpclient.timeout into sequential waits.
+	ResolveTimeout time.Duration `mapstructure:"resolve_timeout"`
+}
+
+func (c SchemaConfig) Validate() error {
+	// A negative value would reach context.WithTimeout and fail every
+	// uncached ingest at runtime instead of failing the boot.
+	if c.ResolveTimeout < 0 {
+		return fmt.Errorf("schema.resolve_timeout must not be negative, got %s", c.ResolveTimeout)
+	}
+	return nil
 }
 
 type MasterKeyConfig struct {

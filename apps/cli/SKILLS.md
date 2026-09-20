@@ -82,6 +82,10 @@ the CLI's help layer, not the envelope.
 
 ## Commands
 
+The groups below mirror the ones `zitadel --help` prints.
+
+### Project commands
+
 - `setup` — create a Zitadel project and scaffold local auth (routes,
   middleware, `.zitadel/**`, env templates). Setup writes the versioned local
   default user schema and login flow into
@@ -144,32 +148,48 @@ the CLI's help layer, not the envelope.
   `hero_url`, from `.zitadel/branding/branding.json`; `hero` falls back to
   editable text), and setup warns when a widget-posture app picks `split`
   or `split-right`.
-- `plan` — validate config and preview the sync diff without mutating anything.
-- `apply` — validate and upload repo config to the platform.
-- `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
-  findings as `{path, rule, message}`, the same text the human plan prints as
-  `# warning:` lines and `apply` prints through stderr. They never fail a run.
-  Two families exist today: flow-definition rules (`warn/…`, mirrored from the
-  server's validator) and branding asset reachability. `warn/asset-unreachable`
-  and `warn/asset-content-type` come from a bounded HEAD probe of
-  `logo_url` / `hero_url` — a URL that is well-formed but dead passes every
-  gate and then renders as a 0×0 image with nothing in the console, so the
-  probe is the only place it can be caught. It is advisory by design: the
-  machine planning is not necessarily the machine that renders the login page.
-  The probe only contacts public HTTPS destinations and re-checks every
-  redirect; loopback/private/internal targets stay inconclusive instead of
-  turning repo config into a network request from the planning host.
-  Set `ZITADEL_SKIP_ASSET_PROBE` to turn it off (offline, air-gapped CI, or a
-  CDN that only resolves from production) and `ZITADEL_ASSET_PROBE_TIMEOUT_MS`
-  to retune the per-URL budget (default 2500).
-- In the human-readable plan, a multi-line field (branding's inlined
-  `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
-  unchanged, and as a changed-line diff when it moved — not as one escaped
-  line. Read the file itself for full content.
-- `schemas list` — inspect the revision history of a user-schema, filtered by
-  `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
-  per revision (newest first); interactive adds a picker that fetches and
-  pretty-prints the selected revision body.
+- `claim` — claim the project for a team to make it permanent. Mints a
+  short-lived link, opens it in a browser, and blocks until the developer
+  finishes signing in there, then records `claimed_at` and `team_id` in
+  `.zitadel/secret`. Nothing about the project changes: the issuer, users,
+  passkeys, and applications keep working, and the project secret is not
+  rotated. Re-running once the project belongs to a team is a clean
+  `status: "skipped"` with `reason: "already-claimed"`, so agents can retry
+  safely. The link is always printed before any browser opens, so a headless
+  machine, an SSH session, or `--no-open` needs no special handling — copy it
+  and open it anywhere. Links last 10 minutes; once one lapses the command
+  exits `E_VALIDATION` and points at a fresh run. Claiming itself is only
+  possible within 14 days of project creation: past that the platform answers
+  `410 proj.claim_window_expired`, the command exits `E_VALIDATION`, and a
+  fresh link does **not** help — only a fresh `setup` yields a claimable
+  project (the old one can no longer be claimed; it stays temporary and its
+  data may be lost).
+  `--dry-run` stops before
+  anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
+  there is nothing to preview, because a claim is decided in a browser.
+  Flags: `--no-open` (print the link instead of launching a browser),
+  `--timeout <seconds>` (stop waiting sooner than the link's own expiry).
+  `setup`, `status`, and `doctor` report whether a team is attached, reading
+  `claimed_at`/`team_id` from `.zitadel/secret` (no platform call). `status`
+  carries `data.project.claim` as
+  `{"kind": "detached", "claimable": true, "deadline": "2026-09-18T09:00:00.000Z"}`
+  (`claimable` flips to `false` once the locally recorded creation time says
+  the 14-day window has passed; the guidance then switches to reconciliation
+  wording but the claim command stays in `next_commands`, because the local
+  record can be stale and running `claim` answers authoritatively — an
+  attached project skips cleanly. `deadline` is omitted when the creation
+  time is unknown) or
+  `{"kind": "attached", "team_id": "team_01H…", "claimed_at": "2026-08-01T09:00:00.000Z"}`,
+  and `doctor` reports a
+  `claim` check. A project with no team is only ever a **warning**, never a
+  failure — it works exactly like one with a team, so `doctor` still exits 0
+  and `--fix` deliberately does nothing (a claim needs a human in a browser).
+  `status` and `doctor` stay silent about teams off the cloud: they answer
+  offline and cannot know whether a local or self-hosted server hosts a
+  platform to claim into. `setup` is online anyway, so against a local server
+  it probes the runtime document and nudges only when the server hosts the
+  platform plane (`platform.bootstrap_project`), where the claim can actually
+  complete.
 - `doctor` — verify generated app files and local state once `zitadel.json`
   exists. The `managed-files` check compares the scaffolded app files against
   the manifest setup recorded in `.zitadel/state.json`: a missing
@@ -200,34 +220,11 @@ the CLI's help layer, not the envelope.
   and are not compared. The repair — an exact-pin install command for the
   project's detected package manager — is emitted in `data.next_commands`
   and quoted in the warning message.
-- `claim` — attach the project to a team so it becomes permanent. Mints a
-  short-lived link, opens it in a browser, and blocks until the developer
-  finishes signing in there, then records `claimed_at` and `team_id` in
-  `.zitadel/secret`. Nothing about the project changes: the issuer, users,
-  passkeys, and applications keep working, and the project secret is not
-  rotated. Re-running once the project belongs to a team is a clean
-  `status: "skipped"` with `reason: "already-claimed"`, so agents can retry
-  safely. The link is always printed before any browser opens, so a headless
-  machine, an SSH session, or `--no-open` needs no special handling — copy it
-  and open it anywhere. Links last 10 minutes; once one lapses the command
-  exits `E_VALIDATION` and points at a fresh run. `--dry-run` stops before
-  anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
-  there is nothing to preview, because a claim is decided in a browser.
-  Flags: `--no-open` (print the link instead of launching a browser),
-  `--timeout <seconds>` (stop waiting sooner than the link's own expiry).
-  `setup`, `status`, and `doctor` report whether a team is attached, reading
-  `claimed_at`/`team_id` from `.zitadel/secret` (no platform call). `status`
-  carries `data.project.claim` as `{"kind": "detached"}` or
-  `{"kind": "attached", "team_id": "team_01H…", "claimed_at": "2026-08-01T09:00:00.000Z"}`,
-  and `doctor` reports a
-  `claim` check. A project with no team is only ever a **warning**, never a
-  failure — it works exactly like one with a team, so `doctor` still exits 0
-  and `--fix` deliberately does nothing (a claim needs a human in a browser).
-  All three stay silent about teams when the project's `server` in
-  `zitadel.json` is local or self-hosted, where there is nothing to attach.
-- `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
+
+### Local server commands
+
 - `start` — start the managed local Zitadel server and persist runtime metadata
   under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
   under `.zitadel/local/nextgen-data/`. Runtime metadata reports the published
@@ -240,6 +237,7 @@ the CLI's help layer, not the envelope.
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes
   from other local projects; it does not kill arbitrary `/healthz` listeners.
+- `status` — summarize the local runtime and project state.
 - `logs` — print managed runtime logs; `--follow` streams in human mode.
 - `reset` — stop/remove the managed runtime and delete local runtime data;
   requires `--force` when non-interactive.
@@ -247,6 +245,40 @@ the CLI's help layer, not the envelope.
 Alpha releases are fixed product package trains. `npx @zitadel/cli@alpha start`
 uses the matching `@zitadel/server` package by default. `zitadel start --runtime
 docker --image <ref>` remains the explicit image override for debugging.
+
+### Configuration commands
+
+- `plan` — validate config and preview the sync diff without mutating anything.
+- `apply` — validate and upload repo config to the platform.
+- `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
+  findings as `{path, rule, message}`, the same text the human plan prints as
+  `# warning:` lines and `apply` prints through stderr. They never fail a run.
+  Two families exist today: flow-definition rules (`warn/…`, mirrored from the
+  server's validator) and branding asset reachability. `warn/asset-unreachable`
+  and `warn/asset-content-type` come from a bounded HEAD probe of
+  `logo_url` / `hero_url` — a URL that is well-formed but dead passes every
+  gate and then renders as a 0×0 image with nothing in the console, so the
+  probe is the only place it can be caught. It is advisory by design: the
+  machine planning is not necessarily the machine that renders the login page.
+  The probe only contacts public HTTPS destinations and re-checks every
+  redirect; loopback/private/internal targets stay inconclusive instead of
+  turning repo config into a network request from the planning host.
+  Set `ZITADEL_SKIP_ASSET_PROBE` to turn it off (offline, air-gapped CI, or a
+  CDN that only resolves from production) and `ZITADEL_ASSET_PROBE_TIMEOUT_MS`
+  to retune the per-URL budget (default 2500).
+- In the human-readable plan, a multi-line field (branding's inlined
+  `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
+  unchanged, and as a changed-line diff when it moved — not as one escaped
+  line. Read the file itself for full content.
+- `schemas list` — inspect the revision history of a user-schema, filtered by
+  `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
+  per revision (newest first); interactive adds a picker that fetches and
+  pretty-prints the selected revision body.
+- `branding eject` — take ownership of the login template: scaffold
+  `.zitadel/branding/` (a `branding.json` descriptor plus the `login.liquid`
+  template) from a shipped design, `--design centered|split|split-right|hero|minimal`
+  or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
+  a new branding revision.
 
 ## Golden path
 
@@ -316,7 +348,7 @@ then re-run `plan` and `apply`. Schema and flow files are synced from
 `.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
-template referenced via `liquid_template_file`. Scaffold them with the
+template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaffold them with the
 `branding eject` command (`--design centered|split|split-right|hero|minimal`,
 interactive picker on a TTY) or at project creation with
 `setup --design <name>`, which also publishes revision 1. Branding is
@@ -329,9 +361,13 @@ validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
 must be absolute `https://`. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
-creation, but CLI-created projects are authored from local files first. Flow create, read, list,
-update, and delete are available, while the server enforces lifecycle rules
-such as draft-only edits. Managed files carry a marker comment; `eject` removes only
+creation, but CLI-created projects are authored from local files first. Flows are
+revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
+immutable flow revision; a schema revise re-publishes the flows pinned to it with
+the new `user_schema` in the same run. A login pinned by `flow-name` serves that
+flow's newest revision; an unpinned login serves the newest active unscoped flow
+in the project, whatever its name. Removing a flow file does not retire the
+flow. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

@@ -19,7 +19,7 @@ npx @zitadel/cli@alpha setup --server local
 
 `zitadel start` runs the released `@zitadel/server` npm binary by default. It does not require Docker, Go, Moon, or a source checkout. The binary runtime defaults to SQLite. Docker is still available explicitly with `zitadel start --runtime docker`.
 
-Create-first, claim-later remains product direction, and the claim flow is implemented end to end on the server: the `zitadel claim` CLI command, the OpenAPI claim endpoints, and the server-side handlers are all shipped. What is still missing is the console claim page, so the browser leg (signing in on the platform project and completing the claim) has no guided UI yet and currently requires driving the API directly.
+Create-first, claim-later remains product direction, and the claim flow is implemented end to end: the `zitadel claim` CLI command, the OpenAPI claim endpoints, the server-side handlers, and the console claim page (the browser leg where you sign in on the platform project and complete the claim) are all shipped, on a deployment with a platform project bootstrapped.
 
 ## What to read first
 

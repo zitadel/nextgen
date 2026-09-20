@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
 	"github.com/zitadel/nextgen/internal/storage/environment"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
+	"github.com/zitadel/nextgen/internal/storage/release"
 	"github.com/zitadel/nextgen/internal/storage/teammembership"
 	"github.com/zitadel/nextgen/internal/storage/user"
 	"github.com/zitadel/nextgen/internal/storage/userpasskey"
@@ -20,6 +21,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/userrecoverycodes"
 	"github.com/zitadel/nextgen/internal/storage/userteam"
 	"github.com/zitadel/nextgen/internal/storage/usertotp"
+	"github.com/zitadel/nextgen/internal/storage/variable"
 )
 
 func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
@@ -33,8 +35,11 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("team_memberships", teammembership.Schema)...)
 	cols = append(cols, schematest.Columns("branding", branding.Schema)...)
 	cols = append(cols, schematest.Columns("environments", environment.Schema)...)
+	cols = append(cols, schematest.Columns("releases", release.Schema)...)
+	cols = append(cols, schematest.Columns("variables", variable.Schema)...)
 	cols = append(cols, schematest.Columns("flow_definitions", flowdefinition.Schema)...)
 	cols = append(cols, schematest.Columns("authz_membership_edges", authz.MembershipEdgeSchema)...)
+	cols = append(cols, schematest.Columns("authz_assignments", authz.AuthzAssignmentSchema)...)
 	joined, err := schematest.JoinColumns(map[string]string{"m": "team_memberships", "t": "teams"}, userteam.Schema)
 	require.NoError(t, err)
 	return append(cols, joined...)

@@ -1,0 +1,33 @@
+title: PatchUserRequest
+description: |
+  A partial update, merged into the user's current state. At least one of
+  `schema` and `attributes` must be present; an empty patch is rejected with
+  `user.invalid`.
+
+  `attributes` is merged key by key into the stored attributes: an omitted
+  key stays untouched, an object merges recursively, `null` deletes the
+  attribute, and any other value replaces the stored one. The merged result
+  is validated as a whole against the user's schema, so a patch that deletes
+  or invalidates a required property is rejected with `user.invalid`.
+
+  `schema` moves the user to another registered schema — the ADR 009 §4
+  upgrade mechanism. The request must be self-contained: merged attributes
+  are validated against the new schema before commit, and every uniqueness
+  claim is recomputed under the new schema's annotations.
+type: object
+additionalProperties: false
+minProperties: 1
+properties:
+  schema:
+    type: string
+    minLength: 1
+    description: |
+      The schema the user follows after this patch. Omit it to keep the
+      current schema. The schema must already be registered via `/schemas`.
+  attributes:
+    type: object
+    additionalProperties: true
+    minProperties: 1
+    description: |
+      The changed attributes only. `null` deletes an attribute; omitted
+      keys are untouched.

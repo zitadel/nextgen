@@ -1,12 +1,47 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/maputil"
 )
+
+// DesignatedIdentifier reads the root x-identifier designation from a raw
+// schema document. It returns "" for a document that designates nothing —
+// including one that is not a JSON object, since designation validity is
+// enforced when the schema is created ([validateUserSchemaDesignations]) and
+// readers treat anything unreadable as undesignated.
+func DesignatedIdentifier(document []byte) string {
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(document, &root); err != nil {
+		return ""
+	}
+	var identifier string
+	if err := json.Unmarshal(root[SchemaAnnotationIdentifier], &identifier); err != nil {
+		return ""
+	}
+	return identifier
+}
+
+// DesignatedDisplay reads the root x-display designation from a raw schema
+// document: the ordered property paths whose values render the user's
+// display name (ADR 058 §2). Same reader contract as
+// [DesignatedIdentifier] — anything unreadable, including non-string
+// entries, reads as undesignated.
+func DesignatedDisplay(document []byte) []string {
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(document, &root); err != nil {
+		return nil
+	}
+	var entries []string
+	if err := json.Unmarshal(root[SchemaAnnotationDisplay], &entries); err != nil {
+		return nil
+	}
+	return entries
+}
 
 // ErrSchemaDesignationInvalid reports an x-identifier / x-display designation
 // the user meta-schema cannot check itself (ADR 058 §1–§2): the named

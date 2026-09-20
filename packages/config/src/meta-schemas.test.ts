@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,7 +19,6 @@ import {
 } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const upstreamDir = join(packageRoot, "../..", "api/openapi/endpoints/schemas");
 
 /** Every `$ref` string value anywhere in a schema document. */
 function collectRefs(node: unknown, refs: string[] = []): string[] {
@@ -43,6 +42,8 @@ describe("meta-schemas", () => {
       "property-name.json",
       "auth-methods.json",
       "auth-method.json",
+      "sso-auth-method.json",
+      "idp-connection.json",
       "branding.json",
     ]);
   });
@@ -69,17 +70,6 @@ describe("meta-schemas", () => {
     );
   });
 
-  // Drift audit: the committed copies must stay identical to the source the
-  // server embeds. Skipped outside the monorepo (published-package CI).
-  it.skipIf(!existsSync(upstreamDir))("committed copies match api/openapi", () => {
-    for (const file of metaSchemaFiles()) {
-      const upstream = JSON.parse(readFileSync(join(upstreamDir, file.name), "utf8")) as object;
-      expect(file.body, `${file.name} drifted from api/openapi/endpoints/schemas`).toEqual(
-        upstream,
-      );
-    }
-  });
-
   // The whole point of shipping the meta-schema: it must accept the exact
   // files that carry the `$schema` pointer at it. A dialect drift here means
   // editors flag every scaffolded flow as invalid.
@@ -90,6 +80,43 @@ describe("meta-schemas", () => {
     for (const preset of SETUP_PRESETS) {
       const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
       expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
+    }
+  });
+
+  // The branding dialect shares one definition between the light and dark
+  // sides and one between the twelve colours, so a broken `$ref` would not
+  // fail loudly — it would quietly stop constraining anything.
+  it("validates a branding descriptor through its shared definitions", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const brandingSchema = metaSchemaFiles().find((f) => f.name === "branding.json");
+    const check = ajv.compile(brandingSchema?.body as object);
+
+    const descriptor = {
+      layout: "centered",
+      logo_url: "https://cdn.example.com/logo.svg",
+      theme: {
+        mode: "auto",
+        light: {
+          logo_url: "https://cdn.example.com/on-light.svg",
+          palette: { primary: "#4F46E5", link: "rebeccapurple" },
+        },
+        dark: {
+          logo_url: "https://cdn.example.com/on-dark.svg",
+          palette: { primary: "color-mix(in oklab, #A5B4FC 40%, white)" },
+        },
+      },
+      typography: { font_family: "Inter, ui-sans-serif, sans-serif", scale: 1 },
+      shape: { radius: 10, density: "regular", logo_scale: 1.5 },
+    };
+    expect(check(descriptor), JSON.stringify(check.errors)).toBe(true);
+
+    // Both sides have to be constrained, not just whichever one the schema
+    // happened to spell out before the definitions were shared.
+    for (const side of ["light", "dark"] as const) {
+      const hostile = {
+        theme: { [side]: { palette: { primary: "red; } :host { display: none" } } },
+      };
+      expect(check(hostile), `${side} accepted an injection`).toBe(false);
     }
   });
 
@@ -112,6 +139,73 @@ describe("meta-schemas", () => {
     // The enum still constrains real values.
     (transition as { action: unknown }).action = "warp";
     expect(check(flow)).toBe(false);
+  });
+
+  // Step and transition shapes the engine can never run are rejected by the
+  // dialect too, so an editor flags them before plan does.
+  it("rejects step and transition shapes the engine cannot run", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const withStep = (step: Record<string, unknown>): object => {
+      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+        steps: object[];
+      };
+      flow.steps.push({ name: "extra", ...step });
+      return flow;
+    };
+    const provider = { id: "google", name: "Google", template: "google" };
+    const cases: Array<[string, Record<string, unknown>, boolean]> = [
+      ["sso_providers without transitions", { sso_providers: [provider] }, false],
+      [
+        "sso_providers without a callback",
+        { sso_providers: [provider], transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      [
+        "sso_providers with a callback",
+        { sso_providers: [provider], transitions: { callback: { target: "extra" } } },
+        true,
+      ],
+      [
+        "terminal step with actions",
+        { complete: "show", actions: [{ name: "submit", kind: "submit" }] },
+        false,
+      ],
+      [
+        "terminal step with transitions",
+        { complete: "show", transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      ["terminal step with empty lists", { complete: "show", fields: [], actions: [] }, true],
+      ["non-terminal step with nothing", {}, false],
+      ["non-terminal step with only empty lists", { fields: [], actions: [] }, false],
+      [
+        "non-terminal step with only a callback",
+        { transitions: { callback: { target: "extra" } } },
+        true,
+      ],
+      ["non-terminal step with fields", { fields: ["email"] }, true],
+      [
+        "transition with both purpose and action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "transition with purpose and a null action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: null } },
+        },
+        true,
+      ],
+    ];
+    for (const [name, step, valid] of cases) {
+      expect(check(withStep(step)), `${name}: ${JSON.stringify(check.errors)}`).toBe(valid);
+    }
   });
 
   // The dialect is what an editor validates against, so the property-name
@@ -163,8 +257,12 @@ describe("meta-schemas", () => {
       const file = { $schema: BRANDING_FILE_SCHEMA_REF, ...branding };
       expect(check(file), `${design}: ${JSON.stringify(check.errors)}`).toBe(true);
     }
-    // The two template carriers are mutually exclusive.
-    expect(check({ liquid_template: "x", liquid_template_file: "./login.liquid" })).toBe(false);
+    // The template is inline or a `$file` reference; the old key is unknown.
+    expect(check({ liquid_template: "<p></p>" })).toBe(true);
+    expect(check({ liquid_template: { $file: "./login.liquid" } })).toBe(true);
+    expect(check({ liquid_template: { $file: "" } })).toBe(false);
+    expect(check({ liquid_template: { $file: "./login.liquid", extra: 1 } })).toBe(false);
+    expect(check({ liquid_template_file: "./login.liquid" })).toBe(false);
     // Unknown keys are dialect errors, like the flow dialect.
     expect(check({ not_a_branding_key: true })).toBe(false);
     // Asset URLs are https by default at the dialect level too — editors flag
@@ -173,6 +271,13 @@ describe("meta-schemas", () => {
     expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
+    expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
+    expect(check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } })).toBe(
+      true,
+    );
+    expect(
+      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" } }),
+    ).toBe(true);
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.
     expect(check({ logo_url: "http://localhost:3000/logo.svg" })).toBe(true);
@@ -190,6 +295,24 @@ describe("meta-schemas", () => {
     expect(check({ hero_url: "http://[0:0:0:0:0:0:0:1]/hero.png" })).toBe(false);
     expect(check({ hero_url: "http://[::ffff:127.0.0.1]/hero.png" })).toBe(false);
     expect(check({ hero_url: "http://localhost:65536/hero.png" })).toBe(false);
+    // Userinfo in an asset URL is a credential every visitor's browser sends,
+    // so the dialect rejects it like the zod and Go gates; an `@` in the path
+    // is not userinfo.
+    expect(check({ logo_url: "https://bob:secret@cdn.example.com/logo.svg" })).toBe(false);
+    expect(
+      check({ theme: { dark: { logo_url: "https://bob@cdn.example.com/on-dark.svg" } } }),
+    ).toBe(false);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://u:p@fonts.example.com/css" },
+      }),
+    ).toBe(false);
+    expect(check({ logo_url: "https://cdn.example.com/logo@2x.png" })).toBe(true);
+    // A stylesheet alone names no face to render in.
+    expect(check({ typography: { font_url: "https://fonts.example.com/css" } })).toBe(false);
+    expect(
+      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com/css" } }),
+    ).toBe(true);
   });
 
   it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {

@@ -92,11 +92,10 @@ type Session struct {
 	// A user may have multiple sessions (e.g. from different devices or browsers), and UserID may be nil during some lifecycle stages.
 	UserID *string
 
-	// User is the hydrated identity of the linked user, carrying the
-	// [IdentityAttributeKeys] attributes. Only populated when the read
-	// requests it (see service.GetSessionInput.WithUserIdentity); nil for
-	// anonymous sessions and plain reads.
-	User *User
+	// User is the linked user's resolved reference (ADR 058 §3), derived
+	// from the schema's x-identifier/x-display designations. Only populated
+	// on identity-hydrating reads; nil for anonymous sessions.
+	User *UserRef
 
 	// UserAgent contains information about the user's device and browser.
 	UserAgent *UserAgent
@@ -129,6 +128,9 @@ func (s *Session) State() SessionState {
 }
 
 func (s *Session) Token(encrypter op.Encrypter) (string, error) {
+	// Scope stays unset: session authority is the user principal, not
+	// credential scopes. Management APIs skip the project.write ceiling for
+	// PrincipalType=user (credentialCeiling) and authorize via Check.
 	token, err := (&Token{
 		ProjectID: s.ProjectID,
 		TokenID:   s.TokenID,

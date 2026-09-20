@@ -18,29 +18,33 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// userReaderStub implements service.UserIdentityReader and records the
-// identity lookup inputs so tests can assert which user was hydrated.
-type userReaderStub struct {
-	getFunc          func(context.Context, string, string, ...string) (*domain.User, error)
-	gotProjectID     string
-	gotUserID        string
-	gotAttributeKeys []string
+// refResolverStub implements service.UserRefResolver and records the
+// resolution inputs so tests can assert which users were hydrated.
+type refResolverStub struct {
+	resolveFunc  func(context.Context, string, []string) (map[string]domain.UserRef, error)
+	gotProjectID string
+	gotUserIDs   []string
 }
 
-func (s *userReaderStub) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	s.gotProjectID, s.gotUserID = projectID, userID
-	s.gotAttributeKeys = attributeKeys
-	if s.getFunc == nil {
-		panic("unexpected users.GetIdentity call")
+func (s *refResolverStub) ResolveUserRefs(ctx context.Context, projectID string, userIDs []string) (map[string]domain.UserRef, error) {
+	s.gotProjectID, s.gotUserIDs = projectID, userIDs
+	if s.resolveFunc == nil {
+		panic("unexpected refs.ResolveUserRefs call")
 	}
-	return s.getFunc(ctx, projectID, userID, attributeKeys...)
+	return s.resolveFunc(ctx, projectID, userIDs)
+}
+
+// ResolveRefsForUsers satisfies the widened port; the session service
+// resolves by id only, so any call here is a test failure.
+func (s *refResolverStub) ResolveRefsForUsers(context.Context, string, []*domain.User) (map[string]domain.UserRef, error) {
+	panic("unexpected refs.ResolveRefsForUsers call")
 }
 
 func sessionConfigForTest() service.SessionConfig {
 	return service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
 }
 
-func newMockedSessionService(t *testing.T, users service.UserIdentityReader, cfg service.SessionConfig) (service.SessionService, *servicemocks.MockAllStatements) {
+func newMockedSessionService(t *testing.T, refs service.UserRefResolver, cfg service.SessionConfig) (service.SessionService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockStatementPool(ctrl)
@@ -55,7 +59,7 @@ func newMockedSessionService(t *testing.T, users service.UserIdentityReader, cfg
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return service.NewSessionService(pool, users, cfg), statements
+	return service.NewSessionService(pool, refs, cfg), statements
 }
 
 func TestSessionService_Create(t *testing.T) {
@@ -93,7 +97,7 @@ func TestSessionService_Create(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
 			statements.EXPECT().
 				CreateSession(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, gotSession *domain.Session) error {
@@ -215,7 +219,7 @@ func TestSessionService_Exchange(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, statements := newMockedSessionService(t, &userReaderStub{}, cfg)
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, cfg)
 			if tt.repoResult != nil || tt.repoErr != nil {
 				statements.EXPECT().
 					ExchangeSession(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -282,7 +286,7 @@ func TestSessionService_Get(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
 			statements.EXPECT().
 				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, projectID, sessionID string) (*domain.Session, error) {
@@ -303,54 +307,54 @@ func TestSessionService_Get(t *testing.T) {
 
 func TestSessionService_Get_UserIdentity(t *testing.T) {
 	userID := "user-1"
-	identityUser := &domain.User{
-		ProjectID: "proj",
-		ID:        userID,
-		Attributes: []domain.Attribute{
-			{Key: "email", Value: "ada@example.com"},
-			{Key: "given_name", Value: "Ada"},
-		},
+	adaRef := domain.UserRef{
+		UserID:             userID,
+		Identifier:         "ada@example.com",
+		IdentifierProperty: "email",
+		Display:            "Ada Lovelace",
 	}
 
 	for _, tt := range []struct {
 		name          string
 		sessionUserID *string
-		userResult    *domain.User
-		userErr       error
-		wantUser      *domain.User
+		refs          map[string]domain.UserRef
+		refErr        error
+		wantUser      *domain.UserRef
 		wantErr       error
 	}{
 		{
-			name:          "hydrates the linked user",
+			name:          "resolves the linked user's ref",
 			sessionUserID: &userID,
-			userResult:    identityUser,
-			wantUser:      identityUser,
+			refs:          map[string]domain.UserRef{userID: adaRef},
+			wantUser:      &adaRef,
 		},
 		{
 			name:          "skips anonymous sessions",
 			sessionUserID: nil,
 		},
 		{
+			// Missing users are absent from the resolution result (ADR 058
+			// §4); the session renders with its user id only.
 			name:          "tolerates a session that outlived its user",
 			sessionUserID: &userID,
-			userErr:       database.NewNoRowFoundError(nil),
+			refs:          map[string]domain.UserRef{},
 		},
 		{
-			name:          "wraps unexpected user lookup error",
+			name:          "wraps resolution error",
 			sessionUserID: &userID,
-			userErr:       errors.New("boom"),
+			refErr:        errors.New("boom"),
 			wantErr:       domain.ErrInternal(nil),
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			users := &userReaderStub{}
+			refs := &refResolverStub{}
 			if tt.sessionUserID != nil {
-				users.getFunc = func(_ context.Context, projectID, uid string, keys ...string) (*domain.User, error) {
-					return tt.userResult, tt.userErr
+				refs.resolveFunc = func(context.Context, string, []string) (map[string]domain.UserRef, error) {
+					return tt.refs, tt.refErr
 				}
 			}
 
-			svc, statements := newMockedSessionService(t, users, sessionConfigForTest())
+			svc, statements := newMockedSessionService(t, refs, sessionConfigForTest())
 			statements.EXPECT().
 				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&domain.Session{ProjectID: "proj", ID: "sess", UserID: tt.sessionUserID}, nil)
@@ -366,17 +370,18 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get returned error: %v", err)
 			}
-			if got.User != tt.wantUser {
+			if tt.wantUser == nil {
+				if got.User != nil {
+					t.Fatalf("Get session.User = %v, want nil", got.User)
+				}
+			} else if got.User == nil || *got.User != *tt.wantUser {
 				t.Fatalf("Get session.User = %v, want %v", got.User, tt.wantUser)
 			}
 			if tt.sessionUserID == nil {
 				return
 			}
-			if users.gotProjectID != "proj" || users.gotUserID != userID {
-				t.Fatalf("users queried with (%q, %q), want (%q, %q)", users.gotProjectID, users.gotUserID, "proj", userID)
-			}
-			if !slices.Equal(users.gotAttributeKeys, domain.IdentityAttributeKeys) {
-				t.Fatalf("users.GetIdentity keys = %v, want %v", users.gotAttributeKeys, domain.IdentityAttributeKeys)
+			if refs.gotProjectID != "proj" || !slices.Equal(refs.gotUserIDs, []string{userID}) {
+				t.Fatalf("refs resolved with (%q, %v), want (%q, %v)", refs.gotProjectID, refs.gotUserIDs, "proj", []string{userID})
 			}
 		})
 	}
@@ -557,7 +562,7 @@ func TestSessionService_List(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
 
 			var gotOpts *database.ListOptions[domain.SessionField]
 			statements.EXPECT().ListSessions(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -751,7 +756,7 @@ func TestSessionService_List_ValidationErrors(t *testing.T) {
 
 			// The statement must never be reached: validation fails first, so no
 			// ListSessions expectation is set and gomock would flag an unexpected call.
-			svc, _ := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			svc, _ := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
 
 			_, err := svc.List(context.Background(), tc.input)
 			require.ErrorIs(t, err, tc.wantErr)

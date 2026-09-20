@@ -21,5 +21,5 @@ func ErrGrantPrincipalNotFound() Error {
 }
 
 func ErrGrantPermissionDenied() Error {
-	return newError(PrefixGrant.ErrorCodePrefix("permission_denied"), "the grant management API requires the project secret", nil, nil)
+	return newError(PrefixGrant.ErrorCodePrefix("permission_denied"), "insufficient permissions to manage grants", nil, nil)
 }

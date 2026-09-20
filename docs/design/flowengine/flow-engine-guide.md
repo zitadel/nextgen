@@ -649,13 +649,14 @@ policy evaluation.
 
 The shipped schema defines two statuses:
 
-| Status | Can be resolved? | How to edit |
+| Status | Can be resolved? | How to change |
 |---|---|---|
-| `draft` | No — never selected for new flows | `PUT /flow_definitions/{id}` (full replacement) |
-| `active` | Yes | `PUT /flow_definitions/{id}` (full replacement) |
+| `draft` | No — never selected for new flows | Publish a new revision with `POST /flow_definitions` |
+| `active` | Yes | Publish a new revision with `POST /flow_definitions` |
 
-There are no lifecycle verbs in the shipped spec — you change `status` by
-replacing the document, and create/update already run the definition
+A revision is immutable and its `status` is fixed at creation. There are no
+lifecycle verbs in the shipped spec — you change a flow by publishing a new
+revision under the same `name`, and create already runs the definition
 validator. A standalone `POST .../validate` (dead-end and reachability checks
 on demand) and `POST .../simulate` (dry-run with mock input) are planned, not
 shipped — see [flow-engine.md](flow-engine.md#flow-definitions).
