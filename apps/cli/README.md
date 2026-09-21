@@ -134,6 +134,7 @@ which ships in this package.
 - [`zitadel variables import`](#zitadel-variables-import)
 - [`zitadel variables list`](#zitadel-variables-list)
 - [`zitadel variables delete NAME`](#zitadel-variables-delete-name)
+- [`zitadel variables get NAME`](#zitadel-variables-get-name)
 - [`zitadel variables set NAME`](#zitadel-variables-set-name)
 - [`zitadel version`](#zitadel-version)
 - [`zitadel which`](#zitadel-which)
@@ -829,6 +830,39 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Delete one variable from an environment or the project.
+```
+
+## `zitadel variables get NAME`
+
+Get one variable from an environment or the project.
+
+```
+USAGE
+  $ zitadel variables get NAME [--json] [-c <value>] [-s <value>] [-n] [-f]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>]
+
+ARGUMENTS
+  NAME  Variable name to read.
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to read from. Omit to read the project
+                             level.
+  -f, --force                Overwrite protected files on conflict.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one variable from an environment or the project.
 ```
 
 ## `zitadel variables set NAME`

@@ -279,7 +279,7 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`
   or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
-- `variables list|set|delete|import` — manage the per-environment variables and
+- `variables list|get|set|delete|import` — manage the per-environment variables and
   secrets a configuration document references as `${{ NAME }}`. `--environment`
   (`-e`) names the owner and addresses the project level when omitted; owners do
   not inherit from one another, so a value that has to hold on several

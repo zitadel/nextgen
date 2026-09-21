@@ -22,7 +22,7 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesSet extends BaseCommand {
   static override description = "Set one variable on an environment or the project.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 6;
+  static override groupOrder = 7;
   static override args = {
     name: Args.string({
       required: true,

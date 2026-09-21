@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import type { ZitadelClient } from "@zitadel/api/client";
-import type { GetVariables200 } from "@zitadel/api/generated/model";
+import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 
 import { ZitadelError } from "./errors";
 
@@ -57,22 +57,50 @@ export function ownerLabel(environment?: string): string {
 }
 
 /**
- * Project the wire map into rows. The platform keys the response by name,
- * with a bare scalar for a non-secret and `{secret: true}` for a secret; rows
- * are sorted by name so output is stable between runs.
+ * Project one wire value into a row. Both endpoints answer in the same two
+ * forms — a bare scalar for a non-secret, `{"secret": true}` for a secret — so
+ * the collection and the single-name read share this.
+ */
+export function toVariableRow(name: string, value: GetVariable200): VariableRow {
+  return typeof value === "object" && value !== null
+    ? { name, secret: true }
+    : { name, secret: false, value };
+}
+
+/**
+ * Project the wire map into rows, sorted by name so output is stable between
+ * runs.
  */
 export function toVariableRows(body: GetVariables200): VariableRow[] {
   return Object.entries(body)
-    .map(([name, value]) =>
-      typeof value === "object" && value !== null
-        ? { name, secret: true }
-        : { name, secret: false, value },
-    )
+    .map(([name, value]) => toVariableRow(name, value))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Stands in for a secret's value, which the platform never discloses. */
 const SECRET_MARKER = "(secret)";
+
+/**
+ * Render a stored scalar for a terminal.
+ *
+ * A value is attacker-influenceable — anyone holding `variable.write` chooses
+ * it — so it is never interpolated raw. A newline would break the table out of
+ * its own row, and an ESC or OSC byte would drive the terminal itself (setting
+ * its title, or writing the clipboard through OSC 52). Control and format
+ * characters are therefore escaped to their `\xNN`/`\uNNNN` spelling, which
+ * keeps ordinary values readable and leaves nothing executable behind.
+ */
+export function renderScalar(value: string | number | boolean | undefined): string {
+  if (typeof value !== "string") {
+    return String(value);
+  }
+  return value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, (char) => {
+    const code = char.codePointAt(0) ?? 0;
+    return code <= 0xff
+      ? `\\x${code.toString(16).padStart(2, "0")}`
+      : `\\u${code.toString(16).padStart(4, "0")}`;
+  });
+}
 
 /**
  * Render rows as the plain-text table, carrying the owner in its header the way
@@ -92,10 +120,10 @@ export function renderVariableTable(
   const nameCol = Math.max("name".length, ...rows.map((r) => r.name.length));
   const valueCol = Math.max(
     "value".length,
-    ...rows.map((r) => (r.secret ? SECRET_MARKER.length : String(r.value).length)),
+    ...rows.map((r) => (r.secret ? SECRET_MARKER.length : renderScalar(r.value).length)),
   );
   const body = rows.map(
-    (r) => `${r.name.padEnd(nameCol)}  ${r.secret ? SECRET_MARKER : String(r.value)}`,
+    (r) => `${r.name.padEnd(nameCol)}  ${r.secret ? SECRET_MARKER : renderScalar(r.value)}`,
   );
   return [
     header,

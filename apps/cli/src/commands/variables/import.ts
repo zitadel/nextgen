@@ -22,7 +22,7 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesImport extends BaseCommand {
   static override description = "Import a .env-style file into an environment or the project.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 8;
+  static override groupOrder = 9;
   static override flags = {
     environment: Flags.string({
       char: "e",

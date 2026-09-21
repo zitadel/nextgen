@@ -21,7 +21,7 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesDelete extends BaseCommand {
   static override description = "Delete one variable from an environment or the project.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 7;
+  static override groupOrder = 8;
   static override args = {
     name: Args.string({ required: true, description: "Variable name to delete." }),
   };

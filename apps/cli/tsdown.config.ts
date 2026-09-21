@@ -36,6 +36,7 @@ export default defineConfig({
     "commands/schemas/list": "src/commands/schemas/list.ts",
     "commands/branding/eject": "src/commands/branding/eject.ts",
     "commands/variables/list": "src/commands/variables/list.ts",
+    "commands/variables/get": "src/commands/variables/get.ts",
     "commands/variables/set": "src/commands/variables/set.ts",
     "commands/variables/delete": "src/commands/variables/delete.ts",
     "commands/variables/import": "src/commands/variables/import.ts",

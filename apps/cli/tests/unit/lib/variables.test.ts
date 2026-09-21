@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertVariableName,
+  renderScalar,
   environmentParam,
   ownerLabel,
   parseEnvFile,
@@ -89,6 +90,13 @@ describe("toVariableRows", () => {
 });
 
 describe("renderVariableTable", () => {
+  it("escapes a value that would otherwise break the table or the terminal", () => {
+    const table = renderVariableTable(toVariableRows({ V: "one\ntwo\u001b[31m" }));
+
+    expect(table).not.toContain("\u001b");
+    expect(table.split("\n")).toHaveLength(4);
+  });
+
   it("prints a marker for a secret rather than an empty column", () => {
     const table = renderVariableTable(toVariableRows({ S: { secret: true }, V: "plain" }));
     expect(table).toContain("(secret)");
@@ -107,6 +115,36 @@ describe("renderVariableTable", () => {
   it("says so when nothing is entered", () => {
     expect(renderVariableTable([], "prod")).toBe("No variables entered on prod.");
     expect(renderVariableTable([])).toBe("No variables entered on the project.");
+  });
+});
+
+describe("renderScalar", () => {
+  it("leaves an ordinary value alone", () => {
+    expect(renderScalar("999-prod.apps.googleusercontent.com")).toBe(
+      "999-prod.apps.googleusercontent.com",
+    );
+    expect(renderScalar("a b/c=d")).toBe("a b/c=d");
+  });
+
+  it("keeps a value on its own row by escaping newlines", () => {
+    expect(renderScalar("one\ntwo")).toBe("one\\x0atwo");
+    expect(renderScalar("one\r\ntwo")).toBe("one\\x0d\\x0atwo");
+  });
+
+  it("neutralises escape sequences that would drive the terminal", () => {
+    // OSC 52 writes the clipboard; a raw ESC here would reach the terminal.
+    expect(renderScalar("\u001b]52;c;cGF5bG9hZA==\u0007")).toBe("\\x1b]52;c;cGF5bG9hZA==\\x07");
+    expect(renderScalar("\u001b[31mred\u001b[0m")).toBe("\\x1b[31mred\\x1b[0m");
+  });
+
+  it("escapes non-ASCII format characters too", () => {
+    expect(renderScalar("a\u200bb")).toBe("a\\u200bb");
+    expect(renderScalar("a\u2028b")).toBe("a\\u2028b");
+  });
+
+  it("renders a non-string scalar as itself", () => {
+    expect(renderScalar(5)).toBe("5");
+    expect(renderScalar(true)).toBe("true");
   });
 });
 
