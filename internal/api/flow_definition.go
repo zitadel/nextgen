@@ -206,17 +206,8 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 			s.Gates = gates
 		}
 
-		// sso providers
-		ssoProviders := make([]domain.FlowSSOProvider, 0, len(step.GetSSOProviders()))
-		for _, ssoProvider := range step.GetSSOProviders() {
-			s := domain.FlowSSOProvider{
-				ID:       ssoProvider.GetID(),
-				Name:     ssoProvider.GetName(),
-				Template: ssoProvider.GetTemplate(),
-			}
-			ssoProviders = append(ssoProviders, s)
-		}
-		s.SSOProviders = ssoProviders
+		// sso providers: connection slugs, stored as given
+		s.SSOProviders = slices.Clone(step.GetSSOProviders())
 
 		// transitions
 		if step.GetTransitions().IsSet() {
@@ -337,8 +328,6 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		actions := mapActionsToAPI(step.Actions)
 		// gates
 		gates := mapGatesToAPI(step.Gates)
-		// sso providers
-		ssoProviders := mapSSOProvidersToAPI(step.SSOProviders)
 		// transitions
 		transitions := mapTransitionsToAPI(step.Transitions)
 
@@ -354,7 +343,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 				Value: gates,
 				Set:   gates != nil,
 			},
-			SSOProviders: ssoProviders,
+			SSOProviders: nilIfEmpty(step.SSOProviders),
 			Transitions: api.OptFlowDefinitionStepTransitions{
 				Value: transitions,
 				Set:   transitions != nil,
@@ -437,21 +426,6 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 		}
 	}
 	return transitions
-}
-
-func mapSSOProvidersToAPI(domainSSOProviders []domain.FlowSSOProvider) []api.SSOProvider {
-	if len(domainSSOProviders) == 0 {
-		return nil
-	}
-	ssoProviders := make([]api.SSOProvider, 0, len(domainSSOProviders))
-	for _, ssoProvider := range domainSSOProviders {
-		ssoProviders = append(ssoProviders, api.SSOProvider{
-			ID:       ssoProvider.ID,
-			Name:     ssoProvider.Name,
-			Template: ssoProvider.Template,
-		})
-	}
-	return ssoProviders
 }
 
 func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Gate {

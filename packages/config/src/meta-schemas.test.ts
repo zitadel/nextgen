@@ -154,7 +154,7 @@ describe("meta-schemas", () => {
       flow.steps.push({ name: "extra", ...step });
       return flow;
     };
-    const provider = { id: "google", name: "Google", template: "google" };
+    const provider = "google";
     const cases: Array<[string, Record<string, unknown>, boolean]> = [
       ["sso_providers without transitions", { sso_providers: [provider] }, false],
       [

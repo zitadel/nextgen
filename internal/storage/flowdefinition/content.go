@@ -47,10 +47,27 @@ type GateJSON struct {
 	Config   map[string]any `json:"config,omitempty"`
 }
 
-type SSOProviderJSON struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Template string `json:"template"`
+// SSOProviderJSON is one entry of a step's sso_providers: the slug of an
+// identity provider connection. Revisions stored before steps referenced
+// connections by slug hold an {id, name, template} object instead; decoding
+// takes its id as the slug so those immutable revisions still load. Encoding
+// always writes the slug.
+type SSOProviderJSON string
+
+func (p *SSOProviderJSON) UnmarshalJSON(data []byte) error {
+	var slug string
+	if err := json.Unmarshal(data, &slug); err == nil {
+		*p = SSOProviderJSON(slug)
+		return nil
+	}
+	var legacy struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return fmt.Errorf("sso provider: want a connection slug or an {id} object: %w", err)
+	}
+	*p = SSOProviderJSON(legacy.ID)
+	return nil
 }
 
 type TransitionJSON struct {
@@ -126,12 +143,8 @@ func marshalStep(s domain.FlowDefinitionStep) StepJSON {
 	}
 	if len(s.SSOProviders) > 0 {
 		out.SSOProviders = make([]SSOProviderJSON, len(s.SSOProviders))
-		for j, p := range s.SSOProviders {
-			out.SSOProviders[j] = SSOProviderJSON{
-				ID:       p.ID,
-				Name:     p.Name,
-				Template: p.Template,
-			}
+		for j, slug := range s.SSOProviders {
+			out.SSOProviders[j] = SSOProviderJSON(slug)
 		}
 	}
 	if s.OnSuccess != nil {
@@ -272,13 +285,9 @@ func unmarshalStep(s StepJSON) (domain.FlowDefinitionStep, error) {
 		}
 	}
 	if len(s.SSOProviders) > 0 {
-		step.SSOProviders = make([]domain.FlowSSOProvider, len(s.SSOProviders))
-		for j, p := range s.SSOProviders {
-			step.SSOProviders[j] = domain.FlowSSOProvider{
-				ID:       p.ID,
-				Name:     p.Name,
-				Template: p.Template,
-			}
+		step.SSOProviders = make([]string, len(s.SSOProviders))
+		for j, slug := range s.SSOProviders {
+			step.SSOProviders[j] = string(slug)
 		}
 	}
 	if s.OnSuccess != nil {

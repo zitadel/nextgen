@@ -381,13 +381,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Fields: []domain.Field{
 								"email",
 							},
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"callback": {Target: "done"},
 							},
@@ -417,13 +411,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name: "identify",
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"cancel": {Target: "done"},
 							},
