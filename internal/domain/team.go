@@ -44,17 +44,8 @@ func ErrTeamPermissionDenied() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("permission_denied"), "the team management API requires the project secret", nil, nil)
 }
 
-// ErrTeamOwnsProject refuses to deactivate a team that still owns a project,
-// which would leave that project without an owner.
-//
-// The message states the condition and does not tell the caller how to clear
-// it, because today nothing can: the grants API handles only viewer, editor
-// and admin rows, so an owning-team row cannot be revoked through it, and
-// there is no ownership-transfer endpoint. Promising a remedy the API does not
-// offer would be worse than saying nothing.
-//
-// Visible rather than hidden: a team the caller may deactivate is one they may
-// already see, so the reason gives away nothing.
+// ErrTeamOwnsProject refuses to deactivate a team that still owns a project.
+// No API operation releases that ownership yet (recovery is zitadel/nextgen#1261).
 func ErrTeamOwnsProject() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("owns_project"), "the team still owns a project and cannot be deactivated while it does", nil, nil)
 }

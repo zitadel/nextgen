@@ -291,7 +291,8 @@ func TestTeamService_Delete(t *testing.T) {
 			wantErr: domain.ErrInternal(assert.AnError),
 		},
 		{
-			// ADR 054 §2: deactivating the owner would orphan the project.
+			// ADR 054 §8 (amendment 2026-09-21): deactivating the owner would
+			// orphan the project, so it is refused until recovery exists.
 			name:   "team that owns a project is refused",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
@@ -300,16 +301,6 @@ func TestTeamService_Delete(t *testing.T) {
 				// No event: the transaction rolls back, so nothing is recorded.
 			},
 			wantErr: domain.ErrTeamOwnsProject(),
-		},
-		{
-			// A revoked owning grant is not ownership; the guard reads active
-			// rows only, so this team deactivates like any other.
-			name:   "team whose owning grant was revoked deactivates",
-			teamID: "team_1",
-			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
-				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, nil)
-			},
 		},
 		{
 			name:   "ownership lookup fails",

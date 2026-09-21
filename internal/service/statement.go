@@ -460,15 +460,9 @@ type AuthzAssignmentStatements interface {
 	// (empty starts at the beginning).
 	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
 	// HasActiveOwningTeamGrant reports whether the team still owns a project.
-	// It is the mirror of GetActiveOwningTeamGrant: that one asks a project who
-	// owns it, this one asks a team what it owns, so the lookup is keyed on the
-	// team and spans every project. Ownership rows sit on the owned project,
-	// which for a claim is not the team's own project.
-	//
-	// Active means unrevoked. Expiry is not consulted because an owning-team
-	// grant cannot carry one: the authz_assignments CHECK rejects expires_at on
-	// (project, team) rows, since ADR 054 §2 ends ownership only by transfer or
-	// revocation.
+	// Keyed on the team alone: the owning row sits on the owned project, which
+	// for a claim is not the team's own project. Expiry is not consulted, the
+	// authz_assignments CHECK forbids expires_at on (project, team) rows (ADR 054 §2).
 	HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error)
 	// ListAuthorizedProjects pages the projects the user can act on, by the
 	// three routes ADR 053 §6 puts in the authorized set:

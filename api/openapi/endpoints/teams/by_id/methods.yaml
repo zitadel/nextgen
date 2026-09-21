@@ -77,12 +77,6 @@ delete:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
-    '409':
-      description: The team still owns a project and cannot be deactivated.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
     '401':
       description: Missing or invalid credentials.
       content:
@@ -93,6 +87,12 @@ delete:
       description: |
         Insufficient permissions, or the credentials are not bound to the
         project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: The team still owns a project and cannot be deactivated.
       content:
         application/json:
           schema:

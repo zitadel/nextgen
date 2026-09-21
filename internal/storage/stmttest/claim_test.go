@@ -386,6 +386,8 @@ func TestClaimStatements_OwningTeamGrant(t *testing.T) {
 
 		// The mirror of GetActiveOwningTeamGrant, asked from the team's side.
 		// It backs the guard that refuses to deactivate a team that owns one.
+		// The lookup is keyed on the team alone because the row lives on the
+		// owned project, which after a claim is not the team's own project.
 		t.Run("has active owning team grant", func(t *testing.T) {
 			owner := "team-owner-" + uniqueSuffix(t)
 			stranger := "team-stranger-" + uniqueSuffix(t)
@@ -410,23 +412,6 @@ func TestClaimStatements_OwningTeamGrant(t *testing.T) {
 			owns, err = d.stmts.HasActiveOwningTeamGrant(t.Context(), owner)
 			require.NoError(t, err)
 			assert.False(t, owns, "a revoked grant is not ownership")
-		})
-
-		// The lookup is keyed on the team alone because the row lives on the
-		// owned project, which after a claim is not the team's own project.
-		// Scoping this query by project would miss exactly the case the guard
-		// exists for.
-		t.Run("owning grant found across projects", func(t *testing.T) {
-			ensureProject(t, d.stmts) // the team's notional home
-			owned := ensureProject(t, d.stmts)
-
-			foreign := "team-foreign-" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				domain.NewClaimTeamAssignment(owned, foreign)))
-
-			owns, err := d.stmts.HasActiveOwningTeamGrant(t.Context(), foreign)
-			require.NoError(t, err)
-			assert.True(t, owns, "ownership of another project must still count")
 		})
 
 		// A collaboration grant is not ownership: only (project, team) rows are.

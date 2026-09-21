@@ -224,15 +224,17 @@ func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context,
 // HasActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error) {
 	var owns bool
-	err := s.db.Query(ctx, buildStatement(hasActiveOwningTeamGrantStmt, teamID).statement(), func(iter *spanner.RowIterator) error {
-		row, qErr := iter.Next()
-		if qErr != nil {
+	err := s.db.Query(ctx, buildStatement(hasActiveOwningTeamGrantStmt, teamID).statement(),
+		func(iter *spanner.RowIterator) error {
+			var qErr error
+			owns, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
+				var found bool
+				return found, row.Columns(&found)
+			})
 			return qErr
-		}
-		return row.Columns(&owns)
-	})
+		})
 	if err != nil {
-		return false, err
+		return false, wrapError(err)
 	}
 	return owns, nil
 }
