@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient } from "../../lib/api-client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,

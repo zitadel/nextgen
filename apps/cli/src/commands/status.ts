@@ -1,4 +1,4 @@
-import { createZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient } from "../lib/api-client";
 
 import {
   claimAction,

@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient } from "../lib/api-client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 

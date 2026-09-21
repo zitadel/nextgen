@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
 import {
   CreateGrantBody,
   CreateTeamBody,
