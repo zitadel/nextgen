@@ -1,3 +1,4 @@
+import { Flags } from "@oclif/core";
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { ZitadelError } from "../lib/errors";
@@ -18,6 +19,12 @@ export default class Reset extends BaseCommand {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 5;
+  static override flags = {
+    force: Flags.boolean({
+      char: "f",
+      description: "Delete the local runtime and its data without the confirmation prompt.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Reset);
