@@ -51,9 +51,12 @@ CREATE TABLE zitadel_nextgen.idp_connection_revisions (
         ON DELETE CASCADE
 );
 
--- Reading a connection's history walks the child rows by parent.
+-- Reading a connection's history walks the child rows by parent, and the
+-- revision keyset rides along so the same index also carries the newest-first
+-- walk the history list pages on: a btree scans backward, so the ascending
+-- definition covers both directions.
 CREATE INDEX idx_idp_connection_revisions_connection
-    ON zitadel_nextgen.idp_connection_revisions (project_id, connection_id);
+    ON zitadel_nextgen.idp_connection_revisions (project_id, connection_id, created_at, id);
 
 -- +goose Down
 DROP INDEX IF EXISTS zitadel_nextgen.idx_idp_connection_revisions_connection;

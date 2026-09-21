@@ -50,8 +50,9 @@ CREATE TABLE idp_connection_revisions (
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- The parent walk plus the revision keyset; see the postgres migration.
 CREATE INDEX idx_idp_connection_revisions_connection
-    ON idp_connection_revisions (project_id, connection_id);
+    ON idp_connection_revisions (project_id, connection_id, created_at, id);
 -- +goose StatementEnd
 
 -- +goose Down

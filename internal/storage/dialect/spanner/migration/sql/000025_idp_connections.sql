@@ -40,6 +40,7 @@ CREATE TABLE idp_connection_revisions (
     document        JSON        NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT chk_idp_connection_revisions_id CHECK (id <> ''),
+    CONSTRAINT chk_idp_connection_revisions_document CHECK (JSON_TYPE(document) = 'object'),
     CONSTRAINT fk_idp_connection_revisions_connection
         FOREIGN KEY (project_id, connection_id)
         REFERENCES idp_connections (project_id, id)
@@ -47,8 +48,12 @@ CREATE TABLE idp_connection_revisions (
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 -- +goose StatementBegin
+-- The parent walk plus the revision keyset, declared in the direction the
+-- history list pages: Spanner serves an ORDER BY from an index only when the
+-- declared key order matches it, so the newest-first walk has to be spelled out
+-- here rather than left to a backward scan the way postgres and sqlite do.
 CREATE INDEX idx_idp_connection_revisions_connection
-    ON idp_connection_revisions (project_id, connection_id)
+    ON idp_connection_revisions (project_id, connection_id, created_at DESC, id DESC)
 -- +goose StatementEnd
 
 -- +goose Down
