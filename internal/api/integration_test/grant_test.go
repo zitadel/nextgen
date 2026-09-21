@@ -3,9 +3,12 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -83,7 +86,8 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		assert.Equal(t, api.GrantObjectTypeProject, created.ObjectType)
 		require.True(t, created.User.IsSet())
 		assert.Equal(t, api.UserID(userID), created.User.Value.UserID)
-		assert.True(t, created.User.Value.Identifier.IsSet())
+		assert.False(t, created.User.Value.Identifier.IsSet())
+		assert.False(t, created.User.Value.Display.IsSet())
 		assert.False(t, created.Team.IsSet())
 		assert.False(t, created.User.Value.Schema.IsSet())
 
@@ -95,6 +99,8 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		got, ok := getResp.(*api.Grant)
 		require.True(t, ok, helpers.MustMarshal(t, getResp))
 		assert.Equal(t, created.ID, got.ID)
+		require.True(t, got.User.IsSet())
+		assert.True(t, got.User.Value.Identifier.IsSet())
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
 			ID:        created.ID,
@@ -127,7 +133,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		assert.Equal(t, api.GrantRelationEditor, created.Relation)
 		require.True(t, created.Team.IsSet())
 		assert.Equal(t, team.ID, created.Team.Value.TeamID)
-		assert.Equal(t, team.Name, created.Team.Value.Name.Or(""))
+		assert.False(t, created.Team.Value.Name.IsSet())
 		assert.False(t, created.User.IsSet())
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
@@ -287,6 +293,18 @@ func TestGrantCreateLocators(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, createResp))
 		require.True(t, created.User.IsSet())
 		assert.Equal(t, api.UserID(userID), created.User.Value.UserID)
+		assert.False(t, created.User.Value.Identifier.IsSet())
+		assert.False(t, created.User.Value.Display.IsSet())
+
+		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+			ID:        created.ID,
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		got, ok := getResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, getResp))
+		require.True(t, got.User.IsSet())
+		assert.True(t, got.User.Value.Identifier.IsSet())
 	})
 
 	t.Run("create by team name", func(t *testing.T) {
@@ -303,7 +321,7 @@ func TestGrantCreateLocators(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, createResp))
 		require.True(t, created.Team.IsSet())
 		assert.Equal(t, team.ID, created.Team.Value.TeamID)
-		assert.Equal(t, team.Name, created.Team.Value.Name.Or(""))
+		assert.False(t, created.Team.Value.Name.IsSet())
 	})
 
 	t.Run("unknown identifier is accepted without a row", func(t *testing.T) {
@@ -362,6 +380,7 @@ func TestGrantCreateLocators(t *testing.T) {
 		require.NoError(t, err)
 		created, ok := first.(*api.Grant)
 		require.True(t, ok, helpers.MustMarshal(t, first))
+		assert.False(t, created.User.Value.Identifier.IsSet())
 
 		second, err := client.CreateGrant(t.Context(), req, params)
 		require.NoError(t, err)
@@ -369,6 +388,8 @@ func TestGrantCreateLocators(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, second))
 		assert.Equal(t, created.ID, again.ID)
 		assert.Equal(t, api.UserID(userID), again.User.Value.UserID)
+		assert.False(t, again.User.Value.Identifier.IsSet())
+		assert.False(t, again.User.Value.Display.IsSet())
 
 		listed, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
 			Filter: []api.QueryGrantsRequestFilterItem{{
@@ -399,6 +420,49 @@ func TestGrantCreateLocators(t *testing.T) {
 		sessionClient.SetSessionToken(platformSessionCookie(t, userID).Value)
 
 		resp, err := sessionClient.CreateGrant(t.Context(), userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationAdmin), params)
+		require.NoError(t, err)
+		bad, ok := resp.(*api.CreateGrantBadRequest)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("grant.invalid"), bad.Code)
+		assert.Equal(t, "you cannot grant access to yourself", bad.Message)
+	})
+
+	t.Run("identifier hit and miss share one body shape", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		user, ok := userResp.(*api.User)
+		require.True(t, ok, helpers.MustMarshal(t, userResp))
+		require.True(t, user.Identifier.IsSet())
+
+		hitResp, err := client.CreateGrant(t.Context(), userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		hit, ok := hitResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, hitResp))
+
+		missResp, err := client.CreateGrant(t.Context(), userIdentifierGrant(helpers.RandString(10)+"@example.com", api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		miss, ok := missResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, missResp))
+
+		hitKeys, hitUserKeys := grantBodyKeys(t, hit)
+		missKeys, missUserKeys := grantBodyKeys(t, miss)
+		assert.Equal(t, hitKeys, missKeys)
+		assert.Equal(t, hitUserKeys, missUserKeys)
+		assert.NotEmpty(t, hitUserKeys)
+	})
+
+	t.Run("own user_id is grant.invalid", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectViewer(t, project.ID, userID)
+
+		sessionClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		sessionClient.SetSessionToken(platformSessionCookie(t, userID).Value)
+
+		resp, err := sessionClient.CreateGrant(t.Context(), userIDGrant(userID, api.CreateGrantRequestRelationAdmin), params)
 		require.NoError(t, err)
 		bad, ok := resp.(*api.CreateGrantBadRequest)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -450,6 +514,16 @@ func TestGrantCreateLocators(t *testing.T) {
 		assertCreateGrantReqInvalid(t, client.Token(), project.ID,
 			`{"relation":"admin","team":{"team_id":"team_1","extra":"nope"}}`)
 	})
+}
+
+// grantBodyKeys returns the sorted JSON keys of a grant body and of its nested
+// user object, so two responses can be compared on shape alone.
+func grantBodyKeys(t *testing.T, g *api.Grant) (top, user []string) {
+	t.Helper()
+	var body map[string]any
+	require.NoError(t, json.Unmarshal([]byte(helpers.MustMarshal(t, g)), &body))
+	nested, _ := body["user"].(map[string]any)
+	return slices.Sorted(maps.Keys(body)), slices.Sorted(maps.Keys(nested))
 }
 
 func TestGrantQuery(t *testing.T) {

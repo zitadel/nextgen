@@ -1198,12 +1198,13 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 // (`project.team`) grants are not created here — claim owns that path. An
 // unrevoked grant with the same principal and relation occupies the unique
 // key even after `expires_at`; DELETE it before re-creating.
-// Create does not accept `expand`; the 201 `user` / `team` are refs only.
+// Create does not accept `expand`; the 201 `user` / `team` carry only
+// `user_id` / `team_id`. Read the grant back for identifier and display.
 // Creating by `user.identifier` is accepted with 201 whether or not
 // a user matched: the server may write nothing, and a duplicate
-// returns the existing grant. Granting the session caller's own
-// resolved user is `grant.invalid`. Other locators still 404 / 409
-// when the principal is missing or the tuple already exists.
+// returns the existing grant. Granting the session caller's own user
+// is `grant.invalid` on either user locator. Other locators still
+// 404 / 409 when the principal is missing or the tuple already exists.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). Session callers are authorized as
 // the human against the target project (home may differ). CSRF/Origin

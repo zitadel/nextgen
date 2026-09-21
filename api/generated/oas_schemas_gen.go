@@ -56420,13 +56420,15 @@ func (s *UserInvalidDetails) init() UserInvalidDetails {
 // Ref: #
 type UserLocator struct {
 	// Platform-homed user id (`user_<opaque>`). The user must be active.
+	// Granting the session caller's own user id is `grant.invalid`.
 	UserID OptUserID `json:"user_id"`
 	// The user schema's designated identifier (`x-identifier`), looked
 	// up in the platform project. Create accepts this locator with
 	// HTTP 201 whether or not a user matched: a miss or several matches
 	// still return a Grant and write nothing; a duplicate returns the
-	// existing grant. The server logs the lookup outcome. Granting the
-	// session caller's own resolved user is `grant.invalid`.
+	// existing grant. The 201 `user` carries only `user_id` on every
+	// outcome. The server logs the lookup outcome. Granting the session
+	// caller's own resolved user is `grant.invalid`.
 	Identifier OptString `json:"identifier"`
 }
 

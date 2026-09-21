@@ -71,6 +71,7 @@ type CreateGrantInput struct {
 // errIdentifierUnresolved is the identifier-path miss/ambiguity signal.
 // Create maps it to a synthetic 201 rather than grant.principal_not_found
 // so the HTTP status cannot tell a caller whether the address matched.
+// The body cannot tell either: create never hydrates its refs.
 var errIdentifierUnresolved = errors.New("grant identifier unresolved")
 
 func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Grant, error) {
@@ -119,6 +120,9 @@ func (s *GrantService) createByResolvedLocator(ctx context.Context, input Create
 		if err != nil {
 			return err
 		}
+		if principalType == domain.AuthzPrincipalTypeUser && input.CallerUserID != "" && principalID == input.CallerUserID {
+			return domain.ErrGrantInvalid().WithMessage("you cannot grant access to yourself")
+		}
 		asgn, err := s.writeGrant(ctx, tx.Statements(), input, principalType, principalID)
 		if err != nil {
 			return err
@@ -129,7 +133,7 @@ func (s *GrantService) createByResolvedLocator(ctx context.Context, input Create
 	if err != nil {
 		return nil, mapGrantWriteError(err)
 	}
-	return s.hydrateCreated(ctx, created)
+	return idOnlyGrant(created), nil
 }
 
 func (s *GrantService) commitGrant(ctx context.Context, input CreateGrantInput, principalType domain.AuthzPrincipalType, principalID string) (*Grant, error) {
@@ -145,7 +149,7 @@ func (s *GrantService) commitGrant(ctx context.Context, input CreateGrantInput, 
 	if err != nil {
 		return nil, mapGrantWriteError(err)
 	}
-	return s.hydrateCreated(ctx, created)
+	return idOnlyGrant(created), nil
 }
 
 func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, input CreateGrantInput, principalType domain.AuthzPrincipalType, principalID string) (*domain.AuthzAssignment, error) {
@@ -185,17 +189,6 @@ func mapGrantWriteError(err error) error {
 	return domain.ErrInternal(err).WithMessage("failed to create grant")
 }
 
-func (s *GrantService) hydrateCreated(ctx context.Context, created *domain.AuthzAssignment) (*Grant, error) {
-	grant, err := s.hydrate(ctx, false, created)
-	if err != nil {
-		// The assignment has already committed: a ref/team load failure must
-		// not fail the create — the caller would retry and hit unique
-		// constraints — so the response carries id-only refs (ADR 058).
-		return idOnlyGrant(created), nil
-	}
-	return grant[0], nil
-}
-
 func (s *GrantService) syntheticIdentifierGrant(ctx context.Context, input CreateGrantInput) (*Grant, error) {
 	stmts := s.v2Pool.Statements()
 	asgnID, err := stmts.NewManagedID(string(domain.PrefixAuthzAssignment))
@@ -230,7 +223,7 @@ func (s *GrantService) existingOrSyntheticGrant(ctx context.Context, input Creat
 	}
 	for _, asgn := range asgns {
 		if asgn.Relation == input.Relation && isManagedGrant(asgn) {
-			return s.hydrateCreated(ctx, asgn)
+			return idOnlyGrant(asgn), nil
 		}
 	}
 	getLoggingContext(ctx, "grant").Info("grant identifier unique conflict without a matching row",
