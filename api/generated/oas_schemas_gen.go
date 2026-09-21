@@ -12673,6 +12673,10 @@ type DeleteTeamBadRequest ErrorDetails
 
 func (*DeleteTeamBadRequest) deleteTeamRes() {}
 
+type DeleteTeamConflict ErrorDetails
+
+func (*DeleteTeamConflict) deleteTeamRes() {}
+
 type DeleteTeamForbidden ErrorDetails
 
 func (*DeleteTeamForbidden) deleteTeamRes() {}

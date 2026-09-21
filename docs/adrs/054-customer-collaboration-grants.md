@@ -13,6 +13,10 @@
 > **Amends if accepted:** [ADR 046 §4](046-claim-lifecycle-v2.md#4-the-personal-team-is-created-at-registration-not-at-claim)
 > so claim selects an explicitly authorized target team instead of always
 > reusing the claimer's personal team.
+>
+> **Amended 2026-09-21** (§8): deactivating a team that still holds an active
+> owning-team assignment is rejected until ownerless-team recovery exists
+> (zitadel/nextgen#1261).
 
 ## Context
 
@@ -357,9 +361,9 @@ owner is **not** rejected: identity-level security actions take effect
 immediately and outrank §1's owner-retention invariant. The team is then left
 without an active owner, and its owned projects show the derived `needs_owner`
 condition below; rejection remains the rule only for ordinary owner removal.
-Deactivating an owning team leaves its projects in the same derived
-`needs_owner` condition for management purposes; this is not a new persisted
-project status. It does not delete projects or create a new owner implicitly.
+Deactivating an owning team is a separate case, amended at the end of this
+section (2026-09-21): while the team still holds an active owning-team
+assignment, the deactivation is rejected.
 
 **Recovery from `needs_owner` is authorized, not deferred.** Ordinarily only an
 active owner may issue `team.owner`, so a team with none would otherwise be
@@ -391,6 +395,21 @@ assignments on the project by default. A later API may accept an explicit retain
 list, but silent retention is unsafe. Project-secret rotation remains governed
 separately; this ADR does not claim that replacing the owner invalidates already
 issued service credentials.
+
+### Amendment (2026-09-21): owning teams cannot be deactivated yet
+
+Until the ownerless-team recovery described above is implemented (tracked in
+zitadel/nextgen#1261), deactivating a team that holds an active owning-team
+assignment is rejected with `team.owns_project`. Ownership must be transferred
+or revoked first. In the API this is `DELETE /teams/{id}`: deletion and
+deactivation are the same operation, the team is tombstoned, not erased.
+
+The derived `needs_owner` condition therefore currently arises only from
+suspending or deactivating the final owner user, which stays allowed.
+zitadel/nextgen#1261 decides whether the rejection is kept once recovery
+exists: team deactivation is an administrative action, not an identity-level
+security action, so keeping it is consistent with the ordinary-owner-removal
+rule above.
 
 ### 9. Project listing returns effective access and its source
 
