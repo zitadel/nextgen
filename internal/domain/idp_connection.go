@@ -15,13 +15,6 @@ func ErrIDPConnectionNotFound() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("not_found"), "identity provider connection: not found", nil, nil)
 }
 
-// ErrIDPConnectionAlreadyExists reports a slug already taken in the project.
-// The slug is what schemas and flow definitions reference a connection by, so
-// it is unique per project rather than per connection.
-func ErrIDPConnectionAlreadyExists() Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("already_exists"), "identity provider connection: a connection with this slug already exists in the project", nil, nil)
-}
-
 // ErrIDPConnectionFieldImmutable rejects a revision that changes a field the
 // connection is identified by: protocol, subject_claim, and the field naming
 // the authority, which is issuer for OIDC and token_endpoint with

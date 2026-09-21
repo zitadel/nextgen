@@ -162,7 +162,8 @@ type IDPConnectionStatements interface {
 	Statements
 	// CreateIDPConnection mints the connection and first revision ids, and
 	// writes the connection row, that revision, and the resource-scope index
-	// row in one transaction. CreatedAt equals UpdatedAt on a fresh connection.
+	// row in one transaction. UpdatedAt is the first revision's creation time,
+	// which is the connection's own birth instant.
 	// A slug already taken in the project surfaces as *database.UniqueError.
 	CreateIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
 	// ReviseIDPConnection appends a revision holding entity.Document and moves
@@ -170,6 +171,7 @@ type IDPConnectionStatements interface {
 	// is always freshly minted, so passing back an entity read from a get does
 	// not overwrite the revision it was read from. Concurrent revisions are
 	// last-write-wins on the head; both revisions stay readable by id.
+	// UpdatedAt is the appended revision's creation time.
 	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
 	GetIDPConnectionByID(ctx context.Context, projectID, id string) (*domain.IDPConnection, error)
 	GetIDPConnectionBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error)
@@ -179,6 +181,17 @@ type IDPConnectionStatements interface {
 	// is not part of the lookup.
 	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
 	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+	// ListIDPConnectionRevisions pages one connection's history newest first:
+	// every row carries the connection's identity with the document, revision
+	// id and creation time of the revision it stands for. The endpoint exposes
+	// neither filter nor sort, so page carries only the limit and the cursor,
+	// and an unset OrderBy defaults to that newest-first key.
+	//
+	// A connection that does not exist is an empty page rather than an error:
+	// nothing here distinguishes it from a connection with no readable
+	// revisions, so the handler pairs this with GetIDPConnectionByID for the
+	// 404.
+	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

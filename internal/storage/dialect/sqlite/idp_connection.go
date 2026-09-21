@@ -13,31 +13,36 @@ import (
 
 const (
 	createIDPConnectionStmt = `INSERT INTO idp_connections ` +
-		`(project_id, id, slug, latest_revision_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+		`(project_id, id, slug, latest_revision_id, created_at) VALUES (?, ?, ?, ?, ?)`
 
 	createIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
 		`(project_id, id, connection_id, document, created_at) VALUES (?, ?, ?, ?, ?)`
 
 	// Moves the head pointer. RETURNING is what tells a missing connection
 	// apart from a successful move, so revising an unknown connection fails
-	// before the revision row is written.
+	// before the revision row is written; the value it returns is the
+	// connection's birth, which every revision of it repeats.
 	moveIDPConnectionHeadStmt = `UPDATE idp_connections SET ` +
-		`latest_revision_id = ?, updated_at = ? WHERE project_id = ? AND id = ? RETURNING created_at, updated_at`
+		`latest_revision_id = ? WHERE project_id = ? AND id = ? RETURNING created_at`
 
 	// The head-pointer join: the connection's identity with the document of the
 	// revision it currently names. The aliases `c` and `r` are the ones
-	// idpconnection.Schema qualifies its column names with.
-	idpConnectionQuery = `SELECT c.project_id, c.id, c.slug, c.latest_revision_id, r.document, c.created_at, c.updated_at
+	// idpconnection.Schema qualifies its column names with, and the trailing
+	// r.created_at is the revision's birth, served as UpdatedAt.
+	idpConnectionQuery = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, r.created_at
 FROM idp_connections c
 JOIN idp_connection_revisions r
   ON r.project_id = c.project_id AND r.id = c.latest_revision_id`
 
-	// The pinned read: the same shape, but the revision is the one asked for
-	// rather than the one the head names, so it cannot go through the schema.
-	getIDPConnectionRevisionStmt = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, c.updated_at
+	// The same shape walked from the revision side, so a row stands for the
+	// revision it was read at rather than for the head. Both history reads use
+	// it: the pinned get pins one revision, the list pages them.
+	idpConnectionRevisionQuery = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, r.created_at
 FROM idp_connection_revisions r
 JOIN idp_connections c
-  ON c.project_id = r.project_id AND c.id = r.connection_id
+  ON c.project_id = r.project_id AND c.id = r.connection_id`
+
+	getIDPConnectionRevisionStmt = idpConnectionRevisionQuery + `
 WHERE r.project_id = ? AND r.id = ?`
 )
 
@@ -55,9 +60,8 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 	if err := ensureManagedID(&entity.RevisionID, domain.PrefixIDPConnectionRevision); err != nil {
 		return err
 	}
-	// One stamp for all three columns: a fresh connection reports
-	// CreatedAt == UpdatedAt, and the revision shares the instant it was
-	// created with.
+	// One stamp for both rows: the connection's birth is also its first
+	// revision's, so a fresh connection reports CreatedAt == UpdatedAt.
 	now := nowUnixNano()
 	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, createIDPConnectionStmt,
@@ -66,10 +70,10 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 			entity.Slug,
 			entity.RevisionID,
 			now,
-			now,
 		); err != nil {
 			// A slug already taken in the project arrives here as a
-			// *database.UniqueError; the service maps it to idp.already_exists.
+			// *database.UniqueError; creating over an existing slug is the
+			// revise path, so the service decides what to do with it.
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, createIDPConnectionRevisionStmt,
@@ -102,13 +106,12 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 		// Head first: it is the only statement that can report the connection
 		// missing, and there is no foreign key on latest_revision_id to make
 		// the order illegal.
-		var createdNano, updatedNano int64
+		var createdNano int64
 		if err := tx.QueryRow(ctx, moveIDPConnectionHeadStmt,
 			revisionID,
-			now,
 			entity.ProjectID,
 			entity.ID,
-		).Scan(&createdNano, &updatedNano); err != nil {
+		).Scan(&createdNano); err != nil {
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, createIDPConnectionRevisionStmt,
@@ -121,7 +124,8 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 			return wrapError(err)
 		}
 		entity.RevisionID = revisionID
-		entity.CreatedAt, entity.UpdatedAt = timeFromUnixNano(createdNano), timeFromUnixNano(updatedNano)
+		// The appended revision's stamp is the connection's new UpdatedAt.
+		entity.CreatedAt, entity.UpdatedAt = timeFromUnixNano(createdNano), timeFromUnixNano(now)
 		return nil
 	})
 }
@@ -183,6 +187,39 @@ func (s idpConnectionStatements) ListIDPConnections(ctx context.Context, filter 
 	// The alias rather than the table name: the authz EXISTS predicate has to
 	// name the connection row the join already bound as `c`.
 	if err := compileList(ctx, &compiler, idpConnectionQuery, opts, idpconnection.Schema, "c", "id"); err != nil {
+		return nil, err
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	items, err := collectRows(rows, scanIDPConnection)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	nextCursor := pagination.MarshalNext(
+		opts.Pagination.OrderBy,
+		items,
+		idpconnection.Schema,
+		opts.Pagination.Limit,
+	)
+
+	return &database.ListResult[*domain.IDPConnection]{
+		Items:      items,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+// ListIDPConnectionRevisions implements [service.IDPConnectionStatements].
+func (s idpConnectionStatements) ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+	opts := idpconnection.RevisionsListOptions(projectID, connectionID, page)
+
+	var compiler statementCompiler
+	// The same alias and column as the head list: what authz guards is the
+	// connection the revisions hang off, not the revision rows.
+	if err := compileList(ctx, &compiler, idpConnectionRevisionQuery, opts, idpconnection.Schema, "c", "id"); err != nil {
 		return nil, err
 	}
 	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)

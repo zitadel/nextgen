@@ -14,31 +14,38 @@ import (
 
 const (
 	createIDPConnectionStmt = `INSERT INTO zitadel_nextgen.idp_connections ` +
-		`(project_id, id, slug, latest_revision_id) VALUES ($1, $2, $3, $4) RETURNING created_at, updated_at`
+		`(project_id, id, slug, latest_revision_id) VALUES ($1, $2, $3, $4) RETURNING created_at`
 
+	// The revision's created_at is what every read serves as UpdatedAt, so the
+	// insert hands it back rather than the caller guessing at it.
 	createIDPConnectionRevisionStmt = `INSERT INTO zitadel_nextgen.idp_connection_revisions ` +
-		`(project_id, id, connection_id, document) VALUES ($1, $2, $3, $4)`
+		`(project_id, id, connection_id, document) VALUES ($1, $2, $3, $4) RETURNING created_at`
 
 	// Moves the head pointer. RETURNING is what tells a missing connection
 	// apart from a successful move, so revising an unknown connection fails
-	// before the revision row is written.
+	// before the revision row is written; the value it returns is the
+	// connection's birth, which every revision of it repeats.
 	moveIDPConnectionHeadStmt = `UPDATE zitadel_nextgen.idp_connections SET ` +
-		`latest_revision_id = $1, updated_at = NOW() WHERE project_id = $2 AND id = $3 RETURNING created_at, updated_at`
+		`latest_revision_id = $1 WHERE project_id = $2 AND id = $3 RETURNING created_at`
 
 	// The head-pointer join: the connection's identity with the document of the
 	// revision it currently names. The aliases `c` and `r` are the ones
-	// idpconnection.Schema qualifies its column names with.
-	idpConnectionQuery = `SELECT c.project_id, c.id, c.slug, c.latest_revision_id, r.document, c.created_at, c.updated_at
+	// idpconnection.Schema qualifies its column names with, and the trailing
+	// r.created_at is the revision's birth, served as UpdatedAt.
+	idpConnectionQuery = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, r.created_at
 FROM zitadel_nextgen.idp_connections c
 JOIN zitadel_nextgen.idp_connection_revisions r
   ON r.project_id = c.project_id AND r.id = c.latest_revision_id`
 
-	// The pinned read: the same shape, but the revision is the one asked for
-	// rather than the one the head names, so it cannot go through the schema.
-	getIDPConnectionRevisionStmt = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, c.updated_at
+	// The same shape walked from the revision side, so a row stands for the
+	// revision it was read at rather than for the head. Both history reads use
+	// it: the pinned get pins one revision, the list pages them.
+	idpConnectionRevisionQuery = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, r.created_at
 FROM zitadel_nextgen.idp_connection_revisions r
 JOIN zitadel_nextgen.idp_connections c
-  ON c.project_id = r.project_id AND c.id = r.connection_id
+  ON c.project_id = r.project_id AND c.id = r.connection_id`
+
+	getIDPConnectionRevisionStmt = idpConnectionRevisionQuery + `
 WHERE r.project_id = $1 AND r.id = $2`
 )
 
@@ -62,21 +69,24 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 			entity.ID,
 			entity.Slug,
 			entity.RevisionID,
-		).Scan(&entity.CreatedAt, &entity.UpdatedAt); err != nil {
+		).Scan(&entity.CreatedAt); err != nil {
 			// A slug already taken in the project arrives here as a
-			// *database.UniqueError; the service maps it to idp.already_exists.
+			// *database.UniqueError; creating over an existing slug is the
+			// revise path, so the service decides what to do with it.
 			return wrapError(err)
 		}
-		// pgx scans timestamptz in Local; reads normalize to UTC.
-		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
-		if _, err := tx.Exec(ctx, createIDPConnectionRevisionStmt,
+		// Both defaults are NOW(), which postgres freezes for the transaction,
+		// so a fresh connection reports CreatedAt == UpdatedAt.
+		if err := tx.QueryRow(ctx, createIDPConnectionRevisionStmt,
 			entity.ProjectID,
 			entity.RevisionID,
 			entity.ID,
 			entity.Document,
-		); err != nil {
+		).Scan(&entity.UpdatedAt); err != nil {
 			return wrapError(err)
 		}
+		// pgx scans timestamptz in Local; reads normalize to UTC.
+		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID))
 	})
@@ -100,18 +110,18 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 			revisionID,
 			entity.ProjectID,
 			entity.ID,
-		).Scan(&entity.CreatedAt, &entity.UpdatedAt); err != nil {
+		).Scan(&entity.CreatedAt); err != nil {
 			return wrapError(err)
 		}
-		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
-		if _, err := tx.Exec(ctx, createIDPConnectionRevisionStmt,
+		if err := tx.QueryRow(ctx, createIDPConnectionRevisionStmt,
 			entity.ProjectID,
 			revisionID,
 			entity.ID,
 			entity.Document,
-		); err != nil {
+		).Scan(&entity.UpdatedAt); err != nil {
 			return wrapError(err)
 		}
+		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		entity.RevisionID = revisionID
 		return nil
 	})
@@ -173,6 +183,39 @@ func (s idpConnectionStatements) ListIDPConnections(ctx context.Context, filter 
 	// The alias rather than the table name: the authz EXISTS predicate has to
 	// name the connection row the join already bound as `c`.
 	if err := compileList(ctx, &compiler, idpConnectionQuery, opts, idpconnection.Schema, "c", "id"); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	items, err := pgx.CollectRows(rows, scanIDPConnection)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	nextCursor := pagination.MarshalNext(
+		opts.Pagination.OrderBy,
+		items,
+		idpconnection.Schema,
+		opts.Pagination.Limit,
+	)
+
+	return &database.ListResult[*domain.IDPConnection]{
+		Items:      items,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+// ListIDPConnectionRevisions implements [service.IDPConnectionStatements].
+func (s idpConnectionStatements) ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+	opts := idpconnection.RevisionsListOptions(projectID, connectionID, page)
+
+	var compiler statementCompiler
+	// The same alias and column as the head list: what authz guards is the
+	// connection the revisions hang off, not the revision rows.
+	if err := compileList(ctx, &compiler, idpConnectionRevisionQuery, opts, idpconnection.Schema, "c", "id"); err != nil {
 		return nil, err
 	}
 

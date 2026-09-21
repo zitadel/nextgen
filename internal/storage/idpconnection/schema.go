@@ -14,10 +14,11 @@ import (
 // `project_id`, `id` and `created_at` exist on both sides, so an unqualified
 // name would be ambiguous.
 //
-// RevisionID binds the head pointer on the connection rather than the revision
-// row's own id, so filtering and ordering stay on the outer table the keyset
-// pages over. The pinned read serves a revision id the head does not name, and
-// goes through a static statement rather than this schema.
+// RevisionID and UpdatedAt bind the revision row rather than the connection:
+// every read serves the joined revision, so a connection's updated_at is the
+// instant the revision it hands back was created. On the head join that is the
+// revision the pointer names; on the revision list it is the row being paged,
+// which is why both columns can also carry the keyset.
 var Schema = database.NewSchema(map[domain.IDPConnectionField]database.FieldBinding[domain.IDPConnection]{
 	domain.IDPConnectionFieldProjectID: {
 		SQLName:  "c.project_id",
@@ -35,7 +36,7 @@ var Schema = database.NewSchema(map[domain.IDPConnectionField]database.FieldBind
 		Coerce:   database.CoerceString,
 	},
 	domain.IDPConnectionFieldRevisionID: {
-		SQLName:  "c.latest_revision_id",
+		SQLName:  "r.id",
 		Accessor: func(c *domain.IDPConnection) any { return c.RevisionID },
 		Coerce:   database.CoerceString,
 	},
@@ -45,7 +46,7 @@ var Schema = database.NewSchema(map[domain.IDPConnectionField]database.FieldBind
 		Coerce:   database.CoerceTime,
 	},
 	domain.IDPConnectionFieldUpdatedAt: {
-		SQLName:  "c.updated_at",
+		SQLName:  "r.created_at",
 		Accessor: func(c *domain.IDPConnection) any { return c.UpdatedAt },
 		Coerce:   database.CoerceTime,
 	},

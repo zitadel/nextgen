@@ -12,16 +12,18 @@ CREATE TABLE zitadel_nextgen.idp_connections (
     -- Head pointer; deliberately no FK: the revision row points back here and
     -- closing the loop would make the paired insert order-impossible.
     , latest_revision_id TEXT COLLATE "C" NOT NULL CHECK (latest_revision_id <> '')
+    -- No updated_at: a connection's last edit is the creation of the revision
+    -- its head names, so every read serves that revision's created_at and a
+    -- column here could only disagree with it.
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
     , PRIMARY KEY (project_id, id)
 );
 
 -- The only user-reachable unique constraint besides the PK, which the PK cannot
 -- collide on (the id is dialect-minted). Spanner reports empty constraint
--- names, so the service can only map a uniqueness violation to
--- idp.already_exists while this is the single candidate.
+-- names, so a uniqueness violation is unambiguous while this is the single
+-- candidate.
 CREATE UNIQUE INDEX uq_idp_connections_project_slug
     ON zitadel_nextgen.idp_connections (project_id, slug);
 

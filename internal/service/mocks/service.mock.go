@@ -4030,6 +4030,45 @@ func (c *MockAllStatementsListFlowDefinitionsCall) DoAndReturn(f func(context.Co
 	return c
 }
 
+// ListIDPConnectionRevisions mocks base method.
+func (m *MockAllStatements) ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListIDPConnectionRevisions", ctx, projectID, connectionID, page)
+	ret0, _ := ret[0].(*database.ListResult[*domain.IDPConnection])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListIDPConnectionRevisions indicates an expected call of ListIDPConnectionRevisions.
+func (mr *MockAllStatementsMockRecorder) ListIDPConnectionRevisions(ctx, projectID, connectionID, page any) *MockAllStatementsListIDPConnectionRevisionsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListIDPConnectionRevisions", reflect.TypeOf((*MockAllStatements)(nil).ListIDPConnectionRevisions), ctx, projectID, connectionID, page)
+	return &MockAllStatementsListIDPConnectionRevisionsCall{Call: call}
+}
+
+// MockAllStatementsListIDPConnectionRevisionsCall wrap *gomock.Call
+type MockAllStatementsListIDPConnectionRevisionsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListIDPConnectionRevisionsCall) Return(arg0 *database.ListResult[*domain.IDPConnection], arg1 error) *MockAllStatementsListIDPConnectionRevisionsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListIDPConnectionRevisionsCall) Do(f func(context.Context, string, string, database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)) *MockAllStatementsListIDPConnectionRevisionsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListIDPConnectionRevisionsCall) DoAndReturn(f func(context.Context, string, string, database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)) *MockAllStatementsListIDPConnectionRevisionsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListIDPConnections mocks base method.
 func (m *MockAllStatements) ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
 	m.ctrl.T.Helper()

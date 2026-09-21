@@ -51,6 +51,21 @@ func idpConnectionIDsInDefaultOrder(connections []*domain.IDPConnection) []strin
 	return ids
 }
 
+// idpRevisionIDsOldestFirst sorts snapshots of one connection by the key the
+// history list pages on — the revision's creation time, which every read serves
+// as UpdatedAt, then the revision id — ascending, so an expectation holds even
+// when two revises land on the same timestamp.
+func idpRevisionIDsOldestFirst(revisions []domain.IDPConnection) []string {
+	sorted := slices.SortedFunc(slices.Values(revisions), func(a, b domain.IDPConnection) int {
+		return cmp.Or(a.UpdatedAt.Compare(b.UpdatedAt), cmp.Compare(a.RevisionID, b.RevisionID))
+	})
+	ids := make([]string, 0, len(sorted))
+	for _, revision := range sorted {
+		ids = append(ids, revision.RevisionID)
+	}
+	return ids
+}
+
 func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -64,7 +79,14 @@ func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 		assert.True(t, domain.PrefixIDPConnection.Matches(entity.ID), "id %q is not idp_-prefixed", entity.ID)
 		assert.True(t, domain.PrefixIDPConnectionRevision.Matches(entity.RevisionID), "revision id %q is not idprev_-prefixed", entity.RevisionID)
 		assert.WithinDuration(t, time.Now(), entity.CreatedAt, 5*time.Second)
-		assert.True(t, entity.CreatedAt.Equal(entity.UpdatedAt), "a connection that was never revised must not look edited")
+		// UpdatedAt is the creation time of the revision a read serves, and the
+		// first revision is written in the same transaction as the connection.
+		// Postgres and SQLite stamp both rows from one clock reading; Spanner
+		// evaluates CURRENT_TIMESTAMP() per statement, so the portable claim is
+		// that a connection which was never revised does not look edited, not
+		// that the two stamps are bit-identical.
+		assert.False(t, entity.UpdatedAt.Before(entity.CreatedAt), "the first revision cannot predate the connection")
+		assert.WithinDuration(t, entity.CreatedAt, entity.UpdatedAt, time.Second)
 
 		// The resource-scope index row is what the HTTP management gate reads
 		// to resolve the connection's project, so create writes it in the same
@@ -96,12 +118,18 @@ func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 		assert.Equal(t, entity.ID, revision.ID)
 		assert.Equal(t, entity.RevisionID, revision.RevisionID)
 		assert.JSONEq(t, string(document), string(revision.Document))
+
+		// The connection carries no updated_at of its own, so both reads serve
+		// the same revision row's created_at and cannot drift apart.
+		assert.True(t, byID.UpdatedAt.Equal(revision.UpdatedAt), "the head and the pinned read must report the same revision timestamp")
+		assert.True(t, byID.UpdatedAt.Equal(entity.UpdatedAt), "create must report the timestamp a read serves")
 	})
 }
 
 // The slug is what schemas and flow definitions reference a connection by, so a
-// second connection cannot take it. The typed error is what the service maps to
-// idp.already_exists.
+// second connection cannot take it. Storage reports the collision as a
+// *database.UniqueError and leaves the service to decide that creating over an
+// existing slug is the revise path.
 func TestIDPConnectionStatements_SlugUniquePerProject(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -172,6 +200,79 @@ func TestIDPConnectionStatements_ReviseAppendsAndMovesHead(t *testing.T) {
 		assert.Equal(t, firstRevisionID, pinned.RevisionID)
 		assert.JSONEq(t, string(v1Document), string(pinned.Document), "an appended revision must not rewrite the one before it")
 		assert.Equal(t, slug, pinned.Slug)
+		assert.True(t, pinned.CreatedAt.Equal(byID.CreatedAt), "a revision repeats the connection's birth rather than its own")
+
+		// The head's updated_at is the new revision's creation time, to the
+		// instant: it is read off the same row either way.
+		head, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
+		require.NoError(t, err)
+		assert.True(t, byID.UpdatedAt.Equal(head.UpdatedAt), "the head read must report the revision it serves")
+		assert.False(t, byID.UpdatedAt.Before(pinned.UpdatedAt), "an appended revision cannot predate the one it supersedes")
+	})
+}
+
+// The history read pages revision rows rather than heads: each row repeats the
+// connection's identity and carries the document, revision id and creation time
+// of the revision it stands for, newest first.
+func TestIDPConnectionStatements_ListRevisionsNewestFirst(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		otherProject := ensureProject(t, d.stmts)
+		slug := "history-" + uniqueSuffix(t)
+		documents := [][]byte{
+			idpConnectionDocument("https://v1.example.com"),
+			idpConnectionDocument("https://v2.example.com"),
+			idpConnectionDocument("https://v3.example.com"),
+		}
+
+		entity := createIDPConnection(t, d.stmts, projectID, slug, documents[0])
+		written := []domain.IDPConnection{*entity}
+		byRevisionID := map[string][]byte{entity.RevisionID: documents[0]}
+		for _, document := range documents[1:] {
+			entity.Document = document
+			require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), entity))
+			written = append(written, *entity)
+			byRevisionID[entity.RevisionID] = document
+		}
+
+		want := idpRevisionIDsOldestFirst(written)
+		slices.Reverse(want)
+
+		result, err := d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, entity.ID, database.Page[domain.IDPConnectionField]{})
+		require.NoError(t, err)
+
+		got := make([]string, 0, len(result.Items))
+		for _, item := range result.Items {
+			got = append(got, item.RevisionID)
+			// Identity comes from the connection, so every row repeats it; only
+			// the document, the revision id and updated_at vary down the page.
+			assert.Equal(t, entity.ID, item.ID)
+			assert.Equal(t, slug, item.Slug)
+			assert.True(t, item.CreatedAt.Equal(entity.CreatedAt), "every revision repeats the connection's birth")
+			assert.JSONEq(t, string(byRevisionID[item.RevisionID]), string(item.Document), "revision %q", item.RevisionID)
+		}
+		assert.Equal(t, want, got)
+
+		// The pinned read of the same revision serves the same row, so the two
+		// endpoints agree on updated_at by construction.
+		pinned, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, written[0].RevisionID)
+		require.NoError(t, err)
+		oldest := result.Items[len(result.Items)-1]
+		assert.Equal(t, pinned.RevisionID, oldest.RevisionID)
+		assert.True(t, pinned.UpdatedAt.Equal(oldest.UpdatedAt))
+
+		// A connection nobody can name is an empty page rather than an error:
+		// the handler pairs this with a get to tell an empty history from a
+		// connection that is not there.
+		missing, err := d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, "idp_does_not_exist", database.Page[domain.IDPConnectionField]{})
+		require.NoError(t, err)
+		assert.Empty(t, missing.Items)
+
+		// The project scopes the read, so another project's connection id
+		// reaches nothing either.
+		crossProject, err := d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), otherProject, entity.ID, database.Page[domain.IDPConnectionField]{})
+		require.NoError(t, err)
+		assert.Empty(t, crossProject.Items)
 	})
 }
 
