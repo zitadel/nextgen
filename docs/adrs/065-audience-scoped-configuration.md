@@ -7,7 +7,8 @@
 > ([PR #1068](https://github.com/zitadel/nextgen/pull/1068)) is the first consumer
 > beyond flow definitions
 > **Builds on:** [ADR 035](035-configuration-environments.md) (releases),
-> [flow definition rules](../design/flowengine/flow-definition-rules.md)
+> [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (resource vs
+> revision), [flow definition rules](../design/flowengine/flow-definition-rules.md)
 > (`audience` field, shipped)
 
 ## Problem
@@ -23,31 +24,34 @@ model: every setting and policy has **one explicit owner**, and *which requests
 it affects* is declared separately from *who owns it*.
 
 Flow definitions already ship the mechanism that fills that second half: an
-optional `audience` (`app_ids[]`, `team_ids[]`) on the definition, with
-empty-means-project-default and most-specific-match-wins resolution. Operation
-policies ([PR #1068](https://github.com/zitadel/nextgen/pull/1068)) need the
-same ability — a password policy for one team stricter than the project
-default — and nothing yet formalizes the mechanism as the general answer. This
-ADR does.
+optional `audience` on the definition, with empty-means-project-default and
+most-specific-match-wins resolution. Operation policies
+([PR #1068](https://github.com/zitadel/nextgen/pull/1068)) need the same
+ability — a password policy for one team stricter than the project default —
+and nothing yet formalizes the mechanism as the general answer. This ADR does.
 
 ## Decision
 
 **Configuration resources declare their applicability as an audience, not by
 where they sit in a hierarchy.**
 
-The audience of a configuration revision is the set of requests it applies to,
+The audience of a configuration document is the set of requests it applies to,
 declared as explicit references to project resources. It is applicability, not
-ownership: the project owns every revision, however narrow its audience.
+ownership: the project owns every document, however narrow its audience. A
+*document* here is a configuration resource at its newest active revision
+([ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)); resolution
+picks between resources, not between revisions of one resource.
 
 The model applies to configuration that is **resolved at runtime** — the
-server picks which revision governs an incoming request. Flow definitions are
-the shipped case; operation policies
-([PR #1068](https://github.com/zitadel/nextgen/pull/1068)) are next; any
-future runtime-resolved configuration resource follows the same model.
-Configuration whose applicability is already fixed by a reference from
-another resource is out of scope — an IdP connection, for example, is
-available where a user schema or flow step references its slug, and needs no
-audience of its own.
+server picks which document governs an incoming request. Flow definitions are
+the shipped case; operation policies (PR #1068) are next; any future
+runtime-resolved configuration resource follows the same model. Configuration
+whose applicability is already fixed by a reference from another resource is
+out of scope: an IdP connection is available where a user schema or flow step
+references its slug, so team-scoped SSO falls out of scoping the flow or the
+schema. The [IdP resource model](../design/idp/1-resource-model.md) cut
+`audience` from its schema citing no identified use case; this ADR keeps it
+cut, and supplies the rationale the cut left implicit.
 
 ### Parameters
 
@@ -60,11 +64,9 @@ new dimensions.
 | `app_ids[]` | arriving through one of the listed applications | future capability |
 | `user_schema` | for users of the referenced schema | future capability |
 
-`team_ids` is the only applicable parameter today. `app_ids` exists on flow
-definitions as early-draft carryover: no application resource exists yet, so
-nothing can populate or match it. It stays in the model as the reserved next
-parameter — and as this ADR's worked example of a second dimension — rather
-than being removed and re-added.
+`app_ids` exists on flow definitions as early-draft carryover: no application
+resource exists yet, so nothing can legitimately populate it. It stays in the
+model as the reserved next parameter rather than being removed and re-added.
 
 `user_schema` as an audience parameter is gated on #899's open decision
 (whether schemas own configuration or configuration merely applies to a
@@ -76,68 +78,48 @@ what it is today — the subject the flow operates on, not an audience.
 ### Format
 
 The audience is one optional object field, named `audience`, on the
-configuration resource. Every parameter is an array of resource ids; a request
-matches a parameter when its context value is one of the listed ids. The shape
-flow definitions already publish
-([`flow-definition.json`](../../api/openapi/endpoints/schemas/flow-definition.json))
-is the canonical one for every consumer:
+configuration resource. Each parameter is an array of resource ids; a request
+matches a parameter when its context value is one of the listed ids:
 
 ```jsonc
-"audience": {
-  "type": "object",
-  "additionalProperties": false,     // unknown parameters rejected at write time
-  "properties": {
-    "team_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },  // applicable today
-    "app_ids":  { "type": "array", "uniqueItems": true, "items": { "type": "string" } }   // future capability
-  }
-}
+"audience": { "team_ids": ["team_01k…"] }
 ```
 
-Only `team_ids` is applicable today. `app_ids` — and later `user_schema` —
-are future capability: the property may appear in a published schema before
-the server can match it, but a server only *accepts* parameters it
-implements.
-
+The canonical shape is the published schema flow definitions already carry
+([`flow-definition.json`](../../api/openapi/endpoints/schemas/flow-definition.json)).
 Rules of the shape:
 
 - **Object of named parameters, never positional.** New parameters land as new
   properties; committed documents never restructure.
-- **Arrays of ids, `uniqueItems`.** Values within one parameter are
-  alternatives: `"team_ids": ["team_a", "team_b"]` matches either team, at the
-  same specificity.
+- **Arrays of ids.** Values within one parameter are alternatives:
+  `"team_ids": ["team_a", "team_b"]` matches either team, at the same
+  specificity.
 - **Omitted ≡ empty.** An absent `audience`, an empty object, and a parameter
   set to `[]` all mean the same thing: no restriction on that dimension.
-  Consumers normalise these to one canonical form so "is this the project
-  default" is a trivial check, not a three-way test.
-- **`additionalProperties: false`.** The schema is what makes the parameter
-  set closed per server version (see Extensibility): a document naming a
-  parameter this server does not know fails validation instead of silently
-  not matching.
+- **Closed per server version.** A document naming a parameter the server does
+  not implement fails validation at write time instead of silently not
+  matching.
 - **Ids, not names.** Parameters reference resources by id (`team_01k…`), not
   by mutable handles, so renames never re-scope configuration.
 
 ### Extensibility
 
-The audience must grow without reshaping existing documents. Adding a
-parameter means Zitadel defines, for that parameter alone:
+Adding a parameter means Zitadel defines, for that parameter alone:
 
 - **Match semantics** — which part of the request context it compares against.
-- **A rank in the specificity order** (rule 3) — inserting a tier, never
+- **A rank in the specificity order** (rule 3 below) — inserting a tier, never
   reordering existing ones.
 
-An absent parameter means "no restriction on that dimension", so every
-existing document keeps its exact meaning when a parameter is added. The wire
-shape is an object of named parameters; a parameter the server does not
-recognise is rejected at write time, keeping the set closed per server
-version.
+Because an absent parameter is no restriction (see Format), every existing
+document keeps its exact meaning when a parameter is added.
 
 ### Resolution rules
 
-1. **Empty audience is the project default.** A revision with no audience
+1. **Empty audience is the project default.** A document with no audience
    applies project-wide. Authoring one document with no audience *is* how a
    project default is defined; there is no separate defaulting mechanism.
-2. **A scoped revision overrides the default wholesale.** For a matching
-   request, the most specific matching revision applies **entirely**. There is
+2. **A scoped document overrides the default wholesale.** For a matching
+   request, the most specific matching document applies **entirely**. There is
    no field-level merge with the project default: a team-scoped password
    policy that omits `history_depth` gets that field's built-in default, not
    the project document's value.
@@ -147,23 +129,20 @@ version.
    application resource exists). A document never carries its own priority.
 4. **Parameters on one document are alternatives, not a conjunction.** A
    document listing both `app_ids` and `team_ids` matches a request through
-   either, at that parameter's specificity. "This team *and* that app" is not
-   expressible.
+   either, and matches at the highest specificity any of its parameters
+   reaches. "This team *and* that app" is not expressible.
 5. **Cross-tier overlap is not a tie — specificity decides.** When a request
-   matches several documents through *different* parameters, the fixed order
-   in rule 3 picks exactly one winner. Example (using the reserved app
-   parameter as the second dimension): document A has
-   `team_ids: [team-1]`, document B has `app_ids: [app-1]`, and a request
-   arrives for `team-1` through `app-1`. Both match, but an app match ranks
-   above a team match, so B applies entirely and A contributes nothing to
-   this request. The same holds within one document (rule 4): it matches at
-   the highest specificity any of its parameters reaches.
-6. **Same-tier ties resolve newest-first.** Two active revisions matching at
-   the same specificity — both naming the request's team, or both naming its
-   app — resolve to the most recently created (flow behaviour today). For
-   policies, release validation should instead reject two documents for the
-   same operation whose audiences overlap at the same tier, per #899's
-   conflicts-rejected-at-validation requirement.
+   matches several documents through *different* parameters, the order in
+   rule 3 picks exactly one winner: a request for `team-1` through `app-1`,
+   matching a team-scoped document and an app-scoped one, gets the app-scoped
+   document entirely. Release validation should warn when a scoped document
+   shadows another this way for a reachable combination.
+6. **Same-tier ties resolve newest-first.** Two active documents matching at
+   the same specificity resolve to the most recently created (`created_at`,
+   then id — the shipped flow behaviour). For policies, release validation
+   instead rejects two documents for the same operation whose audiences
+   overlap at the same tier, per #899's conflicts-rejected-at-validation
+   requirement.
 7. **Fallback strictness depends on the consumer.** Flow resolution is
    routing: hints are client-supplied suggestions, so when no better tier
    exists a scoped definition still resolves rather than failing the login.
@@ -173,13 +152,12 @@ version.
 
 ### Defaults and per-audience overrides
 
-The pattern every consumer follows: author one unscoped revision as the
-project default, and any number of scoped revisions as overrides. A release
-carries all of them; removing a scoped revision restores the default for that
-audience implicitly. For operation policies this means the release may hold
-several documents for the same operation, distinguished by audience.
+The pattern every consumer follows: author one unscoped document as the
+project default, and any number of scoped documents as overrides. A release
+carries all of them; removing a scoped document restores the default for that
+audience implicitly.
 
-### Example: flow definitions
+### Examples
 
 The project default is the unscoped definition; an enterprise team gets an
 SSO-only login by scoping a second definition to it:
@@ -212,13 +190,6 @@ Operation policies follow the same pattern once they land: one unscoped
 `user.password.save` document as the project default, and a team-scoped
 document carrying the stricter values for that team.
 
-IdP connections are **out of scope**: a connection is available where a user
-schema or flow step references its slug, so its applicability is already
-fixed by those references — team-scoped SSO falls out of scoping the flow (as
-above) or the schema, not of an audience on the connection. The
-[IdP resource model](../design/idp/1-resource-model.md) cut `audience` from
-its schema; this ADR keeps it cut.
-
 ## Limitations compared to the traditional hierarchy
 
 Accepted, with eyes open:
@@ -228,7 +199,7 @@ Accepted, with eyes open:
   winning override; there is no override-of-an-override, and no place for an
   intermediate level to contribute part of the answer.
 - **No restrictive inheritance.** The hierarchy can express "the parent sets a
-  floor the child may only strengthen". A scoped revision replaces the default
+  floor the child may only strengthen". A scoped document replaces the default
   entirely and can therefore *weaken* it. #899's composition rules (stricter-
   value ordering, policies that cannot weaken each other) are a future layer
   on top; audience only answers *which documents are in play*.
@@ -242,21 +213,19 @@ Accepted, with eyes open:
   of resolution per (app, team, …) combination, and the number of distinct
   effective configurations grows with the documents authored. #899 requires
   administrators to see the effective requirements; that needs a "which
-  revision wins for this audience" answer, not a tree view.
-- **Overlap is a race until validated.** Two documents scoped to the same team
-  are a conflict the hierarchy cannot express (one slot per node). Under
-  audience they silently resolve newest-first unless release validation
-  rejects the overlap (rule 6).
+  document wins for this audience" answer, not a tree view.
+- **Overlap is invisible without validation.** Two documents scoped to the
+  same team are a conflict the hierarchy cannot express (one slot per node);
+  under audience it takes release validation to surface (rule 6).
 - **Cross-parameter shadowing is silent.** An app-scoped document outranks a
   team-scoped one for every request where both match (rule 5), so a team's
   stricter policy is bypassed for logins through that app — deterministic,
   but easy to author by accident because the two documents name different
-  resources and never look like duplicates. Release validation should warn
-  when a scoped document shadows another for a reachable combination; making
-  both contribute is #899's composition layer, out of scope here.
+  resources and never look like duplicates. Making both contribute is #899's
+  composition layer, out of scope here.
 
 What the model buys in exchange: it matches #899's single-owner split of
-ownership and applicability, it keeps every revision inside the release
+ownership and applicability, it keeps every document inside the release
 lifecycle where the whole configuration is validated together, and it does not
 force a tenant tree onto a resource model that no longer has one. The future
 models #899 sketches — default inheritance, restrictive inheritance, explicit
