@@ -171,21 +171,39 @@ func TestContent_LegacySSOProviderObjectsDecodeAsSlugs(t *testing.T) {
 	assert.Equal(t, []string{"google", "corp_idp"}, got.Steps[0].SSOProviders)
 }
 
-// An sso_providers entry that is neither a slug nor an object is a decode
-// error, not an empty slug.
+// An sso_providers entry that yields no slug is a decode error, not an empty
+// slug that loads and never resolves. JSON null and {} both decode without
+// error on their own, so they need the explicit check.
 func TestContent_MalformedSSOProviderRejected(t *testing.T) {
 	t.Parallel()
 
-	raw := []byte(`{
-		"user_schema": "https://tenant.com/schemas/user.json",
-		"purposes": {"login": "identifier"},
-		"steps": [{"name": "identifier", "sso_providers": [42]}]
-	}`)
+	tests := []struct {
+		name    string
+		entry   string
+		wantErr string
+	}{
+		{"number", `42`, "want a connection slug or an {id} object"},
+		{"null", `null`, "want a non-empty connection slug"},
+		{"empty string", `""`, "want a non-empty connection slug"},
+		{"object without id", `{}`, "want a non-empty connection slug"},
+		{"object with empty id", `{"id": "", "name": "Google"}`, "want a non-empty connection slug"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := flowdefinition.ToDomain(
-		"proj-1", "flow-1", "login", "1",
-		domain.FlowDefinitionStatusActive, time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
-	)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "want a connection slug or an {id} object")
+			raw := []byte(`{
+				"user_schema": "https://tenant.com/schemas/user.json",
+				"purposes": {"login": "identifier"},
+				"steps": [{"name": "identifier", "sso_providers": [` + tt.entry + `]}]
+			}`)
+
+			_, err := flowdefinition.ToDomain(
+				"proj-1", "flow-1", "login", "1",
+				domain.FlowDefinitionStatusActive, time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
 }

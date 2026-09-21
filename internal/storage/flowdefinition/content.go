@@ -52,21 +52,27 @@ type GateJSON struct {
 // connections by slug hold an {id, name, template} object instead; decoding
 // takes its id as the slug so those immutable revisions still load. Encoding
 // always writes the slug.
+//
+// An entry that yields no slug is rejected rather than loaded empty: JSON
+// null decodes into a string without error, and {} into the legacy shape, so
+// both would otherwise produce a provider that can never resolve.
 type SSOProviderJSON string
 
 func (p *SSOProviderJSON) UnmarshalJSON(data []byte) error {
 	var slug string
-	if err := json.Unmarshal(data, &slug); err == nil {
-		*p = SSOProviderJSON(slug)
-		return nil
+	if err := json.Unmarshal(data, &slug); err != nil {
+		var legacy struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(data, &legacy); err != nil {
+			return fmt.Errorf("sso provider: want a connection slug or an {id} object: %w", err)
+		}
+		slug = legacy.ID
 	}
-	var legacy struct {
-		ID string `json:"id"`
+	if slug == "" {
+		return fmt.Errorf("sso provider: want a non-empty connection slug, got %s", data)
 	}
-	if err := json.Unmarshal(data, &legacy); err != nil {
-		return fmt.Errorf("sso provider: want a connection slug or an {id} object: %w", err)
-	}
-	*p = SSOProviderJSON(legacy.ID)
+	*p = SSOProviderJSON(slug)
 	return nil
 }
 
