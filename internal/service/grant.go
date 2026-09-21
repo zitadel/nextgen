@@ -69,9 +69,9 @@ type CreateGrantInput struct {
 }
 
 // errIdentifierUnresolved is the identifier-path miss/ambiguity signal.
-// Create maps it to a synthetic 201 rather than grant.principal_not_found
-// so the HTTP status cannot tell a caller whether the address matched.
-// The body cannot tell either: create never hydrates its refs.
+// Create swallows it rather than returning grant.principal_not_found: the
+// identifier path answers 202 with no body on every outcome, so neither the
+// status nor the body can tell a caller whether the address matched.
 var errIdentifierUnresolved = errors.New("grant identifier unresolved")
 
 func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Grant, error) {
@@ -89,11 +89,14 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Gra
 	return s.createByResolvedLocator(ctx, input)
 }
 
+// createByIdentifier returns a nil Grant on every successful outcome: the
+// handler turns that into a bodiless 202, so a hit, a duplicate, a miss and an
+// ambiguous lookup are one response.
 func (s *GrantService) createByIdentifier(ctx context.Context, input CreateGrantInput) (*Grant, error) {
 	userID, err := s.resolveUserByIdentifier(ctx, s.v2Pool.Statements(), s.locatorHome(input.ProjectID), input.Identifier)
 	if err != nil {
 		if errors.Is(err, errIdentifierUnresolved) {
-			return s.syntheticIdentifierGrant(ctx, input)
+			return nil, nil
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
@@ -103,14 +106,11 @@ func (s *GrantService) createByIdentifier(ctx context.Context, input CreateGrant
 	if input.CallerUserID != "" && input.CallerUserID == userID {
 		return nil, domain.ErrGrantInvalid().WithMessage("you cannot grant access to yourself")
 	}
-	grant, err := s.commitGrant(ctx, input, domain.AuthzPrincipalTypeUser, userID)
-	if err != nil {
-		if errors.Is(err, domain.ErrGrantAlreadyExists()) {
-			return s.existingOrSyntheticGrant(ctx, input, userID)
-		}
+	if err := s.commitGrant(ctx, input, domain.AuthzPrincipalTypeUser, userID); err != nil &&
+		!errors.Is(err, domain.ErrGrantAlreadyExists()) {
 		return nil, err
 	}
-	return grant, nil
+	return nil, nil
 }
 
 func (s *GrantService) createByResolvedLocator(ctx context.Context, input CreateGrantInput) (*Grant, error) {
@@ -136,20 +136,15 @@ func (s *GrantService) createByResolvedLocator(ctx context.Context, input Create
 	return idOnlyGrant(created), nil
 }
 
-func (s *GrantService) commitGrant(ctx context.Context, input CreateGrantInput, principalType domain.AuthzPrincipalType, principalID string) (*Grant, error) {
-	var created *domain.AuthzAssignment
+func (s *GrantService) commitGrant(ctx context.Context, input CreateGrantInput, principalType domain.AuthzPrincipalType, principalID string) error {
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		asgn, err := s.writeGrant(ctx, tx.Statements(), input, principalType, principalID)
-		if err != nil {
-			return err
-		}
-		created = asgn
-		return nil
+		_, err := s.writeGrant(ctx, tx.Statements(), input, principalType, principalID)
+		return err
 	})
 	if err != nil {
-		return nil, mapGrantWriteError(err)
+		return mapGrantWriteError(err)
 	}
-	return idOnlyGrant(created), nil
+	return nil
 }
 
 func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, input CreateGrantInput, principalType domain.AuthzPrincipalType, principalID string) (*domain.AuthzAssignment, error) {
@@ -187,49 +182,6 @@ func mapGrantWriteError(err error) error {
 		return de
 	}
 	return domain.ErrInternal(err).WithMessage("failed to create grant")
-}
-
-func (s *GrantService) syntheticIdentifierGrant(ctx context.Context, input CreateGrantInput) (*Grant, error) {
-	stmts := s.v2Pool.Statements()
-	asgnID, err := stmts.NewManagedID(string(domain.PrefixAuthzAssignment))
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create grant")
-	}
-	userID, err := stmts.NewManagedID(string(domain.PrefixUser))
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create grant")
-	}
-	now := time.Now()
-	asgn := &domain.AuthzAssignment{
-		ID:            asgnID,
-		ProjectID:     input.ProjectID,
-		CatalogID:     domain.SystemCatalogID,
-		PrincipalType: domain.AuthzPrincipalTypeUser,
-		PrincipalID:   userID,
-		ObjectType:    "project",
-		Relation:      input.Relation,
-		ExpiresAt:     input.ExpiresAt,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
-	asgn.ApplyScope(domain.NewProjectAssignmentScope())
-	return idOnlyGrant(asgn), nil
-}
-
-func (s *GrantService) existingOrSyntheticGrant(ctx context.Context, input CreateGrantInput, userID string) (*Grant, error) {
-	asgns, err := s.v2Pool.Statements().ListAuthzAssignments(ctx, input.ProjectID, domain.AuthzPrincipalTypeUser, userID, false)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create grant")
-	}
-	for _, asgn := range asgns {
-		if asgn.Relation == input.Relation && isManagedGrant(asgn) {
-			return idOnlyGrant(asgn), nil
-		}
-	}
-	getLoggingContext(ctx, "grant").Info("grant identifier unique conflict without a matching row",
-		slog.String("project_id", input.ProjectID),
-	)
-	return s.syntheticIdentifierGrant(ctx, input)
 }
 
 func (s *GrantService) Get(ctx context.Context, projectID, id string, includePrincipal bool) (*Grant, error) {

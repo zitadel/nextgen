@@ -289,18 +289,12 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			Relation:   "viewer",
 		})
 		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, userID, got.Assignment.PrincipalID)
-		require.NotNil(t, got.User)
-		assert.Equal(t, userID, got.User.UserID)
-		assert.Empty(t, got.User.Identifier)
-		assert.Empty(t, got.User.Display)
+		assert.Nil(t, got)
 		assert.Empty(t, refs.gotUserIDs)
 	})
 
-	t.Run("identifier duplicate returns the existing grant", func(t *testing.T) {
+	t.Run("identifier duplicate writes nothing new", func(t *testing.T) {
 		t.Parallel()
-		existing := testManagedGrant("asgn_existing", userID)
 		refs := &grantRefStub{}
 		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, refs, func(s *servicemocks.MockAllStatements) {
 			expectIdentifierSchema(s, schemaDoc)
@@ -311,8 +305,6 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			}, nil)
 			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).
 				Return(database.NewUniqueError("authz_assignments", "authz_assignments_unique_active", nil))
-			s.EXPECT().ListAuthzAssignments(gomock.Any(), "proj_customer", domain.AuthzPrincipalTypeUser, userID, false).
-				Return([]*domain.AuthzAssignment{existing}, nil)
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
 			ProjectID:  "proj_customer",
@@ -320,12 +312,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			Relation:   "viewer",
 		})
 		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, "asgn_existing", got.Assignment.ID)
-		assert.Equal(t, userID, got.Assignment.PrincipalID)
-		require.NotNil(t, got.User)
-		assert.Equal(t, userID, got.User.UserID)
-		assert.Empty(t, got.User.Identifier)
+		assert.Nil(t, got)
 		assert.Empty(t, refs.gotUserIDs)
 	})
 
@@ -376,8 +363,6 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			expectIdentifierSchema(s, schemaDoc)
 			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).
 				Return(nil, database.NewNoRowFoundError(nil))
-			s.EXPECT().NewManagedID(string(domain.PrefixAuthzAssignment)).Return("asgn_neutral", nil)
-			s.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_neutral", nil)
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
 			ProjectID:  "proj_customer",
@@ -385,14 +370,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			Relation:   "viewer",
 		})
 		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, "asgn_neutral", got.Assignment.ID)
-		assert.Equal(t, "proj_customer", got.Assignment.ProjectID)
-		assert.Equal(t, "viewer", got.Assignment.Relation)
-		require.NotNil(t, got.User)
-		assert.Equal(t, "user_neutral", got.User.UserID)
-		assert.Empty(t, got.User.Identifier)
-		assert.Nil(t, got.Team)
+		assert.Nil(t, got)
 	})
 
 	t.Run("ambiguous identifier is accepted without a write", func(t *testing.T) {
@@ -420,8 +398,6 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
 				ID: "user_username_match", Metadata: domain.UserMetadata{Status: domain.UserStatusActive},
 			}, nil)
-			s.EXPECT().NewManagedID(string(domain.PrefixAuthzAssignment)).Return("asgn_ambiguous", nil)
-			s.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_ambiguous", nil)
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
 			ProjectID:  "proj_customer",
@@ -429,10 +405,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			Relation:   "viewer",
 		})
 		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, "asgn_ambiguous", got.Assignment.ID)
-		require.NotNil(t, got.User)
-		assert.Equal(t, "user_ambiguous", got.User.UserID)
+		assert.Nil(t, got)
 	})
 
 	t.Run("identifier skips unique value on undesignated schema", func(t *testing.T) {
@@ -483,8 +456,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			Relation:   "viewer",
 		})
 		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, userID, got.Assignment.PrincipalID)
+		assert.Nil(t, got)
 	})
 
 	t.Run("identifier matches among schemas that share a designation", func(t *testing.T) {
@@ -535,8 +507,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			Relation:   "viewer",
 		})
 		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, userID, got.Assignment.PrincipalID)
+		assert.Nil(t, got)
 	})
 
 	t.Run("team name locates active team", func(t *testing.T) {

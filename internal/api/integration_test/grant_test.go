@@ -3,12 +3,9 @@
 package integration_test
 
 import (
-	"encoding/json"
 	"io"
-	"maps"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -289,22 +286,14 @@ func TestGrantCreateLocators(t *testing.T) {
 
 		createResp, err := client.CreateGrant(t.Context(), userIdentifierGrant(strings.ToUpper(user.Identifier.Value), api.CreateGrantRequestRelationViewer), params)
 		require.NoError(t, err)
-		created, ok := createResp.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, createResp))
-		require.True(t, created.User.IsSet())
-		assert.Equal(t, api.UserID(userID), created.User.Value.UserID)
-		assert.False(t, created.User.Value.Identifier.IsSet())
-		assert.False(t, created.User.Value.Display.IsSet())
+		require.IsType(t, &api.CreateGrantAccepted{}, createResp, helpers.MustMarshal(t, createResp))
 
-		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        created.ID,
-			ProjectID: api.ProjectID(project.ID),
-		})
-		require.NoError(t, err)
-		got, ok := getResp.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, getResp))
-		require.True(t, got.User.IsSet())
-		assert.True(t, got.User.Value.Identifier.IsSet())
+		// The 202 says nothing, so the row is proven through the list.
+		listed := grantsForUser(t, client, project.ID, userID)
+		require.Len(t, listed, 1)
+		require.True(t, listed[0].User.IsSet())
+		assert.Equal(t, api.UserID(userID), listed[0].User.Value.UserID)
+		assert.True(t, listed[0].User.Value.Identifier.IsSet())
 	})
 
 	t.Run("create by team name", func(t *testing.T) {
@@ -342,31 +331,16 @@ func TestGrantCreateLocators(t *testing.T) {
 
 		resp, err := isolatedClient.CreateGrant(t.Context(), userIdentifierGrant("nobody@example.com", api.CreateGrantRequestRelationViewer), isolatedParams)
 		require.NoError(t, err)
-		created, ok := resp.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.True(t, strings.HasPrefix(created.ID, "asgn_"), created.ID)
-		require.True(t, created.User.IsSet())
-		assert.True(t, strings.HasPrefix(string(created.User.Value.UserID), "user_"))
-		assert.False(t, created.User.Value.Identifier.IsSet())
-
-		getResp, err := isolatedClient.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        created.ID,
-			ProjectID: api.ProjectID(isolated.ID),
-		})
-		require.NoError(t, err)
-		assertGrantNotFound(t, getResp)
+		require.IsType(t, &api.CreateGrantAccepted{}, resp, helpers.MustMarshal(t, resp))
 
 		after, err := isolatedClient.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(isolated.ID)})
 		require.NoError(t, err)
 		listedAfter, ok := after.(*api.QueryGrantsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, after))
 		assert.Len(t, listedAfter.Grants, len(listedBefore.Grants))
-		for _, g := range listedAfter.Grants {
-			assert.NotEqual(t, created.ID, g.ID)
-		}
 	})
 
-	t.Run("repeat identifier returns the existing grant", func(t *testing.T) {
+	t.Run("repeat identifier is accepted and writes nothing new", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
 		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
@@ -378,31 +352,13 @@ func TestGrantCreateLocators(t *testing.T) {
 		req := userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationEditor)
 		first, err := client.CreateGrant(t.Context(), req, params)
 		require.NoError(t, err)
-		created, ok := first.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, first))
-		assert.False(t, created.User.Value.Identifier.IsSet())
+		require.IsType(t, &api.CreateGrantAccepted{}, first, helpers.MustMarshal(t, first))
 
 		second, err := client.CreateGrant(t.Context(), req, params)
 		require.NoError(t, err)
-		again, ok := second.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, second))
-		assert.Equal(t, created.ID, again.ID)
-		assert.Equal(t, api.UserID(userID), again.User.Value.UserID)
-		assert.False(t, again.User.Value.Identifier.IsSet())
-		assert.False(t, again.User.Value.Display.IsSet())
+		require.IsType(t, &api.CreateGrantAccepted{}, second, helpers.MustMarshal(t, second))
 
-		listed, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
-			Filter: []api.QueryGrantsRequestFilterItem{{
-				Field:     api.GrantFilterFieldUserID,
-				Operation: api.FilterOperationEquals,
-				Value:     api.NewOptFilterValue(api.NewStringFilterValue(userID)),
-			}},
-		}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
-		require.NoError(t, err)
-		page, ok := listed.(*api.QueryGrantsResponse)
-		require.True(t, ok, helpers.MustMarshal(t, listed))
-		require.Len(t, page.Grants, 1)
-		assert.Equal(t, created.ID, page.Grants[0].ID)
+		assert.Len(t, grantsForUser(t, client, project.ID, userID), 1)
 	})
 
 	t.Run("own identifier is grant.invalid", func(t *testing.T) {
@@ -427,7 +383,9 @@ func TestGrantCreateLocators(t *testing.T) {
 		assert.Equal(t, "you cannot grant access to yourself", bad.Message)
 	})
 
-	t.Run("identifier hit and miss share one body shape", func(t *testing.T) {
+	// A hit and a miss, each repeated, are the whole existence oracle: the
+	// 202 has no body to compare and no id to replay through user_id.
+	t.Run("identifier hit and miss are indistinguishable", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
 		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
@@ -436,21 +394,12 @@ func TestGrantCreateLocators(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, userResp))
 		require.True(t, user.Identifier.IsSet())
 
-		hitResp, err := client.CreateGrant(t.Context(), userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationViewer), params)
-		require.NoError(t, err)
-		hit, ok := hitResp.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, hitResp))
-
-		missResp, err := client.CreateGrant(t.Context(), userIdentifierGrant(helpers.RandString(10)+"@example.com", api.CreateGrantRequestRelationViewer), params)
-		require.NoError(t, err)
-		miss, ok := missResp.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, missResp))
-
-		hitKeys, hitUserKeys := grantBodyKeys(t, hit)
-		missKeys, missUserKeys := grantBodyKeys(t, miss)
-		assert.Equal(t, hitKeys, missKeys)
-		assert.Equal(t, hitUserKeys, missUserKeys)
-		assert.NotEmpty(t, hitUserKeys)
+		unknown := helpers.RandString(10) + "@example.com"
+		for _, identifier := range []string{user.Identifier.Value, unknown, user.Identifier.Value, unknown} {
+			resp, err := client.CreateGrant(t.Context(), userIdentifierGrant(identifier, api.CreateGrantRequestRelationViewer), params)
+			require.NoError(t, err)
+			require.IsType(t, &api.CreateGrantAccepted{}, resp, helpers.MustMarshal(t, resp))
+		}
 	})
 
 	t.Run("own user_id is grant.invalid", func(t *testing.T) {
@@ -516,14 +465,21 @@ func TestGrantCreateLocators(t *testing.T) {
 	})
 }
 
-// grantBodyKeys returns the sorted JSON keys of a grant body and of its nested
-// user object, so two responses can be compared on shape alone.
-func grantBodyKeys(t *testing.T, g *api.Grant) (top, user []string) {
+// grantsForUser lists a project's grants for one user. The identifier create
+// answers 202 with no body, so the written row is only observable here.
+func grantsForUser(t *testing.T, client *helpers.ApiClient, projectID, userID string) []api.Grant {
 	t.Helper()
-	var body map[string]any
-	require.NoError(t, json.Unmarshal([]byte(helpers.MustMarshal(t, g)), &body))
-	nested, _ := body["user"].(map[string]any)
-	return slices.Sorted(maps.Keys(body)), slices.Sorted(maps.Keys(nested))
+	listed, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
+		Filter: []api.QueryGrantsRequestFilterItem{{
+			Field:     api.GrantFilterFieldUserID,
+			Operation: api.FilterOperationEquals,
+			Value:     api.NewOptFilterValue(api.NewStringFilterValue(userID)),
+		}},
+	}, api.QueryGrantsParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	page, ok := listed.(*api.QueryGrantsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, listed))
+	return page.Grants
 }
 
 func TestGrantQuery(t *testing.T) {

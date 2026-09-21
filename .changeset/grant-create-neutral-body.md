@@ -2,4 +2,4 @@
 "@zitadel/server": minor
 ---
 
-`POST /grants` no longer resolves the bound principal into the response: the 201 body carries only `user.user_id` or `team.team_id` on every create path, so a create by identifier cannot tell a caller whether the address matched. Read the grant back with `GET /grants/{id}` for identifier and display. Granting your own user is `grant.invalid` by `user_id` as well as by `identifier`.
+Answer `POST /grants` by `user.identifier` with 202 and no body on every outcome, so a hit, a duplicate, a miss and an ambiguous lookup are one response and nothing about the address leaks. Keep 201 for the `user.user_id` and team locators, whose body carries only `user.user_id` or `team.team_id`; read the grant back with `GET /grants/{id}` for identifier and display. Reject granting your own user with `grant.invalid` by `user_id` as well as by `identifier`.
