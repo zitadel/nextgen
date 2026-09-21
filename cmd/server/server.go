@@ -284,14 +284,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	releaseService := service.NewReleaseService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	// ── Operation policies (ADR 066) ──────────────────
-	// Templates ship with the binary; instances are not yet release-backed, so
-	// every project runs on the template defaults until a resolver reads them
-	// from the active release.
+	// Templates ship with the binary; instances are stored revisions and the
+	// policy service resolves the newest per operation and audience. Until
+	// releases pin them, "newest" is the interim resolution branding uses too.
 	policyEngine, err := policy.New()
 	if err != nil {
 		return fmt.Errorf("compile policy catalog: %w", err)
 	}
-	passwordPolicy := service.NewPasswordPolicy(policyEngine, nil, passwordHasher)
+	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	passwordPolicy := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher)
 
 	userService := service.NewUserService(
 		serviceDBPool,
@@ -390,6 +391,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
+			policyService,
 			environmentService,
 			releaseService,
 			eventService,

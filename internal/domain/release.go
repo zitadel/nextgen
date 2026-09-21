@@ -26,6 +26,7 @@ const (
 	ReleasePointerKindSchema ReleasePointerKind = iota
 	ReleasePointerKindFlowDefinition
 	ReleasePointerKindBranding
+	ReleasePointerKindPolicy
 )
 
 // ReleaseBrandingHandle is the handle every branding pointer carries. Branding

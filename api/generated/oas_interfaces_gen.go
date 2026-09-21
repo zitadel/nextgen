@@ -37,6 +37,10 @@ type CreateIdpRes interface {
 	createIdpRes()
 }
 
+type CreatePolicyRes interface {
+	createPolicyRes()
+}
+
 type CreateProjectRes interface {
 	createProjectRes()
 }
@@ -145,6 +149,10 @@ type GetMyUserRes interface {
 	getMyUserRes()
 }
 
+type GetPolicyByIdRes interface {
+	getPolicyByIdRes()
+}
+
 type GetProjectRes interface {
 	getProjectRes()
 }
@@ -211,6 +219,10 @@ type ListIdpRevisionsRes interface {
 
 type ListMyProjectsRes interface {
 	listMyProjectsRes()
+}
+
+type ListPoliciesRes interface {
+	listPoliciesRes()
 }
 
 type ListReleasesRes interface {

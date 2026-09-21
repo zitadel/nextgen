@@ -117,6 +117,15 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
+// policyAccess gates policy revisions (ADR 066), shaped like branding: a
+// project-scoped create and list, and revision reads resolved through RSI.
+var policyAccess = resourceAccess{
+	kind:      domain.ResourceKindPolicy,
+	readMiss:  domain.ErrPolicyNotFound,
+	writeMiss: func() domain.Error { return domain.ErrPolicyInvalid("project does not exist", nil) },
+	denied:    domain.ErrPolicyPermissionDenied,
+}
+
 // environmentAccess gates the project's runtime slots (ADR 035, #534).
 // Reads are project-scoped: the list carries a project_id and the get
 // addresses an environment by name, so no route resolves a path id through

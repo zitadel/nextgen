@@ -14011,10 +14011,12 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) createBrandingRes()       {}
 func (*ErrorDetails) createFlowDefinitionRes() {}
 func (*ErrorDetails) createFlowRes()           {}
+func (*ErrorDetails) createPolicyRes()         {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
+func (*ErrorDetails) getPolicyByIdRes()        {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) submitFlowStepRes()       {}
@@ -14059,6 +14061,7 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 
 func (*ErrorDetailsStatusCode) completeClaimRes()   {}
 func (*ErrorDetailsStatusCode) createBrandingRes()  {}
+func (*ErrorDetailsStatusCode) createPolicyRes()    {}
 func (*ErrorDetailsStatusCode) createTeamRes()      {}
 func (*ErrorDetailsStatusCode) deleteTeamRes()      {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes() {}
@@ -14067,11 +14070,13 @@ func (*ErrorDetailsStatusCode) getClaimWindowRes()  {}
 func (*ErrorDetailsStatusCode) getEventRes()        {}
 func (*ErrorDetailsStatusCode) getHealthRes()       {}
 func (*ErrorDetailsStatusCode) getLiveRes()         {}
+func (*ErrorDetailsStatusCode) getPolicyByIdRes()   {}
 func (*ErrorDetailsStatusCode) getReadyRes()        {}
 func (*ErrorDetailsStatusCode) getTeamRes()         {}
 func (*ErrorDetailsStatusCode) initClaimRes()       {}
 func (*ErrorDetailsStatusCode) listBrandingRes()    {}
 func (*ErrorDetailsStatusCode) listEventsRes()      {}
+func (*ErrorDetailsStatusCode) listPoliciesRes()    {}
 func (*ErrorDetailsStatusCode) queryTeamsRes()      {}
 func (*ErrorDetailsStatusCode) updateTeamRes()      {}
 
@@ -14096,6 +14101,7 @@ type Event struct {
 	FlowdefCreatedEvent            FlowdefCreatedEvent
 	FlowdefDeletedEvent            FlowdefDeletedEvent
 	FlowdefUpdatedEvent            FlowdefUpdatedEvent
+	PolicyCreatedEvent             PolicyCreatedEvent
 	ProjectCreatedEvent            ProjectCreatedEvent
 	ProjectDeletedEvent            ProjectDeletedEvent
 	ProjectUpdatedEvent            ProjectUpdatedEvent
@@ -14132,6 +14138,7 @@ const (
 	FlowdefCreatedEventEvent            EventType = "flowdef.created"
 	FlowdefDeletedEventEvent            EventType = "flowdef.deleted"
 	FlowdefUpdatedEventEvent            EventType = "flowdef.updated"
+	PolicyCreatedEventEvent             EventType = "policy.created"
 	ProjectCreatedEventEvent            EventType = "project.created"
 	ProjectDeletedEventEvent            EventType = "project.deleted"
 	ProjectUpdatedEventEvent            EventType = "project.updated"
@@ -14194,6 +14201,9 @@ func (s Event) IsFlowdefDeletedEvent() bool { return s.Type == FlowdefDeletedEve
 
 // IsFlowdefUpdatedEvent reports whether Event is FlowdefUpdatedEvent.
 func (s Event) IsFlowdefUpdatedEvent() bool { return s.Type == FlowdefUpdatedEventEvent }
+
+// IsPolicyCreatedEvent reports whether Event is PolicyCreatedEvent.
+func (s Event) IsPolicyCreatedEvent() bool { return s.Type == PolicyCreatedEventEvent }
 
 // IsProjectCreatedEvent reports whether Event is ProjectCreatedEvent.
 func (s Event) IsProjectCreatedEvent() bool { return s.Type == ProjectCreatedEventEvent }
@@ -14549,6 +14559,27 @@ func (s Event) GetFlowdefUpdatedEvent() (v FlowdefUpdatedEvent, ok bool) {
 func NewFlowdefUpdatedEventEvent(v FlowdefUpdatedEvent) Event {
 	var s Event
 	s.SetFlowdefUpdatedEvent(v)
+	return s
+}
+
+// SetPolicyCreatedEvent sets Event to PolicyCreatedEvent.
+func (s *Event) SetPolicyCreatedEvent(v PolicyCreatedEvent) {
+	s.Type = PolicyCreatedEventEvent
+	s.PolicyCreatedEvent = v
+}
+
+// GetPolicyCreatedEvent returns PolicyCreatedEvent and true boolean if Event is PolicyCreatedEvent.
+func (s Event) GetPolicyCreatedEvent() (v PolicyCreatedEvent, ok bool) {
+	if !s.IsPolicyCreatedEvent() {
+		return v, false
+	}
+	return s.PolicyCreatedEvent, true
+}
+
+// NewPolicyCreatedEventEvent returns new Event from PolicyCreatedEvent.
+func NewPolicyCreatedEventEvent(v PolicyCreatedEvent) Event {
+	var s Event
+	s.SetPolicyCreatedEvent(v)
 	return s
 }
 
@@ -27307,6 +27338,49 @@ func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) 
 
 func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
+type ListPoliciesResponse []ListPoliciesResponseItem
+
+func (*ListPoliciesResponse) listPoliciesRes() {}
+
+type ListPoliciesResponseItem struct {
+	// The unique identifier of this policy revision.
+	ID string `json:"id"`
+	// The catalogued operation the revision guards.
+	Operation string `json:"operation"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListPoliciesResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetOperation returns the value of Operation.
+func (s *ListPoliciesResponseItem) GetOperation() string {
+	return s.Operation
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListPoliciesResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListPoliciesResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *ListPoliciesResponseItem) SetOperation(val string) {
+	s.Operation = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListPoliciesResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {
 	Type                ListReleasesErrorResponseType // switch on this field
@@ -35171,6 +35245,69 @@ func (o OptNilPageToken) Or(d PageToken) PageToken {
 	return d
 }
 
+// NewOptNilPolicyCreatedEventActorType returns new OptNilPolicyCreatedEventActorType with value set to v.
+func NewOptNilPolicyCreatedEventActorType(v PolicyCreatedEventActorType) OptNilPolicyCreatedEventActorType {
+	return OptNilPolicyCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilPolicyCreatedEventActorType is optional nullable PolicyCreatedEventActorType.
+type OptNilPolicyCreatedEventActorType struct {
+	Value PolicyCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilPolicyCreatedEventActorType was set.
+func (o OptNilPolicyCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilPolicyCreatedEventActorType) Reset() {
+	var v PolicyCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilPolicyCreatedEventActorType) SetTo(v PolicyCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilPolicyCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilPolicyCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v PolicyCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilPolicyCreatedEventActorType) Get() (v PolicyCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilPolicyCreatedEventActorType) Or(d PolicyCreatedEventActorType) PolicyCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilProjectCreatedEventActorType returns new OptNilProjectCreatedEventActorType with value set to v.
 func NewOptNilProjectCreatedEventActorType(v ProjectCreatedEventActorType) OptNilProjectCreatedEventActorType {
 	return OptNilProjectCreatedEventActorType{
@@ -36844,6 +36981,144 @@ func (o OptPatchUserRequestAttributes) Get() (v PatchUserRequestAttributes, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPatchUserRequestAttributes) Or(d PatchUserRequestAttributes) PatchUserRequestAttributes {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolicyAudience returns new OptPolicyAudience with value set to v.
+func NewOptPolicyAudience(v PolicyAudience) OptPolicyAudience {
+	return OptPolicyAudience{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolicyAudience is optional PolicyAudience.
+type OptPolicyAudience struct {
+	Value PolicyAudience
+	Set   bool
+}
+
+// IsSet returns true if OptPolicyAudience was set.
+func (o OptPolicyAudience) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolicyAudience) Reset() {
+	var v PolicyAudience
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolicyAudience) SetTo(v PolicyAudience) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolicyAudience) Get() (v PolicyAudience, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolicyAudience) Or(d PolicyAudience) PolicyAudience {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolicyCreatedEventDelegationType returns new OptPolicyCreatedEventDelegationType with value set to v.
+func NewOptPolicyCreatedEventDelegationType(v PolicyCreatedEventDelegationType) OptPolicyCreatedEventDelegationType {
+	return OptPolicyCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolicyCreatedEventDelegationType is optional PolicyCreatedEventDelegationType.
+type OptPolicyCreatedEventDelegationType struct {
+	Value PolicyCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptPolicyCreatedEventDelegationType was set.
+func (o OptPolicyCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolicyCreatedEventDelegationType) Reset() {
+	var v PolicyCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolicyCreatedEventDelegationType) SetTo(v PolicyCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolicyCreatedEventDelegationType) Get() (v PolicyCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolicyCreatedEventDelegationType) Or(d PolicyCreatedEventDelegationType) PolicyCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolicyEnforcement returns new OptPolicyEnforcement with value set to v.
+func NewOptPolicyEnforcement(v PolicyEnforcement) OptPolicyEnforcement {
+	return OptPolicyEnforcement{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolicyEnforcement is optional PolicyEnforcement.
+type OptPolicyEnforcement struct {
+	Value PolicyEnforcement
+	Set   bool
+}
+
+// IsSet returns true if OptPolicyEnforcement was set.
+func (o OptPolicyEnforcement) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolicyEnforcement) Reset() {
+	var v PolicyEnforcement
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolicyEnforcement) SetTo(v PolicyEnforcement) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolicyEnforcement) Get() (v PolicyEnforcement, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolicyEnforcement) Or(d PolicyEnforcement) PolicyEnforcement {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -41877,6 +42152,734 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	}
 	return m
 }
+
+// A policy instance (ADR 066): the developer-authored half of an operation
+// policy. It carries the configuration values for one catalogued operation,
+// the audience the values apply to, and the enforcement mode. Used as the
+// request body of `POST /policies`, which publishes it as a new immutable
+// revision, and locally as a `.zitadel/policies/<operation>.json` file that
+// `zitadel apply` publishes.
+// The rules themselves are not part of this document: they are defined by
+// Zitadel per operation, and `config` may only carry the settings that
+// operation's template declares, within its bounds.
+// Ref: #
+type Policy struct {
+	// Editor affordance: path or URL of this file's JSON meta-schema. The CLI
+	// strips it before upload; the platform ignores it.
+	Schema OptString `json:"$schema"`
+	// Always `policy`.
+	Kind PolicyKind `json:"kind"`
+	// The catalogued operation this policy guards, for example
+	// `user.password.save`. The catalogue is closed and server-defined.
+	Operation string `json:"operation"`
+	// Which requests the policy applies to. Omitted means the project
+	// default. Only `team_ids` is applicable today.
+	Audience OptPolicyAudience `json:"audience"`
+	// `enforce` rejects the operation on a deny. `audit` keeps enforcing the
+	// template defaults but only records what the instance tightened beyond
+	// them, so a stricter policy can be rolled out before it blocks anyone.
+	Enforcement OptPolicyEnforcement `json:"enforcement"`
+	// Setting values for the operation, validated against the operation's
+	// template: unknown settings, out-of-bounds values and fixed settings are
+	// rejected. Omitted settings take the template default.
+	Config PolicyConfig `json:"config"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *Policy) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetKind returns the value of Kind.
+func (s *Policy) GetKind() PolicyKind {
+	return s.Kind
+}
+
+// GetOperation returns the value of Operation.
+func (s *Policy) GetOperation() string {
+	return s.Operation
+}
+
+// GetAudience returns the value of Audience.
+func (s *Policy) GetAudience() OptPolicyAudience {
+	return s.Audience
+}
+
+// GetEnforcement returns the value of Enforcement.
+func (s *Policy) GetEnforcement() OptPolicyEnforcement {
+	return s.Enforcement
+}
+
+// GetConfig returns the value of Config.
+func (s *Policy) GetConfig() PolicyConfig {
+	return s.Config
+}
+
+// SetSchema sets the value of Schema.
+func (s *Policy) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetKind sets the value of Kind.
+func (s *Policy) SetKind(val PolicyKind) {
+	s.Kind = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *Policy) SetOperation(val string) {
+	s.Operation = val
+}
+
+// SetAudience sets the value of Audience.
+func (s *Policy) SetAudience(val OptPolicyAudience) {
+	s.Audience = val
+}
+
+// SetEnforcement sets the value of Enforcement.
+func (s *Policy) SetEnforcement(val OptPolicyEnforcement) {
+	s.Enforcement = val
+}
+
+// SetConfig sets the value of Config.
+func (s *Policy) SetConfig(val PolicyConfig) {
+	s.Config = val
+}
+
+// Which requests the policy applies to. Omitted means the project
+// default. Only `team_ids` is applicable today.
+type PolicyAudience struct {
+	TeamIds []string `json:"team_ids"`
+}
+
+// GetTeamIds returns the value of TeamIds.
+func (s *PolicyAudience) GetTeamIds() []string {
+	return s.TeamIds
+}
+
+// SetTeamIds sets the value of TeamIds.
+func (s *PolicyAudience) SetTeamIds(val []string) {
+	s.TeamIds = val
+}
+
+// Setting values for the operation, validated against the operation's
+// template: unknown settings, out-of-bounds values and fixed settings are
+// rejected. Omitted settings take the template default.
+type PolicyConfig map[string]jx.Raw
+
+func (s *PolicyConfig) init() PolicyConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type PolicyCreatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category PolicyCreatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilPolicyCreatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptPolicyCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                           `json:"delegation_id"`
+	Grantor        OptString                           `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString         `json:"flow_id"`
+	Metadata OptEventMetadata     `json:"metadata"`
+	Payload  PolicyCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *PolicyCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *PolicyCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *PolicyCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *PolicyCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *PolicyCreatedEvent) GetCategory() PolicyCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *PolicyCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PolicyCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *PolicyCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *PolicyCreatedEvent) GetActorType() OptNilPolicyCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *PolicyCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *PolicyCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *PolicyCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *PolicyCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *PolicyCreatedEvent) GetDelegationType() OptPolicyCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *PolicyCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *PolicyCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *PolicyCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *PolicyCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *PolicyCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *PolicyCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *PolicyCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *PolicyCreatedEvent) GetPayload() PolicyCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *PolicyCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *PolicyCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *PolicyCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *PolicyCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *PolicyCreatedEvent) SetCategory(val PolicyCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *PolicyCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PolicyCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *PolicyCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *PolicyCreatedEvent) SetActorType(val OptNilPolicyCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *PolicyCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *PolicyCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *PolicyCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *PolicyCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *PolicyCreatedEvent) SetDelegationType(val OptPolicyCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *PolicyCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *PolicyCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *PolicyCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *PolicyCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *PolicyCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *PolicyCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *PolicyCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *PolicyCreatedEvent) SetPayload(val PolicyCreatedPayload) {
+	s.Payload = val
+}
+
+type PolicyCreatedEventActorType string
+
+const (
+	PolicyCreatedEventActorTypeHuman   PolicyCreatedEventActorType = "human"
+	PolicyCreatedEventActorTypeService PolicyCreatedEventActorType = "service"
+	PolicyCreatedEventActorTypeSystem  PolicyCreatedEventActorType = "system"
+	PolicyCreatedEventActorTypeAgent   PolicyCreatedEventActorType = "agent"
+)
+
+// AllValues returns all PolicyCreatedEventActorType values.
+func (PolicyCreatedEventActorType) AllValues() []PolicyCreatedEventActorType {
+	return []PolicyCreatedEventActorType{
+		PolicyCreatedEventActorTypeHuman,
+		PolicyCreatedEventActorTypeService,
+		PolicyCreatedEventActorTypeSystem,
+		PolicyCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case PolicyCreatedEventActorTypeService:
+		return []byte(s), nil
+	case PolicyCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case PolicyCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch PolicyCreatedEventActorType(data) {
+	case PolicyCreatedEventActorTypeHuman:
+		*s = PolicyCreatedEventActorTypeHuman
+		return nil
+	case PolicyCreatedEventActorTypeService:
+		*s = PolicyCreatedEventActorTypeService
+		return nil
+	case PolicyCreatedEventActorTypeSystem:
+		*s = PolicyCreatedEventActorTypeSystem
+		return nil
+	case PolicyCreatedEventActorTypeAgent:
+		*s = PolicyCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type PolicyCreatedEventCategory string
+
+const (
+	PolicyCreatedEventCategoryRequest PolicyCreatedEventCategory = "request"
+	PolicyCreatedEventCategoryAuth    PolicyCreatedEventCategory = "auth"
+	PolicyCreatedEventCategorySession PolicyCreatedEventCategory = "session"
+	PolicyCreatedEventCategoryAdmin   PolicyCreatedEventCategory = "admin"
+	PolicyCreatedEventCategoryEntity  PolicyCreatedEventCategory = "entity"
+	PolicyCreatedEventCategorySignal  PolicyCreatedEventCategory = "signal"
+)
+
+// AllValues returns all PolicyCreatedEventCategory values.
+func (PolicyCreatedEventCategory) AllValues() []PolicyCreatedEventCategory {
+	return []PolicyCreatedEventCategory{
+		PolicyCreatedEventCategoryRequest,
+		PolicyCreatedEventCategoryAuth,
+		PolicyCreatedEventCategorySession,
+		PolicyCreatedEventCategoryAdmin,
+		PolicyCreatedEventCategoryEntity,
+		PolicyCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case PolicyCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case PolicyCreatedEventCategorySession:
+		return []byte(s), nil
+	case PolicyCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case PolicyCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case PolicyCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch PolicyCreatedEventCategory(data) {
+	case PolicyCreatedEventCategoryRequest:
+		*s = PolicyCreatedEventCategoryRequest
+		return nil
+	case PolicyCreatedEventCategoryAuth:
+		*s = PolicyCreatedEventCategoryAuth
+		return nil
+	case PolicyCreatedEventCategorySession:
+		*s = PolicyCreatedEventCategorySession
+		return nil
+	case PolicyCreatedEventCategoryAdmin:
+		*s = PolicyCreatedEventCategoryAdmin
+		return nil
+	case PolicyCreatedEventCategoryEntity:
+		*s = PolicyCreatedEventCategoryEntity
+		return nil
+	case PolicyCreatedEventCategorySignal:
+		*s = PolicyCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type PolicyCreatedEventDelegationType string
+
+const (
+	PolicyCreatedEventDelegationTypeDirect    PolicyCreatedEventDelegationType = "direct"
+	PolicyCreatedEventDelegationTypeDelegated PolicyCreatedEventDelegationType = "delegated"
+	PolicyCreatedEventDelegationTypePatShared PolicyCreatedEventDelegationType = "pat_shared"
+	PolicyCreatedEventDelegationTypeExchanged PolicyCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all PolicyCreatedEventDelegationType values.
+func (PolicyCreatedEventDelegationType) AllValues() []PolicyCreatedEventDelegationType {
+	return []PolicyCreatedEventDelegationType{
+		PolicyCreatedEventDelegationTypeDirect,
+		PolicyCreatedEventDelegationTypeDelegated,
+		PolicyCreatedEventDelegationTypePatShared,
+		PolicyCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case PolicyCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case PolicyCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case PolicyCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch PolicyCreatedEventDelegationType(data) {
+	case PolicyCreatedEventDelegationTypeDirect:
+		*s = PolicyCreatedEventDelegationTypeDirect
+		return nil
+	case PolicyCreatedEventDelegationTypeDelegated:
+		*s = PolicyCreatedEventDelegationTypeDelegated
+		return nil
+	case PolicyCreatedEventDelegationTypePatShared:
+		*s = PolicyCreatedEventDelegationTypePatShared
+		return nil
+	case PolicyCreatedEventDelegationTypeExchanged:
+		*s = PolicyCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Allowlisted fields for `policy.created`. Omits the `config` values.
+// Ref: #
+type PolicyCreatedPayload struct {
+	Operation   OptString `json:"operation"`
+	Enforcement OptString `json:"enforcement"`
+	TeamIds     []string  `json:"team_ids"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *PolicyCreatedPayload) GetOperation() OptString {
+	return s.Operation
+}
+
+// GetEnforcement returns the value of Enforcement.
+func (s *PolicyCreatedPayload) GetEnforcement() OptString {
+	return s.Enforcement
+}
+
+// GetTeamIds returns the value of TeamIds.
+func (s *PolicyCreatedPayload) GetTeamIds() []string {
+	return s.TeamIds
+}
+
+// SetOperation sets the value of Operation.
+func (s *PolicyCreatedPayload) SetOperation(val OptString) {
+	s.Operation = val
+}
+
+// SetEnforcement sets the value of Enforcement.
+func (s *PolicyCreatedPayload) SetEnforcement(val OptString) {
+	s.Enforcement = val
+}
+
+// SetTeamIds sets the value of TeamIds.
+func (s *PolicyCreatedPayload) SetTeamIds(val []string) {
+	s.TeamIds = val
+}
+
+// `enforce` rejects the operation on a deny. `audit` keeps enforcing the
+// template defaults but only records what the instance tightened beyond
+// them, so a stricter policy can be rolled out before it blocks anyone.
+type PolicyEnforcement string
+
+const (
+	PolicyEnforcementEnforce PolicyEnforcement = "enforce"
+	PolicyEnforcementAudit   PolicyEnforcement = "audit"
+)
+
+// AllValues returns all PolicyEnforcement values.
+func (PolicyEnforcement) AllValues() []PolicyEnforcement {
+	return []PolicyEnforcement{
+		PolicyEnforcementEnforce,
+		PolicyEnforcementAudit,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyEnforcement) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyEnforcementEnforce:
+		return []byte(s), nil
+	case PolicyEnforcementAudit:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyEnforcement) UnmarshalText(data []byte) error {
+	switch PolicyEnforcement(data) {
+	case PolicyEnforcementEnforce:
+		*s = PolicyEnforcementEnforce
+		return nil
+	case PolicyEnforcementAudit:
+		*s = PolicyEnforcementAudit
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Always `policy`.
+type PolicyKind string
+
+const (
+	PolicyKindPolicy PolicyKind = "policy"
+)
+
+// AllValues returns all PolicyKind values.
+func (PolicyKind) AllValues() []PolicyKind {
+	return []PolicyKind{
+		PolicyKindPolicy,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyKind) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyKindPolicy:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyKind) UnmarshalText(data []byte) error {
+	switch PolicyKind(data) {
+	case PolicyKindPolicy:
+		*s = PolicyKindPolicy
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A stored policy revision. `policy` echoes the canonical stored document so
+// the CLI sync engine can reconcile local files with the server.
+// Ref: #
+type PolicyRevisionResponse struct {
+	// The unique identifier of this policy revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+	Policy    Policy    `json:"policy"`
+}
+
+// GetID returns the value of ID.
+func (s *PolicyRevisionResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PolicyRevisionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetPolicy returns the value of Policy.
+func (s *PolicyRevisionResponse) GetPolicy() Policy {
+	return s.Policy
+}
+
+// SetID sets the value of ID.
+func (s *PolicyRevisionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PolicyRevisionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetPolicy sets the value of Policy.
+func (s *PolicyRevisionResponse) SetPolicy(val Policy) {
+	s.Policy = val
+}
+
+func (*PolicyRevisionResponse) createPolicyRes()  {}
+func (*PolicyRevisionResponse) getPolicyByIdRes() {}
 
 // Merged schema.
 // Ref: #

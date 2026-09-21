@@ -244,6 +244,15 @@ func (s *releaseService) resolveHandle(ctx context.Context, projectID string, po
 		// branding revisions in one release.
 		return domain.ReleaseBrandingHandle, nil
 
+	case domain.ReleasePointerKindPolicy:
+		revision, err := stmts.GetPolicyByID(ctx, projectID, pointer.RevisionID)
+		if err != nil {
+			return "", mapRevisionLookupError(err, pointer)
+		}
+		// One instance per operation and audience (ADR 066): the operation
+		// plus the team ids is what two revisions of the same instance share.
+		return domain.ReleasePolicyHandle(revision), nil
+
 	default:
 		// Unreachable over HTTP: the wire enum admits only the three kinds
 		// above. It stays mapped for the in-process callers that skip the

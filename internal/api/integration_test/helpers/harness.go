@@ -42,6 +42,7 @@ type Harness struct {
 	flowDefinitionService dependency[service.FlowDefinitionService]
 	userService           dependency[service.UserService]
 	passwordPolicy        dependency[*service.PasswordPolicy]
+	policyService         dependency[*service.PolicyService]
 	flowStateMachine      dependency[*domain.FlowStateMachineRuntime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]

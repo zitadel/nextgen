@@ -167,6 +167,19 @@ func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest
 	return r, ht.ErrNotImplemented
 }
 
+// CreatePolicy implements createPolicy operation.
+//
+// Publishes a new immutable policy revision for the project. Revisions
+// cannot be updated or deleted; every edit publishes a new revision, and
+// evaluation resolves the newest revision per operation and audience.
+// The document is validated against the operation's template: unknown
+// settings, out-of-bounds values and fixed settings are rejected.
+//
+// POST /policies
+func (UnimplementedHandler) CreatePolicy(ctx context.Context, req *Policy, params CreatePolicyParams) (r CreatePolicyRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateProject implements createProject operation.
 //
 // Create project.
@@ -520,6 +533,15 @@ func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ er
 	return r, ht.ErrNotImplemented
 }
 
+// GetPolicyById implements getPolicyById operation.
+//
+// Retrieves a single policy revision, including its stored document.
+//
+// GET /policies/{id}
+func (UnimplementedHandler) GetPolicyById(ctx context.Context, params GetPolicyByIdParams) (r GetPolicyByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetProject implements getProject operation.
 //
 // Returns the current state of a project.
@@ -724,6 +746,16 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListPolicies implements listPolicies operation.
+//
+// Lists policy revisions for the project, newest first, capped at the 100
+// most recent. Deliberately unpaginated in v1, like branding.
+//
+// GET /policies
+func (UnimplementedHandler) ListPolicies(ctx context.Context, params ListPoliciesParams) (r ListPoliciesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
