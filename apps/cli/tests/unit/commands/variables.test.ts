@@ -491,7 +491,7 @@ describe("variables set", () => {
   });
 });
 
-describe("variables set --type", () => {
+describe("variables set --as", () => {
   const capture = () => {
     const bodies: Array<Record<string, unknown>> = [];
     server.use(
@@ -513,7 +513,7 @@ describe("variables set --type", () => {
         "set",
         "RETRY_COUNT",
         "--project-level",
-        "--type",
+        "--as",
         "number",
         "--non-interactive",
         ...base(cwd),
@@ -534,7 +534,7 @@ describe("variables set --type", () => {
         "set",
         "DEBUG",
         "--project-level",
-        "--type",
+        "--as",
         "boolean",
         "--non-interactive",
         ...base(cwd),
@@ -572,7 +572,7 @@ describe("variables set --type", () => {
         "set",
         "RETRY_COUNT",
         "--project-level",
-        "--type",
+        "--as",
         "number",
         "--non-interactive",
         ...base(cwd),
@@ -605,7 +605,7 @@ describe("variables set --type", () => {
         "API_KEY",
         "--project-level",
         "--secret",
-        "--type",
+        "--as",
         "number",
         "--non-interactive",
         ...base(cwd),
@@ -623,7 +623,7 @@ describe("variables set --type", () => {
     }
   });
 
-  it("keeps --type in the retry it suggests", async () => {
+  it("keeps --as in the retry it suggests", async () => {
     const cwd = await makeProject();
     const original = Object.getOwnPropertyDescriptor(process, "stdin");
     Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
@@ -634,14 +634,14 @@ describe("variables set --type", () => {
         "RETRY_COUNT",
         "-e",
         "prod",
-        "--type",
+        "--as",
         "number",
         "--non-interactive",
         ...base(cwd),
       ]);
 
       const json = parseJson(res.stdout) as { next_commands: string[] };
-      expect(json.next_commands.join(" ")).toContain("--type number");
+      expect(json.next_commands.join(" ")).toContain("--as number");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);

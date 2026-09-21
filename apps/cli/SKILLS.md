@@ -389,7 +389,7 @@ docker --image <ref>` remains the explicit image override for debugging.
   prompt or from stdin and never from a flag, so a credential never reaches
   `argv`; `--secret` stores it encrypted, after which it can be replaced but
   never read back (`list` reports it as held, and `--json` omits the value key
-  entirely). `set --type number|boolean` stores a JSON number or boolean
+  entirely). `set --as number|boolean` stores a JSON number or boolean
   instead of a string, so a whole-field `${{ NAME }}` reference resolves to that
   type; it is refused with `--secret`, and an integer too large to store exactly
   is refused rather than rounded. There is no `pull` and no bulk import. `set` and `delete` honour

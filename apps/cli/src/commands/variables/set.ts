@@ -40,7 +40,7 @@ export default class VariablesSet extends EnvironmentCommand {
       default: false,
       description: "Store the value encrypted. It can be replaced later but never read back.",
     }),
-    type: Flags.string({
+    as: Flags.string({
       options: [...VARIABLE_TYPES],
       default: "string",
       description:
@@ -53,7 +53,7 @@ export default class VariablesSet extends EnvironmentCommand {
     await this.toMeta(flags);
     const { cwd, source, nonInteractive, dryRun, cliVersion } = this.meta;
     const name = args.name;
-    const type = flags.type as VariableType;
+    const type = flags.as as VariableType;
 
     assertVariableName(name);
     // A credential is a string: a numeric-looking key stored as a number could
@@ -61,7 +61,7 @@ export default class VariablesSet extends EnvironmentCommand {
     // anything is asked for, so no secret is typed only to be turned away.
     if (flags.secret && type !== "string") {
       throw new ZitadelError("E_VALIDATION", "A secret is stored as a string.", {
-        hint: "Drop --type, or drop --secret for a non-credential number or boolean.",
+        hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
       });
     }
 
@@ -160,7 +160,7 @@ function pipeHint(
     name,
     ...(environment ? ["--environment", environment] : ["--project-level"]),
     ...(secret ? ["--secret"] : []),
-    ...(type === "string" ? [] : ["--type", type]),
+    ...(type === "string" ? [] : ["--as", type]),
   ].join(" ");
   return `${publicCliCommand(args, cliVersion)} < value.txt`;
 }
