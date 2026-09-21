@@ -171,7 +171,7 @@ since `started` fires before the command body runs):
 - **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (diff *counts* only).
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
-- **variables** — `is_environment_scoped` (owner is an environment rather than the project), `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value, the environment's name, and the `--file` path — a name is free text, a value is the credential itself, and a path identifies the machine.
+- **variables** — `is_environment_scoped` (owner is an environment rather than the project), `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value, and the environment's name — a name is free text, and a value is the credential itself.
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
 
 ### Naming conventions

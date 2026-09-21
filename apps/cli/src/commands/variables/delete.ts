@@ -6,6 +6,7 @@ import { createZitadelClient } from "@zitadel/api/client";
 
 import { ownerLabel } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
 import { assertVariableName } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -60,14 +61,13 @@ export default class VariablesDelete extends EnvironmentCommand {
     // the resource commands' `delete` uses, which keeps
     // `--dry-run --non-interactive` usable.
     if (dryRun) {
+      // The resource commands' dry-run contract, so an agent reads one shape
+      // for every preview; `deleted` is reserved for a deletion that happened.
+      const preview = dryRunResult("delete", "variables", name);
       return this.emit({
-        status: "ok",
-        data: {
-          title: `Delete ${name} from ${where}.`,
-          environment: environment ?? null,
-          name,
-          deleted: true,
-        },
+        ...preview,
+        data: { ...(preview.data as object), environment: environment ?? null },
+        pretty: `${preview.pretty} from ${where}`,
       });
     }
 

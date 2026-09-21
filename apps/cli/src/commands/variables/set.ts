@@ -6,6 +6,7 @@ import { createZitadelClient } from "@zitadel/api/client";
 
 import { ownerLabel } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
 import {
   assertVariableName,
@@ -82,14 +83,19 @@ export default class VariablesSet extends EnvironmentCommand {
     const where = ownerLabel(environment);
 
     if (dryRun) {
+      // The resource commands' dry-run contract, plus what this write would
+      // store. Never the value: a dry run has not read it, and it may be a
+      // credential.
+      const preview = dryRunResult("set", "variables", name);
       return this.emit({
-        status: "ok",
+        ...preview,
         data: {
-          title: `Set ${name} on ${where}.`,
+          ...(preview.data as object),
           environment: environment ?? null,
-          name,
           secret: flags.secret,
+          as: type,
         },
+        pretty: `${preview.pretty} on ${where}${flags.secret ? " (secret)" : ""}${type === "string" ? "" : ` as ${type}`}`,
       });
     }
 

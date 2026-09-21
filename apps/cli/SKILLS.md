@@ -393,7 +393,8 @@ docker --image <ref>` remains the explicit image override for debugging.
   instead of a string, so a whole-field `${{ NAME }}` reference resolves to that
   type; it is refused with `--secret`, and an integer too large to store exactly
   is refused rather than rounded. There is no `pull` and no bulk import. `set` and `delete` honour
-  `--dry-run` and send no request; `delete` needs `--force` when
+  `--dry-run` and make no change (with no owner flag, a person is still asked,
+  which reads the project's environments); `delete` needs `--force` when
   non-interactive.
 
 ## Golden path

@@ -443,9 +443,19 @@ describe("variables set", () => {
 
     expect(res.exitCode).toBe(0);
     expect(called).toBe(false);
-    const json = parseJson(res.stdout) as { status: string; data: { title: string } };
+    const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
     expect(json.status).toBe("ok");
-    expect(json.data.title).toContain("Set TOKEN");
+    // The resource commands' dry-run contract, marked as a preview, with the
+    // requested classification and type — and no value, which was never read.
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      verb: "set",
+      topic: "variables",
+      id: "TOKEN",
+      secret: false,
+      as: "string",
+    });
+    expect(json.data).not.toHaveProperty("value");
   });
 
   it("sets an empty value, which the scalar schema accepts", async () => {
@@ -475,19 +485,35 @@ describe("variables set", () => {
 
   it("rejects a name longer than the schema allows", async () => {
     const cwd = await makeProject();
+    // A value and a PATCH handler are supplied so that, were the cap missing,
+    // the command would run to completion and fail these assertions at once
+    // rather than block on stdin until the test times out.
+    let patched = false;
+    server.use(
+      http.patch("*/variables", () => {
+        patched = true;
+        return HttpResponse.json({});
+      }),
+    );
 
-    const res = await runCliForTest([
-      "variables",
-      "set",
-      "A",
-      "--project-level".repeat(256),
-      "--non-interactive",
-      ...base(cwd),
-    ]);
+    const res = await withStdin("value", () =>
+      runCliForTest([
+        "variables",
+        "set",
+        "A".repeat(256),
+        "--project-level",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
 
+    expect(patched).toBe(false);
     expect(res.exitCode).not.toBe(0);
-    const json = parseJson(res.stdout) as { code: string };
+    const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_VALIDATION");
+    // Assert the cap itself fired, not merely that something was rejected: a
+    // malformed argument list would also exit E_VALIDATION.
+    expect(json.message).toContain("the limit is 255");
   });
 });
 
@@ -702,9 +728,16 @@ describe("variables delete", () => {
 
     expect(res.exitCode).toBe(0);
     expect(called).toBe(false);
-    const json = parseJson(res.stdout) as { status: string; data: { title: string } };
+    const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
     expect(json.status).toBe("ok");
-    expect(json.data.title).toContain("Delete SUPPORT_EMAIL");
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      verb: "delete",
+      topic: "variables",
+      id: "SUPPORT_EMAIL",
+    });
+    // Nothing was deleted, so the preview must not say it was.
+    expect(json.data).not.toHaveProperty("deleted");
   });
 
   it("refuses to delete without --force in non-interactive mode", async () => {
