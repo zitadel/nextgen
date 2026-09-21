@@ -21,7 +21,6 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesDelete extends BaseCommand {
   static override description = "Delete one variable from an environment or the project.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 8;
   static override args = {
     name: Args.string({ required: true, description: "Variable name to delete." }),
   };
@@ -29,6 +28,12 @@ export default class VariablesDelete extends BaseCommand {
     environment: Flags.string({
       char: "e",
       description: "Environment to delete from. Omit to delete at the project level.",
+    }),
+    // `--force` is per command, not global: here it permits a deletion.
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "Delete the variable without the confirmation prompt. Required when non-interactive.",
     }),
   };
 
@@ -53,8 +58,13 @@ export default class VariablesDelete extends BaseCommand {
     );
 
     const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
-    consola.info(`Server    ${source}`);
+    // Stated to a human, but kept off a pipe: these lines share stdout with the
+    // result, so `$(zitadel variables get NAME)` would otherwise capture them
+    // ahead of the value. The same rule the resource commands follow.
+    if (process.stdout.isTTY) {
+      consola.info(`Project   ${secret.project_id}`);
+      consola.info(`Server    ${source}`);
+    }
 
     if (dryRun) {
       return this.emit({
@@ -84,11 +94,8 @@ export default class VariablesDelete extends BaseCommand {
         message: `Delete ${name} from ${where}?`,
         initialValue: false,
       });
-      if (isCancel(answer)) {
+      if (isCancel(answer) || !answer) {
         cancel("Delete cancelled.");
-        throw new ZitadelError("E_VALIDATION", "Delete cancelled by user");
-      }
-      if (!answer) {
         return this.emit({ status: "skipped", reason: "delete-cancelled" });
       }
     }

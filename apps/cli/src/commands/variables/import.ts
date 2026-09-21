@@ -22,7 +22,6 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesImport extends BaseCommand {
   static override description = "Import a .env-style file into an environment or the project.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 9;
   static override flags = {
     environment: Flags.string({
       char: "e",
@@ -61,8 +60,13 @@ export default class VariablesImport extends BaseCommand {
     }
 
     const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
-    consola.info(`Server    ${source}`);
+    // Stated to a human, but kept off a pipe: these lines share stdout with the
+    // result, so `$(zitadel variables get NAME)` would otherwise capture them
+    // ahead of the value. The same rule the resource commands follow.
+    if (process.stdout.isTTY) {
+      consola.info(`Project   ${secret.project_id}`);
+      consola.info(`Server    ${source}`);
+    }
 
     const where = ownerLabel(environment);
     if (names.length === 0) {

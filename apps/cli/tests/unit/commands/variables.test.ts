@@ -193,6 +193,28 @@ describe("variables get", () => {
     });
   });
 
+  it("prints only the value on a pipe, so it can be captured by a script", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+
+    // No `--json`: this is the plain rendering a `$(zitadel variables get …)`
+    // would capture. Under the test runner stdout is not a TTY, as on a pipe.
+    const res = await runCliForTest([
+      "variables",
+      "get",
+      "GOOGLE_CLIENT_ID",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout.trim()).toBe("999-prod");
+    expect(res.stdout).not.toContain("Project");
+    expect(res.stdout).not.toContain("Server");
+  });
+
   it("reports a secret as held and carries no value", async () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));

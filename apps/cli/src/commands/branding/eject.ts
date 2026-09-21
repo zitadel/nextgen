@@ -44,6 +44,7 @@ export default class BrandingEject extends BaseCommand {
   static override group = CommandGroups.configuration;
   static override groupOrder = 4;
   static override flags = {
+    force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
     design: Flags.string({
       description: `Design to start from (default: ${DEFAULT_BRANDING_DESIGN}).`,
       options: [...BRANDING_DESIGNS],
