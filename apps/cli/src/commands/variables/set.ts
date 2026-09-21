@@ -86,9 +86,18 @@ export default class VariablesSet extends BaseCommand {
     // An empty string is a value the scalar schema accepts, and `import`
     // already sends `A=` as one. Only an absent input is an error, which the
     // stdin guard above and the prompt's own cancel signal cover.
-    const value = nonInteractive
+    // Masked when the value is to be stored as a secret, so it does not stay on
+    // screen or in a scrollback buffer.
+    const answer = nonInteractive
       ? await readStdin(process.stdin)
-      : await promptValue(name, flags.secret);
+      : flags.secret
+        ? await password({ message: `Value for ${name}` })
+        : await text({ message: `Value for ${name}` });
+    if (isCancel(answer)) {
+      cancel("Set cancelled.");
+      throw new ZitadelError("E_VALIDATION", "Set cancelled by user");
+    }
+    const value = String(answer);
 
     const client = createZitadelClient({
       baseUrl: source,
@@ -111,19 +120,4 @@ export default class VariablesSet extends BaseCommand {
 /** The scripted form to suggest when a run supplied no value. */
 function pipeHint(name: string, cliVersion: string): string {
   return `${publicCliCommand(`variables set ${name}`, cliVersion)} < value.txt`;
-}
-
-/**
- * Ask for the value, masked when it is to be stored as a secret so it does not
- * stay on screen or in a scrollback buffer.
- */
-async function promptValue(name: string, secret: boolean): Promise<string> {
-  const answer = secret
-    ? await password({ message: `Value for ${name}` })
-    : await text({ message: `Value for ${name}` });
-  if (isCancel(answer)) {
-    cancel("Set cancelled.");
-    throw new ZitadelError("E_VALIDATION", "Set cancelled by user");
-  }
-  return String(answer ?? "");
 }

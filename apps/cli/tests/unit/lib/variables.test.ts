@@ -69,7 +69,7 @@ describe("toVariableRows", () => {
       { name: "GOOGLE_CLIENT_ID", secret: false, value: "999-prod" },
       { name: "GOOGLE_CLIENT_SECRET", secret: true },
     ]);
-    expect(Object.hasOwn(rows[1]!, "value")).toBe(false);
+    expect(rows[1]).not.toHaveProperty("value");
   });
 
   it("keeps a scalar's JSON type", () => {

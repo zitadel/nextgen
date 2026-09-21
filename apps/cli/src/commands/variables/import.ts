@@ -85,7 +85,10 @@ export default class VariablesImport extends BaseCommand {
           count: names.length,
           secret: flags.secret,
         },
-        pretty: renderPlan(names, where, flags.secret),
+        pretty: [
+          `Will set ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}:`,
+          ...names.map((name) => `  ${name}${flags.secret ? "  (secret)" : ""}`),
+        ].join("\n"),
       });
     }
 
@@ -114,12 +117,4 @@ export default class VariablesImport extends BaseCommand {
       pretty: `Set ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}`,
     });
   }
-}
-
-/** Names only — a value comparison is impossible for a secret. */
-function renderPlan(names: ReadonlyArray<string>, where: string, secret: boolean): string {
-  return [
-    `Will set ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}:`,
-    ...names.map((name) => `  ${name}${secret ? "  (secret)" : ""}`),
-  ].join("\n");
 }

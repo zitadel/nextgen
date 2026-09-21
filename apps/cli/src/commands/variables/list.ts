@@ -4,7 +4,7 @@ import { consola } from "consola";
 import { createZitadelClient } from "@zitadel/api/client";
 
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { listVariables, renderVariableTable } from "../../lib/variables";
+import { environmentParam, renderVariableTable, toVariableRows } from "../../lib/variables";
 import { readZitadelSecret } from "../../lib/project";
 
 /**
@@ -45,7 +45,12 @@ export default class VariablesList extends BaseCommand {
       token: secret.project_secret,
     });
 
-    const rows = await listVariables(client, secret.project_id, environment);
+    const rows = toVariableRows(
+      await client.getVariables({
+        project_id: secret.project_id,
+        ...environmentParam(environment),
+      }),
+    );
     this.recordTelemetry({ count: rows.length, scoped: environment !== undefined });
 
     return this.emit({

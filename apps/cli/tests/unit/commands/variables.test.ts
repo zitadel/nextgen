@@ -95,7 +95,7 @@ describe("variables list", () => {
     const res = await runCliForTest(["variables", "list", ...base(cwd)]);
 
     const json = parseJson(res.stdout) as { data: { variables: Array<Record<string, unknown>> } };
-    expect(Object.hasOwn(json.data.variables[0]!, "value")).toBe(false);
+    expect(json.data.variables[0]).not.toHaveProperty("value");
   });
 
   it("addresses the project level when no environment is given", async () => {

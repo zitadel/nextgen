@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 
-import type { ZitadelClient } from "@zitadel/api/client";
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 
 import { ZitadelError } from "./errors";
@@ -141,32 +140,30 @@ export function renderVariableTable(
  * references or run shell syntax — a value here is written verbatim to the
  * platform, so interpreting it would change the credential that ends up
  * stored.
+ *
+ * `Object.fromEntries` defines own properties rather than assigning them, so a
+ * line naming `__proto__` — which satisfies the platform's `^\w+$` grammar —
+ * lands as data instead of reaching the prototype setter and vanishing.
  */
 export function parseEnvFile(contents: string): Record<string, string> {
-  // Null-prototype: `__proto__` satisfies the platform's `^\w+$` name grammar,
-  // and assigning it on an ordinary object would invoke the prototype setter
-  // and drop the line while still reporting success.
-  const values: Record<string, string> = Object.create(null) as Record<string, string>;
-  for (const raw of contents.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (line === "" || line.startsWith("#")) {
-      continue;
-    }
-    const eq = line.indexOf("=");
-    if (eq <= 0) {
-      continue;
-    }
-    const name = line
-      .slice(0, eq)
-      .trim()
-      .replace(/^export\s+/, "");
-    let value = line.slice(eq + 1).trim();
-    if (value.length >= 2 && /^(".*"|'.*')$/.test(value)) {
-      value = value.slice(1, -1);
-    }
-    values[name] = value;
-  }
-  return values;
+  return Object.fromEntries(
+    contents
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line !== "" && !line.startsWith("#"))
+      .map((line) => [line, line.indexOf("=")] as const)
+      .filter(([, separator]) => separator > 0)
+      .map(([line, separator]) => {
+        const value = line.slice(separator + 1).trim();
+        return [
+          line
+            .slice(0, separator)
+            .trim()
+            .replace(/^export\s+/, ""),
+          value.length >= 2 && /^(".*"|'.*')$/.test(value) ? value.slice(1, -1) : value,
+        ];
+      }),
+  );
 }
 
 /**
@@ -183,15 +180,10 @@ export async function readEnvFile(path: string): Promise<Record<string, string>>
     const code = (error as NodeJS.ErrnoException).code;
     throw new ZitadelError(
       code === "ENOENT" ? "E_NOT_FOUND" : "E_VALIDATION",
-      `Cannot read ${path}${code === "ENOENT" ? "" : `: ${messageOf(error)}`}.`,
+      `Cannot read ${path}${code === "ENOENT" ? "" : `: ${error instanceof Error ? error.message : String(error)}`}.`,
       { hint: "Pass --file with a path to a .env-style file." },
     );
   }
-}
-
-/** The message of a thrown value, whatever was thrown. */
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -222,22 +214,6 @@ export function assertVariableName(name: string): void {
 }
 
 /**
- * Fetch every variable entered at one owner, already projected into rows.
- * Keeps the owner-addressing rule in one place rather than in the command.
- */
-export async function listVariables(
-  client: ZitadelClient,
-  projectId: string,
-  environment?: string,
-): Promise<VariableRow[]> {
-  const body = await client.getVariables({
-    project_id: projectId,
-    ...environmentParam(environment),
-  });
-  return toVariableRows(body);
-}
-
-/**
  * Read a value from stdin, for the non-interactive path
  * (`variables set NAME --secret < secret.txt`).
  *
@@ -246,6 +222,8 @@ export async function listVariables(
  * whitespace inside a value is the caller's to decide.
  */
 export async function readStdin(stream: NodeJS.ReadableStream): Promise<string> {
+  // A local accumulator: `Array.fromAsync` would read better but is not on
+  // every Node the package supports.
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
