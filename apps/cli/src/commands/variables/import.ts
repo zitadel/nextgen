@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import { confirm, isCancel } from "@clack/prompts";
 import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel/api/client";
@@ -17,9 +16,8 @@ import { readZitadelSecret } from "../../lib/project";
  * a secret reads back as held and not as a value, so a download would produce
  * a file that looks complete and is not.
  *
- * The preview lists names only. A value comparison is impossible for secrets
- * and would be misleading for the rest of the set, so the command states what
- * it will write rather than implying a diff.
+ * `--dry-run` lists the names it would write. It never lists values: a
+ * comparison is impossible for secrets, so claiming a diff would be a lie.
  */
 export default class VariablesImport extends BaseCommand {
   static override description = "Import a .env-style file into an environment or the project.";
@@ -41,14 +39,14 @@ export default class VariablesImport extends BaseCommand {
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(VariablesImport);
     // Which server and which environment are independent: the CLI talks to one
     // instance, and its environments live inside that instance. `--environment`
     // names the owner there, so it is withheld from `toMeta`, which would
     // otherwise pass it to the server resolver and let a `zitadel.json`
     // `environments.<name>.server` entry redirect the request.
+    const { flags } = await this.parse(VariablesImport);
     await this.toMeta({ ...flags, environment: undefined });
-    const { cwd, source, nonInteractive, dryRun } = this.meta;
+    const { cwd, source, dryRun } = this.meta;
     const environment = flags.environment;
 
     const owner = environmentParam(environment);
@@ -59,12 +57,10 @@ export default class VariablesImport extends BaseCommand {
     }
 
     const secret = await readZitadelSecret(cwd);
-    consola.info(`Project       ${secret.project_id}`);
-    consola.info(`Server        ${source}`);
-    consola.info(`Environment   ${ownerLabel(environment)}`);
-    consola.info(`Source        ${flags.file}`);
+    consola.info(`Project   ${secret.project_id}`);
+    consola.info(`Server    ${source}`);
 
-    const where = environment ?? "the project";
+    const where = ownerLabel(environment);
     if (names.length === 0) {
       const message = `No variables found in ${flags.file}.`;
       consola.warn(message);
@@ -75,26 +71,17 @@ export default class VariablesImport extends BaseCommand {
       });
     }
 
-    const preview = [
-      `Will set ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}:`,
-      ...names.map((name) => `  ${name}${flags.secret ? "   (secret)" : ""}`),
-    ].join("\n");
-    if (!nonInteractive) {
-      consola.log(preview);
-      const ok = await confirm({ message: "Continue?" });
-      if (isCancel(ok) || !ok) {
-        return this.emit({
-          status: "skipped",
-          reason: "cancelled",
-          data: { environment: environment ?? null, names, count: names.length },
-        });
-      }
-    }
     if (dryRun) {
       return this.emit({
-        status: "skipped",
-        reason: "dry-run",
-        data: { environment: environment ?? null, names, count: names.length },
+        status: "ok",
+        data: {
+          title: `Set ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}.`,
+          environment: environment ?? null,
+          names,
+          count: names.length,
+          secret: flags.secret,
+        },
+        pretty: renderPlan(names, where, flags.secret),
       });
     }
 
@@ -108,7 +95,9 @@ export default class VariablesImport extends BaseCommand {
       baseUrl: source,
       token: secret.project_secret,
     });
+    consola.start(`Setting ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}`);
     await client.updateVariables(body, { project_id: secret.project_id, ...owner });
+    consola.success("Import complete");
     this.recordTelemetry({
       count: names.length,
       secret: flags.secret,
@@ -121,4 +110,12 @@ export default class VariablesImport extends BaseCommand {
       pretty: `Set ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}`,
     });
   }
+}
+
+/** Names only — a value comparison is impossible for a secret. */
+function renderPlan(names: ReadonlyArray<string>, where: string, secret: boolean): string {
+  return [
+    `Will set ${names.length} variable${names.length === 1 ? "" : "s"} on ${where}:`,
+    ...names.map((name) => `  ${name}${secret ? "  (secret)" : ""}`),
+  ].join("\n");
 }

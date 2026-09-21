@@ -52,7 +52,7 @@ describe("assertVariableName", () => {
 
 describe("ownerLabel", () => {
   it("names the project level explicitly", () => {
-    expect(ownerLabel(undefined)).toBe("(project level)");
+    expect(ownerLabel(undefined)).toBe("the project");
     expect(ownerLabel("prod")).toBe("prod");
   });
 });
@@ -91,17 +91,22 @@ describe("toVariableRows", () => {
 describe("renderVariableTable", () => {
   it("prints a marker for a secret rather than an empty column", () => {
     const table = renderVariableTable(toVariableRows({ S: { secret: true }, V: "plain" }));
-    expect(table).toContain("● secret");
+    expect(table).toContain("(secret)");
     expect(table).toContain("plain");
-    expect(table).toContain("2 variables");
   });
 
-  it("singularises one row", () => {
-    expect(renderVariableTable(toVariableRows({ V: "x" }))).toContain("1 variable\n".trimEnd());
+  it("names the owner in the header, as `schemas list` does", () => {
+    expect(renderVariableTable(toVariableRows({ V: "x" }), "prod")).toContain(
+      "Variables on prod (1)",
+    );
+    expect(renderVariableTable(toVariableRows({ V: "x" }))).toContain(
+      "Variables on the project (1)",
+    );
   });
 
   it("says so when nothing is entered", () => {
-    expect(renderVariableTable([])).toBe("No variables entered at this owner.");
+    expect(renderVariableTable([], "prod")).toBe("No variables entered on prod.");
+    expect(renderVariableTable([])).toBe("No variables entered on the project.");
   });
 });
 

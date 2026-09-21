@@ -260,9 +260,9 @@ describe("variables set", () => {
 
     expect(res.exitCode).toBe(0);
     expect(called).toBe(false);
-    const json = parseJson(res.stdout) as { status: string; reason: string };
-    expect(json.status).toBe("skipped");
-    expect(json.reason).toBe("dry-run");
+    const json = parseJson(res.stdout) as { status: string; data: { title: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.title).toContain("Set TOKEN");
   });
 
   it("sets an empty value, which the scalar schema accepts", async () => {
@@ -320,6 +320,7 @@ describe("variables delete", () => {
       "-e",
       "prod",
       "--non-interactive",
+      "--force",
       ...base(cwd),
     ]);
 
@@ -343,15 +344,41 @@ describe("variables delete", () => {
       "delete",
       "SUPPORT_EMAIL",
       "--non-interactive",
+      "--force",
       "--dry-run",
       ...base(cwd),
     ]);
 
     expect(res.exitCode).toBe(0);
     expect(called).toBe(false);
-    const json = parseJson(res.stdout) as { status: string; reason: string };
-    expect(json.status).toBe("skipped");
-    expect(json.reason).toBe("dry-run");
+    const json = parseJson(res.stdout) as { status: string; data: { title: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.title).toContain("Delete SUPPORT_EMAIL");
+  });
+
+  it("refuses to delete without --force in non-interactive mode", async () => {
+    const cwd = await makeProject();
+    let called = false;
+    server.use(
+      http.delete("*/variables/:name", () => {
+        called = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    const res = await runCliForTest([
+      "variables",
+      "delete",
+      "SUPPORT_EMAIL",
+      "--non-interactive",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(called).toBe(false);
+    const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.next_commands.join(" ")).toContain("--force");
   });
 });
 
@@ -487,7 +514,8 @@ describe("variables import", () => {
 
     expect(res.exitCode).toBe(0);
     expect(called).toBe(false);
-    const json = parseJson(res.stdout) as { status: string; reason: string };
-    expect(json.reason).toBe("dry-run");
+    const json = parseJson(res.stdout) as { status: string; data: { names: string[] } };
+    expect(json.status).toBe("ok");
+    expect(json.data.names).toEqual(["A"]);
   });
 });

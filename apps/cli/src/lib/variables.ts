@@ -53,7 +53,7 @@ export function environmentParam(environment?: string): { environment_name?: str
 
 /** How an owner is named in output: an environment, or the project itself. */
 export function ownerLabel(environment?: string): string {
-  return environment ?? "(project level)";
+  return environment ?? "the project";
 }
 
 /**
@@ -72,25 +72,38 @@ export function toVariableRows(body: GetVariables200): VariableRow[] {
 }
 
 /**
- * Render rows as the plain-text table. Secrets print a marker rather than a
+ * Render rows as the plain-text table, carrying the owner in its header the way
+ * `schemas list` carries its objectType. Secrets print a marker rather than a
  * value: there is nothing to print, and a blank column would read as an empty
  * value rather than as a withheld one.
  */
-export function renderVariableTable(rows: ReadonlyArray<VariableRow>): string {
+export function renderVariableTable(
+  rows: ReadonlyArray<VariableRow>,
+  environment?: string,
+): string {
+  const owner = ownerLabel(environment);
   if (rows.length === 0) {
-    return "No variables entered at this owner.";
+    return `No variables entered on ${owner}.`;
   }
-  const nameCol = Math.max("NAME".length, ...rows.map((r) => r.name.length));
+  const header = `Variables on ${owner} (${rows.length})`;
+  const nameCol = Math.max("name".length, ...rows.map((r) => r.name.length));
+  const valueCol = Math.max(
+    "value".length,
+    ...rows.map((r) => (r.secret ? SECRET_MARKER.length : String(r.value).length)),
+  );
   const body = rows.map(
-    (r) => `${r.name.padEnd(nameCol)}  ${r.secret ? "● secret" : String(r.value)}`,
+    (r) => `${r.name.padEnd(nameCol)}  ${r.secret ? SECRET_MARKER : String(r.value)}`,
   );
   return [
-    `${"NAME".padEnd(nameCol)}  VALUE`,
+    header,
+    `${"name".padEnd(nameCol)}  ${"value".padEnd(valueCol)}`,
+    `${"-".repeat(nameCol)}  ${"-".repeat(valueCol)}`,
     ...body,
-    "",
-    `${rows.length} variable${rows.length === 1 ? "" : "s"}`,
   ].join("\n");
 }
+
+/** Stands in for a secret's value, which the platform never discloses. */
+const SECRET_MARKER = "(secret)";
 
 /**
  * Read a `.env`-style file into name/value pairs.

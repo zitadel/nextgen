@@ -4,7 +4,7 @@ import { consola } from "consola";
 import { createZitadelClient } from "@zitadel/api/client";
 
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { listVariables, ownerLabel, renderVariableTable } from "../../lib/variables";
+import { listVariables, renderVariableTable } from "../../lib/variables";
 import { readZitadelSecret } from "../../lib/project";
 
 /**
@@ -27,20 +27,19 @@ export default class VariablesList extends BaseCommand {
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(VariablesList);
     // Which server and which environment are independent: the CLI talks to one
     // instance, and its environments live inside that instance. `--environment`
     // names the owner there, so it is withheld from `toMeta`, which would
     // otherwise pass it to the server resolver and let a `zitadel.json`
     // `environments.<name>.server` entry redirect the request.
+    const { flags } = await this.parse(VariablesList);
     await this.toMeta({ ...flags, environment: undefined });
     const { cwd, source } = this.meta;
     const environment = flags.environment;
 
     const secret = await readZitadelSecret(cwd);
-    consola.info(`Project       ${secret.project_id}`);
-    consola.info(`Server        ${source}`);
-    consola.info(`Environment   ${ownerLabel(environment)}`);
+    consola.info(`Project   ${secret.project_id}`);
+    consola.info(`Server    ${source}`);
     const client = createZitadelClient({
       baseUrl: source,
       token: secret.project_secret,
@@ -56,7 +55,7 @@ export default class VariablesList extends BaseCommand {
         variables: rows,
         count: rows.length,
       },
-      pretty: renderVariableTable(rows),
+      pretty: renderVariableTable(rows, environment),
     });
   }
 }

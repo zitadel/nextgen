@@ -1,5 +1,5 @@
 import { Args, Flags } from "@oclif/core";
-import { isCancel, password, text } from "@clack/prompts";
+import { cancel, isCancel, password, text } from "@clack/prompts";
 import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel/api/client";
@@ -11,7 +11,8 @@ import { publicCliCommand } from "../../lib/public-cli";
 import { readZitadelSecret } from "../../lib/project";
 
 /**
- * The `variables set` topic command — enter or replace one variable at one owner.
+ * The `variables set` topic command — enter or replace one variable at one
+ * owner.
  *
  * The value never comes from a flag. It is prompted for, or read from stdin
  * when scripting, so a credential cannot land in shell history, a process
@@ -40,12 +41,12 @@ export default class VariablesSet extends BaseCommand {
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariablesSet);
     // Which server and which environment are independent: the CLI talks to one
     // instance, and its environments live inside that instance. `--environment`
     // names the owner there, so it is withheld from `toMeta`, which would
     // otherwise pass it to the server resolver and let a `zitadel.json`
     // `environments.<name>.server` entry redirect the request.
+    const { args, flags } = await this.parse(VariablesSet);
     await this.toMeta({ ...flags, environment: undefined });
     const { cwd, source, nonInteractive, dryRun, cliVersion } = this.meta;
     const environment = flags.environment;
@@ -55,35 +56,39 @@ export default class VariablesSet extends BaseCommand {
     // Validate the owner before prompting: failing after the user has typed a
     // secret would make them type it again.
     const owner = environmentParam(environment);
+    const where = ownerLabel(environment);
 
     const secret = await readZitadelSecret(cwd);
-    consola.info(`Project       ${secret.project_id}`);
-    consola.info(`Server        ${source}`);
-    consola.info(`Environment   ${ownerLabel(environment)}`);
+    consola.info(`Project   ${secret.project_id}`);
+    consola.info(`Server    ${source}`);
 
-    // A value never comes from a flag, so a scripted run has to pipe it in. A
+    if (dryRun) {
+      return this.emit({
+        status: "ok",
+        data: {
+          title: `Set ${name} on ${where}.`,
+          environment: environment ?? null,
+          name,
+          secret: flags.secret,
+        },
+      });
+    }
+
+    // A value never comes from a flag, so a scripted run has to pipe one in. A
     // terminal on stdin means nothing was piped: fail rather than block on a
     // read that would never end.
     if (nonInteractive && process.stdin.isTTY) {
       throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
         hint: `Pipe the value in: ${pipeHint(name, cliVersion)}`,
+        nextCommands: [pipeHint(name, cliVersion)],
       });
     }
     // An empty string is a value the scalar schema accepts, and `import`
     // already sends `A=` as one. Only an absent input is an error, which the
-    // stdin guard above and the prompt's own cancel signal cover, so `""`
-    // passes through rather than being rejected as missing.
+    // stdin guard above and the prompt's own cancel signal cover.
     const value = nonInteractive
       ? await readStdin(process.stdin)
       : await promptValue(name, flags.secret);
-
-    if (dryRun) {
-      return this.emit({
-        status: "skipped",
-        reason: "dry-run",
-        data: { environment: environment ?? null, name, secret: flags.secret },
-      });
-    }
 
     const client = createZitadelClient({
       baseUrl: source,
@@ -95,7 +100,6 @@ export default class VariablesSet extends BaseCommand {
     );
     this.recordTelemetry({ secret: flags.secret, scoped: environment !== undefined });
 
-    const where = environment ?? "the project";
     return this.emit({
       status: "ok",
       data: { environment: environment ?? null, name, secret: flags.secret },
@@ -118,9 +122,8 @@ async function promptValue(name: string, secret: boolean): Promise<string> {
     ? await password({ message: `Value for ${name}` })
     : await text({ message: `Value for ${name}` });
   if (isCancel(answer)) {
-    throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
-      hint: "Enter a value at the prompt.",
-    });
+    cancel("Set cancelled.");
+    throw new ZitadelError("E_VALIDATION", "Set cancelled by user");
   }
   return String(answer ?? "");
 }
