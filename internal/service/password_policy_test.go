@@ -188,3 +188,15 @@ func TestSetPasswordActionAppliesPolicy(t *testing.T) {
 	require.True(t, ok, "expected a domain error, got %v", err)
 	require.Equal(t, "user.password_policy_violation", derr.Code)
 }
+
+func TestPasswordTemplateFloorMatchesDomainConstant(t *testing.T) {
+	t.Parallel()
+	engine, err := policy.New()
+	require.NoError(t, err)
+	tmpl, err := engine.Template(service.PasswordSaveOperation)
+	require.NoError(t, err)
+	minimum := tmpl.Config["min_length"].Minimum
+	require.NotNil(t, minimum)
+	require.EqualValues(t, domain.PasswordMinLengthFloor, *minimum,
+		"the template floor and the domain fallback must agree")
+}

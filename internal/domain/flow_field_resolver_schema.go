@@ -156,7 +156,7 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		challenge = FlowFieldChallengePassword
 	}
 
-	validation := &FlowFieldValidation{MinLength: 8}
+	validation := &FlowFieldValidation{MinLength: PasswordMinLengthFloor}
 	if field.AuthMethod() == "password" && passwordValidation != nil {
 		validation = passwordValidation()
 	}
