@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,10 +36,14 @@ func TestCompileListIDPConnectionsNamesTheJoinAlias(t *testing.T) {
 	})
 
 	var compiler statementCompiler
-	require.NoError(t, compileList(ctx, &compiler, idpConnectionQuery, opts, idpconnection.Schema, "c", "id"))
+	require.NoError(t, compileList(ctx, &compiler, idpConnectionQuery, opts, idpconnection.Schema, "c", "id", newestIDPRevision))
 
 	sql := compiler.String()
 	assert.Contains(t, sql, "c.id")
 	assert.NotContains(t, sql, "zitadel_nextgen.idp_connections.id")
 	assert.Contains(t, sql, "ORDER BY c.created_at, c.id")
+	// The newest-revision anti-join correlates on the joined revision alias and
+	// lands in the same WHERE as the filter, the cursor and the authz predicate.
+	assert.Contains(t, sql, "newer.connection_id = r.connection_id")
+	assert.Less(t, strings.Index(sql, "NOT EXISTS"), strings.Index(sql, "ORDER BY"))
 }

@@ -1,7 +1,8 @@
 -- +goose Up
 -- An identity provider connection is strictly revisioned: every edit appends a
--- revision and moves the head pointer here, so an in-flight auth attempt or a
--- release can pin the revision it started on and keep reading it unchanged.
+-- revision, so an in-flight auth attempt or a release can pin the revision it
+-- started on and keep reading it unchanged. This table carries identity only:
+-- nothing here records which revision is newest, per ADR 063 section 7.
 -- Identity links key on the connection id; schemas and flow definitions
 -- reference the slug.
 CREATE TABLE zitadel_nextgen.idp_connections (
@@ -9,21 +10,19 @@ CREATE TABLE zitadel_nextgen.idp_connections (
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
     , id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , slug TEXT COLLATE "C" NOT NULL CHECK (slug <> '')
-    -- Head pointer; deliberately no FK: the revision row points back here and
-    -- closing the loop would make the paired insert order-impossible.
-    , latest_revision_id TEXT COLLATE "C" NOT NULL CHECK (latest_revision_id <> '')
-    -- No updated_at: a connection's last edit is the creation of the revision
-    -- its head names, so every read serves that revision's created_at and a
-    -- column here could only disagree with it.
+    -- No updated_at: a connection's last edit is the creation of its newest
+    -- revision, so every read serves that revision's created_at and a column
+    -- here could only disagree with it.
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
     , PRIMARY KEY (project_id, id)
 );
 
--- The only user-reachable unique constraint besides the PK, which the PK cannot
--- collide on (the id is dialect-minted). Spanner reports empty constraint
--- names, so a uniqueness violation is unambiguous while this is the single
--- candidate.
+-- The only user-reachable unique constraint on this table besides the PK, which
+-- the PK cannot collide on (the id is dialect-minted). Spanner reports empty
+-- constraint names, so a uniqueness violation is unambiguous while this is the
+-- single candidate a create can trip; the revisions table has one of its own,
+-- which only a revise can trip.
 CREATE UNIQUE INDEX uq_idp_connections_project_slug
     ON zitadel_nextgen.idp_connections (project_id, slug);
 
@@ -32,7 +31,7 @@ CREATE INDEX idx_idp_connections_project_created_at
     ON zitadel_nextgen.idp_connections (project_id, created_at, id);
 
 -- One revision of one connection. Rows are never updated: a revision is the
--- immutable thing a pointer pins.
+-- immutable thing a release pointer or an auth attempt pins.
 CREATE TABLE zitadel_nextgen.idp_connection_revisions (
     project_id TEXT COLLATE "C" NOT NULL
     , id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
@@ -51,15 +50,17 @@ CREATE TABLE zitadel_nextgen.idp_connection_revisions (
         ON DELETE CASCADE
 );
 
--- Reading a connection's history walks the child rows by parent, and the
--- revision keyset rides along so the same index also carries the newest-first
+-- Two revisions of one connection stamped at the same instant have no newest,
+-- so uniqueness rules that out (ADR 063 section 7): a second write in the same
+-- instant fails loudly instead of one of the two being picked at random. The
+-- same index is the seek the newest-revision anti-join uses and the newest-first
 -- walk the history list pages on: a btree scans backward, so the ascending
 -- definition covers both directions.
-CREATE INDEX idx_idp_connection_revisions_connection
-    ON zitadel_nextgen.idp_connection_revisions (project_id, connection_id, created_at, id);
+CREATE UNIQUE INDEX uq_idp_connection_revisions_connection_created_at
+    ON zitadel_nextgen.idp_connection_revisions (project_id, connection_id, created_at);
 
 -- +goose Down
-DROP INDEX IF EXISTS zitadel_nextgen.idx_idp_connection_revisions_connection;
+DROP INDEX IF EXISTS zitadel_nextgen.uq_idp_connection_revisions_connection_created_at;
 DROP TABLE IF EXISTS zitadel_nextgen.idp_connection_revisions;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_idp_connections_project_created_at;
 DROP INDEX IF EXISTS zitadel_nextgen.uq_idp_connections_project_slug;

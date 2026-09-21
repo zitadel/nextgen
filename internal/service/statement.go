@@ -158,6 +158,10 @@ type ReleaseStatements interface {
 // revisions. Connections are strictly revisioned: an edit never rewrites a
 // revision, so an auth attempt or a release can pin one and keep reading the
 // configuration it started with.
+//
+// Nothing records which revision is newest (ADR 063 §7). The newest revision of
+// a connection is the one with the greatest creation time among its own, which
+// is what every head read here serves.
 type IDPConnectionStatements interface {
 	Statements
 	// CreateIDPConnection mints the connection and first revision ids, and
@@ -166,12 +170,20 @@ type IDPConnectionStatements interface {
 	// which is the connection's own birth instant.
 	// A slug already taken in the project surfaces as *database.UniqueError.
 	CreateIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
-	// ReviseIDPConnection appends a revision holding entity.Document and moves
-	// the connection's head pointer to it, in one transaction. The revision id
-	// is always freshly minted, so passing back an entity read from a get does
-	// not overwrite the revision it was read from. Concurrent revisions are
-	// last-write-wins on the head; both revisions stay readable by id.
-	// UpdatedAt is the appended revision's creation time.
+	// ReviseIDPConnection appends a revision holding entity.Document. There is
+	// no head to move, so this is a single insert. The revision id is always
+	// freshly minted, so passing back an entity read from a get does not
+	// overwrite the revision it was read from: RevisionID and UpdatedAt come
+	// back from the insert, while CreatedAt is left as the caller had it,
+	// because the entity normally arrives from a get that already carries the
+	// connection's birth.
+	//
+	// A connection that does not exist is a *database.NoRowFoundError. Two
+	// revisions of one connection created in the same instant have no newest,
+	// so the second fails with *database.UniqueError rather than one of the two
+	// being picked at random; Spanner reports empty constraint names, so a
+	// caller tells that apart from the slug collision CreateIDPConnection
+	// reports by which of the two it called.
 	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
 	GetIDPConnectionByID(ctx context.Context, projectID, id string) (*domain.IDPConnection, error)
 	GetIDPConnectionBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error)

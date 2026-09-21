@@ -111,8 +111,8 @@ func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 		assert.Equal(t, entity.ID, bySlug.ID)
 		assert.Equal(t, entity.RevisionID, bySlug.RevisionID)
 
-		// The pinned read serves the same revision the head names, since there
-		// is only one so far.
+		// The pinned read serves the same revision the get does, since there is
+		// only one so far.
 		revision, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
 		require.NoError(t, err)
 		assert.Equal(t, entity.ID, revision.ID)
@@ -121,7 +121,7 @@ func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 
 		// The connection carries no updated_at of its own, so both reads serve
 		// the same revision row's created_at and cannot drift apart.
-		assert.True(t, byID.UpdatedAt.Equal(revision.UpdatedAt), "the head and the pinned read must report the same revision timestamp")
+		assert.True(t, byID.UpdatedAt.Equal(revision.UpdatedAt), "the get and the pinned read must report the same revision timestamp")
 		assert.True(t, byID.UpdatedAt.Equal(entity.UpdatedAt), "create must report the timestamp a read serves")
 	})
 }
@@ -165,10 +165,11 @@ func TestIDPConnectionStatements_SlugReusableAcrossProjects(t *testing.T) {
 	})
 }
 
-// Revising appends: the head moves to the new revision while the old one stays
-// readable and unchanged, which is what lets an in-flight auth attempt pin a
-// revision and keep reading the configuration it started with.
-func TestIDPConnectionStatements_ReviseAppendsAndMovesHead(t *testing.T) {
+// Revising appends: the reads move to the new revision because it carries the
+// greater created_at, while the old one stays readable and unchanged, which is
+// what lets an in-flight auth attempt pin a revision and keep reading the
+// configuration it started with.
+func TestIDPConnectionStatements_ReviseAppendsRevision(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		slug := "entra-" + uniqueSuffix(t)
@@ -202,18 +203,18 @@ func TestIDPConnectionStatements_ReviseAppendsAndMovesHead(t *testing.T) {
 		assert.Equal(t, slug, pinned.Slug)
 		assert.True(t, pinned.CreatedAt.Equal(byID.CreatedAt), "a revision repeats the connection's birth rather than its own")
 
-		// The head's updated_at is the new revision's creation time, to the
+		// The get's updated_at is the new revision's creation time, to the
 		// instant: it is read off the same row either way.
-		head, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
+		newest, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
 		require.NoError(t, err)
-		assert.True(t, byID.UpdatedAt.Equal(head.UpdatedAt), "the head read must report the revision it serves")
-		assert.False(t, byID.UpdatedAt.Before(pinned.UpdatedAt), "an appended revision cannot predate the one it supersedes")
+		assert.True(t, byID.UpdatedAt.Equal(newest.UpdatedAt), "the get must report the revision it serves")
+		assert.True(t, byID.UpdatedAt.After(pinned.UpdatedAt), "the newest revision is the one with the greater created_at")
 	})
 }
 
-// The history read pages revision rows rather than heads: each row repeats the
-// connection's identity and carries the document, revision id and creation time
-// of the revision it stands for, newest first.
+// The history read pages every revision rather than only the newest: each row
+// repeats the connection's identity and carries the document, revision id and
+// creation time of the revision it stands for, newest first.
 func TestIDPConnectionStatements_ListRevisionsNewestFirst(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -276,10 +277,12 @@ func TestIDPConnectionStatements_ListRevisionsNewestFirst(t *testing.T) {
 	})
 }
 
-// Two revisions racing on the same connection are last-write-wins on the head:
-// both revision rows survive and stay readable by id, and the head settles on
-// whichever transaction committed last.
-func TestIDPConnectionStatements_ConcurrentReviseLastWriteWins(t *testing.T) {
+// Two revises racing on one connection have no head pointer to fight over: each
+// appends a row, and the newest is whichever carries the greater created_at
+// (ADR 063 §7). Two rows on the same instant would leave no newest at all, so
+// the unique index rules that out and the loser of such a tie sees a
+// *database.UniqueError instead of a coin flip.
+func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		v1Document := idpConnectionDocument("https://v1.example.com")
@@ -292,10 +295,9 @@ func TestIDPConnectionStatements_ConcurrentReviseLastWriteWins(t *testing.T) {
 		firstRevisionID := entity.RevisionID
 
 		// Each writer revises its own copy of the entity: the statement writes
-		// RevisionID, CreatedAt and UpdatedAt back onto the entity from inside
-		// the transaction callback, and Spanner replays that callback on an
-		// ABORTED retry, so a shared struct would be a data race rather than a
-		// test of the storage layer.
+		// RevisionID and UpdatedAt back onto the entity, and Spanner replays a
+		// transaction callback on an ABORTED retry, so a shared struct would be
+		// a data race rather than a test of the storage layer.
 		var (
 			wg       sync.WaitGroup
 			entities [2]domain.IDPConnection
@@ -310,23 +312,24 @@ func TestIDPConnectionStatements_ConcurrentReviseLastWriteWins(t *testing.T) {
 		}
 		wg.Wait()
 
+		// The first revision plus every writer that got a row in.
+		landed := map[string][]byte{firstRevisionID: v1Document}
 		for i := range entities {
-			// A dialect that surfaces a retryable busy or serialization error
-			// here rather than handling it internally breaks the last-write-wins
-			// contract for its callers.
-			require.NoError(t, errs[i], "writer %d", i)
+			if errs[i] != nil {
+				// The same-instant tie is the only sanctioned failure. A dialect
+				// that surfaces a retryable busy or serialization error here
+				// rather than handling it internally breaks the contract for its
+				// callers.
+				assert.ErrorIs(t, errs[i], new(database.UniqueError), "writer %d", i)
+				continue
+			}
+			landed[entities[i].RevisionID] = documents[i]
 		}
-		assert.NotEqual(t, entities[0].RevisionID, entities[1].RevisionID, "each revise mints its own revision id")
-		assert.NotEqual(t, firstRevisionID, entities[0].RevisionID)
-		assert.NotEqual(t, firstRevisionID, entities[1].RevisionID)
+		require.Greater(t, len(landed), 1, "both writers lost the tie; at least one revise has to land")
 
-		// All three revisions stay readable and keep their own document, which
-		// is what lets an in-flight auth attempt hold a pin through a race.
-		for revisionID, want := range map[string][]byte{
-			firstRevisionID:        v1Document,
-			entities[0].RevisionID: documents[0],
-			entities[1].RevisionID: documents[1],
-		} {
+		// Every revision that landed stays readable and keeps its own document,
+		// which is what lets an in-flight auth attempt hold a pin through a race.
+		for revisionID, want := range landed {
 			pinned, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, revisionID)
 			require.NoError(t, err, "revision %q", revisionID)
 			assert.Equal(t, entity.ID, pinned.ID)
@@ -335,17 +338,58 @@ func TestIDPConnectionStatements_ConcurrentReviseLastWriteWins(t *testing.T) {
 
 		byID, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, entity.ID)
 		require.NoError(t, err)
-		// Which writer wins is commit order, so the head only has to name one of
-		// the two and serve that one's document.
-		winner := slices.IndexFunc(entities[:], func(e domain.IDPConnection) bool { return e.RevisionID == byID.RevisionID })
-		require.NotEqual(t, -1, winner, "head %q is neither concurrent revision", byID.RevisionID)
-		assert.JSONEq(t, string(documents[winner]), string(byID.Document))
+		assert.Contains(t, landed, byID.RevisionID, "the get serves a revision nobody wrote")
+		assert.NotEqual(t, firstRevisionID, byID.RevisionID, "a revise that landed supersedes the first revision")
+		assert.JSONEq(t, string(landed[byID.RevisionID]), string(byID.Document))
 		assert.False(t, byID.UpdatedAt.Before(byID.CreatedAt), "revising must not move updated_at behind created_at")
+
+		// The get and the history read the same rows and order them the same
+		// way, so they cannot disagree about which revision is newest.
+		history, err := d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, entity.ID, database.Page[domain.IDPConnectionField]{})
+		require.NoError(t, err)
+		require.Len(t, history.Items, len(landed), "the history pages exactly the revisions that landed")
+		assert.Equal(t, byID.RevisionID, history.Items[0].RevisionID, "the newest-first page must open on what the get serves")
+		assert.True(t, byID.UpdatedAt.Equal(history.Items[0].UpdatedAt))
+		assert.JSONEq(t, string(byID.Document), string(history.Items[0].Document))
 	})
 }
 
-// Revising a connection that is not there must fail before the revision row is
-// written, rather than leaving a revision no head points at.
+// Create writes the connection row, its first revision and the resource-scope
+// index row in one transaction, so a failure in any of them must leave nothing
+// behind: a caller that retries would otherwise hit the slug uniqueness of a
+// connection that was never really created.
+func TestIDPConnectionStatements_FailedCreateLeavesNothing(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		slug := "rollback-" + uniqueSuffix(t)
+
+		// Valid JSON of the wrong shape: the connection insert succeeds and the
+		// revision's document CHECK (jsonb_typeof / JSON_TYPE / json_type =
+		// 'object') rejects the array, in every dialect.
+		entity := &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: []byte(`[]`)}
+		require.Error(t, d.stmts.CreateIDPConnection(t.Context(), entity))
+		// Both ids are minted before the write, so the rows they would have
+		// named are the ones to go looking for.
+		require.NotEmpty(t, entity.ID)
+		require.NotEmpty(t, entity.RevisionID)
+
+		_, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, entity.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.GetIDPConnectionBySlug(t.Context(), projectID, slug)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "the slug must be free for the retry")
+
+		_, err = d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindIDPConnection, projectID, entity.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "the management gate must not resolve a connection that was rolled back")
+	})
+}
+
+// Revising a connection that is not there must fail rather than leave a
+// revision hanging off no connection: the composite foreign key is what catches
+// it, and storage reports that as a clean not-found.
 func TestIDPConnectionStatements_ReviseUnknownIsNoRowFound(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -418,8 +462,8 @@ func TestIDPConnectionStatements_ListIsProjectScopedOldestFirst(t *testing.T) {
 	})
 }
 
-// A list row carries the document of the revision the head names, not the one
-// the connection was created with.
+// A list row carries the document of the newest revision, not the one the
+// connection was created with.
 func TestIDPConnectionStatements_ListServesLatestDocument(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)

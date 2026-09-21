@@ -683,11 +683,12 @@ func battleReleases(t *testing.T, d dialect) {
 	})
 }
 
-// battleIDPConnections is the head-pointer analogue of battleJSONSchemasLatest:
-// the list joins each connection to the revision its head names, so a page
-// boundary is where that join and the keyset predicate would fall out of step.
-// Every connection here has a superseded revision, so a drain that returns a
-// stale row — or drops a current one — is a broken composition.
+// battleIDPConnections is the newest-revision analogue of
+// battleJSONSchemasLatest: the list joins each connection to all of its
+// revisions and an anti-join keeps only the newest, so a page boundary is where
+// that composition and the keyset predicate would fall out of step. Every
+// connection here has a superseded revision, so a drain that returns a stale
+// row — or drops a current one — is a broken composition.
 func battleIDPConnections(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
@@ -738,11 +739,12 @@ func battleIDPConnections(t *testing.T, d dialect) {
 	})
 }
 
-// battleIDPConnectionRevisions pages one connection's history, which inverts
-// the head join: the keyset sits on the revision row while every identity
-// column comes from the connection joined to it. A page boundary is where that
-// inversion and the keyset predicate would fall out of step, and each row's id
-// is a revision id rather than a connection id.
+// battleIDPConnectionRevisions pages one connection's history, which is the
+// same join without the newest-revision anti-join: the keyset sits on the
+// revision row while every identity column comes from the connection joined to
+// it. A page boundary is where that inversion and the keyset predicate would
+// fall out of step, and each row's id is a revision id rather than a connection
+// id.
 func battleIDPConnectionRevisions(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)

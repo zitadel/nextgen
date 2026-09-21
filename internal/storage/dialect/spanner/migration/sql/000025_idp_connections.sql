@@ -2,18 +2,16 @@
 -- +goose Up
 -- +goose StatementBegin
 -- An identity provider connection is strictly revisioned; see the postgres
--- migration for why the head is a pointer column rather than an ordering, and
--- why it carries no foreign key.
+-- migration for why this table is identity only and nothing records which
+-- revision is newest.
 CREATE TABLE idp_connections (
     project_id          STRING(MAX) NOT NULL,
     id                  STRING(MAX) NOT NULL,
     slug                STRING(MAX) NOT NULL,
-    latest_revision_id  STRING(MAX) NOT NULL,
     -- No updated_at; see the postgres migration.
     created_at          TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT chk_idp_connections_id CHECK (id <> ''),
     CONSTRAINT chk_idp_connections_slug CHECK (slug <> ''),
-    CONSTRAINT chk_idp_connections_latest_revision_id CHECK (latest_revision_id <> ''),
     CONSTRAINT fk_idp_connections_project
         FOREIGN KEY (project_id)
         REFERENCES projects (id)
@@ -48,18 +46,21 @@ CREATE TABLE idp_connection_revisions (
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 -- +goose StatementBegin
--- The parent walk plus the revision keyset, declared in the direction the
--- history list pages: Spanner serves an ORDER BY from an index only when the
--- declared key order matches it, so the newest-first walk has to be spelled out
--- here rather than left to a backward scan the way postgres and sqlite do.
-CREATE INDEX idx_idp_connection_revisions_connection
-    ON idp_connection_revisions (project_id, connection_id, created_at DESC, id DESC)
+-- Two revisions of one connection stamped at the same instant have no newest,
+-- so uniqueness rules that out; see the postgres migration. created_at is
+-- declared DESC in the direction the history list pages: Spanner serves an
+-- ORDER BY from an index only when the declared key order matches it, so the
+-- newest-first walk has to be spelled out here rather than left to a backward
+-- scan the way postgres and sqlite do. Direction does not change what the index
+-- holds unique.
+CREATE UNIQUE INDEX uq_idp_connection_revisions_connection_created_at
+    ON idp_connection_revisions (project_id, connection_id, created_at DESC)
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_idp_connection_revisions_connection
+DROP INDEX IF EXISTS uq_idp_connection_revisions_connection_created_at
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS idp_connection_revisions

@@ -1,5 +1,5 @@
 // Package idpconnection binds the identity provider connection read:
-// connections joined to the revision their head pointer names.
+// connections joined to their revisions.
 package idpconnection
 
 import (
@@ -16,9 +16,10 @@ import (
 //
 // RevisionID and UpdatedAt bind the revision row rather than the connection:
 // every read serves the joined revision, so a connection's updated_at is the
-// instant the revision it hands back was created. On the head join that is the
-// revision the pointer names; on the revision list it is the row being paged,
-// which is why both columns can also carry the keyset.
+// instant the revision it hands back was created. On a head read that is the
+// newest revision, which the anti-join picks out by its created_at rather than
+// any stored pointer (ADR 063 §7); on the revision list it is the row being
+// paged, which is why both columns can also carry the keyset.
 var Schema = database.NewSchema(map[domain.IDPConnectionField]database.FieldBinding[domain.IDPConnection]{
 	domain.IDPConnectionFieldProjectID: {
 		SQLName:  "c.project_id",
