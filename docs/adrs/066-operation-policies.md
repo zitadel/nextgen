@@ -1,7 +1,7 @@
-# ADR 059: Operation Policies
+# ADR 066: Operation Policies
 
 > **Status:** Draft
-> **Date:** 2026-08-28
+> **Date:** 2026-08-28 (revised 2026-09-21)
 > **Context:** [#383](https://github.com/zitadel/nextgen/issues/383) asks for the
 > settings-and-policies architecture; [#899](https://github.com/zitadel/nextgen/issues/899)
 > defines the product model; [#898](https://github.com/zitadel/nextgen/issues/898)
@@ -9,7 +9,8 @@
 > **Related:** [ADR 020](020-credentials-out-of-user-schema.md),
 > [ADR 035](035-configuration-environments.md),
 > [ADR 042](042-scaffolded-file-ownership-and-drift-detection.md),
-> [ADR 048](048-wide-events-internal-audit-primitive.md)
+> [ADR 048](048-wide-events-internal-audit-primitive.md),
+> [ADR 065](065-audience-scoped-configuration.md)
 
 ## Context
 
@@ -19,15 +20,15 @@ This ADR proposes the data model and enforcement mechanism for policies in nextg
 
 ### Zitadel previous versions
 
-There are many controls, but they are fragmented, inconsistently named, and mix capability configuration with security enforcement. 
+There are many controls, but they are fragmented, inconsistently named, and mix capability configuration with security enforcement.
 
 Some work was planned as part of ([zitadel#11596](https://github.com/zitadel/zitadel/issues/11596)) to better organize and split settings and policies.
 
 ### Nextgen
 
 No defined settings / policy model. Some configuration is hard-coded, for example:
-- Password minimum length: [`MinLength: 8`](internal/domain/flow_field_resolver_schema.go)
-- Passkey user verification is a fixed [`"preferred"`](internal/domain/flow_state_machine.go)
+- Password minimum length: [`MinLength: 8`](../../internal/domain/flow_field_resolver_schema.go)
+- Passkey user verification is a fixed [`"preferred"`](../../internal/domain/flow_state_machine.go)
 - Failed authentication attempts are recorded "for rate-limiting purposes" with no threshold reading them.
 
 The first priority is to introduce proper password policies ([#898](https://github.com/zitadel/nextgen/issues/898)):
@@ -48,105 +49,142 @@ In the design documents, these are some of the capabilities expected from the po
 
 ## Proposal
 
-**A policy attaches to one domain operation.** The policy holds all the **configuration** needed at that **operation** and the **rule** that turns that configuration into a **decision**, always evaluated **before** the operation runs.
+**A policy attaches to one domain operation.** It is split in two, following the
+template-and-instance shape that policy-as-code systems converge on (Gatekeeper's
+`ConstraintTemplate`/`Constraint`, Kubernetes' `ValidatingAdmissionPolicy`/`Binding`,
+Azure Policy's definition/assignment):
+
+- The **template** is Zitadel-defined and ships with the server. It declares, for
+  one operation, which configuration a developer may set, which request context
+  the rules receive, and the **rules** themselves: a list of named boolean
+  expressions in [CEL](https://cel.dev) over `config` and context.
+- The **instance** is developer-authored and lives in the release. It carries the
+  configuration values, the audience the policy applies to
+  ([ADR 065](065-audience-scoped-configuration.md)), and the enforcement mode.
+
+A policy is always evaluated **before** its operation runs. Every rule must hold
+for the operation to proceed.
 
 ### Terminology
 
 - **Operation**: a domain action that can carry a policy, such as `user.password.save` (static list defined by Zitadel)
-- **Policy**: everything attached to one operation, the configuration and rule together
-- **Policy configuration**: the values a developer authors (JSON, revisioned, in the release)
-- **Policy rule**: the logic turning configuration + context into a decision (Go or OPA/Rego; project bootstrapped with defaults, a developer may override it)
-- **Decision**: what a policy rule returns for one evaluation — `allow`, `deny`, or `require` (see [Decisions](#decisions))
+- **Template**: the Zitadel-defined half of a policy for one operation: config schema, context schema, rules
+- **Instance** (or just *policy*): the developer-authored half: config values, audience, enforcement mode; a revisioned resource in the release
+- **Rule**: one named CEL expression in a template that must evaluate to `true`
+- **Decision**: what evaluating an instance against a request context returns — `allow` or `deny` with the violated rules
 
 ### Data Model
 
-Each policy guards one domain operation and carries its own configuration.
+#### Instance
+
+Each instance guards one operation and carries its own configuration under `config`.
+The envelope (`kind`, `operation`, `audience`, `enforcement`) is the same for every
+operation; `config` is what the operation's template defines.
 
 ```json
-// .zitadel/policies/user.password.save.json
+// .zitadel/policies/user.password.save.json — the project default
 {
   "kind": "policy",
-  "operation": "user.password.save", // the domain operation this policy guards
-
-  // configuration specific to this policy
-  "min_length": 15,
-  "max_length": 256,
-  "history_depth": 5,
-  "reject_current": true
-}
-```
-
-```json
-// .zitadel/policies/user.password.verify.json (illustrative)
-{
-  "kind": "policy",
-  "operation": "user.password.verify",
-
-  "max_attempts": 10,
-  "lockout_duration": "30m"
-}
-```
-
-#### Definition by JSON Schema
-
-Each policy follows a JSON Schema, which is the source of truth for which settings that operation accepts and which values are legal.
-
-Example of JSON Schema for policy definition for `user.password.save` operation, defined by Zitadel:
-
-```json
-{
-  "title": "user.password.save",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "kind":       { "const": "policy" },
-    "metaSchema": { "type": "string", "format": "uri" },
-    "operation":  { "const": "user.password.save" },
-
-    "min_length":     { "type": "integer", "minimum": 4,  "maximum": 256,  "default": 15 },
-    "max_length":     { "type": "integer", "minimum": 64, "maximum": 4096, "default": 256 },
-    "history_depth":  { "type": "integer", "minimum": 0,  "maximum": 24,   "default": 0 },
-    "reject_current": { "type": "boolean", "default": true },
-
-    "blocklist": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": { "type": "boolean", "default": true },
-        "source":  { "type": "string", "enum": ["zitadel-managed"], "default": "zitadel-managed" }
-      }
-    }
+  "operation": "user.password.save",
+  "config": {
+    "min_length": 15,
+    "history_depth": 4
   }
 }
 ```
 
-### Policy catalog
+```json
+// .zitadel/policies/user.password.save.acme.json — a stricter override for one team
+{
+  "kind": "policy",
+  "operation": "user.password.save",
+  "audience": { "team_ids": ["team_01k…"] },
+  "enforcement": "audit",
+  "config": {
+    "min_length": 20,
+    "history_depth": 4
+  }
+}
+```
 
-The set of policy-guarded operations is **closed and server-defined**. A developer authors a policy configuration for any operation on the list and may replace its policy rule, but cannot add an operation to the list.
+- `audience` follows [ADR 065](065-audience-scoped-configuration.md): absent means
+  project default, the most specific matching instance applies wholesale.
+- `enforcement` is `enforce` (default) or `audit`. In `audit` the policy is
+  evaluated and the decision is recorded, but a deny does not block the
+  operation. This is the rollout mode: deploy a stricter policy in `audit`, read
+  the decisions, switch to `enforce`. Every policy-as-code system surveyed
+  carries this tier on the instance, not the logic (Kubernetes
+  `validationActions`, Gatekeeper `enforcementAction`, Azure `enforcementMode`).
+- `config` is validated against the template's config schema at write time.
+  A key the template does not declare is rejected.
+
+#### Template
+
+One template per operation, defined by Zitadel and versioned with the server.
 
 ```json
+// user.password.save — template
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "${SERVER_URL}/policies/catalog-v1.json",
-  "title": "PolicyDocument",
-  "type": "object",
-  "required": ["kind", "metaSchema", "operation"],
-  "properties": {
-    "kind":       { "const": "policy" },
-    "metaSchema": { "type": "string", "format": "uri" },
-    "operation":  { "type": "string" }
+  "operation": "user.password.save",
+  "config": {
+    "min_length":    { "type": "integer", "minimum": 8, "maximum": 64, "default": 15, "public": true },
+    "history_depth": { "type": "integer", "minimum": 0, "maximum": 4,  "default": 0,  "public": true }
   },
-  "oneOf": [
-    { "$ref": "operations/user.password.save.json" },
-    { "$ref": "operations/user.password.verify.json" }
-    // list grows as more operations are added
+  "context": {
+    "candidate":       { "length": "int", "in_blocklist": "bool" },
+    "history_matches": "list<bool>"
+  },
+  "rules": [
+    { "name": "min_length", "expression": "candidate.length >= config.min_length" },
+    { "name": "history",    "expression": "!history_matches.exists(m, m)" },
+    { "name": "blocklist",  "expression": "!candidate.in_blocklist" }
   ]
 }
 ```
 
+- **`config`** is a JSON Schema fragment per setting: type, bounds, default. The
+  bounds are the floor and ceiling a developer can move within; the built-in
+  protections (`blocklist`) have no setting at all and therefore cannot be turned
+  off. This is the boundary #898 asks for: Zitadel owns the secure baseline, the
+  project chooses within it.
+- **`public: true`** marks a setting the unauthenticated `constraints` projection
+  may return (see [Exposing configuration to the frontend](#exposing-configuration-to-the-frontend)).
+  Unmarked settings are private: `max_attempts` on a lockout policy would tell an
+  attacker their budget.
+- **`context`** is the schema of what the rules receive: derived values computed
+  in Go for this one evaluation, never the raw input. It is the CEL type
+  environment the rules are checked against.
+- **`rules`** is an ordered list. Each rule is one boolean expression; its name is
+  what a denial reports and what the `constraints` projection lists. Rules are
+  atomic by construction: an expression must type-check to `bool`, stays under a
+  length cap, and its statically estimated cost stays under a limit, all checked
+  when the server starts. A rule that needs more than that is two rules.
+
+The template is also published read-only (`GET /policies/catalog`), so the
+console, the CLI and the `constraints` endpoint render from the same source.
+It is not release content: a release pins the catalog version it was validated
+against, and instances keep evaluating under that version after a server upgrade
+(Kubernetes' "stored expressions" rule).
+
+### Policy catalog
+
+The set of policy-guarded operations is **closed and server-defined**: the list
+of templates. A developer authors instances for any operation on the list and
+cannot add an operation to it. Templates ship with the server; today's list:
+
+| Operation | Rules | Context (derived in Go) |
+|---|---|---|
+| `user.password.save` | `min_length`, `history`, `blocklist` (lands with #898's blocklist) | candidate length, blocklist hit, per-history-entry match |
+| `user.password.verify` (illustrative, not MVP) | `lockout` | recent failed attempts |
+
+The server-side implementation lives in `internal/policy` (engine, embedded
+templates, resolver) and `internal/service/password_policy.go` (the
+`user.password.save` context builder and gate). Until instances are read from
+the active release, every project runs on the template defaults.
+
 ### Policy evaluation trigger (relation to domain events)
 
-A policy is evaluated **before** its operation, synchronously. Existing [wide events](048-wide-events-internal-audit-primitive.md) record what happened **after**, and cannot affect the outcome. 
+A policy is evaluated **before** its operation, synchronously. Existing [wide events](048-wide-events-internal-audit-primitive.md) record what happened **after**, and cannot affect the outcome.
 
 | Operation — policy evaluated before | Wide event — emitted after |
 |---|---|
@@ -155,55 +193,59 @@ A policy is evaluated **before** its operation, synchronously. Existing [wide ev
 
 ### Policy evaluation
 
-Each policy is evaluated against its **configuration** and the **request context**. Configuration arrives as `data`; context arrives as `input`. The engine is **stateless**, it never fetches its own inputs.
+Evaluation takes the resolved instance and the request context. The engine is
+**stateless**: it never fetches its own inputs. Every rule runs; there is no
+short-circuit, so a user sees every requirement they missed, not just the first.
 
 ```json
-// data — the policy for this operation, resolved from the active release
-{
-  "kind": "policy",
-  "operation": "user.password.save",
+// config — from the instance resolved for this request (ADR 065), defaults filled from the template
+{ "min_length": 15, "history_depth": 4 }
+```
 
-  "min_length": 15,
-  "max_length": 256,
-  "history_depth": 5,
-  "reject_current": true
+```json
+// context — derived by Go for this one evaluation
+{
+  "candidate":       { "length": 14, "in_blocklist": false },
+  "history_matches": [false, false, true, false]
 }
 ```
 
 ```json
-// input — the request context, derived by Go for this one evaluation
-{
-  "operation": "user.password.save",
-  "user":      { "id": "usr_…", "schema": "human-user", "created_at": "…" },
-  "request":   { "ip": "…", "user_agent": "…", "origin": "…" },
-  "candidate": { "length": 14, "in_blocklist": false },
-  "history_matches": [false, false, true, false, false],
-  "current_matches": false
-}
-```
-
-The request context is fixed per operation, see [The context schema](#the-context-schema).
-
-Resulting **Decision** based on policy and request context above:
-
-```json
+// decision
 {
   "allow": false,
   "violations": [
-    { "rule": "min_length", "limit": 15, "actual": 14 },
-    { "rule": "history", "depth": 5, "position": 3 }
+    { "rule": "min_length", "config": { "min_length": 15 } },
+    { "rule": "history",    "config": { "history_depth": 4 } }
   ]
 }
 ```
 
+A violation names the rule and echoes the public settings the rule reads, which
+is what a client needs to render "at least 15 characters". Private settings are
+never echoed.
 
 #### Decisions
 
-A decision is the result produced after policy rule evaluation. It returns one of:
+- `allow`: every rule held; the operation may proceed
+- `deny`: at least one rule failed; the operation is rejected with the violated rules
 
-- `allow`: the operation may proceed
-- `deny`: the operation is rejected, with machine-readable reasons
-- `require`: the operation is not yet permissible; these requirements are unmet (not needed for allow/deny policies, but needed in cases such as injecting a step during the flow)
+Under `enforcement: audit` a `deny` is recorded as a wide event and the operation
+proceeds as if allowed.
+
+A third outcome, `require` (the operation is not yet permissible, these
+requirements are unmet, used to inject a step mid-flow), is not needed by any MVP
+operation. It returns as a per-rule field when the first assurance consumer lands.
+
+#### Evaluation errors
+
+A rule cannot fail at runtime in the ways a program can: expressions are
+type-checked against the context schema and cost-bounded before the server
+serves traffic, and CEL has no I/O, no recursion and no unbounded loops. What
+remains is Go failing to build the context (a storage error while loading
+password history), which is an ordinary service error: the operation fails,
+closed. There is no per-operation failure posture to declare. An operator who
+needs a misbehaving policy out of the way switches it to `audit`.
 
 ### End to end: a user enters their password during sign-up (via flow-engine)
 
@@ -216,14 +258,14 @@ sequenceDiagram
     participant P as Policy
     participant DB as Storage
 
-    F->>P: retrieve constraints<br>to expose them to the client<br>(configuration only)
-    P-->>F: {min_length 15, max_length 256}
+    F->>P: constraints(operation, instance)
+    P-->>F: {min_length: {limit 15}, history: {depth 4}, blocklist: {}}
     F-->>C: render step carrying those constraints
     C->>F: submit password
     F->>F: re-check constraints<br>(normal payload validation<br>no full-policy evaluation)
     F->>S: SetPasswordUserAction
-    S->>S: build context for policy evaluation<br>(blocklist, VerifyHash per history entry, etc)
-    S->>P: evaluate (configuration + context)
+    S->>S: build context<br>(blocklist, VerifyHash per history entry)
+    S->>P: evaluate(instance, context)
     P-->>S: decision
     alt deny
         S-->>C: invalid password + violated rules
@@ -233,45 +275,48 @@ sequenceDiagram
     end
 ```
 
-1. **Render.** Flow-engine fills `FlowFieldValidation` based on policy configuration. Today that function hard-codes `MinLength: 8`. The client can perform frontend validation.
+1. **Render.** Flow-engine fills `FlowFieldValidation` from the `constraints` projection. Today that function hard-codes `MinLength: 8`. The client can perform frontend validation.
+2. **Submit.** The client posts the new password as the reserved field `x-auth-methods#password`.
+3. **Validation.** Flow-engine backend payload validation re-checks constraints.
+4. **Domain operation.** The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
+5. **Prepare context.** Per-operation Go code derives the context (see [The context schema](#the-context-schema)).
+6. **Evaluate.** Every rule runs over config plus context.
+7. **Return error** or **proceed with operation**.
 
-4. **Submit.** The client posts the new password as the reserved field `x-auth-methods#password`.
+### The rule language: CEL
 
-5. **Validation.** Flow-engine backend payload validation re-check constraints.
+Rules are written in the [Common Expression Language](https://cel.dev). This was
+an open decision between OPA/Rego and Go; reframing a policy from *one program
+that returns a decision* to *a list of named boolean rules* settled it.
 
-6. **Domain operation.** The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
+Once a policy is a rule list, the invariants #899 asks for stop being
+conventions and become structure:
 
-7. **Prepare context**, prepare policy evaluation context (this is per-policy-specific logic, see [The context schema](#the-context-schema)).
+- **Discoverability.** The `constraints` projection *is* the rule list plus its
+  public settings. A rule cannot exist that the client is not told about.
+- **No silent weakening.** Rules live in the template, which the developer does
+  not author. A future developer-authored template can only append rules.
+- **`require`** is a field on a rule, not a program branch.
 
-8. **Evaluate.** The rule runs over configuration plus context and returns a decision.
+Each rule is then one boolean expression, and CEL is the fit for exactly that:
 
-10. **Return error.**
+| | CEL (rule list) | Rego (one program) | Go (compiled) |
+|---|---|---|---|
+| Shape | list of named `bool` expressions | one module returning a decision document | a function per operation |
+| Sandbox | no I/O, no recursion, static cost estimate, runtime cost limit **(best)** | needs builtins such as `http.send` disabled, right after [ADR 061](061-egress-policy-user-injectable-urls.md) locked egress down | no customer code path **(best)** |
+| Latency | in-process, microseconds | in-process, microseconds; or a sidecar round-trip | native call **(best)** |
+| Second language in the product | none: OpenFGA conditions are already CEL, so a widened FGA profile ([ADR 032](032-permission-catalogs.md)) reuses it **(best)** | Rego alongside CEL | none |
+| Extensibility | developer-authored rules later, append-only, same evaluator | developer replaces the program | server release per change |
+| Tooling | no `opa test` equivalent: covered by a release-side test file and a server-side dry-run (see [Testing](#testing)) | `opa test`, `opa fmt`, Regal, coverage **(best)** | Go tests |
+| Precedent | Kubernetes embedded CEL for in-tree policy and kept OPA as an external webhook; Google IAM Conditions, Firebase Rules, OpenFGA, SpiceDB, Envoy RBAC | CNCF-graduated, Gatekeeper, Conftest | n/a |
 
-11. **Proceed with operation.**
+The evaluator is [cel-go](https://github.com/cel-expr/cel-go), the same
+implementation OpenFGA embeds. The environment is deliberately minimal: the CEL
+standard library plus the `strings` and `lists` extensions, nothing else, and it
+is pinned per catalog version.
 
-### The rule engine: OPA/Rego or Go
-
-**This is an open decision.**
-
-**Choosing Rego/OPA** means a policy is two files. Zitadel ships a `.rego` next to the `.json`, and the server embeds an evaluator to run it. The rule is also part of the release, a developer can modify it.
-
-**Choosing Go** means a policy is one file. The rule is a function in the server, and the release carries only the configuration. A developer sets values and nothing else; changing what a rule *does* is a Zitadel code change and a server release.
-
-| | Rego | Go |
-|---|---|---|
-| Extensibility | a developer can read and replace it **(best)** | every rule change is a code change and a server release |
-| Policy as code | the rule is a reviewable artifact part of release **(best)** | the rule is compiled into the binary; the release carries only settings |
-| Tooling | `opa test`, `opa fmt`, coverage, decision logs | existing Go test tooling |
-| Failure surface | a rule can error or loop, so it needs a timeout and a failure posture | cannot fail independently of its caller **(best)** |
-| Latency | microseconds per evaluation | a native function call **(best)** |
-| Debugging | `--explain`, `print()`, decision logs | debugger, stack traces, profiler **(best)** |
-| Familiarity, in-team | a second language in the codebase | what the team already writes **(best)** |
-| Familiarity, industry | the de-facto policy-as-code language — CNCF-graduated OPA, Gatekeeper, Conftest — so an engineer who has written policy elsewhere reads ours on sight **(best)** | no authoring surface, so no transferable skill either way |
-| Untrusted input | evaluates customer-authored logic, so it needs a sandbox | no customer code path exists **(best)** |
-
-Full examples in OPA Playground:
-- [`user.password.save`](https://play.openpolicyagent.org/p/g_YWQ0OGM4ZmYzMjYxZGM1ODQ2YTY3ZmZhYjc1NmIzZDFfczzcYv4Px-YXZQ6l6oBXbuWAIcI)
-- [`user.password.verify`](https://play.openpolicyagent.org/p/g_NTc3ODFmOTliOGJkYmExODI3OWQxNjJiOGIwOGM4YTFfl6BaThO91b4YbCKPqgkrBpvj9DA)
+Rego stays available as an external decision point if an enterprise customer
+insists on OPA: the Kubernetes model, not an embedded second engine.
 
 ## Relation to other domains
 
@@ -279,7 +324,24 @@ Where operation policies sit against the rest of the platform.
 
 ### Releases
 
-Both the policy configuration and the policy rule are revisioned resources deployed as part of a release.
+Instances are revisioned resources deployed as part of a release
+([ADR 035](035-configuration-environments.md), ids per
+[ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)). Templates are not:
+they ship with the server, and a release records the catalog version it was
+validated against. Release validation checks every instance against its template
+(unknown operation, unknown setting, out-of-bounds value) and rejects two
+instances for the same operation whose audiences overlap at the same tier
+(ADR 065 rule 6).
+
+### Applicability
+
+An instance's audience is the [ADR 065](065-audience-scoped-configuration.md)
+mechanism, unchanged: `team_ids` today, closed parameter set, most specific match
+wins wholesale, a request matching no instance gets the template defaults. A
+policy never applies outside its audience. There is no expression-based selector
+on the instance: a free-form predicate would make same-tier overlap undecidable
+at release validation and would break the pre-auth, release-cacheable
+`constraints` projection. Context-dependent conditions belong inside a rule.
 
 ### Hooks and actions
 
@@ -289,12 +351,14 @@ Hooks/actions are the generic version of the same idea, developer-declared exten
 
 ## Risks
 
-**Plaintext reaching the evaluation path.** The obvious context for a password policy is the password, and decision logs capture the full input by default.
-Mitigated by construction: the context carries derived values computed in Go.
+**Plaintext reaching the evaluation path.** The obvious context for a password policy is the password, and a decision log captures its input by default.
+Mitigated by construction: the context carries derived values computed in Go, and the context schema has no field that could hold the secret.
 
 **Duplication across operations.** A control relevant at two operations is configured at both.
 
-**A replaceable rule can weaken policy.** A developer can modify a Rego rule and allow everything.
+**Long expressions in JSON.** A rule list invites the temptation of one long expression. Mitigated by the caps (length, cost, `bool` result) and by the rule that a violation names one requirement.
+
+**Expression language drift.** cel-go gains features per release. Mitigated by the pinned environment per catalog version and the release recording which version it was validated against.
 
 ---
 
@@ -309,45 +373,31 @@ implements it, and questions that outlive the MVP.
 
 ### The context schema
 
-The schema above says what a developer may **configure**. A second schema per operation says what the policy rule **receives**.
+The template's `config` says what a developer may **configure**. Its `context` says what the rules **receive**, and doubles as the CEL type environment.
 
 ```json
-// operations/user.password.save.context.json — Zitadel-defined, versioned with the server
+// user.password.save — context, Zitadel-defined, versioned with the server
 {
-  "title": "user.password.save context",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["operation", "user", "request", "candidate"],
-  "properties": {
-    "operation": { "const": "user.password.save" },
-    "user":      { "$ref": "context-common.json#/$defs/user" },
-    "request":   { "$ref": "context-common.json#/$defs/request" },
-
-    "candidate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["length", "in_blocklist"],
-      "properties": {
-        "length":       { "type": "integer", "minimum": 0 },
-        "in_blocklist": { "type": "boolean" }
-      }
-    },
-    "history_matches": { "type": "array", "items": { "type": "boolean" } },
-    "current_matches": { "type": "boolean" }
-  }
+  "candidate": {
+    "length":       "int",
+    "in_blocklist": "bool"
+  },
+  "history_matches": "list<bool>"
 }
 ```
 
-`operation`, `user` and `request` are the envelope every operation shares; everything else is specific to this one. For example, only the `user.password.save` rule evaluation will receive `history_matches` which carries the information if the new password matches one of the previous ones.
+Every field is a derived value. `history_matches[i]` says whether the candidate matched the i-th most recent previous password; the rule never sees a hash, let alone a password. A rule referencing a field outside the schema fails the type check at startup, which is what makes the context schema a contract rather than documentation.
+
+Shared envelope fields (`user`, `request`) are added to the context once a rule needs them, not before: every field in the context is an attack surface for a decision log.
 
 ### Exposing configuration to the frontend
 
 A login form has to render "at least 15 characters" *before* anyone types, which
-means part of the policy configuration has to reach an unauthenticated client.
-Alongside `evaluate`, every policy therefore answers a second query:
+means part of the policy has to reach an unauthenticated client. Alongside
+`evaluate`, every policy therefore answers a second query:
 
-- **`constraints`** — computed from configuration alone, with no context, so it
-  resolves before the user has typed anything.
+- **`constraints`**: computed from the template and the instance's config alone,
+  with no request context, so it resolves before the user has typed anything.
 
 Today this already works for one value and one value only: `MinLength` is set in
 `resolveAuthMethodField`, travels in the step payload as `FlowFieldValidation`,
@@ -355,14 +405,14 @@ and is re-checked server-side by `SchemaFieldResolver.Validate`. `constraints`
 generalises that path rather than adding one.
 
 **Delivery.** For flows, the flow engine embeds constraints in the step it
-already sends — no new endpoint, and the client contract does not change:
+already sends; no new endpoint, and the client contract does not change:
 
 ```json
-{ "type": "string", "minLength": 15, "maxLength": 256 }
+{ "type": "string", "minLength": 15, "maxLength": 64 }
 ```
 
-For clients not driven by the flow engine — a custom login on the SDK, or a
-self-service password change inside a customer application — the same projection
+For clients not driven by the flow engine, a custom login on the SDK or a
+self-service password change inside a customer application, the same projection
 needs a read endpoint, unauthenticated because the login form is pre-auth.
 
 ```http
@@ -373,130 +423,78 @@ GET /policies/user.password.save/constraints
   "operation": "user.password.save",
   "release": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
   "constraints": {
-    "min_length": { "limit": 15 },
-    "history":    { "depth": 5 },
-    "blocklist":  { "enabled": true }
-  },
-  "field_schema": { "type": "string", "minLength": 15, "maxLength": 256 }
+    "min_length": { "min_length": 15 },
+    "history":    { "history_depth": 4 },
+    "blocklist":  {}
+  }
 }
 ```
 
 Four properties of that endpoint are load-bearing rather than incidental:
 
 - **The path names the projection, not the document.** `GET /policies/{operation}`
-  would imply the policy configuration itself, and that includes settings marked
-  private. Returning `constraints` under its own path makes it structurally
-  impossible to serve the private half by accident, and stops a client author
-  assuming the response is the configuration.
-- **It never 404s for a catalogued operation.** With no policy authored the
-  built-in defaults apply, so the endpoint still answers. A 404 means the
-  operation is not in the catalogue — a client bug, not an unconfigured project.
+  would imply the instance itself, and that includes private settings.
+  Returning `constraints` under its own path makes it structurally
+  impossible to serve the private half by accident.
+- **It never 404s for a catalogued operation.** With no instance authored the
+  template defaults apply, so the endpoint still answers. A 404 means the
+  operation is not in the catalogue: a client bug, not an unconfigured project.
 - **It is cacheable on the release.** Constraints change only when a release is
   deployed, so the response carries its `release` id and that id is the `ETag`.
-  A login form fetching this on every render costs one conditional request.
-- **It is scoped like any other public read**, resolving the project the same way
-  the rest of the unauthenticated surface does, and reading from that
-  environment's active release rather than from the latest revision.
-
-The endpoint takes an **operation**, not an event: `user.password.save` is
-guarded, `user.password.saved` is emitted afterwards and has no constraints to
-serve.
-
-**Not every setting may be published.** `min_length` must be public; it is
-rendered. `max_attempts` must not be, because publishing it tells an attacker
-exactly how many tries they get, and the blocklist contents are not publishable
-at any size. So visibility is a per-setting property and belongs in the
-metaschema next to the bounds:
-
-```json
-"min_length":   { "type": "integer", "minimum": 4, "default": 15, "x-visibility": "public" },
-"history_depth":{ "type": "integer", "minimum": 0, "default": 0,  "x-visibility": "public" },
-"blocklist":    { "type": "object",  "x-visibility": "private" }
-```
-
-A setting with no marker is private. Publishing is then opt-in per setting and
-reviewable when the catalogue changes, rather than a judgement made per endpoint.
+- **It is scoped like any other public read**, resolving the project and the
+  audience the same way the rest of the unauthenticated surface does, and reading
+  from that environment's active release.
 
 **The invariant, and the line it does not cross.** Anything `evaluate` can deny
-for must be discoverable in `constraints` — a rule found only by failing is a
+for must be discoverable in `constraints`. A rule found only by failing is a
 rule the user cannot satisfy. Keycloak shipped without this projection and had to
-retrofit it: password policies were unreachable from login themes, so users could
-not see the requirements before submitting
+retrofit it: password policies were unreachable from login themes
 ([keycloak#32553](https://github.com/keycloak/keycloak/issues/32553)).
 
-That invariant is about **rules being discoverable, not values being public**. A
-user must be able to learn that a blocklist check exists; they must not be able
-to download the blocklist. So `constraints` carries the *shape* of every rule and
-the *value* of only the settings marked public:
-
-```json
-{ "min_length": { "limit": 15 }, "history": { "depth": 5 }, "blocklist": { "enabled": true } }
-```
-
-Where a requirement cannot be published up front without weakening it — lockout
-being the clear case — it is disclosed after the fact instead, in the denial
-("try again in 20 minutes"), never before.
+With a rule list the invariant holds by construction: `constraints` is the list
+of rule names, each with the `public` settings it reads. A rule is in
+`constraints` because it exists, not because a conformance suite proved it.
+Which settings a rule reads is known statically from its checked expression, so
+nothing is authored twice. The invariant is about **rules being discoverable, not
+values being public**: a user learns that a blocklist check exists; they cannot
+download the blocklist.
 
 **Client-side validation is UX, never enforcement.** The server re-checks
-everything; steps 3 and 7 of the walkthrough below are the same check at
-different costs, deliberately.
+everything; steps 3 and 6 of the walkthrough are the same check at different
+costs, deliberately.
 
-Because a developer may replace the policy rule, the invariant cannot be a
-convention. It is checked at release construction:
+### Testing
 
-```rego
-undeclared contains rule if {
-	some v in violations
-	rule := v.rule
-	not constraints[rule]      # denied for something never rendered
-}
-```
+CEL has no `opa test`. Two things replace it:
 
-A release whose policy rule produces a non-empty `undeclared` for any context in
-the operation's conformance suite is rejected.
+- **A test file next to the instance.** `.zitadel/policies/user.password.save.test.json`
+  holds a table of `(config, context, expected decision)`. `zitadel policies test`
+  runs it. The shape is the one every policy-as-code CLI converges on
+  (`gator verify`, `kyverno test`, `sentinel test`, `fga model test`).
+- **A server-side dry run.** `POST /policies/{operation}/evaluate` takes an
+  explicit context and an optional instance, returns the decision, and has no
+  side effects. The CLI test command calls it. The same endpoint answers "which
+  instance wins for this audience and why", which a first-match resolution model
+  needs (Okta ships a policy simulator for exactly this reason).
 
-### Error handling
+The CLI never evaluates CEL itself: it is TypeScript, there is no official CEL
+implementation for JavaScript, and a second evaluator would drift.
 
-Declared per operation. `user.password.save` fails closed: a policy rule that
-errors or times out denies the save. An operation whose closed failure would lock
-every user out of the login screen declares open and logs — #899 requires a
-default that preserves at least one valid path.
+Zitadel's own templates are covered by Go tests in the server: for every
+template, a table of contexts with the expected violations.
 
-A rule that loops is a denial-of-service on the login path, so evaluation runs
-under a context deadline. A blown deadline is not a special case: it resolves
-through the same declared posture as any other rule error.
+### Limits
 
-### Working with Rego
+Checked once, at server start, for every rule in every template:
 
-Only relevant if Rego wins [the engine decision](#the-rule-engine-rego-or-go). The point is that a rule is an
-artifact with a normal toolchain, not a blob of configuration.
+- the expression type-checks to `bool` against `config` plus `context`
+- its length stays under a cap
+- its statically estimated cost stays under a limit
 
-| Step | Command | Where it runs |
-|---|---|---|
-| Format | `opa fmt -w policies/` | pre-commit, and `zitadel policies fmt` |
-| Lint | `regal lint policies/` | CI; catches unused bindings, shadowed names, deprecated builtins |
-| Test | `opa test policies/ -v` | CI, and the developer's machine |
-| Coverage | `opa test policies/ --coverage --threshold 80` | CI |
-| Type-check | `opa check --strict policies/` | publish, before the release is built |
-| Build | `opa build -t wasm` or bundle | server startup, or at release construction |
-
-Three of these do real work for this design specifically:
-
-- **`opa check --strict`** turns a rule referencing something outside the
-  context schema into a publish error rather than a silent `undefined` at
-  authentication time. That is what makes the context schema a contract rather
-  than documentation.
-- **`opa test`** is where the conformance suite lives: the per-operation table of
-  (configuration, context, expected decision) that any engine must satisfy. It is
-  also what checks the `undeclared` invariant, since that is expressible as a
-  test over generated contexts rather than a manual review.
-- **Compilation** is the open sub-question. Rego can be interpreted from source,
-  compiled to an internal IR at load, or built to Wasm ahead of time. Wasm gives
-  the most predictable latency and the strongest sandbox, at the cost of a build
-  step in release construction and losing `print()` debugging. Interpreting from
-  source is simplest and almost certainly fast enough for a handful of scalar
-  comparisons. Measure before choosing.
-
+At evaluation time the program additionally runs under a runtime cost limit and
+the request's context deadline. Kubernetes enforces the same pair (a static
+per-expression limit and a per-request runtime budget); OpenFGA caps condition
+cost at 100 by default. The exact numbers are tuned once real templates exist.
 
 ### Ownership
 
@@ -509,74 +507,57 @@ defines "owner", and the word carries several jobs. This ADR pins it to one:
 The other jobs keep their existing homes: who may view and change it →
 permission catalogs ([ADR 032](032-permission-catalogs.md),
 [033](033-internal-permission-management.md),
-[034](034-external-permission-management.md)); what it affects → applicability,
-which #899 already separates from ownership; what happens when the owning
+[034](034-external-permission-management.md)); what it affects → applicability
+([ADR 065](065-audience-scoped-configuration.md)); what happens when the owning
 resource is deleted → explicit lifecycle policy in
 [ADR 024](024-user-team-lifecycle-ownership.md)'s style, never a cascade; where
 it is authored → the release (ADR 035).
 
 In MVP the resolution root is always the Project, so no owner field is minted.
-#383's future-compatibility requirement is met by the catalogue declaring
-which owner kind each operation resolves from — a property of the catalogue, not
-machinery to build now.
 
-**Team-owned policies are out of scope, and not for scheduling reasons.** Per
-[`hierarchy.md`](../design/api/hierarchy.md) a Team in a customer project is a
-B2B end-customer tenant created at runtime, so a Team-owned policy would be
-runtime state and fall outside the release boundary ADR 035 locked. Whether
-Zitadel wants tenant-authored configuration at all is a separate decision.
+### Change impact
+
+#899 requires each policy to define how a promoted change affects existing state.
+For the MVP operations the answer is fixed per operation and documented here
+rather than configured:
+
+- `user.password.save`: a stricter policy applies the next time a password is
+  set. Existing passwords and sessions are untouched. This is the universal
+  vendor behaviour (Okta, Auth0, Entra, Google, Keycloak). A later
+  "validate at sign-in and force a change" switch is an instance setting, not a
+  template property.
+
+### Developer-authored rules
+
+Not MVP. Every vendor surveyed keeps password policy as configuration values and
+confines customer logic to event hooks; developer-authored rules are
+differentiation, not table stakes. The shape is nevertheless fixed now so the
+MVP does not foreclose it: a developer-authored template is release content,
+names an operation on the catalogue, and may only **append** rules to the
+Zitadel template. It runs in the same evaluator, under the same limits, and its
+rules appear in `constraints` like any other. Elina's product constraint (#898:
+custom rules add or strengthen, never remove built-in protections) is then a
+property of the data model, not of review.
 
 ### Policy hierarchy
 
 **Not MVP.** #383 asks only that the architecture not foreclose it, and
-[Ownership](#ownership) pins the resolution root to the Project. This section
-records what the shape would have to be, so the MVP does not accidentally make it
-unreachable.
+[Ownership](#ownership) pins the resolution root to the Project.
+[ADR 065](065-audience-scoped-configuration.md) already gives one default and
+one winning override per audience, wholesale. What it does not give is
+*restrictive* inheritance: a team override may today be weaker than the project
+default. When that is wanted, the template gains a per-setting strictness
+direction (`min_length`: higher is stricter; `max_attempts`: lower is stricter)
+and release validation rejects an override that weakens the default. The
+setting-level metadata is the only new piece; the resolution model is unchanged.
 
-The motivating case is B2B: in a customer project a Team is an end-customer
-tenant, and one tenant wants a stricter password rule than the project default —
-their own compliance regime, not the developer's.
-
-A resolution order would look like: Application → Team → Project → built-in
-default, first match wins for a whole policy, or per-setting if the appetite is
-there. Two rules keep it honest:
-
-- **Restrictive, not replacing.** A lower level may only strengthen. A Team
-  raising `min_length` from 15 to 20 is allowed; lowering it to 8 is not. This
-  is #899's "one policy cannot implicitly weaken another", and it needs a
-  declared direction per setting — for `min_length` stricter is higher, for
-  `max_attempts` stricter is lower. That direction is a property of the setting,
-  so the metaschema is where it would live.
-- **The effective value and its source are both visible.** #899 requires an
-  administrator to see which level contributed what. That is a reporting
-  requirement on whatever resolves the chain, and it is why "first match wins"
-  has to record the match rather than just return it.
-
-**The unresolved problem is not the merge — it is the release boundary.** Project
-policies are release content: authored in `.zitadel/`, revisioned, promoted,
-rolled back. A Team is created at runtime by a customer, so a Team-level override
-cannot be in the developer's release without the developer authoring a document
-per tenant. That leaves three options, none free:
-
-1. **Tenant overrides are runtime state**, written through an API and outside the
-   release. Honest about what they are, but it breaks ADR 035's guarantee that a
-   release determines behaviour, and it means promoting a release no longer
-   reproduces an environment exactly.
-2. **Tenant overrides are release content**, with the developer authoring them.
-   Preserves the boundary, and does not scale past a handful of tenants.
-3. **The project authors the envelope, tenants pick within it.** The release
-   defines which settings a tenant may strengthen and how far; the tenant's
-   choice is runtime state but is bounded by release content. Behaviour stays
-   determined by the release plus a value from a declared range.
-
-Option 3 is the only one that keeps both properties, and it is the shape worth
-preserving optionality for. Concretely that means a setting's metaschema entry
-would need room for a `tenant_overridable` bound alongside its `minimum` and
-`maximum` — nothing to build now, but a reason not to treat the metaschema as
-closed.
-
-Whether Zitadel wants tenant-authored configuration at all is a product decision
-that has not been made, and it should be made before this is designed.
+The unresolved product question is tenant-authored configuration: a Team in a
+customer project is a runtime resource, so a Team-level override cannot be in
+the developer's release without the developer authoring a document per tenant.
+The shape worth preserving optionality for is the envelope model: the release
+declares which settings a tenant may strengthen and how far, and the tenant's
+choice is runtime state bounded by release content. Whether Zitadel wants that
+at all is a product decision that has not been made.
 
 ---
 
@@ -585,46 +566,41 @@ that has not been made, and it should be made before this is designed.
 Each entry notes what it was used for, so a reviewer can check the claim rather
 than the link.
 
-### Naming and structure
+### Template and instance
 
-- [Azure Policy — definition structure](https://learn.microsoft.com/en-us/azure/governance/policy/concepts/definition-structure) — a policy definition splits into `parameters` and `policyRule`, with assignments supplying values. The closest shipped match to this ADR's policy configuration / policy rule split.
-- [Kyverno — ClusterPolicy overview](https://kyverno.io/docs/policy-types/cluster-policy/overview/) — a policy holds `rules[]`, each with `match` plus a `validate`/`mutate` block. Same containment.
-- [XACML 3.0 core specification](http://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html) — PolicySet → Policy → Rule, and the *deny-overrides* combining algorithm that composition would follow.
-- [Cedar: a new language for expressive, fast, safe, and analyzable authorization](https://dl.acm.org/doi/10.1145/3649835) — forbid always overrides permit, and the grammar is deliberately not Turing-complete so policies stay statically analyzable. The argument for keeping a rule inspectable rather than opaque.
+- [Kubernetes — ValidatingAdmissionPolicy](https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/) — CEL policy with `paramKind`, `matchConditions`, `validations[]`, `failurePolicy`; binding with `paramRef`, `matchResources`, `validationActions: Deny | Warn | Audit`. The closest shipped match to this ADR, and the precedent for embedding CEL in-process while keeping OPA as an external webhook.
+- [Kubernetes — CEL in Kubernetes](https://kubernetes.io/docs/reference/using-api/cel/) — static estimated cost limits, runtime cost budget, and the "stored expressions keep evaluating after a rollback" compatibility rule the catalog version copies.
+- [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/howto/) — ConstraintTemplate holds the logic and the parameter schema; Constraint holds the parameters and the match selector. `enforcementAction: deny | dryrun | warn`.
+- [Azure Policy — definition structure](https://learn.microsoft.com/en-us/azure/governance/policy/concepts/definition-structure) — `parameters` and `policyRule` in the definition, values and scope in the assignment, `enforcementMode: DoNotEnforce` for rollout.
+- [GitHub rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) — enforcement `Active | Evaluate`, and "the most restrictive version of the rule applies" when several target the same branch.
 
-### Rule plus parameters plus selector, as shipped elsewhere
+### CEL
 
-- [Kubernetes — ValidatingAdmissionPolicy](https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/) — CEL policy, `paramKind`/`paramRef` for configuration, a binding carrying `matchResources` and `validationActions: Deny | Warn | Audit`, plus `failurePolicy`. Also the precedent for replacing per-decision webhooks with in-process evaluation.
-- [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/howto/) — ConstraintTemplate holds the Rego and the parameter schema; Constraint holds the parameters and the match selector. `enforcementAction: deny | dryrun | warn`.
-- [GitHub rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) — target conditions, enforcement status, bypass actors, and "the most restrictive version of the rule applies" when several target the same branch. The shape a hierarchy would need.
+- [CEL specification](https://github.com/google/cel-spec) and [cel-go](https://github.com/cel-expr/cel-go) — the language and the evaluator; cost estimation (`EstimateCost`), runtime `CostLimit`, environment extension.
+- [OpenFGA — conditions](https://openfga.dev/docs/modeling/conditions) — conditions are CEL with a default evaluation cost limit of 100; the reason CEL is not a second policy language in the product.
+- [Cedar: a new language for expressive, fast, safe, and analyzable authorization](https://dl.acm.org/doi/10.1145/3649835) — the argument for a deliberately non-Turing-complete rule language that stays statically analysable. Cedar itself competes with the OpenFGA choice, not with this.
 
 ### Why a policy is evaluated before, and an event is emitted after
 
-- [Okta — inline hooks](https://developer.okta.com/docs/concepts/inline-hooks/) and [event hooks](https://developer.okta.com/docs/concepts/event-hooks/) — inline hooks are synchronous and pause the process; event hooks are asynchronous and explicitly "not to provide a way to affect the execution of the underlying Okta process flow". Two mechanisms, deliberately different names.
-- [Auth0 — Actions triggers](https://auth0.com/docs/customize/actions/triggers) — every trigger labelled synchronous or asynchronous.
-- [Google Identity Platform — blocking functions](https://cloud.google.com/identity-platform/docs/blocking-functions) — the blocking kind gets its own name rather than sharing one with background triggers.
-- [Amazon Cognito — Lambda triggers](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-identity-pools-working-with-aws-lambda-triggers.html) — pre-sign-up and pre-authentication can reject the operation; post-* cannot.
-- [Ory Kratos — hooks](https://www.ory.sh/docs/kratos/hooks/configure-hooks) — before/after per self-service flow.
+- [Okta — inline hooks](https://developer.okta.com/docs/concepts/inline-hooks/) and [event hooks](https://developer.okta.com/docs/concepts/event-hooks/) — inline hooks are synchronous and pause the process; event hooks are asynchronous and explicitly "not to provide a way to affect the execution of the underlying Okta process flow".
+- [Auth0 — Actions triggers](https://auth0.com/docs/customize/actions/triggers), [Google Identity Platform — blocking functions](https://cloud.google.com/identity-platform/docs/blocking-functions), [Amazon Cognito — Lambda triggers](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-identity-pools-working-with-aws-lambda-triggers.html), [Ory Kratos — hooks](https://www.ory.sh/docs/kratos/hooks/configure-hooks) — every vendor that put arbitrary code on the decision path ended up with hard timeouts, fail-closed semantics and size caps. The reason the decision here is declarative and code hooks are a separate mechanism.
 
 ### The rendering trap
 
-- [keycloak#32553](https://github.com/keycloak/keycloak/issues/32553) — password policies were unreachable from login themes, so users could not see the requirements before submitting, and it needed a retrofit. The reason `constraints` exists as a first-class answer rather than a by-product of denial.
+- [keycloak#32553](https://github.com/keycloak/keycloak/issues/32553) — password policies were unreachable from login themes, so users could not see the requirements before submitting; retrofitted in 26.0. The reason `constraints` exists as a first-class answer rather than a by-product of denial.
 
 ### Password specifics
 
-- [NIST SP 800-63B — password verifier requirements](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver) — the source of #898's 15-character default, the at-least-64 maximum, NFC normalization before any length check, and the prohibition on composition rules.
-- [Auth0 — flexible password policy](https://auth0.com/docs/authenticate/database-connections/flexible-password-policy) — new database connections default to a 15-character minimum with no required character types as of July 2026, which is where #898's defaults land independently.
-
-### Tooling
-
-- [Open Policy Agent documentation](https://www.openpolicyagent.org/docs) — Rego, `opa test`, `opa check --strict`, bundles.
-- [Rego Playground](https://play.openpolicyagent.org) — the POLICY / DATA / INPUT panels referenced in Terminology.
-- [Regal](https://github.com/StyraInc/regal) — the Rego linter named in *Working with Rego*.
+- [NIST SP 800-63B-4 — password verifier requirements](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver) — the source of #898's 15-character default, the at-least-64 maximum, the blocklist requirement, and the prohibition on composition rules.
+- [Auth0 — flexible password policy](https://auth0.com/docs/authenticate/database-connections/flexible-password-policy) — new database connections default to a 15-character minimum with no required character types, which is where #898's defaults land independently.
 
 ## Alternatives rejected
 
+- **OPA/Rego as the embedded engine.** A policy as one program is more than a rule needs, brings a second policy language next to OpenFGA's CEL, and ships builtins (`http.send`) that have to be disabled after ADR 061 locked egress down. Kept as a possible *external* decision point.
+- **Rules in Go only.** No authoring surface, so the `constraints` projection has to be maintained by hand per operation and developer-authored rules need a different mechanism later. The evaluator is a small dependency for what it removes.
+- **An expression-based selector on the instance** (`when: user.schema == 'human-user'`). Makes same-tier overlap undecidable at release validation and breaks the pre-auth, release-cacheable `constraints` projection. Conditions belong inside rules.
 - **One resource per control**, following #899's vocabulary literally — reproduces v2's fragmentation and needs composition machinery on day one to reassemble controls decided together.
 - **Group by subject, as v2 does** — a `password` resource covering save, verify and expiry becomes a grab-bag like `LoginSettings` as soon as two of them need different context.
 - **The policy itself as a JSON Schema, enforced by validating the context** — the most internally consistent option, and it cannot take a bound from another value in the document, so `history_depth` bakes into the schema's shape and a configuration change becomes a schema change.
-- **A remote policy server queried per decision** a release cannot determine behaviour if the deciding logic lives somewhere we do not version.
-- **Rules inline in the user schema** re-revisions every schema on a security change.
+- **A remote policy server queried per decision** — a release cannot determine behaviour if the deciding logic lives somewhere we do not version.
+- **Rules inline in the user schema** — re-revisions every schema on a security change.

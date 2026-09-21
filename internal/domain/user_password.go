@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/policy"
 )
 
 const PrefixUserPassword ResourcePrefix = "upw"
@@ -72,3 +73,16 @@ const (
 	UserPasswordFieldCreatedAt
 	UserPasswordFieldUpdatedAt
 )
+
+// ErrUserPasswordPolicyViolation is returned when the candidate password
+// fails the `user.password.save` policy. Details carry the violated rules
+// with the public settings they read, so a client can render what was
+// missed (ADR 066).
+func ErrUserPasswordPolicyViolation(violations []policy.Violation) Error {
+	return newError("user.password_policy_violation", "The password does not satisfy the password policy. Check the details for the violated rules.", PasswordPolicyViolationDetails{Violations: violations}, nil)
+}
+
+// PasswordPolicyViolationDetails is the wire shape of a policy denial.
+type PasswordPolicyViolationDetails struct {
+	Violations []policy.Violation `json:"violations"`
+}

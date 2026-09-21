@@ -40116,6 +40116,52 @@ func (o OptUserNotFoundDetails) Or(d UserNotFoundDetails) UserNotFoundDetails {
 	return d
 }
 
+// NewOptUserPasswordPolicyViolationDetails returns new OptUserPasswordPolicyViolationDetails with value set to v.
+func NewOptUserPasswordPolicyViolationDetails(v UserPasswordPolicyViolationDetails) OptUserPasswordPolicyViolationDetails {
+	return OptUserPasswordPolicyViolationDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordPolicyViolationDetails is optional UserPasswordPolicyViolationDetails.
+type OptUserPasswordPolicyViolationDetails struct {
+	Value UserPasswordPolicyViolationDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordPolicyViolationDetails was set.
+func (o OptUserPasswordPolicyViolationDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordPolicyViolationDetails) Reset() {
+	var v UserPasswordPolicyViolationDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordPolicyViolationDetails) SetTo(v UserPasswordPolicyViolationDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordPolicyViolationDetails) Get() (v UserPasswordPolicyViolationDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordPolicyViolationDetails) Or(d UserPasswordPolicyViolationDetails) UserPasswordPolicyViolationDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPermissionDeniedDetails returns new OptUserPermissionDeniedDetails with value set to v.
 func NewOptUserPermissionDeniedDetails(v UserPermissionDeniedDetails) OptUserPermissionDeniedDetails {
 	return OptUserPermissionDeniedDetails{
@@ -51043,14 +51089,15 @@ func (*SetUserPasswordBadRequest) setUserPasswordRes() {}
 
 // SetUserPasswordErrorResponse represents sum type.
 type SetUserPasswordErrorResponse struct {
-	Type                 SetUserPasswordErrorResponseType // switch on this field
-	AuthUnauthorized     AuthUnauthorized
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	ReqInvalid           ReqInvalid
-	UserInvalid          UserInvalid
-	UserNotFound         UserNotFound
-	UserPermissionDenied UserPermissionDenied
+	Type                        SetUserPasswordErrorResponseType // switch on this field
+	AuthUnauthorized            AuthUnauthorized
+	EvtInvalid                  EvtInvalid
+	Internal                    Internal
+	ReqInvalid                  ReqInvalid
+	UserInvalid                 UserInvalid
+	UserNotFound                UserNotFound
+	UserPasswordPolicyViolation UserPasswordPolicyViolation
+	UserPermissionDenied        UserPermissionDenied
 }
 
 // SetUserPasswordErrorResponseType is oneOf type of SetUserPasswordErrorResponse.
@@ -51058,13 +51105,14 @@ type SetUserPasswordErrorResponseType string
 
 // Possible values for SetUserPasswordErrorResponseType.
 const (
-	AuthUnauthorizedSetUserPasswordErrorResponse     SetUserPasswordErrorResponseType = "auth.unauthorized"
-	EvtInvalidSetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "evt.invalid"
-	InternalSetUserPasswordErrorResponse             SetUserPasswordErrorResponseType = "internal"
-	ReqInvalidSetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "req.invalid"
-	UserInvalidSetUserPasswordErrorResponse          SetUserPasswordErrorResponseType = "user.invalid"
-	UserNotFoundSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.not_found"
-	UserPermissionDeniedSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.permission_denied"
+	AuthUnauthorizedSetUserPasswordErrorResponse            SetUserPasswordErrorResponseType = "auth.unauthorized"
+	EvtInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "evt.invalid"
+	InternalSetUserPasswordErrorResponse                    SetUserPasswordErrorResponseType = "internal"
+	ReqInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "req.invalid"
+	UserInvalidSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "user.invalid"
+	UserNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.not_found"
+	UserPasswordPolicyViolationSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.password_policy_violation"
+	UserPermissionDeniedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthUnauthorized reports whether SetUserPasswordErrorResponse is AuthUnauthorized.
@@ -51095,6 +51143,11 @@ func (s SetUserPasswordErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether SetUserPasswordErrorResponse is UserNotFound.
 func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundSetUserPasswordErrorResponse
+}
+
+// IsUserPasswordPolicyViolation reports whether SetUserPasswordErrorResponse is UserPasswordPolicyViolation.
+func (s SetUserPasswordErrorResponse) IsUserPasswordPolicyViolation() bool {
+	return s.Type == UserPasswordPolicyViolationSetUserPasswordErrorResponse
 }
 
 // IsUserPermissionDenied reports whether SetUserPasswordErrorResponse is UserPermissionDenied.
@@ -51225,6 +51278,27 @@ func (s SetUserPasswordErrorResponse) GetUserNotFound() (v UserNotFound, ok bool
 func NewUserNotFoundSetUserPasswordErrorResponse(v UserNotFound) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordPolicyViolation sets SetUserPasswordErrorResponse to UserPasswordPolicyViolation.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
+	s.Type = UserPasswordPolicyViolationSetUserPasswordErrorResponse
+	s.UserPasswordPolicyViolation = v
+}
+
+// GetUserPasswordPolicyViolation returns UserPasswordPolicyViolation and true boolean if SetUserPasswordErrorResponse is UserPasswordPolicyViolation.
+func (s SetUserPasswordErrorResponse) GetUserPasswordPolicyViolation() (v UserPasswordPolicyViolation, ok bool) {
+	if !s.IsUserPasswordPolicyViolation() {
+		return v, false
+	}
+	return s.UserPasswordPolicyViolation, true
+}
+
+// NewUserPasswordPolicyViolationSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordPolicyViolation.
+func NewUserPasswordPolicyViolationSetUserPasswordErrorResponse(v UserPasswordPolicyViolation) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordPolicyViolation(v)
 	return s
 }
 
@@ -51532,33 +51606,34 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff AttAlreadyHandedOff
-	AttInvalidRequest   AttInvalidRequest
-	AttInvalidState     AttInvalidState
-	AttNotCompleted     AttNotCompleted
-	AttNotFound         AttNotFound
-	AttProofRejected    AttProofRejected
-	AttStaleChallenge   AttStaleChallenge
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EncKeyEncryptFailed EncKeyEncryptFailed
-	EncKeyNotFound      EncKeyNotFound
-	EvtInvalid          EvtInvalid
-	FlowCookieExpired   FlowCookieExpired
-	FlowCookieInvalid   FlowCookieInvalid
-	FlowIntegrity       FlowIntegrity
-	FlowInvalidAction   FlowInvalidAction
-	FlowNotFound        FlowNotFound
-	FlowUnsupported     FlowUnsupported
-	Internal            Internal
-	TknInvalid          TknInvalid
-	NotImplemented      NotImplemented
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
-	UserAlreadyExists   UserAlreadyExists
-	UserInvalid         UserInvalid
-	UserNotFound        UserNotFound
+	Type                        SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff         AttAlreadyHandedOff
+	AttInvalidRequest           AttInvalidRequest
+	AttInvalidState             AttInvalidState
+	AttNotCompleted             AttNotCompleted
+	AttNotFound                 AttNotFound
+	AttProofRejected            AttProofRejected
+	AttStaleChallenge           AttStaleChallenge
+	EncKeyDecryptFailed         EncKeyDecryptFailed
+	EncKeyEncryptFailed         EncKeyEncryptFailed
+	EncKeyNotFound              EncKeyNotFound
+	EvtInvalid                  EvtInvalid
+	FlowCookieExpired           FlowCookieExpired
+	FlowCookieInvalid           FlowCookieInvalid
+	FlowIntegrity               FlowIntegrity
+	FlowInvalidAction           FlowInvalidAction
+	FlowNotFound                FlowNotFound
+	FlowUnsupported             FlowUnsupported
+	Internal                    Internal
+	TknInvalid                  TknInvalid
+	NotImplemented              NotImplemented
+	ReqInvalid                  ReqInvalid
+	EncKeyUnknownAlg            EncKeyUnknownAlg
+	Unavailable                 Unavailable
+	UserAlreadyExists           UserAlreadyExists
+	UserInvalid                 UserInvalid
+	UserNotFound                UserNotFound
+	UserPasswordPolicyViolation UserPasswordPolicyViolation
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -51566,32 +51641,33 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
-	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
-	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowCookieExpiredSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowUnsupportedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.unsupported"
+	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordPolicyViolationSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_policy_violation"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -51722,6 +51798,11 @@ func (s SubmitFlowStepErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether SubmitFlowStepErrorResponse is UserNotFound.
 func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordPolicyViolation reports whether SubmitFlowStepErrorResponse is UserPasswordPolicyViolation.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordPolicyViolation() bool {
+	return s.Type == UserPasswordPolicyViolationSubmitFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets SubmitFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -52267,6 +52348,27 @@ func (s SubmitFlowStepErrorResponse) GetUserNotFound() (v UserNotFound, ok bool)
 func NewUserNotFoundSubmitFlowStepErrorResponse(v UserNotFound) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordPolicyViolation sets SubmitFlowStepErrorResponse to UserPasswordPolicyViolation.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
+	s.Type = UserPasswordPolicyViolationSubmitFlowStepErrorResponse
+	s.UserPasswordPolicyViolation = v
+}
+
+// GetUserPasswordPolicyViolation returns UserPasswordPolicyViolation and true boolean if SubmitFlowStepErrorResponse is UserPasswordPolicyViolation.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordPolicyViolation() (v UserPasswordPolicyViolation, ok bool) {
+	if !s.IsUserPasswordPolicyViolation() {
+		return v, false
+	}
+	return s.UserPasswordPolicyViolation, true
+}
+
+// NewUserPasswordPolicyViolationSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordPolicyViolation.
+func NewUserPasswordPolicyViolationSubmitFlowStepErrorResponse(v UserPasswordPolicyViolation) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordPolicyViolation(v)
 	return s
 }
 
@@ -56631,6 +56733,59 @@ func (*UserNotFound) patchMyUserRes() {}
 type UserNotFoundDetails map[string]jx.Raw
 
 func (s *UserNotFoundDetails) init() UserNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserPasswordPolicyViolation struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordPolicyViolationDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordPolicyViolation) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordPolicyViolation) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordPolicyViolation) GetDetails() OptUserPasswordPolicyViolationDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordPolicyViolation) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordPolicyViolation) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordPolicyViolation) SetDetails(val OptUserPasswordPolicyViolationDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordPolicyViolationDetails map[string]jx.Raw
+
+func (s *UserPasswordPolicyViolationDetails) init() UserPasswordPolicyViolationDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
