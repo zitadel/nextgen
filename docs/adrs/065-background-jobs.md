@@ -4,7 +4,7 @@
 > **Date:** 2026-09-03
 > **Context:** Periodic sweeps and queued work in the Go server across PostgreSQL, Spanner, and SQLite
 > **Builds on:** [ADR 028](028-storage-v2-statements-and-dialects.md), [ADR 041](041-storage-statement-contract-tests.md), [ADR 047](047-dialect-id-generation.md), [ADR 048](048-wide-events-internal-audit-primitive.md), [ADR 049](049-events-api-retention-export.md)
-> **Amends if accepted:** [ADR 046](046-claim-lifecycle-v2.md) (unclaimed-project **deletion** can run on this loop; this ADR does not add that sweeper)
+> **Amends if accepted:** [ADR 046](046-claim-lifecycle-v2.md) (unclaimed-project **deletion** can run on this loop; this ADR does not add that sweeper), [ADR 047](047-dialect-id-generation.md) (§2: registers the `job` prefix)
 > **Related:** [ADR 010](010-session-auth-attempt-check-model.md), [ADR 037](037-token-lifecycle.md), [ADR 039](039-signing-key-rotation-and-incident-response.md), [ADR 050](050-dev-inbox.md), [#881](https://github.com/zitadel/nextgen/issues/881)
 
 ## Context
@@ -92,7 +92,12 @@ That split does not change in Go 1.27. The TODO around [`internal/service/statem
 
 The first implementation does not add a `Backend` interface, a memory backend, River, Pub/Sub, or Cloud Tasks.
 
-`Enqueue` is lookup-then-insert inside the caller’s transaction. Spanner will not use `INSERT ... ON CONFLICT` on a `NULL_FILTERED` unique index ([`internal/storage/dialect/spanner/auth_attempt.go`](../../internal/storage/dialect/spanner/auth_attempt.go)). Lookup-then-insert is also not enough by itself: a unique index on `unique_key` would still see `done`/`dead` rows, so a resend would bounce until GC. Same trick as authz in [`internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql`](../../internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql) (lines 9–11): Spanner keeps `active_unique_key` equal to `unique_key` while the row is `pending`/`leased`, and **NULL** when `done`/`dead`. Postgres uses a partial unique index on live rows. When a queued row finishes or dies, that live key is cleared so the next Enqueue can insert.
+`Enqueue` runs inside the caller’s transaction, and its portable contract is: insert the queued row unless a live row (`pending` or `leased`) already holds this `unique_key`; a concurrent loser keeps the winner’s row and does not fail the product transaction it rides on. The contract cannot be written as `INSERT ... ON CONFLICT`, because Spanner will not accept a `NULL_FILTERED` unique index as an `ON CONFLICT` arbiter ([`internal/storage/dialect/spanner/auth_attempt.go`](../../internal/storage/dialect/spanner/auth_attempt.go)). The mechanics are dialect-owned:
+
+- Postgres and SQLite: `INSERT ... ON CONFLICT DO NOTHING` against the live-key partial unique index. Plain lookup-then-insert does not satisfy the contract here: two concurrent transactions can both see no live row, and the losing INSERT then aborts the caller’s product transaction, which [`internal/storage/dialect/postgres/tx.go`](../../internal/storage/dialect/postgres/tx.go) (`executeTransaction`) does not retry.
+- Spanner: lookup-then-insert. Its read/write transaction serializes the read against the competing write, and the client retries an aborted commit, so the loser re-reads and finds the winner’s live row.
+
+A unique index on `unique_key` itself is not enough on any dialect: it would still see `done`/`dead` rows, so a resend would bounce until GC. Same trick as authz in [`internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql`](../../internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql) (lines 9–11): Spanner keeps `active_unique_key` equal to `unique_key` while the row is `pending`/`leased`, and **NULL** when `done`/`dead`. Postgres uses a partial unique index on live rows. When a queued row finishes or dies, that live key is cleared so the next Enqueue can insert.
 
 ### 3. Lease, then work, then complete
 
@@ -131,12 +136,12 @@ The `alt` / `else` in that diagram is mermaid’s “if / otherwise.” If `not_
 Complete:
 
 - Queued success → `done` + `completed_at`. Clear `active_unique_key` / the live unique projection. Reset `attempt`.
-- Periodic success → keep the same row. Clear the lease. Set `run_at = now() + period` (skip missed beats; do not add `period` onto the old `run_at`). Reset `attempt`. Never `done`. No history row.
+- Periodic success → keep the same row. Clear the lease and set `status = pending`. Set `run_at = now() + period` (skip missed beats; do not add `period` onto the old `run_at`). Reset `attempt`. Never `done`. No history row.
 
 Fail:
 
 - Queued: increment `attempt`. Clear the lease. Set `status = pending` and `run_at = now() + backoff`. Become `dead` (with `completed_at`) when `attempt` reaches `max_attempts`, or when the next `run_at` would be `>= not_after`. Dying also clears the live unique key.
-- Periodic: never `done` or `dead`. Clear the lease. Set `run_at = now() + period` (same skip-missed as Complete). Record `last_error`. Fail does not count toward death. The first implementation does not revive a `dead` periodic row because periodic rows never reach `dead`.
+- Periodic: never `done` or `dead`. Clear the lease and set `status = pending`. Set `run_at = now() + period` (same skip-missed as Complete). Record `last_error`. Fail does not count toward death. The first implementation does not revive a `dead` periodic row because periodic rows never reach `dead`.
 
 `not_after` only decides whether the engine **starts** the job. The handler still no-ops if the live entity is gone, used, or rotated.
 
@@ -210,7 +215,7 @@ Defaults for the first implementation (config key names are an implementation de
 | Knob | Default | Role |
 |------|---------|------|
 | `jobs.concurrency` | `1` | How many Take/`Perform` loops this process runs in parallel |
-| `jobs.poll_interval` | ~1s | Idle wait between Takes |
+| `jobs.poll_interval` | 1s | Idle wait between Takes |
 | `jobs.take_batch_size` | `1` | Rows one loop leases per Take |
 | `jobs.lease_duration` | 15m | Take writes `lease_until`; covers today’s retention 10m timeout ([`internal/audit/retention.go`](../../internal/audit/retention.go)) plus margin |
 | `jobs.heartbeat_interval` | 5m | Heartbeat while Perform runs (lease/3) |
@@ -237,7 +242,7 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 ## Non-goals
 
 - Unclaimed-project deletion ([ADR 046](046-claim-lifecycle-v2.md)). This ADR does not add `WHERE projects.created_at + interval` and does not delete unclaimed projects. A future sweeper would be its own periodic job on this loop.
-- [ADR 049](049-events-api-retention-export.md)’s dedicated `DELETE` role on the jobs table
+- A dedicated `DELETE` role on the jobs table, analogous to [ADR 049](049-events-api-retention-export.md)’s events-table role
 - Signing-key purge ([ADR 039](039-signing-key-rotation-and-incident-response.md)) and ADR 050 outbound as handlers in this first implementation. Token rows do not need a sweeper: [ADR 037](037-token-lifecycle.md) deletes a revoked token on the spot, and expiry is checked from the token itself.
 
 ## Consequences
@@ -256,7 +261,7 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 
 ### Testing
 
-- [`stmttest`](../../internal/storage/stmttest/) owns, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)): Take of pending and lease-expired rows; Take marking `not_after <= now()` `dead` without Perform (including a reclaimed lease, and the equality case); Fail returning queued rows to `pending` with backoff; queued Fail-to-dead at `max_attempts` and when the next `run_at` would be `>= not_after`; periodic Fail rescheduling `run_at = now() + period` without `dead`; Complete resetting `attempt`; live-row `unique_key` conflict vs insert after `done`/`dead` (Spanner `active_unique_key` null on terminal); `UpsertPeriodic` updating `period` without clobbering a live lease; `DeleteCompleted` ignoring `pending`/`leased`; Heartbeat/Complete/Fail rejected when `lease_token` does not match or the row is no longer `leased`; lookup-then-insert Enqueue (not `ON CONFLICT`).
+- [`stmttest`](../../internal/storage/stmttest/) owns, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)): Take of pending and lease-expired rows; Take marking `not_after <= now()` `dead` without Perform (including a reclaimed lease, and the equality case); Fail returning queued rows to `pending` with backoff; queued Fail-to-dead at `max_attempts` and when the next `run_at` would be `>= not_after`; periodic Fail and Complete rescheduling `run_at = now() + period` back to `pending` without `dead`; Complete resetting `attempt`; live-row `unique_key` conflict vs insert after `done`/`dead` (Spanner `active_unique_key` null on terminal); `UpsertPeriodic` updating `period` without clobbering a live lease; `DeleteCompleted` ignoring `pending`/`leased`; Heartbeat/Complete/Fail rejected when `lease_token` does not match or the row is no longer `leased`; Enqueue keeping the live row under two concurrent enqueues of the same `unique_key` (dialect-owned mechanics, one row survives).
 - The engine loop is tested against a fake `JobStatements` (or sqlite only), not a second backend × three-dialect matrix: registered-name Take filter, Heartbeat, unknown names left untouched.
 
 ## Alternatives considered
@@ -266,5 +271,5 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 | River as the portability layer | Postgres-only; SQLite and Spanner still need another runtime |
 | Pub/Sub / Cloud Tasks as source of truth | No transactional enqueue with the entity write; no SQLite |
 | Insert a tick row per period | Backlog of missed intervals; the unique row already remembers the next run |
-| `INSERT ... ON CONFLICT` as the Enqueue contract | Spanner rejects a `NULL_FILTERED` unique index as an `ON CONFLICT` arbiter |
+| `INSERT ... ON CONFLICT` as the Enqueue contract | Spanner rejects a `NULL_FILTERED` unique index as an `ON CONFLICT` arbiter; Postgres and SQLite still use it internally |
 | Call the pick-up step `Claim` | Collides with ADR 046 project claim |
