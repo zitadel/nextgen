@@ -191,7 +191,7 @@ async function grantDevUserAdmin(userId: string): Promise<boolean> {
     const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
-      body: JSON.stringify({ principal_type: "user", principal_id: userId, relation: "admin" }),
+      body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
       signal: AbortSignal.timeout(5_000),
     });
     return response.ok;
