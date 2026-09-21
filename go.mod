@@ -3,6 +3,7 @@ module github.com/zitadel/nextgen
 go 1.26
 
 require (
+	cel.dev/cel-go v0.32.0
 	cloud.google.com/go/spanner v1.91.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.53.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.33.0
@@ -78,7 +79,6 @@ require (
 )
 
 require (
-	cel.dev/cel-go v0.32.0 // indirect
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.20.0 // indirect
