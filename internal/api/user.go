@@ -440,6 +440,8 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrUserPasswordPolicyViolation(nil).Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
 		return internalErrorResponse(err)
 	}

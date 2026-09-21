@@ -35,7 +35,12 @@ type SchemaResolver interface {
 //     [FlowImplicitOutcomeUserAlreadyExists]
 //   - `x-auth-methods#<method>` field name → credential challenge for
 //     that method (e.g. `x-auth-methods#password` → password)
-type SchemaFieldResolver struct{}
+type SchemaFieldResolver struct {
+	// PasswordValidation supplies the validation rules rendered on the
+	// `x-auth-methods#password` field from the `user.password.save` policy
+	// constraints (ADR 066). Nil keeps the built-in minimum.
+	PasswordValidation func() *FlowFieldValidation
+}
 
 // NewSchemaFieldResolver returns a stateless [FlowFieldResolver].
 func NewSchemaFieldResolver() *SchemaFieldResolver {
@@ -62,7 +67,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 		)
 		switch {
 		case field.IsAuthMethod():
-			ff, err = resolveAuthMethodField(authMethods, field, stepName)
+			ff, err = resolveAuthMethodField(authMethods, field, stepName, r.PasswordValidation)
 		default:
 			ff, err = resolveUserPropertyField(root, field, stepName, identifier)
 		}
@@ -140,7 +145,7 @@ func walkUserProperty(root schemaReader, field Field) (schemaReader, bool, error
 // credential challenge only when the method is enabled on the schema;
 // otherwise [FlowFieldChallengeNone] is returned (the validator
 // rejects this at definition time).
-func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepName string) (FlowField, error) {
+func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepName string, passwordValidation func() *FlowFieldValidation) (FlowField, error) {
 	fieldType, err := deriveAuthMethodType(field)
 	if err != nil {
 		return FlowField{}, err
@@ -151,15 +156,18 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		challenge = FlowFieldChallengePassword
 	}
 
+	validation := &FlowFieldValidation{MinLength: 8}
+	if field.AuthMethod() == "password" && passwordValidation != nil {
+		validation = passwordValidation()
+	}
+
 	return FlowField{
-		Name:      field.String(),
-		TextKey:   stepName + ".field." + field.AuthMethod(),
-		Type:      fieldType,
-		Challenge: challenge,
-		Required:  true,
-		Validation: &FlowFieldValidation{
-			MinLength: 8, // TODO: should come from policy or user-schema
-		},
+		Name:       field.String(),
+		TextKey:    stepName + ".field." + field.AuthMethod(),
+		Type:       fieldType,
+		Challenge:  challenge,
+		Required:   true,
+		Validation: validation,
 	}, nil
 }
 

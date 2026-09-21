@@ -40,6 +40,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
@@ -282,11 +283,22 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
+	// ── Operation policies (ADR 066) ──────────────────
+	// Templates ship with the binary; instances are not yet release-backed, so
+	// every project runs on the template defaults until a resolver reads them
+	// from the active release.
+	policyEngine, err := policy.New()
+	if err != nil {
+		return fmt.Errorf("compile policy catalog: %w", err)
+	}
+	passwordPolicy := service.NewPasswordPolicy(policyEngine, nil, passwordHasher)
+
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
 		passwordHasher,
 		userRefs,
+		service.WithPasswordPolicy(passwordPolicy),
 	)
 
 	// The platform project's registration side effect (#527): every flow-created
@@ -303,12 +315,20 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
+	fields.PasswordValidation = func() *domain.FlowFieldValidation {
+		v, err := passwordPolicy.FieldValidation(context.Background(), "")
+		if err != nil {
+			return &domain.FlowFieldValidation{MinLength: 8}
+		}
+		return v
+	}
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		passwordHasher,
 		userService,
 		schemaStore,
 		serviceDBPool,
+		service.WithFlowPasswordPolicy(passwordPolicy),
 	)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
