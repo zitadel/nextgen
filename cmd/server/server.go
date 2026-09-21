@@ -318,7 +318,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	fields.PasswordValidation = func() *domain.FlowFieldValidation {
 		v, err := passwordPolicy.FieldValidation(context.Background(), "")
 		if err != nil {
-			return &domain.FlowFieldValidation{MinLength: 8}
+			return &domain.FlowFieldValidation{MinLength: domain.PasswordMinLengthFloor}
 		}
 		return v
 	}
