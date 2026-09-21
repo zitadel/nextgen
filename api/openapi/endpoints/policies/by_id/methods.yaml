@@ -1,0 +1,34 @@
+get:
+  operationId: getPolicyById
+  summary: Get a policy revision by ID
+  description: Retrieves a single policy revision, including its stored document.
+  tags:
+    - Policies
+  security:
+    - oauth2:
+        - policy.read
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: The policy revision was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../policy-revision-response.yaml
+    '404':
+      description: No policy revision was found with the given id.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

@@ -39,6 +39,8 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Policies
+    description: Operation policy revision publication and lookup endpoints (configuration values, audience, enforcement mode per catalogued operation).
   - name: Identity Providers
     description: |
       External login providers a project offers, each published as a
@@ -174,6 +176,10 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /policies:
+    $ref: endpoints/policies/methods.yaml
+  /policies/{id}:
+    $ref: endpoints/policies/by_id/methods.yaml
   /idps:
     $ref: endpoints/idps/methods.yaml
   /idps/query:

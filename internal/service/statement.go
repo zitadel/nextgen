@@ -42,6 +42,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	PolicyStatements
 	VariableStatements
 	ClaimStatements
 	ResourceScopeStatements
@@ -379,6 +380,13 @@ type BrandingStatements interface {
 	CreateBranding(ctx context.Context, entity *domain.Branding) error
 	GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error)
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
+}
+
+type PolicyStatements interface {
+	Statements
+	CreatePolicy(ctx context.Context, entity *domain.Policy) error
+	GetPolicyByID(ctx context.Context, projectID, id string) (*domain.Policy, error)
+	ListPolicies(ctx context.Context, filter *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)
 }
 
 // TODO(IAM-marco): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

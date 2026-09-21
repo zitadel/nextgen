@@ -22,6 +22,7 @@ const (
 	ResourceKindUser           ResourceKind = "user"
 	ResourceKindSchema         ResourceKind = "schema"
 	ResourceKindBranding       ResourceKind = "branding"
+	ResourceKindPolicy         ResourceKind = "policy"
 	ResourceKindFlowDefinition ResourceKind = "flow_definition"
 	ResourceKindSession        ResourceKind = "session"
 	ResourceKindEnvironment    ResourceKind = "environment"

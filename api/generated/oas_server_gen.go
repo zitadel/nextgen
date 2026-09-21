@@ -135,6 +135,16 @@ type Handler interface {
 	//
 	// POST /idps
 	CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
+	// CreatePolicy implements createPolicy operation.
+	//
+	// Publishes a new immutable policy revision for the project. Revisions
+	// cannot be updated or deleted; every edit publishes a new revision, and
+	// evaluation resolves the newest revision per operation and audience.
+	// The document is validated against the operation's template: unknown
+	// settings, out-of-bounds values and fixed settings are rejected.
+	//
+	// POST /policies
+	CreatePolicy(ctx context.Context, req *Policy, params CreatePolicyParams) (CreatePolicyRes, error)
 	// CreateProject implements createProject operation.
 	//
 	// Create project.
@@ -407,6 +417,12 @@ type Handler interface {
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context) (GetMyUserRes, error)
+	// GetPolicyById implements getPolicyById operation.
+	//
+	// Retrieves a single policy revision, including its stored document.
+	//
+	// GET /policies/{id}
+	GetPolicyById(ctx context.Context, params GetPolicyByIdParams) (GetPolicyByIdRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.
@@ -563,6 +579,13 @@ type Handler interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListPolicies implements listPolicies operation.
+	//
+	// Lists policy revisions for the project, newest first, capped at the 100
+	// most recent. Deliberately unpaginated in v1, like branding.
+	//
+	// GET /policies
+	ListPolicies(ctx context.Context, params ListPoliciesParams) (ListPoliciesRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.

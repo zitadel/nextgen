@@ -87,6 +87,14 @@ func (s *IdpConnectionProvisioning) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *Policy) setDefaults() {
+	{
+		val := PolicyEnforcement("enforce")
+		s.Enforcement.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *QueryGrantsRequest) setDefaults() {
 	{
 		val := int(20)
