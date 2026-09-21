@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 
 	"golang.org/x/text/cases"
@@ -99,6 +100,48 @@ func (attrs Attributes) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// MergeAttributesPatch merges patch into current with RFC 7386 semantics:
+// an omitted key stays untouched, an object merges recursively, nil deletes
+// the key, and any other value replaces the stored one. Neither input is
+// mutated. An object that merges down to no keys is kept as an empty map;
+// the EAV flattening then stores nothing for it, same as on create.
+func MergeAttributesPatch(current, patch map[string]any) map[string]any {
+	merged := make(map[string]any, len(current)+len(patch))
+	maps.Copy(merged, current)
+	for key, value := range patch {
+		switch typed := value.(type) {
+		case nil:
+			delete(merged, key)
+		case map[string]any:
+			sub, _ := merged[key].(map[string]any)
+			merged[key] = MergeAttributesPatch(sub, typed)
+		default:
+			merged[key] = value
+		}
+	}
+	return merged
+}
+
+// RegistryTeamScopes resolves the registry team scope of each attribute, index
+// aligned with attrs: project-unique values are project-wide (""), team-unique
+// values keep their already-stored scope when preserved knows the key and fall
+// back to fallback otherwise. Entries for non-unique attributes stay "" and go
+// unused. Pass a nil preserved map when nothing is stored yet (create).
+func (attrs CreateAttributes) RegistryTeamScopes(preserved map[AttributeKey]string, fallback string) []string {
+	scopes := make([]string, len(attrs))
+	for i, a := range attrs {
+		if a.UniqueScope != AttributeUniquenessTeam {
+			continue
+		}
+		if team, ok := preserved[a.Key]; ok {
+			scopes[i] = team
+			continue
+		}
+		scopes[i] = fallback
+	}
+	return scopes
+}
+
 type CreateAttribute struct {
 	Key         AttributeKey        `json:"key"`
 	Value       any                 `json:"value"`
@@ -128,7 +171,7 @@ func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness)
 
 // UniqueValueHash is the one comparison function behind attribute uniqueness:
 // the unique-attributes registry stores it and identifier resolution looks it
-// up, so both always agree on what counts as the same value (ADR 057 §4a).
+// up, so both always agree on what counts as the same value (ADR 058 §4a).
 // String values are Unicode case-folded before hashing — Alice@Example.com
 // and alice@example.com are one unique value — while the attribute itself
 // keeps its original casing. Non-string values hash as encoded.
@@ -180,11 +223,11 @@ func (attrs *CreateAttributes) fromMap(m map[string]any, schema map[string]any, 
 			}
 		default:
 			var unique AttributeUniqueness
-			strUnique, _ := maputil.GetNested[string](schema, []string{"properties", key, "x-unique"})
+			strUnique, _ := maputil.GetNested[string](schema, []string{"properties", key, SchemaAnnotationUnique})
 			switch strUnique {
-			case "project":
+			case SchemaUniqueScopeProject:
 				unique = AttributeUniquenessProject
-			case "team":
+			case SchemaUniqueScopeTeam:
 				unique = AttributeUniquenessTeam
 			}
 			attr, err := NewCreateAttribute(fullKey, value, unique)

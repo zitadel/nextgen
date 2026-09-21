@@ -17,8 +17,10 @@ type CreateBrandingInput struct {
 	Layout         string
 	LiquidTemplate string
 	LogoURL        string
-	FontURL        string
 	HeroURL        string
+	Theme          domain.BrandingTheme
+	Typography     domain.BrandingTypography
+	Shape          domain.BrandingShape
 }
 
 // BrandingService publishes and resolves immutable branding revisions
@@ -41,8 +43,10 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 		input.Layout,
 		input.LiquidTemplate,
 		input.LogoURL,
-		input.FontURL,
 		input.HeroURL,
+		input.Theme,
+		input.Typography,
+		input.Shape,
 	)
 	if err != nil {
 		return nil, err
@@ -60,7 +64,7 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 			Payload: domain.BrandingPayload{
 				Layout:  entity.Layout,
 				LogoURL: entity.LogoURL,
-				FontURL: entity.FontURL,
+				FontURL: entity.Typography.FontURL,
 				HeroURL: entity.HeroURL,
 			},
 		})

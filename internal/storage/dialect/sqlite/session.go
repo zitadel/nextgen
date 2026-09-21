@@ -504,4 +504,21 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 		SQLName:  "EXISTS (SELECT 1 FROM checks vc WHERE vc.project_id = s.project_id AND vc.session_id = s.id AND vc.last_verified_at IS NOT NULL)",
 		Computed: true,
 	},
+	// Not a column: a correlated EXISTS over the session user's lifecycle
+	// owner (ADR 024, ADR 060), split so the filter binds the team id inline.
+	// Both correlation columns are the users primary key and the team side is
+	// equality-bound against idx_users_lifecycle_owner_team_id, which leaves
+	// the planner two shapes to pick from by selectivity: probe users per
+	// candidate session for a team owning much of the project, or drive from
+	// the owned users into sessions for a narrow one. A session with user_id
+	// NULL never matches: the correlation compares to NULL and EXISTS is
+	// false, and a self-owned user's NULL lifecycle_owner_team_id never equals
+	// a bound team id.
+	domain.SessionFieldLifecycleOwnerTeamID: {
+		SQLName: `EXISTS (SELECT 1 FROM users u
+	WHERE u.project_id = s.project_id AND u.id = s.user_id
+	  AND u.lifecycle_owner_team_id = `,
+		SQLSuffix: ")",
+		Computed:  true,
+	},
 })

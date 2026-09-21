@@ -45,7 +45,7 @@ func conflictSchemaDocument(schemaID string) []byte {
       "metaSchema": "%s/user-schema.json",
       "kind": "user-schema",
       "type": "object",
-      "x-auth-methods": { "password": { "enabled": true } },
+      "x-auth-methods": { "passkey": { "enabled": true } },
       "properties": { "givenName": { "type": "string" } }
     }`, schemaID, conflictSchemaBase)
 }
@@ -226,7 +226,7 @@ func TestSchemaService_ListSchemas(t *testing.T) {
 			name: "kind filter applied",
 			input: service.ListSchemasInput{
 				ProjectID: "proj_a",
-				Kind:      ptr(domain.JSONSchemaKindUserSchema),
+				Kind:      new(domain.JSONSchemaKindUserSchema),
 			},
 			wantOpts: listSchemasOpts(20, "",
 				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),

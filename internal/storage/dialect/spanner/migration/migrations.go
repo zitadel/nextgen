@@ -85,8 +85,13 @@ func Migrate(ctx context.Context, db *sql.DB) (err error) {
 	if err != nil {
 		return err
 	}
+	// batchDDLFS brackets each run of consecutive DDL with START BATCH DDL /
+	// RUN BATCH, so those statements reach Spanner as one UpdateDatabaseDdl
+	// instead of one per statement (#973). goose just executes what it reads.
+	// See ddl_batch.go.
+	//
 	// WithIsolateDDL runs DDL statements outside transactions, which Spanner requires.
-	p, err := goose.NewProvider(goose.DialectSpanner, db, sqlFS, goose.WithIsolateDDL(true))
+	p, err := goose.NewProvider(goose.DialectSpanner, db, batchDDLFS{inner: sqlFS}, goose.WithIsolateDDL(true))
 	if err != nil {
 		return err
 	}

@@ -14,8 +14,10 @@ const (
 
 // PlatformProjectID is the well-known id of the deployment's platform project.
 // The server owns it: bootstrap (platform.bootstrap_project) creates this row
-// and default-project resolution pins to it. Readable body per ADR 047 §3.3;
-// operators never author it.
+// and pins default-project resolution to it while the flag is set. Without
+// that pin (or an explicit platform.project_id) the resolution heuristic
+// skips this row — it is infrastructure, never the deployment's own product
+// project. Readable body per ADR 047 §3.3; operators never author it.
 var PlatformProjectID = PrefixProject.IDPrefix("platform") // "proj_platform"
 
 func ErrProjectNameInvalid() Error {
@@ -40,6 +42,20 @@ func ErrProjectAlreadyClaimed() Error {
 
 func ErrProjectClaimExpired() Error {
 	return newError(PrefixProject.ErrorCodePrefix("claim_expired"), "the claim challenge has expired", nil, nil)
+}
+
+// ErrProjectClaimWindowExpired covers a claim attempted after the project's
+// ClaimWindow closed. Distinct from ErrProjectClaimExpired, which names a dead
+// challenge and invites starting a new one; this refusal is final, so clients
+// must not present it as retryable. The message spells out ClaimWindow's 14
+// days as a literal because gen_error_schemas lifts it into the OpenAPI error
+// component verbatim; keep the two in sync.
+func ErrProjectClaimWindowExpired() Error {
+	return newError(
+		PrefixProject.ErrorCodePrefix("claim_window_expired"),
+		"the project was not claimed within 14 days of creation and can no longer be claimed",
+		nil, nil,
+	)
 }
 
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)

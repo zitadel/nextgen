@@ -1,7 +1,8 @@
+import { Flags } from "@oclif/core";
 import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import { createOrca } from "../lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
@@ -87,7 +88,15 @@ async function pathExists(path: string): Promise<boolean> {
  */
 export default class Eject extends BaseCommand {
   static override description = "Remove managed files and local Zitadel state.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 4;
   static override aliases = ["uninstall"];
+  static override flags = {
+    force: Flags.boolean({
+      char: "f",
+      description: "Remove the managed files without the confirmation prompt.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Eject);

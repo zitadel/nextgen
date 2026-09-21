@@ -57,12 +57,17 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 
 // GetTeamByID implements [service.TeamStatements].
 func (ts teamStatements) GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error) {
+	return ts.GetTeam(ctx, database.And(
+		database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+		database.Equal(database.Col(domain.TeamFieldID), id),
+	))
+}
+
+// GetTeam implements [service.TeamStatements].
+func (ts teamStatements) GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error) {
 	var compiler statementCompiler
 	if err := compileRead(&compiler, getTeamQuery, &database.ListOptions[domain.TeamField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
-			database.Equal(database.Col(domain.TeamFieldID), id),
-		),
+		Filter: filter,
 	}, teamSchema); err != nil {
 		return nil, err
 	}

@@ -25,12 +25,24 @@ type CreateFlowRes interface {
 	createFlowRes()
 }
 
+type CreateGrantRes interface {
+	createGrantRes()
+}
+
 type CreateHandoffRes interface {
 	createHandoffRes()
 }
 
+type CreateIdpRes interface {
+	createIdpRes()
+}
+
 type CreateProjectRes interface {
 	createProjectRes()
+}
+
+type CreateReleaseRes interface {
+	createReleaseRes()
 }
 
 type CreateSchemaRes interface {
@@ -49,8 +61,8 @@ type CreateUserRes interface {
 	createUserRes()
 }
 
-type DeleteFlowDefinitionRes interface {
-	deleteFlowDefinitionRes()
+type DeleteGrantRes interface {
+	deleteGrantRes()
 }
 
 type DeleteTeamRes interface {
@@ -59,6 +71,10 @@ type DeleteTeamRes interface {
 
 type DeleteUserByIDRes interface {
 	deleteUserByIDRes()
+}
+
+type DeleteVariableRes interface {
+	deleteVariableRes()
 }
 
 type ExchangeHandoffRes interface {
@@ -81,6 +97,14 @@ type GetClaimStatusRes interface {
 	getClaimStatusRes()
 }
 
+type GetClaimWindowRes interface {
+	getClaimWindowRes()
+}
+
+type GetEnvironmentByNameRes interface {
+	getEnvironmentByNameRes()
+}
+
 type GetEventRes interface {
 	getEventRes()
 }
@@ -93,8 +117,20 @@ type GetFlowStepRes interface {
 	getFlowStepRes()
 }
 
+type GetGrantRes interface {
+	getGrantRes()
+}
+
 type GetHealthRes interface {
 	getHealthRes()
+}
+
+type GetIdpByIdRes interface {
+	getIdpByIdRes()
+}
+
+type GetIdpRevisionByIdRes interface {
+	getIdpRevisionByIdRes()
 }
 
 type GetLiveRes interface {
@@ -117,6 +153,10 @@ type GetReadyRes interface {
 	getReadyRes()
 }
 
+type GetReleaseByIdRes interface {
+	getReleaseByIdRes()
+}
+
 type GetSchemaByIdRes interface {
 	getSchemaByIdRes()
 }
@@ -133,6 +173,14 @@ type GetUserByIDRes interface {
 	getUserByIDRes()
 }
 
+type GetVariableRes interface {
+	getVariableRes()
+}
+
+type GetVariablesRes interface {
+	getVariablesRes()
+}
+
 type InitClaimRes interface {
 	initClaimRes()
 }
@@ -145,12 +193,28 @@ type ListBrandingRes interface {
 	listBrandingRes()
 }
 
+type ListEnvironmentsRes interface {
+	listEnvironmentsRes()
+}
+
 type ListEventsRes interface {
 	listEventsRes()
 }
 
 type ListFlowDefinitionsRes interface {
 	listFlowDefinitionsRes()
+}
+
+type ListIdpRevisionsRes interface {
+	listIdpRevisionsRes()
+}
+
+type ListMyProjectsRes interface {
+	listMyProjectsRes()
+}
+
+type ListReleasesRes interface {
+	listReleasesRes()
 }
 
 type ListSchemasRes interface {
@@ -165,12 +229,24 @@ type ListUserTeamsRes interface {
 	listUserTeamsRes()
 }
 
-type ListUsersRes interface {
-	listUsersRes()
+type PatchMyUserRes interface {
+	patchMyUserRes()
 }
 
 type PatchProjectRes interface {
 	patchProjectRes()
+}
+
+type PatchUserByIDRes interface {
+	patchUserByIDRes()
+}
+
+type QueryGrantsRes interface {
+	queryGrantsRes()
+}
+
+type QueryIdpsRes interface {
+	queryIdpsRes()
 }
 
 type QueryProjectsRes interface {
@@ -183,6 +259,10 @@ type QuerySessionsRes interface {
 
 type QueryTeamsRes interface {
 	queryTeamsRes()
+}
+
+type QueryUsersRes interface {
+	queryUsersRes()
 }
 
 type RevokeMySessionRes interface {
@@ -201,12 +281,12 @@ type SubmitFlowStepRes interface {
 	submitFlowStepRes()
 }
 
-type UpdateFlowDefinitionRes interface {
-	updateFlowDefinitionRes()
-}
-
 type UpdateTeamRes interface {
 	updateTeamRes()
+}
+
+type UpdateVariablesRes interface {
+	updateVariablesRes()
 }
 
 type VerifyChallengeProofRes interface {

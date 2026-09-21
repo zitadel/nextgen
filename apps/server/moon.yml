@@ -15,6 +15,7 @@ fileGroups:
     - "/api/**/*.json"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
+    - "/scripts/generate-meta-schemas.ts"
     - "moon.yml"
     - "package.json"
     - "bin/**"
@@ -60,10 +61,16 @@ tasks:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
       - "/api/openapi/endpoints/**/*-error-response.yaml"
+      - "/api/openapi/endpoints/schemas/*.json"
       - "/internal/**/*_enumer.go"
       - "/internal/**/*.mock.go"
     options:
       runFromWorkspaceRoot: true
+      # Generation rewrites files other projects read mid-graph: the JSON
+      # meta-schemas (config:sync-schemas) and the error-response YAML
+      # (api:generate). The shared mutex keeps those from running against a
+      # half-written or pruned tree; CI already runs the pruned check alone.
+      mutex: "generated-sources"
 
   # Generators only write; they never retract. Removing everything and
   # regenerating is how orphaned output gets pruned — whatever does not come
@@ -77,6 +84,7 @@ tasks:
       cache: false
       runInCI: false
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   check-generate:
     command: "node scripts/check-go-generate.mjs"
@@ -91,6 +99,7 @@ tasks:
       - "/scripts/generated-outputs.mjs"
     options:
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   # check-generate plus a prune, so output nothing generates any more fails the
   # build instead of lingering. Deliberately not a dep of vet/test: it deletes
@@ -107,6 +116,7 @@ tasks:
       - "/scripts/dev-process.mjs"
     options:
       runFromWorkspaceRoot: true
+      mutex: "generated-sources"
 
   vet:
     command: "go vet ./..."
@@ -114,6 +124,32 @@ tasks:
       - "check-generate"
       # Same embed race as test/build: go vet compiles //go:embed all:dist while
       # a concurrent console/login-ui build can emptyOutDir the placeholder.
+      - "console:build"
+      - "login-ui:build"
+    inputs:
+      - "@group(serverInputs)"
+    options:
+      runFromWorkspaceRoot: true
+
+  # Custom go/analysis checks, run directly rather than through go vet so the
+  # built-in vet analyzers (task "vet") keep running alongside. Today this is
+  # egresslint, which enforces the single egress-client invariant (ADR 061):
+  # outbound HTTP or TCP clients may only be built in internal/httputil, and
+  # any other site needs an //egress:allow <reason> directive. Further
+  # analyzers join the same binary (tools/analyzers/cmd/analyzers).
+  #
+  # Runs once per build configuration: the default set, then each integration
+  # tag on its own, because the tagged files are invisible to the default run
+  # and the tags cannot be combined (each lane defines its own TestMain).
+  lint:
+    script: |
+      set -e
+      go run ./tools/analyzers/cmd/analyzers ./...
+      for tag in postgres_integration spanner_integration sqlite_integration; do
+        GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
+      done
+    deps:
+      - "check-generate"
       - "console:build"
       - "login-ui:build"
     inputs:
@@ -134,6 +170,7 @@ tasks:
       - "format"
       - "check-generate"
       - "vet"
+      - "lint"
       # Order UI builds before go test so a batched moon graph cannot compile
       # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
       # Intentionally deps-only (not inputs): UI-only changes must not invalidate
@@ -146,10 +183,24 @@ tasks:
       runFromWorkspaceRoot: true
 
   test-postgres:
+    # Two independent caches can replay these lanes, and both have to be off.
+    #
+    # -count=1 disables go's test-result cache. These suites talk to an external
+    # database whose state is invisible to go's cache key, and CI restores
+    # GOCACHE between runs (setup-go cache: true), so an unchanged source tree
+    # yields "ok (cached)" without anything executing against the current
+    # backend. Observed on run 32743380406, where this very lane reported
+    # `ok … integration_test (cached)`.
+    #
+    # options.cache: false disables moon's. That one sits in front of go: on a
+    # repeat task hash moon reports the task cached and never starts the `go`
+    # process at all, so -count=1 never gets a turn. The external database is
+    # just as invisible to moon's hash as it is to go's.
     command: "go"
     args:
       - "test"
       - "-v"
+      - "-count=1"
       - "-tags"
       - "postgres_integration"
       - "-timeout"
@@ -159,6 +210,9 @@ tasks:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
+      # See the -count=1 note above: moon's own cache would skip the process
+      # before go's cache mattered.
+      cache: false
       # Invoked explicitly by the CI "Run Go integration tests (postgres)" step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
@@ -166,6 +220,12 @@ tasks:
       runInCI: true
 
   test-spanner:
+    # -count=1 disables go's test-result cache; see test-postgres above. This is
+    # the lane where it did real damage: on run 32741899403 the real-instance
+    # step finished in 23 seconds printing `ok … integration_test (cached)`,
+    # replaying results recorded by an emulator execution. A benchmark number
+    # was nearly read off a run that never happened.
+    #
     # -parallel is deliberately NOT pinned to 1. The emulator serves one
     # transaction at a time, so tests running concurrently within a package force
     # the aborts that prove the abort-retry path still works. Pinning it hid the
@@ -178,17 +238,35 @@ tasks:
     args:
       - "test"
       - "-v"
+      - "-count=1"
       - "-tags"
       - "spanner_integration"
+      # Emulator-only budget: the emulator's query planner is pathologically slow
+      # on the principal-scoped authz list predicate (TestListAuthzTeamScoped*),
+      # spiking to ~9m30s and tripping a 10m timeout, while real Cloud Spanner
+      # runs the same predicate in ~40ms. Postgres runs the same test in 0.08s.
+      # Keep the other lanes tight so genuine hangs still surface; see #1011.
       - "-timeout"
-      - "10m"
+      - "20m"
       - "-p"
       - "1"
       - "./..."
     inputs:
       - "@group(serverInputs)"
+      # Belt-and-braces, not the thing protecting this lane: with cache: false
+      # below, the task hash is never consulted, so nothing can be replayed from
+      # it and this entry changes no outcome today. It is kept because the target
+      # backend (emulator container vs real Cloud Spanner instance) genuinely
+      # does change what runs, so the hash should reflect it if caching is ever
+      # switched back on. Same pairing as build-release in apps/cli/moon.yml,
+      # which also lists an env input alongside cache: false.
+      - "$ZITADEL_TEST_SPANNER_INSTANCE"
     options:
       runFromWorkspaceRoot: true
+      # See the -count=1 note above: moon's own cache would skip the process
+      # before go's cache mattered. Observed on #934, where moon replayed the
+      # emulator task's result for a real-instance run.
+      cache: false
       # Invoked by the CI Spanner emulator step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
@@ -196,10 +274,15 @@ tasks:
       runInCI: true
 
   test-sqlite:
+    # -count=1 disables go's test-result cache; see test-postgres above. SQLite
+    # runs in-process rather than against a container, but the database file is
+    # still created at runtime and is not part of go's cache key, so a cached
+    # "ok" is no more trustworthy here than on the other two lanes.
     command: "go"
     args:
       - "test"
       - "-v"
+      - "-count=1"
       - "-tags"
       - "sqlite_integration"
       - "-timeout"
@@ -209,6 +292,9 @@ tasks:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
+      # See the -count=1 note above: moon's own cache would skip the process
+      # before go's cache mattered.
+      cache: false
       # Invoked explicitly by the CI "Run Go integration tests (sqlite)" step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that

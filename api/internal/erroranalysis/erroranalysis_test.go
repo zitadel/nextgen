@@ -194,7 +194,7 @@ func TestHandlerAuthzGatePropagatesResourceAccessErrors(t *testing.T) {
 		"Handler.CreateBranding": {
 			"domain.ErrBrandingPermissionDenied",
 		},
-		"Handler.ListUsers": {
+		"Handler.QueryUsers": {
 			"domain.ErrUserNotFound",
 			"domain.ErrUserPermissionDenied",
 		},

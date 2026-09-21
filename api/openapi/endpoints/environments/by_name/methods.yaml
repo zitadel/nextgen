@@ -1,0 +1,25 @@
+get:
+  operationId: getEnvironmentByName
+  summary: Get an environment by name
+  description: |
+    Reads one environment of the project by its name.
+
+    The lookup is scoped to the project in `project_id`: a name that exists in
+    another project answers `env.not_found` exactly as an unused name does.
+  tags:
+    - Environments
+  security:
+    - oauth2:
+        - environment.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/environment-name.yaml
+  responses:
+    '200':
+      description: The environment was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../environment.yaml
+    default:
+      $ref: getEnvironmentByName-error-response.yaml

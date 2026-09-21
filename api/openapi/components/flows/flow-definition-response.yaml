@@ -11,6 +11,16 @@ properties:
     example: proj_789ghi012jkl
   flow_definition:
     $ref: flow-definition.yaml
+  user_schema:
+    readOnly: true
+    description: |
+      The user schema this flow operates on: the same object
+      `GET /schemas/{id}` returns. Present only when the request asked for it
+      with `expand=user_schema`; `null` when it was requested but the
+      referenced schema no longer resolves or the caller may not read it.
+    oneOf:
+      - $ref: ../../endpoints/schemas/schema.yaml
+      - type: 'null'
   created_at:
     type: string
     format: date-time

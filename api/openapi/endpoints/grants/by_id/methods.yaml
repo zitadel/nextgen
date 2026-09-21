@@ -1,0 +1,126 @@
+get:
+  operationId: getGrant
+  summary: Get grant
+  description: |
+    Loads a grant by `(project_id, id)` that this API manages (user or team
+    bound to viewer, editor, or admin) and that has not been revoked.
+    "Active" here means not revoked: expired grants stay visible so the
+    client can DELETE before re-granting the same binding. Authorization
+    still ignores expired grants. Grants are not registered in
+    `resource_scope_index`; project scope is required on the query (same as
+    events). Misses, revoked rows, project-secret setup (`sk_proj`),
+    owning-team (`relation=team`) rows, and cross-project ids return 404.
+    `expand=principal` adds envelope fields on `user` or `team` and requires
+    `user.read` and `team.read` in addition to `project.read` for project
+    secrets. A user-bound Console session that already passed the project
+    Check may expand without those scopes.
+
+    Accepts either a project secret (`oauth2`) or a user-bound Console
+    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+    is a follow-up (#1140).
+  tags:
+    - Grants
+  security:
+    - oauth2:
+        - project.read
+    - nextgenSession: []
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/project-id.yaml
+    - name: expand
+      in: query
+      required: false
+      description: |
+        Extra principal fields to add onto `user` or `team`. Same enum and
+        `user.read` + `team.read` gate as `POST /grants/query`.
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: ../query/grant-expand.yaml
+  responses:
+    '200':
+      description: The grant.
+      content:
+        application/json:
+          schema:
+            $ref: ../grant.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: |
+        No unrevoked collaboration grant was found for the given project and
+        id (including setup and owning-team rows this API does not manage).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getGrant-error-response.yaml
+
+delete:
+  operationId: deleteGrant
+  summary: Revoke grant
+  description: |
+    Soft-revokes a grant this API manages and emits `authz.revoked`.
+    Already-revoked, missing, project-secret setup, and owning-team grants
+    return 404. The row is not un-revoked. Expired grants can still be
+    revoked so the unique binding can be reused.
+
+    Accepts either a project secret (`oauth2`) or a user-bound Console
+    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+    is a follow-up (#1140).
+  tags:
+    - Grants
+  security:
+    - oauth2:
+        - project.write
+    - nextgenSession: []
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '204':
+      description: The grant was revoked.
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: |
+        No unrevoked collaboration grant was found for the given project and
+        id (including setup and owning-team rows this API does not manage).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: deleteGrant-error-response.yaml

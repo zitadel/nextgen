@@ -37,7 +37,7 @@ func TestListSchemasPagination(t *testing.T) {
 			"kind": "user-schema",
 			"type": "object",
 			"x-auth-methods": {
-				"password": { "enabled": true }
+				"passkey": { "enabled": true }
 			},
 			"properties": {
 				"prop%d": { "type": "string" }
@@ -104,10 +104,10 @@ func TestListSchemasPagination(t *testing.T) {
 			PageToken: api.NewOptPageToken("not-a-cursor"),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.ErrorDetailsStatusCode{}, res, helpers.MustMarshal(t, res))
-		errRes := res.(*api.ErrorDetailsStatusCode)
+		require.IsType(t, &api.ListSchemasErrorResponseStatusCode{}, res, helpers.MustMarshal(t, res))
+		errRes := res.(*api.ListSchemasErrorResponseStatusCode)
 		assert.Equal(t, http.StatusBadRequest, errRes.StatusCode)
-		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), errRes.Response.Code)
+		assert.Equal(t, api.ListSchemasErrorResponseType(domain.ErrRequestInvalid().Code), errRes.Response.Type)
 	})
 }
 
@@ -135,7 +135,7 @@ func TestListSchemasRevisions(t *testing.T) {
 			"kind": "user-schema",
 			"type": "object",
 			"x-auth-methods": {
-				"password": { "enabled": true }
+				"passkey": { "enabled": true }
 			},
 			"properties": {
 				"givenName": { "type": "string" }
@@ -248,10 +248,10 @@ func TestListSchemasRevisions(t *testing.T) {
 			PageToken: api.NewOptPageToken(token),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.ErrorDetailsStatusCode{}, res, helpers.MustMarshal(t, res))
-		errRes := res.(*api.ErrorDetailsStatusCode)
+		require.IsType(t, &api.ListSchemasErrorResponseStatusCode{}, res, helpers.MustMarshal(t, res))
+		errRes := res.(*api.ListSchemasErrorResponseStatusCode)
 		assert.Equal(t, http.StatusBadRequest, errRes.StatusCode)
-		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), errRes.Response.Code)
+		assert.Equal(t, api.ListSchemasErrorResponseType(domain.ErrRequestInvalid().Code), errRes.Response.Type)
 	})
 }
 

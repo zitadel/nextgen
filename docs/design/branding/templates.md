@@ -164,7 +164,7 @@ zitadel plan                            # authoritative validation + diff (revis
 zitadel apply                           # publishes an immutable branding revision
 ```
 
-`branding.json` references the template via `liquid_template_file`; the CLI inlines it into the wire `liquid_template` on upload. Flow responses resolve the latest revision per project — see [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md).
+`branding.json` references the template as `"liquid_template": { "$file": "./login.liquid" }`; the CLI replaces the reference with the file's content on upload. Flow responses resolve the latest revision per project — see [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md).
 
 ## Contract every template must satisfy
 

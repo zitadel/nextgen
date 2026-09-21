@@ -9,7 +9,6 @@
 }
 
 /* Shared surface for `<zl-select>` / `<Select>`. Lit-only rules: lit/select-host.css */
-/* Figma masters: 8UjCXw8yemgljmbkWGrSfE / Dropdown 4397:4816 · Items 4397:4098 */
 /*
  * A select-only combobox: a button trigger (`.zr-select__trigger`) that opens a
  * `role="listbox"` popup (`.zr-select__listbox`). The trigger mirrors the text

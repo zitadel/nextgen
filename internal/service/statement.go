@@ -29,6 +29,8 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
+	EnvironmentStatements
+	ReleaseStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -40,6 +42,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	VariableStatements
 	ClaimStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
@@ -72,12 +75,18 @@ type ProjectStatements interface {
 // 	Transactioner[FlowDefinitionStatements]
 // }
 
+// FlowDefinitionQueryOptions carries query modes for ListFlowDefinitions that
+// are not column predicates. Column predicates stay in Filter / ListOptions.
+type FlowDefinitionQueryOptions struct {
+	// LatestRevisionPerName keeps only the newest revision of each name.
+	LatestRevisionPerName bool
+}
+
 type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
-	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
+	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], opts FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
 
@@ -115,6 +124,36 @@ type JSONSchemaStatements interface {
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type EnvironmentPool interface {
+// 	Statementer[EnvironmentStatements]
+// 	Transactioner[EnvironmentStatements]
+// }
+
+type EnvironmentStatements interface {
+	Statements
+	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
+	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
+	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type ReleasePool interface {
+// 	Statementer[ReleaseStatements]
+// 	Transactioner[ReleaseStatements]
+// }
+
+type ReleaseStatements interface {
+	Statements
+	CreateRelease(ctx context.Context, entity *domain.Release) error
+	GetReleaseByID(ctx context.Context, projectID, id string) (*domain.Release, error)
+	// GetReleaseByContentHash is the read half of the idempotency contract:
+	// assembling a release resolves an identical pinned set to the release that
+	// already holds it rather than writing a second one.
+	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
+	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type TeamPool interface {
 // 	Statementer[TeamStatements]
 // 	Transactioner[TeamStatements]
@@ -124,6 +163,7 @@ type TeamStatements interface {
 	Statements
 	CreateTeam(ctx context.Context, entity *domain.Team) error
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	GetTeam(ctx context.Context, filter database.Filter[domain.TeamField]) (*domain.Team, error)
 	UpdateTeam(ctx context.Context, entity *domain.Team) error
 	ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle
@@ -226,7 +266,26 @@ type UserQueryOptions struct {
 	UniqueAttributesOnly bool
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
+	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded
+	// by a batched second query keyed on the page's ids, never by joining it
+	// into the user query: a join multiplies rows, which would make LIMIT
+	// count memberships instead of users and corrupt the keyset cursor.
+	IncludeTeams bool
+	// TeamsLimit caps how many membership entries each user carries when
+	// IncludeTeams is set. Zero means [DefaultUserTeamsLimit].
+	TeamsLimit int
+	// IncludeLifecycleOwnerTeam hydrates the team that owns each user's
+	// lifecycle (ADR 059). Like IncludeTeams it is a batched second query,
+	// keyed on the distinct owner ids the page returned; self-owned users
+	// contribute no id and stay nil.
+	IncludeLifecycleOwnerTeam bool
 }
+
+// DefaultUserTeamsLimit caps an embedded membership list. Embedded collections are not
+// paginated, so without a cap one user on thousands of teams would dominate a
+// page whose limit promised twenty users. Past the cap the user is flagged
+// truncated and the full list is read from ListUserTeams.
+const DefaultUserTeamsLimit = 10
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type UserPool interface {
@@ -237,6 +296,17 @@ type UserQueryOptions struct {
 type UserStatements interface {
 	Statements
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
+	// PatchUser reconciles the stored user to the given post-merge state:
+	// header (schema_url, updated_at), attribute rows, and unique-attribute
+	// registry rows are all rewritten. It writes nothing and returns a
+	// NoRowFoundError when the row's updated_at no longer matches
+	// [domain.PatchUser.ExpectedUpdatedAt] (concurrent write) or the user is
+	// gone.
+	PatchUser(ctx context.Context, user *domain.PatchUser) error
+	// GetUserUniqueAttributeScopes reads the stored registry team scope per
+	// attribute key, so a patch keeps the scope an existing claim was created
+	// under. An unknown user reads as an empty map, not an error.
+	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
@@ -317,6 +387,31 @@ type BrandingStatements interface {
 // 	Transactioner[ClaimStatements]
 // }
 
+type VariableStatements interface {
+	Statements
+	// GetVariables returns the variables owner entered, for the given names (all
+	// names when none are given), ordered by name. Every owner column is matched
+	// exactly, so a name owner has not entered is absent even when another owner
+	// of the same project holds it -- nothing is inherited. This is the only
+	// place the owner predicate is enforced, so a caller never sees a variable
+	// entered elsewhere.
+	//
+	// The primary key is the name plus the owner, so at most one variable comes
+	// back per name and the caller has nothing to choose between.
+	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
+	// SetVariable writes variable under its own name and owner, replacing the
+	// value and IsSecret flag of an existing variable with the same name and
+	// owner. The environment is optional -- unset addresses the project level --
+	// but the project is not, and one that is missing or names no existing
+	// project is rejected by the table.
+	SetVariable(ctx context.Context, variable *domain.Variable) error
+	// DeleteVariable removes the variable owner entered under name. Removing one
+	// that is not there returns NoRowFoundError; it never deletes a variable
+	// with a different owner, since every owner column must match exactly, so
+	// one owner cannot remove what another entered.
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+}
+
 type ClaimStatements interface {
 	Statements
 	// CreateChallenge inserts a pending claim challenge; entity.ID is the
@@ -331,6 +426,14 @@ type ClaimStatements interface {
 	// is not active. It never falls back to a later membership: a deactivated
 	// personal team is not silently replaced by another team the user belongs to.
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
+	// GetEarliestTeamMembership returns the same earliest membership
+	// GetPersonalTeamForUser resolves from, but regardless of its status and
+	// without joining the team. It exists to tell apart the two states
+	// GetPersonalTeamForUser deliberately collapses into NoRowFoundError:
+	// a user who holds no membership at all (NoRowFoundError here too) from one
+	// whose personal team is deactivated (a row with a non-active status).
+	// Provisioning must create a team for the first and leave the second alone.
+	GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error)
 }
 
 // ResourceScopeStatements persists resource_scope_index rows (path.id → project/team).
@@ -366,6 +469,11 @@ type AuthzAssignmentStatements interface {
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
 	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	// ListManagedGrants lists unrevoked collaboration grants (user/team
+	// viewer|editor|admin) with cursor pagination. Setup and owning-team
+	// rows are excluded in SQL. projectID is required and always ANDed
+	// into the SELECT so a caller cannot list across projects.
+	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
@@ -377,13 +485,28 @@ type AuthzAssignmentStatements interface {
 	// grant (ADR 049 export visibility), ordered by project_id after afterID
 	// (empty starts at the beginning).
 	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
+	// ListAuthorizedProjects pages the projects the user can act on, by the
+	// three routes ADR 053 §6 puts in the authorized set:
+	//
+	//  1. the user holds an active project-level grant directly;
+	//  2. a team the user has a membership edge in inside homeProjectID holds
+	//     one;
+	//  3. the active catalog's bounded tuple-to-userset path: the user holds a
+	//     grant, directly or through such a team, whose relation closes to the
+	//     source of a project tuple-to-userset edge and whose scope points at
+	//     the tupleset team, so nothing names the user on the project at all.
+	//
+	// Every route is evaluated on the active system catalog, mirroring
+	// CheckAuthz. page.OrderBy carries the sort columns; a cursor issued for a
+	// different OrderBy is rejected.
+	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
-// The resolver reads these edges, not team_memberships (roster/lifecycle stays separate).
+// The resolver reads these edges, not team_memberships (membership/lifecycle stays separate).
 //
 // Use cases:
-//   - Upsert: low-level row ops. Prefer [SyncUserTeamMembershipEdge] for roster status changes.
+//   - Upsert: low-level row ops. Prefer [SyncUserTeamMembershipEdge] for membership status changes.
 //   - DeleteAuthzMembershipEdges: column-shaped deletes via Filter (single edge, by member, by set).
 //   - DeleteAuthzMembershipEdgesForTeamDeactivate: team deactivate (team set + lifecycle-owned users).
 //   - Get/ListByMember: resolver / dual-write test reads.
@@ -433,14 +556,16 @@ type AuthzCatalogStatements interface {
 //
 // Use cases:
 //   - ActiveSystemCatalogID: active system catalog (kind=system, owner=system).
-//   - HasAuthzProjectFoothold: any active assignment or membership edge in project.
+//   - HasAuthzProjectFoothold: any active assignment in project (team expand via
+//     homeProjectID) or a local membership edge in project. Empty homeProjectID
+//     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
 //     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
-	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
+	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

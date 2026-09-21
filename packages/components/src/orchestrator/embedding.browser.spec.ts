@@ -260,6 +260,10 @@ function centerX(element: Element): number {
   return (rect.left + rect.right) / 2;
 }
 
+function centerY(rect: DOMRect): number {
+  return (rect.top + rect.bottom) / 2;
+}
+
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {
   const start = performance.now();
   while (performance.now() - start < timeout) {
@@ -492,6 +496,44 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
     const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
     expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
+  });
+
+  it("projects host content onto the trustmark row through attribution-trailing", async () => {
+    // The design draws a badge beside the mark, but the widget has nothing
+    // true to put there — so it exposes the position and a host fills it. The
+    // console's claim page is the first, with the project's claim window.
+    const element = await mount(identifierStep, (el) => {
+      const badge = document.createElement("span");
+      badge.slot = "attribution-trailing";
+      badge.id = "trailing-probe";
+      badge.textContent = "Expires in 7 days";
+      el.appendChild(badge);
+    });
+    const slot = element.shadowRoot?.querySelector(
+      '.zl-attribution slot[name="attribution-trailing"]',
+    ) as HTMLSlotElement;
+    expect(slot.assignedElements()).toEqual([element.querySelector("#trailing-probe")]);
+
+    // Same row as the mark, not stacked under it, and separated by the row's
+    // own 10px gap — the geometry the design draws.
+    const mark = element.shadowRoot?.querySelector(".zl-trustmark__mark") as HTMLElement;
+    const badge = element.querySelector("#trailing-probe") as HTMLElement;
+    const markBox = mark.getBoundingClientRect();
+    const badgeBox = badge.getBoundingClientRect();
+    expect(Math.abs(centerY(markBox) - centerY(badgeBox))).toBeLessThanOrEqual(1);
+    expect(Math.round(badgeBox.left - markBox.right)).toBe(10);
+  });
+
+  it("an unfilled attribution-trailing slot leaves the trustmark row unchanged", async () => {
+    // A slot is display:contents, so it is not a flex item and cannot add the
+    // row's gap to the end of the mark. Every embed that ignores the slot has
+    // to render exactly as it did before it existed.
+    const element = await mount(identifierStep);
+    const row = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
+    const mark = element.shadowRoot?.querySelector(".zl-trustmark__mark") as HTMLElement;
+    expect(Math.round(row.getBoundingClientRect().width)).toBe(
+      Math.round(mark.getBoundingClientRect().width),
+    );
   });
 
   it("the split designs hang the trustmark off the card, not off the pane seam", async () => {

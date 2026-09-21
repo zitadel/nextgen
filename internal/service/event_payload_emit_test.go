@@ -24,6 +24,7 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	masterKey := cryptomock.NewMockCrypter(ctrl)
 	keyService := servicemocks.NewMockKeyService(ctrl)
 	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	expectKeySavesThroughStatements(keyService)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
@@ -54,6 +55,7 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
+	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 
@@ -94,6 +96,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	masterKey := cryptomock.NewMockCrypter(ctrl)
 	keyService := servicemocks.NewMockKeyService(ctrl)
 	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	expectKeySavesThroughStatements(keyService)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
@@ -351,6 +354,10 @@ func TestBrandingCreate_EventPayloadURLs(t *testing.T) {
 		LiquidTemplate: "<div>{% mandatory_gates %}</div>",
 		LogoURL:        "https://cdn.example.com/logo.svg",
 		HeroURL:        "https://cdn.example.com/hero.png",
+		Typography: domain.BrandingTypography{
+			FontFamily: "Inter, sans-serif",
+			FontURL:    "https://fonts.example.com/css2",
+		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, gotEvent)
@@ -359,7 +366,7 @@ func TestBrandingCreate_EventPayloadURLs(t *testing.T) {
 	assert.Equal(t, domain.BrandingLayoutSplit, payload.Layout)
 	assert.Equal(t, "https://cdn.example.com/logo.svg", payload.LogoURL)
 	assert.Equal(t, "https://cdn.example.com/hero.png", payload.HeroURL)
-	assert.Empty(t, payload.FontURL, "font_url is not writable yet; omit when empty")
+	assert.Equal(t, "https://fonts.example.com/css2", payload.FontURL)
 	assert.NotContains(t, string(gotEvent.Payload), "liquid")
 }
 
@@ -372,6 +379,7 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	masterKey := cryptomock.NewMockCrypter(ctrl)
 	keyService := servicemocks.NewMockKeyService(ctrl)
 	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	expectKeySavesThroughStatements(keyService)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
@@ -402,6 +410,7 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
+	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 

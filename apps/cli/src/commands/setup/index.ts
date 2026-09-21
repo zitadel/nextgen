@@ -18,10 +18,18 @@ import {
 import { consola } from "consola";
 
 import { brandingDesignLabel } from "../../lib/branding/designs";
-import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
+import { renderBoxActions, wrapForBox } from "../../lib/box";
+import {
+  claimAction,
+  claimBoxAction,
+  claimCommand,
+  claimState,
+  claimWindowDeadline,
+} from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { serverKind } from "../../lib/oclif/server-kind";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -100,11 +108,14 @@ const RENDERER_FLAG_DESCRIPTION =
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> setup --framework next",
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
   static override flags = {
+    force: Flags.boolean({ char: "f", description: "Overwrite managed files that already exist." }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
       description: RENDERER_FLAG_DESCRIPTION,
@@ -411,14 +422,29 @@ export default class Setup extends BaseCommand {
     // Position in the list carries no staging meaning, so appending is not a
     // way of deferring it.
     //
-    // Empty off the cloud, where nothing can be attached.
-    const claimNudge =
-      claimState({ secret: {}, server: answers.server }).kind === "detached"
-        ? {
-            actions: [claimAction(this.meta.cliVersion)],
-            commands: [claimCommand(this.meta.cliVersion)],
-          }
-        : { actions: [], commands: [] };
+    // Nudged on the cloud, and on a local server that actually hosts the
+    // platform plane: `claimState` is offline and gates local to
+    // not-applicable, but setup is online anyway, so it asks the server's
+    // runtime document (see localServerHostsPlatform). A dry run contacts no
+    // platform, so it previews the nudge for local servers optimistically
+    // instead of probing.
+    // The deadline is concrete because the server enforces the claim window
+    // at claim time and the project was created moments ago, so created_at
+    // computes the same date the platform will hold the user to. A dry run
+    // gets the generic wording: its stand-in project has a fixed past
+    // created_at, and no real window started anyway.
+    const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
+    const nudgeClaim =
+      claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+      (serverKind.value(answers.server) === "local" &&
+        (dryRun || (await localServerHostsPlatform(answers.server))));
+    const claimNudge = nudgeClaim
+      ? {
+          actions: [claimAction(this.meta.cliVersion, deadline)],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
+          commands: [claimCommand(this.meta.cliVersion)],
+        }
+      : { actions: [], boxActions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -434,6 +460,7 @@ export default class Setup extends BaseCommand {
       const sections = buildSummary({
         projectFacts,
         writtenRel,
+        depsAdded: result.depsAdded,
         project,
         server: answers.server,
         issuer,
@@ -444,13 +471,18 @@ export default class Setup extends BaseCommand {
       // status panel separate from the per-step narration above it.
       // `box` accepts ANSI-styled text in the message body, so our
       // pre-coloured rows (path/url/id helpers) survive intact.
+      // `wrapForBox` caps the content at the terminal width: consola sizes
+      // the frame to the longest line, so an unwrapped sentence wider than
+      // the window would break the right border.
       consola.box({
         title: "Zitadel is ready",
-        message: [
-          renderSummary(sections),
-          "",
-          [...installOutcome.boxActions, ...claimNudge.actions].join("\n"),
-        ].join("\n"),
+        message: wrapForBox(
+          [
+            renderSummary(sections),
+            "",
+            renderBoxActions([...installOutcome.boxActions, ...claimNudge.boxActions]),
+          ].join("\n"),
+        ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
       // The envelope's `warnings` never render in non-JSON mode (setup
@@ -539,10 +571,40 @@ async function resolveScaffoldFramework(
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
 }
 
+/**
+ * Whether a local server hosts the platform plane, i.e. whether a claim
+ * started against it can actually complete. `platform.bootstrap_project`
+ * pins the deployment's default project to the well-known proj_platform, and
+ * the console runtime document publishes that resolution, so one public GET
+ * answers the question. Fail closed: an unreadable, absent, or hanging
+ * document means no nudge, never a nudge into a flow that would 401 at
+ * claim/complete — the timeout mirrors checkLocalServerHealth so a socket
+ * that accepts and stalls cannot hang setup after the real work is done.
+ * Exported so the fail-closed behavior is testable without a live server.
+ */
+export async function localServerHostsPlatform(
+  server: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  try {
+    const res = await fetch(new URL("/console/runtime.json", server), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      return false;
+    }
+    const doc = (await res.json()) as { console_project_id?: unknown };
+    return doc.console_project_id === "proj_platform";
+  } catch {
+    return false;
+  }
+}
+
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
+    name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
     preview_origins: [issuer],
@@ -768,14 +830,23 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
 function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
+  depsAdded: ReadonlyArray<string>;
   project: CreateProject201;
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
   design?: BrandingDesign;
 }): Section[] {
-  const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework, design } = opts;
-  const sdkPackage = "@zitadel/sdk-next";
+  const {
+    projectFacts,
+    writtenRel,
+    depsAdded,
+    project,
+    server,
+    issuer,
+    scaffoldedFramework,
+    design,
+  } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
@@ -784,13 +855,17 @@ function buildSummary(opts: {
   }
 
   const installedRows: Row[] = [];
-  if (packageJsonHit) {
+  if (packageJsonHit && depsAdded.length > 0) {
     installedRows.push({
       label: "Package",
-      value: sdkPackage,
+      value: depsAdded.join(", "),
       secondary: stylePath(fileNameOf(packageJsonHit)),
     });
   }
+  // A union over every framework's scaffold artifacts: rows only render when
+  // the patcher actually wrote the file, so entries for other frameworks are
+  // inert. Suffixes are matched case-sensitively (src/App.tsx is React/Solid,
+  // src/app.tsx is Qwik, app.vue is the Nuxt shell, src/App.vue is Vue).
   for (const [label, suffix] of [
     ["Home redirect", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
@@ -798,10 +873,28 @@ function buildSummary(opts: {
     ["Profile page", "app/profile/page.tsx"],
     ["Request proxy", "proxy.ts"],
     ["Middleware", "middleware.ts"],
+    ["App entry", "src/App.tsx"],
+    ["App entry", "src/app.tsx"],
+    ["App entry", "src/App.vue"],
+    ["App entry", "src/App.svelte"],
+    ["App entry", "src/app/app.ts"],
+    ["Routes", "src/app/app.routes.ts"],
+    ["Request proxy", "proxy.conf.cjs"],
+    ["App shell", "app.vue"],
+    ["Home redirect", "pages/index.vue"],
+    ["Login page", "pages/login.vue"],
+    ["Register page", "pages/register.vue"],
+    ["Profile page", "pages/profile.vue"],
     ["Env vars", ".env.local"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) installedRows.push({ label, value: stylePath(hit) });
+  }
+  // The Vite config merge carries the /__nextgen dev proxy; the file name
+  // varies (ts/js/mts/mjs), so it can't ride the suffix table above.
+  const viteConfigHit = writtenRel.find((file) => /(^|\/)vite\.config\.[cm]?[jt]s$/.test(file));
+  if (viteConfigHit) {
+    installedRows.push({ label: "Dev proxy", value: stylePath(viteConfigHit) });
   }
 
   // The login-customization entry points. These are what a user edits to

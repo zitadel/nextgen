@@ -34,6 +34,37 @@ WHERE project_id = ? AND user_id IN (SELECT value FROM json_each(?))`
 	userAttributesByIDsAndKeysQuery = userAttributesByIDsQuery + `
 AND key IN (SELECT value FROM json_each(?))`
 
+	// userTeamsByIDsQuery hydrates the team memberships of one page of users
+	// (ADR 059), ordered so each user's rows arrive together and by team name.
+	// The cap is applied in Go — see the note on the postgres query for why a
+	// per-user window function is not used.
+	userTeamsByIDsQuery = `SELECT m.user_id, m.team_id, t.name, m.status, m.created_at, m.updated_at
+FROM team_memberships m
+JOIN teams t ON t.project_id = m.project_id AND t.id = m.team_id
+WHERE m.project_id = ?
+  AND m.user_id IN (SELECT value FROM json_each(?))
+  AND m.status IN (SELECT value FROM json_each(?))
+ORDER BY m.user_id, t.name, m.team_id`
+
+	// ownerTeamsByIDsQuery hydrates the lifecycle owner teams of one page of
+	// users (ADR 059), keyed on the distinct owner ids the page returned.
+	ownerTeamsByIDsQuery = `SELECT id, name, status, created_at, updated_at
+FROM teams
+WHERE project_id = ? AND id IN (SELECT value FROM json_each(?))`
+
+	// patchUserHeaderStmt rewrites the header row. The updated_at predicate is
+	// the optimistic guard: a row that moved past the value the merge was
+	// computed against matches nothing, and the caller retries from a fresh
+	// read.
+	patchUserHeaderStmt = `UPDATE users SET updated_at = ?, schema_url = ?
+WHERE project_id = ? AND id = ? AND updated_at = ?`
+
+	selectUserUniqueAttrScopesStmt = `SELECT key, team_id FROM user_unique_attributes WHERE project_id = ? AND user_id = ?`
+
+	deleteUserUniqueAttributesStmt = `DELETE FROM user_unique_attributes WHERE project_id = ? AND user_id = ?`
+
+	deleteUserAttributesStmt = `DELETE FROM user_attributes WHERE project_id = ? AND user_id = ?`
+
 	deactivateUserStmt = `UPDATE users SET status = ?, updated_at = ?
 WHERE project_id = ? AND id = ?`
 
@@ -72,29 +103,9 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			return wrapError(err)
 		}
 
-		for _, a := range user.Attributes {
-			raw, err := json.Marshal(a.Value)
-			if err != nil {
-				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-			}
-			if _, err := tx.Exec(ctx, createUserAttributeStmt,
-				user.ProjectID, teamScope, user.ID, string(a.Key), string(raw),
-			); err != nil {
-				return wrapError(err)
-			}
-			if a.UniqueScope == domain.AttributeUniquenessUnspecified {
-				continue
-			}
-			scopeTeamID := teamScope
-			if a.UniqueScope == domain.AttributeUniquenessProject {
-				scopeTeamID = ""
-			}
-			sum := a.ValueHash
-			if _, err := tx.Exec(ctx, createUserUniqueAttrStmt,
-				user.ProjectID, user.ID, scopeTeamID, string(a.Key), sum[:],
-			); err != nil {
-				return wrapError(err)
-			}
+		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, teamScope, user.Attributes,
+			user.Attributes.RegistryTeamScopes(nil, teamScope)); err != nil {
+			return err
 		}
 
 		initialTeamID := ""
@@ -112,6 +123,83 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		rsi := newResourceScopeStatements(tx)
 		edges := newAuthzMembershipEdgeStatements(tx)
 		return authz.UserCreated(ctx, &rsi, &edges, user.ProjectID, user.ID, initialTeamID)
+	})
+}
+
+// insertUserAttributes writes one attribute row per entry, plus a registry
+// row for each unique-scoped value. registryTeams is index-aligned with attrs
+// (see [domain.CreateAttributes.RegistryTeamScopes]).
+func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID, attrTeamID string, attrs domain.CreateAttributes, registryTeams []string) error {
+	for i, a := range attrs {
+		raw, err := json.Marshal(a.Value)
+		if err != nil {
+			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+		}
+		if _, err := tx.Exec(ctx, createUserAttributeStmt,
+			projectID, attrTeamID, userID, string(a.Key), string(raw),
+		); err != nil {
+			return wrapError(err)
+		}
+		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
+			continue
+		}
+		sum := a.ValueHash
+		if _, err := tx.Exec(ctx, createUserUniqueAttrStmt,
+			projectID, userID, registryTeams[i], string(a.Key), sum[:],
+		); err != nil {
+			return wrapError(err)
+		}
+	}
+	return nil
+}
+
+// GetUserUniqueAttributeScopes implements [service.UserStatements].
+func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error) {
+	rows, err := us.client.Query(ctx, selectUserUniqueAttrScopesStmt, projectID, userID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+
+	scopes := make(map[domain.AttributeKey]string)
+	for rows.Next() {
+		var key, team string
+		if err := rows.Scan(&key, &team); err != nil {
+			return nil, err
+		}
+		scopes[domain.AttributeKey(key)] = team
+	}
+	return scopes, wrapError(rows.Err())
+}
+
+// PatchUser implements [service.UserStatements] as a full rewrite of the
+// user's attribute and registry rows; a registry insert colliding with
+// another user's claim still surfaces as a UniqueError.
+func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
+	if len(user.Attributes) == 0 {
+		return fmt.Errorf("user patch requires attributes")
+	}
+	if len(user.RegistryTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	}
+	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
+		n, err := execAffected(ctx, tx, patchUserHeaderStmt,
+			nowUnixNano(), user.SchemaURL, user.ProjectID, user.UserID, user.ExpectedUpdatedAt.UnixNano(),
+		)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return database.NewNoRowFoundError(nil)
+		}
+		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
+			return wrapError(err)
+		}
+		if _, err := tx.Exec(ctx, deleteUserAttributesStmt, user.ProjectID, user.UserID); err != nil {
+			return wrapError(err)
+		}
+		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes,
+			user.RegistryTeamScopes)
 	})
 }
 
@@ -283,8 +371,107 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		if err := us.hydrateUserGroup(ctx, group, opts); err != nil {
 			return err
 		}
+		if opts.IncludeTeams {
+			if err := us.hydrateUserGroupTeams(ctx, group, opts); err != nil {
+				return err
+			}
+		}
+		if opts.IncludeLifecycleOwnerTeam {
+			if err := us.hydrateUserGroupOwnerTeams(ctx, group); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// hydrateUserGroupTeams loads the team memberships of an already-read page of users
+// (ADR 059): one batched query keyed on the ids the page already returned.
+// Joining memberships into the user query instead would multiply rows — LIMIT
+// would count memberships rather than users, and the keyset cursor is
+// marshalled from the last row's sort values, so fan-out corrupts it.
+func (us userStatements) hydrateUserGroupTeams(ctx context.Context, group v2user.ProjectGroup, opts service.UserQueryOptions) error {
+	limit := opts.TeamsLimit
+	if limit <= 0 {
+		limit = service.DefaultUserTeamsLimit
+	}
+
+	idsJSON, err := json.Marshal(group.IDs)
+	if err != nil {
+		return err
+	}
+	statusesJSON, err := json.Marshal(v2user.MembershipStatusStrings())
+	if err != nil {
+		return err
+	}
+
+	collector := v2user.NewTeamCollector(group, limit)
+	rows, err := us.client.Query(ctx, userTeamsByIDsQuery, group.ProjectID, string(idsJSON), string(statusesJSON))
+	if err != nil {
+		return wrapError(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			userID               string
+			team                 domain.UserTeam
+			status               string
+			createdNano, updNano int64
+		)
+		// Timestamps come back as unix nanos here, the same way scanUserTeam
+		// reads them for the paginated membership list.
+		if err := rows.Scan(&userID, &team.TeamID, &team.TeamName, &status, &createdNano, &updNano); err != nil {
+			return err
+		}
+		team.ProjectID = group.ProjectID
+		team.UserID = userID
+		team.Status = domain.MembershipStatus(status)
+		team.CreatedAt = timeFromUnixNano(createdNano)
+		team.UpdatedAt = timeFromUnixNano(updNano)
+		collector.Add(userID, team)
+	}
+	return wrapError(rows.Err())
+}
+
+// hydrateUserGroupOwnerTeams loads the lifecycle owner teams of an already-read
+// page of users (ADR 059), keyed on the distinct owner ids the page returned.
+// A page of self-owned users runs no query at all.
+func (us userStatements) hydrateUserGroupOwnerTeams(ctx context.Context, group v2user.ProjectGroup) error {
+	collector := v2user.NewOwnerTeamCollector(group)
+	teamIDs := collector.TeamIDs()
+	if len(teamIDs) == 0 {
+		return nil
+	}
+
+	idsJSON, err := json.Marshal(teamIDs)
+	if err != nil {
+		return err
+	}
+
+	rows, err := us.client.Query(ctx, ownerTeamsByIDsQuery, group.ProjectID, string(idsJSON))
+	if err != nil {
+		return wrapError(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			team                 domain.Team
+			status               string
+			createdNano, updNano int64
+		)
+		// Unix nanos here, the same way the membership hydrate reads them.
+		if err := rows.Scan(&team.ID, &team.Name, &status, &createdNano, &updNano); err != nil {
+			return err
+		}
+		team.ProjectID = group.ProjectID
+		team.Status = domain.TeamStatus(status)
+		team.CreatedAt = timeFromUnixNano(createdNano)
+		team.UpdatedAt = timeFromUnixNano(updNano)
+		collector.Add(team)
+	}
+	return wrapError(rows.Err())
 }
 
 func (us userStatements) hydrateUserGroup(ctx context.Context, group v2user.ProjectGroup, opts service.UserQueryOptions) error {

@@ -1,10 +1,5 @@
 package domain
 
-import (
-	"maps"
-	"slices"
-)
-
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
 // docs/design/api/events-catalog.md and OpenAPI Event discriminator schemas.
 
@@ -125,8 +120,8 @@ func SchemaCreatedPayloadSnapshot(schema *JSONSchema) SchemaCreatedPayload {
 	return payload
 }
 
-// FlowdefPayload is shared by flowdef.created (snapshot) and flowdef.updated (delta).
-// Steps are intentionally omitted (large graph).
+// FlowdefPayload is the flowdef.created snapshot. Retired flowdef.updated rows
+// carry a delta in the same shape. Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {
 	Name       string                  `json:"name,omitempty"`
 	Status     string                  `json:"status,omitempty"`
@@ -155,37 +150,6 @@ func FlowdefPayloadSnapshot(fd *FlowDefinition) FlowdefPayload {
 	}
 }
 
-// FlowdefPayloadDelta is the allowlisted update delta (new values only).
-func FlowdefPayloadDelta(before, after *FlowDefinition) FlowdefPayload {
-	if after == nil {
-		return FlowdefPayload{}
-	}
-	if before == nil {
-		return FlowdefPayloadSnapshot(after)
-	}
-	var delta FlowdefPayload
-	if before.Name != after.Name {
-		delta.Name = after.Name
-	}
-	if before.Status != after.Status {
-		delta.Status = after.Status.String()
-	}
-	if before.UserSchema != after.UserSchema {
-		delta.UserSchema = after.UserSchema
-	}
-	beforePurposes := flowdefPurposesWire(before.Purposes)
-	afterPurposes := flowdefPurposesWire(after.Purposes)
-	if !maps.Equal(beforePurposes, afterPurposes) {
-		delta.Purposes = afterPurposes
-	}
-	beforeAud := flowdefAudiencePayload(before.Audience)
-	afterAud := flowdefAudiencePayload(after.Audience)
-	if !flowdefAudienceEqual(beforeAud, afterAud) {
-		delta.Audience = afterAud
-	}
-	return delta
-}
-
 func flowdefPurposesWire(in map[FlowDefinitionPurpose]string) map[string]string {
 	if len(in) == 0 {
 		return nil
@@ -207,16 +171,6 @@ func flowdefAudiencePayload(a FlowDefinitionAudience) *FlowdefAudiencePayload {
 	}
 }
 
-func flowdefAudienceEqual(a, b *FlowdefAudiencePayload) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return slices.Equal(a.AppIDs, b.AppIDs) && slices.Equal(a.TeamIDs, b.TeamIDs)
-}
-
 type BrandingPayload struct {
 	Layout  string `json:"layout,omitempty"`
 	LogoURL string `json:"logo_url,omitempty"`
@@ -226,6 +180,62 @@ type BrandingPayload struct {
 
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
+
+type EnvironmentPayload struct {
+	Name string `json:"name,omitempty"`
+}
+
+type EnvironmentCreatedPayload = EnvironmentPayload
+
+// ReleasePayload records what a release pinned, so the audit stream answers
+// "what changed" without a join back to the releases table. ContentHash
+// identifies the pinned set; Pointers spell it out.
+//
+// GitDirty is always encoded. For the string fields an empty value and an
+// absent one mean the same thing — the caller supplied nothing — but false is
+// an assertion the audit record has to carry: it says the working tree was
+// clean, so git_sha describes this release exactly.
+type ReleasePayload struct {
+	ContentHash string                  `json:"content_hash,omitempty"`
+	Message     string                  `json:"message,omitempty"`
+	GitSHA      string                  `json:"git_sha,omitempty"`
+	GitDirty    bool                    `json:"git_dirty"`
+	Pointers    []ReleasePointerPayload `json:"pointers,omitempty"`
+}
+
+type ReleasePointerPayload struct {
+	Kind       string `json:"kind,omitempty"`
+	Handle     string `json:"handle,omitempty"`
+	RevisionID string `json:"revision_id,omitempty"`
+}
+
+type ReleaseCreatedPayload = ReleasePayload
+
+// ReleasePayloadSnapshot is the allowlisted create snapshot for release events.
+func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
+	if rel == nil {
+		return ReleasePayload{}
+	}
+	payload := ReleasePayload{
+		ContentHash: rel.ContentHash,
+		GitDirty:    rel.Metadata.GitDirty,
+		Pointers:    make([]ReleasePointerPayload, 0, len(rel.Pointers)),
+	}
+	if rel.Metadata.Message != nil {
+		payload.Message = *rel.Metadata.Message
+	}
+	if rel.Metadata.GitSHA != nil {
+		payload.GitSHA = *rel.Metadata.GitSHA
+	}
+	for _, pointer := range rel.Pointers {
+		payload.Pointers = append(payload.Pointers, ReleasePointerPayload{
+			Kind:       pointer.Kind.String(),
+			Handle:     pointer.Handle,
+			RevisionID: pointer.RevisionID,
+		})
+	}
+	return payload
+}
 
 type AuthzGrantedPayload struct {
 	PrincipalType string `json:"principal_type,omitempty"`

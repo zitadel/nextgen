@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.1.0-alpha.19",
+  "version": "1.0.0-alpha.22",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -43,6 +43,16 @@
       "types": "./dist/branding-url.d.mts",
       "import": "./dist/branding-url.mjs"
     },
+    "./branding-contrast": {
+      "@zitadel/source": "./src/branding-contrast.ts",
+      "types": "./dist/branding-contrast.d.mts",
+      "import": "./dist/branding-contrast.mjs"
+    },
+    "./css-color": {
+      "@zitadel/source": "./src/css-color.ts",
+      "types": "./dist/css-color.d.mts",
+      "import": "./dist/css-color.mjs"
+    },
     "./normalize": {
       "@zitadel/source": "./src/normalize.ts",
       "types": "./dist/normalize.d.mts",
@@ -71,17 +81,20 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "typecheck": "tsc --build tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "sync-schemas": "node scripts/sync-meta-schemas.mjs",
+    "build": "node scripts/sync-meta-schemas.mjs && tsdown",
+    "typecheck": "node scripts/sync-meta-schemas.mjs && tsc --build tsconfig.json",
+    "test": "node scripts/sync-meta-schemas.mjs && vitest run --passWithNoTests",
     "lint": "oxlint ."
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
+    "culori": "catalog:",
     "liquidjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/culori": "catalog:",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",

@@ -1,0 +1,39 @@
+title: UpdateVariablesRequest
+description: |
+  The variables to enter, keyed by name. Each is either a bare scalar (a
+  non-secret value), an object stating the `secret` flag, or `null` to remove
+  the name.
+
+  This is a patch: a name present here is written at the owner the request
+  addresses, replacing whatever that owner held under it, and a name absent
+  here is left alone. A name whose value is `null` is removed from that owner
+  (RFC 7386), so one request can enter, replace and remove names together —
+  which is also the way to remove several at once. `DELETE
+  /variables/{variable_name}` remains the way to remove exactly one name and
+  be told whether it was there.
+
+  Removing a name the owner does not hold is not an error: a patch states what
+  the owner holds afterwards, and that name is already absent. That makes a
+  retry safe, and it is the one place this body differs from `DELETE`, which
+  answers `var.not_found`.
+
+  The body is applied whole or not at all. Every value is validated, and every
+  secret encrypted, before anything is written, and the writes and removals
+  share one transaction.
+
+  Names are written at exactly the owner the request addresses, and reach no
+  further. Writing at the project level does not change what any environment
+  resolves, and writing on one environment does not touch another.
+type: object
+minProperties: 1
+propertyNames:
+  $ref: ../../components/schemas/variable-name.yaml
+additionalProperties:
+  $ref: variable-input.yaml
+example:
+  GITHUB_CLIENT_ID: Iv1.a1b2c3d4e5f6
+  GITHUB_CLIENT_SECRET:
+    value: s3cr3t
+    secret: true
+  RETRY_COUNT: 10
+  LEGACY_ENDPOINT: null

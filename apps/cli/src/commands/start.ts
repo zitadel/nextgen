@@ -23,6 +23,7 @@ import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
 } from "../lib/local-server/docker-guidance";
+import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   checkLocalServerHealth,
@@ -36,7 +37,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
 
@@ -44,6 +45,8 @@ const START_TIMEOUT_MS = 90_000;
 
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 1;
   static override flags = {
     image: Flags.string({ description: "Container image to run." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
@@ -99,6 +102,10 @@ export default class Start extends BaseCommand {
 
     const paths = await ensureLocalState(this.meta.cwd);
     const existingRuntime = await readRuntimeMetadata(this.meta.cwd);
+    // NEXTGEN_* variables from .env.local and .env are read before any runtime
+    // is stopped and reach the new runtime through its environment only; see
+    // env-vars.ts.
+    const env = await loadProjectEnv(this.meta.cwd);
 
     if (runtimeBackend === "binary") {
       if (
@@ -121,6 +128,7 @@ export default class Start extends BaseCommand {
         logPath: paths.logFile,
         port,
         serverUrl,
+        env,
       });
       try {
         await waitForHealth(
@@ -169,6 +177,8 @@ export default class Start extends BaseCommand {
         image,
         port,
         serverUrl,
+        // The container was started with whatever was recorded then.
+        env: existingRuntime?.backend === "docker" ? existingRuntime.env : undefined,
       });
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
@@ -183,12 +193,13 @@ export default class Start extends BaseCommand {
 
     await assertPortAvailableForStart(port, serverUrl, this.meta.cliVersion);
     await ensureImage(image);
-    const containerId = await startContainer({
+    const { containerId, env: containerEnv } = await startContainer({
       containerName,
       image,
       port,
       dataDir: paths.dataDir,
       identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
+      env,
     });
     await waitForHealth(serverUrl, this.meta.cliVersion, {
       runtime: "docker",
@@ -203,6 +214,7 @@ export default class Start extends BaseCommand {
       image,
       port,
       serverUrl,
+      env: containerEnv,
     });
     await writeRuntimeMetadata(this.meta.cwd, metadata);
     return this.emit({
@@ -287,6 +299,7 @@ function readyData(
           }),
       port: metadata.port,
       data_dir: metadata.data_dir,
+      env: metadata.env ?? EMPTY_SUMMARY,
     },
     urls: {
       api: metadata.server_url,

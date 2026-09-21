@@ -29,7 +29,7 @@ Same resources, different project context. The SDK talks to `/users`, `/teams`, 
 
 "Singleton" describes the platform project and the default team, not the deployment's project count. Customer projects are unbounded in both modes.
 
-Not shipped yet: self-host today has **no platform project at all** — bootstrap creates one only once ADR 0004 §2's seed transport ships for self-hosted deployments. Until then every project created is a customer project, and the Console signs in against §2's transitional fallback (the first-created project, or the `platform.project_id` pin). Read this section as the contract bootstrap implements, not as current behavior.
+Not shipped yet: the *discoverable, auto-provisioned* singleton this section describes. A self-hoster can opt into a platform project today by setting `platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`), which provisions the project itself (keys, default schema, default login flow) at startup — but without ADR 0004 §2's fuller seed transport (initial user, membership, owner assignment), so the flag is a manual opt-in, not the server-discovered default this section targets. With the flag off, every project created is a customer project, and the Console signs in against §2's transitional fallback (the first-created project, or the `platform.project_id` pin). Read this section as the contract bootstrap implements, not as current behavior.
 
 The self-hosted project ID should be **discoverable from the server** ([direction](conventions.md#direction-not-shipped)), never hardcoded. When self-hosted grows to multiple projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it discovered its defaults from the server.
 

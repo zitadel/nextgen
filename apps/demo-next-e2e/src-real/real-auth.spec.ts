@@ -16,7 +16,8 @@ async function loginWithPassword(page: Page, user: SeededUser): Promise<void> {
 
 async function expectAuthenticatedAs(page: Page, user: SeededUser): Promise<void> {
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
-  await expect(page.getByText(`Signed in as ${user.id}`)).toBeVisible();
+  // Default schema: email identifier, no display — the line shows the email.
+  await expect(page.getByText(`Signed in as ${user.email}`)).toBeVisible();
   const cookies = await page.context().cookies();
   const session = cookies.find((cookie) => cookie.name === "__nextgen_session");
   expect(session).toBeDefined();

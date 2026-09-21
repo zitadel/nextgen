@@ -107,3 +107,24 @@ func TestPlatformConfigResolvedProjectID(t *testing.T) {
 		assert.Empty(t, PlatformConfig{}.ResolvedProjectID())
 	})
 }
+
+func TestPlatformConfigProvisioningProjectID(t *testing.T) {
+	t.Parallel()
+	t.Run("bootstrap opts into platform provisioning", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "proj_platform", PlatformConfig{BootstrapProject: true}.ProvisioningProjectID())
+	})
+
+	// The doctrine under test: a standalone pin names the console's default
+	// project, it does not opt the deployment into the platform plane — its
+	// end-user registrations must never mint personal teams (#605, #736).
+	t.Run("a pin alone does NOT opt in", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, PlatformConfig{ProjectID: "proj_setup"}.ProvisioningProjectID())
+	})
+
+	t.Run("no bootstrap and no pin is empty", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, PlatformConfig{}.ProvisioningProjectID())
+	})
+}

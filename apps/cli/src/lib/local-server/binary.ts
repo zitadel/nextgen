@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
+import { EMPTY_ENV, type ResolvedEnv, envSummary } from "./env-vars";
 import {
   type BinaryRuntimeMetadata,
   type RuntimeMetadata,
@@ -25,6 +26,8 @@ export type BinaryRunSpec = {
   logPath: string;
   port: number;
   serverUrl: string;
+  /** Project variables for the child's environment, never its argv. */
+  env?: ResolvedEnv;
 };
 
 export type StopBinaryRuntimeResult = Readonly<{
@@ -61,15 +64,22 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
 
 export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRuntimeMetadata> {
   const command = resolveServerCommand();
+  const env = spec.env ?? EMPTY_ENV;
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
-    const child = spawn(command.command, command.args, {
+    const args = withMigrateFlag(command.args);
+    const child = spawn(command.command, args, {
       detached: true,
       env: {
         ...process.env,
+        // Declared project variables ride the child's environment, never argv.
+        ...env.values,
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
+        // Browser-facing URLs (claim, dashboard) must point at this local
+        // server, not the cloud default the server config falls back to.
+        NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
       },
       stdio: ["ignore", log.fd, log.fd],
     });
@@ -81,7 +91,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       schema_version: 1,
       backend: "binary",
       pid: child.pid,
-      command: [command.command, ...command.args].join(" "),
+      command: [command.command, ...args].join(" "),
       log_path: spec.logPath,
       server_package: command.serverPackage,
       server_version: command.serverVersion,
@@ -90,6 +100,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       data_dir: spec.dataDir,
       created_at: new Date().toISOString(),
       cli_version: spec.cliVersion,
+      env: envSummary(env),
     };
   } finally {
     await log.close();
@@ -265,4 +276,10 @@ function errorMessage(error: unknown): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
+const MIGRATE_FLAG = "--migrate";
+
+function withMigrateFlag(args: string[]): string[] {
+  return args.includes(MIGRATE_FLAG) ? args : [...args, MIGRATE_FLAG];
 }

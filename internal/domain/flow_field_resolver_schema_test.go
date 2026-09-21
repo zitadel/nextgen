@@ -56,6 +56,7 @@ const defaultSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"x-auth-methods": { "password": { "enabled": true }, "passkey": { "enabled": true } },
+		"x-identifier": "email",
 		"required": ["email", "username", "given_name", "family_name"],
 		"properties": {
 			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "team" },
@@ -146,9 +147,10 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			},
 		},
 		{
-			name: "x-unique=team surfaces identifier challenge plus implicit outcomes",
+			name: "the designated identifier surfaces the challenge plus implicit outcomes",
 			schema: `{
 				"type": "object",
+				"x-identifier": "email",
 				"properties": {
 					"email": { "type": "string", "format": "email", "x-unique": "team" }
 				}
@@ -170,7 +172,7 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			},
 		},
 		{
-			name: "x-unique=project surfaces project-scoped uniqueness",
+			name: "x-unique alone carries uniqueness but no identifier challenge",
 			schema: `{
 				"type": "object",
 				"properties": {
@@ -182,14 +184,13 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			want: domain.FlowResolvedFields{
 				Fields: []domain.FlowField{
 					{
-						Name:      "handle",
-						TextKey:   "step.field.handle",
-						Type:      domain.FlowFieldTypeText,
-						Challenge: domain.FlowFieldChallengeIdentifier,
-						Unique:    domain.AttributeUniquenessProject,
+						Name:    "handle",
+						TextKey: "step.field.handle",
+						Type:    domain.FlowFieldTypeText,
+						Unique:  domain.AttributeUniquenessProject,
 					},
 				},
-				ImplicitOutcomes: map[string][]string{"handle": identifierOutcomes},
+				ImplicitOutcomes: map[string][]string{},
 			},
 		},
 		{
@@ -266,6 +267,7 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			name: "mixed user-property and auth-method fields preserve input order",
 			schema: `{
 				"type": "object",
+				"x-identifier": "email",
 				"x-auth-methods": { "password": { "enabled": true } },
 				"properties": {
 					"email": { "type": "string", "format": "email", "x-unique": "team" }
@@ -450,21 +452,50 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			},
 		},
 		{
-			name:   "x-unique on a nested leaf makes it an identifier",
+			name: "a designated nested leaf is an identifier",
+			schema: `{
+				"type": "object",
+				"x-identifier": "account.email",
+				"properties": {
+					"account": {
+						"type": "object",
+						"properties": {
+							"email": { "type": "string", "format": "email", "x-unique": "project" }
+						}
+					}
+				}
+			}`,
+			step:   "identifier",
+			fields: []domain.Field{"account.email"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "account.email",
+						TextKey:    "identifier.field.account.email",
+						Type:       domain.FlowFieldTypeEmail,
+						Challenge:  domain.FlowFieldChallengeIdentifier,
+						Unique:     domain.AttributeUniquenessProject,
+						Validation: &domain.FlowFieldValidation{Format: "email"},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{"account.email": identifierOutcomes},
+			},
+		},
+		{
+			name:   "an undesignated nested unique leaf carries no challenge",
 			schema: nestedSchemaContent,
 			step:   "profile",
 			fields: []domain.Field{"address.zip"},
 			want: domain.FlowResolvedFields{
 				Fields: []domain.FlowField{
 					{
-						Name:      "address.zip",
-						TextKey:   "profile.field.address.zip",
-						Type:      domain.FlowFieldTypeText,
-						Challenge: domain.FlowFieldChallengeIdentifier,
-						Unique:    domain.AttributeUniquenessProject,
+						Name:    "address.zip",
+						TextKey: "profile.field.address.zip",
+						Type:    domain.FlowFieldTypeText,
+						Unique:  domain.AttributeUniquenessProject,
 					},
 				},
-				ImplicitOutcomes: map[string][]string{"address.zip": identifierOutcomes},
+				ImplicitOutcomes: map[string][]string{},
 			},
 		},
 		{

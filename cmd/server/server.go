@@ -10,13 +10,16 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	slogctx "github.com/veqryn/slog-context"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
@@ -28,10 +31,13 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/service"
@@ -41,31 +47,84 @@ import (
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
+
+// flagDisableMasterKeyGeneration is the command-line half of
+// server.generate_master_key. It is spelled as the negative because that is
+// what an operator reaches for: generation is on by default, and this turns a
+// silent "a key was minted for you" into a startup failure.
+const flagDisableMasterKeyGeneration = "disable-master-key-generation"
 
 func NewCommand() *cobra.Command {
 	var configPath string
 	var userFiles []string
+	var applyMigrations bool
 
-	cmd := &cobra.Command{
-		Use:   "server",
-		Short: "Run the server",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(configPath)
-			if err != nil {
-				return err
-			}
-			return run(cmd.Context(), cfg, userFiles)
-		},
+	runServer := func(cmd *cobra.Command, _ []string) error {
+		overrides, err := flagOverrides(cmd.Flags())
+		if err != nil {
+			return err
+		}
+		cfg, err := loadConfig(configPath, overrides...)
+		if err != nil {
+			return err
+		}
+		return run(cmd.Context(), cfg, userFiles, applyMigrations)
 	}
 
-	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
-	cmd.Flags().StringArrayVar(&userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
+	root := &cobra.Command{
+		Use:           "nextgen",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	root.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
+	addServerFlags(root, &applyMigrations, &userFiles)
 
-	return cmd
+	serverCmd := &cobra.Command{
+		Use:           "server",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	addServerFlags(serverCmd, &applyMigrations, &userFiles)
+
+	root.AddCommand(serverCmd)
+	root.AddCommand(newMigrateCommand(&configPath))
+	return root
 }
 
-func run(ctx context.Context, cfg Config, userFiles []string) error {
+// flagOverrides turns the flags that shadow a configuration key into config
+// overrides. Only a flag the operator actually passed becomes one, so an
+// untouched flag leaves the config file and the environment in charge of the
+// key it shadows.
+func flagOverrides(flags *pflag.FlagSet) ([]configOverride, error) {
+	var overrides []configOverride
+
+	if flags.Changed(flagDisableMasterKeyGeneration) {
+		disabled, err := flags.GetBool(flagDisableMasterKeyGeneration)
+		if err != nil {
+			return nil, fmt.Errorf("read --%s: %w", flagDisableMasterKeyGeneration, err)
+		}
+		overrides = append(overrides, func(v *viper.Viper) {
+			v.Set("server.generate_master_key", !disabled)
+		})
+	}
+
+	return overrides, nil
+}
+
+func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]string) {
+	cmd.Flags().BoolVar(applyMigrations, "migrate", false, "Apply database migrations before serving")
+	cmd.Flags().StringArrayVar(userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
+	cmd.Flags().Bool(flagDisableMasterKeyGeneration, false,
+		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
+}
+
+func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) error {
 	var err error
 	sfs := &ShutdownFuncs{}
 	defer func() {
@@ -83,7 +142,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	slog.Info("building server")
 
-	metrics, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
+	telemetry, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
 		ServiceName:     cfg.Instrumentation.ServiceName,
 		TraceIdFraction: cfg.Instrumentation.Trace.Fraction,
 		TraceExporter:   cfg.Instrumentation.Trace.Exporter,
@@ -93,11 +152,11 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create otel metrics: %w", err)
 	}
-	sfs.Add(metrics.Shutdown)
+	sfs.Add(telemetry.Shutdown)
 
-	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
+	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
 
-	pool, err := startDatabase(ctx, cfg)
+	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
 		return err
 	}
@@ -123,14 +182,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
-	if err := platform.Ensure(ctx, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
-		return fmt.Errorf("failed to bootstrap platform project: %w", err)
-	}
-
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
 	if err != nil {
@@ -145,19 +196,38 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		}
 	}
 
-	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+	// The hardened egress client guards the one fetch path a platform user
+	// controls: schema ingest by URL. Response size is capped by the client's
+	// MaxBodySize; the resolve timeout bounds one whole $ref chain.
+	egressClient, err := cfg.HTTPClient.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to build egress http client: %w", err)
+	}
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, cfg.Schema.ResolveTimeout, egressClient, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
-	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, nil, builtinPublicBase)
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 0, nil, builtinPublicBase)
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
 	}
 
 	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
-	userIdentity := service.UserStatementsIdentityReader{Pool: serviceDBPool}
+	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
-	keyService := service.NewKeyService(serviceDBPool, *masterKey)
+	// Whether anything is exported stays the existing instrumentation.metric
+	// config's decision: with no exporter the provider is a no-op and the
+	// instruments cost nothing.
+	cacheMeter := metrics.WithMeterProvider(telemetry.MeterProvider())
+	crypterCache, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, cfg.Keys.CrypterLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build crypter cache: %w", err)
+	}
+	signingKeyCache, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, cfg.Keys.SigningKeyLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build signing key cache: %w", err)
+	}
+	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
@@ -165,7 +235,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userLookup,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(serviceDBPool, userIdentity, service.SessionConfig{
+	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -175,6 +245,21 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		schemaValidator,
 		keyService,
 	)
+
+	// Bootstrap runs here rather than straight after the migrations because it
+	// now seeds a usable project (keys, user schema, login flows) and so needs
+	// the project service, which needs the key service. It must still precede
+	// the user import: that import creates a bare, unseeded project row for any
+	// project id a bootstrap user names, and a project row that already exists
+	// would make this a no-op and leave the platform project unseeded.
+	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
+		return fmt.Errorf("failed to bootstrap platform project: %w", err)
+	}
+
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
+
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
@@ -183,19 +268,37 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
-	// The claim and dashboard URLs hang off the console. builtin_public_base is
-	// the only public-origin config today and carries the /api/schemas path, so
-	// strip it down to the origin before appending the console path; a
-	// dedicated server public-base setting should replace this when cloud
-	// deployment configuration lands.
-	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
+	// The claim and dashboard URLs hang off the console, reached at the
+	// deployment's public base (not at schema.builtin_public_base, which is an
+	// identifier namespace and must not follow the deployment address).
+	consoleBase, err := consoleBaseURL(cfg.Server.PublicBase, cfg.Server.ConsolePath)
+	if err != nil {
+		return err
+	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
+	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
+	environmentService := service.NewEnvironmentService(serviceDBPool)
+	variableService := service.NewVariableService(serviceDBPool, keyService)
+	releaseService := service.NewReleaseService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
 		passwordHasher,
+		userRefs,
+	)
+
+	// The platform project's registration side effect (#527): every flow-created
+	// user on the platform project gets their personal team — the team
+	// claim/complete attaches projects to — ensured idempotently. Gated on the
+	// explicit bootstrap opt-in, never the standalone pin: a pinned deployment's
+	// end-user registrations must not silently mint teams (#605, #736). Note the
+	// deliberate asymmetry with claimService above, which resolves the pin —
+	// a pinned deployment can attempt claims but is never auto-provisioned.
+	personalTeams := service.NewPersonalTeamService(
+		serviceDBPool,
+		cfg.Platform.ProvisioningProjectID(),
 	)
 
 	// ── Flow engine ──────────────────
@@ -267,22 +370,26 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
+			environmentService,
+			releaseService,
 			eventService,
 			tokenService,
 			keyService,
 			claimService,
+			grantService,
+			variableService,
 			serviceDBPool,
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		),
+		).WithPersonalTeamEnsurer(personalTeams),
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level
 		),
-		oasapi.WithMeterProvider(metrics.MeterProvider()),
-		oasapi.WithTracerProvider(metrics.TracerProvider()),
+		oasapi.WithMeterProvider(telemetry.MeterProvider()),
+		oasapi.WithTracerProvider(telemetry.TracerProvider()),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
@@ -341,9 +448,36 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 }
 
+// consoleBaseURL joins the deployment's public base with the console mount
+// path. The public base may carry a path prefix (a proxy mounting the server
+// under a subpath) but nothing else: query, fragment, or userinfo would leak
+// into every minted claim and dashboard URL, so misconfiguration fails at
+// startup instead. The result never ends in a slash — callers append paths.
+func consoleBaseURL(publicBase, consolePath string) (string, error) {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server public base: %w", err)
+	}
+	if (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" {
+		return "", fmt.Errorf("server public base %q must be an absolute http(s) URL", publicBase)
+	}
+	if base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return "", fmt.Errorf("server public base %q must carry only an origin and an optional path prefix", publicBase)
+	}
+	if consolePath != "" && !strings.HasPrefix(consolePath, "/") {
+		return "", fmt.Errorf("server console path %q must start with a slash", consolePath)
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + strings.TrimRight(consolePath, "/")
+	return base.String(), nil
+}
+
 // ----------------------------- CONFIG --------------------------------------
 
-func loadConfig(configPath string) (Config, error) {
+// configOverride sets a value that outranks the config file and the
+// environment, which is what a command-line flag has to do.
+type configOverride func(*viper.Viper)
+
+func loadConfig(configPath string, overrides ...configOverride) (Config, error) {
 	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -357,8 +491,12 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.data_dir", dataDir)
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
+	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
+	// Generation on by default: a first local start has to work with no
+	// configuration at all. Production turns it off, per ADR 029.
+	v.SetDefault("server.generate_master_key", true)
 	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
 	// recommended option (t=3, m=64 MiB, p=4), a good balance for servers.
 	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameArgon2id)
@@ -386,14 +524,28 @@ func loadConfig(configPath string) (Config, error) {
 			MinThreads: 1, MaxThreads: 16,
 		},
 	})
-	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
+	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
+	v.SetDefault("keys.crypter_lru_cache_size", 1000)
+	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
+	// Egress policy for user-injectable URLs (ADR 061). The deny list
+	// blocks by default; allow_list carves exceptions out of it, e.g.
+	// NEXTGEN_HTTPCLIENT_ALLOW_LIST="localhost,127.0.0.0/8,::1/128" for
+	// local development against loopback schema hosts.
+	v.SetDefault("httpclient.max_body_size", 1<<20) // 1 MiB; the only consumer is JSON schema ingest
+	v.SetDefault("httpclient.timeout", 10*time.Second)
+	v.SetDefault("httpclient.max_redirects", 5)
+	v.SetDefault("httpclient.allow_https_downgrade", false)
+	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
+	v.SetDefault("httpclient.allow_list", []string{})
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
-	// Empty means "the deployment's first-created project is the default"
-	// (Console ADR 0004 §2); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
-	// existing project instead. The server never creates a project itself,
-	// unless platform.bootstrap_project explicitly opts in (#605).
+	// Empty means "the deployment's first-created non-platform project is the
+	// default" (Console ADR 0004 §2; the built-in platform row is skipped by
+	// the heuristic); set NEXTGEN_PLATFORM_PROJECT_ID to pin an existing
+	// project instead. The server never creates a project itself, unless
+	// platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
 	v.SetDefault("platform.bootstrap_project", false)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
@@ -439,8 +591,29 @@ func loadConfig(configPath string) (Config, error) {
 		}
 	}
 
+	// Last, so a flag outranks both the file and the environment.
+	for _, override := range overrides {
+		override(v)
+	}
+
+	warnIgnoredMasterKeyEnv(os.Environ())
+
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		// viper's own defaults (see viper.DecodeHook's doc comment) — lost if
+		// not restated here, since DecodeHook overrides rather than extends them.
+		// stringToWeakSliceHookFunc mirrors viper's own unexported hook of the
+		// same name: mapstructure.StringToSliceHookFunc only fires for a
+		// []string target, which would silently stop comma-separated env vars
+		// (e.g. NEXTGEN_INSTRUMENTATION_LOG_STREAMS=request,service) from
+		// reaching non-string slice fields such as []zlog.Stream.
+		mapstructure.StringToTimeDurationHookFunc(),
+		stringToWeakSliceHookFunc(","),
+		// Lets enum types generated by enumer (zlog.Level, zlog.Stream,
+		// instrumentation.LogFormat, ...) decode from their documented string
+		// names via the encoding.TextUnmarshaler they already implement.
+		mapstructure.TextUnmarshallerHookFunc(),
+	))); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
 	// Create the data dir configuration actually selected, not the default
@@ -456,6 +629,24 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, cfg.Validate()
+}
+
+// stringToWeakSliceHookFunc splits a string into a slice on sep, without
+// requiring the target slice's element type to be string — matching
+// viper's own unexported hook of the same name (spf13/viper's
+// stringToWeakSliceHookFunc in viper.go), which viper.DecodeHook drops
+// unless it's restated alongside any custom hooks.
+func stringToWeakSliceHookFunc(sep string) mapstructure.DecodeHookFunc {
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String || t.Kind() != reflect.Slice {
+			return data, nil
+		}
+		raw := data.(string)
+		if raw == "" {
+			return []string{}, nil
+		}
+		return strings.Split(raw, sep), nil
+	}
 }
 
 // mustBindEnv panics on viper's documented "this can't fail in
@@ -522,16 +713,24 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 
 // ----------------------------- STORAGE --------------------------------------
 
-func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
+func connectDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
 	dialect, err := buildDatabaseDialect(cfg)
 	if err != nil {
 		return nil, err
 	}
-	pool, err := database.Connect(ctx, dialect)
+	return database.Connect(ctx, dialect)
+}
+
+func startDatabase(ctx context.Context, cfg Config, applyMigrations bool) (database.Pool, error) {
+	pool, err := connectDatabase(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	if !applyMigrations {
+		return pool, nil
+	}
 	if err := pool.Migrate(ctx); err != nil {
+		_ = pool.Close(ctx)
 		return nil, err
 	}
 	return pool, nil

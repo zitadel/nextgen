@@ -16,6 +16,13 @@ const (
 // ClaimChallengeTTL is the challenge lifetime (ADR 046 §3).
 const ClaimChallengeTTL = 10 * time.Minute
 
+// ClaimWindow is how long after creation an unclaimed project can still be
+// claimed (the epic's 14-day lifetime, enforced at claim time; ADR 046
+// §Non-goals records that nothing deletes the project when it closes).
+// The CLI prints the deadline this constant enforces; keep its copy in
+// apps/cli/src/lib/claim-state.ts in sync.
+const ClaimWindow = 14 * 24 * time.Hour
+
 // NewClaimChallengeToken mints the plaintext challenge token and the stored
 // challenge id (handoff-token pattern, ADR 046 §3): 128 bits of crypto/rand,
 // prefixed and base64url-encoded. Only the id — the SHA-256 of the plaintext —
@@ -62,6 +69,34 @@ type ClaimConflictDetails struct {
 // until then it guards manually seeded platform projects.
 func ErrClaimNoPersonalTeam() Error {
 	return newError(PrefixClaim.ErrorCodePrefix("no_personal_team"), "The user has no active personal team in the platform project.", nil, nil)
+}
+
+// ErrPersonalTeamNotActive covers a platform user whose personal team exists
+// but is not active: the membership was flipped, or the team was deactivated
+// and cascaded the membership to removed.
+//
+// Deliberately distinct from ErrClaimNoPersonalTeam. "You hold no membership"
+// is provisioned automatically on the next sign-in, while a membership that is
+// not active will not be provisioned around, so a UI has to say different
+// things about them.
+//
+// What clears it depends on the status, which is why Details carries it rather
+// than the message summarising one cause: `removed` follows a team or user
+// deactivation and needs an administrator, while `pending` is an invitation
+// the user can still accept.
+func ErrPersonalTeamNotActive(status string) Error {
+	return newError(
+		PrefixClaim.ErrorCodePrefix("personal_team_not_active"),
+		"The user's personal team in the platform project is not active.",
+		PersonalTeamNotActiveDetails{MembershipStatus: status},
+		nil,
+	)
+}
+
+// PersonalTeamNotActiveDetails names the membership state that blocked the
+// personal-team resolution.
+type PersonalTeamNotActiveDetails struct {
+	MembershipStatus string `json:"membership_status"`
 }
 
 // The claim session sentinels are internal diagnostics for the claim/complete

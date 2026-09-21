@@ -97,7 +97,14 @@ const ZitadelSessionElementReact = createComponent({
  * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginProps>(
+/**
+ * `ZitadelLoginProps` is framework-agnostic, so it carries no `children`.
+ * React hosts need them: the widget exposes slots (`attribution-trailing`)
+ * that are filled with light-DOM content.
+ */
+export type ZitadelLoginReactProps = ZitadelLoginProps & { children?: React.ReactNode };
+
+export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
     { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowError, ...props },
     ref,

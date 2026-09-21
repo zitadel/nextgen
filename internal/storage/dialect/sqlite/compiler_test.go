@@ -139,6 +139,36 @@ func TestCompileCompareFilterBoolEqual(t *testing.T) {
 	assert.Empty(t, cNot.args)
 }
 
+func TestCompileCorrelatedFilterBindsValueInline(t *testing.T) {
+	t.Parallel()
+
+	teamID := database.Col(domain.SessionFieldLifecycleOwnerTeamID)
+
+	var c statementCompiler
+	compileFilter(&c, database.CorrelatedEqual(teamID, "team_01H"), sessionSchema)
+	assert.Equal(t,
+		sessionSchema.SQLName(teamID)+"?"+sessionSchema.SQLSuffix(teamID),
+		c.String(),
+		"the bound value must land between SQLName and SQLSuffix",
+	)
+	require.Len(t, c.args, 1)
+	assert.Equal(t, "team_01H", c.args[0])
+
+	// Args must stay in emission order across the surrounding filters, so the
+	// correlated predicate composes like any other.
+	var combined statementCompiler
+	compileFilter(&combined, database.And(
+		database.Equal(database.Col(domain.SessionFieldProjectID), "proj_01H"),
+		database.CorrelatedEqual(teamID, "team_01H"),
+	), sessionSchema)
+	assert.Equal(t,
+		"(s.project_id = ? AND "+sessionSchema.SQLName(teamID)+"?"+sessionSchema.SQLSuffix(teamID)+")",
+		combined.String(),
+	)
+	require.Len(t, combined.args, 2)
+	assert.Equal(t, []any{"proj_01H", "team_01H"}, combined.args)
+}
+
 func TestCompileStringFilterLikeUsesEscape(t *testing.T) {
 	t.Parallel()
 

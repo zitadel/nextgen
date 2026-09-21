@@ -13,6 +13,9 @@
 > owning-team grant in `authz_assignments` (the database enforces one owner
 > per project), which anticipates proposed ADR 054 §2. The console claim page
 > is still open (#615), so the browser leg of the flow has no guided UI yet.
+> *(Correction: the console claim page shipped in
+> `feat(console): add the project claim page (#1078)` —
+> `apps/console/src/routes/claim/index.tsx` — closing #615.)*
 >
 > **Proposed amendment — [ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
 > if ADR 053 is accepted, [§2](#2-claimcomplete-is-authenticated-by-a-platform-project-session)'s
@@ -22,6 +25,20 @@
 > a non-simple header. SameSite becomes defense in depth rather than the only
 > check. This is a wire-contract change to an already-implemented flow; do not
 > implement §2's CSRF posture from this ADR alone.
+>
+> **Amendment (2026-08-31):** [§4](#4-the-personal-team-is-created-at-registration-not-at-claim)
+> stated that team names are not unique. That was never true of the schema: the
+> teams table has carried a case-insensitive unique index on the name, scoped to
+> the project, since it was introduced, so team names are unique per project.
+> §4 is corrected below, and the correction is load-bearing rather than
+> editorial: it is what makes automatic personal-team provisioning converge.
+> Because the name is derived per user — deterministically for one user and
+> distinctly between users — two provisioning attempts racing for the same user
+> compute the same name, so the index rejects the loser instead of minting a
+> second team, while different users never block each other (#527, #979). This
+> bounds *automatic provisioning* to one team per user; it does not change
+> §Context's rule that a user may belong to many teams.
+>
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
 > Withdrawn [ADR 003](003-create-first-claim-later.md), which removed the
@@ -142,8 +159,13 @@ dance):
    key**, not a credential. The poll is authorized by the project secret, which
    must be the same one that initiated (its hash is stored at init, otherwise
    `403`). It returns `pending`, or `completed` with `team_id` / `claimed_at` /
-   `dashboard_url`. It is a plain completion signal with no secret handover;
-   `410` once expired.
+   `dashboard_url`. The claim grant, not the polled challenge, is the source
+   of truth: once the project is claimed — through this challenge or another
+   concurrent one — the poll keeps answering `completed`, surviving challenge
+   expiry and the claim window alike. It is a plain completion signal with no
+   secret handover; `410` only while the project is unclaimed, for a lapsed
+   challenge (`proj.claim_expired`) or a closed claim window
+   (`proj.claim_window_expired`, which takes precedence).
 3. **`POST /claim/complete`** (browser) treats it as **effectively a credential**.
    The browser never holds the project secret
    ([ADR 005](005-public-runtime-private-credentials.md)), so the `challenge_id`
@@ -161,13 +183,33 @@ hashed at rest) and `complete` must be rate-limited.
 
 ### 4. The personal team is created at registration, not at claim
 
-The user, their **"Personal Team"**, and their membership in it all exist before
+The user, their **personal team**, and their membership in it all exist before
 claim: they are created when the user registers on the platform project. The
 claim transaction only writes the project-to-team grant; it never creates a team
 or a membership.
 
-- The team is named "Personal Team" and is user-renamable later; team names are
-  not unique.
+- Team names are unique per project, case-insensitively. (Postgres indexes
+  `lower(name)`; SQLite and Spanner materialise a `name_lower` column because
+  neither can index an expression. The invariant is the same on all three.) The
+  personal team's name is therefore derived per user rather than shared: a
+  single literal "Personal Team" would collide on the second registration. The
+  name is a renamable placeholder, not an identifier.
+- The contract constrains the name's *properties*, not the derivation. It must
+  be **deterministic** for a given user, **distinct** between users, and
+  **unlikely to be chosen by a human** naming an ordinary team. Determinism
+  alone is not enough: a shared literal "Personal Team" is deterministic too,
+  and it would make the first registration's name block every later one.
+  - Determinism is what makes the unique index the concurrency guard: a second
+    concurrent attempt for the same user computes the same name, collides, and
+    converges on the winner instead of creating a second team.
+  - Distinctness and unguessability are what keep one user's provisioning from
+    being blocked by another user's team, or by a pre-existing team that
+    happens to hold the name. A name that can be squatted turns a recoverable
+    race into a permanent failure, because the same name is recomputed on every
+    later attempt.
+- This bounds *automatic provisioning* to one team per user. It is narrower
+  than a limit on how many teams a user may belong to; per §Context a user may
+  still belong to many.
 - Automatic team creation is restricted to platform-project registrations;
   customer projects must not auto-create teams.
 - A returning claimer reuses their one existing personal team (per ADR 024);
@@ -202,12 +244,30 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   `projects.project_secret`, so changing the stored value would not invalidate
   the old secret). **Accepted trade-off:** the pre-claim secret stays valid after
   claim, so anyone who held it pre-claim retains API access until rotation ships.
-- **Automated expiry and deletion of unclaimed projects.** There is no
-  scheduled-task infrastructure in the server (all TTLs are read-time filtering),
-  so unclaimed projects persist unenforced. CLI messaging frames them as
-  temporary without promising deletion; an expired-unclaimed project stays
-  cheaply derivable (created long ago with no claim grant). **Accepted
-  trade-off:** unclaimed projects accumulate until an expiry mechanism exists.
+- **Automated deletion of unclaimed projects.** The claim *window* itself is
+  enforced, but only at claim time: `claim/init` and `claim/complete` refuse a
+  project older than `domain.ClaimWindow` (14 days from `projects.created_at`)
+  with `proj.claim_window_expired` (410), ordered after the already-claimed
+  check so a claimed project keeps answering 409, and `claim/status` reports
+  the same final 410 for a pending challenge, taking precedence over challenge
+  expiry so a polling client learns the refusal no new challenge can fix. That
+  lets CLI messaging state the deadline honestly, and the browser leg read it:
+  `GET /claim/window?challenge_id=...` reports `{ expires_at, expired }` for
+  the claim page's countdown. It is unauthenticated, because the page runs it
+  before the developer signs in — the challenge from the claim URL is the same
+  capability `claim/complete` accepts, it is matched rather than spent, and an
+  unresolvable one answers the same 404 a wrong project id gets, so the read
+  confirms nothing about which projects exist. `expired` is decided
+  server-side so a skewed browser clock cannot contradict what the claim legs
+  enforce. Deleting the project when the window closes stays out
+  of scope: there is no general scheduled-task infrastructure in the server
+  (the audit retention loop is audit-specific), and the proposed ADR 061
+  ([#1119](https://github.com/zitadel/nextgen/pull/1119)), which designs one,
+  explicitly excludes this sweeper. An expired-unclaimed project stays cheaply
+  derivable (created
+  long ago with no claim grant). **Accepted trade-off:** expired unclaimed
+  projects accumulate, unclaimable, until a reaper ships on the ADR 061
+  runtime.
 - **Claim metrics and telemetry.** Claim volumes are answerable with ad-hoc
   queries over the grant data until a metrics surface is added.
 - **Claim attributes on `GET /projects/{id}`.** `claimed_at` and `team_id` are

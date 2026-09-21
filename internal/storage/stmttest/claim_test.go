@@ -243,6 +243,88 @@ func TestClaimStatements_GetPersonalTeamForUser(t *testing.T) {
 	})
 }
 
+// TestClaimStatements_GetEarliestTeamMembership pins the other half of the
+// personal-team resolution (#527). GetPersonalTeamForUser answers "may this
+// user claim" and so collapses "holds no membership" and "personal team is
+// deactivated" into one NoRowFoundError. Provisioning has to tell those apart,
+// because the first needs a team created and the second must be left alone, so
+// it asks this question instead: the same earliest pick, no active filters.
+func TestClaimStatements_GetEarliestTeamMembership(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("no membership at all is not-found", func(t *testing.T) {
+			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+			userID := "usr-em-none-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "NoTeam")))
+
+			_, err := d.stmts.GetEarliestTeamMembership(t.Context(), projectID, userID)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError),
+				"only a user with no membership at all may be provisioned a team")
+		})
+
+		t.Run("deactivated earliest membership is returned, not hidden", func(t *testing.T) {
+			// The distinction the split exists for: GetPersonalTeamForUser
+			// reports not-found here (pinned above by non_active_membership_excluded),
+			// so provisioning would read that as "no team" and mint a second one.
+			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+			userID := "usr-em-removed-" + uniqueSuffix(t)
+			teamID := addActiveMembership(t, d.stmts, projectID, schemaURL, "team-em-removed-"+uniqueSuffix(t), userID)
+			require.NoError(t, d.stmts.UpdateTeamMembershipStatus(t.Context(), projectID, teamID, userID, domain.MembershipStatusRemoved))
+
+			_, err := d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
+			require.ErrorIs(t, err, new(database.NoRowFoundError), "claim still refuses the deactivated team")
+
+			got, err := d.stmts.GetEarliestTeamMembership(t.Context(), projectID, userID)
+			require.NoError(t, err, "provisioning must still see the membership")
+			assert.Equal(t, teamID, got.TeamID)
+			assert.Equal(t, domain.MembershipStatusRemoved, got.Status)
+		})
+
+		t.Run("deactivated earliest team is returned, not hidden", func(t *testing.T) {
+			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+			userID := "usr-em-deacteam-" + uniqueSuffix(t)
+			teamID := addActiveMembership(t, d.stmts, projectID, schemaURL, "team-em-deac-"+uniqueSuffix(t), userID)
+			_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+			require.NoError(t, err)
+
+			_, err = d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
+			require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+			got, err := d.stmts.GetEarliestTeamMembership(t.Context(), projectID, userID)
+			require.NoError(t, err, "the membership row survives its team's deactivation")
+			assert.Equal(t, teamID, got.TeamID)
+		})
+
+		t.Run("picks the earliest membership, never a later one", func(t *testing.T) {
+			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+			userID := "usr-em-earliest-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Earliest")))
+
+			teamA := "team-em-a-" + uniqueSuffix(t)
+			teamB := "team-em-b-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamA)))
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID, TeamID: teamA, UserID: userID, Status: domain.MembershipStatusActive,
+			}))
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamB)))
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID, TeamID: teamB, UserID: userID, Status: domain.MembershipStatusActive,
+			}))
+
+			got, err := d.stmts.GetEarliestTeamMembership(t.Context(), projectID, userID)
+			require.NoError(t, err)
+			assert.Equal(t, teamA, got.TeamID, "must agree with GetPersonalTeamForUser on which membership is earliest")
+
+			// And it keeps agreeing once the earliest is removed: the same row
+			// comes back, now carrying the status that explains claim's refusal.
+			require.NoError(t, d.stmts.UpdateTeamMembershipStatus(t.Context(), projectID, teamA, userID, domain.MembershipStatusRemoved))
+			got, err = d.stmts.GetEarliestTeamMembership(t.Context(), projectID, userID)
+			require.NoError(t, err)
+			assert.Equal(t, teamA, got.TeamID, "no fallback to the later active membership")
+			assert.Equal(t, domain.MembershipStatusRemoved, got.Status)
+		})
+	})
+}
+
 // TestClaimStatements_OwningTeamGrant pins the claim source of truth
 // (ADR 046 / ADR 054 §2): the active owning-team grant answers claimed-ness,
 // export visibility lists it, and the DB keeps it unique per project on every

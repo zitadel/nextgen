@@ -23,4 +23,6 @@ USER 65532:65532
 VOLUME ["/var/lib/zitadel/nextgen-data"]
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/nextgen"]
-# Root cobra command is already `server` (see main.go); no extra argv.
+# Default argv applies schema migrations then serves. Override with
+# `migrate` (apply and exit) or drop `--migrate` once a migrate job has run.
+CMD ["--migrate"]

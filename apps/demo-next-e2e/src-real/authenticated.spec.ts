@@ -14,7 +14,9 @@ test("an authenticatedPage starts on a protected route without visiting login", 
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin(?:[/?#]|$)/);
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
-  await expect(page.getByText(`Signed in as ${user.id}`)).toBeVisible();
+  // The default schema designates email as the identifier and no display
+  // properties, so the identity line renders the seeded user's email.
+  await expect(page.getByText(`Signed in as ${user.email}`)).toBeVisible();
 
   // The same minted token drives session APIs headlessly — the value the
   // future vitest surface builds on, proven without a browser in the loop.

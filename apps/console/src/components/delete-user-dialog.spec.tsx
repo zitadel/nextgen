@@ -15,9 +15,15 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const USER = {
   id: "user_1",
   schema: "sch_business",
+  // The dialog's label comes from the envelope's resolved identity
+  // (ADR 058), not from attribute derivation.
+  display: "Maya Patel",
+  identifier: "maya@acme.com",
+  identifier_property: "email",
   attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
 };
 const server = setupServer();
@@ -54,7 +60,7 @@ describe("delete user dialog", () => {
     // The menu used to list Edit user, Reset password and Deactivate, none of
     // which had an endpoint behind them. A menu of dead controls is worse than
     // a short menu — it reads as a feature that is broken rather than absent.
-    server.use(http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })));
+    server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
       import("@tanstack/react-router"),
       import("../router"),
@@ -74,7 +80,7 @@ describe("delete user dialog", () => {
   });
 
   it("names the user in the heading and keeps Delete locked until DELETE is typed", async () => {
-    server.use(http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })));
+    server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     await openDialog();
 
     expect(await screen.findByRole("heading", { name: "Delete Maya Patel?" })).toBeInTheDocument();
@@ -88,7 +94,7 @@ describe("delete user dialog", () => {
   });
 
   it("does not accept the confirmation in the wrong case", async () => {
-    server.use(http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })));
+    server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     await openDialog();
 
     await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "delete");
@@ -98,7 +104,7 @@ describe("delete user dialog", () => {
   it("deletes the user by id and reports success", async () => {
     let deleted: URL | undefined;
     server.use(
-      http.get(USERS_URL, () => HttpResponse.json({ users: deleted ? [] : [USER] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: deleted ? [] : [USER] })),
       http.delete(`${USERS_URL}/:userId`, ({ request, params }) => {
         deleted = new URL(request.url);
         expect(params.userId).toBe("user_1");
@@ -119,8 +125,8 @@ describe("delete user dialog", () => {
     // row is gone from the invalidated list.
     expect(await screen.findByText("Maya Patel deleted")).toBeInTheDocument();
     await waitFor(() =>
-      // The row's link is its first schema-driven column, not a combined name.
-      expect(screen.queryByRole("link", { name: "maya@acme.com" })).not.toBeInTheDocument(),
+      // The row's link lives on the User identity column.
+      expect(screen.queryByRole("link", { name: "Maya Patel" })).not.toBeInTheDocument(),
     );
   });
 
@@ -130,7 +136,7 @@ describe("delete user dialog", () => {
     // form and deleted the user. Caught by the real-instance e2e, pinned here.
     let deleteCalls = 0;
     server.use(
-      http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })),
       http.delete(`${USERS_URL}/:userId`, () => {
         deleteCalls += 1;
         return new HttpResponse(null, { status: 204 });
@@ -149,12 +155,12 @@ describe("delete user dialog", () => {
     // found: opening the dialog from inside the row menu left the menu open
     // underneath, and its `aria-hidden` on the rest of the page outlived the
     // dialog — so the list was invisible to assistive tech after cancelling.
-    expect(screen.getByRole("link", { name: "maya@acme.com" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
   });
 
   it("keeps the dialog open and shows the server's message when the delete fails", async () => {
     server.use(
-      http.get(USERS_URL, () => HttpResponse.json({ users: [USER] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })),
       http.delete(`${USERS_URL}/:userId`, () =>
         HttpResponse.json({ message: "User not found." }, { status: 404 }),
       ),

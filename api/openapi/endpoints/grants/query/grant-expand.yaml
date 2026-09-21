@@ -1,0 +1,17 @@
+type: string
+description: |
+  Ask for extra fields on the bound user or team. Those extras land on
+  `user` or `team` themselves; there is no sibling `principal` object.
+
+  `principal` adds `schema`, `attributes`, and `metadata` on `user`, or
+  `status`, `created_at`, and `updated_at` on `team`. The id (`user_id` /
+  `team_id`) is always present. If the user or team cannot be loaded, the
+  object stays id-only — the same shape as not expanding.
+
+  Expanding requires `user.read` and `team.read` in addition to
+  `project.read` for project secrets. Both are checked once for the whole
+  request. If the caller lacks either, the request is 403; extras are not
+  omitted silently. A user-bound Console session that already passed the
+  project Check may expand without those scopes.
+enum:
+  - principal

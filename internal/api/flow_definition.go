@@ -3,9 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -57,6 +57,11 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	for _, def := range listed.Items {
 		respDefinitions = append(respDefinitions, *flowDefinitionResponse(def))
 	}
+	if slices.Contains(params.Expand, api.FlowDefinitionExpandUserSchema) {
+		if err := h.expandUserSchemas(ctx, string(params.ProjectID), respDefinitions); err != nil {
+			return nil, err
+		}
+	}
 	resp := &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}
 	if listed.NextPageToken != "" {
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
@@ -64,38 +69,64 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	return resp, nil
 }
 
-func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opWrite)
+// expandUserSchemas embeds each listed flow definition's user schema
+// (ADR 059: hydrate, never join — one batched query keyed on the page's
+// distinct schema ids, after the flow query ran, so ordering and page
+// tokens stay untouched).
+//
+// The schema kind gets its own authz stamp first: the flow-definition list
+// consumed the one-shot Allow skip, and reading schemas embedded must gate
+// exactly like reading them at GET /schemas (a caller without schema read
+// access gets an error, not a silently missing property).
+func (h Handler) expandUserSchemas(ctx context.Context, projectID string, definitions []api.FlowDefinitionResponse) error {
+	ctx, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
 	if err != nil {
-		return nil, err
-	}
-	svcReq, err := mapUpdateRequestToService(projectID, params, req)
-	if err != nil {
-		return nil, err
+		return err
 	}
 
-	flowDefinition, err := h.flowDefinitionService.Update(ctx, svcReq)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := flowDefinitionResponse(flowDefinition)
-	return resp, nil
-}
-
-func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opDelete)
-	if err != nil {
-		if errors.Is(err, errResourceGone) {
-			return &api.DeleteFlowDefinitionNoContent{}, nil
+	seen := make(map[string]struct{}, len(definitions))
+	ids := make([]string, 0, len(definitions))
+	for _, def := range definitions {
+		id := def.FlowDefinition.UserSchema
+		if _, dup := seen[id]; dup || id == "" {
+			continue
 		}
-		return nil, err
+		seen[id] = struct{}{}
+		ids = append(ids, id)
 	}
-	err = h.flowDefinitionService.Delete(ctx, projectID, params.ID)
-	if err != nil {
-		return nil, err
+
+	byID := make(map[string]*api.Schema, len(ids))
+	if len(ids) > 0 {
+		// One batched query suffices: the generated validation caps the flow
+		// page at the shared list maximum (limit defaults to 20, tops out at
+		// 100), so a page can never reference more distinct schemas than one
+		// schema query of the same maximum returns. If either cap ever moves
+		// independently, chunk this loop instead.
+		schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+			ProjectID: projectID,
+			IDs:       ids,
+			Limit:     len(ids),
+		})
+		if err != nil {
+			return err
+		}
+		for _, schema := range schemas.Items {
+			apiSchema, err := domainSchemaToApiSchema(schema)
+			if err != nil {
+				return err
+			}
+			byID[schema.URL] = apiSchema
+		}
 	}
-	return &api.DeleteFlowDefinitionNoContent{}, nil
+
+	for i := range definitions {
+		if schema, ok := byID[definitions[i].FlowDefinition.UserSchema]; ok {
+			definitions[i].UserSchema.SetTo(*schema)
+		} else {
+			definitions[i].UserSchema.SetToNull()
+		}
+	}
+	return nil
 }
 
 /* ---------------- CONVERTERS ---------------- */
@@ -103,25 +134,11 @@ func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlow
 /* API request to service/domain converters */
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.FlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
-	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), strings.ToLower(string(definition.GetStatus())))
-}
-
-func mapUpdateRequestToService(projectID string, params api.UpdateFlowDefinitionParams, req *api.FlowDefinitionUpdateRequest) (service.FlowDefinitionRequest, error) {
-	definition := req.GetFlowDefinition()
-	svcReq, err := mapFlowDefinitionRequestToService(projectID, req.GetSchemaURI(), definition, strings.ToLower(string(definition.GetStatus())))
-	if err != nil {
-		return svcReq, err
-	}
-	svcReq.FlowDefinitionID = params.ID
-	return svcReq, nil
-}
-
-func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchemaURI, definition api.FlowDefinition, status string) (service.FlowDefinitionRequest, error) {
 	svcReq := service.FlowDefinitionRequest{
-		ProjectID:     projectID,
+		ProjectID:     string(req.GetProjectID()),
 		Name:          definition.GetName(),
 		UserSchema:    definition.GetUserSchema(),
-		Status:        status,
+		Status:        strings.ToLower(string(definition.GetStatus())),
 		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
@@ -131,7 +148,7 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 	}
 	svcReq.Purposes = purposes
 
-	reqFlowSchemaURI, ok := schemaURI.Get()
+	reqFlowSchemaURI, ok := req.GetSchemaURI().Get()
 	if ok {
 		u := (url.URL)(reqFlowSchemaURI)
 		svcReq.FlowSchemaURI = u.String()
@@ -255,11 +272,15 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 
 func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListFlowDefinitionsRequest {
 	req := service.ListFlowDefinitionsRequest{
-		ProjectID: string(params.ProjectID),
+		ProjectID:             string(params.ProjectID),
+		LatestRevisionPerName: params.Revisions.Value == api.ListFlowDefinitionsRevisionsLatest,
 	}
 	purpose, ok := params.Purpose.Get()
 	if ok {
 		req.Purpose = string(purpose)
+	}
+	if name, ok := params.Name.Get(); ok {
+		req.Name = name
 	}
 	limit, ok := params.Limit.Get()
 	if ok {

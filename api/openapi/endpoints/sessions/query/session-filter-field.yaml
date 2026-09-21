@@ -5,7 +5,16 @@ description: |
   - `user_id`: user id
   - `state`: one of `building`, `active`, `expired`. State is computed at read
     time, so a session expiring mid-request can match `active` but return `expired`.
+  - `lifecycle_owner_team_id`: team id. Matches the sessions of the users whose
+    lifecycle that team owns — the same users it can deactivate and whose
+    sessions it can revoke. Roster membership does not match: a collaborator on
+    the team's roster whose lifecycle another team (or the user themselves)
+    owns is not returned. A session is project-scoped and is not bound to a
+    team, so the link is read from the user at query time; a session of a
+    self-owned user, and a session with no user, match no team. Only `equals`
+    is supported.
 enum:
   - created_at
   - user_id
   - state
+  - lifecycle_owner_team_id

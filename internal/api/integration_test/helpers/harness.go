@@ -44,6 +44,8 @@ type Harness struct {
 	flowStateMachine      dependency[*domain.FlowStateMachineRuntime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
+	environmentService    dependency[*service.EnvironmentService]
+	releaseService        dependency[service.ReleaseService]
 	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]
 	tokenService          dependency[service.TokenService]

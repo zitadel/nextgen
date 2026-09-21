@@ -1,0 +1,35 @@
+title: CreateGrantRequest
+description: |
+  Bind a user or a team. Exactly one of `user` or `team`. Shared fields are
+  `relation` and optional `expires_at`. Sending both locators or neither is
+  `grant.invalid`.
+type: object
+required:
+  - relation
+properties:
+  relation:
+    type: string
+    enum:
+      - viewer
+      - editor
+      - admin
+    description: Catalog relation on `object_type` `project`. `team` (owning-team) is not allowed.
+  expires_at:
+    type: string
+    format: date-time
+    description: |
+      Optional expiry. Must be in the future when set. Expiry stops
+      authorization but does not free the unique binding; DELETE the grant
+      before posting the same principal and relation again.
+  user:
+    description: |
+      User to bind. Exactly one of `user_id` or `identifier`. The user must
+      exist in the platform project when a platform project is configured.
+      Mutually exclusive with `team`.
+    $ref: user-locator.yaml
+  team:
+    description: |
+      Team to bind. Exactly one of `team_id` or `name`. The team must exist
+      in the platform project when a platform project is configured.
+      Mutually exclusive with `user`.
+    $ref: team-locator.yaml

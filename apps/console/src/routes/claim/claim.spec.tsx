@@ -1,0 +1,426 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { makeTestSession } from "../../auth/session.fixture";
+import { createAppRouter } from "../../router";
+import { resetClaimAttemptsForTests } from "./index";
+
+/**
+ * The claim page (#615): `claim/init` hands the CLI a URL of the form
+ * `<console>/claim?challenge_id=…&project_id=…`; the browser leg signs the
+ * developer in against the platform project and spends the challenge via
+ * `claim/complete`, cookie-authenticated.
+ *
+ * Same module-boundary mocks as `auth-guard.spec`: the auth module because the
+ * screen branches on the session, the widget because `<zitadel-login>` drives
+ * real flow requests on mount, which a jsdom spec neither needs nor supports.
+ */
+const fetchSession = vi.fn();
+
+vi.mock("@/auth/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/auth/session")>();
+  return {
+    ...actual,
+    fetchSession: (...args: []) => fetchSession(...args),
+  };
+});
+
+vi.mock("@zitadel/sdk-react", () => ({
+  // Renders children: the claim page projects the claim-window badge into the
+  // widget's `attribution-trailing` slot, so a mock that dropped them would
+  // hide the badge from every assertion below.
+  ZitadelLogin: (props: {
+    postSignInUrl?: string;
+    theme?: string;
+    project?: { projectId?: string };
+    children?: React.ReactNode;
+  }) => (
+    <div
+      data-testid="zitadel-login"
+      data-post-sign-in-url={props.postSignInUrl}
+      data-project-id={props.project?.projectId}
+    >
+      {props.children}
+    </div>
+  ),
+}));
+
+const PROJECT_ID = "proj_claimme";
+const CHALLENGE_ID = "chal_1";
+const CLAIM_PATH = `/claim?challenge_id=${CHALLENGE_ID}&project_id=${PROJECT_ID}`;
+
+// A path pattern rather than an absolute URL: this spec imports the router
+// statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
+const COMPLETE_PATTERN = `*/api/projects/${PROJECT_ID}/claim/complete`;
+const WINDOW_PATTERN = `*/api/projects/${PROJECT_ID}/claim/window`;
+
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
+
+beforeEach(() => {
+  fetchSession.mockReset();
+  // The spend gate outlives a mount by design, and every case here claims the
+  // same URL, so without this each test would replay the previous one's
+  // outcome instead of calling the server.
+  resetClaimAttemptsForTests();
+  // The widget renders only when a project id resolves (ADR 0004 §§2–3);
+  // pin the dev override so the unauthenticated branch exercises it.
+  vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  server.resetHandlers();
+});
+
+async function renderAt(path: string) {
+  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
+  const { unmount } = render(<RouterProvider router={router} />);
+  return { router, unmount };
+}
+
+/** Answers the countdown read with a window closing `days` from now. */
+function stubWindow(days: number, expired = false) {
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  server.use(
+    http.get(WINDOW_PATTERN, () =>
+      HttpResponse.json({ expires_at: expiresAt.toISOString(), expired }),
+    ),
+  );
+  return expiresAt;
+}
+
+/** Records completion calls and answers them with `respond`. */
+function stubComplete(respond: () => Response) {
+  const bodies: unknown[] = [];
+  server.use(
+    http.post(COMPLETE_PATTERN, async ({ request }) => {
+      bodies.push(await request.json());
+      return respond();
+    }),
+  );
+  return bodies;
+}
+
+describe("claim page", () => {
+  it("prompts an unauthenticated visitor to sign in, returning to the claim URL", async () => {
+    fetchSession.mockResolvedValue(null);
+    await renderAt(CLAIM_PATH);
+
+    const widget = await screen.findByTestId("zitadel-login");
+    // The widget's terminal step is a full-document navigation; pointing it
+    // back at the claim URL (params included) is what resumes the claim with
+    // the cookie in place.
+    expect(widget.dataset.postSignInUrl).toContain("/claim");
+    expect(widget.dataset.postSignInUrl).toContain(`challenge_id=${CHALLENGE_ID}`);
+    expect(widget.dataset.postSignInUrl).toContain(`project_id=${PROJECT_ID}`);
+    // Identity lives in the console's platform project, not the project being
+    // claimed (ADR 0004).
+    expect(widget.dataset.projectId).toBe("proj_platform");
+  });
+
+  it("completes the claim exactly once for a signed-in visit and shows success", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    const bodies = stubComplete(() =>
+      HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_personal",
+        claimed_at: "2026-08-24T10:00:00Z",
+      }),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    // The challenge is single-use (first-claim-wins): one visit must spend it
+    // exactly once, whatever React re-renders happen around the effect.
+    expect(bodies).toEqual([{ challenge_id: CHALLENGE_ID }]);
+    // One next step, not two: the console is where the developer goes, and the
+    // CLI picks the claim up on its own without being told to.
+    expect(screen.getByRole("link", { name: "Open the console" })).toBeInTheDocument();
+    expect(screen.queryByText(/terminal/i)).not.toBeInTheDocument();
+  });
+
+  // The gap the in-component ref cannot cover: a fresh mount gets a fresh ref.
+  // The page was observed mounting twice on the way back from the sign-in
+  // widget, and the second mount re-spent a challenge the first had completed
+  // -- which the server refuses with 409 by contract, replacing the success
+  // already on screen with "Already claimed".
+  it("spends the challenge once across a remount, keeping the success", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    let calls = 0;
+    server.use(
+      http.post(COMPLETE_PATTERN, () => {
+        calls += 1;
+        // The second spend answers exactly as the server does.
+        return calls === 1
+          ? HttpResponse.json({
+              project_id: PROJECT_ID,
+              team_id: "team_personal",
+              claimed_at: "2026-08-24T10:00:00Z",
+            })
+          : HttpResponse.json(
+              {
+                code: "proj-already_claimed",
+                message: "The project is already claimed by a team.",
+                details: { team_id: "team_personal" },
+              },
+              { status: 409 },
+            );
+      }),
+    );
+
+    const first = await renderAt(CLAIM_PATH);
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    first.unmount();
+
+    await renderAt(CLAIM_PATH);
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    expect(calls).toBe(1);
+  });
+
+  it("shows the owning team's dashboard when the project is already claimed", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "proj-already_claimed",
+          message: "The project is already claimed by a team.",
+          details: {
+            team_id: "team_other",
+            dashboard_url: "https://console.example/teams/team_other",
+          },
+        },
+        { status: 409 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByRole("heading", { name: "Already claimed" })).toBeInTheDocument();
+    // ADR 030: the API owns the error copy; it is rendered verbatim.
+    expect(screen.getByText("The project is already claimed by a team.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute(
+      "href",
+      "https://console.example/teams/team_other",
+    );
+  });
+
+  it("prompts a restart when the challenge has expired", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        { code: "proj-claim_expired", message: "The claim challenge has expired." },
+        { status: 410 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByRole("heading", { name: "Claim link expired" })).toBeInTheDocument();
+    expect(screen.getByText("The claim challenge has expired.")).toBeInTheDocument();
+    // The fix is a fresh challenge from `claim/init`, which only the CLI can
+    // mint — the page says where to go rather than offering a dead retry.
+    expect(screen.getByText(/terminal/i)).toBeInTheDocument();
+  });
+
+  it("offers a retry on claim.no_personal_team — the contract says it self-clears", async () => {
+    // `claim.no_personal_team` means no membership at all, and the 403's own
+    // contract text says the next sign-in provisions one. Dead-ending here
+    // would tell a developer to give up on the recoverable case.
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "claim.no_personal_team",
+          message: "The session user has no active personal team in the platform project.",
+        },
+        { status: 403 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "Your account has no team yet" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("The session user has no active personal team in the platform project."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("dead-ends claim.personal_team_not_active and names the remedy", async () => {
+    // The mirror case: the membership exists but is not active, which
+    // provisioning will not fix. `membership_status` decides the copy —
+    // `removed` is about the user's access, not the team's.
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "claim.personal_team_not_active",
+          message: "The user's personal team in the platform project is not active.",
+          details: { membership_status: "removed" },
+        },
+        { status: 403 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "This account cannot claim projects" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Restoring this account's access/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  });
+
+  it("drops a dashboard link that is not http(s)", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "proj-already_claimed",
+          message: "The project is already claimed by a team.",
+          details: { team_id: "team_other", dashboard_url: "javascript:alert(1)" },
+        },
+        { status: 409 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByRole("heading", { name: "Already claimed" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /dashboard/i })).not.toBeInTheDocument();
+  });
+
+  it("dead-ends a 401 instead of re-running sign-in", async () => {
+    // The loader just confirmed an active session, so a 401 from
+    // `claim/complete` is the server's opaque wrong-plane verdict (no platform
+    // project, or a foreign-project session — `verifyClaimSession` collapses
+    // both into public `auth.unauthorized`). Re-embedding the widget mints the
+    // same session again and loops forever — the local dev backend boots
+    // without a platform project, which is exactly how the loop was found.
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "Missing or invalid session token." },
+        { status: 401 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "This account can't claim the project" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("zitadel-login")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("offers a retry on an unexpected failure, spending one call per attempt", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    let calls = 0;
+    server.use(
+      http.post(COMPLETE_PATTERN, () => {
+        calls += 1;
+        return calls === 1
+          ? HttpResponse.json({ code: "internal", message: "Something broke." }, { status: 500 })
+          : HttpResponse.json({
+              project_id: PROJECT_ID,
+              team_id: "team_personal",
+              claimed_at: "2026-08-24T10:00:00Z",
+            });
+      }),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "The claim did not complete" }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    expect(calls).toBe(2);
+  });
+
+  it("rejects a claim URL with missing parameters without spending anything", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    const bodies = stubComplete(() => HttpResponse.json({}));
+    await renderAt("/claim?project_id=proj_only");
+
+    expect(
+      await screen.findByRole("heading", { name: "This claim link is not valid" }),
+    ).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+  });
+});
+
+describe("claim window countdown", () => {
+  it("shows the days left beside the sign-up prompt", async () => {
+    fetchSession.mockResolvedValue(null);
+    stubWindow(11);
+
+    await renderAt(CLAIM_PATH);
+
+    // Slotted into the widget's trustmark row, which is where the design
+    // draws it — so it must render inside the widget, not beside it.
+    const widget = await screen.findByTestId("zitadel-login");
+    expect(await within(widget).findByText("Expires in 11 days")).toBeInTheDocument();
+  });
+
+  it("says the window closed when the server reports it expired", async () => {
+    fetchSession.mockResolvedValue(null);
+    stubWindow(-1, true);
+
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByText("Claim window expired")).toBeInTheDocument();
+  });
+
+  it("rounds a deadline later today up to a day rather than down to zero", async () => {
+    fetchSession.mockResolvedValue(null);
+    stubWindow(0.4);
+
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByText("Expires in 1 day")).toBeInTheDocument();
+  });
+
+  it("renders the page without a countdown when the window read fails", async () => {
+    fetchSession.mockResolvedValue(null);
+    server.use(http.get(WINDOW_PATTERN, () => HttpResponse.json({}, { status: 500 })));
+
+    await renderAt(CLAIM_PATH);
+
+    // A read that only decorates must never gate the claim itself.
+    expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+    expect(screen.queryByText(/^Expires in/)).not.toBeInTheDocument();
+  });
+
+  it("drops the badge once the project is claimed", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubWindow(9);
+    stubComplete(() =>
+      HttpResponse.json({ project_id: PROJECT_ID, team_id: "team_1", claimed_at: "2026-08-24T10:00:00Z" }),
+    );
+
+    await renderAt(CLAIM_PATH);
+
+    expect(await screen.findByText("Project claimed")).toBeInTheDocument();
+    expect(screen.queryByText(/^Expires in/)).not.toBeInTheDocument();
+  });
+
+  it("shows the window beside an expired claim link", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubWindow(9);
+    stubComplete(() =>
+      HttpResponse.json({ code: "proj.claim_expired", message: "the claim link expired" }, { status: 410 }),
+    );
+
+    await renderAt(CLAIM_PATH);
+
+    // Both are true at once, and the page has to say so: this link is done,
+    // the project is still claimable for another nine days.
+    expect(await screen.findByText("Claim link expired")).toBeInTheDocument();
+    expect(await screen.findByText("Expires in 9 days")).toBeInTheDocument();
+  });
+});

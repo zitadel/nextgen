@@ -1,0 +1,8 @@
+title: EnvironmentCreatedPayload
+type: object
+description: |
+  Allowlisted fields for `environment.created`. The environment id is already
+  the event's `entity_id`, so the name is the only field carried here.
+properties:
+  name:
+    type: string

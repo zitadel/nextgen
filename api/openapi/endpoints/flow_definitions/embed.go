@@ -142,20 +142,42 @@ func convertStepTransitions(transitions api.OptFlowDefinitionStepTransitions) (m
 			return nil, err
 		}
 
+		purpose, err := convertStepTransitionPurpose(transition.GetPurpose())
+		if err != nil {
+			return nil, err
+		}
+
 		ret[name] = domain.FlowStepTransition{
-			Action: action,
-			Target: transition.GetTarget(),
+			Action:  action,
+			Target:  transition.GetTarget(),
+			Purpose: purpose,
 		}
 	}
 	return ret, nil
 }
 
-func convertStepTransitionAction(action api.OptNilFlowDefinitionStepTransitionsItemAction) (*domain.FlowDefinitionTransitionAction, error) {
-	if !action.IsSet() {
+func convertStepTransitionPurpose(purpose api.OptNilFlowDefinitionStepTransitionsItemPurpose) (*domain.FlowDefinitionPurpose, error) {
+	// Get() is false for absent and explicit-null values alike; IsSet() alone
+	// would map an explicit `null` to the zero enum and fail the conversion.
+	value, ok := purpose.Get()
+	if !ok {
 		return nil, nil
 	}
 
-	ret, err := domain.FlowDefinitionTransitionActionString(string(action.Value))
+	ret, err := domain.FlowDefinitionPurposeString(string(value))
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func convertStepTransitionAction(action api.OptNilFlowDefinitionStepTransitionsItemAction) (*domain.FlowDefinitionTransitionAction, error) {
+	value, ok := action.Get()
+	if !ok {
+		return nil, nil
+	}
+
+	ret, err := domain.FlowDefinitionTransitionActionString(string(value))
 	if err != nil {
 		return nil, err
 	}

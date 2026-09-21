@@ -8,7 +8,26 @@ post:
         - user.write
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/team-id.yaml
+    # Declared here rather than shared: `team_id` is the team parameter across
+    # the API, but what it does is the resource's own business. On a user it is
+    # membership, and saying so is the whole point of spelling it out locally.
+    - name: team_id
+      in: query
+      description: |
+        Adds the new user to this team: creating the user also creates an
+        active membership in it. Omit it to create a user with no memberships.
+
+        This is team membership, not lifecycle ownership. It does not decide
+        who may deprovision the user, and the created user stays self-owned
+        either way. The owning team is reported on reads as
+        `metadata.lifecycle_owner_team_id` and cannot be set through this API.
+        See ADR 024.
+
+        The team also scopes team-unique attributes for this create: an
+        attribute the schema marks unique per team is checked against this
+        team's members.
+      schema:
+        $ref: ../../components/schemas/team-id.yaml
   requestBody:
     required: true
     content:
@@ -64,36 +83,3 @@ post:
             $ref: ../../components/error-details.yaml
     default:
       $ref: createUser-error-response.yaml
-
-get:
-  operationId: listUsers
-  summary: List users
-  tags:
-    - Users
-  parameters:
-    - $ref: ../../components/parameters/limit.yaml
-    - $ref: ../../components/parameters/page-token.yaml
-  security:
-    - oauth2:
-        - user.read
-  responses:
-    '200':
-      description: A list of users was returned
-      content:
-        application/json:
-          schema:
-            $ref: list-users-response.yaml
-    '400':
-      description: The provided input was not valid
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-    '500':
-      description: Something went wrong on the server. This was not your fault.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-    default:
-      $ref: listUsers-error-response.yaml

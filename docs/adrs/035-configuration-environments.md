@@ -3,6 +3,7 @@
 > **Status:** Accepted
 > **Date:** 2026-07-07
 > **Context:** Multi-environment lifecycle for source-controlled configuration
+> **Amended by:** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (fixed `id` plus `revision_id` on every revisioned resource; a pointer pins `revision_id`)
 
 ## Status quo
 
@@ -75,6 +76,8 @@ For example, release `rel_01KX3RG8A7F0N9WD3P2E4YM5C1` might contain:
 | app       | `name` = `web`               | `app_01KWJC2B78ZQ…`        |
 | policy    | `name` = `password`          | `pol_01KWHF3XY6RN…`        |
 
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): the Revision column is the revision's `revision_id`, and the idp handle is `slug`, not `name`.
+
 The "handle" is the field each resource kind uses as its stable identifier across revisions. For example, schemas use `objectType`.
 
 Each release also records **audit metadata** — who created it, when, and from what source:
@@ -87,7 +90,7 @@ Each release also records **audit metadata** — who created it, when, and from 
 
 These fields are set at construction time and never mutate.
 
-**A release is a closed boundary.** An environment sees only what is inside its current release: resources outside the release are invisible, and drafted revisions on the server that never made it into a release do not exist at runtime. Per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) operates outside any release.
+**A release is a closed boundary.** An environment sees only what is inside its current release: resources outside the release are invisible, and drafted revisions on the server that never made it into a release do not exist at runtime. Per-resource CRUD (`POST /schemas`, `POST /flow_definitions`, …) operates outside any release.
 
 > Exception: users carry their own user-schema revision. A user record persists the sch_… id of the user-schema revision it was created against.
 
@@ -141,6 +144,8 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 | `GET /releases`                | List releases in the project, newest first. Each entry carries audit metadata; pointer tuples are omitted (fetch via `GET /releases/{release_id}`).                         |
 | `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{id}`, `GET /flow_definitions/{id}`, …). |
 
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a pinned revision is fetched through `GET /<kind>/revisions/{revision_id}`, since get-by-id returns the newest revision.
+
 A release owns pointers and audit metadata, not content. Per-kind endpoints stay the single source of truth for resource bytes; a release is the immutable snapshot of *which* revisions belong together. Consumers that need content (e.g. `zitadel status` diffing against local, or a UI rendering a release preview) resolve each pointer themselves. This keeps releases lightweight and avoids duplicating resource storage.
 
 #### `environments` and `deployments`
@@ -171,7 +176,7 @@ Tailored for the CLI: a single endpoint that backs `zitadel deploy` (and `zitade
 
 \* Endpoint name is a placeholder; a shorter form may replace it.
 
-Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) remains available and creates a new revision on write. It does not touch any environment's current deployment.
+Direct per-resource CRUD (`POST /schemas`, `POST /flow_definitions`, …) remains available and creates a new revision on write. It does not touch any environment's current deployment.
 
 ### CLI
 
@@ -533,3 +538,23 @@ An environment either runs the previous release or the new one, never a mixture.
 - **Auto-deploy defaults for bare `zitadel deploy` (per #449).** Whether bare `deploy` should auto-target a designated non-prod environment (Vercel-style: implicit for preview, explicit for prod) depends on env-metadata this ADR treats as out of scope (which envs are production-class). Follow-up once env-classes are defined.
 - **Environment lifecycle, values, and data isolation.** Environment creation, retirement, per-env value shape (base URLs, custom domains, template values referenced from releases), template resolution semantics on deployment, and cross-env data isolation (including the exception that users carry their own user-schema revision) are covered by a follow-up ADR.
 - **Inner-loop semantics.** Whether every local save creates a release (Vercel-shaped local dev) or only explicit `zitadel deploy` does (Terraform-shaped) is a follow-up decision affecting local-dev ergonomics.
+
+## Amendment (2026-09-02): pointer kind vocabulary
+
+The [Releases](#releases) table above writes the flow kind as `flow`. The wire
+enum on `POST /releases` spells it **`flow_definition`** instead.
+
+`flow` is ambiguous in the API it ships into: `/flow` is the runtime flow
+orchestration resource (tag *Flows*), while the revisions a release pins come
+from `/flow_definitions` (tag *Flow Definitions*), carry `flowdef_` ids, and are
+gated by `flow_definition.read` / `flow_definition.write`. A pointer reading
+`kind: flow` invites the reading that a release pins a runtime flow.
+
+The kinds accepted at the contract are therefore `schema`, `flow_definition`
+and `branding`. Branding is included from the outset: its revisions are already
+immutable, and because a project has exactly one branding there is no field to
+derive a handle from, so its handle is the constant `default` — as the table
+above already shows. Handle resolution is per kind, not a shared column read.
+
+The illustrative table is otherwise unchanged; this fixes the name the wire
+uses, not the model.

@@ -1,0 +1,8 @@
+type: string
+description: |
+  Field to sort grants by. Default is `created_at` ascending with `id` as
+  the tiebreaker.
+enum:
+  - created_at
+  - expires_at
+  - id

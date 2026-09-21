@@ -15,26 +15,29 @@ export function userAttributes(user: Record<string, unknown>): Record<string, un
 }
 
 /**
- * The user's human-readable name, mirroring the platform's identity contract
- * (`User.DisplayName` in `internal/domain/user.go` — the same derivation behind
- * `GET /sessions/me`'s `name`): an explicit `name` wins, otherwise the given and
- * family parts joined. The shipped presets spell them camelCase
- * (`packages/config/defaults/*.json`); snake_case stays accepted for schemas
- * authored that way.
+ * The user's rendered identity per ADR 058: the envelope's derived `display`,
+ * falling back to `identifier`, then the id. The fields are resolved by the
+ * server from the schema's own `x-identifier`/`x-display` designations, so
+ * the console carries zero designation logic — the convention-guessing
+ * `userDisplayName` this replaces is gone with the platform's own resolver.
  *
- * User schemas are free-form and `listUsers` returns the attribute tree verbatim,
- * so this reads only the conventional identity keys and returns `undefined` when
- * a schema names its properties differently. Callers fall back to the email and
- * then the id — inventing a name from an unrelated attribute is worse than
- * having none.
- *
- * Takes the attributes object, not the whole user: `name` is a schema property.
+ * Takes the whole user record: `display`/`identifier` are envelope fields,
+ * not schema properties.
  */
-export function userDisplayName(attributes: Record<string, unknown>): string | undefined {
-  const explicit = field(attributes, "name");
-  if (explicit) return explicit;
-  const given = field(attributes, "givenName") ?? field(attributes, "given_name");
-  const family = field(attributes, "familyName") ?? field(attributes, "family_name");
-  const joined = [given, family].filter(Boolean).join(" ");
-  return joined || undefined;
+export function userIdentity(user: Record<string, unknown>): string | undefined {
+  return field(user, "display") ?? field(user, "identifier") ?? field(user, "id");
+}
+
+/** The envelope's designated identifier value, when the schema designates one. */
+export function userIdentifier(user: Record<string, unknown>): string | undefined {
+  return field(user, "identifier");
+}
+
+/**
+ * The muted secondary line shown under a heading: the identifier, but only
+ * when a display name is the primary (rendering the identifier twice says
+ * nothing). The users list shows the identifier as its own column instead.
+ */
+export function userIdentitySecondary(user: Record<string, unknown>): string | undefined {
+  return field(user, "display") ? field(user, "identifier") : undefined;
 }

@@ -217,11 +217,14 @@ An agency or consultancy uses its own platform-project team as the principal on
 customer-issued grants. A user may belong to several customer or agency access
 teams. Team IDs are stable addressing identifiers.
 
-For v1, the customer-facing collaboration API accepts either a user ID or team
-ID from the platform project. It validates that the supplied principal exists
-and is active without exposing a global directory. Direct grants are useful for
-one-off access; access teams are preferred when several people share the same
-project set or when one membership removal should revoke several derived roles.
+For v1, the customer-facing collaboration API accepts an id **or** a unique
+locator from the platform project: `user_id` / `identifier` for a user, and
+`team_id` / `name` for a team. It resolves that locator to a stored principal
+and validates that the principal exists and is active, without exposing a
+global directory. Storage and `authz.granted` / `authz.revoked` events stay
+`(principal_type, principal_id)`. Direct grants are useful for one-off access;
+access teams are preferred when several people share the same project set or
+when one membership removal should revoke several derived roles.
 
 Both primitives are model commitments from day one: the row shape is identical,
 and the testing obligations cover the direct and team-derived paths regardless
@@ -306,9 +309,9 @@ Put plainly, the assignment says **who has which project role**; the event says
 **who changed that assignment**.
 
 Customer-issued grants need no agency-side request flow in v1. The customer
-names the target user or team ID and remains responsible for granting and
-revoking access. Invitations, approval handshakes, and a discoverable agency
-directory are later product surfaces.
+names the target user or team (by id or unique locator) and remains
+responsible for granting and revoking access. Invitations, approval
+handshakes, and a discoverable agency directory are later product surfaces.
 
 ### 7. Project creation and claim name the target team
 

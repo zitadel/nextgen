@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"go.uber.org/mock/gomock"
 )
@@ -159,4 +161,107 @@ func TestExchangeInputFromRequest(t *testing.T) {
 		require.Nil(t, input.TTL)
 		require.Nil(t, input.IdempotencyKey)
 	})
+}
+
+// recordingEnsurer captures the ensure calls the exchange makes.
+type recordingEnsurer struct {
+	calls []string
+	err   error
+}
+
+func (r *recordingEnsurer) EnsurePersonalTeam(_ context.Context, projectID, userID string) error {
+	r.calls = append(r.calls, projectID+"/"+userID)
+	return r.err
+}
+
+// exchangeFixture drives ExchangeHandoff far enough to observe the ensure.
+// GetProjectCrypter is stubbed to fail on purpose: it runs after the ensure, so
+// its error proves the handler got past the side effect without needing a real
+// crypter, and it is the value the "ensure failure is non-fatal" case compares
+// against.
+func exchangeFixture(t *testing.T, session *domain.Session, ens service.PersonalTeamEnsurer) (Handler, error) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+
+	sessions := servicemocks.NewMockSessionService(ctrl)
+	sessions.EXPECT().Exchange(gomock.Any(), gomock.Any()).Return(session, nil)
+
+	crypterErr := errors.New("crypter unavailable")
+	keys := servicemocks.NewMockKeyService(ctrl)
+	keys.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, crypterErr).AnyTimes()
+
+	h := Handler{sessionService: sessions, keyService: keys}
+	if ens != nil {
+		h.WithPersonalTeamEnsurer(ens)
+	}
+	return h, crypterErr
+}
+
+func exchangedSession(userID *string) *domain.Session {
+	return &domain.Session{
+		ProjectID: "proj_platform",
+		ID:        "sess_1",
+		TokenID:   "tkn_1",
+		ExpiresAt: time.Now().Add(time.Hour),
+		UserID:    userID,
+	}
+}
+
+func callExchange(t *testing.T, h Handler) error {
+	t.Helper()
+	_, err := h.ExchangeHandoff(t.Context(),
+		&api.ExchangeRequest{HandoffToken: "handoff"},
+		api.ExchangeHandoffParams{ProjectID: "proj_platform"})
+	return err
+}
+
+// TestExchangeHandoffRunsThePersonalTeamEnsure pins the handler wiring itself.
+// Session exchange is the only place the ensure runs, so a dropped call here
+// would silently stop provisioning without any service test noticing.
+func TestExchangeHandoffRunsThePersonalTeamEnsure(t *testing.T) {
+	t.Parallel()
+
+	ens := &recordingEnsurer{}
+	h, crypterErr := exchangeFixture(t, exchangedSession(new("user_1")), ens)
+
+	require.ErrorIs(t, callExchange(t, h), crypterErr)
+	require.Equal(t, []string{"proj_platform/user_1"}, ens.calls,
+		"the exchanged session's project and user are what the ensure is scoped to")
+}
+
+// TestExchangeHandoffSkipsTheEnsureForAnonymousSessions: a session with no
+// resolved user has nobody to provision a team for.
+func TestExchangeHandoffSkipsTheEnsureForAnonymousSessions(t *testing.T) {
+	t.Parallel()
+
+	ens := &recordingEnsurer{}
+	h, crypterErr := exchangeFixture(t, exchangedSession(nil), ens)
+
+	require.ErrorIs(t, callExchange(t, h), crypterErr)
+	require.Empty(t, ens.calls)
+}
+
+// TestExchangeHandoffSurvivesAnEnsureFailure: the side effect is best-effort,
+// so a failing ensure must not cost the sign-in. The handler must fail no
+// earlier than it would have without the ensurer, and never with its error.
+func TestExchangeHandoffSurvivesAnEnsureFailure(t *testing.T) {
+	t.Parallel()
+
+	ensureErr := errors.New("ensure exploded")
+	ens := &recordingEnsurer{err: ensureErr}
+	h, crypterErr := exchangeFixture(t, exchangedSession(new("user_1")), ens)
+
+	err := callExchange(t, h)
+	require.ErrorIs(t, err, crypterErr, "the exchange continued past the failed side effect")
+	require.NotErrorIs(t, err, ensureErr, "the side effect's failure must not surface to the caller")
+}
+
+// TestExchangeHandoffWithoutAnEnsurerIsUnchanged: the setter is optional, so a
+// handler built without it must behave exactly as before it existed.
+func TestExchangeHandoffWithoutAnEnsurerIsUnchanged(t *testing.T) {
+	t.Parallel()
+
+	h, crypterErr := exchangeFixture(t, exchangedSession(new("user_1")), nil)
+	require.ErrorIs(t, callExchange(t, h), crypterErr)
 }

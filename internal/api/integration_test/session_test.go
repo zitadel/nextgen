@@ -26,7 +26,7 @@ func TestQuerySessions(t *testing.T) {
 
 	building := harness.CreateSession(t, project.ID, time.Hour)
 	expired := harness.CreateSession(t, project.ID, time.Nanosecond)
-	userID := harness.CreateUserWithTeam(t, project.ID)
+	userID, teamID := harness.CreateUserOwnedByTeam(t, project.ID)
 	active := harness.CreateActiveSession(t, project.ID, userID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -86,6 +86,24 @@ func TestQuerySessions(t *testing.T) {
 		assert.Equal(t, active.ID, ids[0], "the last-created session must sort first")
 	})
 
+	// The #869 acceptance: listed rows carry the linked user's resolved
+	// reference (ADR 058 §4), batch-hydrated — the seeded default schema
+	// designates email as identifier and no display properties.
+	t.Run("rows carry resolved user refs", func(t *testing.T) {
+		for _, session := range querySessions(t, &api.QuerySessionsRequest{}).Sessions {
+			if string(session.SessionID) != active.ID {
+				assert.False(t, session.User.Set, "anonymous session %s must carry no user ref", session.SessionID)
+				continue
+			}
+			require.True(t, session.User.Set, "the authenticated session must carry a user ref")
+			ref := session.User.Value
+			assert.Equal(t, userID, string(ref.UserID))
+			assert.Equal(t, "email", ref.IdentifierProperty.Value)
+			assert.NotEmpty(t, ref.Identifier.Value, "the designated email must resolve as the identifier")
+			assert.False(t, ref.Display.Set, "the default schema designates no display properties")
+		}
+	})
+
 	for _, tc := range []struct {
 		state string
 		want  *domain.Session
@@ -119,6 +137,31 @@ func TestQuerySessions(t *testing.T) {
 		}).Sessions
 		require.Len(t, sessions, 1, helpers.MustMarshal(t, sessions))
 		assert.Equal(t, active.ID, string(sessions[0].SessionID))
+	})
+
+	// A session is project-scoped and carries no team; it joins the team that
+	// owns its user's lifecycle (ADR 024, ADR 060). The two anonymous sessions
+	// have no user, so they belong to no team.
+	t.Run("filter by lifecycle_owner_team_id", func(t *testing.T) {
+		teamFilter := func(id string) *api.QuerySessionsRequest {
+			return &api.QuerySessionsRequest{
+				Filter: []api.QuerySessionsRequestFilterItem{{
+					Field:     api.SessionFilterFieldLifecycleOwnerTeamID,
+					Operation: api.FilterOperationEquals,
+					Value:     api.NewOptFilterValue(api.NewStringFilterValue(id)),
+				}},
+			}
+		}
+
+		// The roster-vs-ownership split is pinned across all three dialects in
+		// stmttest; here the seeded project holds one owned user, so the
+		// contract-level assertion is that the wire field reaches that join.
+		sessions := querySessions(t, teamFilter(teamID)).Sessions
+		require.Len(t, sessions, 1, helpers.MustMarshal(t, sessions))
+		assert.Equal(t, active.ID, string(sessions[0].SessionID))
+
+		other := querySessions(t, teamFilter("team_does_not_exist")).Sessions
+		assert.Empty(t, other, helpers.MustMarshal(t, other))
 	})
 
 	t.Run("filter by created_at", func(t *testing.T) {

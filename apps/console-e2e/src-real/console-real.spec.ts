@@ -1,6 +1,6 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary, grantProjectAdmin, signIn } from "./support";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -9,7 +9,15 @@ test("shows the bootstrapped project in the list and detail views", async ({
   zitadel,
   seed,
 }) => {
-  await signIn(page, await seed.user());
+  // The list is the projects this person can act on (`GET /users/me/projects`),
+  // so the operator needs a grant on the project before it shows up — being
+  // able to sign in to it is not access to it.
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  await signIn(page, operator);
+
+  // The pill reads the same query, with the session cookie alone.
+  await expect(page.getByRole("button", { name: "Switch project" })).not.toHaveText("No projects");
 
   await page.goto("/projects");
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
@@ -71,10 +79,12 @@ test("keeps the project credential out of browser requests and resources", async
     );
   });
 
-  const responsePromise = page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return url.pathname.startsWith("/api/projects/");
-  });
+  // The Projects screen's own read. It is session-authenticated, so the browser
+  // request carries no bearer — and the proxy adding one on the way through
+  // must not show up here either.
+  const responsePromise = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/users/me/projects",
+  );
 
   await page.goto("/projects");
   const response = await responsePromise;
@@ -100,4 +110,106 @@ test("shows the status the API stamped on a seeded user", async ({ page, seed })
   await page.goto("/users");
   const row = page.getByRole("row").filter({ hasText: user.email });
   await expect(row.getByText("active", { exact: true })).toBeVisible();
+});
+
+test("embeds the team memberships on the list read rather than degrading", async ({
+  page,
+  seed,
+}) => {
+  // `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and
+  // the console falls back to an unexpanded read when it is refused — which is
+  // silent by design. Asserted against a real instance because the fallback
+  // would otherwise hide a genuinely rejected expansion behind a list that
+  // still renders: what a stub cannot tell you is whether the *server* accepts
+  // the parameter.
+  //
+  // The column's contents are not asserted. No endpoint writes a membership
+  // (`EnsurePersonalTeam` is a no-op outside the platform project, and the API
+  // exposes only `GET /users/{user_id}/teams`), so on this instance every user
+  // is on no team and every cell is honestly empty. Add the content assertion
+  // with the endpoint that can seed one.
+  const user = await seed.user();
+  await signIn(page, user);
+
+  const query = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/users/query" && response.ok(),
+  );
+  await page.goto("/users");
+  expect(JSON.parse((await (await query).request().postData()) ?? "{}")).toMatchObject({
+    expand: ["teams"],
+  });
+
+  // The header is the console's own signal that the expansion was served: it is
+  // dropped on a 403, so its presence means no fallback happened.
+  await expect(page.getByRole("columnheader", { name: "Team", exact: true })).toBeVisible();
+  await expectNoErrorBoundary(page);
+});
+
+test("gives a colleague admin access to the project, and takes it away", async ({ page, seed }) => {
+  // The whole journey of #769 against a live backend: the grant is created for
+  // somebody who already exists, shows up in the list with their resolved
+  // identity, and is revoked again. Asserted here rather than only over stubs
+  // because both writes and the `expand: ["principal"]` read are server
+  // behaviour, and the unit specs prove only what the console does with them.
+  const operator = await seed.user();
+  const colleague = await seed.user();
+  await signIn(page, operator);
+
+  await page.goto("/settings/admins");
+  await expect(page.getByRole("heading", { name: "Admins", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add admin", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add admin" });
+  await dialog.getByRole("combobox", { name: "Person" }).click();
+  await page.getByRole("option", { name: colleague.email }).click();
+  await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+
+  // The row is what proves the write landed: it comes back from the list read,
+  // not from the form's own state.
+  const row = page.getByRole("row").filter({ hasText: colleague.email });
+  await expect(row).toBeVisible();
+  await expect(row.getByText("Admin", { exact: true })).toBeVisible();
+
+  await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
+  await page.getByRole("menuitem", { name: "Remove admin" }).click();
+  const confirm = page.getByRole("alertdialog");
+  await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+
+  // Gone from the list, which leaves the instance as this test found it.
+  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
+  await expectNoErrorBoundary(page);
+});
+
+test("stops offering a colleague once they are already an admin", async ({ page, seed }) => {
+  // `POST /grants` refuses a second grant for the same principal and relation.
+  // Rather than let the operator pick someone and then read an error, the
+  // picker drops people who already hold one — asserted here because the list
+  // it filters against comes from the server, not from the form.
+  const operator = await seed.user();
+  const colleague = await seed.user();
+  await signIn(page, operator);
+
+  await page.goto("/settings/admins");
+  await page.getByRole("button", { name: "Add admin", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add admin" });
+  await dialog.getByRole("combobox", { name: "Person" }).click();
+  await page.getByRole("option", { name: colleague.email }).click();
+  await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toBeVisible();
+
+  // Second time round they are not on offer.
+  await page.getByRole("button", { name: "Add admin", exact: true }).click();
+  await page.getByRole("dialog", { name: "Add admin" }).getByRole("combobox", { name: "Person" }).click();
+  await expect(page.getByRole("option", { name: colleague.email })).toHaveCount(0);
+  // The operator, who holds no grant, is still offered.
+  await expect(page.getByRole("option", { name: operator.email })).toBeVisible();
+
+  // Leave the instance as found.
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog", { name: "Add admin" }).getByRole("button", { name: "Cancel" }).click();
+  const row = page.getByRole("row").filter({ hasText: colleague.email });
+  await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
+  await page.getByRole("menuitem", { name: "Remove admin" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Remove admin", exact: true }).click();
+  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
 });

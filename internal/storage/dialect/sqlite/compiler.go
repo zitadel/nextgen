@@ -41,24 +41,12 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 	c.WriteString(stmt)
 
 	filter := opt.Filter
-	if len(opt.Pagination.Cursor) != 0 {
-		cursor, err := pagination.CursorFromToken[F](opt.Pagination.Cursor)
-		if err != nil {
-			return database.ErrInvalidCursor()
-		}
-		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy) {
-			return database.ErrCursorOrderMismatch()
-		}
-		values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)
-		if err != nil {
-			return database.ErrInvalidCursor().WithParent(err)
-		}
-		terms := compareTerms(cursor.Columns, values)
-		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
-			filter = database.And(filter, database.CompareGreater(terms...))
-		} else {
-			filter = database.And(filter, database.CompareLess(terms...))
-		}
+	keyset, err := cursorFilter(opt.Pagination, schema)
+	if err != nil {
+		return err
+	}
+	if keyset != nil {
+		filter = database.And(filter, keyset)
 	}
 	hasWhere := false
 	if filter != nil {
@@ -80,6 +68,31 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 	compileLimit(c, opt.Pagination.Limit)
 
 	return nil
+}
+
+// cursorFilter decodes the page cursor into the keyset comparison that resumes
+// the page, or nil when the page starts from the beginning. Statements that
+// assemble their own WHERE call it directly; compileList calls it for the rest.
+func cursorFilter[F ~uint8, T any](page database.Page[F], schema database.Schema[F, T]) (database.Filter[F], error) {
+	if len(page.Cursor) == 0 {
+		return nil, nil
+	}
+	cursor, err := pagination.CursorFromToken[F](page.Cursor)
+	if err != nil {
+		return nil, database.ErrInvalidCursor()
+	}
+	if !cursor.MatchesOrderBy(page.OrderBy) {
+		return nil, database.ErrCursorOrderMismatch()
+	}
+	values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)
+	if err != nil {
+		return nil, database.ErrInvalidCursor().WithParent(err)
+	}
+	terms := compareTerms(cursor.Columns, values)
+	if page.OrderBy.Direction == database.OrderAsc {
+		return database.CompareGreater(terms...), nil
+	}
+	return database.CompareLess(terms...), nil
 }
 
 func compareTerms[F ~uint8](columns []database.Column[F], values []any) []database.CompareTerm[F] {
@@ -106,6 +119,8 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileStringFilter(c, f, schema)
 	case *database.ArrayContainsFilter[F]:
 		compileArrayContainsFilter(c, f, schema)
+	case *database.CorrelatedFilter[F]:
+		compileCorrelatedFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
@@ -187,6 +202,12 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		writeArg(c, term.Value)
 	}
 	c.WriteString(")")
+}
+
+func compileCorrelatedFilter[F ~uint8, T any](c *statementCompiler, filter *database.CorrelatedFilter[F], schema database.Schema[F, T]) {
+	compare.CompileCorrelated(c, filter, schema, func(_ compare.Writer, arg any, _ database.Column[F]) {
+		writeArg(c, arg)
+	})
 }
 
 // compileArrayContainsFilter for SQLite uses json_each on the stored JSON TEXT column.

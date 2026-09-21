@@ -1,0 +1,30 @@
+type: string
+description: |
+  A related object to embed on each returned user (ADR 059).
+
+  - `teams`: the user's team memberships, as `teams` on each user. The property
+    is omitted entirely when not requested and `[]` when the user has none, so
+    "did not ask" is distinguishable from "there are none". Embedded lists are
+    capped and are not paginated: past the cap the user carries
+    `teams_truncated: true` and the whole list is read at
+    `GET /users/{user_id}/teams`.
+
+    Membership is team participation, not lifecycle ownership — the
+    owning team stays at `metadata.lifecycle_owner_team_id` (ADR 024).
+
+    Requires `team_membership.read` in addition to `user.read`.
+
+  - `lifecycle_owner_team`: the team that owns the user's identity lifecycle,
+    as `metadata.lifecycle_owner_team`. It resolves the id already carried at
+    `metadata.lifecycle_owner_team_id`, and serves the same representation as
+    `GET /teams/{team_id}`. The property is omitted when not requested and
+    `null` when the user is self-owned. One team, so no cap and no truncation
+    flag.
+
+    Requires `team.read` in addition to `user.read`.
+
+  The two are independent: asking for one says nothing about the other, and
+  neither implies the other's permission.
+enum:
+  - teams
+  - lifecycle_owner_team

@@ -2,21 +2,38 @@ import { useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { fetchSession, invalidateSessionCache } from "../auth/session";
 
-const STATE_ROW = "flex items-center gap-2 text-muted-foreground";
+const STATE_ROW = "flex items-center justify-center gap-2 text-muted-foreground";
+
+/**
+ * Boundary states replace a whole routed screen, so they get the content area to
+ * themselves and sit centred in it rather than wedged into its top left corner.
+ * `flex-1` claims the height left by the context bar inside the shell; the
+ * `min-h` covers the shell-less root boundaries, where there is no flex parent
+ * to grow into.
+ */
+function StatePage({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-[60vh] flex-1 items-center justify-center px-6 py-8">
+      <div className="w-full max-w-xl">{children}</div>
+    </div>
+  );
+}
 
 /** Shared pending boundary (Console ADR 0001). */
 export function PendingState() {
   return (
-    <div className={STATE_ROW} role="status" aria-live="polite">
-      <Loader2 className="size-4 animate-spin" aria-hidden />
-      <span>Loading…</span>
-    </div>
+    <StatePage>
+      <div className={STATE_ROW} role="status" aria-live="polite">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        <span>Loading…</span>
+      </div>
+    </StatePage>
   );
 }
 
@@ -71,7 +88,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
   if (unauthenticated) {
     if (sessionAlive) {
       return (
-        <div className={STATE_ROW}>
+        <StatePage>
           <Alert variant="destructive">
             <AlertCircle aria-hidden />
             <AlertTitle>Console API not authorized</AlertTitle>
@@ -81,33 +98,35 @@ export function ErrorState({ error }: ErrorComponentProps) {
               set and belongs to the current project (ADR 0003 §4).
             </AlertDescription>
           </Alert>
-        </div>
+        </StatePage>
       );
     }
     return (
-      <div className={STATE_ROW} role="status" aria-live="polite">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-        <span>Checking your session…</span>
-      </div>
+      <StatePage>
+        <div className={STATE_ROW} role="status" aria-live="polite">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          <span>Checking your session…</span>
+        </div>
+      </StatePage>
     );
   }
 
   const { heading, message } = describeError(error);
   return (
-    <div className={STATE_ROW}>
+    <StatePage>
       <Alert variant="destructive">
         <AlertCircle aria-hidden />
         <AlertTitle>{heading}</AlertTitle>
         <AlertDescription>{message}</AlertDescription>
       </Alert>
-    </div>
+    </StatePage>
   );
 }
 
 /** Shared not-found boundary. */
 export function NotFoundState() {
   return (
-    <div className={STATE_ROW}>
+    <StatePage>
       <Alert>
         <TriangleAlert aria-hidden />
         <AlertTitle>Not found</AlertTitle>
@@ -115,7 +134,7 @@ export function NotFoundState() {
           The page or resource you were looking for does not exist.
         </AlertDescription>
       </Alert>
-    </div>
+    </StatePage>
   );
 }
 

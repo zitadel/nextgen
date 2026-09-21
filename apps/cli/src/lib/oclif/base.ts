@@ -17,6 +17,7 @@ import {
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
 } from "./command-telemetry";
+import type { CommandGroup } from "./groups";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -40,7 +41,22 @@ export abstract class BaseCommand extends Command {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
-  /** Flags shared by every command, inherited via oclif `baseFlags`. */
+  /**
+   * The group the root help lists this command under (see `lib/oclif/groups`).
+   * Every product command must set it; the root-help test fails otherwise.
+   */
+  static group?: CommandGroup;
+
+  /** Position within {@link group} on the root help, lowest first. */
+  static groupOrder?: number;
+
+  /**
+   * Flags shared by every command, inherited via oclif `baseFlags`. `--force` is
+   * deliberately absent: what it permits differs per command (overwrite a
+   * managed file, delete a resource), so each command that honours it declares
+   * its own with wording that says what it does. {@link toMeta} still reads
+   * `flags.force` into {@link GlobalOptions.force} for those commands.
+   */
   static override baseFlags = {
     cwd: Flags.string({ char: "c", description: "Project directory to operate on." }),
     server: Flags.string({ char: "s", description: "Override the resolved server URL." }),
@@ -48,7 +64,6 @@ export abstract class BaseCommand extends Command {
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
     }),
-    force: Flags.boolean({ char: "f", description: "Overwrite protected files on conflict." }),
     "dry-run": Flags.boolean({ description: "Preview without mutating files or the platform." }),
     verbose: Flags.boolean({ description: "Verbose logging." }),
     debug: Flags.boolean({ description: "Debug logging." }),
@@ -235,7 +250,12 @@ export abstract class BaseCommand extends Command {
         }),
       );
     }
-    this.log(renderPretty(normalized, this.meta));
+    // An empty rendering is written as nothing, not as a blank line: a piped
+    // list of no records must leave stdout empty, so `wc -l` reports 0.
+    const rendered = renderPretty(normalized, this.meta);
+    if (rendered !== "") {
+      this.log(rendered);
+    }
     return toEnvelope(normalized, this.meta);
   }
 

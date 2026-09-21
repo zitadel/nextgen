@@ -26,7 +26,11 @@ type CreateSchemaByURLInput struct {
 }
 
 type ListSchemasInput struct {
-	ProjectID  string
+	ProjectID string
+	// IDs narrows the list to the given schema ids. Empty means no id filter.
+	// Not exposed on the wire: it serves in-process batch resolution, such as
+	// the flow-definition expand hydrator.
+	IDs        []string
 	ObjectType string
 	// Kind is nil when the caller did not filter by one. It is a pointer rather
 	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
@@ -72,7 +76,14 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
 	if err != nil {
-		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
+		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
+		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
+			// The designation rules are semantic and their text is the only
+			// pointer to which rule fired; Parent is never serialized
+			// (ADR 030), so carry the message to the client.
+			invalid = invalid.WithMessage(err.Error())
+		}
+		return nil, invalid
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
@@ -91,7 +102,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		// the duplicate as a commit-time AlreadyExists otherwise.
 		_, err := s.schemaResolver.Resolve(ctx, stmts, input.ProjectID, model.URL, model.Schema)
 		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+			return resolveSchemaError(err)
 		}
 		return audit.Emit(ctx, stmts, audit.EmitSpec{
 			Type:       domain.EventTypeSchemaCreated,
@@ -128,12 +139,41 @@ func (s *SchemaService) classifyCreateConflict(ctx context.Context, projectID, s
 	return domain.ErrJSONSchemaAlreadyExists().WithParent(cause)
 }
 
+// resolveSchemaError maps a failed schema resolution onto the caller-visible
+// error. The fetch_* re-stamps are runtime no-ops that put each code in a
+// return position, which the OpenAPI error analysis needs: it cannot see
+// through the resolver's $ref loader indirection (domain.classifyFetchError).
+func resolveSchemaError(err error) error {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok {
+		// The resolver reports an envelope that expired after the last
+		// fetch as a bare context error (see domain.JSONSchemaResolver.Resolve).
+		if errors.Is(err, context.DeadlineExceeded) {
+			return domain.ErrJSONSchemaFetchTimeout().WithParent(err)
+		}
+		return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+	}
+	switch de.Code {
+	case domain.ErrJSONSchemaFetchDenied().Code:
+		return domain.ErrJSONSchemaFetchDenied().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchTooLarge().Code:
+		return domain.ErrJSONSchemaFetchTooLarge().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchTooManyRedirects().Code:
+		return domain.ErrJSONSchemaFetchTooManyRedirects().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchDowngrade().Code:
+		return domain.ErrJSONSchemaFetchDowngrade().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchTimeout().Code:
+		return domain.ErrJSONSchemaFetchTimeout().WithDetails(de.Details).WithParent(de.Parent)
+	}
+	return de
+}
+
 func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
 	strURI := input.URL.String()
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
 		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+			return resolveSchemaError(err)
 		}
 		return nil
 	})
@@ -161,6 +201,16 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
+	}
+	// The ids are ORed with each other and ANDed with everything else, so they
+	// narrow the caller's already-authorized rows rather than reaching outside
+	// them: an id from another project matches nothing, like an unknown one.
+	if len(input.IDs) > 0 {
+		ids := make([]database.Filter[domain.JSONSchemaField], len(input.IDs))
+		for i, id := range input.IDs {
+			ids[i] = database.Equal(database.Col(domain.JSONSchemaFieldURL), id)
+		}
+		filters = append(filters, database.Or(ids...))
 	}
 	if input.ObjectType != "" {
 		filters = append(filters,

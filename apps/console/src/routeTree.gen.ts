@@ -11,17 +11,18 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as ClaimIndexRouteImport } from './routes/claim/index'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
 import { Route as AuthedTeamsIndexRouteImport } from './routes/_authed/teams/index'
 import { Route as AuthedSystemIndexRouteImport } from './routes/_authed/system/index'
 import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
-import { Route as AuthedSessionsIndexRouteImport } from './routes/_authed/sessions/index'
 import { Route as AuthedSchemasIndexRouteImport } from './routes/_authed/schemas/index'
 import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
 import { Route as AuthedFlowDefinitionsIndexRouteImport } from './routes/_authed/flow-definitions/index'
 import { Route as AuthedUsersUserIdRouteImport } from './routes/_authed/users/$userId'
 import { Route as AuthedTeamsTeamIdRouteImport } from './routes/_authed/teams/$teamId'
+import { Route as AuthedSettingsAdminsRouteImport } from './routes/_authed/settings/admins'
 import { Route as AuthedSchemasSchemaIdRouteImport } from './routes/_authed/schemas/$schemaId'
 import { Route as AuthedProjectsProjectIdRouteImport } from './routes/_authed/projects/$projectId'
 import { Route as AuthedFlowDefinitionsDefinitionIdRouteImport } from './routes/_authed/flow-definitions/$definitionId'
@@ -33,6 +34,11 @@ const LoginRoute = LoginRouteImport.update({
 } as any)
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClaimIndexRoute = ClaimIndexRouteImport.update({
+  id: '/claim/',
+  path: '/claim/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedIndexRoute = AuthedIndexRouteImport.update({
@@ -58,11 +64,6 @@ const AuthedSystemIndexRoute = AuthedSystemIndexRouteImport.update({
 const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedSessionsIndexRoute = AuthedSessionsIndexRouteImport.update({
-  id: '/sessions/',
-  path: '/sessions/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedSchemasIndexRoute = AuthedSchemasIndexRouteImport.update({
@@ -91,6 +92,11 @@ const AuthedTeamsTeamIdRoute = AuthedTeamsTeamIdRouteImport.update({
   path: '/teams/$teamId',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedSettingsAdminsRoute = AuthedSettingsAdminsRouteImport.update({
+  id: '/settings/admins',
+  path: '/settings/admins',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedSchemasSchemaIdRoute = AuthedSchemasSchemaIdRouteImport.update({
   id: '/schemas/$schemaId',
   path: '/schemas/$schemaId',
@@ -111,15 +117,16 @@ const AuthedFlowDefinitionsDefinitionIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
+  '/claim/': typeof ClaimIndexRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/projects/$projectId': typeof AuthedProjectsProjectIdRoute
   '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/settings/admins': typeof AuthedSettingsAdminsRoute
   '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/users/$userId': typeof AuthedUsersUserIdRoute
   '/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
   '/projects/': typeof AuthedProjectsIndexRoute
   '/schemas/': typeof AuthedSchemasIndexRoute
-  '/sessions/': typeof AuthedSessionsIndexRoute
   '/settings/': typeof AuthedSettingsIndexRoute
   '/system/': typeof AuthedSystemIndexRoute
   '/teams/': typeof AuthedTeamsIndexRoute
@@ -128,15 +135,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/': typeof AuthedIndexRoute
+  '/claim': typeof ClaimIndexRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/projects/$projectId': typeof AuthedProjectsProjectIdRoute
   '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/settings/admins': typeof AuthedSettingsAdminsRoute
   '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/users/$userId': typeof AuthedUsersUserIdRoute
   '/flow-definitions': typeof AuthedFlowDefinitionsIndexRoute
   '/projects': typeof AuthedProjectsIndexRoute
   '/schemas': typeof AuthedSchemasIndexRoute
-  '/sessions': typeof AuthedSessionsIndexRoute
   '/settings': typeof AuthedSettingsIndexRoute
   '/system': typeof AuthedSystemIndexRoute
   '/teams': typeof AuthedTeamsIndexRoute
@@ -147,15 +155,16 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/claim/': typeof ClaimIndexRoute
   '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/_authed/projects/$projectId': typeof AuthedProjectsProjectIdRoute
   '/_authed/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/_authed/settings/admins': typeof AuthedSettingsAdminsRoute
   '/_authed/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/_authed/users/$userId': typeof AuthedUsersUserIdRoute
   '/_authed/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
   '/_authed/projects/': typeof AuthedProjectsIndexRoute
   '/_authed/schemas/': typeof AuthedSchemasIndexRoute
-  '/_authed/sessions/': typeof AuthedSessionsIndexRoute
   '/_authed/settings/': typeof AuthedSettingsIndexRoute
   '/_authed/system/': typeof AuthedSystemIndexRoute
   '/_authed/teams/': typeof AuthedTeamsIndexRoute
@@ -166,15 +175,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/claim/'
     | '/flow-definitions/$definitionId'
     | '/projects/$projectId'
     | '/schemas/$schemaId'
+    | '/settings/admins'
     | '/teams/$teamId'
     | '/users/$userId'
     | '/flow-definitions/'
     | '/projects/'
     | '/schemas/'
-    | '/sessions/'
     | '/settings/'
     | '/system/'
     | '/teams/'
@@ -183,15 +193,16 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/'
+    | '/claim'
     | '/flow-definitions/$definitionId'
     | '/projects/$projectId'
     | '/schemas/$schemaId'
+    | '/settings/admins'
     | '/teams/$teamId'
     | '/users/$userId'
     | '/flow-definitions'
     | '/projects'
     | '/schemas'
-    | '/sessions'
     | '/settings'
     | '/system'
     | '/teams'
@@ -201,15 +212,16 @@ export interface FileRouteTypes {
     | '/_authed'
     | '/login'
     | '/_authed/'
+    | '/claim/'
     | '/_authed/flow-definitions/$definitionId'
     | '/_authed/projects/$projectId'
     | '/_authed/schemas/$schemaId'
+    | '/_authed/settings/admins'
     | '/_authed/teams/$teamId'
     | '/_authed/users/$userId'
     | '/_authed/flow-definitions/'
     | '/_authed/projects/'
     | '/_authed/schemas/'
-    | '/_authed/sessions/'
     | '/_authed/settings/'
     | '/_authed/system/'
     | '/_authed/teams/'
@@ -219,6 +231,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ClaimIndexRoute: typeof ClaimIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -235,6 +248,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/claim/': {
+      id: '/claim/'
+      path: '/claim'
+      fullPath: '/claim/'
+      preLoaderRoute: typeof ClaimIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/': {
@@ -272,13 +292,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSettingsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/sessions/': {
-      id: '/_authed/sessions/'
-      path: '/sessions'
-      fullPath: '/sessions/'
-      preLoaderRoute: typeof AuthedSessionsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/schemas/': {
       id: '/_authed/schemas/'
       path: '/schemas'
@@ -314,6 +327,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedTeamsTeamIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/settings/admins': {
+      id: '/_authed/settings/admins'
+      path: '/settings/admins'
+      fullPath: '/settings/admins'
+      preLoaderRoute: typeof AuthedSettingsAdminsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/schemas/$schemaId': {
       id: '/_authed/schemas/$schemaId'
       path: '/schemas/$schemaId'
@@ -343,12 +363,12 @@ interface AuthedRouteChildren {
   AuthedFlowDefinitionsDefinitionIdRoute: typeof AuthedFlowDefinitionsDefinitionIdRoute
   AuthedProjectsProjectIdRoute: typeof AuthedProjectsProjectIdRoute
   AuthedSchemasSchemaIdRoute: typeof AuthedSchemasSchemaIdRoute
+  AuthedSettingsAdminsRoute: typeof AuthedSettingsAdminsRoute
   AuthedTeamsTeamIdRoute: typeof AuthedTeamsTeamIdRoute
   AuthedUsersUserIdRoute: typeof AuthedUsersUserIdRoute
   AuthedFlowDefinitionsIndexRoute: typeof AuthedFlowDefinitionsIndexRoute
   AuthedProjectsIndexRoute: typeof AuthedProjectsIndexRoute
   AuthedSchemasIndexRoute: typeof AuthedSchemasIndexRoute
-  AuthedSessionsIndexRoute: typeof AuthedSessionsIndexRoute
   AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
   AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
   AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
@@ -361,12 +381,12 @@ const AuthedRouteChildren: AuthedRouteChildren = {
     AuthedFlowDefinitionsDefinitionIdRoute,
   AuthedProjectsProjectIdRoute: AuthedProjectsProjectIdRoute,
   AuthedSchemasSchemaIdRoute: AuthedSchemasSchemaIdRoute,
+  AuthedSettingsAdminsRoute: AuthedSettingsAdminsRoute,
   AuthedTeamsTeamIdRoute: AuthedTeamsTeamIdRoute,
   AuthedUsersUserIdRoute: AuthedUsersUserIdRoute,
   AuthedFlowDefinitionsIndexRoute: AuthedFlowDefinitionsIndexRoute,
   AuthedProjectsIndexRoute: AuthedProjectsIndexRoute,
   AuthedSchemasIndexRoute: AuthedSchemasIndexRoute,
-  AuthedSessionsIndexRoute: AuthedSessionsIndexRoute,
   AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
   AuthedSystemIndexRoute: AuthedSystemIndexRoute,
   AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
@@ -379,6 +399,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ClaimIndexRoute: ClaimIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

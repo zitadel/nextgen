@@ -1,0 +1,25 @@
+title: GrantTeam
+description: |
+  Team bound by this grant. Always a team-ref (`team_id`, never `id`).
+  `expand: ["principal"]` adds `status`, `created_at`, and `updated_at` on
+  this same object. Missing teams degrade to `team_id` only, with or without
+  expand (ADR 059 grant exception).
+allOf:
+  - $ref: ../../components/schemas/team-ref.yaml
+  - type: object
+    properties:
+      status:
+        $ref: ../../components/schemas/team-status.yaml
+        description: |
+          Team lifecycle. Present only when the request asked for
+          `expand: ["principal"]` and the team could be loaded.
+      created_at:
+        type: string
+        format: date-time
+        description: |
+          When the team was created. Present only when expand loaded the team.
+      updated_at:
+        type: string
+        format: date-time
+        description: |
+          When the team was last updated. Present only when expand loaded the team.

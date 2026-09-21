@@ -32,6 +32,7 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 
 	return &api.CreateProjectResponse{
 		ID:             project.ID,
+		Name:           project.Name,
 		ProjectSecret:  projectSecret,
 		PreviewSecret:  previewSecret,
 		PreviewOrigins: project.PreviewOrigins,
@@ -96,6 +97,45 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 	return resp, nil
 }
 
+// ListMyProjects answers "which projects can the person behind this session act
+// on". There is no requireProjectAccess here on purpose: the query is itself the
+// authorization, so a caller with no grants gets an empty page rather than a 403.
+func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsParams) (api.ListMyProjectsRes, error) {
+	token, ok := sessionTokenFromContext(ctx)
+	if !ok || token.UserID == "" {
+		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	}
+
+	listed, err := h.projectService.ListAuthorized(ctx, service.ListAuthorizedProjectsRequest{
+		HomeProjectID: token.ProjectID,
+		UserID:        token.UserID,
+		Limit:         int(params.Limit.Value),
+		PageToken:     string(params.PageToken.Value),
+	})
+	if err != nil {
+		// A refused session answers exactly like an anonymous one. Letting
+		// sess.token_invalid through here would tell a caller that its cookie is
+		// genuine and the user behind it is deactivated (#553).
+		if errors.Is(err, domain.ErrSessionTokenInvalid()) {
+			return nil, invalidSessionCredential(err)
+		}
+		return nil, err
+	}
+
+	projects := make([]api.ProjectResponse, 0, len(listed.Projects))
+	for _, project := range listed.Projects {
+		projects = append(projects, *projectResponse(project))
+	}
+	resp := api.ListMyProjectsResponse{Projects: projects}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return &api.ListMyProjectsResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     resp,
+	}, nil
+}
+
 // ------------------ Converters ---------------
 
 func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) service.ListProjectsRequest {
@@ -138,6 +178,10 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrProjectAlreadyClaimed().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrProjectClaimExpired().Code:
+		return errorResponseWithStatusCode(http.StatusGone, err)
+	case domain.ErrProjectClaimWindowExpired().Code:
+		// Gone like an expired challenge, but under its own code: a new
+		// challenge fixes claim_expired, nothing fixes a closed window.
 		return errorResponseWithStatusCode(http.StatusGone, err)
 	default:
 		return internalErrorResponse(err)

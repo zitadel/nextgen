@@ -27,6 +27,8 @@ import {
 } from "./api-client.js";
 import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
+import { resolveLogoUrl } from "./branding.js";
+import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
@@ -193,11 +195,22 @@ export class ZitadelLogin extends ZitadelSurface {
 
   @state() private accessor loading = false;
 
+  /** Terminal step that navigates away, so its screen is never painted. */
+  @state() private accessor completing = false;
+
   @state() private accessor startupError: string | null = null;
 
   @state() private accessor formValues: Record<string, string> = {};
 
   private engine: Liquid | null = null;
+
+  /**
+   * The theme the last commit rendered with. The template output carries the
+   * resolved side's mark, so a theme change rewrites the string and
+   * `unsafeHTML` rebuilds the form — which drops what the visitor had typed
+   * unless it is put back.
+   */
+  private lastRenderedTheme: ResolvedTheme | null = null;
 
   private readonly sanitise = createSanitiser();
 
@@ -362,13 +375,23 @@ export class ZitadelLogin extends ZitadelSurface {
         card.toggleAttribute("data-suppress-header", this.suppressHeader);
       }
     }
+    const previousTheme = this.lastRenderedTheme;
+    this.lastRenderedTheme = this.themeController.theme;
+
     const props = changed as Map<string, unknown>;
-    if (!props.has("response")) return;
-    // `changed` holds the OLD value: nullish (`null` initializer, or
-    // undefined when the property never changed before) means this commit
-    // applied the first response — the initial paint, not a user-driven
-    // step swap.
-    void this.hydrateStepAfterRender(props.get("response") == null);
+    if (props.has("response")) {
+      // `changed` holds the OLD value: nullish (`null` initializer, or
+      // undefined when the property never changed before) means this commit
+      // applied the first response — the initial paint, not a user-driven
+      // step swap.
+      void this.hydrateStepAfterRender(props.get("response") == null);
+      return;
+    }
+    if (previousTheme !== null && previousTheme !== this.lastRenderedTheme) {
+      // A flip mid-step is not a step change: restore what was typed, but
+      // leave focus where the visitor put it.
+      void this.restoreValuesAfterRender();
+    }
   }
 
   /**
@@ -384,6 +407,18 @@ export class ZitadelLogin extends ZitadelSurface {
    * swaps are user-initiated, so focus moves in both modes.
    */
   private async hydrateStepAfterRender(initial = false): Promise<void> {
+    await this.restoreValuesAfterRender();
+    if (!initial || this.variant === "page") {
+      this.moveFocusToFirstField(initial && this.variant === "page");
+    }
+  }
+
+  /**
+   * Put captured values back once the rebuilt subtree has rendered. Awaits the
+   * child atoms' own first render before touching them, rather than guessing a
+   * frame with `requestAnimationFrame`.
+   */
+  private async restoreValuesAfterRender(): Promise<void> {
     await this.updateComplete;
     const atoms = this.shadowRoot?.querySelectorAll<LitElement>(
       "zl-field, zl-select, zl-checkbox, zl-button",
@@ -392,9 +427,6 @@ export class ZitadelLogin extends ZitadelSurface {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
-    if (!initial || this.variant === "page") {
-      this.moveFocusToFirstField(initial && this.variant === "page");
-    }
   }
 
   override render() {
@@ -413,7 +445,10 @@ export class ZitadelLogin extends ZitadelSurface {
         </zl-page-shell>
       </form>`;
     }
-    if (!this.response || !this.engine) {
+    // `completing` holds the loader through the terminal step: painting a
+    // success screen the host immediately navigates away from shows the user
+    // two confirmations for one sign-in.
+    if (!this.response || !this.engine || this.completing) {
       return html`<slot name="loader"></slot>`;
     }
     const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
@@ -461,6 +496,20 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
+   * The branding a template renders against, with `logo_url` already resolved
+   * to the mark for the active side. Templates read one logo field and get the
+   * right file per surface; the per-side URLs stay on `theme` for a template
+   * that wants to reach them itself.
+   */
+  private brandingForTemplate(): Branding | Record<string, never> {
+    if (!this.branding) {
+      return {};
+    }
+    const logoUrl = resolveLogoUrl(this.branding, this.themeController.theme);
+    return { ...this.branding, logo_url: logoUrl };
+  }
+
+  /**
    * "Secured with Zitadel" attribution chrome injected into every
    * template's page-shell footer slot. Controlled by
    * `branding.attribution.show_zitadel` — defaults to `true` for
@@ -475,16 +524,23 @@ export class ZitadelLogin extends ZitadelSurface {
       return "";
     }
     // The design sets the trustmark as plain text beside the logotype rather
-    // than inside a chip. It also draws a session-lifetime badge next to it —
-    // not rendered, because nothing on the flow response carries an expiry to
-    // put in it. A badge showing an invented duration would be worse than none.
+    // than inside a chip, and draws a badge beside it. The widget does not
+    // render that badge: nothing on the flow response carries a duration to
+    // put in it, and an invented one would be worse than none. It exposes the
+    // position instead — the `attribution-trailing` slot — so a host that does
+    // have something true to say there can say it. The console's claim page is
+    // the first: it knows how long the project can still be claimed.
+    //
+    // A `<slot>` is `display: contents` by default, so an unfilled one is not
+    // a flex item and contributes no gap. Every existing embed renders exactly
+    // as it did.
     const mark = custom
       ? `<a class="zl-trustmark__mark" part="attribution-mark" href="${escapeHtml(
           String(custom.href),
         )}">${escapeHtml(String(custom.label))}</a>`
       : `<a class="zl-trustmark__mark" part="attribution-mark" href="https://zitadel.com" aria-label="Secured with Zitadel">${zitadelTrustmarkInnerHtml()}</a>`;
     const slot = placement === "footer" ? ` slot="footer"` : "";
-    return `<div${slot} part="attribution" class="zl-attribution zl-trustmark">${mark}</div>`;
+    return `<div${slot} part="attribution" class="zl-attribution zl-trustmark">${mark}<slot name="attribution-trailing"></slot></div>`;
   }
 
   /** Declarative config read from this element's attributes. */
@@ -560,6 +616,9 @@ export class ZitadelLogin extends ZitadelSurface {
   private applyResponse(wire: CreateFlow201): void {
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
+    // Decided before the step is assigned: `maybeCompleteFlow` navigates a
+    // turn later, and by then the terminal screen has already painted.
+    this.completing = navigatesOnComplete(wire, this.postSignInUrl);
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
@@ -702,7 +761,7 @@ export class ZitadelLogin extends ZitadelSurface {
       messages: [],
       identity: this.deriveIdentity(),
       errors,
-      branding: this.branding ?? {},
+      branding: this.brandingForTemplate(),
       loading: this.loading,
     };
 
@@ -1180,6 +1239,20 @@ export class ZitadelLogin extends ZitadelSurface {
  */
 function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string): boolean {
   return field.validation?.enum?.includes(value) ?? false;
+}
+
+/**
+ * Whether a terminal step ends in a navigation rather than a screen: a
+ * `redirect` with a URI, or a `show` whose handoff the widget exchanges before
+ * sending the browser to `post-sign-in-url`. A `show` without a
+ * `post-sign-in-url` is the host handling the handoff itself, and that screen
+ * is the flow's own last word — it still renders.
+ */
+function navigatesOnComplete(wire: CreateFlow201, postSignInUrl: string | undefined): boolean {
+  const behavior = wire.step.complete;
+  if (behavior === "redirect") return Boolean(wire.redirect_uri);
+  if (behavior === "show") return Boolean(wire.handoff_token && postSignInUrl);
+  return false;
 }
 
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {

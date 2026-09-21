@@ -24,6 +24,8 @@ const (
 	ResourceKindBranding       ResourceKind = "branding"
 	ResourceKindFlowDefinition ResourceKind = "flow_definition"
 	ResourceKindSession        ResourceKind = "session"
+	ResourceKindEnvironment    ResourceKind = "environment"
+	ResourceKindRelease        ResourceKind = "release"
 )
 
 func (k ResourceKind) String() string { return string(k) }
@@ -275,6 +277,21 @@ func (a *AuthzAssignment) ApplyScope(scope AuthzAssignmentScope) {
 	a.ScopeResourceID = scope.ResourceID
 }
 
+// AuthzAssignmentField enumerates assignment columns that can be used for
+// filtering and ordering the managed-grants list.
+type AuthzAssignmentField uint8
+
+const (
+	AuthzAssignmentFieldUnspecified AuthzAssignmentField = iota
+	AuthzAssignmentFieldProjectID
+	AuthzAssignmentFieldID
+	AuthzAssignmentFieldPrincipalType
+	AuthzAssignmentFieldPrincipalID
+	AuthzAssignmentFieldRelation
+	AuthzAssignmentFieldCreatedAt
+	AuthzAssignmentFieldExpiresAt
+)
+
 // NewSKProjProjectSetupAssignment is the grant seeded at CreateProject so the
 // returned full project secret can set up the project via resolver.Check.
 //
@@ -389,12 +406,17 @@ type AuthzCheckParams struct {
 	ResourceTeamID string
 }
 
+// AuthzHomeProjectID returns home when set, otherwise projectID.
+func AuthzHomeProjectID(home, projectID string) string {
+	if home != "" {
+		return home
+	}
+	return projectID
+}
+
 // HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.
 func (p AuthzCheckParams) HomeProjectID() string {
-	if p.PrincipalHomeProjectID != "" {
-		return p.PrincipalHomeProjectID
-	}
-	return p.ProjectID
+	return AuthzHomeProjectID(p.PrincipalHomeProjectID, p.ProjectID)
 }
 
 // AuthzListObjectsParams lists resource_scope_index ids the principal may see

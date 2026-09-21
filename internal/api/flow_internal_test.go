@@ -180,7 +180,7 @@ func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
 		},
 	}
 
-	svcReq, err := mapFlowDefinitionRequestToService("proj-1", apigen.OptSchemaURI{}, definition, "active")
+	svcReq, err := mapCreateRequestToService(&apigen.CreateFlowDefinitionRequest{ProjectID: "proj-1", FlowDefinition: definition})
 	require.NoError(t, err)
 	require.Len(t, svcReq.Steps, 1)
 

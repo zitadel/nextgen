@@ -3,6 +3,29 @@
 > **Status:** Accepted
 > **Date:** 2026-06-11
 > **Context:** Project/team/user hierarchy, lifecycle ownership, deletion behavior
+>
+> **Amendment (2026-08-26):** the user endpoints' `team_id` query parameter is
+> **membership**, never lifecycle ownership. On `POST /users` it adds the new
+> user to that team; on `GET /users/{user_id}` it serves the user only when
+> they hold an active membership there. `team_id` stays the team parameter
+> across the API — the distinction is carried by each endpoint's own
+> documentation rather than by a longer name, so the parameter reads the same
+> everywhere and what it does stays the resource's own business.
+>
+> That works because the plain name is reserved for one relation. A resource
+> takes `team_id` only where membership is its natural relation to a team; a
+> resource with no membership relation does not take `team_id` at all, and
+> names the relation it actually has. `metadata.lifecycle_owner_team_id` is
+> that rule already applied on the user itself, and a session — which has no
+> membership relation — takes no plain `team_id` either, whatever its
+> team-scoped filter ends up being called.
+>
+> Lifecycle ownership has no write path today: reads report it as
+> `metadata.lifecycle_owner_team_id`, and no endpoint sets it. That is the
+> current state of the implementation, not a decision that it should stay that
+> way. Team-admin onboarding needs exactly that write path, and the shape it
+> takes is for the team-semantics use-case matrix to settle — this amendment
+> does not pre-empt it.
 
 ## Context
 
