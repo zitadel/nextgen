@@ -835,12 +835,10 @@ describe("body field flags", () => {
     const res = await run(cwd, [
       "grants",
       "create",
-      "--principal-type",
-      "robot",
-      "--principal-id",
-      "user_1",
       "--relation",
-      "viewer",
+      "robot",
+      "--data",
+      JSON.stringify({ user: { user_id: "user_1" } }),
     ]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; message: string };
@@ -850,7 +848,14 @@ describe("body field flags", () => {
 
   it("names the required flags that are missing", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["grants", "create", "--principal-id", "user_1"]);
+    // The locator (`user`/`team`) is a nested object, so it rides in --data;
+    // `relation` is the only required scalar flag the framework knows about.
+    const res = await run(cwd, [
+      "grants",
+      "create",
+      "--data",
+      JSON.stringify({ user: { user_id: "user_1" } }),
+    ]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as {
       code: string;
@@ -859,11 +864,9 @@ describe("body field flags", () => {
       details: { missing: string[] };
     };
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toBe(
-      "grants create is missing required fields: --principal-type, --relation",
-    );
-    expect(json.hint).toContain("--principal-type and --relation");
-    expect(json.details.missing).toEqual(["principal_type", "relation"]);
+    expect(json.message).toBe("grants create is missing required field: --relation");
+    expect(json.hint).toContain("--relation");
+    expect(json.details.missing).toEqual(["relation"]);
   });
 
   it("accepts a required field supplied through --data instead of its flag", async () => {
@@ -880,12 +883,10 @@ describe("body field flags", () => {
       "grants",
       "create",
       "--data",
-      JSON.stringify({ principal_type: "user", relation: "viewer" }),
-      "--principal-id",
-      "user_1",
+      JSON.stringify({ user: { user_id: "user_1" }, relation: "viewer" }),
     ]);
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ principal_type: "user", principal_id: "user_1", relation: "viewer" });
+    expect(body).toEqual({ user: { user_id: "user_1" }, relation: "viewer" });
   });
 
   it("reports a single missing field in the singular", async () => {
