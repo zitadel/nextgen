@@ -232,12 +232,24 @@ The groups below mirror the ones `zitadel --help` prints.
   `dev+<short-commit>` source build it launched. That label names the revision
   the binary was built from, which after a Moon cache hit can be an earlier
   commit whose server sources are byte-identical. Use `--runtime docker` or
-  `--image` for the Docker backend.
+  `--image` for the Docker backend. The project's env files configure the
+  local server: every `NEXTGEN_*` variable in `.env.local` and `.env` (the
+  former wins; empty values are skipped) is handed to the runtime through its
+  environment only (bare `--env NAME` on Docker), so no value reaches `argv`,
+  logs, `runtime.json`, or `--json`. The address, data dir and public base the
+  CLI sets itself always win. `data.runtime.env` and `runtime.json` carry
+  `injected`, the list of names. A running runtime is not updated in place:
+  after changing a value run `stop` then `start`. An unreadable env file fails
+  `start` with `E_VALIDATION` before any runtime is stopped. `setup` writes a
+  comment saying so at the top of the scaffolded `.env.example` and
+  `.env.local`.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes
   from other local projects; it does not kill arbitrary `/healthz` listeners.
 - `status` — summarize the local runtime and project state.
+  `data.server.runtime.env.injected` repeats the variable names recorded at
+  the last `start` (empty for a runtime started before this field existed).
 - `logs` — print managed runtime logs; `--follow` streams in human mode.
 - `reset` — stop/remove the managed runtime and delete local runtime data;
   requires `--force` when non-interactive.
