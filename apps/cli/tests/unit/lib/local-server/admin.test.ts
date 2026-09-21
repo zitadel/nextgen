@@ -1,5 +1,5 @@
 import { pbkdf2Sync } from "node:crypto";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -76,6 +76,22 @@ describe("local admin", () => {
     const recomputed = pbkdf2Sync(admin.password, ab64Decode(salt ?? ""), Number(rounds), 32, "sha256");
     expect(recomputed.equals(ab64Decode(hash ?? ""))).toBe(true);
     expect(doc.authenticators.password.change_required).toBe(false);
+  });
+
+  // `zitadel reset` keeps admin.json and deleting the file alone orphans the
+  // imported password, so the advice has to name both steps.
+  it("points a malformed credential at deleting the file and resetting the data", async () => {
+    const cwd = await tempCwd();
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{ truncated");
+
+    const error = await readLocalAdmin(cwd).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({
+      code: "E_VALIDATION",
+      nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
+    });
+    expect((error as { hint: string }).hint).toContain("Both are needed");
   });
 
   it("keeps the same credential on later starts", async () => {

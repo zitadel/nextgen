@@ -84,16 +84,16 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
 }
 
 /**
- * Recovering means re-minting the credential, which only helps if the server
- * has not already imported the old one — hence the reset rather than a bare
- * "delete the file", which would leave the CLI holding a password the imported
- * user does not have. The data directory lives in the same folder, so naming it
- * for deletion here would cost the developer their local database.
+ * Recovery needs both halves. `zitadel reset` clears the server's data but keeps
+ * `admin.json`, so the next start would read the same broken file; deleting the
+ * file alone leaves the server holding a hash of the old password, so the admin
+ * could never sign in. Removing the file and resetting the data lets the next
+ * start mint a fresh credential and import it.
  */
 function malformedAdminFile(cause?: unknown): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
-    hint: "Run `zitadel reset --force` to clear the local server's data and admin, then `zitadel start`. Deleting the file alone leaves the server holding the old password.",
-    nextCommands: ["zitadel reset --force", "zitadel start"],
+    hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
+    nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
     ...(cause ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } } : {}),
   });
 }
