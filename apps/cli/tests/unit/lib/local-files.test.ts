@@ -143,6 +143,31 @@ describe("inlineFileReferences", () => {
     });
   });
 
+  it("preserves unrelated undefined values when omitting missing references", async () => {
+    const cwd = await makeProject("<p>template</p>");
+    const document = {
+      keep: undefined,
+      t: { $file: "./missing.liquid" },
+      list: [undefined, { $file: "./missing.liquid" }, { $file: "./login.liquid" }],
+    };
+    const inlined = inlineFileReferences(document, { cwd, baseDir }, { onMissing: "omit" }) as {
+      keep: undefined;
+      list: Array<string | undefined>;
+    };
+    expect(Object.prototype.hasOwnProperty.call(inlined, "keep")).toBe(true);
+    expect(inlined.keep).toBeUndefined();
+    expect(inlined.list).toEqual([undefined, "<p>template</p>"]);
+  });
+
+  it("still throws E_VALIDATION on a non-missing read failure when omitting", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, baseDir, "dir.liquid"));
+    const document = { t: { $file: "./dir.liquid" } };
+    expect(() => inlineFileReferences(document, { cwd, baseDir }, { onMissing: "omit" })).toThrow(
+      /cannot be read/,
+    );
+  });
+
   it("still refuses paths that leave the project when omitting", async () => {
     const cwd = await makeProject();
     const document = { t: { $file: "../../../x" } };

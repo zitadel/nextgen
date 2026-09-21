@@ -1,0 +1,127 @@
+get:
+  operationId: listIdpRevisions
+  summary: List the revisions of an identity provider connection
+  description: |
+    Returns every revision of one connection, newest first, paginated with a
+    cursor. The order is fixed, so there is no `sorting`.
+
+    The lookup is scoped to the project in `project_id`.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.read
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - name: id
+      in: path
+      required: true
+      description: The connection id, allocated when the connection was created.
+      schema:
+        type: string
+        example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+  responses:
+    '200':
+      description: The revisions of the identity provider connection were returned successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-idp-revisions-response.yaml
+          examples:
+            twoRevisions:
+              summary: A connection revised once
+              description: |
+                Both rows share `id` and `slug`. The second revision added a
+                scope, so `revision_id` and `updated_at` differ. It is newest,
+                so it comes first.
+              value:
+                revisions:
+                  - id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                    revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    slug: google
+                    created_at: '2026-07-14T09:11:00Z'
+                    updated_at: '2026-07-16T14:20:00Z'
+                    definition:
+                      slug: google
+                      protocol: oidc
+                      template: google
+                      display_name: Google
+                      subject_claim: sub
+                      claim_mapping:
+                        email: email
+                        givenName: given_name
+                        familyName: family_name
+                      verified_claims:
+                        email: email_verified
+                      provisioning:
+                        creation: auto
+                      oidc:
+                        issuer: https://accounts.google.com
+                        id_token_mapping: false
+                        client_id: '${{ GOOGLE_CLIENT_ID }}'
+                        client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                        token_endpoint_auth_method: client_secret_basic
+                        scopes:
+                          - openid
+                          - profile
+                          - email
+                          - https://www.googleapis.com/auth/user.phonenumbers.read
+                        pkce_enabled: true
+                        static_authorize_parameters:
+                          prompt: select_account
+                  - id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                    revision_id: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
+                    slug: google
+                    created_at: '2026-07-14T09:11:00Z'
+                    updated_at: '2026-07-14T09:11:00Z'
+                    definition:
+                      slug: google
+                      protocol: oidc
+                      template: google
+                      display_name: Google
+                      subject_claim: sub
+                      claim_mapping:
+                        email: email
+                        givenName: given_name
+                        familyName: family_name
+                      verified_claims:
+                        email: email_verified
+                      provisioning:
+                        creation: auto
+                      oidc:
+                        issuer: https://accounts.google.com
+                        id_token_mapping: false
+                        client_id: '${{ GOOGLE_CLIENT_ID }}'
+                        client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                        token_endpoint_auth_method: client_secret_basic
+                        scopes:
+                          - openid
+                          - profile
+                          - email
+                        pkce_enabled: true
+                        static_authorize_parameters:
+                          prompt: select_account
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: |
+        No identity provider connection with this id exists in the given
+        project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: listIdpRevisions-error-response.yaml

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { ZitadelError } from "../errors";
 import { isObject, parseJsonObject } from "../json";
+import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -29,6 +30,8 @@ type RuntimeMetadataBase = {
   data_dir: string;
   created_at: string;
   cli_version: string;
+  /** Absent on runtime files written before the env summary existed. */
+  env?: EnvSummary;
 };
 
 export type BinaryRuntimeMetadata = RuntimeMetadataBase & {
@@ -280,6 +283,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     data_dir: input.data_dir,
     created_at: input.created_at,
     cli_version: input.cli_version,
+    env: isEnvSummary(input.env) ? input.env : undefined,
   };
 
   if (backend === "binary") {
@@ -369,6 +373,7 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
     server_url: metadata.server_url,
     data_dir: metadata.data_dir,
     created_at: metadata.created_at,
+    env: metadata.env ?? EMPTY_SUMMARY,
   };
   if (metadata.backend === "binary") {
     return {

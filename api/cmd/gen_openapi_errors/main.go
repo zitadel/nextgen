@@ -278,6 +278,11 @@ func writeErrorResponses(
 		if endpoint.requiresAuth {
 			errFuncs = append(errFuncs, securityErrors...)
 		}
+		if excluded := operationExcludedErrors[endpoint.operationID]; len(excluded) > 0 {
+			errFuncs = slices.DeleteFunc(errFuncs, func(errFunc string) bool {
+				return slices.Contains(excluded, errFunc)
+			})
+		}
 		sort.Strings(errFuncs)
 		errFuncs = slices.Compact(errFuncs)
 
@@ -878,6 +883,13 @@ var transportErrors = []string{
 // call-graph walk, so gating here only drops the transport's contribution.
 var securityErrors = []string{
 	"domain.ErrAuthUnauthorized",
+}
+
+// operationExcludedErrors drops internal sentinels from the generated default
+// error union when the API handler intentionally remaps them to a different
+// public code before the response is written.
+var operationExcludedErrors = map[string][]string{
+	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
 }
 
 // methodErrorsFromAnalysis adapts the inferred error sets to the shape the

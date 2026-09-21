@@ -108,6 +108,20 @@ func encodeCreateGrantRequest(
 	return nil
 }
 
+func encodeCreateIdpRequest(
+	req *CreateIdpRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateProjectRequest(
 	req *CreateProjectRequest,
 	r *http.Request,
@@ -290,6 +304,20 @@ func encodeQueryGrantsRequest(
 	return nil
 }
 
+func encodeQueryIdpsRequest(
+	req *QueryIdpsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeQueryProjectsRequest(
 	req *QueryProjectsRequest,
 	r *http.Request,
@@ -376,6 +404,20 @@ func encodeSubmitFlowStepRequest(
 
 func encodeUpdateTeamRequest(
 	req *UpdateTeamRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateVariablesRequest(
+	req UpdateVariablesRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
