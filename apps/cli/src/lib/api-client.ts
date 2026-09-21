@@ -18,14 +18,15 @@ const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 export type EscapeOptions = {
   /**
    * Keep `\n` and `\t` as they are. On by default; a renderer that must keep
-   * a value on one line (a table cell, a tab-separated row) turns it off.
+   * a value on one line turns it off.
    */
   keepLayout?: boolean;
 };
 
 /**
  * Escape every character that could drive the reader's terminal to its
- * visible `\xNN`/`\uNNNN` spelling.
+ * visible `\xNN`/`\uNNNN` spelling, or `\u{NNNNN}` above the BMP so the
+ * spelling cannot run into the character that follows it.
  *
  * Anything the server returns was written by someone — a user's name, a
  * branding value, a variable — and an ESC or OSC sequence in it would
@@ -40,16 +41,29 @@ export function escapeControlCharacters(text: string, opts: EscapeOptions = {}):
       return char;
     }
     const code = char.codePointAt(0) ?? 0;
-    return code <= 0xff
-      ? `\\x${code.toString(16).padStart(2, "0")}`
-      : `\\u${code.toString(16).padStart(4, "0")}`;
+    if (code <= 0xff) {
+      return `\\x${code.toString(16).padStart(2, "0")}`;
+    }
+    return code <= 0xffff
+      ? `\\u${code.toString(16).padStart(4, "0")}`
+      : `\\u{${code.toString(16)}}`;
   });
+}
+
+/**
+ * Escape an object key. Unlike a value, a key must stay distinct from its
+ * siblings: a key holding a raw ESC and one holding the literal text `\x1b`
+ * would otherwise both come out as `\x1b`, and one of the two fields would be
+ * lost. Doubling the backslash first makes the spelling unambiguous.
+ */
+function escapeKey(key: string): string {
+  return escapeControlCharacters(key.replaceAll("\\", "\\\\"));
 }
 
 /**
  * Escape every string in a decoded JSON value, keys included, at any depth.
  * Numbers, booleans and `null` pass through untouched; the result has the
- * same shape as the input.
+ * same shape as the input, with the same number of fields.
  */
 export function sanitizeResponse<T>(value: T): T {
   if (typeof value === "string") {
@@ -60,10 +74,7 @@ export function sanitizeResponse<T>(value: T): T {
   }
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        escapeControlCharacters(key),
-        sanitizeResponse(item),
-      ]),
+      Object.entries(value).map(([key, item]) => [escapeKey(key), sanitizeResponse(item)]),
     ) as T;
   }
   return value;
@@ -108,11 +119,14 @@ export type SanitizeOptions = {
  * Build the typed Zitadel client the CLI talks to the server through.
  *
  * It is `@zitadel/api`'s client with every resolved response, and every
- * server-supplied error, passed through {@link sanitizeResponse} — the fix the
- * GitHub CLI made in go-gh's `asciisanitizer`. Doing it once here, rather than
+ * server-supplied error, passed through {@link sanitizeResponse} — the approach
+ * the GitHub CLI takes with go-gh's `asciisanitizer`, widened to the format
+ * and bidi controls that can disguise text. Doing it once here, rather than
  * in each renderer, covers every command, table, detail view and `--json`
- * envelope, including ones not yet written. The shared package is left raw:
- * the console renders into a DOM, which does not interpret escape codes.
+ * envelope, including ones not yet written; only a caller that asks for
+ * {@link SanitizeOptions.verbatim} bodies escapes for itself. The shared
+ * package is left raw: the console renders into a DOM, which does not
+ * interpret escape codes.
  */
 export function createZitadelClient(
   opts: ZitadelClientOptions,

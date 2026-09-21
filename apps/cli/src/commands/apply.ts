@@ -2,7 +2,6 @@ import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../lib/api-client";
-
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { environmentSchema } from "../lib/environment";
 import {

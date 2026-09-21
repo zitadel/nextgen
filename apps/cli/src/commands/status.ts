@@ -1,5 +1,4 @@
 import { createZitadelClient } from "../lib/api-client";
-
 import {
   claimAction,
   claimCommand,

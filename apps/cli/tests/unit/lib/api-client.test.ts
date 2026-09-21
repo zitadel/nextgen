@@ -19,6 +19,10 @@ describe("escapeControlCharacters", () => {
     );
   });
 
+  it("spells a format character above the BMP so it cannot run into the next one", () => {
+    expect(escapeControlCharacters("a\u{e0001}7")).toBe("a\\u{e0001}7");
+  });
+
   it("keeps newline and tab unless asked to escape them", () => {
     expect(escapeControlCharacters("one\ntwo\tthree")).toBe("one\ntwo\tthree");
     expect(escapeControlCharacters("one\ntwo\tthree", { keepLayout: false })).toBe(
@@ -53,6 +57,16 @@ describe("createZitadelClient", () => {
         tags: ["ok", "\\x1b]8;;https://evil.example\\x07click\\x1b]8;;\\x07"],
         "key\\x1b": [{ deep: "\\x9b31m" }],
       },
+    });
+  });
+
+  it("keeps two keys apart when one spells out the other's escape", async () => {
+    stubFetch(200, { "k\u001b": 1, "k\\x1b": 2, "a\\b": 3 });
+
+    await expect(client().getProject("p1")).resolves.toEqual({
+      "k\\x1b": 1,
+      "k\\\\x1b": 2,
+      "a\\\\b": 3,
     });
   });
 

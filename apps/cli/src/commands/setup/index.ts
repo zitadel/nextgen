@@ -3,7 +3,6 @@ import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "../../lib/api-client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,
@@ -17,6 +16,7 @@ import {
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
+import { createZitadelClient } from "../../lib/api-client";
 import { brandingDesignLabel } from "../../lib/branding/designs";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import {

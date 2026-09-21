@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
 import {
   CreateGrantBody,
   CreateTeamBody,
@@ -62,6 +61,7 @@ import type {
 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
+import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
 import { environmentSchema } from "../lib/environment";
 import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
