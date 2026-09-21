@@ -126,6 +126,11 @@ People API's `$country_code` profile property for the same derived country. Buil
 in `src/lib/oclif/command-telemetry.ts` (using the generic env/geo helpers in
 `src/lib/telemetry/`).
 
+`ci_provider` and `host_agent` also leave the machine outside Mixpanel, as the
+`ci/` and `host/` tokens of the HTTP `User-Agent` (`src/lib/user-agent.ts`). They
+share the telemetry opt-out: `--no-telemetry`, `DO_NOT_TRACK` and
+`ZITADEL_TELEMETRY=0` drop them.
+
 ### Event shape
 
 Each event is one Mixpanel `track` call. We set the properties below;

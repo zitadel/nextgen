@@ -23,7 +23,8 @@ parse the result rather than scraping human output.
 - The CLI sends anonymous usage telemetry by default. For automated/agent runs
   that should stay silent, disable it with `--no-telemetry` (per invocation) or
   `ZITADEL_TELEMETRY=0` / `DO_NOT_TRACK=1` (per environment); this also skips the
-  small end-of-command network flush.
+  small end-of-command network flush and drops the `ci/` and `host/` tokens from
+  the CLI's HTTP `User-Agent`.
 - See `README.md` (its commands section is generated from the CLI's own
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
