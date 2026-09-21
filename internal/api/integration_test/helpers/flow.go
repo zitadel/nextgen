@@ -43,7 +43,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 		fields.PasswordValidation = func() *domain.FlowFieldValidation {
 			v, err := h.EnsurePasswordPolicy(t).FieldValidation(t.Context(), "")
 			if err != nil {
-				return &domain.FlowFieldValidation{MinLength: 8}
+				return &domain.FlowFieldValidation{MinLength: domain.PasswordMinLengthFloor}
 			}
 			return v
 		}

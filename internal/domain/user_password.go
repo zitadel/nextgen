@@ -11,6 +11,15 @@ import (
 
 const PrefixUserPassword ResourcePrefix = "upw"
 
+// PasswordMinLengthFloor is the lowest minimum password length the platform
+// accepts anywhere: NIST SP 800-63B's hard floor (eight characters, and only
+// for passwords used inside multi-factor authentication). It is the fallback
+// the login surface renders when no policy is reachable and the `minimum`
+// the `user.password.save` template declares for `min_length`; the two are
+// kept equal by test. The default a project starts on is 15 and lives in the
+// template.
+const PasswordMinLengthFloor = 8
+
 func ErrUserPasswordInvalid() Error {
 	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
