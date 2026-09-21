@@ -157,6 +157,84 @@ describe("variables list", () => {
   });
 });
 
+describe("variables get", () => {
+  it("returns a non-secret value and addresses the named owner", async () => {
+    const cwd = await makeProject();
+    let path = "";
+    let environment: string | null = null;
+    server.use(
+      http.get("*/variables/:name", ({ request, params }) => {
+        path = String(params.name);
+        environment = new URL(request.url).searchParams.get("environment_name");
+        return HttpResponse.json("999-prod");
+      }),
+    );
+
+    const res = await runCliForTest([
+      "variables",
+      "get",
+      "GOOGLE_CLIENT_ID",
+      "-e",
+      "prod",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(path).toBe("GOOGLE_CLIENT_ID");
+    expect(environment).toBe("prod");
+    const json = parseJson(res.stdout) as {
+      data: { name: string; secret: boolean; value: string; environment: string };
+    };
+    expect(json.data).toEqual({
+      environment: "prod",
+      name: "GOOGLE_CLIENT_ID",
+      secret: false,
+      value: "999-prod",
+    });
+  });
+
+  it("reports a secret as held and carries no value", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+
+    const res = await runCliForTest(["variables", "get", "TOKEN", ...base(cwd)]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { data: Record<string, unknown> };
+    expect(json.data.secret).toBe(true);
+    expect(json.data).not.toHaveProperty("value");
+  });
+
+  it("escapes a value that would otherwise drive the terminal", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json("a\u001b[31mb")));
+
+    const res = await runCliForTest([
+      "variables",
+      "get",
+      "NASTY",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("\u001b");
+    expect(res.stdout).toContain("a\\x1b[31mb");
+  });
+
+  it("rejects a variable name the platform would refuse", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest(["variables", "get", "BAD-NAME", ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).toBe("E_VALIDATION");
+  });
+});
+
 describe("variables set", () => {
   it("sends the piped value and marks it secret", async () => {
     const cwd = await makeProject();
@@ -213,6 +291,25 @@ describe("variables set", () => {
         Object.defineProperty(process, "stdin", original);
       }
     }
+  });
+
+  it('stores an empty submission as "" rather than the string undefined', async () => {
+    const cwd = await makeProject();
+    let body: Record<string, unknown> = {};
+    server.use(
+      http.patch("*/variables", async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await withStdin("", () =>
+      runCliForTest(["variables", "set", "BLANK", "--non-interactive", ...base(cwd)]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({ BLANK: { value: "", secret: false } });
+    expect(JSON.stringify(body)).not.toContain("undefined");
   });
 
   it("rejects a variable name the platform would refuse", async () => {
