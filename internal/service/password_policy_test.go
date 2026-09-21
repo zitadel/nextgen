@@ -91,9 +91,29 @@ func TestPasswordPolicyCheck(t *testing.T) {
 			wantLookup: true,
 		},
 		{
-			name:      "audit mode records but does not block",
+			name:      "audit mode records the stricter rule but does not block",
 			instances: []*policy.Instance{instance(t, `{"kind":"policy","operation":"user.password.save","enforcement":"audit","config":{"min_length":20}}`)},
 			candidate: long,
+		},
+		{
+			name:      "audit mode still enforces the baseline",
+			instances: []*policy.Instance{instance(t, `{"kind":"policy","operation":"user.password.save","enforcement":"audit","config":{"min_length":20}}`)},
+			candidate: "short",
+			wantRules: []string{"min_length"},
+		},
+		{
+			name:      "length counts code points after NFC, not bytes",
+			candidate: strings.Repeat("e\u0301", 8), // 8 decomposed é: 24 bytes, 16 code points raw, 8 after NFC
+			wantRules: []string{"min_length"},
+		},
+		{
+			name:      "fifteen composed characters pass regardless of input form",
+			candidate: strings.Repeat("e\u0301", 15),
+		},
+		{
+			name:      "above the fixed maximum is rejected",
+			candidate: strings.Repeat("a", 65),
+			wantRules: []string{"max_length"},
 		},
 		{
 			name:       "every violated rule is reported",
@@ -143,6 +163,7 @@ func TestPasswordPolicyFieldValidation(t *testing.T) {
 	v, err := pol.FieldValidation(context.Background(), "proj_1")
 	require.NoError(t, err)
 	require.Equal(t, 12, v.MinLength)
+	require.Equal(t, 64, v.MaxLength)
 
 	v, err = pol.FieldValidation(context.Background(), "proj_other")
 	require.NoError(t, err)

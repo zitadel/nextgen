@@ -53,14 +53,18 @@ func (p *PasswordPolicy) FieldValidation(ctx context.Context, projectID string) 
 	if n, ok := c.Rules["min_length"]["min_length"].(int64); ok {
 		out.MinLength = int(n)
 	}
+	if n, ok := c.Rules["max_length"]["max_length"].(int64); ok {
+		out.MaxLength = int(n)
+	}
 	return out, nil
 }
 
 // Check evaluates the policy for a candidate password. It returns
 // [domain.ErrUserPasswordPolicyViolation] on a blocking deny and nil when the
-// operation may proceed. Under `enforcement: audit` a deny is logged and the
-// operation proceeds.
+// operation may proceed. Under `enforcement: audit` the template defaults
+// still block; what the instance tightened beyond them is only recorded.
 func (p *PasswordPolicy) Check(ctx context.Context, stmts AllStatements, projectID, userID, candidate string) error {
+	candidate = domain.NormalizePassword(candidate)
 	inst, err := policy.Effective(ctx, p.engine, p.resolver, projectID, PasswordSaveOperation, policy.Hint{})
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to resolve password policy")
@@ -73,27 +77,26 @@ func (p *PasswordPolicy) Check(ctx context.Context, stmts AllStatements, project
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to evaluate password policy")
 	}
-	if decision.Allow {
-		return nil
-	}
-	if !inst.Blocks() {
-		// TODO(ADR 066): record the audit decision as a wide event once the
-		// event type is catalogued; until then it is only logged.
-		slog.WarnContext(ctx, "password policy denied in audit mode",
+	if len(decision.Audited) > 0 {
+		// TODO(ADR 066): record the audited violations as a wide event once
+		// the event type is catalogued; until then they are only logged.
+		slog.WarnContext(ctx, "password policy audit: stricter rules not met",
 			slog.String("project_id", projectID),
 			slog.String("user_id", userID),
-			slog.Any("violations", decision.Violations),
+			slog.Any("violations", decision.Audited),
 		)
+	}
+	if decision.Allow {
 		return nil
 	}
 	return domain.ErrUserPasswordPolicyViolation(decision.Violations)
 }
 
-// buildContext derives the `user.password.save` context. Length counts
-// Unicode characters, as NIST 800-63B requires. History compares the
-// candidate against the stored password only when the policy enables
-// history: the current password is the one entry available today, and it
-// counts as soon as history is on (#898).
+// buildContext derives the `user.password.save` context from the normalized
+// candidate. Length counts Unicode code points, as NIST 800-63B requires.
+// History compares the candidate against the stored password only when the
+// policy enables history: the current password is the one entry available
+// today, and it counts as soon as history is on (#898).
 func (p *PasswordPolicy) buildContext(ctx context.Context, stmts AllStatements, inst *policy.Instance, projectID, userID, candidate string) (map[string]any, error) {
 	historyMatches := []bool{}
 	if p.historyEnabled(inst) {

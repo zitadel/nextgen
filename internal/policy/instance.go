@@ -71,8 +71,12 @@ func effectiveConfig(t *Template, inst *Instance) (map[string]any, error) {
 		return nil, fmt.Errorf("enforcement must be %q or %q, got %q", EnforcementEnforce, EnforcementAudit, inst.Enforcement)
 	}
 	for name := range inst.Config {
-		if _, ok := t.Config[name]; !ok {
+		setting, ok := t.Config[name]
+		if !ok {
 			return nil, fmt.Errorf("setting %q is not defined for operation %q", name, t.Operation)
+		}
+		if setting.Fixed {
+			return nil, fmt.Errorf("setting %q is fixed by Zitadel and cannot be set", name)
 		}
 	}
 	out := make(map[string]any, len(t.Config))

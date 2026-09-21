@@ -25,15 +25,24 @@ type Template struct {
 	Rules     []Rule             `json:"rules"`
 }
 
-// Setting describes one configurable value: its JSON type, the bounds a
+// Setting describes one value a rule reads: its JSON type, the bounds a
 // developer may move within, the default used when an instance omits it, and
 // whether the unauthenticated constraints projection may return it.
+//
+// A fixed setting is part of the secure baseline: an instance may not set it,
+// so the default is the only value. It is still a setting, not a literal in
+// the rule, so clients can learn it through the constraints projection.
+//
+// RecommendedMinimum marks the threshold below which a value is legal but
+// discouraged; the authoring workflow warns about it ([Engine.Warnings]).
 type Setting struct {
-	Type    SettingType `json:"type"`
-	Minimum *int64      `json:"minimum,omitempty"`
-	Maximum *int64      `json:"maximum,omitempty"`
-	Default any         `json:"default"`
-	Public  bool        `json:"public,omitempty"`
+	Type               SettingType `json:"type"`
+	Minimum            *int64      `json:"minimum,omitempty"`
+	Maximum            *int64      `json:"maximum,omitempty"`
+	Default            any         `json:"default"`
+	Public             bool        `json:"public,omitempty"`
+	Fixed              bool        `json:"fixed,omitempty"`
+	RecommendedMinimum *int64      `json:"recommended_minimum,omitempty"`
 }
 
 // SettingType is the JSON type of a setting.
@@ -152,8 +161,11 @@ func (t *Template) validate() error {
 		if _, err := coerceSetting(name, setting, setting.Default); err != nil {
 			return fmt.Errorf("setting %q: default: %w", name, err)
 		}
-		if setting.Type != SettingTypeInteger && (setting.Minimum != nil || setting.Maximum != nil) {
+		if setting.Type != SettingTypeInteger && (setting.Minimum != nil || setting.Maximum != nil || setting.RecommendedMinimum != nil) {
 			return fmt.Errorf("setting %q: bounds only apply to integers", name)
+		}
+		if setting.Fixed && (setting.Minimum != nil || setting.Maximum != nil || setting.RecommendedMinimum != nil) {
+			return fmt.Errorf("setting %q: a fixed setting has no bounds", name)
 		}
 	}
 	if len(t.Rules) == 0 {

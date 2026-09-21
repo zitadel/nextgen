@@ -109,11 +109,14 @@ operation; `config` is what the operation's template defines.
 
 - `audience` follows [ADR 065](065-audience-scoped-configuration.md): absent means
   project default, the most specific matching instance applies wholesale.
-- `enforcement` is `enforce` (default) or `audit`. In `audit` the policy is
-  evaluated and the decision is recorded, but a deny does not block the
-  operation. This is the rollout mode: deploy a stricter policy in `audit`, read
-  the decisions, switch to `enforce`. Every policy-as-code system surveyed
-  carries this tier on the instance, not the logic (Kubernetes
+- `enforcement` is `enforce` (default) or `audit`. In `audit` the template
+  defaults are still enforced; only what the instance tightened beyond them is
+  evaluated and recorded without blocking. This is the rollout mode: deploy a
+  stricter policy in `audit`, read the decisions, switch to `enforce`. It can
+  never weaken the baseline: a project cannot use `audit` to accept a
+  password the defaults reject, which keeps #898's "secure defaults are not
+  configurable by Projects" true for every instance. Every policy-as-code
+  system surveyed carries this tier on the instance, not the logic (Kubernetes
   `validationActions`, Gatekeeper `enforcementAction`, Azure `enforcementMode`).
 - `config` is validated against the template's config schema at write time.
   A key the template does not declare is rejected.
@@ -127,7 +130,8 @@ One template per operation, defined by Zitadel and versioned with the server.
 {
   "operation": "user.password.save",
   "config": {
-    "min_length":    { "type": "integer", "minimum": 8, "maximum": 64, "default": 15, "public": true },
+    "min_length":    { "type": "integer", "minimum": 8, "maximum": 64, "default": 15, "recommended_minimum": 15, "public": true },
+    "max_length":    { "type": "integer", "default": 64, "fixed": true, "public": true },
     "history_depth": { "type": "integer", "minimum": 0, "maximum": 4,  "default": 0,  "public": true }
   },
   "context": {
@@ -136,7 +140,8 @@ One template per operation, defined by Zitadel and versioned with the server.
   },
   "rules": [
     { "name": "min_length", "expression": "candidate.length >= config.min_length" },
-    { "name": "history",    "expression": "!history_matches.exists(m, m)" },
+    { "name": "max_length", "expression": "candidate.length <= config.max_length" },
+    { "name": "history",    "expression": "config.history_depth == 0 || !history_matches.exists(m, m)" },
     { "name": "blocklist",  "expression": "!candidate.in_blocklist" }
   ]
 }
@@ -147,6 +152,20 @@ One template per operation, defined by Zitadel and versioned with the server.
   protections (`blocklist`) have no setting at all and therefore cannot be turned
   off. This is the boundary #898 asks for: Zitadel owns the secure baseline, the
   project chooses within it.
+- **`fixed: true`** marks a setting that is part of the baseline: an instance
+  may not set it, the default is the only value. It is still a setting rather
+  than a literal in the rule so that clients learn it through `constraints`
+  (`max_length` is 64 for everyone and every login form needs to know that).
+- **`recommended_minimum`** marks a legal-but-discouraged range. A value below
+  it is accepted and the authoring workflow warns (#898: 8 to 14 is allowed,
+  15 is what NIST requires for a single-factor password). The warning comes
+  from the catalog, so the CLI and the console never hardcode the threshold.
+  There is no API-level warning channel; the floor is the protection, the
+  warning is guidance.
+- **A rule reads every setting it gates on.** A setting that only steers the
+  Go context builder (say, how many history entries to compare) is invisible
+  to `constraints`. `history` therefore reads `config.history_depth` even
+  though the depth is applied in Go; that is what makes the depth renderable.
 - **`public: true`** marks a setting the unauthenticated `constraints` projection
   may return (see [Exposing configuration to the frontend](#exposing-configuration-to-the-frontend)).
   Unmarked settings are private: `max_attempts` on a lockout policy would tell an
@@ -230,8 +249,10 @@ never echoed.
 - `allow`: every rule held; the operation may proceed
 - `deny`: at least one rule failed; the operation is rejected with the violated rules
 
-Under `enforcement: audit` a `deny` is recorded as a wide event and the operation
-proceeds as if allowed.
+Under `enforcement: audit` the rules run twice, once with the instance's config
+and once with the template defaults. A rule that fails under the defaults
+denies as usual; a rule that fails only under the instance's stricter values is
+recorded as a wide event and the operation proceeds.
 
 A third outcome, `require` (the operation is not yet permissible, these
 requirements are unmet, used to inject a step mid-flow), is not needed by any MVP
@@ -326,7 +347,12 @@ Where operation policies sit against the rest of the platform.
 
 Instances are revisioned resources deployed as part of a release
 ([ADR 035](035-configuration-environments.md), ids per
-[ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)). Templates are not:
+[ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)). ADR 035 already
+reserved the names: the `policy` resource kind with a `name` handle, the `pol_`
+id prefix, and the `policies` key in the release bundle. Instances occupy
+them. The resource slice copies branding (create-only, versioned,
+project-owned), not the user schema (URL identity and `$ref` handling a
+policy does not need). Templates are not release content:
 they ship with the server, and a release records the catalog version it was
 validated against. Release validation checks every instance against its template
 (unknown operation, unknown setting, out-of-bounds value) and rejects two
@@ -338,7 +364,10 @@ instances for the same operation whose audiences overlap at the same tier
 An instance's audience is the [ADR 065](065-audience-scoped-configuration.md)
 mechanism, unchanged: `team_ids` today, closed parameter set, most specific match
 wins wholesale, a request matching no instance gets the template defaults. A
-policy never applies outside its audience. There is no expression-based selector
+policy never applies outside its audience. #898 scopes the MVP to one
+project-wide password policy, so the MVP ships one unscoped instance per
+project; audience-scoped instances are ADR 065 capability the model keeps
+open, not #898 scope. There is no expression-based selector
 on the instance: a free-form predicate would make same-tier overlap undecidable
 at release validation and would break the pre-auth, release-cacheable
 `constraints` projection. Context-dependent conditions belong inside a rule.
@@ -387,6 +416,13 @@ The template's `config` says what a developer may **configure**. Its `context` s
 ```
 
 Every field is a derived value. `history_matches[i]` says whether the candidate matched the i-th most recent previous password; the rule never sees a hash, let alone a password. A rule referencing a field outside the schema fails the type check at startup, which is what makes the context schema a contract rather than documentation.
+
+The context builder is where #898's password handling lives, not the rules:
+the candidate is NFC-normalized before anything else (`domain.NormalizePassword`,
+applied on hashing and verification too), `candidate.length` counts Unicode
+code points, and `history_matches` costs one slow hash verification per entry
+(argon2id, per ADR 029), which is why `history_depth` is capped at 4 and why
+stored history beyond the depth is pruned and deleted with the user.
 
 Shared envelope fields (`user`, `request`) are added to the context once a rule needs them, not before: every field in the context is an attack surface for a decision log.
 

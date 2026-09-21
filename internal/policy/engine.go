@@ -121,6 +121,9 @@ func (e *Engine) DefaultInstance(operation string) (*Instance, error) {
 	}
 	cfg := make(map[string]any, len(t.Config))
 	for name, setting := range t.Config {
+		if setting.Fixed {
+			continue // filled from the template; an instance never carries it
+		}
 		cfg[name] = setting.Default
 	}
 	return &Instance{
@@ -143,10 +146,49 @@ func (e *Engine) ValidateInstance(inst *Instance) error {
 	return err
 }
 
+// Warning flags a legal but discouraged value in an instance.
+type Warning struct {
+	Setting            string `json:"setting"`
+	Value              int64  `json:"value"`
+	RecommendedMinimum int64  `json:"recommended_minimum"`
+}
+
+// Warnings lists the settings an instance sets below their recommended
+// minimum. The authoring workflow shows them; they never block.
+func (e *Engine) Warnings(inst *Instance) ([]Warning, error) {
+	ct, ok := e.templates[inst.Operation]
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownOperation, inst.Operation)
+	}
+	cfg, err := effectiveConfig(ct.Template, inst)
+	if err != nil {
+		return nil, err
+	}
+	var out []Warning
+	for _, name := range slices.Sorted(maps.Keys(ct.Config)) {
+		setting := ct.Config[name]
+		if setting.RecommendedMinimum == nil {
+			continue
+		}
+		if value, ok := cfg[name].(int64); ok && value < *setting.RecommendedMinimum {
+			out = append(out, Warning{Setting: name, Value: value, RecommendedMinimum: *setting.RecommendedMinimum})
+		}
+	}
+	return out, nil
+}
+
 // Decision is the outcome of one evaluation.
+//
+// Allow is false when the operation must be rejected; Violations are the
+// rules that failed. Under `enforcement: audit` the template defaults are
+// still enforced: a rule that fails under the defaults blocks, a rule that
+// fails only under the instance's stricter values is reported in Audited and
+// the operation proceeds. Audit mode can therefore roll out a stricter policy
+// but never weaken the baseline.
 type Decision struct {
 	Allow      bool        `json:"allow"`
 	Violations []Violation `json:"violations,omitempty"`
+	Audited    []Violation `json:"audited,omitempty"`
 }
 
 // Violation names a failed rule and echoes the public settings it reads,
@@ -169,30 +211,58 @@ func (e *Engine) Evaluate(ctx context.Context, inst *Instance, requestContext ma
 	if err != nil {
 		return Decision{}, err
 	}
-	activation, err := ct.activation(cfg, requestContext)
+	violations, err := ct.evaluate(ctx, cfg, requestContext)
 	if err != nil {
 		return Decision{}, err
 	}
-	decision := Decision{Allow: true}
+	if inst.Blocks() {
+		return Decision{Allow: len(violations) == 0, Violations: violations}, nil
+	}
+	// Audit: the baseline (template defaults) still blocks; only what the
+	// instance tightened beyond it is audited.
+	defaults, err := e.DefaultInstance(inst.Operation)
+	if err != nil {
+		return Decision{}, err
+	}
+	baselineCfg, err := effectiveConfig(ct.Template, defaults)
+	if err != nil {
+		return Decision{}, err
+	}
+	blocking, err := ct.evaluate(ctx, baselineCfg, requestContext)
+	if err != nil {
+		return Decision{}, err
+	}
+	decision := Decision{Allow: len(blocking) == 0, Violations: blocking}
+	for _, v := range violations {
+		if !slices.ContainsFunc(blocking, func(b Violation) bool { return b.Rule == v.Rule }) {
+			decision.Audited = append(decision.Audited, v)
+		}
+	}
+	return decision, nil
+}
+
+// evaluate runs every rule over one config and returns the violations, in
+// rule order.
+func (ct *compiledTemplate) evaluate(ctx context.Context, cfg map[string]any, requestContext map[string]any) ([]Violation, error) {
+	activation, err := ct.activation(cfg, requestContext)
+	if err != nil {
+		return nil, err
+	}
+	var violations []Violation
 	for _, rule := range ct.rules {
 		out, _, err := rule.program.ContextEval(ctx, activation)
 		if err != nil {
-			return Decision{}, fmt.Errorf("rule %q: %w", rule.Name, err)
+			return nil, fmt.Errorf("rule %q: %w", rule.Name, err)
 		}
 		held, ok := out.Value().(bool)
 		if !ok {
-			return Decision{}, fmt.Errorf("rule %q: returned %s, expected bool", rule.Name, out.Type())
+			return nil, fmt.Errorf("rule %q: returned %s, expected bool", rule.Name, out.Type())
 		}
-		if held {
-			continue
+		if !held {
+			violations = append(violations, Violation{Rule: rule.Name, Config: publicReads(ct.Template, rule, cfg)})
 		}
-		decision.Allow = false
-		decision.Violations = append(decision.Violations, Violation{
-			Rule:   rule.Name,
-			Config: publicReads(ct.Template, rule, cfg),
-		})
 	}
-	return decision, nil
+	return violations, nil
 }
 
 // Constraints is the pre-auth projection of a policy: every rule by name with
