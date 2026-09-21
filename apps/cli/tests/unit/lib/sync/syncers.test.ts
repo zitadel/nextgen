@@ -31,8 +31,8 @@ describe("makeSyncers", () => {
   it("returns the schema and flow syncers in order", () => {
     const syncers = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-    expect(syncers).toHaveLength(3);
-    expect(syncers.map((s) => s.kind)).toEqual(["schema", "flow", "branding"]);
+    expect(syncers).toHaveLength(4);
+    expect(syncers.map((s) => s.kind)).toEqual(["schema", "flow", "branding", "policy"]);
   });
 
   it("configures the schema syncer (immutable, SCHEMAS_DIR)", () => {
@@ -523,5 +523,115 @@ describe("BrandingSyncer", () => {
     const body = await branding.fetch?.("brnd-1");
 
     expect(body).toEqual({ layout: "centered", liquid_template: VALID_TEMPLATE });
+  });
+});
+
+describe("PolicySyncer", () => {
+  const instance = {
+    $schema: "../meta/policy.json",
+    kind: "policy",
+    operation: "user.password.save",
+    config: { min_length: 15, history_depth: 0 },
+  };
+  const cwd = "/tmp/zitadel-policy-sync-test";
+
+  it("configures the policy syncer (revisioned, POLICIES_DIR, one file per operation)", () => {
+    const [, , , policy] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(policy.kind).toBe("policy");
+    expect(policy.directory).toBe(".zitadel/policies");
+    expect(policy.mutable).toBe(false);
+    expect(policy.revisioned).toBe(true);
+    expect(policy.singletonFile).toBeUndefined();
+  });
+
+  it("validate accepts a well-formed instance and rejects a bad envelope", () => {
+    const [, , , policy] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(() => policy.validate(instance)).not.toThrow();
+    expect(() => policy.validate({ ...instance, kind: "rule" })).toThrow(ZitadelError);
+    expect(() => policy.validate({ ...instance, enforcement: "warn" })).toThrow(ZitadelError);
+    expect(() => policy.validate({ ...instance, rules: [] })).toThrow(ZitadelError);
+    const { operation, ...noOperation } = instance;
+    void operation;
+    expect(() => policy.validate(noOperation)).toThrow(ZitadelError);
+  });
+
+  it("normalize strips the editor $schema so the hash is the wire body", () => {
+    const [, , , policy] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(policy.normalize?.(instance)).toEqual({
+      kind: "policy",
+      operation: "user.password.save",
+      config: { min_length: 15, history_depth: 0 },
+    });
+  });
+
+  it("create POSTs the wire body and keeps the $schema on the canonical", async () => {
+    let receivedBody: unknown;
+    let receivedProjectId: string | null = null;
+    server.use(
+      http.post(`${BASE}/policies`, async ({ request }) => {
+        receivedProjectId = new URL(request.url).searchParams.get("project_id");
+        receivedBody = await request.json();
+        return HttpResponse.json(
+          {
+            id: "pol-1",
+            created_at: "2026-07-20T00:00:00Z",
+            policy: {
+              kind: "policy",
+              operation: "user.password.save",
+              enforcement: "enforce",
+              config: { min_length: 15, history_depth: 0 },
+            },
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    const [, , , policy] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    const result = await policy.create(instance);
+
+    expect(receivedProjectId).toBe("proj-1");
+    expect(receivedBody).toEqual({
+      kind: "policy",
+      operation: "user.password.save",
+      config: { min_length: 15, history_depth: 0 },
+    });
+    expect(result.id).toBe("pol-1");
+    expect(result.canonical).toEqual({
+      $schema: "../meta/policy.json",
+      kind: "policy",
+      operation: "user.password.save",
+      enforcement: "enforce",
+      config: { min_length: 15, history_depth: 0 },
+    });
+  });
+
+  it("fetch returns the stored document from the revision envelope", async () => {
+    server.use(
+      http.get(`${BASE}/policies/pol-1`, () =>
+        HttpResponse.json({
+          id: "pol-1",
+          created_at: "2026-07-20T00:00:00Z",
+          policy: { kind: "policy", operation: "user.password.save", config: { min_length: 20 } },
+        }),
+      ),
+    );
+    const [, , , policy] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(await policy.fetch?.("pol-1")).toEqual({
+      kind: "policy",
+      operation: "user.password.save",
+      config: { min_length: 20 },
+    });
+  });
+
+  it("update and delete are not supported for revisioned policies", async () => {
+    const [, , , policy] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    await expect(policy.update("pol-1", instance)).rejects.toThrow(ZitadelError);
+    await expect(policy.delete("pol-1")).rejects.toThrow(ZitadelError);
   });
 });

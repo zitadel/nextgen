@@ -15,6 +15,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
   GetBrandingByIdResponse,
+  GetPolicyByIdResponse,
   GetEnvironmentByNameResponse,
   GetFlowDefinitionResponse,
   CreateIdpBody,
@@ -27,6 +28,7 @@ import {
   GetTeamResponse,
   GetUserByIDResponse,
   ListBrandingResponse,
+  ListPoliciesResponse,
   ListEnvironmentsResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
@@ -545,6 +547,26 @@ export const RESOURCES = {
     get: {
       call: ({ client }, id) => client.getBrandingById(id),
       response: GetBrandingByIdResponse,
+    },
+  },
+
+  policies: {
+    group: CommandGroups.configuration,
+    singular: "policy revision",
+    idField: "id",
+    columns: ["id", "operation", "created_at"],
+    heading: "operation",
+    detail: ["id", "operation", "created_at"],
+    list: {
+      // `GET /policies` answers with the array itself and takes no cursor, so
+      // the paging flags are not generated for it.
+      paged: false,
+      response: ListPoliciesResponse,
+      call: ({ client, projectId }) => client.listPolicies({ project_id: projectId }),
+    },
+    get: {
+      call: ({ client }, id) => client.getPolicyById(id),
+      response: GetPolicyByIdResponse,
     },
   },
 } satisfies ResourceRegistry<Platform>;

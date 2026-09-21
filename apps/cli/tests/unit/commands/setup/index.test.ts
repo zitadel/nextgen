@@ -490,6 +490,16 @@ async function startCreateProjectCaptureServer(): Promise<{
       );
       return;
     }
+    if (req.method === "POST" && path === "/policies") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "pol_test",
+          created_at: "2026-06-01T00:00:00.000Z",
+          policy: {},
+        }),
+      );
+      return;
+    }
     res.writeHead(404).end();
   });
   servers.push(server);

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { ZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
+  DEFAULT_POLICY_CONFIG_PATH,
   DEFAULT_SCHEMA_CONFIG_PATH,
 } from "@zitadel/config/defaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +43,7 @@ describe("materializeSetupResources", () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockRejectedValue(new Error("flow create failed")),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
     } as unknown as ZitadelClient;
 
     await expect(
@@ -73,6 +75,7 @@ describe("materializeSetupResources", () => {
         status: "active",
         flow_definition: body.flow_definition,
       })),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -109,6 +112,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
@@ -140,6 +144,7 @@ describe("materializeSetupResources", () => {
         status: "active",
         flow_definition: { audience: {}, ...body.flow_definition },
       })),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
@@ -167,6 +172,7 @@ describe("materializeSetupResources", () => {
         status: "active",
         flow_definition: body.flow_definition,
       })),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -207,6 +213,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
     } as unknown as ZitadelClient;
 
     const result = await materializeSetupResources({
@@ -245,6 +252,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
     } as unknown as ZitadelClient;
 
     const result = await materializeSetupResources({
@@ -273,6 +281,7 @@ describe("materializeSetupResources branding design", () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
       createBranding,
     } as unknown as ZitadelClient;
 
@@ -323,6 +332,7 @@ describe("materializeSetupResources branding design", () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
+      createPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP", created_at: "2026-07-20T00:00:00Z", policy: {} }),
       createBranding,
     } as unknown as ZitadelClient;
 
@@ -333,5 +343,45 @@ describe("materializeSetupResources branding design", () => {
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
     expect(Object.keys(state.resources)).not.toContain(".zitadel/branding/branding.json");
+  });
+});
+
+describe("materializeSetupResources password policy", () => {
+  it("scaffolds the default instance, publishes revision 1, and seeds state", async () => {
+    const createPolicy = vi.fn().mockResolvedValue({
+      id: "pol_01KWHP",
+      created_at: "2026-07-20T00:00:00Z",
+      policy: { kind: "policy", operation: "user.password.save", config: { min_length: 15, history_depth: 0 } },
+    });
+    const client = {
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
+      createPolicy,
+    } as unknown as ZitadelClient;
+
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+
+    const [wireBody, params] = createPolicy.mock.calls[0] as [Record<string, unknown>, Record<string, unknown>];
+    expect(wireBody).toEqual({
+      kind: "policy",
+      operation: "user.password.save",
+      config: { min_length: 15, history_depth: 0 },
+    });
+    expect(wireBody).not.toHaveProperty("$schema");
+    expect(params).toEqual({ project_id: "project_123" });
+
+    const file = JSON.parse(await readFile(join(cwd, DEFAULT_POLICY_CONFIG_PATH), "utf8")) as Record<string, unknown>;
+    expect(file.$schema).toBe("../meta/policy.json");
+    expect(file.operation).toBe("user.password.save");
+
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as ZitadelState;
+    expect(state.resources[DEFAULT_POLICY_CONFIG_PATH]).toMatchObject({
+      id: "pol_01KWHP",
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+
+    const readme = await readFile(join(cwd, ".zitadel/policies/README.md"), "utf8");
+    expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+    expect(readme).not.toMatch(/`zitadel /);
   });
 });

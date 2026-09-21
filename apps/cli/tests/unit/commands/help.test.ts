@@ -41,6 +41,8 @@ Configuration commands
   environments list:     List environments
   flow-definitions get:  Get one flow definition by id
   flow-definitions list: List flow-definitions
+  policies get:          Get one policy revision by id
+  policies list:         List policies
   releases get:          Get one release by id
   releases list:         List releases
   schemas get:           Get one schema by id

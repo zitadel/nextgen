@@ -74,6 +74,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // Configuration is written declaratively (ADR 035), never imperatively here.
   createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createBranding: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+  createPolicy: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
   createFlowDefinition: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
 

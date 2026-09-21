@@ -3,7 +3,10 @@ import type {
   CreateBrandingBody,
   CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
+  CreatePolicy201,
+  CreatePolicyBody,
   GetBrandingById200,
+  GetPolicyById200,
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
@@ -13,7 +16,12 @@ import { consola } from "consola";
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
-import { brandingConfigSchema, flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
+import {
+  brandingConfigSchema,
+  flowConfigSchema,
+  policyConfigSchema,
+  schemaConfigSchema,
+} from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
 
 import {
@@ -24,6 +32,7 @@ import {
   toLocalBrandingBody,
 } from "../branding";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
+import { POLICIES_DIR, toPolicyWireBody } from "../policies";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { ResourceSyncer } from "./types.js";
@@ -53,6 +62,7 @@ export function makeSyncers(opts: {
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
     new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
+    new PolicySyncer(opts.client, opts.projectId, opts.env),
   ];
 }
 
@@ -328,5 +338,73 @@ class BrandingSyncer implements ResourceSyncer {
       consola.info(`Updated ${ref} from the server's canonical response`);
     }
     return document;
+  }
+}
+
+/**
+ * Policy instances (ADR 066): one `<operation>.json` per guarded operation
+ * under `.zitadel/policies/`, published as immutable revisions through
+ * `POST /policies`. The platform validates `config` against the operation's
+ * template; the CLI gate checks the envelope so a typo fails plan.
+ */
+class PolicySyncer implements ResourceSyncer {
+  readonly kind = "policy";
+  readonly directory = POLICIES_DIR;
+  readonly mutable = false;
+  readonly revisioned = true;
+
+  constructor(
+    private readonly client: ZitadelClient,
+    private readonly projectId: string,
+    private readonly env: EnvLookup,
+  ) {}
+
+  /** The comparison form is the wire body: the file minus its `$schema`. */
+  readonly normalize = (data: object): object => toPolicyWireBody(data);
+
+  validate(data: object): void {
+    const result = policyConfigSchema.safeParse(data);
+    if (!result.success) {
+      throw new ZitadelError("E_VALIDATION", "Policy file is not a valid policy instance", {
+        details: { issues: result.error.issues },
+        hint: "A policy file carries kind, operation, optional audience and enforcement, and config.",
+      });
+    }
+    assertEnvRefs(data, this.env);
+  }
+
+  /** `POST /policies` publishes a new immutable revision. */
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const wire = toPolicyWireBody(data) as CreatePolicyBody;
+    const result = (await this.client.createPolicy(wire, {
+      project_id: this.projectId,
+    })) as CreatePolicy201;
+    return { id: result.id, canonical: this.canonicalToLocal(result.policy as object, data) };
+  }
+
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "policies are revisioned — edit publishes a new revision, not an update",
+    );
+  }
+
+  async delete(id: string): Promise<void> {
+    // Revisions are immutable on the platform; removing the local file does
+    // not retire them. The newest revision keeps being evaluated — publish a
+    // new revision to change what applies.
+    throw new ZitadelError("E_NOT_IMPLEMENTED", `policy delete is not supported (${id})`);
+  }
+
+  /** Wire form; diffs compare in the normalized form. Flat-by-id: no project_id query. */
+  async fetch(id: string): Promise<object> {
+    const envelope = (await this.client.getPolicyById(id)) as GetPolicyById200;
+    return envelope.policy as object;
+  }
+
+  /** Keeps the local `$schema` pointer on the canonical write-back. */
+  private canonicalToLocal(canonicalWire: object, localData: object): object {
+    const { $schema } = localData as { $schema?: unknown };
+    return typeof $schema === "string" ? { $schema, ...canonicalWire } : canonicalWire;
   }
 }
