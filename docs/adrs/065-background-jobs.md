@@ -117,7 +117,7 @@ sequenceDiagram
 The `alt` / `else` in that diagram is mermaid’s “if / otherwise.” If `not_after` has passed, mark the row `dead`. Otherwise run it.
 
 1. **Take** — pick a due row (waiting, or lease expired). Then:
-   - If `not_after <= now()`: mark `dead`, set `completed_at`, do not Perform. Any replica may do this. It does not need to know the handler. This is how a job that outlived its useful life is closed, including after a crash.
+   - If `not_after <= now()`: mark `dead`, set `completed_at`, clear the lease, do not Perform. Any replica may do this. It does not need to know the handler. This is how a job that outlived its useful life is closed, including after a crash.
    - Else if this process registered that `name`: write the lease (`lease_until = now() + lease_duration`, a new `lease_token`), commit, Perform.
    - Else: leave the row. Do not Fail it. An old binary, or a process that did not register `events.retention`, must not burn retries on a job it cannot run.
 
@@ -126,7 +126,7 @@ The `alt` / `else` in that diagram is mermaid’s “if / otherwise.” If `not_
    If `not_after` passes **while this replica still holds a live lease**, it finishes Perform. The deadline is “do not **start** at or after.” Do not steal mid-run. After the lease expires, Take may see the row and mark `dead` without a second Perform. The old worker’s late Heartbeat, Complete, or Fail must send the old `lease_token` and is a no-op.
 
 2. **Perform** — do the handler work in its own transactions or I/O. Keep Heartbeat going so the lease does not expire under a long run.
-3. **Complete** or **Fail**. Both must match `lease_token`.
+3. **Complete** or **Fail**. Both must match `lease_token` and only apply while the row is still `leased`.
 
 Complete:
 
@@ -256,7 +256,7 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 
 ### Testing
 
-- [`stmttest`](../../internal/storage/stmttest/) owns, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)): Take of pending and lease-expired rows; Take marking `not_after <= now()` `dead` without Perform (including a reclaimed lease, and the equality case); Fail returning queued rows to `pending` with backoff; queued Fail-to-dead at `max_attempts` and when the next `run_at` would be `>= not_after`; periodic Fail rescheduling `run_at = now() + period` without `dead`; Complete resetting `attempt`; live-row `unique_key` conflict vs insert after `done`/`dead` (Spanner `active_unique_key` null on terminal); `UpsertPeriodic` updating `period` without clobbering a live lease; `DeleteCompleted` ignoring `pending`/`leased`; Heartbeat/Complete/Fail rejected when `lease_token` does not match; lookup-then-insert Enqueue (not `ON CONFLICT`).
+- [`stmttest`](../../internal/storage/stmttest/) owns, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)): Take of pending and lease-expired rows; Take marking `not_after <= now()` `dead` without Perform (including a reclaimed lease, and the equality case); Fail returning queued rows to `pending` with backoff; queued Fail-to-dead at `max_attempts` and when the next `run_at` would be `>= not_after`; periodic Fail rescheduling `run_at = now() + period` without `dead`; Complete resetting `attempt`; live-row `unique_key` conflict vs insert after `done`/`dead` (Spanner `active_unique_key` null on terminal); `UpsertPeriodic` updating `period` without clobbering a live lease; `DeleteCompleted` ignoring `pending`/`leased`; Heartbeat/Complete/Fail rejected when `lease_token` does not match or the row is no longer `leased`; lookup-then-insert Enqueue (not `ON CONFLICT`).
 - The engine loop is tested against a fake `JobStatements` (or sqlite only), not a second backend × three-dialect matrix: registered-name Take filter, Heartbeat, unknown names left untouched.
 
 ## Alternatives considered
