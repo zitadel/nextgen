@@ -44,9 +44,6 @@ JOIN zitadel_nextgen.idp_connection_revisions r
 FROM zitadel_nextgen.idp_connection_revisions r
 JOIN zitadel_nextgen.idp_connections c
   ON c.project_id = r.project_id AND c.id = r.connection_id`
-
-	getIDPConnectionRevisionStmt = idpConnectionRevisionQuery + `
-WHERE r.project_id = $1 AND r.id = $2`
 )
 
 type idpConnectionStatements struct{ statement }
@@ -129,7 +126,7 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 
 // GetIDPConnectionByID implements [service.IDPConnectionStatements].
 func (s idpConnectionStatements) GetIDPConnectionByID(ctx context.Context, projectID, id string) (*domain.IDPConnection, error) {
-	return s.getOne(ctx, database.And(
+	return s.getOne(ctx, idpConnectionQuery, database.And(
 		database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
 		database.Equal(database.Col(domain.IDPConnectionFieldID), id),
 	))
@@ -137,15 +134,15 @@ func (s idpConnectionStatements) GetIDPConnectionByID(ctx context.Context, proje
 
 // GetIDPConnectionBySlug implements [service.IDPConnectionStatements].
 func (s idpConnectionStatements) GetIDPConnectionBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
-	return s.getOne(ctx, database.And(
+	return s.getOne(ctx, idpConnectionQuery, database.And(
 		database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
 		database.Equal(database.Col(domain.IDPConnectionFieldSlug), slug),
 	))
 }
 
-func (s idpConnectionStatements) getOne(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error) {
+func (s idpConnectionStatements) getOne(ctx context.Context, query string, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, idpConnectionQuery, &database.ListOptions[domain.IDPConnectionField]{
+	if err := compileRead(&compiler, query, &database.ListOptions[domain.IDPConnectionField]{
 		Filter: filter,
 	}, idpconnection.Schema); err != nil {
 		return nil, err
@@ -164,58 +161,31 @@ func (s idpConnectionStatements) getOne(ctx context.Context, filter database.Fil
 
 // GetIDPConnectionRevision implements [service.IDPConnectionStatements].
 func (s idpConnectionStatements) GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error) {
-	rows, err := s.client.Query(ctx, getIDPConnectionRevisionStmt, projectID, revisionID)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	entity, err := pgx.CollectExactlyOneRow(rows, scanIDPConnection)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return entity, nil
+	// RevisionID binds r.id, the revision the caller pinned; ProjectID binds
+	// c.project_id, which the join equates with the revision's own.
+	return s.getOne(ctx, idpConnectionRevisionQuery, database.And(
+		database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
+		database.Equal(database.Col(domain.IDPConnectionFieldRevisionID), revisionID),
+	))
 }
 
 // ListIDPConnections implements [service.IDPConnectionStatements].
 func (s idpConnectionStatements) ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
-	opts := idpconnection.EnsureListOptions(filter)
-
-	var compiler statementCompiler
-	// The alias rather than the table name: the authz EXISTS predicate has to
-	// name the connection row the join already bound as `c`.
-	if err := compileList(ctx, &compiler, idpConnectionQuery, opts, idpconnection.Schema, "c", "id"); err != nil {
-		return nil, err
-	}
-
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	items, err := pgx.CollectRows(rows, scanIDPConnection)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	nextCursor := pagination.MarshalNext(
-		opts.Pagination.OrderBy,
-		items,
-		idpconnection.Schema,
-		opts.Pagination.Limit,
-	)
-
-	return &database.ListResult[*domain.IDPConnection]{
-		Items:      items,
-		NextCursor: nextCursor,
-	}, nil
+	return s.list(ctx, idpConnectionQuery, idpconnection.EnsureListOptions(filter))
 }
 
 // ListIDPConnectionRevisions implements [service.IDPConnectionStatements].
 func (s idpConnectionStatements) ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
-	opts := idpconnection.RevisionsListOptions(projectID, connectionID, page)
+	return s.list(ctx, idpConnectionRevisionQuery, idpconnection.RevisionsListOptions(projectID, connectionID, page))
+}
 
+func (s idpConnectionStatements) list(ctx context.Context, query string, opts *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
 	var compiler statementCompiler
-	// The same alias and column as the head list: what authz guards is the
-	// connection the revisions hang off, not the revision rows.
-	if err := compileList(ctx, &compiler, idpConnectionRevisionQuery, opts, idpconnection.Schema, "c", "id"); err != nil {
+	// The alias rather than the table name: the authz EXISTS predicate has to
+	// name the connection row the join already bound as `c`. That holds for the
+	// revision list too, where what authz guards is the connection the
+	// revisions hang off, not the revision rows.
+	if err := compileList(ctx, &compiler, query, opts, idpconnection.Schema, "c", "id"); err != nil {
 		return nil, err
 	}
 

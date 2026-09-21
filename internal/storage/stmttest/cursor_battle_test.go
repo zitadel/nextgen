@@ -755,6 +755,8 @@ func battleIDPConnectionRevisions(t *testing.T, d dialect) {
 	}
 	want := idpRevisionIDsOldestFirst(revisions)
 
+	// The drain walks both directions, so it reuses the newest-first key and
+	// only inverts the direction; the name says which way this copy points.
 	orderAsc := idpconnection.RevisionsNewestFirst()
 	orderAsc.Direction = database.OrderAsc
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
