@@ -80,13 +80,10 @@ func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 		assert.True(t, domain.PrefixIDPConnectionRevision.Matches(entity.RevisionID), "revision id %q is not idprev_-prefixed", entity.RevisionID)
 		assert.WithinDuration(t, time.Now(), entity.CreatedAt, 5*time.Second)
 		// UpdatedAt is the creation time of the revision a read serves, and the
-		// first revision is written in the same transaction as the connection.
-		// Postgres and SQLite stamp both rows from one clock reading; Spanner
-		// evaluates CURRENT_TIMESTAMP() per statement, so the portable claim is
-		// that a connection which was never revised does not look edited, not
-		// that the two stamps are bit-identical.
-		assert.False(t, entity.UpdatedAt.Before(entity.CreatedAt), "the first revision cannot predate the connection")
-		assert.WithinDuration(t, entity.CreatedAt, entity.UpdatedAt, time.Second)
+		// first revision is written in the same transaction as the connection —
+		// off the same stamp in every dialect, so a connection nobody has
+		// revised reports the two as one instant, not merely close together.
+		assert.True(t, entity.CreatedAt.Equal(entity.UpdatedAt), "a connection that was never revised must not look edited")
 
 		// The resource-scope index row is what the HTTP management gate reads
 		// to resolve the connection's project, so create writes it in the same
@@ -123,6 +120,9 @@ func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 		// the same revision row's created_at and cannot drift apart.
 		assert.True(t, byID.UpdatedAt.Equal(revision.UpdatedAt), "the get and the pinned read must report the same revision timestamp")
 		assert.True(t, byID.UpdatedAt.Equal(entity.UpdatedAt), "create must report the timestamp a read serves")
+		// And the two stored rows carry that one instant, not just the two
+		// values create handed back.
+		assert.True(t, byID.CreatedAt.Equal(byID.UpdatedAt), "a connection that was never revised must not read as edited")
 	})
 }
 

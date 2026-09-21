@@ -25,6 +25,14 @@ const (
 	createIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
 		`(project_id, id, connection_id, document) VALUES (@p1, @p2, @p3, @p4) THEN RETURN created_at`
 
+	// The create path binds created_at instead of defaulting it: Spanner
+	// evaluates CURRENT_TIMESTAMP() per statement, so a defaulted first revision
+	// would land microseconds after the connection row it belongs to, and a
+	// connection nobody has revised would report UpdatedAt later than CreatedAt.
+	// The connection insert's own stamp goes in here.
+	createFirstIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
+		`(project_id, id, connection_id, document, created_at) VALUES (@p1, @p2, @p3, @p4, @p5)`
+
 	// One row per revision, carrying the connection's identity alongside it. The
 	// aliases `c` and `r` are the ones idpconnection.Schema qualifies its column
 	// names with, and the trailing r.created_at is the revision's birth, served
@@ -76,21 +84,28 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 		// A slug already taken in the project arrives here as a
 		// *database.UniqueError; creating over an existing slug is the revise
 		// path, so the service decides what to do with it.
-		if err := tx.Write(ctx, stmt, scanIDPConnectionTimestamp(&entity.CreatedAt)); err != nil {
+		//
+		// The stamp stays local until the transaction is through: a retry
+		// replays this callback, and the revision insert below has to bind the
+		// value this invocation returned rather than one a previous attempt left
+		// on the entity.
+		var createdAt time.Time
+		if err := tx.Write(ctx, stmt, scanIDPConnectionTimestamp(&createdAt)); err != nil {
 			return err
 		}
-		revision := buildStatement(createIDPConnectionRevisionStmt,
+		revision := buildStatement(createFirstIDPConnectionRevisionStmt,
 			entity.ProjectID,
 			entity.RevisionID,
 			entity.ID,
 			document,
+			createdAt,
 		).statement()
-		// Spanner evaluates CURRENT_TIMESTAMP() per statement rather than per
-		// transaction, so the first revision can land a few microseconds after
-		// the connection row: UpdatedAt is read back rather than copied.
-		if err := tx.Write(ctx, revision, scanIDPConnectionTimestamp(&entity.UpdatedAt)); err != nil {
+		if _, err := tx.Update(ctx, revision); err != nil {
 			return err
 		}
+		// One stamp for both rows, so a connection nobody has revised reports
+		// UpdatedAt == CreatedAt.
+		entity.CreatedAt, entity.UpdatedAt = createdAt, createdAt
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID))
 	})
