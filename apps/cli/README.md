@@ -2608,7 +2608,7 @@ Set one variable on an environment or the project.
 USAGE
   $ zitadel variables set NAME [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
-    --project-level] [--secret]
+    --project-level] [--secret] [--type string|number|boolean]
 
 ARGUMENTS
   NAME  Variable name (letters, digits and underscores).
@@ -2628,6 +2628,10 @@ FLAGS
                              but never read back.
       --[no-]telemetry       Send anonymous usage analytics. Disable with
                              --no-telemetry.
+      --type=<option>        [default: string] Store the value as this JSON
+                             type. A reference to the whole field resolves to
+                             that type, so a number stays a number.
+                             <options: string|number|boolean>
       --verbose              Verbose logging.
 
 GLOBAL FLAGS

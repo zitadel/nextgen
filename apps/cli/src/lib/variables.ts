@@ -114,6 +114,63 @@ export function assertVariableName(name: string): void {
 }
 
 /**
+ * The scalar types a variable can hold — the API's JSON scalars (ADR 062 §1).
+ * A whole-field reference keeps its value's type, so `"retry": "${{ RETRY }}"`
+ * resolves to `5`, not `"5"`, only when the value was stored as a number.
+ */
+export const VARIABLE_TYPES = ["string", "number", "boolean"] as const;
+
+export type VariableType = (typeof VARIABLE_TYPES)[number];
+
+/**
+ * A JSON number, spelled strictly. `Number()` alone would accept `0x10`, a
+ * blank string, or surrounding whitespace, none of which is a number anyone
+ * means when they type one.
+ */
+const JSON_NUMBER = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/;
+
+/**
+ * Turn what was typed or piped into the scalar to store, as the type asks.
+ *
+ * The type is stated, never guessed: an integer past 2^53 has no exact JSON
+ * number, so an ID or a numeric credential would be stored with different
+ * digits than were entered. It is refused rather than silently rounded.
+ */
+export function parseVariableValue(raw: string, type: VariableType): string | number | boolean {
+  switch (type) {
+    case "string":
+      return raw;
+    case "boolean":
+      if (raw === "true" || raw === "false") {
+        return raw === "true";
+      }
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `Expected true or false, got ${JSON.stringify(raw)}.`,
+        {
+          hint: "A boolean variable is exactly `true` or `false`.",
+        },
+      );
+    case "number": {
+      const value = Number(raw);
+      if (!JSON_NUMBER.test(raw) || !Number.isFinite(value)) {
+        throw new ZitadelError("E_VALIDATION", `Expected a number, got ${JSON.stringify(raw)}.`, {
+          hint: "Write it as a JSON number, such as 5, -1.5 or 1e3.",
+        });
+      }
+      if (Number.isInteger(value) && !Number.isSafeInteger(value)) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${raw} is too large to store exactly as a number.`,
+          { hint: "Store it as a string, which keeps every digit." },
+        );
+      }
+      return value;
+    }
+  }
+}
+
+/**
  * Read a value from stdin, for the non-interactive path
  * (`variables set NAME --secret < secret.txt`).
  *

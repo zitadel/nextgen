@@ -491,6 +491,165 @@ describe("variables set", () => {
   });
 });
 
+describe("variables set --type", () => {
+  const capture = () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    server.use(
+      http.patch("*/variables", async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({});
+      }),
+    );
+    return bodies;
+  };
+
+  it("stores a number as a JSON number, not a string", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await withStdin("5", () =>
+      runCliForTest([
+        "variables",
+        "set",
+        "RETRY_COUNT",
+        "--project-level",
+        "--type",
+        "number",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(bodies).toEqual([{ RETRY_COUNT: { value: 5, secret: false } }]);
+  });
+
+  it("stores a boolean as a JSON boolean", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    await withStdin("true", () =>
+      runCliForTest([
+        "variables",
+        "set",
+        "DEBUG",
+        "--project-level",
+        "--type",
+        "boolean",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
+
+    expect(bodies).toEqual([{ DEBUG: { value: true, secret: false } }]);
+  });
+
+  it('keeps a string by default, so 5 stays "5" unless asked otherwise', async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    await withStdin("5", () =>
+      runCliForTest([
+        "variables",
+        "set",
+        "ZIP",
+        "--project-level",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
+
+    expect(bodies).toEqual([{ ZIP: { value: "5", secret: false } }]);
+  });
+
+  it("refuses a value that is not the stated type, sending nothing", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await withStdin("abc", () =>
+      runCliForTest([
+        "variables",
+        "set",
+        "RETRY_COUNT",
+        "--project-level",
+        "--type",
+        "number",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
+
+    expect(res.exitCode).not.toBe(0);
+    expect(bodies).toEqual([]);
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).toBe("E_VALIDATION");
+  });
+
+  it("refuses a typed secret before reading the value", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+    let consumed = false;
+    const stdin = new Readable({
+      read() {
+        consumed = true;
+        this.push("12345");
+        this.push(null);
+      },
+    });
+    const original = Object.getOwnPropertyDescriptor(process, "stdin");
+    Object.defineProperty(process, "stdin", { value: stdin, configurable: true });
+    try {
+      const res = await runCliForTest([
+        "variables",
+        "set",
+        "API_KEY",
+        "--project-level",
+        "--secret",
+        "--type",
+        "number",
+        "--non-interactive",
+        ...base(cwd),
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect(bodies).toEqual([]);
+      expect(consumed).toBe(false);
+      const json = parseJson(res.stdout) as { message: string };
+      expect(json.message).toContain("A secret is stored as a string");
+    } finally {
+      if (original) {
+        Object.defineProperty(process, "stdin", original);
+      }
+    }
+  });
+
+  it("keeps --type in the retry it suggests", async () => {
+    const cwd = await makeProject();
+    const original = Object.getOwnPropertyDescriptor(process, "stdin");
+    Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
+    try {
+      const res = await runCliForTest([
+        "variables",
+        "set",
+        "RETRY_COUNT",
+        "-e",
+        "prod",
+        "--type",
+        "number",
+        "--non-interactive",
+        ...base(cwd),
+      ]);
+
+      const json = parseJson(res.stdout) as { next_commands: string[] };
+      expect(json.next_commands.join(" ")).toContain("--type number");
+    } finally {
+      if (original) {
+        Object.defineProperty(process, "stdin", original);
+      }
+    }
+  });
+});
+
 describe("variables delete", () => {
   it("deletes the name at the addressed owner", async () => {
     const cwd = await makeProject();

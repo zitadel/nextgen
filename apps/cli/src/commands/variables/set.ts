@@ -7,7 +7,13 @@ import { createZitadelClient } from "@zitadel/api/client";
 import { ownerLabel } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
-import { assertVariableName, readStdin } from "../../lib/variables";
+import {
+  assertVariableName,
+  parseVariableValue,
+  readStdin,
+  VARIABLE_TYPES,
+  type VariableType,
+} from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
 import { readZitadelSecret } from "../../lib/project";
 
@@ -34,6 +40,12 @@ export default class VariablesSet extends EnvironmentCommand {
       default: false,
       description: "Store the value encrypted. It can be replaced later but never read back.",
     }),
+    type: Flags.string({
+      options: [...VARIABLE_TYPES],
+      default: "string",
+      description:
+        "Store the value as this JSON type. A reference to the whole field resolves to that type, so a number stays a number.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -41,8 +53,17 @@ export default class VariablesSet extends EnvironmentCommand {
     await this.toMeta(flags);
     const { cwd, source, nonInteractive, dryRun, cliVersion } = this.meta;
     const name = args.name;
+    const type = flags.type as VariableType;
 
     assertVariableName(name);
+    // A credential is a string: a numeric-looking key stored as a number could
+    // lose digits, and one stored as a boolean is meaningless. Refused before
+    // anything is asked for, so no secret is typed only to be turned away.
+    if (flags.secret && type !== "string") {
+      throw new ZitadelError("E_VALIDATION", "A secret is stored as a string.", {
+        hint: "Drop --type, or drop --secret for a non-credential number or boolean.",
+      });
+    }
 
     const secret = await readZitadelSecret(cwd);
     // Stated to a human, but kept off a pipe: these lines share stdout with the
@@ -76,7 +97,7 @@ export default class VariablesSet extends EnvironmentCommand {
     // terminal on stdin means nothing was piped: fail rather than block on a
     // read that would never end.
     if (nonInteractive && process.stdin.isTTY) {
-      const retry = pipeHint(name, environment, flags.secret, cliVersion);
+      const retry = pipeHint(name, environment, flags.secret, type, cliVersion);
       throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
         hint: `Pipe the value in: ${retry}`,
         nextCommands: [retry],
@@ -97,7 +118,7 @@ export default class VariablesSet extends EnvironmentCommand {
     // become `""`, not the string "undefined". An empty string is a value the
     // scalar schema accepts; only an absent input is an error, which the stdin
     // guard above and the cancel signal cover.
-    const value = String(answer ?? "");
+    const value = parseVariableValue(String(answer ?? ""), type);
 
     await client.updateVariables(
       { [name]: { value, secret: flags.secret } },
@@ -113,7 +134,7 @@ export default class VariablesSet extends EnvironmentCommand {
 
     return this.emit({
       status: "ok",
-      data: { environment: environment ?? null, name, secret: flags.secret },
+      data: { environment: environment ?? null, name, secret: flags.secret, type },
       pretty: `Set ${name} on ${where}${flags.secret ? " (secret)" : ""}`,
     });
   }
@@ -122,14 +143,15 @@ export default class VariablesSet extends EnvironmentCommand {
 /**
  * The scripted form to suggest when a run supplied no value.
  *
- * It carries the owner and the secret flag the run actually used. Dropping
- * either would hand back a command that writes somewhere else, or writes a
- * credential as a readable value.
+ * It carries the owner, the secret flag and the type the run actually used.
+ * Dropping any of them would hand back a command that writes somewhere else,
+ * writes a credential as a readable value, or stores a number as a string.
  */
 function pipeHint(
   name: string,
   environment: string | undefined,
   secret: boolean,
+  type: VariableType,
   cliVersion: string,
 ): string {
   const args = [
@@ -138,6 +160,7 @@ function pipeHint(
     name,
     ...(environment ? ["--environment", environment] : ["--project-level"]),
     ...(secret ? ["--secret"] : []),
+    ...(type === "string" ? [] : ["--type", type]),
   ].join(" ");
   return `${publicCliCommand(args, cliVersion)} < value.txt`;
 }
