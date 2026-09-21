@@ -410,7 +410,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 					Steps: []domain.FlowDefinitionStep{
 						{
-							Name: "identify",
+							Name:         "identify",
 							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"cancel": {Target: "done"},
