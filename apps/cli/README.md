@@ -416,12 +416,11 @@ Open the local console, signed in as the local admin created by `zitadel start`.
 
 ```
 USAGE
-  $ zitadel console [--json] [-c <value>] [-n] [-f] [--dry-run]
+  $ zitadel console [--json] [-c <value>] [-n] [--dry-run]
     [--verbose] [--debug] [--telemetry] [--no-open]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Overwrite protected files on conflict.
   -n, --non-interactive  Disable prompts. Required when scripting or running as
                          an agent.
       --debug            Debug logging.
