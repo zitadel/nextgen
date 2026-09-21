@@ -124,7 +124,7 @@ becomes a flag, so `--help` is the field reference and a wrong value is caught
 before a request is made. Conventions:
 
 - **`snake_case` on the wire becomes `--kebab-case` on the command line**
-  (`principal_type` → `--principal-type`). One mechanical rule, so the flag is
+  (`relation` → `--relation`). One mechanical rule, so the flag is
   derivable from the API docs and vice versa.
 - **`--data '{…}'` and `--file` stay**, because a nested object or an array
   cannot be a single flag. `--file -` reads stdin, and fails immediately when

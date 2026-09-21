@@ -231,7 +231,7 @@ output both say which, since it changes what the query means.
 
 **One flag per field.** The generated request schema names every field, its
 type, whether it is required, and its allowed values, so the factory turns each
-into a flag: `principal_type` becomes `--principal-type`, a closed value set
+into a flag: `relation` becomes `--relation`, a closed value set
 becomes the flag's `options` (oclif rejects anything else at parse time), and
 the schema's own description becomes the flag help. `--help` groups them under
 `REQUIRED FIELD` and `OPTIONAL FIELD`, and each required flag also carries a
@@ -239,7 +239,7 @@ the schema's own description becomes the flag help. `--help` groups them under
 alphabetically rather than by declaration.
 
 ```sh
-zitadel grants create --principal-type user --principal-id user_01J… --relation viewer
+zitadel grants create --relation viewer --data '{"user":{"user_id":"user_01J…"}}'
 ```
 
 An **open record** — a user's `attributes`, whose keys come from the project's
@@ -287,9 +287,9 @@ so presence is checked once both sources are merged, and reported as the flags
 the caller is missing rather than as schema issues:
 
 ```console
-$ zitadel grants create --principal-id user_01J… --json | jq -r '.message, .hint'
-grants create is missing required fields: --principal-type, --relation
-Pass --principal-type and --relation, or include them in --data / --file. See `grants create --help`.
+$ zitadel grants create --data '{"user":{"user_id":"user_01J…"}}' --json | jq -r '.message, .hint'
+grants create is missing required field: --relation
+Pass --relation, or include it in --data / --file. See `grants create --help`.
 ```
 
 Either way the assembled body is validated against the generated request schema

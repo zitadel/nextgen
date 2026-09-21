@@ -777,10 +777,9 @@ Create a grant.
 ```
 USAGE
   $ zitadel grants create [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--principal-type user|team]
-    [--principal-id <value>] [--relation viewer|editor|admin] [--expires-at
-    <value>] [--data <value> | --file <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--relation
+    viewer|editor|admin] [--expires-at <value>] [--data <value> | --file
+    <value>] [-e development|preview|production]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -806,19 +805,14 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 REQUIRED FIELD FLAGS
-  --principal-id=<value>     (required) Principal id (`user_<opaque>` or
-                             `team_<opaque>`).
-  --principal-type=<option>  (required) Kind of principal to bind.
-                             <options: user|team>
-  --relation=<option>        (required) Catalog relation on `object_type`
-                             `project`.
-                             <options: viewer|editor|admin>
+  --relation=<option>  (required) Catalog relation on `object_type` `project`.
+                       <options: viewer|editor|admin>
 
 DESCRIPTION
   Create a grant.
 
 EXAMPLES
-  $ zitadel grants create --principal-type user --principal-id <principal_id> --relation viewer --json
+  $ zitadel grants create --relation viewer --json
 
   $ zitadel grants create --data '{...}' --json
 
@@ -945,10 +939,10 @@ FLAGS
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields:
       created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
-      qual|greater_than|greater_than_or_equal), principal_type
+      qual|greater_than|greater_than_or_equal), user_id
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
-      r_than|greater_than_or_equal), principal_id (equals|not_equals|contains|not_
-      contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      r_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_conta
+      ins|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
       relation (equals|not_equals|contains|not_contains|less_than|less_than_or_equ
       al|greater_than|greater_than_or_equal), expires_at
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate

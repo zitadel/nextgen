@@ -48,14 +48,6 @@ describe("zitadel resources", () => {
     const grants = resources.find((resource) => resource.topic === "grants");
     expect(grants?.create_fields).toEqual([
       {
-        name: "principal_type",
-        flag: "--principal-type",
-        kind: "enum",
-        required: true,
-        options: ["user", "team"],
-      },
-      { name: "principal_id", flag: "--principal-id", kind: "string", required: true },
-      {
         name: "relation",
         flag: "--relation",
         kind: "enum",
@@ -97,6 +89,10 @@ describe("zitadel resources", () => {
 
     // A structured query endpoint offers the full operation set...
     expect(find("teams", "name")?.operations).toContain("contains");
+    expect(find("grants", "user_id")?.operations).toContain("equals");
+    expect(find("grants", "team_id")?.operations).toContain("equals");
+    expect(find("grants", "principal_id")).toBeUndefined();
+    expect(find("grants", "principal_type")).toBeUndefined();
     // ...and a GET list is described in the same vocabulary, narrowed to what
     // it actually accepts, so an agent never has to guess per transport.
     expect(find("events", "category")?.operations).toEqual(["equals"]);

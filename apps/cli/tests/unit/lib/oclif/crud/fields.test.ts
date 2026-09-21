@@ -20,10 +20,10 @@ const byName = (schema: Parameters<typeof describeBody>[0]) =>
 describe("describeBody", () => {
   it("marks required and optional fields from the schema", () => {
     const fields = byName(CreateGrantBody);
-    expect(fields.principal_type?.required).toBe(true);
-    expect(fields.principal_id?.required).toBe(true);
     expect(fields.relation?.required).toBe(true);
     expect(fields.expires_at?.required).toBe(false);
+    expect(fields.user).toBeUndefined();
+    expect(fields.team).toBeUndefined();
   });
 
   it("treats a fully optional body as optional", () => {
@@ -32,15 +32,16 @@ describe("describeBody", () => {
   });
 
   it("carries enum options and kebab-cases the flag name", () => {
-    const field = byName(CreateGrantBody).principal_type;
-    expect(field?.flag).toBe("principal-type");
+    const field = byName(CreateGrantBody).relation;
+    expect(field?.flag).toBe("relation");
     expect(field?.kind).toBe("enum");
-    expect(field?.options).toEqual(["user", "team"]);
+    expect(field?.options).toEqual(["viewer", "editor", "admin"]);
+    expect(byName(CreateGrantBody).expires_at?.flag).toBe("expires-at");
   });
 
   it("summarises a long multi-line description to one sentence", () => {
-    const summary = byName(CreateGrantBody).principal_id?.summary ?? "";
-    expect(summary).toBe("Principal id (`user_<opaque>` or `team_<opaque>`).");
+    const summary = byName(CreateGrantBody).relation?.summary ?? "";
+    expect(summary).toBe("Catalog relation on `object_type` `project`.");
     expect(summary).not.toContain("\n");
   });
 
@@ -67,9 +68,9 @@ describe("bodyFieldFlags", () => {
       string,
       { helpGroup?: string; description?: string; options?: string[]; multiple?: boolean }
     >;
-    expect(flags["principal-type"]?.helpGroup).toBe("REQUIRED FIELD");
-    expect(flags["principal-type"]?.options).toEqual(["user", "team"]);
-    expect(flags["principal-type"]?.description).toMatch(/^\(required\) /);
+    expect(flags.relation?.helpGroup).toBe("REQUIRED FIELD");
+    expect(flags.relation?.options).toEqual(["viewer", "editor", "admin"]);
+    expect(flags.relation?.description).toMatch(/^\(required\) /);
     expect(flags["expires-at"]?.helpGroup).toBe("OPTIONAL FIELD");
     expect(flags["expires-at"]?.description).not.toMatch(/^\(required\)/);
   });
@@ -91,11 +92,9 @@ describe("bodyFromFlags", () => {
   it("collects scalar and enum flags under their wire names", () => {
     expect(
       bodyFromFlags(grantFields, {
-        "principal-type": "user",
-        "principal-id": "user_1",
         relation: "viewer",
       }),
-    ).toEqual({ principal_type: "user", principal_id: "user_1", relation: "viewer" });
+    ).toEqual({ relation: "viewer" });
   });
 
   it("builds an object from repeated key=value entries", () => {
@@ -193,9 +192,7 @@ describe("bodyFromFlags", () => {
 
 describe("fieldExample", () => {
   it("uses the required fields and their first allowed value", () => {
-    expect(fieldExample(describeBody(CreateGrantBody))).toBe(
-      "--principal-type user --principal-id <principal_id> --relation viewer",
-    );
+    expect(fieldExample(describeBody(CreateGrantBody))).toBe("--relation viewer");
   });
 
   it("is absent when nothing is required", () => {
