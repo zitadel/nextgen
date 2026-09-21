@@ -481,6 +481,96 @@ func TestIDPConnectionStatements_ListServesLatestDocument(t *testing.T) {
 	})
 }
 
+// The query contract lets a caller narrow a list by slug and by creation time,
+// and both columns are alias-qualified in idpconnection.Schema (`c.slug`,
+// `c.created_at`) because the read joins the connection to its revisions, where
+// `slug` would be unambiguous only by accident and `created_at` exists on both
+// sides. Filtering on them here is what catches a binding that points at the
+// wrong alias or a time value the dialect fails to coerce.
+func TestIDPConnectionStatements_ListFiltersBySlugAndCreatedAt(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		latest := idpConnectionDocument("https://v3.example.com")
+
+		// Gaps between the writes so the three fixtures land on distinct
+		// created_at values: without them two connections can share an instant
+		// and a strict time bound would have no subset left to select.
+		created := make([]*domain.IDPConnection, 0, 3)
+		for _, name := range []string{"a", "b", "c"} {
+			if len(created) > 0 {
+				time.Sleep(2 * time.Millisecond)
+			}
+			created = append(created, createIDPConnection(t, d.stmts, projectID, "filter-"+name+"-"+suffix, idpConnectionDocument("https://v1.example.com")))
+		}
+		// The newest and the oldest connection are each revised twice, in that
+		// order, so the oldest one ends up carrying the most recent revision of
+		// the whole set. A filter has to compose with the newest-revision
+		// anti-join: the rows it selects carry the latest document, and the
+		// time bound it compares against is the connection's birth, not the
+		// revision's.
+		for _, entity := range []*domain.IDPConnection{created[2], created[0]} {
+			for _, document := range [][]byte{idpConnectionDocument("https://v2.example.com"), latest} {
+				entity.Document = document
+				require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), entity))
+			}
+		}
+
+		ids := func(items []*domain.IDPConnection) []string {
+			got := make([]string, 0, len(items))
+			for _, item := range items {
+				got = append(got, item.ID)
+			}
+			return got
+		}
+		// Every filter is ANDed with the project scope the endpoint always
+		// applies, which is how a caller reaches these columns at all.
+		list := func(t *testing.T, filter database.Filter[domain.IDPConnectionField], limit uint32) *database.ListResult[*domain.IDPConnection] {
+			t.Helper()
+			opts := idpConnectionListOptions(projectID)
+			opts.Filter = database.And(opts.Filter, filter)
+			opts.Pagination.Limit = limit
+			result, err := d.stmts.ListIDPConnections(unfilteredListCtx(t), opts)
+			require.NoError(t, err)
+			return result
+		}
+
+		// A slug is unique per project, so equality on it picks out exactly one
+		// connection — served on the revision it was last revised to.
+		bySlug := list(t, database.Equal(database.Col(domain.IDPConnectionFieldSlug), created[0].Slug), 0)
+		require.Len(t, bySlug.Items, 1)
+		assert.Equal(t, created[0].ID, bySlug.Items[0].ID)
+		assert.Equal(t, created[0].RevisionID, bySlug.Items[0].RevisionID)
+		assert.JSONEq(t, string(latest), string(bySlug.Items[0].Document))
+
+		// The bound comes from a stored row rather than from what create wrote
+		// back: the Spanner emulator's THEN RETURN reports a created_at a few
+		// hundred microseconds off the value it commits, which a strict
+		// comparison would turn into a coin flip.
+		oldest, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, created[0].ID)
+		require.NoError(t, err)
+
+		after := list(t, database.GreaterThan(database.Col(domain.IDPConnectionFieldCreatedAt), oldest.CreatedAt), 0)
+		// Sorted by the key the default order pages on rather than by insertion,
+		// same as the unfiltered list test. created[0] falls outside the bound
+		// even though it holds the most recent revision row in the join, which
+		// is what separates a c.created_at binding from an r.created_at one.
+		require.Len(t, after.Items, 2)
+		assert.Equal(t, idpConnectionIDsInDefaultOrder(created[1:]), ids(after.Items))
+		// created[2] is in the selection and was revised twice, so a filtered
+		// row still has to arrive on its newest revision.
+		assert.Equal(t, created[2].RevisionID, after.Items[1].RevisionID)
+		assert.JSONEq(t, string(latest), string(after.Items[1].Document))
+
+		// A slug nobody holds is an empty page rather than an error, and an
+		// empty page ends the cursor chain even when the caller asked for more
+		// than it got.
+		none := list(t, database.Equal(database.Col(domain.IDPConnectionFieldSlug), created[0].Slug+"-nope"), 10)
+		assert.Empty(t, none.Items)
+		assert.Empty(t, none.NextCursor)
+	})
+}
+
 // The project FK cascades through the connection to its revisions, so deleting
 // a project leaves no revisions of a connection that no longer exists.
 func TestIDPConnectionStatements_ProjectDeleteCascades(t *testing.T) {
