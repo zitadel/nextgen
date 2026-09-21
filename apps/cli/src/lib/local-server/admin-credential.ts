@@ -25,6 +25,13 @@ export const LOCAL_ADMIN_USER_FILE = `${LOCAL_RUNTIME_DIR}/admin-user.json`;
 /** The local admin's sign-in identifier; the default user schema identifies users by email. */
 export const LOCAL_ADMIN_EMAIL = "admin@zitadel.localhost";
 
+/**
+ * Which user attribute identifies the admin. A project decides this for itself;
+ * this one is the CLI's own, and `bootstrapUserDocument` below writes the email
+ * under `email`, so that is what an identifier proof names.
+ */
+export const LOCAL_ADMIN_IDENTIFIER_ATTRIBUTE = "email";
+
 const ADMIN_USER_ID = "user_localadmin";
 const ADMIN_TEAM_ID = "team_localadmin";
 

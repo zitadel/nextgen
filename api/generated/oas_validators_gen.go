@@ -2657,7 +2657,10 @@ func (s CompletedFactorPayload) Validate() error {
 		}
 		return nil
 	case PasswordFactorPayloadCompletedFactorPayload:
-		return nil // no validation needed
+		if err := s.PasswordFactorPayload.Validate(); err != nil {
+			return err
+		}
+		return nil
 	case PasskeyFactorPayloadCompletedFactorPayload:
 		if err := s.PasskeyFactorPayload.Validate(); err != nil {
 			return err
@@ -5311,6 +5314,17 @@ func (s *IdentifierFactorPayload) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := s.Method.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.UserID.Validate(); err != nil {
 			return err
 		}
@@ -6815,6 +6829,17 @@ func (s *PasskeyFactorPayload) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := s.Method.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.AuthenticatorAttachment.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -6847,6 +6872,29 @@ func (s PasskeyFactorPayloadAuthenticatorAttachment) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *PasswordFactorPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Method.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s *PatchMyUserRequest) Validate() error {

@@ -1,40 +1,18 @@
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
-import type { LocalAdmin } from "./admin-credential";
+import { LOCAL_ADMIN_IDENTIFIER_ATTRIBUTE, type LocalAdmin } from "./admin-credential";
 import { apiError, fetchJson, postJson, type JsonResponse } from "./http";
 import { PLATFORM_PROJECT_ID } from "./platform";
 
 /**
  * Signing the local admin in without a browser.
  *
- * There is no API that takes an email and a password and returns a session, so
- * the CLI drives the login flow the way the login widget does: ask the server
- * for the current step, fill in the fields it declares, submit, repeat, until
- * the flow ends with a one-time `handoff_token`. That token becomes either a
- * console sign-in link or, exchanged, a session cookie.
- *
- * This is the fragile part of the local admin: the CLI renders nothing, so it
- * infers from field names which box wants the password and which wants the
- * email. `POST /auth_attempts` is the API that would let it state both outright
- * — see #1256, which fixes the server-side gap that makes it unusable today.
+ * The auth-attempt API is the state machine the login widget drives; the widget
+ * adds the rendering. With no page to render, the CLI states the factors
+ * outright: open an attempt, prove the identifier, prove the password, take the
+ * one-time `handoff_token`. That token becomes either a console sign-in link or,
+ * exchanged, a session cookie.
  */
-
-/** A step the flow API returned: either a form to fill, or the terminal token. */
-type FlowStep = {
-  id?: unknown;
-  handoff_token?: unknown;
-  step?: unknown;
-};
-
-/** Steps the login flow routes to when the identifier is unknown to the server. */
-const REGISTRATION_STEPS = new Set(["register", "register-password"]);
-
-/**
- * How many steps a password login may take before the CLI gives up. The shipped
- * flows take two (identifier, password); the bound exists so an unexpected flow
- * fails with a diagnosis instead of looping.
- */
-const MAX_FLOW_STEPS = 6;
 
 /** A console URL that signs the admin in once, via a fresh handoff token. */
 export async function consoleSignInUrl(serverUrl: string, admin: LocalAdmin): Promise<string> {
@@ -65,113 +43,95 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
 }
 
 /**
- * Walks the platform project's login flow to its terminal handoff token,
- * without exchanging it.
+ * Proves the admin's identifier and password against a fresh auth attempt and
+ * returns its terminal handoff token, without exchanging it.
  */
 async function signIn(
   serverUrl: string,
   admin: LocalAdmin,
 ): Promise<{ handoffToken: string; publishableKey: string }> {
   const publishableKey = await platformPublishableKey(serverUrl);
-  const flow = flowClient(serverUrl, publishableKey);
+  const attempts = attemptClient(serverUrl, publishableKey);
 
-  let step: FlowStep = await flow("/flow", {
-    project_id: PLATFORM_PROJECT_ID,
-    purpose: "login",
-  });
-
-  for (let hop = 0; hop < MAX_FLOW_STEPS; hop += 1) {
-    if (typeof step.handoff_token === "string") {
-      return { handoffToken: step.handoff_token, publishableKey };
-    }
-
-    const current = isObject(step.step) ? step.step : {};
-    if (typeof current.name === "string" && REGISTRATION_STEPS.has(current.name)) {
-      // The flow routes to registration only when the identifier is unknown,
-      // so this server never imported the admin — an older data directory,
-      // say. Refuse rather than sign a second user up.
-      throw new ZitadelError("E_AUTH", `The local server has no user ${admin.email}`, {
-        hint: "The local data directory predates the local admin. Run `zitadel reset --force`, then `zitadel start`.",
-        nextCommands: ["zitadel reset --force", "zitadel start"],
-      });
-    }
-
-    step = await flow(`/flow/${encodeURIComponent(String(step.id))}/submit`, {
-      action: "submit",
-      fields: answerStep(current, admin),
-    });
+  const attempt = await attempts("/auth_attempts", { project_id: PLATFORM_PROJECT_ID });
+  if (!isObject(attempt.body) || typeof attempt.body.attempt_id !== "string") {
+    throw apiError("auth_attempts", attempt);
   }
+  const attemptId = encodeURIComponent(attempt.body.attempt_id);
 
-  throw new ZitadelError("E_AUTH", "The local admin login did not complete", {
-    details: { last_step: isObject(step.step) ? step.step.name : undefined },
+  // The CLI wrote this user's attributes itself, so it names the one that
+  // identifies them rather than reading it off a rendered step.
+  await prove(attempts, attemptId, "identifier", {
+    login_name: admin.email,
+    attribute_name: LOCAL_ADMIN_IDENTIFIER_ATTRIBUTE,
   });
+  await prove(attempts, attemptId, "password", { password: admin.password });
+
+  const handoff = await attempts(`/auth_attempts/${attemptId}/handoff`, {});
+  if (!isObject(handoff.body) || typeof handoff.body.handoff_token !== "string") {
+    throw apiError("handoff", handoff);
+  }
+  return { handoffToken: handoff.body.handoff_token, publishableKey };
 }
 
 /**
- * Fills the fields a step declares. Credential fields are named by schema
- * pointer (`x-auth-methods#password`), so the trailing segment is what says
- * whether a box wants the password; everything else on a login flow identifies
- * the user, which for this admin is their email.
+ * Issues a challenge for one factor and answers it. The proof must carry the
+ * challenge just issued: the server rejects a proof against a re-issued
+ * challenge, so the two calls belong together.
  */
-function answerStep(step: Record<string, unknown>, admin: LocalAdmin): Record<string, string> {
-  const fields: Record<string, string> = {};
-  for (const field of Array.isArray(step.fields) ? step.fields : []) {
-    if (!isObject(field) || typeof field.name !== "string") continue;
-    const isPassword = field.name.split("#").pop() === "password";
-    fields[field.name] = isPassword ? admin.password : admin.email;
+async function prove(
+  attempts: AttemptClient,
+  attemptId: string,
+  method: "identifier" | "password",
+  proof: Record<string, string>,
+): Promise<void> {
+  const challenge = await attempts(`/auth_attempts/${attemptId}/challenges`, { method });
+  if (!isObject(challenge.body) || typeof challenge.body.challenge_id !== "string") {
+    throw apiError(`${method} challenge`, challenge);
   }
-  return fields;
+
+  const challengeId = encodeURIComponent(challenge.body.challenge_id);
+  const verified = await attempts(
+    `/auth_attempts/${attemptId}/challenges/${challengeId}/verify`,
+    proof,
+  );
+  if (!verified.ok) {
+    throw proofError(method, verified);
+  }
 }
 
-/**
- * Posts one flow call, carrying the sealed `_zflow` cookie forward. The flow is
- * stateless across calls: every response re-seals its state into `Set-Cookie`
- * and a submit without it is rejected. A browser round-trips it implicitly;
- * here the closure is the jar.
- */
-function flowClient(serverUrl: string, publishableKey: string) {
+type AttemptClient = (path: string, body: Record<string, unknown>) => Promise<JsonResponse>;
+
+/** Posts to the auth-attempt API with the browser-plane credential it expects. */
+function attemptClient(serverUrl: string, publishableKey: string): AttemptClient {
   const origin = new URL(serverUrl).origin;
-  let flowCookie: string | undefined;
-
-  return async function flow(path: string, body: Record<string, unknown>): Promise<FlowStep> {
-    const res = await postJson(`${serverUrl}${path}`, body, {
+  return async (path, body) =>
+    postJson(`${serverUrl}${path}`, body, {
       authorization: `Bearer ${publishableKey}`,
       origin,
-      ...(flowCookie ? { cookie: flowCookie } : {}),
     });
-
-    for (const raw of res.cookies) {
-      const [pair] = raw.split(";", 1);
-      if (pair?.startsWith("_zflow=")) flowCookie = pair;
-    }
-
-    if (!res.ok || !isObject(res.body)) {
-      throw flowError(path, res);
-    }
-    return res.body;
-  };
 }
 
 /**
- * A rejected step comes back as 400 with a flow response, not an error body:
- * the reason sits in `step.error` (`internal/api/flow.go`), so read it there
- * before falling back to the generic shape.
+ * A rejected identifier means this server never imported the admin — an older
+ * data directory, say — which no retry fixes, so say that rather than letting
+ * the generic proof error send the reader hunting.
  */
-function flowError(path: string, res: JsonResponse): ZitadelError {
-  const step = isObject(res.body) && isObject(res.body.step) ? res.body.step : undefined;
-  const reason = step && typeof step.error === "string" ? step.error : undefined;
-  if (reason === undefined) {
-    return apiError(`flow ${path}`, res);
+function proofError(method: string, res: JsonResponse): ZitadelError {
+  const code = isObject(res.body) && typeof res.body.code === "string" ? res.body.code : undefined;
+  if (method === "identifier" && code === "att.proof_rejected") {
+    return new ZitadelError("E_AUTH", "The local server has no local admin user", {
+      hint: "The local data directory predates the local admin. Run `zitadel reset --force`, then `zitadel start`.",
+      nextCommands: ["zitadel reset --force", "zitadel start"],
+    });
   }
-  return new ZitadelError("E_AUTH", `The local admin could not sign in: ${reason}`, {
-    details: { status: res.status, step: step?.name, error: reason },
-  });
+  return apiError(`${method} proof`, res);
 }
 
 /**
- * The platform project's browser-safe key, which also authorises the flow
- * calls. Its absence means this server was not started with the platform
- * project, which no retry will change.
+ * The platform project's browser-safe key, which also authorises the
+ * auth-attempt calls. Its absence means this server was not started with the
+ * platform project, which no retry will change.
  */
 async function platformPublishableKey(serverUrl: string): Promise<string> {
   const res = await fetchJson(`${serverUrl}/console/runtime.json`, { method: "GET" });
