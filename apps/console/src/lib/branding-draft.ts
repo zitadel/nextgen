@@ -116,6 +116,31 @@ export function withTypography(
   return { ...draft, typography };
 }
 
+type NumericSection = "typography" | "shape";
+type SectionValues<S extends NumericSection> = NonNullable<BrandingDraft[S]>;
+
+/**
+ * Set one value in `typography` or `shape`, dropping the key when the field is
+ * cleared — for the same reason as the string helpers: an absent key takes the
+ * maintained default, which is not the same as publishing `undefined`, and a
+ * key left with that value survives a spread only to be dropped by JSON.
+ */
+export function withSectionValue<S extends NumericSection, K extends keyof SectionValues<S>>(
+  draft: BrandingDraft,
+  section: S,
+  key: K,
+  value: SectionValues<S>[K] | undefined,
+): BrandingDraft {
+  const current = { ...(draft[section] ?? {}) } as SectionValues<S>;
+  if (value === undefined) {
+    delete current[key];
+  } else {
+    current[key] = value;
+  }
+  // A computed generic key widens the literal, so the shape is asserted back.
+  return { ...draft, [section]: current } as BrandingDraft;
+}
+
 /**
  * Clearing the family clears the URL with it: a stylesheet that loads a face
  * nothing names is rejected.

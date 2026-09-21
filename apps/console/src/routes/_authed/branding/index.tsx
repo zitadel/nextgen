@@ -75,13 +75,24 @@ const JOURNEYS: { id: PreviewJourney; label: string }[] = [
 const GHOST_TRIGGER =
   "h-9 gap-1.5 border-0 px-2.5 font-medium shadow-none hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:hover:bg-accent [&_svg:not([class*='text-'])]:text-foreground";
 
+/**
+ * Which side the preview paints: a fixed side, or `draft` to leave it to the
+ * draft's own `theme.mode` — what a visitor gets, and the only setting under
+ * which the panel's Theme select is visible in the preview. A pinned side
+ * still cannot reach one the draft does not publish.
+ */
+type PreviewTheme = "light" | "dark" | "draft";
+
 function BrandingScreen() {
   const { published, flows } = Route.useLoaderData();
   // The draft starts from what is in use, per #936: customisation continues
   // from the appearance currently live rather than from an empty form.
   const [draft, setDraft] = useState<BrandingDraft>(published);
+  // What the operator last picked; `activeJourney` below is what renders.
   const [journey, setJourney] = useState<PreviewJourney>("register");
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
+  const [theme, setTheme] = useState<PreviewTheme>("draft");
+  const [narrow, setNarrow] = useState(false);
 
   // Only the journeys the chosen flow actually serves: asking it for a purpose
   // it does not carry answers `flowdef.purpose_mismatch` instead of rendering.
@@ -91,14 +102,14 @@ function BrandingScreen() {
   const journeys = selected?.purposes.length
     ? JOURNEYS.filter((entry) => selected.purposes.includes(entry.id))
     : JOURNEYS;
-  // Switching to a flow that does not serve the open tab moves to one it does,
-  // rather than leaving a tab selected that the preview cannot start.
+  // Derived rather than corrected in state: switching to a flow that does not
+  // serve the picked tab previews one it does, and switching back restores
+  // the pick, without a render-time setState.
   const activeJourney = journeys.some((entry) => entry.id === journey)
     ? journey
     : (journeys[0]?.id ?? journey);
-  if (activeJourney !== journey) setJourney(activeJourney);
-  const [theme, setTheme] = useState<"light" | "dark" | "auto">("auto");
-  const [narrow, setNarrow] = useState(false);
+  // Unset, a widget follows the visitor: the panel shows `auto` for it too.
+  const draftMode = draft.theme?.mode ?? "auto";
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
@@ -162,7 +173,7 @@ function BrandingScreen() {
               size="icon"
               aria-label="Switch the previewed theme"
               onClick={() => setTheme(nextTheme(theme))}
-              title={`Theme: ${theme}`}
+              title={theme === "draft" ? `Theme: ${draftMode} (from the draft)` : `Theme: ${theme}`}
             >
               <Sun />
             </Button>
@@ -180,7 +191,12 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview draft={draft} journey={activeJourney} flowName={flowName} theme={theme} />
+            <LoginPreview
+              draft={draft}
+              journey={activeJourney}
+              flowName={flowName}
+              theme={theme}
+            />
           </div>
         </Card>
 
@@ -192,7 +208,7 @@ function BrandingScreen() {
   );
 }
 
-function nextTheme(current: "light" | "dark" | "auto"): "light" | "dark" | "auto" {
-  if (current === "auto") return "light";
-  return current === "light" ? "dark" : "auto";
+function nextTheme(current: PreviewTheme): PreviewTheme {
+  if (current === "draft") return "light";
+  return current === "light" ? "dark" : "draft";
 }

@@ -185,6 +185,10 @@ export class ZitadelLogin extends ZitadelSurface {
    * loginElement.locales = { en: { "identifier.title": "Welcome" } };
    * ```
    */
+  @property({ attribute: false }) accessor locales:
+    | Readonly<Record<string, Partial<Locale>>>
+    | undefined;
+
   /**
    * Paint this branding instead of the revision the flow response carries.
    *
@@ -192,12 +196,14 @@ export class ZitadelLogin extends ZitadelSurface {
    * the point is to see unpublished values against a real flow. It changes
    * what this element paints and nothing else: the published revision still
    * governs every other visitor, and the draft is never sent anywhere.
+   *
+   * The draft passes through the same validation as the wire payload, so the
+   * preview never shows a logo or font the published revision would drop.
    */
   @property({ attribute: false }) accessor brandingOverride: Branding | undefined;
 
-  @property({ attribute: false }) accessor locales:
-    | Readonly<Record<string, Partial<Locale>>>
-    | undefined;
+  /** `brandingOverride` after validation, which is what actually paints. */
+  @state() private accessor sanitisedOverride: Branding | undefined = undefined;
 
   @state() private accessor response: CreateFlow201 | null = null;
 
@@ -355,6 +361,15 @@ export class ZitadelLogin extends ZitadelSurface {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
     if (changed.has("brandingOverride")) {
+      // Same sanitiser as the wire payload: a draft is an untrusted URL source
+      // too, and a preview that paints what publishing would drop is a lie.
+      const { branding, issues } = validateBranding(this.brandingOverride, {
+        renderingOrigin: this.ownerDocument.location.origin,
+      });
+      this.sanitisedOverride = branding;
+      if (issues.length > 0) {
+        console.warn("[zitadel-login] brandingOverride has issues:", issues);
+      }
       // The draft carries its own `theme.mode` and its own published sides, so
       // the controller has to resolve against it rather than the wire value.
       this.themeController.setBranding(this.activeBranding());
@@ -527,7 +542,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /** The draft when one is set, otherwise the revision the flow carried. */
   private activeBranding(): Branding | undefined {
-    return this.brandingOverride ?? this.branding;
+    return this.brandingOverride ? this.sanitisedOverride : this.branding;
   }
 
   /**

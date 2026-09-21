@@ -2037,6 +2037,24 @@ describe("<zitadel-login> branding override", () => {
     element.remove();
   });
 
+  it("runs the draft through the same validation as the wire payload", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      document.body.appendChild(element);
+      // A preview that paints a logo publishing would drop misleads the editor.
+      element.brandingOverride = { logo_url: "http://cdn.example.com/logo.svg" };
+      await element.updateComplete;
+      expect(warn).toHaveBeenCalledWith(
+        "[zitadel-login] brandingOverride has issues:",
+        expect.arrayContaining([expect.stringContaining("logo_url must use https")]),
+      );
+      element.remove();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("falls back to the revision when no draft is set", async () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.variant = "page";

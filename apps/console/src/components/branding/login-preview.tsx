@@ -1,11 +1,9 @@
 import "@zitadel/components";
 
 import type { Branding, ZitadelLogin } from "@zitadel/components";
-import type { ZitadelProject } from "@zitadel/sdk-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 
-import { apiBase } from "../../api/zitadel";
-import { getConsoleProjectId, getPublishableKey } from "../../runtime/runtime";
+import { useConsoleProject } from "../../hooks/use-console-project";
 
 export type PreviewJourney = "register" | "login";
 
@@ -16,8 +14,8 @@ type Props = {
   journey: PreviewJourney;
   /** Flow definition name, empty for the project's default. */
   flowName: string;
-  /** Which side to show, or `auto` to follow the viewer. */
-  theme: "light" | "dark" | "auto";
+  /** Which side to show, or `draft` to let the draft's own `theme.mode` decide. */
+  theme: "light" | "dark" | "draft";
 };
 
 /**
@@ -28,6 +26,12 @@ type Props = {
  * The element is fed the draft through `brandingOverride`, so what renders is
  * the unpublished edit over the live flow; nothing here publishes.
  *
+ * Typography is the exception: the element mounts as a `widget`, and a widget
+ * never injects a font stylesheet into the document that embeds it (the host
+ * owns its fonts and its CSP), so `typography.font_url` and a `font_family`
+ * the console has not loaded do not show here. The panel says so beside those
+ * rows; a preview that loads the face is a follow-up.
+ *
  * Mounted imperatively rather than as JSX: `project` and `draft` are objects,
  * which reach a custom element as properties, and the element starts its flow
  * on connect — so a journey change has to build a new one rather than mutate
@@ -37,18 +41,7 @@ export function LoginPreview({ draft, journey, flowName, theme }: Props) {
   const host = useRef<HTMLDivElement | null>(null);
   const element = useRef<ZitadelLogin | null>(null);
 
-  // Built from the runtime-discovered id, as the sign-in screen does, not from
-  // the app-wide handle: that one carries the build-time env override, which is
-  // empty in the embedded build, and the element's own `project` property wins
-  // over the global config — so passing it would make the preview refuse to
-  // start a flow at `/ui/console/branding`.
-  const projectId = getConsoleProjectId();
-  const publishableKey = getPublishableKey();
-  const project = useMemo<ZitadelProject | undefined>(
-    () =>
-      projectId ? Object.freeze({ projectId, proxyPath: apiBase, publishableKey }) : undefined,
-    [projectId, publishableKey],
-  );
+  const project = useConsoleProject();
 
   useEffect(() => {
     const container = host.current;
@@ -62,7 +55,7 @@ export function LoginPreview({ draft, journey, flowName, theme }: Props) {
     // revision until the next edit, so switching journey or flow would drop
     // the draft being previewed.
     login.brandingOverride = draft;
-    login.theme = theme;
+    login.theme = elementTheme(theme);
     container.replaceChildren(login);
     element.current = login;
     return () => {
@@ -79,8 +72,17 @@ export function LoginPreview({ draft, journey, flowName, theme }: Props) {
   useEffect(() => {
     if (!element.current) return;
     element.current.brandingOverride = draft;
-    element.current.theme = theme;
+    element.current.theme = elementTheme(theme);
   }, [draft, theme]);
 
   return <div ref={host} />;
+}
+
+/**
+ * An unset element `theme` lets `branding.theme.mode` govern — the element's
+ * own `auto` would override the draft's mode with the OS preference, hiding
+ * the panel's Theme select from the preview.
+ */
+function elementTheme(theme: Props["theme"]): ZitadelLogin["theme"] {
+  return theme === "draft" ? "" : theme;
 }

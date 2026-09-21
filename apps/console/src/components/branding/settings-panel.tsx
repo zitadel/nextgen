@@ -41,6 +41,7 @@ import {
   type ThemeSide,
   withFontFamily,
   withPaletteValue,
+  withSectionValue,
   withSideLogo,
   withTypography,
 } from "@/lib/branding-draft";
@@ -131,6 +132,10 @@ export function SettingsPanel({ draft, onChange }: Props) {
       <Separator />
       <section className={SECTION}>
         <h3 className={SECTION_TITLE}>Typography</h3>
+        {/* The preview mounts the login as a widget, and a widget never loads a
+            font into the page that embeds it — so these rows reach the draft
+            but not the preview until it can load the face itself. */}
+        <p className="text-xs leading-4 text-muted-foreground">Not shown in the preview yet.</p>
         <TextRow
           label="Font family"
           value={draft.typography?.font_family ?? ""}
@@ -149,7 +154,7 @@ export function SettingsPanel({ draft, onChange }: Props) {
           min={0.75}
           max={1.25}
           step={0.05}
-          onChange={(scale) => onChange({ ...draft, typography: { ...draft.typography, scale } })}
+          onChange={(scale) => onChange(withSectionValue(draft, "typography", "scale", scale))}
         />
       </section>
 
@@ -173,7 +178,7 @@ export function SettingsPanel({ draft, onChange }: Props) {
           min={0.5}
           max={2}
           step={0.1}
-          onChange={(logo_scale) => onChange({ ...draft, shape: { ...draft.shape, logo_scale } })}
+          onChange={(value) => onChange(withSectionValue(draft, "shape", "logo_scale", value))}
         />
       </section>
 
@@ -242,13 +247,14 @@ function RadiusRows({
         options={[...RADIUS_PRESETS, "custom"]}
         labels={RADIUS_LABELS}
         onChange={(value) =>
-          onChange({
-            ...draft,
-            shape: {
-              ...draft.shape,
-              radius: value === "custom" ? 8 : (value as BrandingRadius),
-            },
-          })
+          onChange(
+            withSectionValue(
+              draft,
+              "shape",
+              "radius",
+              value === "custom" ? 8 : (value as BrandingRadius),
+            ),
+          )
         }
       />
       {custom && (
@@ -258,9 +264,7 @@ function RadiusRows({
           min={0}
           max={32}
           step={1}
-          onChange={(pixels) =>
-            onChange({ ...draft, shape: { ...draft.shape, radius: pixels ?? 0 } })
-          }
+          onChange={(pixels) => onChange(withSectionValue(draft, "shape", "radius", pixels ?? 0))}
         />
       )}
     </>
@@ -312,7 +316,10 @@ function PaletteSection({
               side={side}
               value={palette[key] ?? ""}
               fallback={defaults[key]}
-              issues={sideIssues.filter((candidate) => candidate.pair.startsWith(`${key}/`))}
+              // Both rows of a pair carry the marker: the customer who set
+              // `primary` should find the warning on the row they touched, not
+              // only on the `on_primary` row they left alone.
+              issues={sideIssues.filter((candidate) => candidate.pair.split("/").includes(key))}
               onChange={(value) => onChange(withPaletteValue(draft, side, key, value))}
             />
           ))}

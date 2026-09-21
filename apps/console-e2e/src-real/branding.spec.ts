@@ -96,7 +96,10 @@ test("says what a failing pair measures and which rule it misses", async ({ page
 
   // The row has space for a glyph, so the measurement sits behind it. Reaching
   // it by role proves it is operable rather than a title a pointer alone finds.
-  await page.getByRole("button", { name: /Primary \/ On primary/ }).click();
+  // Both rows of the pair carry one; either opens the same detail.
+  const markers = page.getByRole("button", { name: /Primary \/ On primary/ });
+  await expect(markers).toHaveCount(2);
+  await markers.first().click();
 
   await expect(page.getByText("Primary / On primary", { exact: true })).toBeVisible();
   await expect(
