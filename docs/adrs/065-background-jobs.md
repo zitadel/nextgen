@@ -1,4 +1,4 @@
-# ADR 064: SQL-Backed Background Jobs
+# ADR 065: SQL-Backed Background Jobs
 
 > **Status:** Proposed
 > **Date:** 2026-09-03

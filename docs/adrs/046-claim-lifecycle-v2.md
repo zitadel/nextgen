@@ -39,8 +39,8 @@
 > bounds *automatic provisioning* to one team per user; it does not change
 > §Context's rule that a user may belong to many teams.
 >
-> **Proposed amendment — [ADR 064](064-background-jobs.md):**
-> if ADR 064 is accepted, unclaimed-project **deletion** can run as a
+> **Proposed amendment — [ADR 065](065-background-jobs.md):**
+> if ADR 065 is accepted, unclaimed-project **deletion** can run as a
 > periodic job on that runtime. This claim contract still does not add that
 > sweeper. The 14-day claim *window* stays a read of `projects.created_at` at
 > claim time. Do not implement a deleter from this ADR alone.
@@ -267,12 +267,12 @@ follow-up, and excluding it carries an accepted trade-off recorded here.
   server-side so a skewed browser clock cannot contradict what the claim legs
   enforce. Deleting the project when the window closes stays out
   of scope: there is no general scheduled-task infrastructure in the server
-  (the audit retention loop is audit-specific), and the proposed ADR 064
+  (the audit retention loop is audit-specific), and the proposed ADR 065
   ([#1119](https://github.com/zitadel/nextgen/pull/1119)), which designs one,
   explicitly excludes this sweeper. An expired-unclaimed project stays cheaply
   derivable (created
   long ago with no claim grant). **Accepted trade-off:** expired unclaimed
-  projects accumulate, unclaimable, until a reaper ships on the ADR 064
+  projects accumulate, unclaimable, until a reaper ships on the ADR 065
   runtime.
 - **Claim metrics and telemetry.** Claim volumes are answerable with ad-hoc
   queries over the grant data until a metrics surface is added.

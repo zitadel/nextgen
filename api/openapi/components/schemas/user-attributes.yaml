@@ -1,0 +1,6 @@
+title: UserAttributes
+type: object
+additionalProperties: true
+description: |
+  The user's content, satisfying the schema named by `schema`. Property
+  names and types are determined entirely by that schema.

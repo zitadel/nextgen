@@ -241,8 +241,13 @@ tasks:
       - "-count=1"
       - "-tags"
       - "spanner_integration"
+      # Emulator-only budget: the emulator's query planner is pathologically slow
+      # on the principal-scoped authz list predicate (TestListAuthzTeamScoped*),
+      # spiking to ~9m30s and tripping a 10m timeout, while real Cloud Spanner
+      # runs the same predicate in ~40ms. Postgres runs the same test in 0.08s.
+      # Keep the other lanes tight so genuine hangs still surface; see #1011.
       - "-timeout"
-      - "10m"
+      - "20m"
       - "-p"
       - "1"
       - "./..."
