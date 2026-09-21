@@ -137,10 +137,20 @@ type UserService interface {
 // ---- Implementation -------------------------------------------------------------
 
 type userService struct {
-	v2Pool      StatementPool
-	schemaStore domain.JSONSchemaStore
-	hasher      crypto.Hasher
-	refs        UserRefResolver
+	v2Pool         StatementPool
+	schemaStore    domain.JSONSchemaStore
+	hasher         crypto.Hasher
+	refs           UserRefResolver
+	passwordPolicy *PasswordPolicy
+}
+
+// UserServiceOption configures [NewUserService].
+type UserServiceOption func(*userService)
+
+// WithPasswordPolicy gates every password save on the `user.password.save`
+// policy (ADR 066).
+func WithPasswordPolicy(p *PasswordPolicy) UserServiceOption {
+	return func(s *userService) { s.passwordPolicy = p }
 }
 
 // NewUserService returns the interface rather than *userService, deliberately
@@ -154,13 +164,18 @@ func NewUserService(
 	schemaStore domain.JSONSchemaStore,
 	hasher crypto.Hasher,
 	refs UserRefResolver,
+	opts ...UserServiceOption,
 ) UserService {
-	return &userService{
+	s := &userService{
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
 		hasher:      hasher,
 		refs:        refs,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
@@ -565,7 +580,7 @@ func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (
 }
 
 func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	action := NewSetUserPasswordAction(input, s.hasher)
+	action := NewSetUserPasswordAction(input, s.hasher).WithPasswordPolicy(s.passwordPolicy)
 	return s.ApplyActions(ctx, action)
 }
 
@@ -778,6 +793,7 @@ type SetPasswordUserAction struct {
 	SetPasswordInput
 
 	hasher crypto.Hasher
+	policy *PasswordPolicy
 
 	hash string
 }
@@ -789,12 +805,24 @@ func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *Set
 	}
 }
 
+// WithPasswordPolicy gates the save on the `user.password.save` policy
+// (ADR 066). Nil skips the check.
+func (o *SetPasswordUserAction) WithPasswordPolicy(p *PasswordPolicy) *SetPasswordUserAction {
+	o.policy = p
+	return o
+}
+
 func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 	o.hash, err = domain.HashPassword(o.Password, o.hasher)
 	return err
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	if o.policy != nil {
+		if err := o.policy.Check(ctx, stmts, o.ProjectID, o.UserID, o.Password); err != nil {
+			return err
+		}
+	}
 	pw := &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,

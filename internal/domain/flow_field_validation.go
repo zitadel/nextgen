@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // Validate applies the rules carried by a previously resolved field
@@ -127,10 +128,12 @@ func applyValidationRules(name, value string, v *FlowFieldValidation) []FlowFiel
 		return nil
 	}
 	var out []FlowFieldValidationError
-	if v.MinLength > 0 && len(value) < v.MinLength {
+	// Length is counted in Unicode code points (NIST SP 800-63B), never bytes.
+	length := utf8.RuneCountInString(value)
+	if v.MinLength > 0 && length < v.MinLength {
 		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMinLength})
 	}
-	if v.MaxLength > 0 && len(value) > v.MaxLength {
+	if v.MaxLength > 0 && length > v.MaxLength {
 		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMaxLength})
 	}
 	if v.Format == "email" && !looksLikeEmail(value) {

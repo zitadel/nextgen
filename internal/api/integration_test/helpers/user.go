@@ -23,6 +23,7 @@ func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
 			h.EnsureSchemaStore(t),
 			h.EnsureHasher(t),
 			service.StatementsUserRefResolver{Pool: h.EnsureServiceDB(t)},
+			service.WithPasswordPolicy(h.EnsurePasswordPolicy(t)),
 		)
 	}
 	return h.userService.value

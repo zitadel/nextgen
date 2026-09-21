@@ -58,7 +58,7 @@ func signedInSession(t *testing.T, project *domain.Project, email string) (*doma
 	})
 	require.NoError(t, err)
 
-	const password = "fake-password"
+	const password = "fake-password-long!"
 	require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
 		ProjectID: project.ID,
 		UserID:    user.ID,
