@@ -312,6 +312,37 @@ describe("variables set", () => {
     expect(JSON.stringify(body)).not.toContain("undefined");
   });
 
+  it("suggests a retry that reproduces the run, not a weaker one", async () => {
+    const cwd = await makeProject();
+    const original = Object.getOwnPropertyDescriptor(process, "stdin");
+    Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
+    try {
+      const res = await runCliForTest([
+        "variables",
+        "set",
+        "TOKEN",
+        "-e",
+        "prod",
+        "--secret",
+        "--non-interactive",
+        ...base(cwd),
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      const json = parseJson(res.stdout) as { next_commands: string[]; hint: string };
+      const retry = json.next_commands.join(" ");
+      // Dropping either would hand back a command writing a non-secret at the
+      // project level: a different owner and a weaker classification.
+      expect(retry).toContain("--environment prod");
+      expect(retry).toContain("--secret");
+      expect(json.hint).toContain("--environment prod");
+    } finally {
+      if (original) {
+        Object.defineProperty(process, "stdin", original);
+      }
+    }
+  });
+
   it("rejects a variable name the platform would refuse", async () => {
     const cwd = await makeProject();
 

@@ -64,7 +64,10 @@ export default class VariablesGet extends BaseCommand {
       name,
       await client.getVariable(name, { project_id: secret.project_id, ...owner }),
     );
-    this.recordTelemetry({ secret: row.secret, scoped: environment !== undefined });
+    this.recordTelemetry({
+      is_secret: row.secret,
+      is_environment_scoped: environment !== undefined,
+    });
 
     return this.emit({
       status: "ok",

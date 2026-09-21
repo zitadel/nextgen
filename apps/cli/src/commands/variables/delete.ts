@@ -98,7 +98,7 @@ export default class VariablesDelete extends BaseCommand {
       token: secret.project_secret,
     });
     await client.deleteVariable(name, { project_id: secret.project_id, ...owner });
-    this.recordTelemetry({ scoped: environment !== undefined });
+    this.recordTelemetry({ is_environment_scoped: environment !== undefined });
 
     return this.emit({
       status: "ok",

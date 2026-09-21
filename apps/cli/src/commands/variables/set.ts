@@ -78,9 +78,10 @@ export default class VariablesSet extends BaseCommand {
     // terminal on stdin means nothing was piped: fail rather than block on a
     // read that would never end.
     if (nonInteractive && process.stdin.isTTY) {
+      const retry = pipeHint(name, environment, flags.secret, cliVersion);
       throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
-        hint: `Pipe the value in: ${pipeHint(name, cliVersion)}`,
-        nextCommands: [pipeHint(name, cliVersion)],
+        hint: `Pipe the value in: ${retry}`,
+        nextCommands: [retry],
       });
     }
     // The prompt is masked when the value is to be stored as a secret, so it
@@ -109,7 +110,10 @@ export default class VariablesSet extends BaseCommand {
       { [name]: { value, secret: flags.secret } },
       { project_id: secret.project_id, ...owner },
     );
-    this.recordTelemetry({ secret: flags.secret, scoped: environment !== undefined });
+    this.recordTelemetry({
+      is_secret: flags.secret,
+      is_environment_scoped: environment !== undefined,
+    });
 
     return this.emit({
       status: "ok",
@@ -119,7 +123,26 @@ export default class VariablesSet extends BaseCommand {
   }
 }
 
-/** The scripted form to suggest when a run supplied no value. */
-function pipeHint(name: string, cliVersion: string): string {
-  return `${publicCliCommand(`variables set ${name}`, cliVersion)} < value.txt`;
+/**
+ * The scripted form to suggest when a run supplied no value.
+ *
+ * It carries the owner and the secret flag the run actually used. Dropping
+ * either would hand back a command that writes a non-secret at the project
+ * level — a different target and a weaker classification than what was asked
+ * for.
+ */
+function pipeHint(
+  name: string,
+  environment: string | undefined,
+  secret: boolean,
+  cliVersion: string,
+): string {
+  const args = [
+    "variables",
+    "set",
+    name,
+    ...(environment ? ["--environment", environment] : []),
+    ...(secret ? ["--secret"] : []),
+  ].join(" ");
+  return `${publicCliCommand(args, cliVersion)} < value.txt`;
 }

@@ -106,9 +106,9 @@ export default class VariablesImport extends BaseCommand {
     await client.updateVariables(body, { project_id: secret.project_id, ...owner });
     consola.success("Import complete");
     this.recordTelemetry({
-      count: names.length,
-      secret: flags.secret,
-      scoped: environment !== undefined,
+      variable_count: names.length,
+      is_secret: flags.secret,
+      is_environment_scoped: environment !== undefined,
     });
 
     return this.emit({

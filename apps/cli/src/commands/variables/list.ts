@@ -51,7 +51,10 @@ export default class VariablesList extends BaseCommand {
         ...environmentParam(environment),
       }),
     );
-    this.recordTelemetry({ count: rows.length, scoped: environment !== undefined });
+    this.recordTelemetry({
+      variable_count: rows.length,
+      is_environment_scoped: environment !== undefined,
+    });
 
     return this.emit({
       status: "ok",
