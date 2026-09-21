@@ -25,6 +25,9 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type {
   CompleteClaim200,
   CreateFlowDefinition201,
+  CreatePolicy201,
+  GetPolicyById200,
+  ListPolicies200Item,
   CreateProject201,
   CreateSchema201,
   GetClaimWindow200,
@@ -40,6 +43,10 @@ import type {
 import {
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
+  CreatePolicyBody,
+  CreatePolicyQueryParams,
+  GetPolicyByIdParams,
+  ListPoliciesQueryParams,
   CreateProjectBody,
   CreateSchemaBody,
   CreateSchemaQueryParams,
@@ -219,10 +226,19 @@ type ClaimRecord = {
   dashboardUrl: string;
 };
 
+type PolicyRecord = {
+  id: string;
+  projectId: string;
+  createdAt: string;
+  seq: number;
+  body: z.infer<typeof CreatePolicyBody>;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
+  policies: Map<string, PolicyRecord>;
   claimChallenges: Map<string, ClaimChallengeRecord>;
   claims: Map<string, ClaimRecord>;
   // Publication order. `nowIso()` is millisecond-resolution and ids are
@@ -237,6 +253,7 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
+    policies: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
     lastSeq: 0,
@@ -1032,5 +1049,69 @@ export function setupPlatformHandlers() {
       }
       return HttpResponse.json(out.data);
     }),
+
+    // Policy revisions (ADR 066): create-only, newest first per project. The
+    // mock validates the envelope only; template bounds are the server's.
+    http.post("*/policies", async ({ request }) => {
+      const query = parse(CreatePolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreatePolicyBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const record: PolicyRecord = {
+        id: `pol_${shortId()}`,
+        projectId: query.data.project_id,
+        createdAt: nowIso(),
+        seq: ++store.lastSeq,
+        body: body.data,
+      };
+      store.policies.set(record.id, record);
+      const responseBody: CreatePolicy201 = policyResponse(record);
+      return HttpResponse.json(responseBody, { status: 201 });
+    }),
+
+    http.get("*/policies", ({ request }) => {
+      const query = parse(ListPoliciesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const responseBody: ListPolicies200Item[] = [...store.policies.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .sort(compareNewestFirst)
+        .map((record) => ({
+          id: record.id,
+          operation: record.body.operation,
+          created_at: record.createdAt,
+        }));
+      return HttpResponse.json(responseBody);
+    }),
+
+    http.get("*/policies/:id", ({ params }) => {
+      const path = parse(GetPolicyByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const record = store.policies.get(path.data.id);
+      if (!record) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
+      const responseBody: GetPolicyById200 = policyResponse(record);
+      return HttpResponse.json(responseBody);
+    }),
   ];
+}
+
+function policyResponse(record: PolicyRecord): CreatePolicy201 {
+  return {
+    id: record.id,
+    created_at: record.createdAt,
+    policy: record.body,
+  };
 }

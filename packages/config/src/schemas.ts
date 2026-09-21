@@ -2,6 +2,7 @@ import {
   CreateBrandingBody,
   CreateFlowDefinitionBody,
   CreateSchemaBody,
+  CreatePolicyBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
@@ -172,3 +173,14 @@ function validateBrandingAssetUrl(
     });
   }
 }
+
+/**
+ * Policy instance file (`.zitadel/policies/<operation>.json`, ADR 066).
+ * Strict, like branding: an unknown top-level key must fail plan. `config`
+ * stays open here because its keys are the operation's settings, which the
+ * server validates against the operation's template on publish.
+ */
+export const policyConfigSchema = z.strictObject({
+  ...CreatePolicyBody.shape,
+  $schema: z.string().optional(),
+});

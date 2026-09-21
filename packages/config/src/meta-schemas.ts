@@ -26,6 +26,9 @@ import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with
 import idpConnectionMetaSchema from "../meta-schemas/idp-connection.json" with {
   type: "json",
 };
+import policyMetaSchema from "../meta-schemas/policy.json" with {
+  type: "json",
+};
 import propertyNameMetaSchema from "../meta-schemas/property-name.json" with {
   type: "json",
 };
@@ -54,6 +57,12 @@ export const FLOW_FILE_SCHEMA_REF = "../meta/flow-definition.json";
  */
 export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
 
+/**
+ * The `$schema` value scaffolded policy files carry, relative to
+ * `.zitadel/policies/` — resolves to `{@link META_SCHEMA_DIR}/policy.json`.
+ */
+export const POLICY_FILE_SCHEMA_REF = "../meta/policy.json";
+
 export type MetaSchemaFile = { name: string; body: object };
 
 /**
@@ -73,5 +82,6 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "sso-auth-method.json", body: ssoAuthMethodMetaSchema as object },
     { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
+    { name: "policy.json", body: policyMetaSchema as object },
   ];
 }
