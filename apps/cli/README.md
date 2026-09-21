@@ -167,7 +167,6 @@ which ships in this package.
 * [`zitadel users update ID`](#zitadel-users-update-id)
 * [`zitadel variables delete NAME`](#zitadel-variables-delete-name)
 * [`zitadel variables get NAME`](#zitadel-variables-get-name)
-* [`zitadel variables import`](#zitadel-variables-import)
 * [`zitadel variables list`](#zitadel-variables-list)
 * [`zitadel variables set NAME`](#zitadel-variables-set-name)
 * [`zitadel version`](#zitadel-version)
@@ -2504,15 +2503,15 @@ Delete one variable from an environment or the project.
 ```
 USAGE
   $ zitadel variables delete NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>] [-f]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level] [-f]
 
 ARGUMENTS
   NAME  Variable name to delete.
 
 FLAGS
   -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Environment to delete from. Omit to delete at the
-                             project level.
+  -e, --environment=<value>  Environment to address, by name.
   -f, --force                Delete the variable without the confirmation
                              prompt. Required when non-interactive.
   -n, --non-interactive      Disable prompts. Required when scripting or running
@@ -2520,6 +2519,9 @@ FLAGS
   -s, --server=<value>       Override the resolved server URL.
       --debug                Debug logging.
       --dry-run              Preview without mutating files or the platform.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
       --[no-]telemetry       Send anonymous usage analytics. Disable with
                              --no-telemetry.
       --verbose              Verbose logging.
@@ -2538,20 +2540,23 @@ Get one variable from an environment or the project.
 ```
 USAGE
   $ zitadel variables get NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level]
 
 ARGUMENTS
   NAME  Variable name to read.
 
 FLAGS
   -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Environment to read from. Omit to read the project
-                             level.
+  -e, --environment=<value>  Environment to address, by name.
   -n, --non-interactive      Disable prompts. Required when scripting or running
                              as an agent.
   -s, --server=<value>       Override the resolved server URL.
       --debug                Debug logging.
       --dry-run              Preview without mutating files or the platform.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
       --[no-]telemetry       Send anonymous usage analytics. Disable with
                              --no-telemetry.
       --verbose              Verbose logging.
@@ -2563,37 +2568,6 @@ DESCRIPTION
   Get one variable from an environment or the project.
 ```
 
-## `zitadel variables import`
-
-Import a .env-style file into an environment or the project.
-
-```
-USAGE
-  $ zitadel variables import --file <value> [--json] [-c <value>] [-s <value>]
-    [-n] [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>] [--secret]
-
-FLAGS
-  -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Environment to write to. Omit to write at the
-                             project level.
-  -n, --non-interactive      Disable prompts. Required when scripting or running
-                             as an agent.
-  -s, --server=<value>       Override the resolved server URL.
-      --debug                Debug logging.
-      --dry-run              Preview without mutating files or the platform.
-      --file=<value>         (required) Path to the .env-style file to read.
-      --secret               Store every imported value encrypted.
-      --[no-]telemetry       Send anonymous usage analytics. Disable with
-                             --no-telemetry.
-      --verbose              Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Import a .env-style file into an environment or the project.
-```
-
 ## `zitadel variables list`
 
 List the variables entered on an environment or the project.
@@ -2601,17 +2575,20 @@ List the variables entered on an environment or the project.
 ```
 USAGE
   $ zitadel variables list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level]
 
 FLAGS
   -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Environment to read. Omit to read the project
-                             level.
+  -e, --environment=<value>  Environment to address, by name.
   -n, --non-interactive      Disable prompts. Required when scripting or running
                              as an agent.
   -s, --server=<value>       Override the resolved server URL.
       --debug                Debug logging.
       --dry-run              Preview without mutating files or the platform.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
       --[no-]telemetry       Send anonymous usage analytics. Disable with
                              --no-telemetry.
       --verbose              Verbose logging.
@@ -2630,20 +2607,23 @@ Set one variable on an environment or the project.
 ```
 USAGE
   $ zitadel variables set NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value>] [--secret]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level] [--secret]
 
 ARGUMENTS
   NAME  Variable name (letters, digits and underscores).
 
 FLAGS
   -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Environment to write to. Omit to write at the
-                             project level.
+  -e, --environment=<value>  Environment to address, by name.
   -n, --non-interactive      Disable prompts. Required when scripting or running
                              as an agent.
   -s, --server=<value>       Override the resolved server URL.
       --debug                Debug logging.
       --dry-run              Preview without mutating files or the platform.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
       --secret               Store the value encrypted. It can be replaced later
                              but never read back.
       --[no-]telemetry       Send anonymous usage analytics. Disable with

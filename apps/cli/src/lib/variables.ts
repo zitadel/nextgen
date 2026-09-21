@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 
 import { ZitadelError } from "./errors";
@@ -14,46 +12,6 @@ export type VariableRow = {
   secret: boolean;
   value?: string | number | boolean;
 };
-
-/**
- * Environment-name grammar from `environment-name.yaml`: a lowercase
- * DNS-style label. Checked before the request so a malformed name fails with
- * the CLI's own message instead of a 400 from the edge.
- */
-const ENVIRONMENT_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
-
-/** Longest name the platform accepts, from the same schema. */
-const ENVIRONMENT_NAME_MAX = 63;
-
-/**
- * Resolve the `--environment` flag into the query parameter the variables
- * endpoints take. Omitted addresses the project level, which is an owner of
- * its own rather than a default the environments fall back to (ADR 062 §4).
- *
- * The name is validated but not resolved to an id here: the platform resolves
- * it at the edge and answers `var.not_found` for a name no environment
- * answers to, so a second round trip would only duplicate that check.
- */
-export function environmentParam(environment?: string): { environment_name?: string } {
-  if (environment === undefined) {
-    return {};
-  }
-  if (!ENVIRONMENT_NAME.test(environment) || environment.length > ENVIRONMENT_NAME_MAX) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `Invalid environment name ${JSON.stringify(environment)}.`,
-      {
-        hint: "An environment name is a lowercase DNS-style label: letters, digits, and hyphens between them.",
-      },
-    );
-  }
-  return { environment_name: environment };
-}
-
-/** How an owner is named in output: an environment, or the project itself. */
-export function ownerLabel(environment?: string): string {
-  return environment ?? "the project";
-}
 
 /**
  * Project one wire value into a row. Both endpoints answer in the same two
@@ -107,11 +65,7 @@ export function renderScalar(value: string | number | boolean | undefined): stri
  * value: there is nothing to print, and a blank column would read as an empty
  * value rather than as a withheld one.
  */
-export function renderVariableTable(
-  rows: ReadonlyArray<VariableRow>,
-  environment?: string,
-): string {
-  const owner = ownerLabel(environment);
+export function renderVariableTable(rows: ReadonlyArray<VariableRow>, owner: string): string {
   if (rows.length === 0) {
     return `No variables entered on ${owner}.`;
   }
@@ -130,60 +84,6 @@ export function renderVariableTable(
     `${"-".repeat(nameCol)}  ${"-".repeat(valueCol)}`,
     ...body,
   ].join("\n");
-}
-
-/**
- * Read a `.env`-style file into name/value pairs.
- *
- * Deliberately small: `KEY=VALUE` per line, `#` comments, blank lines skipped,
- * and one matching pair of surrounding quotes stripped. It does not expand
- * references or run shell syntax — a value here is written verbatim to the
- * platform, so interpreting it would change the credential that ends up
- * stored.
- *
- * `Object.fromEntries` defines own properties rather than assigning them, so a
- * line naming `__proto__` — which satisfies the platform's `^\w+$` grammar —
- * lands as data instead of reaching the prototype setter and vanishing.
- */
-export function parseEnvFile(contents: string): Record<string, string> {
-  return Object.fromEntries(
-    contents
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line !== "" && !line.startsWith("#"))
-      .map((line) => [line, line.indexOf("=")] as const)
-      .filter(([, separator]) => separator > 0)
-      .map(([line, separator]) => {
-        const value = line.slice(separator + 1).trim();
-        return [
-          line
-            .slice(0, separator)
-            .trim()
-            .replace(/^export\s+/, ""),
-          value.length >= 2 && /^(".*"|'.*')$/.test(value) ? value.slice(1, -1) : value,
-        ];
-      }),
-  );
-}
-
-/**
- * Read and parse a `.env`-style file.
- *
- * A missing file is the common mistake and reports as `E_NOT_FOUND`; anything
- * else (a directory, a permission error) carries its own message so the cause
- * is not flattened into "not found".
- */
-export async function readEnvFile(path: string): Promise<Record<string, string>> {
-  try {
-    return parseEnvFile(await readFile(path, "utf8"));
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    throw new ZitadelError(
-      code === "ENOENT" ? "E_NOT_FOUND" : "E_VALIDATION",
-      `Cannot read ${path}${code === "ENOENT" ? "" : `: ${error instanceof Error ? error.message : String(error)}`}.`,
-      { hint: "Pass --file with a path to a .env-style file." },
-    );
-  }
 }
 
 /**

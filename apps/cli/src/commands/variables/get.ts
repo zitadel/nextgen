@@ -1,16 +1,11 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel/api/client";
 
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import {
-  assertVariableName,
-  environmentParam,
-  ownerLabel,
-  renderScalar,
-  toVariableRow,
-} from "../../lib/variables";
+import { ownerLabel } from "../../lib/environment";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import { assertVariableName, renderScalar, toVariableRow } from "../../lib/variables";
 import { readZitadelSecret } from "../../lib/project";
 
 /**
@@ -21,33 +16,20 @@ import { readZitadelSecret } from "../../lib/project";
  * secret is found but not disclosed, so the answer says it is held and nothing
  * more.
  */
-export default class VariablesGet extends BaseCommand {
+export default class VariablesGet extends EnvironmentCommand {
   static override description = "Get one variable from an environment or the project.";
   static override group = CommandGroups.configuration;
   static override args = {
     name: Args.string({ required: true, description: "Variable name to read." }),
   };
-  static override flags = {
-    environment: Flags.string({
-      char: "e",
-      description: "Environment to read from. Omit to read the project level.",
-    }),
-  };
 
   async run(): Promise<JsonEnvelope> {
-    // Which server and which environment are independent: the CLI talks to one
-    // instance, and its environments live inside that instance. `--environment`
-    // names the owner there, so it is withheld from `toMeta`, which would
-    // otherwise pass it to the server resolver and let a `zitadel.json`
-    // `environments.<name>.server` entry redirect the request.
     const { args, flags } = await this.parse(VariablesGet);
-    await this.toMeta({ ...flags, environment: undefined });
+    await this.toMeta(flags);
     const { cwd, source } = this.meta;
-    const environment = flags.environment;
     const name = args.name;
 
     assertVariableName(name);
-    const owner = environmentParam(environment);
 
     const secret = await readZitadelSecret(cwd);
     // Stated to a human, but kept off a pipe: these lines share stdout with the
@@ -61,12 +43,16 @@ export default class VariablesGet extends BaseCommand {
       baseUrl: source,
       token: secret.project_secret,
     });
+    const environment = await this.resolveOwner(client, secret.project_id);
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
     const row = toVariableRow(
       name,
-      await client.getVariable(name, { project_id: secret.project_id, ...owner }),
+      await client.getVariable(name, {
+        project_id: secret.project_id,
+        ...(environment ? { environment_name: environment } : {}),
+      }),
     );
     this.recordTelemetry({
       is_secret: row.secret,

@@ -73,13 +73,7 @@ describe("variables telemetry dimensions", () => {
 
   it("covers every variables command", async () => {
     const recorded = await recordedDimensions();
-    expect([...recorded.keys()].sort()).toEqual([
-      "delete.ts",
-      "get.ts",
-      "import.ts",
-      "list.ts",
-      "set.ts",
-    ]);
+    expect([...recorded.keys()].sort()).toEqual(["delete.ts", "get.ts", "list.ts", "set.ts"]);
     for (const [file, keys] of recorded) {
       expect(keys.length, `${file} records no dimensions`).toBeGreaterThan(0);
     }

@@ -4,9 +4,10 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel/api/client";
 
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { ownerLabel } from "../../lib/environment";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
-import { assertVariableName, environmentParam, ownerLabel, readStdin } from "../../lib/variables";
+import { assertVariableName, readStdin } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
 import { readZitadelSecret } from "../../lib/project";
 
@@ -19,7 +20,7 @@ import { readZitadelSecret } from "../../lib/project";
  * listing, or CI logs. `--secret` stores it encrypted under the project's own
  * key, after which it can be replaced but never read back (ADR 062 §7).
  */
-export default class VariablesSet extends BaseCommand {
+export default class VariablesSet extends EnvironmentCommand {
   static override description = "Set one variable on an environment or the project.";
   static override group = CommandGroups.configuration;
   static override args = {
@@ -29,10 +30,6 @@ export default class VariablesSet extends BaseCommand {
     }),
   };
   static override flags = {
-    environment: Flags.string({
-      char: "e",
-      description: "Environment to write to. Omit to write at the project level.",
-    }),
     secret: Flags.boolean({
       default: false,
       description: "Store the value encrypted. It can be replaced later but never read back.",
@@ -40,31 +37,28 @@ export default class VariablesSet extends BaseCommand {
   };
 
   async run(): Promise<JsonEnvelope> {
-    // Which server and which environment are independent: the CLI talks to one
-    // instance, and its environments live inside that instance. `--environment`
-    // names the owner there, so it is withheld from `toMeta`, which would
-    // otherwise pass it to the server resolver and let a `zitadel.json`
-    // `environments.<name>.server` entry redirect the request.
     const { args, flags } = await this.parse(VariablesSet);
-    await this.toMeta({ ...flags, environment: undefined });
+    await this.toMeta(flags);
     const { cwd, source, nonInteractive, dryRun, cliVersion } = this.meta;
-    const environment = flags.environment;
     const name = args.name;
 
     assertVariableName(name);
-    // Validate the owner before prompting: failing after the user has typed a
-    // secret would make them type it again.
-    const owner = environmentParam(environment);
-    const where = ownerLabel(environment);
 
     const secret = await readZitadelSecret(cwd);
     // Stated to a human, but kept off a pipe: these lines share stdout with the
-    // result, so `$(zitadel variables get NAME)` would otherwise capture them
-    // ahead of the value. The same rule the resource commands follow.
+    // result. The same rule the resource commands follow.
     if (process.stdout.isTTY) {
       consola.info(`Project   ${secret.project_id}`);
       consola.info(`Server    ${source}`);
     }
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
+    });
+    // Resolve the owner before asking for the value: being refused after typing
+    // a secret would mean typing it again.
+    const environment = await this.resolveOwner(client, secret.project_id);
+    const where = ownerLabel(environment);
 
     if (dryRun) {
       return this.emit({
@@ -101,18 +95,16 @@ export default class VariablesSet extends BaseCommand {
     }
     // An empty submission reads as `undefined` from the prompt and has to
     // become `""`, not the string "undefined". An empty string is a value the
-    // scalar schema accepts, and `import` already sends `A=` as one; only an
-    // absent input is an error, which the stdin guard above and the cancel
-    // signal cover.
+    // scalar schema accepts; only an absent input is an error, which the stdin
+    // guard above and the cancel signal cover.
     const value = String(answer ?? "");
 
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
     await client.updateVariables(
       { [name]: { value, secret: flags.secret } },
-      { project_id: secret.project_id, ...owner },
+      {
+        project_id: secret.project_id,
+        ...(environment ? { environment_name: environment } : {}),
+      },
     );
     this.recordTelemetry({
       is_secret: flags.secret,
@@ -131,9 +123,8 @@ export default class VariablesSet extends BaseCommand {
  * The scripted form to suggest when a run supplied no value.
  *
  * It carries the owner and the secret flag the run actually used. Dropping
- * either would hand back a command that writes a non-secret at the project
- * level — a different target and a weaker classification than what was asked
- * for.
+ * either would hand back a command that writes somewhere else, or writes a
+ * credential as a readable value.
  */
 function pipeHint(
   name: string,
@@ -145,7 +136,7 @@ function pipeHint(
     "variables",
     "set",
     name,
-    ...(environment ? ["--environment", environment] : []),
+    ...(environment ? ["--environment", environment] : ["--project-level"]),
     ...(secret ? ["--secret"] : []),
   ].join(" ");
   return `${publicCliCommand(args, cliVersion)} < value.txt`;

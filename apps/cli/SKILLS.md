@@ -376,17 +376,22 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`
   or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
-- `variables list|get|set|delete|import` — manage the per-environment variables and
-  secrets a configuration document references as `${{ NAME }}`. `--environment`
-  (`-e`) names the owner and addresses the project level when omitted; owners do
-  not inherit from one another, so a value that has to hold on several
-  environments is entered on each. `set` takes its value from a prompt or from
-  stdin and never from a flag, so a credential never reaches `argv`; `--secret`
-  stores it encrypted, after which it can be replaced but never read back
-  (`list` reports it as held, and `--json` omits the value key entirely).
-  `import --file <path>` sends a whole `.env`-style file as one patch, applied
-  whole or not at all. There is no `pull`. `set`, `delete` and `import` honour
-  `--dry-run` and send no request.
+- `variables list|get|set|delete` — manage the per-environment variables and
+  secrets a configuration document references as `${{ NAME }}`. Every command
+  addresses one owner: `--environment <name>` (`-e`, alias `--env`) names an
+  environment, and `--project-level` names the project level. Owners do not
+  inherit from one another — a value set at the project level is **not** seen
+  by any environment — so a value a running environment needs must be set on
+  that environment, and one needed on several must be set on each. Because of
+  that, the owner is never defaulted: with neither flag a person is asked and a
+  non-interactive run fails with `E_VALIDATION` naming the project's
+  environments, as ADR 035 specifies for `deploy`. `set` takes its value from a
+  prompt or from stdin and never from a flag, so a credential never reaches
+  `argv`; `--secret` stores it encrypted, after which it can be replaced but
+  never read back (`list` reports it as held, and `--json` omits the value key
+  entirely). There is no `pull` and no bulk import. `set` and `delete` honour
+  `--dry-run` and send no request; `delete` needs `--force` when
+  non-interactive.
 
 ## Golden path
 

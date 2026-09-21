@@ -4,9 +4,10 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel/api/client";
 
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { ownerLabel } from "../../lib/environment";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
-import { assertVariableName, environmentParam, ownerLabel } from "../../lib/variables";
+import { assertVariableName } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
 import { readZitadelSecret } from "../../lib/project";
 
@@ -16,19 +17,15 @@ import { readZitadelSecret } from "../../lib/project";
  * A variable is removable only by the owner that entered it: deleting a name
  * another owner of the same project holds answers `var.not_found` and leaves
  * that owner's value standing (ADR 062 §4). Destructive, so it takes the same
- * `--force`-or-confirm gate `reset` uses.
+ * `--force`-or-confirm gate the resource commands' `delete` uses.
  */
-export default class VariablesDelete extends BaseCommand {
+export default class VariablesDelete extends EnvironmentCommand {
   static override description = "Delete one variable from an environment or the project.";
   static override group = CommandGroups.configuration;
   static override args = {
     name: Args.string({ required: true, description: "Variable name to delete." }),
   };
   static override flags = {
-    environment: Flags.string({
-      char: "e",
-      description: "Environment to delete from. Omit to delete at the project level.",
-    }),
     // `--force` is per command, not global: here it permits a deletion.
     force: Flags.boolean({
       char: "f",
@@ -38,34 +35,30 @@ export default class VariablesDelete extends BaseCommand {
   };
 
   async run(): Promise<JsonEnvelope> {
-    // Which server and which environment are independent: the CLI talks to one
-    // instance, and its environments live inside that instance. `--environment`
-    // names the owner there, so it is withheld from `toMeta`, which would
-    // otherwise pass it to the server resolver and let a `zitadel.json`
-    // `environments.<name>.server` entry redirect the request.
     const { args, flags } = await this.parse(VariablesDelete);
-    await this.toMeta({ ...flags, environment: undefined });
+    await this.toMeta(flags);
     const { cwd, source, nonInteractive, dryRun, force, cliVersion } = this.meta;
-    const environment = flags.environment;
     const name = args.name;
 
     assertVariableName(name);
-    const owner = environmentParam(environment);
-    const where = ownerLabel(environment);
-    const retry = publicCliCommand(
-      `variables delete ${name}${environment ? ` --environment ${environment}` : ""} --force`,
-      cliVersion,
-    );
 
     const secret = await readZitadelSecret(cwd);
     // Stated to a human, but kept off a pipe: these lines share stdout with the
-    // result, so `$(zitadel variables get NAME)` would otherwise capture them
-    // ahead of the value. The same rule the resource commands follow.
+    // result. The same rule the resource commands follow.
     if (process.stdout.isTTY) {
       consola.info(`Project   ${secret.project_id}`);
       consola.info(`Server    ${source}`);
     }
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
+    });
+    const environment = await this.resolveOwner(client, secret.project_id);
+    const where = ownerLabel(environment);
 
+    // A dry run makes no request, so it answers before the guard — the order
+    // the resource commands' `delete` uses, which keeps
+    // `--dry-run --non-interactive` usable.
     if (dryRun) {
       return this.emit({
         status: "ok",
@@ -74,13 +67,16 @@ export default class VariablesDelete extends BaseCommand {
           environment: environment ?? null,
           name,
           deleted: true,
-          next_commands: [retry],
         },
       });
     }
 
     if (!force) {
       if (nonInteractive) {
+        const retry = publicCliCommand(
+          `variables delete ${name} ${environment ? `--environment ${environment}` : "--project-level"} --force`,
+          cliVersion,
+        );
         throw new ZitadelError(
           "E_VALIDATION",
           "Deleting a variable requires --force in non-interactive mode",
@@ -100,11 +96,10 @@ export default class VariablesDelete extends BaseCommand {
       }
     }
 
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
+    await client.deleteVariable(name, {
+      project_id: secret.project_id,
+      ...(environment ? { environment_name: environment } : {}),
     });
-    await client.deleteVariable(name, { project_id: secret.project_id, ...owner });
     this.recordTelemetry({ is_environment_scoped: environment !== undefined });
 
     return this.emit({

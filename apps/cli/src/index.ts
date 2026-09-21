@@ -16,7 +16,6 @@ import Status from "./commands/status";
 import Stop from "./commands/stop";
 import VariablesDelete from "./commands/variables/delete";
 import VariablesGet from "./commands/variables/get";
-import VariablesImport from "./commands/variables/import";
 import VariablesList from "./commands/variables/list";
 import VariablesSet from "./commands/variables/set";
 
@@ -47,6 +46,5 @@ export const COMMANDS: Record<string, typeof Command> = {
   "variables:get": VariablesGet,
   "variables:set": VariablesSet,
   "variables:delete": VariablesDelete,
-  "variables:import": VariablesImport,
   ...RESOURCE_COMMANDS,
 };
