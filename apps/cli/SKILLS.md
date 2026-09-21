@@ -392,8 +392,11 @@ docker --image <ref>` remains the explicit image override for debugging.
   entirely). `set --as number|boolean` stores a JSON number or boolean
   instead of a string, so a whole-field `${{ NAME }}` reference resolves to that
   type; it is refused with `--secret`, and an integer too large to store exactly
-  is refused rather than rounded. There is no `pull` and no bulk import. `set` and `delete` honour
-  `--dry-run` and make no change (with no owner flag, a person is still asked,
+  is refused rather than rounded. Output follows the resource commands: on a
+  pipe, `list` prints tab-separated `name`/`value` rows (a secret's value is
+  `(secret)`) and `get` prints the whole record as JSON, which carries no
+  `value` key for a secret. There is no `pull` and no bulk import. `set` and
+  `delete` honour `--dry-run` and make no change (with no owner flag, a person is still asked,
   which reads the project's environments); `delete` needs `--force` when
   non-interactive.
 

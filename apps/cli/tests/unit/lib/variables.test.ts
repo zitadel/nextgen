@@ -5,8 +5,8 @@ import {
   parseVariableValue,
   readStdin,
   renderScalar,
-  renderVariableTable,
   toVariableRows,
+  variableCells,
 } from "../../../src/lib/variables";
 
 describe("assertVariableName", () => {
@@ -58,35 +58,25 @@ describe("toVariableRows", () => {
   });
 });
 
-describe("renderVariableTable", () => {
+describe("variableCells", () => {
   it("escapes a value that would otherwise break the table or the terminal", () => {
-    const table = renderVariableTable(toVariableRows({ V: "one\ntwo\u001b[31m" }), "the project");
-
-    expect(table).not.toContain("\u001b");
-    expect(table.split("\n")).toHaveLength(4);
+    expect(variableCells(toVariableRows({ V: "one\ntwo\u001b[31m" }))).toEqual([
+      { name: "V", value: "one\\x0atwo\\x1b[31m" },
+    ]);
   });
 
   it("prints a marker for a secret rather than an empty column", () => {
-    const table = renderVariableTable(
-      toVariableRows({ S: { secret: true }, V: "plain" }),
-      "the project",
-    );
-    expect(table).toContain("(secret)");
-    expect(table).toContain("plain");
+    expect(variableCells(toVariableRows({ S: { secret: true }, V: "plain" }))).toEqual([
+      { name: "S", value: "(secret)" },
+      { name: "V", value: "plain" },
+    ]);
   });
 
-  it("names the owner in the header, as `schemas list` does", () => {
-    expect(renderVariableTable(toVariableRows({ V: "x" }), "prod")).toContain(
-      "Variables on prod (1)",
-    );
-    expect(renderVariableTable(toVariableRows({ V: "x" }), "the project")).toContain(
-      "Variables on the project (1)",
-    );
-  });
-
-  it("says so when nothing is entered", () => {
-    expect(renderVariableTable([], "prod")).toBe("No variables entered on prod.");
-    expect(renderVariableTable([], "the project")).toBe("No variables entered on the project.");
+  it("renders a number or a boolean as its JSON text", () => {
+    expect(variableCells(toVariableRows({ N: 5, B: false }))).toEqual([
+      { name: "B", value: "false" },
+      { name: "N", value: "5" },
+    ]);
   });
 });
 

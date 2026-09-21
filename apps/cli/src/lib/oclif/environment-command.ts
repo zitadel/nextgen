@@ -1,10 +1,12 @@
 import { cancel, isCancel, select } from "@clack/prompts";
 import { Flags } from "@oclif/core";
+import { consola } from "consola";
 
-import type { ZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
 
 import { assertEnvironmentName, listEnvironmentNames } from "../environment";
 import { ZitadelError } from "../errors";
+import { readZitadelSecret } from "../project";
 import { BaseCommand } from "./base";
 import type { GlobalOptions } from "./types";
 
@@ -68,6 +70,42 @@ export abstract class EnvironmentCommand extends BaseCommand {
     }
     this.projectLevel = flags["project-level"] === true;
     return super.toMeta({ ...flags, environment: undefined }, options);
+  }
+
+  /**
+   * Open the platform connection and settle the owner, the counterpart of the
+   * resource commands' `connect`.
+   *
+   * Which project and server the command is about is worth stating to a person,
+   * but those lines share stdout with the result, so they are printed only on a
+   * terminal: on a pipe the result travels alone, and `--json` silences them
+   * either way.
+   */
+  protected async connect(): Promise<
+    Readonly<{
+      client: ZitadelClient;
+      /** The query parameters every variables endpoint takes for this owner. */
+      scope: Readonly<{ project_id: string; environment_name?: string }>;
+      /** The environment addressed, or `undefined` for the project level. */
+      environment: string | undefined;
+    }>
+  > {
+    const { cwd, source } = this.meta;
+    const secret = await readZitadelSecret(cwd);
+    if (process.stdout.isTTY) {
+      consola.info(`Project   ${secret.project_id}`);
+      consola.info(`Server    ${source}`);
+    }
+    const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
+    const environment = await this.resolveOwner(client, secret.project_id);
+    return {
+      client,
+      environment,
+      scope: {
+        project_id: secret.project_id,
+        ...(environment === undefined ? {} : { environment_name: environment }),
+      },
+    };
   }
 
   /**

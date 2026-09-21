@@ -60,30 +60,20 @@ export function renderScalar(value: string | number | boolean | undefined): stri
 }
 
 /**
- * Render rows as the plain-text table, carrying the owner in its header the way
- * `schemas list` carries its objectType. Secrets print a marker rather than a
- * value: there is nothing to print, and a blank column would read as an empty
- * value rather than as a withheld one.
+ * The rows as the cells the resource commands' renderers print, one per
+ * column. Those renderers print a string verbatim, so every value is escaped
+ * here first: a stored value is chosen by whoever holds `variable.write`, and a
+ * newline or an ESC byte must not reach the reader's terminal. A secret prints
+ * a marker rather than a value — there is none to print, and an empty cell would
+ * read as an empty value rather than a withheld one.
  */
-export function renderVariableTable(rows: ReadonlyArray<VariableRow>, owner: string): string {
-  if (rows.length === 0) {
-    return `No variables entered on ${owner}.`;
-  }
-  const header = `Variables on ${owner} (${rows.length})`;
-  const nameCol = Math.max("name".length, ...rows.map((r) => r.name.length));
-  const valueCol = Math.max(
-    "value".length,
-    ...rows.map((r) => (r.secret ? SECRET_MARKER.length : renderScalar(r.value).length)),
-  );
-  const body = rows.map(
-    (r) => `${r.name.padEnd(nameCol)}  ${r.secret ? SECRET_MARKER : renderScalar(r.value)}`,
-  );
-  return [
-    header,
-    `${"name".padEnd(nameCol)}  ${"value".padEnd(valueCol)}`,
-    `${"-".repeat(nameCol)}  ${"-".repeat(valueCol)}`,
-    ...body,
-  ].join("\n");
+export function variableCells(
+  rows: ReadonlyArray<VariableRow>,
+): Array<{ name: string; value: string }> {
+  return rows.map((row) => ({
+    name: row.name,
+    value: row.secret ? SECRET_MARKER : renderScalar(row.value),
+  }));
 }
 
 /**

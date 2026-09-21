@@ -1,11 +1,12 @@
-import { consola } from "consola";
-
-import { createZitadelClient } from "@zitadel/api/client";
+import { Flags } from "@oclif/core";
 
 import { ownerLabel } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderVariableTable, toVariableRows } from "../../lib/variables";
-import { readZitadelSecret } from "../../lib/project";
+import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { toVariableRows, variableCells } from "../../lib/variables";
+
+/** The columns `list` renders, in order. */
+const COLUMNS = ["name", "value"] as const;
 
 /**
  * The `variables list` topic command — show the variables entered at one owner.
@@ -18,37 +19,33 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesList extends EnvironmentCommand {
   static override description = "List the variables entered on an environment or the project.";
   static override group = CommandGroups.configuration;
+  static override examples = [
+    "<%= config.bin %> variables list --environment prod",
+    "<%= config.bin %> variables list --project-level --json",
+  ];
+  static override flags = {
+    plain: Flags.boolean({
+      description:
+        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(VariablesList);
     await this.toMeta(flags);
-    const { cwd, source } = this.meta;
+    const { client, scope, environment } = await this.connect();
 
-    const secret = await readZitadelSecret(cwd);
-    // Stated to a human, but kept off a pipe: these lines share stdout with the
-    // result, so a piped `list` would count them as rows. The same rule the
-    // resource commands follow.
-    if (process.stdout.isTTY) {
-      consola.info(`Project   ${secret.project_id}`);
-      consola.info(`Server    ${source}`);
-    }
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
-    const environment = await this.resolveOwner(client, secret.project_id);
-
-    const rows = toVariableRows(
-      await client.getVariables({
-        project_id: secret.project_id,
-        ...(environment ? { environment_name: environment } : {}),
-      }),
-    );
+    const rows = toVariableRows(await client.getVariables(scope));
     this.recordTelemetry({
       variable_count: rows.length,
       is_environment_scoped: environment !== undefined,
     });
 
+    // The resource commands' list rendering: a pipe (or `--plain`) gets one
+    // tab-separated record per line, with no header and nothing at all when
+    // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
+    const cells = variableCells(rows);
+    const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
       data: {
@@ -56,7 +53,15 @@ export default class VariablesList extends EnvironmentCommand {
         variables: rows,
         count: rows.length,
       },
-      pretty: renderVariableTable(rows, ownerLabel(environment)),
+      pretty: plain
+        ? renderRows(COLUMNS, cells)
+        : rows.length === 0
+          ? `No variables on ${ownerLabel(environment)}.`
+          : [
+              renderTable(COLUMNS, cells),
+              "",
+              `${rows.length} ${rows.length === 1 ? "variable" : "variables"}`,
+            ].join("\n"),
     });
   }
 }

@@ -2531,6 +2531,11 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Delete one variable from an environment or the project.
+
+EXAMPLES
+  $ zitadel variables delete GOOGLE_CLIENT_ID --environment prod
+
+  $ zitadel variables delete GOOGLE_CLIENT_ID --project-level --force
 ```
 
 ## `zitadel variables get NAME`
@@ -2566,6 +2571,11 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Get one variable from an environment or the project.
+
+EXAMPLES
+  $ zitadel variables get GOOGLE_CLIENT_ID --environment prod
+
+  $ zitadel variables get GOOGLE_CLIENT_ID --environment prod --json
 ```
 
 ## `zitadel variables list`
@@ -2576,7 +2586,7 @@ List the variables entered on an environment or the project.
 USAGE
   $ zitadel variables list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
-    --project-level]
+    --project-level] [--plain]
 
 FLAGS
   -c, --cwd=<value>          Project directory to operate on.
@@ -2586,6 +2596,8 @@ FLAGS
   -s, --server=<value>       Override the resolved server URL.
       --debug                Debug logging.
       --dry-run              Preview without mutating files or the platform.
+      --plain                Tab-separated rows with no header, for piping.
+                             Implied when stdout is not a terminal.
       --project-level        Address the project level instead of an
                              environment. Environments do not inherit
                              project-level values.
@@ -2598,6 +2610,11 @@ GLOBAL FLAGS
 
 DESCRIPTION
   List the variables entered on an environment or the project.
+
+EXAMPLES
+  $ zitadel variables list --environment prod
+
+  $ zitadel variables list --project-level --json
 ```
 
 ## `zitadel variables set NAME`
@@ -2639,6 +2656,13 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Set one variable on an environment or the project.
+
+EXAMPLES
+  $ zitadel variables set GOOGLE_CLIENT_ID --environment prod
+
+  $ zitadel variables set GOOGLE_CLIENT_SECRET --environment prod --secret < secret.txt
+
+  $ zitadel variables set SESSION_TTL --project-level --as number
 ```
 
 ## `zitadel version`

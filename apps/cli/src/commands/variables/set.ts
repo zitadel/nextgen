@@ -1,8 +1,5 @@
 import { Args, Flags } from "@oclif/core";
 import { cancel, isCancel, password, text } from "@clack/prompts";
-import { consola } from "consola";
-
-import { createZitadelClient } from "@zitadel/api/client";
 
 import { ownerLabel } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
@@ -16,7 +13,6 @@ import {
   type VariableType,
 } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
-import { readZitadelSecret } from "../../lib/project";
 
 /**
  * The `variables set` topic command — enter or replace one variable at one
@@ -30,6 +26,11 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesSet extends EnvironmentCommand {
   static override description = "Set one variable on an environment or the project.";
   static override group = CommandGroups.configuration;
+  static override examples = [
+    "<%= config.bin %> variables set GOOGLE_CLIENT_ID --environment prod",
+    "<%= config.bin %> variables set GOOGLE_CLIENT_SECRET --environment prod --secret < secret.txt",
+    "<%= config.bin %> variables set SESSION_TTL --project-level --as number",
+  ];
   static override args = {
     name: Args.string({
       required: true,
@@ -52,7 +53,7 @@ export default class VariablesSet extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariablesSet);
     await this.toMeta(flags);
-    const { cwd, source, nonInteractive, dryRun, cliVersion } = this.meta;
+    const { nonInteractive, dryRun, cliVersion } = this.meta;
     const name = args.name;
     const type = flags.as as VariableType;
 
@@ -66,20 +67,9 @@ export default class VariablesSet extends EnvironmentCommand {
       });
     }
 
-    const secret = await readZitadelSecret(cwd);
-    // Stated to a human, but kept off a pipe: these lines share stdout with the
-    // result. The same rule the resource commands follow.
-    if (process.stdout.isTTY) {
-      consola.info(`Project   ${secret.project_id}`);
-      consola.info(`Server    ${source}`);
-    }
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
-    // Resolve the owner before asking for the value: being refused after typing
-    // a secret would mean typing it again.
-    const environment = await this.resolveOwner(client, secret.project_id);
+    // The owner is resolved before the value is asked for: being refused after
+    // typing a secret would mean typing it again.
+    const { client, scope, environment } = await this.connect();
     const where = ownerLabel(environment);
 
     if (dryRun) {
@@ -126,13 +116,7 @@ export default class VariablesSet extends EnvironmentCommand {
     // guard above and the cancel signal cover.
     const value = parseVariableValue(String(answer ?? ""), type);
 
-    await client.updateVariables(
-      { [name]: { value, secret: flags.secret } },
-      {
-        project_id: secret.project_id,
-        ...(environment ? { environment_name: environment } : {}),
-      },
-    );
+    await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope);
     this.recordTelemetry({
       is_secret: flags.secret,
       is_environment_scoped: environment !== undefined,

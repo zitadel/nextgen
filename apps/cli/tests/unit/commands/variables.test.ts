@@ -40,6 +40,20 @@ async function makeProject(): Promise<string> {
 
 const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", SERVER];
 
+/** The plain rendering: no `--json`. */
+const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", SERVER, "--non-interactive"];
+
+/** Run as though stdout were a terminal; under the test runner it is a pipe. */
+async function asTerminal<T>(run: () => Promise<T>): Promise<T> {
+  const tty = process.stdout.isTTY;
+  Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+  try {
+    return await run();
+  } finally {
+    Object.defineProperty(process.stdout, "isTTY", { value: tty, configurable: true });
+  }
+}
+
 /**
  * Run with `value` on stdin, the way a scripted `zitadel variables set NAME <
  * value.txt` supplies it. `runCliForTest` runs in-process, so the stream is
@@ -115,6 +129,58 @@ describe("variables list", () => {
     const json = parseJson(res.stdout) as { data: { environment: null; count: number } };
     expect(json.data.environment).toBeNull();
     expect(json.data.count).toBe(0);
+  });
+
+  it("prints tab-separated rows with no header on a pipe, and nothing when empty", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/variables", ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get("environment_name") === "prod"
+            ? { B: "two", A: { secret: true } }
+            : {},
+        ),
+      ),
+    );
+
+    const rows = await runCliForTest(["variables", "list", "-e", "prod", ...plainArgs(cwd)]);
+    const empty = await runCliForTest(["variables", "list", "-e", "dev", ...plainArgs(cwd)]);
+
+    expect(rows.exitCode).toBe(0);
+    expect(rows.stdout.trim().split("\n")).toEqual(["A\t(secret)", "B\ttwo"]);
+    expect(empty.exitCode).toBe(0);
+    expect(empty.stdout.trim()).toBe("");
+  });
+
+  it("renders a table and a count on a terminal, unless --plain", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables", () => HttpResponse.json({ V: "one\ntwo\u001b[31m" })));
+
+    const table = await asTerminal(() =>
+      runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]),
+    );
+    const plain = await asTerminal(() =>
+      runCliForTest(["variables", "list", "--project-level", "--plain", ...plainArgs(cwd)]),
+    );
+
+    expect(table.stdout).toMatch(/name\s+value/);
+    expect(table.stdout).toContain("1 variable");
+    // Escaped, so the value can neither break the row nor drive the terminal.
+    expect(table.stdout).not.toContain("\u001b");
+    expect(table.stdout).toContain("one\\x0atwo\\x1b[31m");
+    expect(plain.stdout).not.toMatch(/name\s+value/);
+    expect(plain.stdout).toContain("V\tone\\x0atwo");
+  });
+
+  it("says so on a terminal when the owner holds nothing", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables", () => HttpResponse.json({})));
+
+    const res = await asTerminal(() =>
+      runCliForTest(["variables", "list", "-e", "prod", ...plainArgs(cwd)]),
+    );
+
+    expect(res.stdout).toContain("No variables on prod.");
   });
 
   it("does not let the owner name pick a different server", async () => {
@@ -193,27 +259,74 @@ describe("variables get", () => {
     });
   });
 
-  it("prints only the value on a pipe, so it can be captured by a script", async () => {
+  it("prints the whole record on a pipe, as every other get does", async () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
 
-    // No `--json`: this is the plain rendering a `$(zitadel variables get …)`
-    // would capture. Under the test runner stdout is not a TTY, as on a pipe.
     const res = await runCliForTest([
       "variables",
       "get",
       "GOOGLE_CLIENT_ID",
       "--project-level",
-      "--cwd",
-      cwd,
-      "--server",
-      SERVER,
+      ...plainArgs(cwd),
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout.trim()).toBe("999-prod");
-    expect(res.stdout).not.toContain("Project");
-    expect(res.stdout).not.toContain("Server");
+    expect(JSON.parse(res.stdout)).toEqual({
+      environment: null,
+      name: "GOOGLE_CLIENT_ID",
+      secret: false,
+      value: "999-prod",
+    });
+  });
+
+  it("gives a pipe no value to capture for a secret", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+
+    const res = await runCliForTest([
+      "variables",
+      "get",
+      "TOKEN",
+      "--project-level",
+      ...plainArgs(cwd),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(JSON.parse(res.stdout)).toEqual({ environment: null, name: "TOKEN", secret: true });
+  });
+
+  it("lays the record out field by field on a terminal", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+
+    const res = await asTerminal(() =>
+      runCliForTest(["variables", "get", "GOOGLE_CLIENT_ID", "-e", "prod", ...plainArgs(cwd)]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("GOOGLE_CLIENT_ID");
+    expect(res.stdout).toMatch(/environment\s+prod/);
+    expect(res.stdout).toMatch(/value\s+999-prod/);
+  });
+
+  it("marks a secret, and shows an empty value, on a terminal", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/variables/:name", ({ params }) =>
+        HttpResponse.json(params.name === "TOKEN" ? { secret: true } : ""),
+      ),
+    );
+
+    const secret = await asTerminal(() =>
+      runCliForTest(["variables", "get", "TOKEN", "--project-level", ...plainArgs(cwd)]),
+    );
+    const empty = await asTerminal(() =>
+      runCliForTest(["variables", "get", "BLANK", "--project-level", ...plainArgs(cwd)]),
+    );
+
+    expect(secret.stdout).toMatch(/value\s+\(secret\)/);
+    expect(empty.stdout).toMatch(/value\s+""/);
   });
 
   it("reports a secret as held and carries no value", async () => {
@@ -232,16 +345,9 @@ describe("variables get", () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables/:name", () => HttpResponse.json("a\u001b[31mb")));
 
-    const res = await runCliForTest([
-      "variables",
-      "get",
-      "NASTY",
-      "--project-level",
-      "--cwd",
-      cwd,
-      "--server",
-      SERVER,
-    ]);
+    const res = await asTerminal(() =>
+      runCliForTest(["variables", "get", "NASTY", "--project-level", ...plainArgs(cwd)]),
+    );
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).not.toContain("\u001b");

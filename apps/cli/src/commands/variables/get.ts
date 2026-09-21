@@ -1,12 +1,9 @@
 import { Args } from "@oclif/core";
-import { consola } from "consola";
-
-import { createZitadelClient } from "@zitadel/api/client";
 
 import { ownerLabel } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { assertVariableName, renderScalar, toVariableRow } from "../../lib/variables";
-import { readZitadelSecret } from "../../lib/project";
+import { renderDetail } from "../../lib/oclif/crud/table";
+import { assertVariableName, toVariableRow, variableCells } from "../../lib/variables";
 
 /**
  * The `variables get` topic command — read one variable by name at one owner.
@@ -19,6 +16,10 @@ import { readZitadelSecret } from "../../lib/project";
 export default class VariablesGet extends EnvironmentCommand {
   static override description = "Get one variable from an environment or the project.";
   static override group = CommandGroups.configuration;
+  static override examples = [
+    "<%= config.bin %> variables get GOOGLE_CLIENT_ID --environment prod",
+    "<%= config.bin %> variables get GOOGLE_CLIENT_ID --environment prod --json",
+  ];
   static override args = {
     name: Args.string({ required: true, description: "Variable name to read." }),
   };
@@ -26,45 +27,37 @@ export default class VariablesGet extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariablesGet);
     await this.toMeta(flags);
-    const { cwd, source } = this.meta;
     const name = args.name;
 
     assertVariableName(name);
-
-    const secret = await readZitadelSecret(cwd);
-    // Stated to a human, but kept off a pipe: these lines share stdout with the
-    // result, so `$(zitadel variables get NAME)` would otherwise capture them
-    // ahead of the value. The same rule the resource commands follow.
-    if (process.stdout.isTTY) {
-      consola.info(`Project   ${secret.project_id}`);
-      consola.info(`Server    ${source}`);
-    }
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
-    const environment = await this.resolveOwner(client, secret.project_id);
+    const { client, scope, environment } = await this.connect();
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
-    const row = toVariableRow(
-      name,
-      await client.getVariable(name, {
-        project_id: secret.project_id,
-        ...(environment ? { environment_name: environment } : {}),
-      }),
-    );
+    const row = toVariableRow(name, await client.getVariable(name, scope));
     this.recordTelemetry({
       is_secret: row.secret,
       is_environment_scoped: environment !== undefined,
     });
 
+    const data = { environment: environment ?? null, ...row };
+    // The resource commands' `get`: a pipe receives the whole record, since a
+    // script wants the record rather than a view of it. That is also what keeps
+    // a secret from being mistaken for a value — it reads `"secret": true` and
+    // carries no `value` at all.
+    if (!process.stdout.isTTY) {
+      return this.emit({ status: "ok", data, pretty: JSON.stringify(data, null, 2) });
+    }
+    const [cell] = variableCells([row]);
     return this.emit({
       status: "ok",
-      data: { environment: environment ?? null, ...row },
-      pretty: row.secret
-        ? `${name} is held on ${ownerLabel(environment)} (secret)`
-        : renderScalar(row.value),
+      data,
+      pretty: renderDetail(name, ["environment", "value"], {
+        environment: ownerLabel(environment),
+        // The detail view drops an empty field, which would hide a value that
+        // is legitimately the empty string.
+        value: cell?.value === "" ? '""' : cell?.value,
+      }),
     });
   }
 }
