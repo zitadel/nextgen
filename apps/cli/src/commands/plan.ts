@@ -43,10 +43,11 @@ export default class Plan extends BaseCommand {
     const secret = await readZitadelSecret(cwd);
     consola.info(`Project   ${secret.project_id}`);
     consola.info(`Server    ${source}`);
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
+    // Verbatim: the sync loop diffs and writes back what it reads.
+    const client = createZitadelClient(
+      { baseUrl: source, token: secret.project_secret },
+      { verbatim: true },
+    );
     const syncers = makeSyncers({
       client,
       projectId: secret.project_id,

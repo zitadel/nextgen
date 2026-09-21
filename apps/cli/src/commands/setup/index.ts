@@ -330,7 +330,11 @@ export default class Setup extends BaseCommand {
         ? { filesWritten: [] }
         : await materializeSetupResources({
             cwd,
-            client: createZitadelClient({ baseUrl: answers.server, token: project.project_secret }),
+            // Verbatim: the canonical bodies are written back to the project.
+            client: createZitadelClient(
+              { baseUrl: answers.server, token: project.project_secret },
+              { verbatim: true },
+            ),
             projectId: project.id,
             force,
             preset: answers.preset,

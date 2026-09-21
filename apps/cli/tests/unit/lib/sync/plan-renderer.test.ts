@@ -399,6 +399,23 @@ describe("renderPlan — string escaping", () => {
     expect(renderPlan(actions, false)).toContain('"col1\\tcol2\\r"');
   });
 
+  // `plan` and `apply` read the server verbatim, so the renderer is what
+  // keeps a stored ESC or OSC sequence from reaching the terminal.
+  it("escapes terminal control characters in a value and in a key", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "create",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: { "k\u001b[2J": "v\u001b]0;pwned\u0007\u202e" },
+        hash: "a",
+      },
+    ];
+    const out = renderPlan(actions, false);
+    expect(out).toContain('+ k\\x1b[2J = "v\\x1b]0;pwned\\x07\\u202e"');
+    expect(out).not.toContain("\u001b");
+  });
+
   // Multi-line strings are documents, not scalars — see the block-string
   // suite below. Escaping one onto a single line is what made a branding
   // plan unreadable.
@@ -690,6 +707,18 @@ describe("renderPlan — block strings (liquid_template)", () => {
     expect(out).toContain('+ ' + '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="Acme" />');
     // Untouched lines never reach the output.
     expect(out).not.toContain("<zl-page-shell>");
+  });
+
+  it("escapes terminal control characters in a changed line", () => {
+    const edited = template.replace('alt=""', 'alt="\u001b[2J"');
+
+    const out = renderPlan(
+      revise({ liquid_template: edited }, { liquid_template: template }),
+      false,
+    );
+
+    expect(out).toContain('alt="\\x1b[2J"');
+    expect(out).not.toContain("\u001b");
   });
 
   it("caps the changed-line body and says how much it dropped", () => {

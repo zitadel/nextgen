@@ -67,6 +67,32 @@ describe("createZitadelClient", () => {
     });
   });
 
+  it("returns bodies untouched when asked for them verbatim", async () => {
+    const body = { liquid_template: "<p>\r\n\u200d\u001b[2J</p>" };
+    stubFetch(200, body);
+
+    const verbatim = createZitadelClient(
+      { baseUrl: "http://localhost:8080", token: "t" },
+      { verbatim: true },
+    );
+
+    await expect(verbatim.getProject("p1")).resolves.toEqual(body);
+  });
+
+  it("escapes the server's text in a rejected call even for a verbatim client", async () => {
+    stubFetch(404, { code: "not_found", message: "no \u001b[2Jproject" });
+
+    const verbatim = createZitadelClient(
+      { baseUrl: "http://localhost:8080", token: "t" },
+      { verbatim: true },
+    );
+
+    await expect(verbatim.getProject("p1")).rejects.toMatchObject({
+      status: 404,
+      body: { message: "no \\x1b[2Jproject" },
+    });
+  });
+
   it("escapes the server's text in a rejected call and keeps it an ApiError", async () => {
     stubFetch(400, {
       code: "invalid_argument",

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { escapeControlCharacters } from "../api-client";
 import { stableStringify } from "../json";
 import type {
   ResourceSyncer,
@@ -186,13 +187,26 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 const KNOWN_AFTER_APPLY = "(known after apply)";
 
+/**
+ * Quote-escape a string value, then escape whatever could still drive the
+ * terminal. The plan prints what the server stores, and `plan` and `apply`
+ * read it verbatim so the diff and the write-back see the real bytes; this is
+ * where it is made safe to print.
+ */
 function escapeString(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
+  return escapeControlCharacters(
+    s
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t"),
+  );
+}
+
+/** A field name as printed: a server-side key is as untrusted as a value. */
+function fieldLabel(key: string): string {
+  return escapeControlCharacters(key, { keepLayout: false });
 }
 
 function fmtPrimitive(v: string | number | boolean | null): string {
@@ -285,11 +299,11 @@ function renderFields(
   const col = (s: string) => paint(s, ansi, ctx.tty);
 
   const keys = Object.keys(obj).sort();
-  const maxLen = keys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = keys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
 
   for (const key of keys) {
     const val = obj[key];
-    const pk = key.padEnd(maxLen);
+    const pk = fieldLabel(key).padEnd(maxLen);
 
     if (isPrimitive(val)) {
       const formatted = fmtScalar(val);
@@ -476,7 +490,8 @@ function renderBlockStringDiff(
   );
   for (const op of changed.slice(0, MAX_BLOCK_DIFF_LINES)) {
     const del = op.kind === "del";
-    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${op.line}`, del ? A.red : A.green, tty));
+    const line = escapeControlCharacters(op.line);
+    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${line}`, del ? A.red : A.green, tty));
   }
   const omitted = changed.length - MAX_BLOCK_DIFF_LINES;
   if (omitted > 0) {
@@ -503,12 +518,12 @@ function renderDiff(
   lines: string[],
 ): boolean {
   const allKeys = [...new Set([...Object.keys(oldObj), ...Object.keys(newObj)])].sort();
-  const maxLen = allKeys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = allKeys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
   const pad = " ".repeat(prefixCol);
   let hasChanges = false;
 
   for (const key of allKeys) {
-    const pk = key.padEnd(maxLen);
+    const pk = fieldLabel(key).padEnd(maxLen);
     const hasOld = Object.prototype.hasOwnProperty.call(oldObj, key);
     const hasNew = Object.prototype.hasOwnProperty.call(newObj, key);
     const oldVal = oldObj[key];

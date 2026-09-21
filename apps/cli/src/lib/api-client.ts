@@ -86,9 +86,23 @@ function sanitizeRejection(error: unknown): never {
     sanitizeResponse(error.body),
     escapeControlCharacters(error.message),
   );
-  sanitized.stack = error.stack;
+  sanitized.stack = error.stack === undefined ? undefined : escapeControlCharacters(error.stack);
   throw sanitized;
 }
+
+/** Options for {@link createZitadelClient}. */
+export type SanitizeOptions = {
+  /**
+   * Return response bodies exactly as the server sent them. Only for a
+   * caller that stores or compares what it reads rather than printing it:
+   * `apply` and `setup` write the server's canonical body back to the
+   * project's files, and `plan` diffs it against them, so an escaped
+   * `\r` or zero-width joiner would be written to disk as literal text and
+   * published as a change. Such a caller escapes at the point it prints.
+   * Errors are escaped either way.
+   */
+  verbatim?: boolean;
+};
 
 /**
  * Build the typed Zitadel client the CLI talks to the server through.
@@ -100,7 +114,11 @@ function sanitizeRejection(error: unknown): never {
  * envelope, including ones not yet written. The shared package is left raw:
  * the console renders into a DOM, which does not interpret escape codes.
  */
-export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
+export function createZitadelClient(
+  opts: ZitadelClientOptions,
+  sanitize: SanitizeOptions = {},
+): ZitadelClient {
+  const onResolve = sanitize.verbatim ? <T>(value: T): T => value : sanitizeResponse;
   const client = createRawClient(opts);
   return new Proxy(client, {
     get(target, prop, receiver) {
@@ -110,9 +128,7 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       }
       return (...args: unknown[]) => {
         const result = (value as (...a: unknown[]) => unknown)(...args);
-        return result instanceof Promise
-          ? result.then(sanitizeResponse, sanitizeRejection)
-          : sanitizeResponse(result);
+        return result instanceof Promise ? result.then(onResolve, sanitizeRejection) : result;
       };
     },
   });
