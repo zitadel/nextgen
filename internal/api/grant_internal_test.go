@@ -2,10 +2,11 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -27,14 +28,123 @@ func TestMapQueryGrantsToService_Expand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			input := mapQueryGrantsToService("proj_a", &api.QueryGrantsRequest{Expand: tt.expand})
-			if input.IncludePrincipal != tt.wantIncl {
-				t.Fatalf("IncludePrincipal = %v, want %v", input.IncludePrincipal, tt.wantIncl)
-			}
+			assert.Equal(t, tt.wantIncl, input.IncludePrincipal)
 		})
 	}
 }
 
-func TestGrantResponse_Principal(t *testing.T) {
+func TestCreateGrantInput_Locators(t *testing.T) {
+	t.Run("user id", func(t *testing.T) {
+		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationViewer,
+			User: api.NewOptUserLocator(api.UserLocator{
+				UserID: api.NewOptUserID("user_1"),
+			}),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "user_1", got.UserID)
+		assert.Empty(t, got.Identifier)
+		assert.Empty(t, got.TeamID)
+	})
+	t.Run("user identifier", func(t *testing.T) {
+		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationAdmin,
+			User: api.NewOptUserLocator(api.UserLocator{
+				Identifier: api.NewOptString("alice@acme.com"),
+			}),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "alice@acme.com", got.Identifier)
+		assert.Empty(t, got.UserID)
+	})
+	t.Run("team id", func(t *testing.T) {
+		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationEditor,
+			Team: api.NewOptTeamLocator(api.TeamLocator{
+				TeamID: api.NewOptTeamID("team_1"),
+			}),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "team_1", got.TeamID)
+		assert.Empty(t, got.TeamName)
+	})
+	t.Run("team name", func(t *testing.T) {
+		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationAdmin,
+			Team: api.NewOptTeamLocator(api.TeamLocator{
+				Name: api.NewOptString("Acme AI Admins"),
+			}),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Acme AI Admins", got.TeamName)
+		assert.Empty(t, got.TeamID)
+	})
+	t.Run("neither user nor team", func(t *testing.T) {
+		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{Relation: api.CreateGrantRequestRelationViewer})
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
+	})
+	t.Run("both user and team", func(t *testing.T) {
+		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationViewer,
+			User:     api.NewOptUserLocator(api.UserLocator{UserID: api.NewOptUserID("user_1")}),
+			Team:     api.NewOptTeamLocator(api.TeamLocator{TeamID: api.NewOptTeamID("team_1")}),
+		})
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
+	})
+	t.Run("user both fields", func(t *testing.T) {
+		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationViewer,
+			User: api.NewOptUserLocator(api.UserLocator{
+				UserID:     api.NewOptUserID("user_1"),
+				Identifier: api.NewOptString("alice@acme.com"),
+			}),
+		})
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
+	})
+	t.Run("team both fields", func(t *testing.T) {
+		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationViewer,
+			Team: api.NewOptTeamLocator(api.TeamLocator{
+				TeamID: api.NewOptTeamID("team_1"),
+				Name:   api.NewOptString("Acme AI Admins"),
+			}),
+		})
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
+	})
+	t.Run("empty user locator", func(t *testing.T) {
+		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
+			Relation: api.CreateGrantRequestRelationViewer,
+			User:     api.NewOptUserLocator(api.UserLocator{}),
+		})
+		require.ErrorIs(t, err, domain.ErrGrantInvalid())
+	})
+}
+
+func TestGrantCallerUserID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("user session copies principal id", func(t *testing.T) {
+		ctx := WithScopeContext(t.Context(), ScopeContext{
+			ProjectID:     "proj_platform",
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+		})
+		assert.Equal(t, "user_alice", grantCallerUserID(ctx))
+	})
+	t.Run("project secret is empty", func(t *testing.T) {
+		ctx := WithScopeContext(t.Context(), ScopeContext{
+			ProjectID:     "proj_customer",
+			PrincipalType: domain.AuthzPrincipalTypeSKProj,
+			PrincipalID:   "proj_customer",
+		})
+		assert.Empty(t, grantCallerUserID(ctx))
+	})
+	t.Run("missing scope is empty", func(t *testing.T) {
+		assert.Empty(t, grantCallerUserID(t.Context()))
+	})
+}
+
+func TestGrantResponse_UserAndTeam(t *testing.T) {
 	asgn := &domain.AuthzAssignment{
 		ID:            "asgn_1",
 		ProjectID:     "proj_a",
@@ -43,35 +153,45 @@ func TestGrantResponse_Principal(t *testing.T) {
 		ObjectType:    "project",
 		Relation:      "viewer",
 	}
-	userRef := &domain.UserRef{UserID: "user_1"}
+	userRef := &domain.UserRef{UserID: "user_1", Identifier: "alice@acme.com", IdentifierProperty: "email"}
 
-	t.Run("omit when Principal is nil", func(t *testing.T) {
+	t.Run("ref only when Principal is nil", func(t *testing.T) {
 		resp, err := grantResponse(&service.Grant{Assignment: asgn, User: userRef})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if resp.Principal.IsSet() {
-			t.Fatal("principal should be omitted")
-		}
+		require.NoError(t, err)
+		require.True(t, resp.User.IsSet())
+		assert.Equal(t, api.UserID("user_1"), resp.User.Value.UserID)
+		assert.False(t, resp.User.Value.Schema.IsSet())
+		assert.False(t, resp.Team.IsSet())
 	})
-	t.Run("null when Principal is empty", func(t *testing.T) {
+	t.Run("expand extras on user when Principal is loaded", func(t *testing.T) {
 		resp, err := grantResponse(&service.Grant{
 			Assignment: asgn,
 			User:       userRef,
+			Principal: &service.GrantPrincipal{
+				User: &domain.User{
+					ID:        "user_1",
+					SchemaURL: "sch_1",
+					Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.True(t, resp.User.Value.Schema.IsSet())
+		assert.Equal(t, "sch_1", resp.User.Value.Schema.Value)
+	})
+	t.Run("degraded ref when expand asked but user missing", func(t *testing.T) {
+		resp, err := grantResponse(&service.Grant{
+			Assignment: asgn,
+			User:       &domain.UserRef{UserID: "user_1"},
 			Principal:  &service.GrantPrincipal{},
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !resp.Principal.IsSet() || !resp.Principal.IsNull() {
-			t.Fatalf("principal set=%v null=%v, want set+null", resp.Principal.IsSet(), resp.Principal.IsNull())
-		}
+		require.NoError(t, err)
+		assert.Equal(t, api.UserID("user_1"), resp.User.Value.UserID)
+		assert.False(t, resp.User.Value.Schema.IsSet())
 	})
 	t.Run("nil grant", func(t *testing.T) {
 		_, err := grantResponse(nil)
-		if !errors.Is(err, domain.ErrGrantNotFound()) {
-			t.Fatalf("error = %v, want grant not found", err)
-		}
+		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 	})
 }
 

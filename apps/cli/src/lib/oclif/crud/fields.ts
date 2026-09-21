@@ -23,9 +23,9 @@ import { unwrap, type ZodLike } from "./zod";
 export type FieldKind = "string" | "number" | "boolean" | "enum" | "record";
 
 export type BodyField = Readonly<{
-  /** Property name on the wire (`principal_type`). */
+  /** Property name on the wire (`relation`). */
   name: string;
-  /** Flag name as typed (`principal-type`). */
+  /** Flag name as typed (`relation`). */
   flag: string;
   kind: FieldKind;
   required: boolean;
