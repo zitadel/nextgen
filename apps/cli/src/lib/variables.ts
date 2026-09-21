@@ -71,6 +71,9 @@ export function toVariableRows(body: GetVariables200): VariableRow[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Stands in for a secret's value, which the platform never discloses. */
+const SECRET_MARKER = "(secret)";
+
 /**
  * Render rows as the plain-text table, carrying the owner in its header the way
  * `schemas list` carries its objectType. Secrets print a marker rather than a
@@ -102,9 +105,6 @@ export function renderVariableTable(
   ].join("\n");
 }
 
-/** Stands in for a secret's value, which the platform never discloses. */
-const SECRET_MARKER = "(secret)";
-
 /**
  * Read a `.env`-style file into name/value pairs.
  *
@@ -133,7 +133,7 @@ export function parseEnvFile(contents: string): Record<string, string> {
       .trim()
       .replace(/^export\s+/, "");
     let value = line.slice(eq + 1).trim();
-    if (value.length >= 2 && /^(".*"|'.*')$/s.test(value)) {
+    if (value.length >= 2 && /^(".*"|'.*')$/.test(value)) {
       value = value.slice(1, -1);
     }
     values[name] = value;
@@ -155,10 +155,15 @@ export async function readEnvFile(path: string): Promise<Record<string, string>>
     const code = (error as NodeJS.ErrnoException).code;
     throw new ZitadelError(
       code === "ENOENT" ? "E_NOT_FOUND" : "E_VALIDATION",
-      `Cannot read ${path}${code === "ENOENT" ? "" : `: ${(error as Error).message}`}.`,
+      `Cannot read ${path}${code === "ENOENT" ? "" : `: ${messageOf(error)}`}.`,
       { hint: "Pass --file with a path to a .env-style file." },
     );
   }
+}
+
+/** The message of a thrown value, whatever was thrown. */
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**

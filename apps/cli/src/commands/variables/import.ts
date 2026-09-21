@@ -50,8 +50,12 @@ export default class VariablesImport extends BaseCommand {
     const environment = flags.environment;
 
     const owner = environmentParam(environment);
-    const values = await readEnvFile(flags.file);
-    const names = Object.keys(values).sort();
+    // Sorted entries, so the preview, the patch and the envelope all list the
+    // names in one order and the value never needs re-looking-up by key.
+    const entries = Object.entries(await readEnvFile(flags.file)).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+    const names = entries.map(([name]) => name);
     for (const name of names) {
       assertVariableName(name);
     }
@@ -89,7 +93,7 @@ export default class VariablesImport extends BaseCommand {
     // so a file that fails validation leaves the owner untouched rather than
     // half-written.
     const body: UpdateVariablesBody = Object.fromEntries(
-      names.map((name) => [name, { value: values[name] as string, secret: flags.secret }]),
+      entries.map(([name, value]) => [name, { value, secret: flags.secret }]),
     );
     const client = createZitadelClient({
       baseUrl: source,
