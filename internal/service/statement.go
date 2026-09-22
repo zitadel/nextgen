@@ -42,6 +42,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	VariableStatements
 	ClaimStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
@@ -386,6 +387,31 @@ type BrandingStatements interface {
 // 	Transactioner[ClaimStatements]
 // }
 
+type VariableStatements interface {
+	Statements
+	// GetVariables returns the variables owner entered, for the given names (all
+	// names when none are given), ordered by name. Every owner column is matched
+	// exactly, so a name owner has not entered is absent even when another owner
+	// of the same project holds it -- nothing is inherited. This is the only
+	// place the owner predicate is enforced, so a caller never sees a variable
+	// entered elsewhere.
+	//
+	// The primary key is the name plus the owner, so at most one variable comes
+	// back per name and the caller has nothing to choose between.
+	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
+	// SetVariable writes variable under its own name and owner, replacing the
+	// value and IsSecret flag of an existing variable with the same name and
+	// owner. The environment is optional -- unset addresses the project level --
+	// but the project is not, and one that is missing or names no existing
+	// project is rejected by the table.
+	SetVariable(ctx context.Context, variable *domain.Variable) error
+	// DeleteVariable removes the variable owner entered under name. Removing one
+	// that is not there returns NoRowFoundError; it never deletes a variable
+	// with a different owner, since every owner column must match exactly, so
+	// one owner cannot remove what another entered.
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+}
+
 type ClaimStatements interface {
 	Statements
 	// CreateChallenge inserts a pending claim challenge; entity.ID is the
@@ -459,6 +485,11 @@ type AuthzAssignmentStatements interface {
 	// grant (ADR 049 export visibility), ordered by project_id after afterID
 	// (empty starts at the beginning).
 	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
+	// HasActiveOwningTeamGrant reports whether the team still owns a project.
+	// Keyed on the team alone: the owning row sits on the owned project, which
+	// for a claim is not the team's own project. Expiry is not consulted, the
+	// authz_assignments CHECK forbids expires_at on (project, team) rows (ADR 054 §2).
+	HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error)
 	// ListAuthorizedProjects pages the projects the user can act on, by the
 	// three routes ADR 053 §6 puts in the authorized set:
 	//

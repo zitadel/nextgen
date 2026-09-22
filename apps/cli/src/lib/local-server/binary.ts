@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
+import { EMPTY_ENV, type ResolvedEnv, envSummary } from "./env-vars";
 import {
   type BinaryRuntimeMetadata,
   type RuntimeMetadata,
@@ -25,6 +26,8 @@ export type BinaryRunSpec = {
   logPath: string;
   port: number;
   serverUrl: string;
+  /** Project variables for the child's environment, never its argv. */
+  env?: ResolvedEnv;
 };
 
 export type StopBinaryRuntimeResult = Readonly<{
@@ -61,6 +64,7 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
 
 export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRuntimeMetadata> {
   const command = resolveServerCommand();
+  const env = spec.env ?? EMPTY_ENV;
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
@@ -69,6 +73,8 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       detached: true,
       env: {
         ...process.env,
+        // Declared project variables ride the child's environment, never argv.
+        ...env.values,
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
         // Browser-facing URLs (claim, dashboard) must point at this local
@@ -94,6 +100,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       data_dir: spec.dataDir,
       created_at: new Date().toISOString(),
       cli_version: spec.cliVersion,
+      env: envSummary(env),
     };
   } finally {
     await log.close();

@@ -7,6 +7,8 @@
 > **Amends:** [ADR 011](011-resource-identifiers.md) (single ID class),
 > [ADR 012](012-ephemeral-id-api-representation.md) (prefixed API ids);
 > completes the open checklist item in [ADR 028](028-storage-v2-statements-and-dialects.md)
+> **Amended by:** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (§2 and §5: a schema's resource id is always dialect-minted; a declared `$id` stays a document property),
+> [ADR 065](065-background-jobs.md) (§2: `job` prefix)
 
 ## Context
 
@@ -68,6 +70,11 @@ the dialect generator is the only mint path, not that create always overwrites.
 | authz assignment | `asgn` |
 | event (audit wide-event) | `evt` |
 | event sink | `sink` |
+| job row | `job` |
+
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): the `sch` row no longer depends on whether a `$id` is declared; a schema's resource `id` is always dialect-minted.
+>
+> Amended by [ADR 065](065-background-jobs.md): registers the `job` prefix for job rows (not an HTTP resource).
 
 Existing style mix (`brnd` / `flowdef` / `enc_key` / `upw`) stays until a
 dedicated rename PR. Do not add more without the selection rules below.
@@ -105,6 +112,8 @@ the forbid; handlers enforce it where ogen cannot (e.g. create-user).
 | SSO provider `id` in flow definitions | Config key, not a storage PK |
 | Middleware `req_*` | Correlation only; local `RequestIDGenerator` |
 | Secrets (`sk_*`, handoff, session token material) | Cryptographic secrets, not row PKs |
+
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a schema's resource `id` is dialect-minted; a declared `$id` stays a document property.
 
 ### 6. Pre-persist ceremony IDs
 

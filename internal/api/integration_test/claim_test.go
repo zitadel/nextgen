@@ -243,8 +243,7 @@ func TestInitClaimAlreadyClaimed(t *testing.T) {
 
 	// Claimed state exactly as Complete writes it: the active owning-team
 	// grant, the claim source of truth (ADR 046 / ADR 054 §2).
-	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(),
-		domain.NewClaimTeamAssignment(project.ID, team.ID)))
+	harness.SeedOwningTeam(t, project.ID, team.ID)
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
 		harness.EnsureTestServer(t).URL+"/projects/"+project.ID+"/claim/init", nil)

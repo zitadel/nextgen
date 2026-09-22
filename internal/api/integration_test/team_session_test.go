@@ -3,8 +3,8 @@
 package integration_test
 
 import (
-	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,9 +30,7 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 	claimerID, claimerTeamID := harness.CreateUserOwnedByTeam(t, console.ID)
 	harness.SeedOwningTeam(t, console.ID, claimerTeamID)
 
-	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	session.SetSessionToken(platformSessionCookie(t, claimerID).Value)
+	session := sessionClientForUser(t, claimerID)
 
 	t.Run("queryTeams returns the claimer's team", func(t *testing.T) {
 		resp, err := session.QueryTeams(t.Context(), &api.QueryTeamsRequest{},
@@ -101,11 +99,8 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 			{"delete", http.MethodDelete, "/teams/" + claimerTeamID, ""},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				var body io.Reader
-				if tc.body != "" {
-					body = strings.NewReader(tc.body)
-				}
-				req, err := http.NewRequestWithContext(t.Context(), tc.method, base+tc.path, body)
+				req, err := http.NewRequestWithContext(t.Context(), tc.method, base+tc.path,
+					strings.NewReader(tc.body))
 				require.NoError(t, err)
 				if tc.body != "" {
 					req.Header.Set("Content-Type", "application/json")
@@ -131,9 +126,7 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 	console := harness.EnsurePlatformProject(t)
 	strangerID, strangerTeamID := harness.CreateUserOwnedByTeam(t, console.ID)
 
-	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	session.SetSessionToken(platformSessionCookie(t, strangerID).Value)
+	session := sessionClientForUser(t, strangerID)
 
 	otherProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
@@ -152,11 +145,18 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 			"a signed-in user with no grant must not see any team, including its own")
 	})
 
+	// The foothold decides the shape. This caller is a member of a team in the
+	// console project, so the gate answers Forbidden, not the not-found branch
+	// the foreign project takes below: 403 team.permission_denied. Pinned by
+	// status and code, because "not a TeamResponse" is also true of a 500.
+	// getTeam declares no 403 in its spec, hence the generic carrier.
 	t.Run("cannot read its own team without a grant", func(t *testing.T) {
 		resp, err := session.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(strangerTeamID)})
 		require.NoError(t, err)
-		_, readable := resp.(*api.TeamResponse)
-		assert.False(t, readable, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ErrorDetailsStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.ErrorDetailsStatusCode)
+		assert.Equal(t, 403, denied.StatusCode)
+		assert.Equal(t, api.ErrorCode("team.permission_denied"), denied.Response.Code)
 	})
 
 	t.Run("cannot read a team in a project it has no foothold in", func(t *testing.T) {
@@ -165,22 +165,19 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 		require.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 
+	// Unlike the console project above, this caller has no foothold here at
+	// all, so the list gate takes its not-found branch instead of attaching a
+	// filter: a 404, not an empty 200. Required as a type -- a conditional
+	// assertion on QueryTeamsResponse never runs, so the subtest would stay
+	// green even if a stranger could list a foreign project's teams.
 	t.Run("cannot list teams of a project it has no foothold in", func(t *testing.T) {
 		resp, err := session.QueryTeams(t.Context(), &api.QueryTeamsRequest{},
 			api.QueryTeamsParams{ProjectID: api.ProjectID(otherProject.ID)})
 		require.NoError(t, err)
-		if listed, ok := resp.(*api.QueryTeamsResponse); ok {
-			assert.False(t, teamListed(listed.Teams, foreignTeamID),
-				"a foreign project's teams must never appear")
-		}
+		require.IsType(t, &api.QueryTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 }
 
 func teamListed(teams []api.TeamResponse, id string) bool {
-	for _, team := range teams {
-		if team.ID == id {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(teams, func(team api.TeamResponse) bool { return team.ID == id })
 }

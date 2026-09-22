@@ -95,6 +95,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateHandoffOperation: []string{
 		"auth_attempt.write",
 	},
+	CreateIdpOperation: []string{
+		"idp.write",
+	},
 	CreateReleaseOperation: []string{
 		"release.write",
 	},
@@ -118,6 +121,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	DeleteUserByIDOperation: []string{
 		"user.delete",
+	},
+	DeleteVariableOperation: []string{
+		"variable.write",
 	},
 	ExchangeHandoffOperation: []string{
 		"session.write",
@@ -146,6 +152,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetGrantOperation: []string{
 		"project.read",
 	},
+	GetIdpByIdOperation: []string{
+		"idp.read",
+	},
+	GetIdpRevisionByIdOperation: []string{
+		"idp.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
 	},
@@ -164,6 +176,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetUserByIDOperation: []string{
 		"user.read",
 	},
+	GetVariableOperation: []string{
+		"variable.read",
+	},
+	GetVariablesOperation: []string{
+		"variable.read",
+	},
 	InitClaimOperation: []string{
 		"project.write",
 	},
@@ -181,6 +199,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definition.read",
+	},
+	ListIdpRevisionsOperation: []string{
+		"idp.read",
 	},
 	ListReleasesOperation: []string{
 		"release.read",
@@ -204,6 +225,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryGrantsOperation: []string{
 		"project.read",
 	},
+	QueryIdpsOperation: []string{
+		"idp.read",
+	},
 	QueryProjectsOperation: []string{
 		"project.write",
 	},
@@ -224,6 +248,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	UpdateTeamOperation: []string{
 		"team.write",
+	},
+	UpdateVariablesOperation: []string{
+		"variable.write",
 	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempt.write",
