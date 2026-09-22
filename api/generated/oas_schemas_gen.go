@@ -9368,6 +9368,11 @@ func (s *CreateFlowRequestPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
+// CreateGrantAccepted is response for CreateGrant operation.
+type CreateGrantAccepted struct{}
+
+func (*CreateGrantAccepted) createGrantRes() {}
+
 type CreateGrantBadRequest ErrorDetails
 
 func (*CreateGrantBadRequest) createGrantRes() {}
@@ -56568,13 +56573,14 @@ func (s *UserInvalidDetails) init() UserInvalidDetails {
 // Ref: #
 type UserLocator struct {
 	// Platform-homed user id (`user_<opaque>`). The user must be active.
+	// Granting the session caller's own user id is `grant.invalid`.
 	UserID OptUserID `json:"user_id"`
 	// The user schema's designated identifier (`x-identifier`), looked
-	// up in the platform project. Create accepts this locator with
-	// HTTP 201 whether or not a user matched: a miss or several matches
-	// still return a Grant and write nothing; a duplicate returns the
-	// existing grant. The server logs the lookup outcome. Granting the
-	// session caller's own resolved user is `grant.invalid`.
+	// up in the platform project. Create answers 202 with no body on
+	// every outcome: a hit, a duplicate, a miss, and several matches are
+	// indistinguishable, and a miss or several matches write nothing.
+	// The server logs the lookup outcome. Granting the session caller's
+	// own resolved user is `grant.invalid`.
 	Identifier OptString `json:"identifier"`
 }
 
