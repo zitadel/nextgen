@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_ENV,
+  hasDatabaseConfigured,
   isEnvSummary,
   loadEnvFiles,
   loadProjectEnv,
@@ -82,5 +83,36 @@ describe("dev-runtime env", () => {
     expect(isEnvSummary({ injected: ["A", 1] })).toBe(false);
     expect(isEnvSummary({})).toBe(false);
     expect(isEnvSummary(null)).toBe(false);
+  });
+});
+
+describe("local server database selection", () => {
+  // The local server defaults to the filesystem configuration store so that
+  // editing `.zitadel/**` shows up without a restart. That default has to
+  // yield to a developer who named their own dialect: the server accepts
+  // exactly one `database.*` key and refuses to start with two.
+  it("reports no database when the project declares none", () => {
+    expect(hasDatabaseConfigured({}, {})).toBe(false);
+    expect(hasDatabaseConfigured({ NEXTGEN_SERVER_ADDRESS: ":8080" }, {})).toBe(false);
+  });
+
+  it("reports a database declared in the project env files", () => {
+    expect(hasDatabaseConfigured({ NEXTGEN_DATABASE_POSTGRES: "postgres://…" }, {})).toBe(true);
+  });
+
+  it("reports a database exported into the ambient environment", () => {
+    expect(hasDatabaseConfigured({}, { NEXTGEN_DATABASE_SQLITE: "/tmp/x.db" })).toBe(true);
+  });
+
+  // Any registered dialect counts, not a hardcoded list: the server binds one
+  // env key per registered dialect, so a dialect added later must switch the
+  // default off here without this code changing.
+  it("reports any dialect name under the database prefix", () => {
+    expect(hasDatabaseConfigured({ NEXTGEN_DATABASE_SPANNER: "projects/…" }, {})).toBe(true);
+    expect(hasDatabaseConfigured({ NEXTGEN_DATABASE_SOMETHINGNEW: "x" }, {})).toBe(true);
+  });
+
+  it("ignores an unset variable", () => {
+    expect(hasDatabaseConfigured({}, { NEXTGEN_DATABASE_POSTGRES: undefined })).toBe(false);
   });
 });

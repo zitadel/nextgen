@@ -17,12 +17,14 @@ content:
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_expired.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-invalid.yaml'
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/sch-invalid_request.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -46,12 +48,14 @@ content:
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           flow.cookie_expired: '../../../components/schemas/errors/flow-cookie_expired.yaml'
           flow.cookie_invalid: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
+          flowdef.invalid: '../../../components/schemas/errors/flowdef-invalid.yaml'
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
+          sch.invalid_request: '../../../components/schemas/errors/sch-invalid_request.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -125,6 +129,11 @@ content:
         value:
           code: flow.cookie_invalid
           message: 'flow cookie is missing or invalid'
+      flowdef.invalid:
+        summary: flowdef.invalid
+        value:
+          code: flowdef.invalid
+          message: 'flow definition: invalid'
       flow.integrity:
         summary: flow.integrity
         value:
@@ -155,6 +164,11 @@ content:
         value:
           code: tkn.invalid
           message: 'the token is not valid'
+      sch.invalid_request:
+        summary: sch.invalid_request
+        value:
+          code: sch.invalid_request
+          message: 'invalid request'
       not_implemented:
         summary: not_implemented
         value:

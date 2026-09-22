@@ -22,6 +22,11 @@ import (
 // same helpers the SQL dialects use for their definition column, so a flow
 // round-trips through a file exactly as it round-trips through a row.
 type flowFile struct {
+	// ID is the id the server assigned, carried in the document so the flow
+	// does not depend on the CLI's index to know its own identity. A schema
+	// declares this as `$id`; a flow definition has no such convention, so the
+	// field is explicit.
+	ID            string `json:"id,omitempty"`
 	Name          string `json:"name"`
 	Status        string `json:"status,omitempty"`
 	SchemaVersion string `json:"schema_version,omitempty"`
@@ -82,9 +87,17 @@ func (s *Store) flowFromFile(e entry) (*domain.FlowDefinition, error) {
 	// that changed on every save would break the reference a release or a
 	// running flow holds at exactly the moment the operator is editing to see
 	// the effect.
+	// The document's own id wins: it is written by the server and survives a
+	// half-written index. The index is the fallback for a document authored by
+	// hand, and the name the last resort.
+	id := file.ID
+	if id == "" {
+		id = s.resourceID(e, name)
+	}
+
 	return flowdefinition.ToDomain(
 		s.ProjectID(),
-		s.resourceID(e, name),
+		id,
 		name,
 		file.SchemaVersion,
 		status,
@@ -97,7 +110,10 @@ func (s *Store) flowFromFile(e entry) (*domain.FlowDefinition, error) {
 // CreateFlowDefinition implements [service.FlowDefinitionStatements].
 func (s *Statements) CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
 	if !s.config.store.serves(entity.ProjectID) {
-		return domain.ErrFlowDefinitionInvalid("project is not served by the configuration directory", nil)
+		return s.AllStatements.CreateFlowDefinition(ctx, entity)
+	}
+	if err := s.ensureID(&entity.ID, domain.FlowDefinitionPrefix); err != nil {
+		return err
 	}
 
 	content, err := flowdefinition.Marshal(entity)
@@ -105,6 +121,7 @@ func (s *Statements) CreateFlowDefinition(ctx context.Context, entity *domain.Fl
 		return err
 	}
 	file := flowFile{
+		ID:            entity.ID,
 		Name:          entity.Name,
 		Status:        entity.Status.String(),
 		SchemaVersion: entity.SchemaVersion,
@@ -128,7 +145,7 @@ func (s *Statements) CreateFlowDefinition(ctx context.Context, entity *domain.Fl
 // GetFlowDefinitionByID implements [service.FlowDefinitionStatements].
 func (s *Statements) GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 	if !s.config.store.serves(projectID) {
-		return nil, new(database.NoRowFoundError)
+		return s.AllStatements.GetFlowDefinitionByID(ctx, projectID, id)
 	}
 	defs, err := s.config.store.loadFlowDefinitions()
 	if err != nil {
@@ -148,6 +165,10 @@ func (s *Statements) ListFlowDefinitions(
 	filter *database.ListOptions[domain.FlowDefinitionField],
 	opts service.FlowDefinitionQueryOptions,
 ) (*database.ListResult[*domain.FlowDefinition], error) {
+	if projectID, ok := projectIDFromFilter(filter.Filter, domain.FlowDefinitionFieldProjectID); !ok ||
+		!s.config.store.serves(projectID) {
+		return s.AllStatements.ListFlowDefinitions(ctx, filter, opts)
+	}
 	if err := authz.RequireManagementListFilter(ctx); err != nil {
 		return nil, err
 	}
@@ -177,7 +198,7 @@ func (s *Statements) ListFlowDefinitions(
 // DeleteFlowDefinitionByID implements [service.FlowDefinitionStatements].
 func (s *Statements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
 	if !s.config.store.serves(projectID) {
-		return new(database.NoRowFoundError)
+		return s.AllStatements.DeleteFlowDefinitionByID(ctx, projectID, id)
 	}
 	def, err := s.GetFlowDefinitionByID(ctx, projectID, id)
 	if err != nil {

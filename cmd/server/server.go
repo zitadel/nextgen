@@ -45,6 +45,7 @@ import (
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/dialect/configfs"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -209,6 +210,22 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
+	}
+
+	// A configuration directory serves documents from disk, so a schema's
+	// content can change while its id stays the same. The resolver caches a
+	// compiled schema under that id and would otherwise keep serving the
+	// version from before the edit — visible as a flow that cannot find a
+	// field the file plainly declares. Purging on change is what makes an edit
+	// take effect everywhere, not only on the read that goes to the file.
+	//
+	// Purging rather than evicting one key: the tree is small and edited by
+	// hand, so the cost is a few recompiles, and precision here would mean
+	// teaching the store which derived values depend on which document.
+	if configPool, ok := pool.(*configfs.Pool); ok {
+		configPool.Store().OnConfigChange(schemaCache.Purge)
+		slog.Info("configuration directory watched for changes",
+			slog.String("root", configPool.Store().Root()))
 	}
 
 	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}

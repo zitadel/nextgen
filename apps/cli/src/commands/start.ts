@@ -124,6 +124,7 @@ export default class Start extends BaseCommand {
       await assertPortAvailableForStart(port, serverUrl, this.meta.cliVersion);
       const metadata = await startBinaryRuntime({
         cliVersion: this.meta.cliVersion,
+        projectDir: this.meta.cwd,
         dataDir: paths.dataDir,
         logPath: paths.logFile,
         port,

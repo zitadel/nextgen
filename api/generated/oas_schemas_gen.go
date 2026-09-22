@@ -8752,6 +8752,7 @@ type CreateFlowErrorResponse struct {
 	EncKeyEncryptFailed    EncKeyEncryptFailed
 	EncKeyNotFound         EncKeyNotFound
 	EvtInvalid             EvtInvalid
+	FlowdefInvalid         FlowdefInvalid
 	FlowdefNotFound        FlowdefNotFound
 	FlowdefPurposeMismatch FlowdefPurposeMismatch
 	FlowIntegrity          FlowIntegrity
@@ -8773,6 +8774,7 @@ const (
 	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
 	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
+	FlowdefInvalidCreateFlowErrorResponse         CreateFlowErrorResponseType = "flowdef.invalid"
 	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
 	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
 	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
@@ -8807,6 +8809,11 @@ func (s CreateFlowErrorResponse) IsEncKeyNotFound() bool {
 // IsEvtInvalid reports whether CreateFlowErrorResponse is EvtInvalid.
 func (s CreateFlowErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidCreateFlowErrorResponse
+}
+
+// IsFlowdefInvalid reports whether CreateFlowErrorResponse is FlowdefInvalid.
+func (s CreateFlowErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidCreateFlowErrorResponse
 }
 
 // IsFlowdefNotFound reports whether CreateFlowErrorResponse is FlowdefNotFound.
@@ -8954,6 +8961,27 @@ func (s CreateFlowErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidCreateFlowErrorResponse(v EvtInvalid) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetFlowdefInvalid sets CreateFlowErrorResponse to FlowdefInvalid.
+func (s *CreateFlowErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidCreateFlowErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if CreateFlowErrorResponse is FlowdefInvalid.
+func (s CreateFlowErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidCreateFlowErrorResponse(v FlowdefInvalid) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetFlowdefInvalid(v)
 	return s
 }
 
@@ -12124,6 +12152,7 @@ type CreateUserErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	SchInvalidRequest    SchInvalidRequest
 	ReqInvalid           ReqInvalid
 	UserAlreadyExists    UserAlreadyExists
 	UserInvalid          UserInvalid
@@ -12139,6 +12168,7 @@ const (
 	AuthUnauthorizedCreateUserErrorResponse     CreateUserErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateUserErrorResponse           CreateUserErrorResponseType = "evt.invalid"
 	InternalCreateUserErrorResponse             CreateUserErrorResponseType = "internal"
+	SchInvalidRequestCreateUserErrorResponse    CreateUserErrorResponseType = "sch.invalid_request"
 	ReqInvalidCreateUserErrorResponse           CreateUserErrorResponseType = "req.invalid"
 	UserAlreadyExistsCreateUserErrorResponse    CreateUserErrorResponseType = "user.already_exists"
 	UserInvalidCreateUserErrorResponse          CreateUserErrorResponseType = "user.invalid"
@@ -12158,6 +12188,11 @@ func (s CreateUserErrorResponse) IsEvtInvalid() bool {
 
 // IsInternal reports whether CreateUserErrorResponse is Internal.
 func (s CreateUserErrorResponse) IsInternal() bool { return s.Type == InternalCreateUserErrorResponse }
+
+// IsSchInvalidRequest reports whether CreateUserErrorResponse is SchInvalidRequest.
+func (s CreateUserErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestCreateUserErrorResponse
+}
 
 // IsReqInvalid reports whether CreateUserErrorResponse is ReqInvalid.
 func (s CreateUserErrorResponse) IsReqInvalid() bool {
@@ -12244,6 +12279,27 @@ func (s CreateUserErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateUserErrorResponse(v Internal) CreateUserErrorResponse {
 	var s CreateUserErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchInvalidRequest sets CreateUserErrorResponse to SchInvalidRequest.
+func (s *CreateUserErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestCreateUserErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if CreateUserErrorResponse is SchInvalidRequest.
+func (s CreateUserErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestCreateUserErrorResponse returns new CreateUserErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestCreateUserErrorResponse(v SchInvalidRequest) CreateUserErrorResponse {
+	var s CreateUserErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 
@@ -16113,6 +16169,7 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	SchInvalidRequest    SchInvalidRequest
 	ReqInvalid           ReqInvalid
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
@@ -16134,6 +16191,7 @@ const (
 	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
 	EvtInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
 	InternalFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "internal"
+	SchInvalidRequestFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "sch.invalid_request"
 	ReqInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
@@ -16188,6 +16246,11 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether FinishUserPasskeyRegistrationErrorResponse is Internal.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsInternal() bool {
 	return s.Type == InternalFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsSchInvalidRequest reports whether FinishUserPasskeyRegistrationErrorResponse is SchInvalidRequest.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsReqInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is ReqInvalid.
@@ -16417,6 +16480,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetInternal() (v Internal, o
 func NewInternalFinishUserPasskeyRegistrationErrorResponse(v Internal) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchInvalidRequest sets FinishUserPasskeyRegistrationErrorResponse to SchInvalidRequest.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestFinishUserPasskeyRegistrationErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if FinishUserPasskeyRegistrationErrorResponse is SchInvalidRequest.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestFinishUserPasskeyRegistrationErrorResponse(v SchInvalidRequest) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 
@@ -21000,6 +21084,7 @@ func (*GetEventUnauthorized) getEventRes() {}
 type GetFlowDefinitionErrorResponse struct {
 	Type                    GetFlowDefinitionErrorResponseType // switch on this field
 	AuthUnauthorized        AuthUnauthorized
+	FlowdefInvalid          FlowdefInvalid
 	FlowdefNotFound         FlowdefNotFound
 	FlowdefPermissionDenied FlowdefPermissionDenied
 	Internal                Internal
@@ -21014,6 +21099,7 @@ type GetFlowDefinitionErrorResponseType string
 // Possible values for GetFlowDefinitionErrorResponseType.
 const (
 	AuthUnauthorizedGetFlowDefinitionErrorResponse        GetFlowDefinitionErrorResponseType = "auth.unauthorized"
+	FlowdefInvalidGetFlowDefinitionErrorResponse          GetFlowDefinitionErrorResponseType = "flowdef.invalid"
 	FlowdefNotFoundGetFlowDefinitionErrorResponse         GetFlowDefinitionErrorResponseType = "flowdef.not_found"
 	FlowdefPermissionDeniedGetFlowDefinitionErrorResponse GetFlowDefinitionErrorResponseType = "flowdef.permission_denied"
 	InternalGetFlowDefinitionErrorResponse                GetFlowDefinitionErrorResponseType = "internal"
@@ -21025,6 +21111,11 @@ const (
 // IsAuthUnauthorized reports whether GetFlowDefinitionErrorResponse is AuthUnauthorized.
 func (s GetFlowDefinitionErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetFlowDefinitionErrorResponse
+}
+
+// IsFlowdefInvalid reports whether GetFlowDefinitionErrorResponse is FlowdefInvalid.
+func (s GetFlowDefinitionErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidGetFlowDefinitionErrorResponse
 }
 
 // IsFlowdefNotFound reports whether GetFlowDefinitionErrorResponse is FlowdefNotFound.
@@ -21075,6 +21166,27 @@ func (s GetFlowDefinitionErrorResponse) GetAuthUnauthorized() (v AuthUnauthorize
 func NewAuthUnauthorizedGetFlowDefinitionErrorResponse(v AuthUnauthorized) GetFlowDefinitionErrorResponse {
 	var s GetFlowDefinitionErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetFlowdefInvalid sets GetFlowDefinitionErrorResponse to FlowdefInvalid.
+func (s *GetFlowDefinitionErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidGetFlowDefinitionErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if GetFlowDefinitionErrorResponse is FlowdefInvalid.
+func (s GetFlowDefinitionErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidGetFlowDefinitionErrorResponse returns new GetFlowDefinitionErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidGetFlowDefinitionErrorResponse(v FlowdefInvalid) GetFlowDefinitionErrorResponse {
+	var s GetFlowDefinitionErrorResponse
+	s.SetFlowdefInvalid(v)
 	return s
 }
 
@@ -21240,6 +21352,7 @@ type GetFlowStepErrorResponse struct {
 	FlowCompleted       FlowCompleted
 	FlowCookieExpired   FlowCookieExpired
 	FlowCookieInvalid   FlowCookieInvalid
+	FlowdefInvalid      FlowdefInvalid
 	FlowIntegrity       FlowIntegrity
 	FlowNotFound        FlowNotFound
 	Internal            Internal
@@ -21258,6 +21371,7 @@ const (
 	FlowCompletedGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.completed"
 	FlowCookieExpiredGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.cookie_expired"
 	FlowCookieInvalidGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowdefInvalidGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "flowdef.invalid"
 	FlowIntegrityGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.integrity"
 	FlowNotFoundGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "flow.not_found"
 	InternalGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "internal"
@@ -21289,6 +21403,11 @@ func (s GetFlowStepErrorResponse) IsFlowCookieExpired() bool {
 // IsFlowCookieInvalid reports whether GetFlowStepErrorResponse is FlowCookieInvalid.
 func (s GetFlowStepErrorResponse) IsFlowCookieInvalid() bool {
 	return s.Type == FlowCookieInvalidGetFlowStepErrorResponse
+}
+
+// IsFlowdefInvalid reports whether GetFlowStepErrorResponse is FlowdefInvalid.
+func (s GetFlowStepErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidGetFlowStepErrorResponse
 }
 
 // IsFlowIntegrity reports whether GetFlowStepErrorResponse is FlowIntegrity.
@@ -21423,6 +21542,27 @@ func (s GetFlowStepErrorResponse) GetFlowCookieInvalid() (v FlowCookieInvalid, o
 func NewFlowCookieInvalidGetFlowStepErrorResponse(v FlowCookieInvalid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetFlowCookieInvalid(v)
+	return s
+}
+
+// SetFlowdefInvalid sets GetFlowStepErrorResponse to FlowdefInvalid.
+func (s *GetFlowStepErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidGetFlowStepErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if GetFlowStepErrorResponse is FlowdefInvalid.
+func (s GetFlowStepErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidGetFlowStepErrorResponse(v FlowdefInvalid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowdefInvalid(v)
 	return s
 }
 
@@ -26555,6 +26695,7 @@ type ListFlowDefinitionsErrorResponse struct {
 	FlowdefNotFound         FlowdefNotFound
 	FlowdefPermissionDenied FlowdefPermissionDenied
 	Internal                Internal
+	SchInvalidRequest       SchInvalidRequest
 	SchNotFound             SchNotFound
 	SchPermissionDenied     SchPermissionDenied
 	FlowdefMissingProjectID FlowdefMissingProjectID
@@ -26571,6 +26712,7 @@ const (
 	FlowdefNotFoundListFlowDefinitionsErrorResponse         ListFlowDefinitionsErrorResponseType = "flowdef.not_found"
 	FlowdefPermissionDeniedListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.permission_denied"
 	InternalListFlowDefinitionsErrorResponse                ListFlowDefinitionsErrorResponseType = "internal"
+	SchInvalidRequestListFlowDefinitionsErrorResponse       ListFlowDefinitionsErrorResponseType = "sch.invalid_request"
 	SchNotFoundListFlowDefinitionsErrorResponse             ListFlowDefinitionsErrorResponseType = "sch.not_found"
 	SchPermissionDeniedListFlowDefinitionsErrorResponse     ListFlowDefinitionsErrorResponseType = "sch.permission_denied"
 	FlowdefMissingProjectIDListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.missing_project_id"
@@ -26600,6 +26742,11 @@ func (s ListFlowDefinitionsErrorResponse) IsFlowdefPermissionDenied() bool {
 // IsInternal reports whether ListFlowDefinitionsErrorResponse is Internal.
 func (s ListFlowDefinitionsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListFlowDefinitionsErrorResponse
+}
+
+// IsSchInvalidRequest reports whether ListFlowDefinitionsErrorResponse is SchInvalidRequest.
+func (s ListFlowDefinitionsErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestListFlowDefinitionsErrorResponse
 }
 
 // IsSchNotFound reports whether ListFlowDefinitionsErrorResponse is SchNotFound.
@@ -26724,6 +26871,27 @@ func (s ListFlowDefinitionsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListFlowDefinitionsErrorResponse(v Internal) ListFlowDefinitionsErrorResponse {
 	var s ListFlowDefinitionsErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchInvalidRequest sets ListFlowDefinitionsErrorResponse to SchInvalidRequest.
+func (s *ListFlowDefinitionsErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestListFlowDefinitionsErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if ListFlowDefinitionsErrorResponse is SchInvalidRequest.
+func (s ListFlowDefinitionsErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestListFlowDefinitionsErrorResponse(v SchInvalidRequest) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 
@@ -27523,6 +27691,7 @@ type ListSchemasErrorResponse struct {
 	Type                ListSchemasErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	SchInvalidRequest   SchInvalidRequest
 	SchNotFound         SchNotFound
 	SchPermissionDenied SchPermissionDenied
 	ReqInvalid          ReqInvalid
@@ -27535,6 +27704,7 @@ type ListSchemasErrorResponseType string
 const (
 	AuthUnauthorizedListSchemasErrorResponse    ListSchemasErrorResponseType = "auth.unauthorized"
 	InternalListSchemasErrorResponse            ListSchemasErrorResponseType = "internal"
+	SchInvalidRequestListSchemasErrorResponse   ListSchemasErrorResponseType = "sch.invalid_request"
 	SchNotFoundListSchemasErrorResponse         ListSchemasErrorResponseType = "sch.not_found"
 	SchPermissionDeniedListSchemasErrorResponse ListSchemasErrorResponseType = "sch.permission_denied"
 	ReqInvalidListSchemasErrorResponse          ListSchemasErrorResponseType = "req.invalid"
@@ -27548,6 +27718,11 @@ func (s ListSchemasErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether ListSchemasErrorResponse is Internal.
 func (s ListSchemasErrorResponse) IsInternal() bool {
 	return s.Type == InternalListSchemasErrorResponse
+}
+
+// IsSchInvalidRequest reports whether ListSchemasErrorResponse is SchInvalidRequest.
+func (s ListSchemasErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestListSchemasErrorResponse
 }
 
 // IsSchNotFound reports whether ListSchemasErrorResponse is SchNotFound.
@@ -27604,6 +27779,27 @@ func (s ListSchemasErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListSchemasErrorResponse(v Internal) ListSchemasErrorResponse {
 	var s ListSchemasErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchInvalidRequest sets ListSchemasErrorResponse to SchInvalidRequest.
+func (s *ListSchemasErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestListSchemasErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if ListSchemasErrorResponse is SchInvalidRequest.
+func (s ListSchemasErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestListSchemasErrorResponse returns new ListSchemasErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestListSchemasErrorResponse(v SchInvalidRequest) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 
@@ -40902,6 +41098,7 @@ type PatchMyUserErrorResponse struct {
 	Type              PatchMyUserErrorResponseType // switch on this field
 	AuthUnauthorized  AuthUnauthorized
 	Internal          Internal
+	SchInvalidRequest SchInvalidRequest
 	ReqInvalid        ReqInvalid
 	SessTokenInvalid  SessTokenInvalid
 	UserAlreadyExists UserAlreadyExists
@@ -40917,6 +41114,7 @@ type PatchMyUserErrorResponseType string
 const (
 	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
 	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
+	SchInvalidRequestPatchMyUserErrorResponse PatchMyUserErrorResponseType = "sch.invalid_request"
 	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
 	SessTokenInvalidPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "sess.token_invalid"
 	UserAlreadyExistsPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.already_exists"
@@ -40933,6 +41131,11 @@ func (s PatchMyUserErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether PatchMyUserErrorResponse is Internal.
 func (s PatchMyUserErrorResponse) IsInternal() bool {
 	return s.Type == InternalPatchMyUserErrorResponse
+}
+
+// IsSchInvalidRequest reports whether PatchMyUserErrorResponse is SchInvalidRequest.
+func (s PatchMyUserErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestPatchMyUserErrorResponse
 }
 
 // IsReqInvalid reports whether PatchMyUserErrorResponse is ReqInvalid.
@@ -41004,6 +41207,27 @@ func (s PatchMyUserErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalPatchMyUserErrorResponse(v Internal) PatchMyUserErrorResponse {
 	var s PatchMyUserErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchInvalidRequest sets PatchMyUserErrorResponse to SchInvalidRequest.
+func (s *PatchMyUserErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestPatchMyUserErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if PatchMyUserErrorResponse is SchInvalidRequest.
+func (s PatchMyUserErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestPatchMyUserErrorResponse(v SchInvalidRequest) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 
@@ -41506,6 +41730,7 @@ type PatchUserByIDErrorResponse struct {
 	Type                 PatchUserByIDErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	SchInvalidRequest    SchInvalidRequest
 	ReqInvalid           ReqInvalid
 	UserAlreadyExists    UserAlreadyExists
 	UserConflict         UserConflict
@@ -41521,6 +41746,7 @@ type PatchUserByIDErrorResponseType string
 const (
 	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
 	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
+	SchInvalidRequestPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "sch.invalid_request"
 	ReqInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "req.invalid"
 	UserAlreadyExistsPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "user.already_exists"
 	UserConflictPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.conflict"
@@ -41537,6 +41763,11 @@ func (s PatchUserByIDErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether PatchUserByIDErrorResponse is Internal.
 func (s PatchUserByIDErrorResponse) IsInternal() bool {
 	return s.Type == InternalPatchUserByIDErrorResponse
+}
+
+// IsSchInvalidRequest reports whether PatchUserByIDErrorResponse is SchInvalidRequest.
+func (s PatchUserByIDErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestPatchUserByIDErrorResponse
 }
 
 // IsReqInvalid reports whether PatchUserByIDErrorResponse is ReqInvalid.
@@ -41608,6 +41839,27 @@ func (s PatchUserByIDErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalPatchUserByIDErrorResponse(v Internal) PatchUserByIDErrorResponse {
 	var s PatchUserByIDErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchInvalidRequest sets PatchUserByIDErrorResponse to SchInvalidRequest.
+func (s *PatchUserByIDErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestPatchUserByIDErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if PatchUserByIDErrorResponse is SchInvalidRequest.
+func (s PatchUserByIDErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestPatchUserByIDErrorResponse(v SchInvalidRequest) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 
@@ -51546,12 +51798,14 @@ type SubmitFlowStepErrorResponse struct {
 	EvtInvalid          EvtInvalid
 	FlowCookieExpired   FlowCookieExpired
 	FlowCookieInvalid   FlowCookieInvalid
+	FlowdefInvalid      FlowdefInvalid
 	FlowIntegrity       FlowIntegrity
 	FlowInvalidAction   FlowInvalidAction
 	FlowNotFound        FlowNotFound
 	FlowUnsupported     FlowUnsupported
 	Internal            Internal
 	TknInvalid          TknInvalid
+	SchInvalidRequest   SchInvalidRequest
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
@@ -51579,12 +51833,14 @@ const (
 	EvtInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "evt.invalid"
 	FlowCookieExpiredSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_expired"
 	FlowCookieInvalidSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowdefInvalidSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "flowdef.invalid"
 	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
 	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
 	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
 	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
+	SchInvalidRequestSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "sch.invalid_request"
 	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
 	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
@@ -51659,6 +51915,11 @@ func (s SubmitFlowStepErrorResponse) IsFlowCookieInvalid() bool {
 	return s.Type == FlowCookieInvalidSubmitFlowStepErrorResponse
 }
 
+// IsFlowdefInvalid reports whether SubmitFlowStepErrorResponse is FlowdefInvalid.
+func (s SubmitFlowStepErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidSubmitFlowStepErrorResponse
+}
+
 // IsFlowIntegrity reports whether SubmitFlowStepErrorResponse is FlowIntegrity.
 func (s SubmitFlowStepErrorResponse) IsFlowIntegrity() bool {
 	return s.Type == FlowIntegritySubmitFlowStepErrorResponse
@@ -51687,6 +51948,11 @@ func (s SubmitFlowStepErrorResponse) IsInternal() bool {
 // IsTknInvalid reports whether SubmitFlowStepErrorResponse is TknInvalid.
 func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 	return s.Type == TknInvalidSubmitFlowStepErrorResponse
+}
+
+// IsSchInvalidRequest reports whether SubmitFlowStepErrorResponse is SchInvalidRequest.
+func (s SubmitFlowStepErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestSubmitFlowStepErrorResponse
 }
 
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
@@ -51997,6 +52263,27 @@ func NewFlowCookieInvalidSubmitFlowStepErrorResponse(v FlowCookieInvalid) Submit
 	return s
 }
 
+// SetFlowdefInvalid sets SubmitFlowStepErrorResponse to FlowdefInvalid.
+func (s *SubmitFlowStepErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidSubmitFlowStepErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if SubmitFlowStepErrorResponse is FlowdefInvalid.
+func (s SubmitFlowStepErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidSubmitFlowStepErrorResponse(v FlowdefInvalid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
 // SetFlowIntegrity sets SubmitFlowStepErrorResponse to FlowIntegrity.
 func (s *SubmitFlowStepErrorResponse) SetFlowIntegrity(v FlowIntegrity) {
 	s.Type = FlowIntegritySubmitFlowStepErrorResponse
@@ -52120,6 +52407,27 @@ func (s SubmitFlowStepErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
 func NewTknInvalidSubmitFlowStepErrorResponse(v TknInvalid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetTknInvalid(v)
+	return s
+}
+
+// SetSchInvalidRequest sets SubmitFlowStepErrorResponse to SchInvalidRequest.
+func (s *SubmitFlowStepErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestSubmitFlowStepErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if SubmitFlowStepErrorResponse is SchInvalidRequest.
+func (s SubmitFlowStepErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestSubmitFlowStepErrorResponse(v SchInvalidRequest) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 
@@ -57819,6 +58127,7 @@ type VerifyChallengeProofErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	SchInvalidRequest   SchInvalidRequest
 	ReqInvalid          ReqInvalid
 	UserAlreadyExists   UserAlreadyExists
 	UserInvalid         UserInvalid
@@ -57840,6 +58149,7 @@ const (
 	AuthUnauthorizedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "auth.unauthorized"
 	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
 	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
+	SchInvalidRequestVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "sch.invalid_request"
 	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
 	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
 	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
@@ -57894,6 +58204,11 @@ func (s VerifyChallengeProofErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether VerifyChallengeProofErrorResponse is Internal.
 func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
 	return s.Type == InternalVerifyChallengeProofErrorResponse
+}
+
+// IsSchInvalidRequest reports whether VerifyChallengeProofErrorResponse is SchInvalidRequest.
+func (s VerifyChallengeProofErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestVerifyChallengeProofErrorResponse
 }
 
 // IsReqInvalid reports whether VerifyChallengeProofErrorResponse is ReqInvalid.
@@ -58123,6 +58438,27 @@ func (s VerifyChallengeProofErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalVerifyChallengeProofErrorResponse(v Internal) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchInvalidRequest sets VerifyChallengeProofErrorResponse to SchInvalidRequest.
+func (s *VerifyChallengeProofErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestVerifyChallengeProofErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if VerifyChallengeProofErrorResponse is SchInvalidRequest.
+func (s VerifyChallengeProofErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestVerifyChallengeProofErrorResponse(v SchInvalidRequest) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetSchInvalidRequest(v)
 	return s
 }
 

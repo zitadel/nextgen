@@ -9,6 +9,7 @@ content:
         - $ref: '../../../components/schemas/errors/flow-completed.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_expired.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-invalid.yaml'
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
@@ -23,6 +24,7 @@ content:
           flow.completed: '../../../components/schemas/errors/flow-completed.yaml'
           flow.cookie_expired: '../../../components/schemas/errors/flow-cookie_expired.yaml'
           flow.cookie_invalid: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
+          flowdef.invalid: '../../../components/schemas/errors/flowdef-invalid.yaml'
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
@@ -55,6 +57,11 @@ content:
         value:
           code: flow.cookie_invalid
           message: 'flow cookie is missing or invalid'
+      flowdef.invalid:
+        summary: flowdef.invalid
+        value:
+          code: flowdef.invalid
+          message: 'flow definition: invalid'
       flow.integrity:
         summary: flow.integrity
         value:

@@ -1,6 +1,9 @@
 package configfs
 
 import (
+	"strings"
+
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -56,3 +59,28 @@ func NewStatements(sql service.AllStatements, store *Store) *Statements {
 }
 
 var _ service.AllStatements = (*Statements)(nil)
+
+// ensureID assigns a resource id when the caller supplied none.
+//
+// Every create path in this repository accepts an empty id and has the dialect
+// mint one (ADR 047): a schema uploaded without `$id`, a flow or branding
+// created without one. The SQL dialects do it in their own CreateX; this store
+// has to do the same, and a store that skipped it would hand the rest of the
+// write an empty id — which is how a schema created without `$id` reached the
+// resource-scope index as an empty resource_id and came back to the caller as a
+// bogus conflict.
+//
+// The id is minted through the SQL dialect's generator rather than invented
+// here, so ADR 047's "dialects own minting" still holds and the value is the
+// same prefixed opaque id every other backend would have produced.
+func (s *Statements) ensureID(id *string, prefix domain.ResourcePrefix) error {
+	if strings.TrimSpace(*id) != "" {
+		return nil
+	}
+	minted, err := s.NewManagedID(string(prefix))
+	if err != nil {
+		return err
+	}
+	*id = minted
+	return nil
+}

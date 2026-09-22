@@ -89,3 +89,25 @@ export const loadProjectEnv = async (cwd: string): Promise<ResolvedEnv> => {
   );
   return { values, injected: Object.keys(values).sort() };
 };
+
+/** Env prefix the server reads a database dialect from (`database.<name>`). */
+export const DATABASE_ENV_PREFIX = `${ENV_PREFIX}DATABASE_`;
+
+/**
+ * True when a database dialect is already configured for the local server,
+ * whether from the project's env files or the ambient environment.
+ *
+ * The local server defaults to the filesystem configuration store so that
+ * editing `.zitadel/**` is visible without a restart. A developer who names
+ * their own dialect overrules that: the server accepts exactly one
+ * `database.*` key and fails to start with two, so the CLI must not add its
+ * own alongside theirs. They lose hot reload, which is the documented
+ * trade — their database is the thing they asked for.
+ */
+export const hasDatabaseConfigured = (
+  values: Readonly<Record<string, string | undefined>>,
+  ambient: Readonly<Record<string, string | undefined>> = {},
+): boolean =>
+  [...Object.keys(values), ...Object.keys(ambient)].some(
+    (key) => key.startsWith(DATABASE_ENV_PREFIX) && (values[key] ?? ambient[key]) !== undefined,
+  );

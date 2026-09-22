@@ -10,6 +10,7 @@ package configfs
 import (
 	"cmp"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -79,7 +80,7 @@ func matches[F ~uint8, T any](filter database.Filter[F], item *T, schema databas
 	switch f := filter.(type) {
 	case database.AndFilter[F]:
 		for _, sub := range f.Filters {
-			ok, err := matches(sub, item, schema)
+			ok, err := matches[F, T](sub, item, schema)
 			if err != nil || !ok {
 				return false, err
 			}
@@ -88,7 +89,7 @@ func matches[F ~uint8, T any](filter database.Filter[F], item *T, schema databas
 
 	case database.OrFilter[F]:
 		for _, sub := range f.Filters {
-			ok, err := matches(sub, item, schema)
+			ok, err := matches[F, T](sub, item, schema)
 			if err != nil {
 				return false, err
 			}
@@ -103,6 +104,9 @@ func matches[F ~uint8, T any](filter database.Filter[F], item *T, schema databas
 
 	case *database.StringFilter[F]:
 		return matchesString(f, item, schema)
+
+	case *database.ArrayContainsFilter[F]:
+		return matchesArrayContains(f, item, schema)
 
 	default:
 		return false, fmt.Errorf("configfs: unsupported filter %T", filter)
@@ -196,6 +200,60 @@ func matchesString[F ~uint8, T any](f *database.StringFilter[F], item *T, schema
 	default:
 		return false, fmt.Errorf("configfs: unsupported string match %d", f.Match)
 	}
+}
+
+// matchesArrayContains reports whether a collection-valued column holds the
+// wanted element.
+//
+// The flow engine selects a definition by the purposes it serves, which is a
+// map on the entity and a collection column in SQL. Without this the resolver's
+// audience path fails the read outright — the engine asks for "a flow that
+// serves register", and a store that cannot answer that question cannot serve
+// a login page.
+func matchesArrayContains[F ~uint8, T any](
+	f *database.ArrayContainsFilter[F],
+	item *T,
+	schema database.Schema[F, T],
+) (bool, error) {
+	have := schema.ValuesFrom(item, []database.Column[F]{f.Column})[0]
+	if have == nil {
+		return false, nil
+	}
+
+	want, err := asString(f.Value)
+	if err != nil {
+		return false, err
+	}
+
+	// A map's keys are its elements: `purposes` is keyed by purpose, and the
+	// question asked of it is whether a purpose is present.
+	if m := reflect.ValueOf(have); m.Kind() == reflect.Map {
+		for _, key := range m.MapKeys() {
+			got, err := asString(key.Interface())
+			if err != nil {
+				continue
+			}
+			if got == want {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	if list := reflect.ValueOf(have); list.Kind() == reflect.Slice || list.Kind() == reflect.Array {
+		for i := range list.Len() {
+			got, err := asString(list.Index(i).Interface())
+			if err != nil {
+				continue
+			}
+			if got == want {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	return false, fmt.Errorf("configfs: array-contains filter on non-collection value %T", have)
 }
 
 // sortItems orders items by the requested columns. NULL sorts smallest, so
@@ -367,4 +425,40 @@ func asInt64(v any) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// projectIDFromFilter finds the project a list is scoped to.
+//
+// The configuration tree holds one project, so a list for any other project
+// must go to SQL. Get and Create are told their project outright; a list is
+// not, and carries it as an equality on the project column instead. An
+// undeterminable project reports false, and the caller sends the list to SQL —
+// the backend that can answer for every project.
+func projectIDFromFilter[F ~uint8](filter database.Filter[F], projectField F) (string, bool) {
+	switch f := filter.(type) {
+	case database.AndFilter[F]:
+		// Only a conjunction pins a value. Either arm of an Or may match a
+		// different project, so neither is the list's project.
+		for _, sub := range f.Filters {
+			if id, ok := projectIDFromFilter(sub, projectField); ok {
+				return id, true
+			}
+		}
+	case *database.CompareFilter[F]:
+		if f.Op != database.OpEqual || len(f.Terms) != 1 {
+			return "", false
+		}
+		term := f.Terms[0]
+		if term.Column.Field() != projectField {
+			return "", false
+		}
+		if id, ok := term.Value.(string); ok && id != "" {
+			return id, true
+		}
+	case *database.StringFilter[F]:
+		if f.Match == database.StringMatchEqual && !f.IgnoreCase && f.Column.Field() == projectField {
+			return f.Value, true
+		}
+	}
+	return "", false
 }

@@ -29,6 +29,7 @@ describe("local server binary helpers", () => {
 
     const runtime = await startBinaryRuntime({
       cliVersion: "0.0.0-test",
+      projectDir: dir,
       dataDir: join(dir, "data"),
       logPath: join(dir, "logs", "server.log"),
       port: 8091,
@@ -54,6 +55,7 @@ describe("local server binary helpers", () => {
 
     const runtime = await startBinaryRuntime({
       cliVersion: "0.0.0-test",
+      projectDir: dir,
       dataDir: join(dir, "data"),
       logPath: join(dir, "logs", "server.log"),
       port: 8091,
@@ -149,3 +151,51 @@ function errno(code: string): NodeJS.ErrnoException {
   error.code = code;
   return error;
 }
+
+describe("local server database selection", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  async function spawnEnv(
+    projectValues: Record<string, string> = {},
+  ): Promise<Record<string, string | undefined>> {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-db-test-"));
+    await startBinaryRuntime({
+      cliVersion: "0.0.0-test",
+      projectDir: dir,
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+      port: 8092,
+      serverUrl: "http://localhost:8092",
+      env: { injected: Object.keys(projectValues), values: projectValues },
+    });
+    const [, , options] = vi.mocked(spawn).mock.calls.at(-1)!;
+    return { ...(options as { env: Record<string, string | undefined> }).env, __dir: dir };
+  }
+
+  // Hot reload is the reason the local server exists in this shape: the
+  // configuration store reads the project directory, so a file the CLI writes
+  // or the developer edits is live on the next read.
+  it("points the server at the project directory by default", async () => {
+    const env = await spawnEnv();
+    expect(env.NEXTGEN_DATABASE_CONFIGFS).toBe(env.__dir);
+  });
+
+  // A declared dialect wins. The server accepts exactly one `database.*` key,
+  // so adding ours beside theirs would stop it booting; they lose hot reload,
+  // which is the trade they asked for.
+  it("stands aside when the project declares its own database", async () => {
+    const env = await spawnEnv({ NEXTGEN_DATABASE_POSTGRES: "postgres://localhost/zitadel" });
+    expect(env.NEXTGEN_DATABASE_CONFIGFS).toBeUndefined();
+    expect(env.NEXTGEN_DATABASE_POSTGRES).toBe("postgres://localhost/zitadel");
+  });
+
+  it("stands aside when a database is exported into the environment", async () => {
+    vi.stubEnv("NEXTGEN_DATABASE_SQLITE", "/tmp/their.db");
+    const env = await spawnEnv();
+    expect(env.NEXTGEN_DATABASE_CONFIGFS).toBeUndefined();
+  });
+});

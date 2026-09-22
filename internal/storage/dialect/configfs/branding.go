@@ -2,6 +2,7 @@ package configfs
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/branding"
@@ -41,9 +42,16 @@ func (s *Store) loadBrandings() ([]*domain.Branding, error) {
 			continue
 		}
 		modified, _ := modTime(e.path)
-		// Branding revisions are minted per publish, so the id the CLI recorded
-		// is the only way a release that pinned one still resolves here.
-		b, err := branding.ToDomain(s.ProjectID(), s.resourceID(e, brandingHandle), modified, e.bytes)
+		// The document's own id wins, then the index, then the handle.
+		var declared struct {
+			ID string `json:"id"`
+		}
+		_ = json.Unmarshal(e.bytes, &declared)
+		id := declared.ID
+		if id == "" {
+			id = s.resourceID(e, brandingHandle)
+		}
+		b, err := branding.ToDomain(s.ProjectID(), id, modified, e.bytes)
 		if err != nil {
 			return nil, domain.ErrBrandingInvalid(
 				"file "+e.path+" is not a valid branding document", err)
@@ -61,13 +69,22 @@ func (s *Store) loadBrandings() ([]*domain.Branding, error) {
 // next reload to show the edit, not a growing pile of files.
 func (s *Statements) CreateBranding(ctx context.Context, entity *domain.Branding) error {
 	if !s.config.store.serves(entity.ProjectID) {
-		return domain.ErrBrandingInvalid("project is not served by the configuration directory", nil)
+		return s.AllStatements.CreateBranding(ctx, entity)
+	}
+	if err := s.ensureID(&entity.ID, domain.PrefixBranding); err != nil {
+		return err
 	}
 	definition, err := branding.Marshal(entity)
 	if err != nil {
 		return err
 	}
-	if err := s.config.store.write(brandingDir, brandingHandle, indent(definition)); err != nil {
+	// As with flows: the document carries the id, so branding does not depend
+	// on the index to know which revision it is.
+	document, err := withID(definition, "id", entity.ID)
+	if err != nil {
+		return err
+	}
+	if err := s.config.store.write(brandingDir, brandingHandle, document); err != nil {
 		return err
 	}
 	return s.config.rsi.UpsertResourceScope(ctx,
@@ -77,7 +94,7 @@ func (s *Statements) CreateBranding(ctx context.Context, entity *domain.Branding
 // GetBrandingByID implements [service.BrandingStatements].
 func (s *Statements) GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error) {
 	if !s.config.store.serves(projectID) {
-		return nil, new(database.NoRowFoundError)
+		return s.AllStatements.GetBrandingByID(ctx, projectID, id)
 	}
 	brandings, err := s.config.store.loadBrandings()
 	if err != nil {
@@ -96,6 +113,10 @@ func (s *Statements) ListBrandings(
 	ctx context.Context,
 	filter *database.ListOptions[domain.BrandingField],
 ) (*database.ListResult[*domain.Branding], error) {
+	if projectID, ok := projectIDFromFilter(filter.Filter, domain.BrandingFieldProjectID); !ok ||
+		!s.config.store.serves(projectID) {
+		return s.AllStatements.ListBrandings(ctx, filter)
+	}
 	if err := authz.RequireManagementListFilter(ctx); err != nil {
 		return nil, err
 	}

@@ -77,6 +77,7 @@ func TestFlowDefinitionsListFromDisk(t *testing.T) {
 	writeFile(t, store, flowsDir, "admin-login", flowDoc("admin-login", "identifier"))
 
 	res, err := stmts.ListFlowDefinitions(unrestricted(t), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), testProject),
 		Pagination: database.Page[domain.FlowDefinitionField]{
 			OrderBy: database.OrderBy[domain.FlowDefinitionField]{
 				Columns: []database.Column[domain.FlowDefinitionField]{database.Col(domain.FlowDefinitionFieldName)},
@@ -105,7 +106,10 @@ func TestFlowDefinitionRoundTripsThroughAFile(t *testing.T) {
 	original.Name = "written"
 	require.NoError(t, stmts.CreateFlowDefinition(ctx, original))
 
-	got, err := stmts.GetFlowDefinitionByID(ctx, testProject, "written")
+	// Addressed by its id, not its name: the two are independent now that the
+	// document carries an explicit id, and renaming a flow does not re-identify
+	// it.
+	got, err := stmts.GetFlowDefinitionByID(ctx, testProject, original.ID)
 	require.NoError(t, err)
 	assert.Equal(t, original.UserSchema, got.UserSchema)
 	assert.Equal(t, original.Purposes, got.Purposes)
@@ -138,7 +142,7 @@ func TestFlowDefinitionListFailsClosedWithoutAnAuthzFilter(t *testing.T) {
 	stmts, store, _ := newStatements(t)
 	writeFile(t, store, flowsDir, "default-login", flowDoc("default-login", "identifier"))
 
-	_, err := stmts.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{}, service.FlowDefinitionQueryOptions{})
+	_, err := stmts.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{Filter: database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), testProject)}, service.FlowDefinitionQueryOptions{})
 	require.ErrorIs(t, err, service.ErrListFilterRequired)
 }
 
@@ -148,7 +152,7 @@ func TestFlowDefinitionRejectsAnUnparseableFile(t *testing.T) {
 	stmts, store, _ := newStatements(t)
 	writeFile(t, store, flowsDir, "broken", []byte("{not json"))
 
-	_, err := stmts.ListFlowDefinitions(unrestricted(t), &database.ListOptions[domain.FlowDefinitionField]{}, service.FlowDefinitionQueryOptions{})
+	_, err := stmts.ListFlowDefinitions(unrestricted(t), &database.ListOptions[domain.FlowDefinitionField]{Filter: database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), testProject)}, service.FlowDefinitionQueryOptions{})
 	require.Error(t, err)
 }
 
@@ -181,7 +185,7 @@ func TestBrandingIgnoresLayoutAssets(t *testing.T) {
 	writeFile(t, store, brandingDir, cliBrandingFile, brandingDoc("https://example.com/a.png"))
 	writeFile(t, store, brandingDir, "some-layout-metadata", []byte(`{"not":"a branding"}`))
 
-	res, err := stmts.ListBrandings(unrestricted(t), &database.ListOptions[domain.BrandingField]{})
+	res, err := stmts.ListBrandings(unrestricted(t), &database.ListOptions[domain.BrandingField]{Filter: database.Equal(database.Col(domain.BrandingFieldProjectID), testProject)})
 	require.NoError(t, err)
 	require.Len(t, res.Items, 1, "only the project's branding document is a resource")
 	assert.Equal(t, brandingHandle, res.Items[0].ID)
@@ -217,7 +221,7 @@ func TestBrandingListFailsClosedWithoutAnAuthzFilter(t *testing.T) {
 	stmts, store, _ := newStatements(t)
 	writeFile(t, store, brandingDir, cliBrandingFile, brandingDoc("https://example.com/a.png"))
 
-	_, err := stmts.ListBrandings(t.Context(), &database.ListOptions[domain.BrandingField]{})
+	_, err := stmts.ListBrandings(t.Context(), &database.ListOptions[domain.BrandingField]{Filter: database.Equal(database.Col(domain.BrandingFieldProjectID), testProject)})
 	require.ErrorIs(t, err, service.ErrListFilterRequired)
 }
 

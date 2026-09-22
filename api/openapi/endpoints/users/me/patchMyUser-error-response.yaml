@@ -6,6 +6,7 @@ content:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/sch-invalid_request.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-token_invalid.yaml'
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
@@ -17,6 +18,7 @@ content:
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          sch.invalid_request: '../../../components/schemas/errors/sch-invalid_request.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.token_invalid: '../../../components/schemas/errors/sess-token_invalid.yaml'
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
@@ -34,6 +36,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      sch.invalid_request:
+        summary: sch.invalid_request
+        value:
+          code: sch.invalid_request
+          message: 'invalid request'
       req.invalid:
         summary: req.invalid
         value:

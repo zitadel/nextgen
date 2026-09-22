@@ -14571,6 +14571,22 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowdefInvalidCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowdefNotFoundCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("flowdef.not_found")
@@ -14756,6 +14772,9 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 				case "evt.invalid":
 					s.Type = EvtInvalidCreateFlowErrorResponse
 					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidCreateFlowErrorResponse
+					found = true
 				case "flowdef.not_found":
 					s.Type = FlowdefNotFoundCreateFlowErrorResponse
 					found = true
@@ -14815,6 +14834,10 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EvtInvalidCreateFlowErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefInvalidCreateFlowErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
 			return err
 		}
 	case FlowdefNotFoundCreateFlowErrorResponse:
@@ -19546,6 +19569,22 @@ func (s CreateUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchInvalidRequestCreateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -19661,6 +19700,9 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateUserErrorResponse
 					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestCreateUserErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateUserErrorResponse
 					found = true
@@ -19700,6 +19742,10 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalCreateUserErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestCreateUserErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateUserErrorResponse:
@@ -28747,6 +28793,22 @@ func (s FinishUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) 
 				}
 			}
 		}
+	case SchInvalidRequestFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidFinishUserPasskeyRegistrationErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -28867,6 +28929,9 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 				case "internal":
 					s.Type = InternalFinishUserPasskeyRegistrationErrorResponse
 					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestFinishUserPasskeyRegistrationErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidFinishUserPasskeyRegistrationErrorResponse
 					found = true
@@ -28931,6 +28996,10 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 		}
 	case InternalFinishUserPasskeyRegistrationErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidFinishUserPasskeyRegistrationErrorResponse:
@@ -38395,6 +38464,22 @@ func (s GetFlowDefinitionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowdefInvalidGetFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowdefNotFoundGetFlowDefinitionErrorResponse:
 		e.FieldStart("code")
 		e.Str("flowdef.not_found")
@@ -38520,6 +38605,9 @@ func (s *GetFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedGetFlowDefinitionErrorResponse
 					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidGetFlowDefinitionErrorResponse
+					found = true
 				case "flowdef.not_found":
 					s.Type = FlowdefNotFoundGetFlowDefinitionErrorResponse
 					found = true
@@ -38554,6 +38642,10 @@ func (s *GetFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AuthUnauthorizedGetFlowDefinitionErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefInvalidGetFlowDefinitionErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
 			return err
 		}
 	case FlowdefNotFoundGetFlowDefinitionErrorResponse:
@@ -38677,6 +38769,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("flow.cookie_invalid")
 		{
 			s := s.FlowCookieInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefInvalidGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -38825,6 +38933,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.cookie_invalid":
 					s.Type = FlowCookieInvalidGetFlowStepErrorResponse
 					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidGetFlowStepErrorResponse
+					found = true
 				case "flow.integrity":
 					s.Type = FlowIntegrityGetFlowStepErrorResponse
 					found = true
@@ -38875,6 +38986,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case FlowCookieInvalidGetFlowStepErrorResponse:
 		if err := s.FlowCookieInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefInvalidGetFlowStepErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
 			return err
 		}
 	case FlowIntegrityGetFlowStepErrorResponse:
@@ -47185,6 +47300,22 @@ func (s ListFlowDefinitionsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchInvalidRequestListFlowDefinitionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case SchNotFoundListFlowDefinitionsErrorResponse:
 		e.FieldStart("code")
 		e.Str("sch.not_found")
@@ -47290,6 +47421,9 @@ func (s *ListFlowDefinitionsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListFlowDefinitionsErrorResponse
 					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestListFlowDefinitionsErrorResponse
+					found = true
 				case "sch.not_found":
 					s.Type = SchNotFoundListFlowDefinitionsErrorResponse
 					found = true
@@ -47334,6 +47468,10 @@ func (s *ListFlowDefinitionsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalListFlowDefinitionsErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestListFlowDefinitionsErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case SchNotFoundListFlowDefinitionsErrorResponse:
@@ -48428,6 +48566,22 @@ func (s ListSchemasErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchInvalidRequestListSchemasErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case SchNotFoundListSchemasErrorResponse:
 		e.FieldStart("code")
 		e.Str("sch.not_found")
@@ -48508,6 +48662,9 @@ func (s *ListSchemasErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListSchemasErrorResponse
 					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestListSchemasErrorResponse
+					found = true
 				case "sch.not_found":
 					s.Type = SchNotFoundListSchemasErrorResponse
 					found = true
@@ -48537,6 +48694,10 @@ func (s *ListSchemasErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalListSchemasErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestListSchemasErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case SchNotFoundListSchemasErrorResponse:
@@ -60017,6 +60178,22 @@ func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchInvalidRequestPatchMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidPatchMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -60145,6 +60322,9 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalPatchMyUserErrorResponse
 					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestPatchMyUserErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidPatchMyUserErrorResponse
 					found = true
@@ -60183,6 +60363,10 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalPatchMyUserErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestPatchMyUserErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidPatchMyUserErrorResponse:
@@ -60975,6 +61159,22 @@ func (s PatchUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchInvalidRequestPatchUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidPatchUserByIDErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -61103,6 +61303,9 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalPatchUserByIDErrorResponse
 					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestPatchUserByIDErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidPatchUserByIDErrorResponse
 					found = true
@@ -61141,6 +61344,10 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalPatchUserByIDErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestPatchUserByIDErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidPatchUserByIDErrorResponse:
@@ -81520,6 +81727,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowdefInvalidSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowIntegritySubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("flow.integrity")
@@ -81605,6 +81828,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("tkn.invalid")
 		{
 			s := s.TknInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchInvalidRequestSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -81793,6 +82032,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.cookie_invalid":
 					s.Type = FlowCookieInvalidSubmitFlowStepErrorResponse
 					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidSubmitFlowStepErrorResponse
+					found = true
 				case "flow.integrity":
 					s.Type = FlowIntegritySubmitFlowStepErrorResponse
 					found = true
@@ -81810,6 +82052,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "tkn.invalid":
 					s.Type = TknInvalidSubmitFlowStepErrorResponse
+					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestSubmitFlowStepErrorResponse
 					found = true
 				case "not_implemented":
 					s.Type = NotImplementedSubmitFlowStepErrorResponse
@@ -81898,6 +82143,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowCookieInvalid.Decode(d); err != nil {
 			return err
 		}
+	case FlowdefInvalidSubmitFlowStepErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
+			return err
+		}
 	case FlowIntegritySubmitFlowStepErrorResponse:
 		if err := s.FlowIntegrity.Decode(d); err != nil {
 			return err
@@ -81920,6 +82169,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TknInvalidSubmitFlowStepErrorResponse:
 		if err := s.TknInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestSubmitFlowStepErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case NotImplementedSubmitFlowStepErrorResponse:
@@ -91584,6 +91837,22 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchInvalidRequestVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -91704,6 +91973,9 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalVerifyChallengeProofErrorResponse
 					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestVerifyChallengeProofErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidVerifyChallengeProofErrorResponse
 					found = true
@@ -91768,6 +92040,10 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalVerifyChallengeProofErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestVerifyChallengeProofErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidVerifyChallengeProofErrorResponse:

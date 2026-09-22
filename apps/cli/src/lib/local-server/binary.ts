@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
-import { EMPTY_ENV, type ResolvedEnv, envSummary } from "./env-vars";
+import { EMPTY_ENV, hasDatabaseConfigured, type ResolvedEnv, envSummary } from "./env-vars";
 import {
   type BinaryRuntimeMetadata,
   type RuntimeMetadata,
@@ -22,6 +22,12 @@ const require = createRequire(import.meta.url);
 
 export type BinaryRunSpec = {
   cliVersion: string;
+  /**
+   * The project directory — the one holding `zitadel.json` and `.zitadel/`.
+   * The local server reads its configuration resources straight out of it, so
+   * a file the CLI writes, or the developer edits, is live on the next read.
+   */
+  projectDir: string;
   dataDir: string;
   logPath: string;
   port: number;
@@ -62,6 +68,18 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
   };
 }
 
+/**
+ * The database the local server should use: the filesystem configuration store
+ * pointed at the project, or nothing at all when one is already configured.
+ */
+function databaseEnv(
+  projectDir: string,
+  values: Readonly<Record<string, string>>,
+): Record<string, string> {
+  if (hasDatabaseConfigured(values, process.env)) return {};
+  return { NEXTGEN_DATABASE_CONFIGFS: projectDir };
+}
+
 export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRuntimeMetadata> {
   const command = resolveServerCommand();
   const env = spec.env ?? EMPTY_ENV;
@@ -75,6 +93,10 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
         ...process.env,
         // Declared project variables ride the child's environment, never argv.
         ...env.values,
+        // Serve configuration from the project directory unless the developer
+        // named their own database; theirs wins. Placed before the CLI-owned
+        // keys but after the project's, so it never overrides a declared one.
+        ...databaseEnv(spec.projectDir, env.values),
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
         // Browser-facing URLs (claim, dashboard) must point at this local

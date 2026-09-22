@@ -1,7 +1,6 @@
 package configfs
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -51,6 +50,18 @@ type Store struct {
 	mu        sync.RWMutex
 	projectID string
 	state     StateFile
+	// onChange is notified after any resource document in the tree changes.
+	//
+	// The store serves documents straight from disk, but the rest of the
+	// server does not always read through it: a compiled schema is cached by
+	// project and id, and with a file store an id keeps its value while the
+	// content behind it changes. Nothing would evict that entry, so a caller
+	// resolving the schema would keep getting the version from before the
+	// edit. This is how the server is told to drop what it derived.
+	onChange []func()
+	// watchedDirs is the kind directories already added to the watcher, so a
+	// directory appearing can be told from one already known.
+	watchedDirs map[string]struct{}
 }
 
 // StateFile is `.zitadel/state.json` as the server reads it.
@@ -78,29 +89,35 @@ func NewStore(ctx context.Context, root string) (*Store, error) {
 		return nil, fmt.Errorf("configfs: resolve root: %w", err)
 	}
 
-	store := &Store{root: abs}
+	store := &Store{root: abs, watchedDirs: map[string]struct{}{}}
 
-	// The project must be known before the store can answer anything, so a
-	// missing or unreadable zitadel.json fails construction. The index does
-	// not: a tree authored by hand has no state.json, and every resource then
-	// falls back to its handle.
-	if err := store.reloadZitadelJSON(); err != nil {
-		return nil, err
-	}
-	if err := store.reloadStateFile(); err != nil {
-		return nil, err
-	}
-
+	// Subscribe before the first read, never after.
 	if err := store.watchFileSystem(ctx); err != nil {
 		return nil, err
+	}
+
+	// Neither document has to exist yet, and neither failing to parse stops the
+	// server from starting.
+	//
+	// The order of events in a fresh project is the reason: `zitadel setup`
+	// needs a running server to upload to, and it is setup that writes
+	// zitadel.json and creates .zitadel. A store that demanded a project up
+	// front could never be pointed at a directory setup had not already
+	// produced, which is the case this backend exists to serve. Until a project
+	// is named the store holds no configuration, which before setup is the
+	// truth — and the watch above is what adopts it the moment setup lands.
+	if err := store.reloadZitadelJSON(); err != nil {
+		slogctx.Warn(ctx, "configuration directory names no project yet",
+			slogctx.Err(err), "root", abs)
+	}
+	if err := store.reloadStateFile(); err != nil {
+		slogctx.Warn(ctx, "configuration directory has no readable index yet",
+			slogctx.Err(err), "root", abs)
 	}
 
 	return store, nil
 }
 
-// Close stops watching. The store stays readable afterwards — every read goes
-// to disk regardless — it simply stops following changes to the two described
-// files.
 func (s *Store) Close() error {
 	if s.watcher == nil {
 		return nil
@@ -116,17 +133,6 @@ func (s *Store) stateFilePath() string {
 	return filepath.Join(s.root, zitadelDir, stateFileName)
 }
 
-// watchFileSystem follows the two described files.
-//
-// It watches their *directories*, not the files. A watch on a file follows the
-// inode, and both writers here replace rather than truncate: the CLI rewrites
-// state.json, editors save through a temporary file, and this package's own
-// write does CreateTemp+Rename. Watching the file would survive exactly one
-// such save and then go quiet with no error — hot reload that stops working
-// after the first change is worse than none, because nothing reports it.
-//
-// Watching a directory also means the files do not have to exist yet: a tree
-// gains its state.json when `zitadel setup` first records an id.
 func (s *Store) watchFileSystem(ctx context.Context) error {
 	if s.watcher != nil {
 		if err := s.watcher.Close(); err != nil {
@@ -140,11 +146,6 @@ func (s *Store) watchFileSystem(ctx context.Context) error {
 	}
 	s.watcher = watcher
 
-	// The project root always exists; .zitadel may not yet, because
-	// `zitadel setup` creates it after the server is already running. Watching
-	// the root means that mkdir is itself an event, and watchZitadelDir then
-	// picks the index up — a store that only watched an existing .zitadel
-	// would never follow a project that was set up underneath it.
 	if err := s.watcher.Add(s.root); err != nil {
 		_ = s.watcher.Close()
 		return fmt.Errorf("configfs: watch %s: %w", s.root, err)
@@ -153,6 +154,7 @@ func (s *Store) watchFileSystem(ctx context.Context) error {
 		_ = s.watcher.Close()
 		return err
 	}
+	s.watchResourceDirs()
 
 	reload := map[string]func() error{
 		s.zitadelJSONPath(): s.reloadZitadelJSON,
@@ -163,9 +165,6 @@ func (s *Store) watchFileSystem(ctx context.Context) error {
 	return nil
 }
 
-// watchZitadelDir adds the .zitadel directory to the watch set once it exists.
-// It is idempotent: fsnotify treats a repeat Add as a no-op, so it can be
-// called on every root event without tracking whether it already succeeded.
 func (s *Store) watchZitadelDir() error {
 	dir := filepath.Join(s.root, zitadelDir)
 	if _, err := os.Stat(dir); err != nil {
@@ -180,12 +179,6 @@ func (s *Store) watchZitadelDir() error {
 	return nil
 }
 
-// followChanges applies a reload for every event naming one of the described
-// files, until the context ends or the watcher closes.
-//
-// A failed reload is logged and the previous value kept. The alternative is
-// serving a half-written document: an editor's save is briefly visible as a
-// truncated file, and dropping that parse is how the next, complete event wins.
 func (s *Store) followChanges(ctx context.Context, reload map[string]func() error) {
 	defer func() {
 		if err := s.watcher.Close(); err != nil {
@@ -199,14 +192,19 @@ func (s *Store) followChanges(ctx context.Context, reload map[string]func() erro
 			if !ok {
 				return
 			}
-			// Chmod alone changes no content; reloading on it would re-parse
-			// the tree every time a tool touches permissions.
 			if event.Op == fsnotify.Chmod {
 				continue
 			}
-			// A project being set up creates .zitadel after this watch
-			// started. Catch it on the event that creates it, then read the
-			// index it now contains.
+
+			// The tree grows while it is watched: `zitadel setup` creates
+			// .zitadel and the kind directories after the server started, and
+			// a developer may add one later still. Re-adding on every event
+			// keeps the watch set current without tracking which directories
+			// have appeared; fsnotify treats a repeat Add as a no-op.
+			if s.watchResourceDirs() {
+				s.notifyChanged()
+			}
+
 			if filepath.Clean(event.Name) == filepath.Join(s.root, zitadelDir) {
 				if err := s.watchZitadelDir(); err != nil {
 					slogctx.Error(ctx, "error while watching the .zitadel directory", slogctx.Err(err))
@@ -218,6 +216,14 @@ func (s *Store) followChanges(ctx context.Context, reload map[string]func() erro
 				continue
 			}
 
+			// A resource document changed: pick up directories that appeared
+			// with it, then let the server drop anything it derived from the
+			// previous content.
+			if isResourceDocument(s.root, event.Name) {
+				s.notifyChanged()
+				continue
+			}
+
 			apply, watched := reload[filepath.Clean(event.Name)]
 			if !watched {
 				continue
@@ -226,6 +232,7 @@ func (s *Store) followChanges(ctx context.Context, reload map[string]func() erro
 				slogctx.Error(ctx, "error while reloading a watched configuration file",
 					slogctx.Err(err), "file", event.Name)
 			}
+
 		case err, ok := <-s.watcher.Errors:
 			if err != nil {
 				slogctx.Error(ctx, "error while watching filesystem", slogctx.Err(err))
@@ -233,14 +240,18 @@ func (s *Store) followChanges(ctx context.Context, reload map[string]func() erro
 			if !ok {
 				return
 			}
+
 		case <-ctx.Done():
 			return
+
 		}
 	}
 }
 
-// reloadZitadelJSON re-reads the project this tree belongs to.
 func (s *Store) reloadZitadelJSON() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	bs, err := os.ReadFile(s.zitadelJSONPath())
 	if err != nil {
 		return fmt.Errorf("configfs: read %s: %w", zitadelJSONName, err)
@@ -256,22 +267,17 @@ func (s *Store) reloadZitadelJSON() error {
 		return fmt.Errorf("configfs: %s declares no project", zitadelJSONName)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.projectID = contents.Project
 	return nil
 }
 
-// reloadStateFile re-reads the resource index.
-//
-// A missing file is an empty index rather than an error: a hand-authored tree
-// never had one, and a project gains it the first time the CLI records an id.
 func (s *Store) reloadStateFile() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	bs, err := os.ReadFile(s.stateFilePath())
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			s.mu.Lock()
-			defer s.mu.Unlock()
 			s.state = StateFile{}
 			return nil
 		}
@@ -283,29 +289,18 @@ func (s *Store) reloadStateFile() error {
 		return fmt.Errorf("configfs: parse %s: %w", stateFileName, err)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.state = contents
 	return nil
 }
 
-// Root reports the directory this store reads, for diagnostics.
 func (s *Store) Root() string { return s.root }
 
-// ProjectID reports the project whose configuration this tree holds, as
-// zitadel.json most recently declared it.
 func (s *Store) ProjectID() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.projectID
 }
 
-// idFor returns the id the CLI recorded for a resource file, keyed by its path
-// relative to the project root.
-//
-// Absent is not a failure. A document a developer added by hand has no index
-// entry until the CLI syncs it, and the caller falls back to the resource's
-// handle so the file is still readable in the meantime.
 func (s *Store) idFor(relPath string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -316,12 +311,15 @@ func (s *Store) idFor(relPath string) (string, bool) {
 	return resource.ID, true
 }
 
-// serves reports whether a request for projectID addresses this tree. A read
-// for any other project is empty rather than an error: the store is one
-// project's configuration, and a caller scoped elsewhere simply has nothing
-// here.
 func (s *Store) serves(projectID string) bool {
-	return projectID == "" || projectID == s.ProjectID()
+	known := s.ProjectID()
+	if known == "" {
+		// No project named yet, so nothing in this tree belongs to anyone.
+		// Serving reads here would attribute a half-set-up directory's files
+		// to whichever project happened to ask for them.
+		return false
+	}
+	return projectID == "" || projectID == known
 }
 
 // entry is one resource file on disk, already read.
@@ -454,12 +452,98 @@ func fileName(handle string) string {
 	return b.String()
 }
 
-// indent re-encodes compact JSON so a written document stays readable to the
-// person who will edit it next.
-func indent(raw []byte) []byte {
-	var buf bytes.Buffer
-	if err := json.Indent(&buf, raw, "", "  "); err != nil {
-		return raw
+// withID writes id into a JSON document under key, indented.
+//
+// A minted id has to live in the document, because the document is the record.
+// The SQL dialects keep it in a column beside the payload; a file has no such
+// column, so an id that stayed in memory would be gone on the next read and the
+// resource would answer to a different one than the server just returned.
+//
+// `$id` is where a JSON Schema already declares its identity, so writing it
+// there makes the file say exactly what the server stored — the same shape a
+// hand-authored schema has.
+func withID(raw []byte, key, id string) ([]byte, error) {
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("configfs: parse document before stamping %s: %w", key, err)
 	}
-	return buf.Bytes()
+	if doc == nil {
+		doc = map[string]any{}
+	}
+	doc[key] = id
+	stamped, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("configfs: encode document after stamping %s: %w", key, err)
+	}
+	return stamped, nil
+}
+
+// OnConfigChange registers a callback run after any resource document in the
+// tree changes. Callbacks run on the watcher goroutine, so they should be
+// cheap; evicting a cache is the intended use.
+func (s *Store) OnConfigChange(fn func()) {
+	if fn == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onChange = append(s.onChange, fn)
+}
+
+// notifyChanged runs the registered callbacks. A copy is taken under the lock
+// so a callback that registers another one cannot deadlock.
+func (s *Store) notifyChanged() {
+	s.mu.RLock()
+	callbacks := make([]func(), len(s.onChange))
+	copy(callbacks, s.onChange)
+	s.mu.RUnlock()
+	for _, fn := range callbacks {
+		fn()
+	}
+}
+
+// watchResourceDirs adds each kind's directory that exists. They are watched so
+// an edit to a document — not just to the two files describing the tree — can
+// invalidate what the server derived from the previous content.
+//
+// A missing directory is skipped rather than an error: a project with no flows
+// has no flows directory, and it is added when one appears. fsnotify treats a
+// repeat Add as a no-op, so this is safe to call on every event.
+// It reports whether it started watching a directory it was not watching
+// before. A directory only appears with documents already in it — `mkdir -p`
+// then write, which is what both the CLI and an editor do — and those writes
+// land before the watch does. Treating a newly watched directory as a change
+// is what keeps that first document from being missed.
+func (s *Store) watchResourceDirs() (added bool) {
+	for _, kind := range []string{schemasDir, flowsDir, brandingDir} {
+		dir := filepath.Join(s.root, kind)
+		if _, err := os.Stat(dir); err != nil {
+			continue
+		}
+		s.mu.Lock()
+		_, known := s.watchedDirs[dir]
+		if !known {
+			s.watchedDirs[dir] = struct{}{}
+		}
+		s.mu.Unlock()
+		if known {
+			continue
+		}
+		if err := s.watcher.Add(dir); err == nil {
+			added = true
+		}
+	}
+	return added
+}
+
+// isResourceDocument reports whether a path names a file directly inside one of
+// the kind directories.
+func isResourceDocument(root, path string) bool {
+	dir := filepath.Dir(filepath.Clean(path))
+	for _, kind := range []string{schemasDir, flowsDir, brandingDir} {
+		if dir == filepath.Join(root, kind) {
+			return true
+		}
+	}
+	return false
 }

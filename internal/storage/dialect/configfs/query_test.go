@@ -14,6 +14,8 @@ type row struct {
 	Name    string
 	Group   *string
 	Created time.Time
+	Tags    []string
+	Roles   map[string]string
 }
 
 type rowField uint8
@@ -23,6 +25,8 @@ const (
 	rowName
 	rowGroup
 	rowCreated
+	rowTags
+	rowRoles
 )
 
 var rowSchema = database.NewSchema(map[rowField]database.FieldBinding[row]{
@@ -47,6 +51,16 @@ var rowSchema = database.NewSchema(map[rowField]database.FieldBinding[row]{
 		Accessor: func(r *row) any { return r.Created },
 		Coerce:   database.CoerceTime,
 	},
+	rowTags: {
+		SQLName:  "tags",
+		Accessor: func(r *row) any { return r.Tags },
+		Coerce:   database.CoerceString,
+	},
+	rowRoles: {
+		SQLName:  "roles",
+		Accessor: func(r *row) any { return r.Roles },
+		Coerce:   database.CoerceString,
+	},
 })
 
 func ptr(s string) *string { return &s }
@@ -54,10 +68,10 @@ func ptr(s string) *string { return &s }
 func rows() []*row {
 	base := time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)
 	return []*row{
-		{Project: "p1", Name: "c", Group: ptr("g2"), Created: base.Add(2 * time.Hour)},
-		{Project: "p1", Name: "a", Group: ptr("g1"), Created: base},
+		{Project: "p1", Name: "c", Group: ptr("g2"), Created: base.Add(2 * time.Hour), Tags: []string{"blue"}},
+		{Project: "p1", Name: "a", Group: ptr("g1"), Created: base, Tags: []string{"red", "blue"}},
 		{Project: "p2", Name: "d", Group: nil, Created: base.Add(3 * time.Hour)},
-		{Project: "p1", Name: "b", Group: nil, Created: base.Add(time.Hour)},
+		{Project: "p1", Name: "b", Group: nil, Created: base.Add(time.Hour), Roles: map[string]string{"admin": "yes"}},
 	}
 }
 
@@ -126,11 +140,39 @@ func TestQueryFiltersAndOrders(t *testing.T) {
 		assert.Equal(t, []string{"b"}, names(t, res))
 	})
 
-	// A predicate this engine cannot evaluate must fail the read rather than be
-	// dropped: a silently ignored filter returns rows the caller excluded.
+	// The flow engine selects a definition by the purposes it serves, which is
+	// a collection column. A store that could not answer that cannot serve a
+	// login page.
+	t.Run("array-contains matches a collection member", func(t *testing.T) {
+		res, err := query(rows(), &database.ListOptions[rowField]{
+			Filter: database.ArrayContains(database.Col(rowTags), "blue"),
+			Pagination: database.Page[rowField]{
+				OrderBy: database.OrderBy[rowField]{Columns: []database.Column[rowField]{database.Col(rowName)}},
+			},
+		}, rowSchema)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a", "c"}, names(t, res))
+	})
+
+	// Keys are a map's elements: `purposes` is keyed by purpose, and the
+	// question asked of it is whether one is present.
+	t.Run("array-contains matches a map key", func(t *testing.T) {
+		res, err := query(rows(), &database.ListOptions[rowField]{
+			Filter: database.ArrayContains(database.Col(rowRoles), "admin"),
+			Pagination: database.Page[rowField]{
+				OrderBy: database.OrderBy[rowField]{Columns: []database.Column[rowField]{database.Col(rowName)}},
+			},
+		}, rowSchema)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"b"}, names(t, res))
+	})
+
+	// A predicate this engine cannot evaluate must still fail the read rather
+	// than be dropped: a silently ignored filter returns rows the caller
+	// excluded, and for an authorization predicate that is a leak.
 	t.Run("an unsupported filter errors", func(t *testing.T) {
 		_, err := query(rows(), &database.ListOptions[rowField]{
-			Filter: database.ArrayContains(database.Col(rowName), "a"),
+			Filter: database.CorrelatedEqual(database.Col(rowName), "a"),
 			Pagination: database.Page[rowField]{
 				OrderBy: database.OrderBy[rowField]{Columns: []database.Column[rowField]{database.Col(rowName)}},
 			},

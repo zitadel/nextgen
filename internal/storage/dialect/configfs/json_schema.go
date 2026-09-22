@@ -2,6 +2,7 @@ package configfs
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -98,13 +99,38 @@ func modTime(path string) (time.Time, error) {
 
 func (s *Statements) CreateJSONSchema(ctx context.Context, entity *domain.JSONSchema) error {
 	if !s.config.store.serves(entity.ProjectID) {
-		return domain.ErrJSONSchemaInvalid().WithDetails("project is not served by the configuration directory")
+		return s.AllStatements.CreateJSONSchema(ctx, entity)
 	}
-	name := entity.URL
-	if entity.ObjectType != nil && *entity.ObjectType != "" {
-		name = *entity.ObjectType
+	// A schema may arrive without an `$id`; the dialect mints its identity.
+	if err := s.ensureID(&entity.URL, domain.PrefixJSONSchema); err != nil {
+		return err
 	}
-	if err := s.config.store.write(schemasDir, fileName(name), entity.Schema); err != nil {
+	// Where this document belongs in the tree.
+	//
+	// The CLI writes its own copy of a schema before uploading it, under its
+	// own file name (`default-human-user.json`), and the server has no way to
+	// know that name. Choosing one from the object type instead produced a
+	// second file for the same schema, and two documents resolving to one id
+	// is worse than either name: a list returned the schema twice and a read
+	// picked whichever came first.
+	//
+	// So an existing document for this object type is the document to write.
+	// Only when none exists does the object type name a new file.
+	name := fileNameForObjectType(s.config.store, entity.ObjectType)
+	if name == "" {
+		name = fileName(entity.URL)
+		if entity.ObjectType != nil && *entity.ObjectType != "" {
+			name = fileName(*entity.ObjectType)
+		}
+	}
+	// The document carries the id the server assigned, so the next read finds
+	// the same schema under the same id.
+	document, err := withID(entity.Schema, "$id", entity.URL)
+	if err != nil {
+		return err
+	}
+	entity.Schema = document
+	if err := s.config.store.write(schemasDir, name, document); err != nil {
 		return err
 	}
 	return s.config.rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, entity.ProjectID, entity.URL))
@@ -113,7 +139,7 @@ func (s *Statements) CreateJSONSchema(ctx context.Context, entity *domain.JSONSc
 // GetJSONSchemaByID implements [service.JSONSchemaStatements].
 func (s *Statements) GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
 	if !s.config.store.serves(projectID) {
-		return nil, new(database.NoRowFoundError)
+		return s.AllStatements.GetJSONSchemaByID(ctx, projectID, schemaID)
 	}
 	schemas, err := s.config.store.loadJSONSchemas()
 	if err != nil {
@@ -137,6 +163,10 @@ func (s *Statements) ListJSONSchemas(
 	// no authorization filter must fail rather than return the world. The SQL
 	// dialects check this inside compileList; there is no compiler here, so it
 	// is checked directly.
+	if projectID, ok := projectIDFromFilter(filter.Filter, domain.JSONSchemaFieldProjectID); !ok ||
+		!s.config.store.serves(projectID) {
+		return s.AllStatements.ListJSONSchemas(ctx, filter, opts)
+	}
 	if err := authz.RequireManagementListFilter(ctx); err != nil {
 		return nil, err
 	}
@@ -195,7 +225,7 @@ func latestPerObjectType(schemas []*domain.JSONSchema) []*domain.JSONSchema {
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (s *Statements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	if !s.config.store.serves(projectID) {
-		return new(database.NoRowFoundError)
+		return s.AllStatements.DeleteJSONSchemaByID(ctx, projectID, schemaID)
 	}
 	schema, err := s.GetJSONSchemaByID(ctx, projectID, schemaID)
 	if err != nil {
@@ -236,4 +266,29 @@ func (s *Statements) visibleResourceIDs(ctx context.Context) (map[string]struct{
 // diagnostics.
 func (s *Store) schemaFilePath(handle string) string {
 	return filepath.Join(s.root, schemasDir, fileName(handle)+".json")
+}
+
+// fileNameForObjectType returns the file already holding this object type, or
+// empty when the tree has none. Reading the tree is what lets a create adopt a
+// document the CLI authored rather than writing a rival copy beside it.
+func fileNameForObjectType(store *Store, objectType *string) string {
+	if objectType == nil || *objectType == "" {
+		return ""
+	}
+	entries, err := store.readDir(schemasDir)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		var doc struct {
+			ObjectType string `json:"objectType"`
+		}
+		if err := json.Unmarshal(e.bytes, &doc); err != nil {
+			continue
+		}
+		if doc.ObjectType == *objectType {
+			return e.name
+		}
+	}
+	return ""
 }

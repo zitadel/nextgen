@@ -117,6 +117,7 @@ func TestSchemasListFromDisk(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "machine.json"), schemaDoc("machine", "M"), 0o600))
 
 	res, err := stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), testProject),
 		Pagination: database.Page[domain.JSONSchemaField]{
 			OrderBy: database.OrderBy[domain.JSONSchemaField]{
 				Columns: []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldURL)},
@@ -131,6 +132,7 @@ func TestSchemasListFromDisk(t *testing.T) {
 	// A file added after the list, served by the next one.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "device.json"), schemaDoc("device", "D"), 0o600))
 	res, err = stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), testProject),
 		Pagination: database.Page[domain.JSONSchemaField]{
 			OrderBy: database.OrderBy[domain.JSONSchemaField]{
 				Columns: []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldURL)},
@@ -167,7 +169,7 @@ func TestSchemaListFailsClosedWithoutAnAuthzFilter(t *testing.T) {
 	require.NoError(t, os.MkdirAll(dir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "human-user.json"), schemaDoc("human-user", "H"), 0o600))
 
-	_, err := stmts.ListJSONSchemas(t.Context(), &database.ListOptions[domain.JSONSchemaField]{}, service.JSONSchemaQueryOptions{})
+	_, err := stmts.ListJSONSchemas(t.Context(), &database.ListOptions[domain.JSONSchemaField]{Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), testProject)}, service.JSONSchemaQueryOptions{})
 	require.ErrorIs(t, err, service.ErrListFilterRequired)
 }
 
@@ -191,6 +193,7 @@ func TestSchemaListNarrowsToAuthorizedIDs(t *testing.T) {
 	filter.ResourceKind = domain.ResourceKindSchema
 	ctx := service.WithAuthzListFilter(t.Context(), filter)
 	res, err := stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), testProject),
 		Pagination: database.Page[domain.JSONSchemaField]{
 			OrderBy: database.OrderBy[domain.JSONSchemaField]{
 				Columns: []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldURL)},
@@ -212,7 +215,7 @@ func TestSchemaListRejectsAnUnparseableFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(dir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "broken.json"), []byte("{not json"), 0o600))
 
-	_, err := stmts.ListJSONSchemas(unrestricted(t), &database.ListOptions[domain.JSONSchemaField]{}, service.JSONSchemaQueryOptions{})
+	_, err := stmts.ListJSONSchemas(unrestricted(t), &database.ListOptions[domain.JSONSchemaField]{Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), testProject)}, service.JSONSchemaQueryOptions{})
 	require.Error(t, err)
 	assert.Equal(t, domain.ErrJSONSchemaInvalid().Code, err.(domain.Error).Code)
 }
@@ -223,7 +226,7 @@ func TestMissingTreeReadsEmpty(t *testing.T) {
 	t.Parallel()
 
 	stmts, _, _ := newStatements(t)
-	res, err := stmts.ListJSONSchemas(unrestricted(t), &database.ListOptions[domain.JSONSchemaField]{}, service.JSONSchemaQueryOptions{})
+	res, err := stmts.ListJSONSchemas(unrestricted(t), &database.ListOptions[domain.JSONSchemaField]{Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), testProject)}, service.JSONSchemaQueryOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, res.Items)
 }
