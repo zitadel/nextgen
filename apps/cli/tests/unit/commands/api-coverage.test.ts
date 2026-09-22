@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
 import { describe, expect, it } from "vitest";
 
@@ -44,15 +47,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
-  // Variables are a management resource (ADR 062), not file-authored: only the
-  // `${{ NAME }}` placeholders live in `.zitadel/`. They are excluded because
-  // they do not fit this surface's grammar, not because they are configuration.
-  // A variable has no id, the list returns a map keyed by name rather than
-  // rows, and the write is one RFC 7386 merge over the whole map where `null`
-  // removes. That is an upsert on a collection, so it would need a `set` verb
-  // and map rendering, which no other resource has. `gh` models them the same
-  // way, with `gh variable set` rather than create and update.
-  variables: "a management resource, but keyed by name with a merge write; needs a shape decision",
 };
 
 /**
@@ -62,7 +56,8 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
  */
 const NOT_CALLED: Readonly<Record<string, string>> = {
   // Bootstrap and the claim flow belong to their own commands.
-  createProject: "unauthenticated bootstrap minting secrets into .zitadel/secret; `zitadel setup` owns it",
+  createProject:
+    "unauthenticated bootstrap minting secrets into .zitadel/secret; `zitadel setup` owns it",
   initClaim: "the browser claim flow; `zitadel claim` calls it",
   getClaimStatus: "the browser claim flow; `zitadel claim` calls it",
   // These two are reached by nothing in the CLI at all — not the registry, not
@@ -73,9 +68,11 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
 
   // Configuration is written declaratively (ADR 035), never imperatively here.
   createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createBranding: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+  createBranding:
+    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
-  createFlowDefinition: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+  createFlowDefinition:
+    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
@@ -88,17 +85,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // Session and passkey protocol, driven by the SDKs and the login flow.
   createSession: "a session is minted for an end user by the SDKs and the login flow",
   exchangeHandoff: "part of the login handoff protocol",
-  beginUserPasskeyRegistration: "WebAuthn registration needs an authenticator, which a terminal is not",
-  finishUserPasskeyRegistration: "WebAuthn registration needs an authenticator, which a terminal is not",
-
-  // Per-environment variables and secrets (ADR 062) are configuration: they
-  // are authored in `.zitadel/` and shipped through a release, so the CLI does
-  // not write them, and there is no read worth a command that `deploy` does
-  // not already cover.
-  getVariables: "per-environment configuration, authored in .zitadel/ and deployed",
-  getVariable: "per-environment configuration, authored in .zitadel/ and deployed",
-  updateVariables: "per-environment configuration, authored in .zitadel/ and deployed",
-  deleteVariable: "per-environment configuration, authored in .zitadel/ and deployed",
+  beginUserPasskeyRegistration:
+    "WebAuthn registration needs an authenticator, which a terminal is not",
+  finishUserPasskeyRegistration:
+    "WebAuthn registration needs an authenticator, which a terminal is not",
 
   // ADR 063's revision routes. The CLI has no grammar for a sub-resource
   // listing (`idps revisions <id>`) and inventing verbs for one resource is
@@ -152,6 +142,40 @@ const clientOperations = (): ClientOperations => {
  */
 const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as const;
 
+/**
+ * Collections served by hand-written commands rather than the registry, with
+ * the command files that serve them.
+ *
+ * Variables sit outside the registry's grammar: a variable has no id, the list
+ * is a map keyed by name rather than rows, and the write is one RFC 7386 merge
+ * where `null` removes — an upsert, which is why the commands use `set` rather
+ * than create and update, as `gh variable set` does (ADR 062, ADR 064).
+ */
+const STANDALONE: Readonly<Record<string, readonly string[]>> = {
+  variables: ["variables/list", "variables/get", "variables/set", "variables/delete"],
+};
+
+/**
+ * The client operations the standalone commands call, read from their sources.
+ * The registry's evidence is which client properties its verbs touch; a
+ * `client.<operation>(` call site is the same evidence, so a command that stops
+ * calling an operation leaves that operation unaccounted and this test fails.
+ */
+const standaloneOperations = async (): Promise<ReadonlySet<string>> => {
+  const sources = await Promise.all(
+    Object.values(STANDALONE)
+      .flat()
+      .map((command) =>
+        readFile(join(import.meta.dirname, "../../../src/commands", `${command}.ts`), "utf8"),
+      ),
+  );
+  return new Set(
+    sources.flatMap((source) =>
+      [...source.matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string),
+    ),
+  );
+};
+
 /** The client operations the registry's verbs actually invoke. */
 const calledOperations = async (): Promise<ReadonlySet<string>> => {
   const called = new Set<string>();
@@ -182,9 +206,10 @@ const calledOperations = async (): Promise<ReadonlySet<string>> => {
 describe("the CLI covers the API client", () => {
   it("calls, or explains, every operation the client offers", async () => {
     const called = await calledOperations();
+    const standalone = await standaloneOperations();
     const unaccounted = [...clientOperations()]
       .filter(([operation, collection]) => {
-        if (called.has(operation) || operation in NOT_CALLED) {
+        if (called.has(operation) || standalone.has(operation) || operation in NOT_CALLED) {
           return false;
         }
         return !(collection in NOT_RESOURCES);
@@ -194,15 +219,16 @@ describe("the CLI covers the API client", () => {
     expect(
       unaccounted,
       `The API client offers operations the CLI neither calls nor explains: ${unaccounted.join(", ")}. ` +
-        "Add or extend a registry entry in src/commands/resources.ts, or add the operation to " +
-        "NOT_CALLED in this test with the reason it stays unexposed.",
+        "Add or extend a registry entry in src/commands/resources.ts, call it from a command listed " +
+        "in STANDALONE, or add the operation to NOT_CALLED in this test with the reason it stays unexposed.",
     ).toEqual([]);
   });
 
   it("has a registry entry, or a reason, for every collection", async () => {
     const topics = new Set(Object.keys(RESOURCES).map((topic) => topic.replaceAll("-", "_")));
     const unaccounted = [...new Set(clientOperations().values())].filter(
-      (collection) => !topics.has(collection) && !(collection in NOT_RESOURCES),
+      (collection) =>
+        !topics.has(collection) && !(collection in NOT_RESOURCES) && !(collection in STANDALONE),
     );
 
     expect(
