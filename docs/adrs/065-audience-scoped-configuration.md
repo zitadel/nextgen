@@ -110,7 +110,7 @@ Rules of the shape:
 Adding a parameter means Zitadel defines, for that parameter alone:
 
 - **Match semantics** — which part of the request context it compares against.
-- **A rank in the specificity order** (rule 3 below) — inserting a tier, never
+- **A rank in the specificity order** (rule 4 below) — inserting a tier, never
   reordering existing ones.
 
 Because an absent parameter is no restriction (see Format), every existing
@@ -126,32 +126,43 @@ document keeps its exact meaning when a parameter is added.
    no field-level merge with the project default: a team-scoped password
    policy that omits `history_depth` gets that field's built-in default, not
    the project document's value.
-3. **Specificity is fixed by Zitadel, per parameter.** Effective today:
-   team match > project default. The reserved `app_ids` tier sits above team
-   (the order flow resolution already implements, dormant until an
-   application resource exists). A document never carries its own priority.
-4. **Parameters on one document are alternatives, not a conjunction.** A
-   document listing both `app_ids` and `team_ids` matches a request through
-   either, and matches at the highest specificity any of its parameters
-   reaches. "This team *and* that app" is not expressible.
-5. **Cross-tier overlap is not a tie — specificity decides.** When a request
-   matches several documents through *different* parameters, the order in
-   rule 3 picks exactly one winner: a request for `team-1` through `app-1`,
-   matching a team-scoped document and an app-scoped one, gets the app-scoped
-   document entirely. Release validation should warn when a scoped document
-   shadows another this way for a reachable combination.
-6. **Same-tier ties resolve newest-first.** Two active documents matching at
-   the same specificity resolve to the most recently created (`created_at`,
-   then id — the shipped flow behaviour). For policies, release validation
-   instead rejects two documents for the same operation whose audiences
-   overlap at the same tier, per #899's conflicts-rejected-at-validation
-   requirement.
+3. **Parameters on one document are a conjunction.** A document matches a
+   request only when **every** parameter it binds matches — the convention of
+   matcher objects everywhere (keys AND, values within a key OR). So
+   `{"team_ids": ["team_1"], "app_ids": ["app_1"]}` means "team-1 *through*
+   app-1". A union across dimensions is expressed as separate documents, one
+   per alternative.
+4. **More constrained is more specific.** Among the documents matching a
+   request, the winner is decided by the *set* of parameters each binds:
+   a document binding a strict superset of another's parameters is more
+   specific; between documents binding incomparable sets, the one binding
+   the highest-ranked parameter wins. The rank is fixed by Zitadel — the
+   reserved app tier above team, both above the unscoped project default —
+   and a document never carries its own priority.
+5. **Worked overlap example.** A request for `team-1` through `app-1`
+   matching document A `{team_ids: [team_1]}`, document B
+   `{app_ids: [app_1]}`, and document C
+   `{team_ids: [team_1], app_ids: [app_1]}` resolves to C — it binds a
+   superset. Without C, B beats A on parameter rank. Release validation
+   should warn when a scoped document shadows another this way for a
+   reachable combination.
+6. **Same-specificity ties resolve newest-first.** Two active documents
+   binding equivalent parameter sets and both matching resolve to the most
+   recently created (`created_at`, then id — the shipped flow behaviour).
+   For policies, release validation instead rejects two documents for the
+   same operation whose audiences overlap at equal specificity, per #899's
+   conflicts-rejected-at-validation requirement.
 7. **Fallback strictness depends on the consumer.** Flow resolution is
    routing: hints are client-supplied suggestions, so when no better tier
    exists a scoped definition still resolves rather than failing the login.
    Policy evaluation is enforcement: a scoped policy must **never** apply
    outside its audience, and a request matching no document falls back to the
    catalogue's built-in defaults.
+
+The shipped flow resolver (`flowAudienceScore`) predates this ADR and treats
+parameters as alternatives with single-tier scoring; it must be aligned to
+the conjunction semantics above. Only team hints carry real traffic today, so
+the change is behaviour-neutral in practice.
 
 ### Defaults and per-audience overrides
 
@@ -221,11 +232,13 @@ Accepted, with eyes open:
   same team are a conflict the hierarchy cannot express (one slot per node);
   under audience it takes release validation to surface (rule 6).
 - **Cross-parameter shadowing is silent.** An app-scoped document outranks a
-  team-scoped one for every request where both match (rule 5), so a team's
+  team-scoped one for every request where both match (rules 4–5), so a team's
   stricter policy is bypassed for logins through that app — deterministic,
   but easy to author by accident because the two documents name different
-  resources and never look like duplicates. Making both contribute is #899's
-  composition layer, out of scope here.
+  resources and never look like duplicates. Conjunction gives the admin an
+  authored fix — a document binding team *and* app for the intersection —
+  but nothing forces authoring it; making overlapping documents contribute
+  jointly is #899's composition layer, out of scope here.
 
 What the model buys in exchange: it matches #899's single-owner split of
 ownership and applicability, it keeps every document inside the release
