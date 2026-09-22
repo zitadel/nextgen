@@ -7,7 +7,8 @@ required:
   - user_verified
 properties:
   method:
-    $ref: ../schemas/factor-method.yaml
+    type: string
+    enum: [passkey]
     description: Always `passkey`; the discriminator of the payload union.
   credential_id:
     type: string

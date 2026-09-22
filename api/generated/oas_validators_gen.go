@@ -5341,6 +5341,15 @@ func (s *IdentifierFactorPayload) Validate() error {
 	return nil
 }
 
+func (s IdentifierFactorPayloadMethod) Validate() error {
+	switch s {
+	case "identifier":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *IdpConnection) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -6874,6 +6883,15 @@ func (s PasskeyFactorPayloadAuthenticatorAttachment) Validate() error {
 	}
 }
 
+func (s PasskeyFactorPayloadMethod) Validate() error {
+	switch s {
+	case "passkey":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *PasswordFactorPayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -6895,6 +6913,15 @@ func (s *PasswordFactorPayload) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s PasswordFactorPayloadMethod) Validate() error {
+	switch s {
+	case "password":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *PatchMyUserRequest) Validate() error {
