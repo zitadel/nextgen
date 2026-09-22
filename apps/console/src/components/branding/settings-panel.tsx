@@ -83,9 +83,17 @@ export function SettingsPanel({ revision }: Props) {
   const radius = revision.shape?.radius;
 
   return (
-    <div className="flex h-full flex-col gap-2 overflow-y-auto px-3 py-4">
+    // A landmark named by its own title, so the panel is addressable as a
+    // region: the screen's h1 is "Branding" too, and a test that walks up
+    // from the h2 lands on the header, not the panel.
+    <section
+      aria-labelledby="branding-panel-title"
+      className="flex h-full flex-col gap-2 overflow-y-auto px-3 py-4"
+    >
       <header className="flex flex-col gap-2 py-2">
-        <h2 className={PANEL_TITLE}>Branding</h2>
+        <h2 id="branding-panel-title" className={PANEL_TITLE}>
+          Branding
+        </h2>
         {/* The design ends this with a "Learn more" link. Held back until the
             docs page it should point at exists — the current branding page
             covers ejecting Liquid templates, not these settings. */}
@@ -141,7 +149,7 @@ export function SettingsPanel({ revision }: Props) {
       <PaletteSection side="dark" revision={revision} issues={issues} />
       <PaletteSection side="light" revision={revision} issues={issues} />
       <Separator />
-    </div>
+    </section>
   );
 }
 

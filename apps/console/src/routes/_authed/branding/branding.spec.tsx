@@ -98,9 +98,10 @@ describe("branding screen", () => {
     expect(rowValue("Font family")).toHaveTextContent("Arimo, sans-serif");
     expect(rowValue("Corner radius")).toHaveTextContent("Medium");
     expect(rowValue("Logo dark")).toHaveTextContent("https://cdn.example.com/on-dark.svg");
-    const panel = screen.getByRole("heading", { name: "Branding", level: 2 }).closest("div");
-    expect(within(panel as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
-    expect(within(panel as HTMLElement).queryByRole("combobox")).not.toBeInTheDocument();
+    const panel = screen.getByRole("region", { name: "Branding" });
+    expect(within(panel).getByText("Corner radius")).toBeInTheDocument();
+    expect(within(panel).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("shows the maintained defaults when nothing has been published", async () => {

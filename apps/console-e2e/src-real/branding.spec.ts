@@ -65,7 +65,8 @@ test("shows the branding in use without a control to change it", async ({ page, 
 
   // The values are changed in the project configuration. The panel is a
   // description list, and the only textbox on the page is the preview's own.
-  const panel = page.getByRole("heading", { name: "Branding", level: 2 }).locator("..");
+  const panel = page.getByRole("region", { name: "Branding" });
+  await expect(panel.getByText("Corner radius")).toBeVisible();
   await expect(panel.getByRole("textbox")).toHaveCount(0);
   await expect(panel.getByRole("combobox")).toHaveCount(0);
   // A fresh instance has no revision, so the rows read the maintained defaults.
