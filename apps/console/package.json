@@ -17,6 +17,8 @@
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
     "@zitadel/sdk-react": "workspace:*",
     "class-variance-authority": "catalog:",
