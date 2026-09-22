@@ -18,10 +18,13 @@ a policy lives on the instance as the default, an organization overrides it,
 and evaluation walks up the tree from the resource to the instance. The
 hierarchy is both the ownership model and the applicability model at once.
 
-Nextgen has no such tree. A project owns teams and applications as flat
-resources, and [#899](https://github.com/zitadel/nextgen/issues/899) fixes the
-model: every setting and policy has **one explicit owner**, and *which requests
-it affects* is declared separately from *who owns it*.
+Nextgen keeps a containment hierarchy — project > team > user
+([`hierarchy.md`](../design/api/hierarchy.md)) — but it is a **data
+hierarchy, not a configuration-inheritance chain**: nothing about containing
+a resource implies contributing to its configuration.
+[#899](https://github.com/zitadel/nextgen/issues/899) makes the split
+explicit: every setting and policy has **one explicit owner**, and *which
+requests it affects* is declared separately from *who owns it*.
 
 Flow definitions already ship the mechanism that fills that second half: an
 optional `audience` on the definition, with empty-means-project-default and
@@ -226,7 +229,8 @@ Accepted, with eyes open:
 
 What the model buys in exchange: it matches #899's single-owner split of
 ownership and applicability, it keeps every document inside the release
-lifecycle where the whole configuration is validated together, and it does not
-force a tenant tree onto a resource model that no longer has one. The future
+lifecycle where the whole configuration is validated together, and it keeps
+configuration decoupled from the containment hierarchy instead of turning
+containment back into an inheritance chain. The future
 models #899 sketches — default inheritance, restrictive inheritance, explicit
 overrides — remain buildable per control on top of audience resolution.
