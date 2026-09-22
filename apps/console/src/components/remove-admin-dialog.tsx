@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 
 import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
-import { getConsoleProjectId } from "../runtime/runtime";
 
 /**
  * The revoke confirmation (`Remove admin?` frame).
@@ -25,7 +24,8 @@ import { getConsoleProjectId } from "../runtime/runtime";
  * grant carries.
  *
  * **The copy is literally true.** `DELETE /grants/{id}` revokes one binding on
- * one project. It does not touch the user record, and it does not touch any
+ * one project — the `projectId` the section passes in, since the screen lists
+ * admins per project rather than the console's own (#1238). It does not touch the user record, and it does not touch any
  * other grant that person holds, so the design's "their user account isn't
  * deleted, and their other team memberships aren't affected" is accurate rather
  * than reassuring.
@@ -34,6 +34,7 @@ import { getConsoleProjectId } from "../runtime/runtime";
  * grant is reversible by adding the person again, where deleting a user is not.
  */
 export function RemoveAdminDialog({
+  projectId,
   grantId,
   name,
   level,
@@ -41,6 +42,8 @@ export function RemoveAdminDialog({
   onOpenChange,
   onRemoved,
 }: {
+  /** The project the grant lives on. */
+  projectId: string;
   grantId: string;
   name: string;
   /** The relation being revoked, title-cased, e.g. `Admin`. */
@@ -61,6 +64,7 @@ export function RemoveAdminDialog({
             Holding that state out here instead would carry a failed attempt's
             message into the next one. */}
         <RemoveAdminBody
+          projectId={projectId}
           grantId={grantId}
           name={name}
           level={level}
@@ -73,12 +77,14 @@ export function RemoveAdminDialog({
 }
 
 function RemoveAdminBody({
+  projectId,
   grantId,
   name,
   level,
   onOpenChange,
   onRemoved,
 }: {
+  projectId: string;
   grantId: string;
   name: string;
   level: string;
@@ -92,7 +98,7 @@ function RemoveAdminBody({
     setSubmitting(true);
     setError(undefined);
     try {
-      await api.deleteGrant(grantId, { project_id: getConsoleProjectId() });
+      await api.deleteGrant(grantId, { project_id: projectId });
       // Raised before the dialog closes, from the root-mounted toaster.
       toast.success(`${name} removed`, {
         description: "They no longer have access to this project.",

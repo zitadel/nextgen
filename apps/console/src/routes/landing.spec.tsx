@@ -50,8 +50,10 @@ describe("landing routes", () => {
   });
 
   it("lands on Admins from settings", async () => {
+    // The pane lists admins per project the person can act on (#1238); with no
+    // project it asks for no grants.
     server.use(
-      http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
+      http.get("http://localhost/api/users/me/projects", () => HttpResponse.json({ projects: [] })),
     );
     const router = await renderAt("/settings");
 

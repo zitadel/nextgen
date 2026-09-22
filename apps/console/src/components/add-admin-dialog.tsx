@@ -25,10 +25,14 @@ import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
 import { field } from "../lib/record";
 import { userIdentifier, userIdentity } from "../lib/user";
-import { getConsoleProjectId } from "../runtime/runtime";
 
 /**
- * Give an existing person admin access to this project (#769).
+ * Give an existing person admin access to a project (#769).
+ *
+ * **The project is the caller's.** Settings → Admins renders one of these per
+ * project the signed-in person can act on, so the grant is created against the
+ * section's `projectId` — never the console's own platform project, whose grants
+ * are not the ones anyone means (#1238).
  *
  * **The colleague must already have signed up.** A grant binds a `user_id`,
  * so there is nobody to bind until the account exists — which is why this picks
@@ -51,12 +55,15 @@ import { getConsoleProjectId } from "../runtime/runtime";
  */
 export function AddAdminDialog({
   children,
+  projectId,
   onAdded,
   alreadyAdmins,
 }: {
   children: ReactNode;
+  /** The project the grant is created on. */
+  projectId: string;
   onAdded: () => void;
-  /** Principal ids that already hold an `admin` grant on this project. */
+  /** Principal ids that already hold an `admin` grant on that project. */
   alreadyAdmins: readonly string[];
 }) {
   const [open, setOpen] = useState(false);
@@ -78,6 +85,7 @@ export function AddAdminDialog({
             selection, its error or its people list behind. */}
         {open && (
           <AddAdminForm
+            projectId={projectId}
             alreadyAdmins={alreadyAdmins}
             onDone={() => {
               setOpen(false);
@@ -101,10 +109,12 @@ interface Person {
 }
 
 function AddAdminForm({
+  projectId,
   alreadyAdmins,
   onDone,
   onCancel,
 }: {
+  projectId: string;
   alreadyAdmins: readonly string[];
   onDone: () => void;
   onCancel: () => void;
@@ -144,7 +154,7 @@ function AddAdminForm({
     try {
       await api.createGrant(
         { user: { user_id: selected.id }, relation: "admin" },
-        { project_id: getConsoleProjectId() },
+        { project_id: projectId },
       );
       toast.success(`${selected.label} added`, {
         description: "They now have admin access to this project.",
