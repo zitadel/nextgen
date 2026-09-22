@@ -1,11 +1,11 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createZitadelClient } from "@zitadel/api/client";
-import { ZitadelLogin, type ZitadelProject } from "@zitadel/sdk-react";
-import { useMemo } from "react";
+import { ZitadelLogin } from "@zitadel/sdk-react";
 
 import { apiBase } from "../api/zitadel";
 import { fetchSession, sanitizeNextPath } from "../auth/session";
 import { ZitadelMark } from "../components/app-shell/icons";
+import { useConsoleProject } from "../hooks/use-console-project";
 import { getConsoleProjectId, getPublishableKey } from "../runtime/runtime";
 import { useTheme } from "../theme";
 
@@ -100,21 +100,13 @@ async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
 function LoginScreen() {
   const { next } = Route.useSearch();
   const { resolved: theme } = useTheme();
-  const projectId = getConsoleProjectId();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const postSignInUrl = `${base}${next ?? "/"}` || "/";
 
-  // Stable per config tuple: a fresh object every render would re-set the
-  // element property and miss the SDK's per-handle client cache. The
-  // runtime-discovered publishable key (root ADR 036) makes the widget send
-  // the public-plane bearer itself — the handoff exchange then needs no
-  // server-side secret injection.
-  const publishableKey = getPublishableKey();
-  const project = useMemo<ZitadelProject | undefined>(
-    () =>
-      projectId ? Object.freeze({ projectId, proxyPath: apiBase, publishableKey }) : undefined,
-    [projectId, publishableKey],
-  );
+  // With the runtime-discovered publishable key the widget sends the
+  // public-plane bearer itself, so the handoff exchange needs no server-side
+  // secret injection.
+  const project = useConsoleProject();
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background px-4 py-10">
