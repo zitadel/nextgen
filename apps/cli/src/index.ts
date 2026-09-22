@@ -14,6 +14,10 @@ import Setup from "./commands/setup/index";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
+import VariablesDelete from "./commands/variables/delete";
+import VariablesGet from "./commands/variables/get";
+import VariablesList from "./commands/variables/list";
+import VariablesSet from "./commands/variables/set";
 
 /**
  * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
@@ -38,5 +42,9 @@ export const COMMANDS: Record<string, typeof Command> = {
   status: Status,
   stop: Stop,
   "branding:eject": BrandingEject,
+  "variables:list": VariablesList,
+  "variables:get": VariablesGet,
+  "variables:set": VariablesSet,
+  "variables:delete": VariablesDelete,
   ...RESOURCE_COMMANDS,
 };

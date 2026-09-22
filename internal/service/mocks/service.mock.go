@@ -3449,6 +3449,45 @@ func (c *MockAllStatementsHandoffAuthAttemptCall) DoAndReturn(f func(context.Con
 	return c
 }
 
+// HasActiveOwningTeamGrant mocks base method.
+func (m *MockAllStatements) HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasActiveOwningTeamGrant", ctx, teamID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasActiveOwningTeamGrant indicates an expected call of HasActiveOwningTeamGrant.
+func (mr *MockAllStatementsMockRecorder) HasActiveOwningTeamGrant(ctx, teamID any) *MockAllStatementsHasActiveOwningTeamGrantCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasActiveOwningTeamGrant", reflect.TypeOf((*MockAllStatements)(nil).HasActiveOwningTeamGrant), ctx, teamID)
+	return &MockAllStatementsHasActiveOwningTeamGrantCall{Call: call}
+}
+
+// MockAllStatementsHasActiveOwningTeamGrantCall wrap *gomock.Call
+type MockAllStatementsHasActiveOwningTeamGrantCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsHasActiveOwningTeamGrantCall) Return(arg0 bool, arg1 error) *MockAllStatementsHasActiveOwningTeamGrantCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsHasActiveOwningTeamGrantCall) Do(f func(context.Context, string) (bool, error)) *MockAllStatementsHasActiveOwningTeamGrantCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsHasActiveOwningTeamGrantCall) DoAndReturn(f func(context.Context, string) (bool, error)) *MockAllStatementsHasActiveOwningTeamGrantCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // HasAuthzProjectFoothold mocks base method.
 func (m *MockAllStatements) HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
 	m.ctrl.T.Helper()
@@ -10373,6 +10412,45 @@ func (c *MockAuthzAssignmentStatementsGetAuthzAssignmentCall) Do(f func(context.
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsGetAuthzAssignmentCall) DoAndReturn(f func(context.Context, string, string) (*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsGetAuthzAssignmentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// HasActiveOwningTeamGrant mocks base method.
+func (m *MockAuthzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasActiveOwningTeamGrant", ctx, teamID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasActiveOwningTeamGrant indicates an expected call of HasActiveOwningTeamGrant.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) HasActiveOwningTeamGrant(ctx, teamID any) *MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasActiveOwningTeamGrant", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).HasActiveOwningTeamGrant), ctx, teamID)
+	return &MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall) Return(arg0 bool, arg1 error) *MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall) Do(f func(context.Context, string) (bool, error)) *MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall) DoAndReturn(f func(context.Context, string) (bool, error)) *MockAuthzAssignmentStatementsHasActiveOwningTeamGrantCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
