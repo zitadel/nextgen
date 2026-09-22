@@ -43971,15 +43971,10 @@ func (s *IdentifierProof) encodeFields(e *jx.Encoder) {
 		e.FieldStart("login_name")
 		e.Str(s.LoginName)
 	}
-	{
-		e.FieldStart("attribute_name")
-		e.Str(s.AttributeName)
-	}
 }
 
-var jsonFieldsNameOfIdentifierProof = [2]string{
+var jsonFieldsNameOfIdentifierProof = [1]string{
 	0: "login_name",
-	1: "attribute_name",
 }
 
 // Decode decodes IdentifierProof from json.
@@ -44003,18 +43998,6 @@ func (s *IdentifierProof) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"login_name\"")
 			}
-		case "attribute_name":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.AttributeName = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"attribute_name\"")
-			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
 		}
@@ -44025,7 +44008,7 @@ func (s *IdentifierProof) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -92141,19 +92124,6 @@ func (s *VerifyChallengeRequestSum) Decode(d *jx.Decoder) error {
 	if err := d.Capture(func(d *jx.Decoder) error {
 		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
 			switch string(key) {
-			case "attribute_name":
-				// Type-based discrimination: check if field has expected JSON type
-				if typ := d.Next(); typ != jx.String {
-					// Field exists but has wrong type, not a match for this variant
-					return d.Skip()
-				}
-				match := IdentifierProofVerifyChallengeRequestSum
-				if found && s.Type != match {
-					s.Type = ""
-					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
-				}
-				found = true
-				s.Type = match
 			case "login_name":
 				// Type-based discrimination: check if field has expected JSON type
 				if typ := d.Next(); typ != jx.String {

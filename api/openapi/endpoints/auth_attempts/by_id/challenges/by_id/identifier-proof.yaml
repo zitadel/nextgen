@@ -3,21 +3,16 @@ type: object
 description: |
   Proof for `identifier` method.
 
-  A project decides for itself which attributes identify a user — a login flow
-  step collects `email`, `username`, `phone`, or several of them — so the proof
-  names the attribute the value belongs to rather than the server assuming one.
-  The attribute must be registered unique for the project; a value matching only
-  a non-unique property resolves nobody.
+  The login name is resolved against the designated identifier (`x-identifier`)
+  of every user schema in the project, and must identify exactly one user; none,
+  or users of more than one schema, rejects the proof. The caller does not name
+  the property: which property identifies users is the project's decision, made
+  in its user schemas (ADR 058 §5).
 required:
   - login_name
-  - attribute_name
 additionalProperties: false
 properties:
   login_name:
     type: string
     description: The value being identified, as the user typed it.
     example: alice@acme.com
-  attribute_name:
-    type: string
-    description: The user attribute `login_name` is a value of.
-    example: email

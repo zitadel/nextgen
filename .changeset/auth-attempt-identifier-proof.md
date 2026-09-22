@@ -1,8 +1,6 @@
 ---
-"@zitadel/server": major
-"@zitadel/api": major
+"@zitadel/server": patch
+"@zitadel/api": patch
 ---
 
-An identifier proof now says which attribute its value belongs to, so a client can authenticate without a rendered login step. `POST /auth_attempts/{id}/challenges/{id}/verify` takes a required `attribute_name` alongside `login_name`: a project decides for itself whether users are identified by `email`, `username` or something else, and the login flow reads that from the step it rendered — a client that renders nothing had no way to say it, so the proof resolved no user and the whole auth-attempt API could not sign anyone in. The factor payloads in an attempt response now also declare the `method` they are discriminated on, which the server always sent but the schema forbade, so a generated client can decode a completed password factor.
-
-Both are breaking schema changes: a request built against the previous schema omits `attribute_name`, and a response decoder generated from it rejects a payload's `method`. Neither could have had a working consumer — the identifier proof resolved nobody, and a completed password factor failed to decode — but a client generated from the old spec still needs regenerating.
+The auth-attempt API can now identify a user, so a client that renders no login step can sign one in. `POST /auth_attempts/{id}/challenges/{id}/verify` resolved an identifier proof against an attribute with an empty name, which matched nobody, so every proof was rejected. It now resolves the login name as ADR 058 §5 defines: against the designated identifier (`x-identifier`) of each user schema in the project, among that schema's users and uniquely registered values only, and it must identify exactly one user — none, or users of more than one schema, rejects the proof. The request is unchanged; the caller never names the property. The completed-factor payloads in an attempt response now also declare the `method` they are discriminated on, pinned per variant, which the server always sent but the schema forbade.
