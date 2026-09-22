@@ -142,7 +142,13 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           value={value}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => {
+            setValue(event.target.value);
+            // The message described the address that was refused. Editing makes
+            // it a different address, so the message and the invalid state go
+            // with the old one rather than waiting for the next submit.
+            setError(undefined);
+          }}
         />
         <FieldError id={errorId}>{error}</FieldError>
       </Field>

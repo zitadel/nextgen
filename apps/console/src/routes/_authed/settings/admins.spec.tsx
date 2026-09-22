@@ -241,6 +241,17 @@ describe("admins screen", () => {
     expect(input).toBeInvalid();
     expect(input).toHaveAccessibleDescription(SELF_MESSAGE);
     expect(created).toHaveLength(0);
+
+    // Editing makes it a different address, and the refusal was about the old
+    // one. `FieldError` renders nothing at all when it has no message, so the
+    // alert is gone rather than empty. The replacement is a well-formed
+    // address on purpose: `toBeInvalid` also reads native constraint
+    // validation, so appending to this one would fail the format check and say
+    // nothing about the error that was meant to be cleared.
+    await userEvent.clear(input);
+    await userEvent.type(input, "colleague@acme.com");
+    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+    expect(input).not.toBeInvalid();
   });
 
   it("leaves a malformed address to the browser", async () => {
