@@ -1,5 +1,5 @@
-import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, within } from "@testing-library/react";
+import { RouterProvider, createBrowserHistory, createMemoryHistory } from "@tanstack/react-router";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -422,5 +422,45 @@ describe("claim window countdown", () => {
     // the project is still claimable for another nine days.
     expect(await screen.findByText("Claim link expired")).toBeInTheDocument();
     expect(await screen.findByText("Expires in 9 days")).toBeInTheDocument();
+  });
+
+  it("does not spend the challenge when the widget's history sentinel moves the router", async () => {
+    // The widget keeps a back-gesture sentinel on the history stack (ADR 022)
+    // and retires it with a traversal. The popstate that fires is a navigation
+    // to the router; a loader that reloaded on it could see the session the
+    // handoff exchange has just created and complete the claim in a document
+    // the widget's own navigation is about to replace — the next document then
+    // spends again and is told the project is already claimed.
+    fetchSession.mockResolvedValue(null);
+    const bodies = stubComplete(() =>
+      HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_personal",
+        claimed_at: "2026-08-24T10:00:00Z",
+      }),
+    );
+    window.history.replaceState(null, "", CLAIM_PATH);
+    const router = createAppRouter({ history: createBrowserHistory() });
+    const { unmount } = render(<RouterProvider router={router} />);
+    try {
+      await screen.findByTestId("zitadel-login");
+      expect(fetchSession).toHaveBeenCalledTimes(1);
+
+      // The exchange landed: a fresh read would now find a session.
+      fetchSession.mockResolvedValue(makeTestSession());
+      window.history.pushState({ zl: true }, "");
+      window.history.back();
+      // jsdom delivers the popstate asynchronously; wait until the router has
+      // seen it before asserting that it changed nothing.
+      await waitFor(() => expect(router.state.location.state).not.toMatchObject({ zl: true }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(screen.getByTestId("zitadel-login")).toBeInTheDocument();
+      expect(fetchSession).toHaveBeenCalledTimes(1);
+      expect(bodies).toHaveLength(0);
+    } finally {
+      unmount();
+      window.history.replaceState(null, "", "/");
+    }
   });
 });

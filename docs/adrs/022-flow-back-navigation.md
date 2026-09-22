@@ -1,7 +1,7 @@
 # ADR 022: Flow Back-Navigation
 
 > **Status:** Accepted
-> **Date:** 2026-05-21 (revised 2026-07-29 to match the shipped implementation)
+> **Date:** 2026-05-21 (revised 2026-07-29 to match the shipped implementation; revised 2026-09-22 for terminal steps that navigate away)
 > **Context:** Flow engine step traversal, browser History API, `<zitadel-login>` orchestrator
 
 ## Decision
@@ -94,6 +94,24 @@ browser's native back gesture fire `popstate` instead of leaving the page.
      `popstate` handler skips stale sentinels in one extra hop from
      either direction. The next back press then navigates the host page —
      the flow is transparent to history once back is unavailable.
+   - **Exception — a terminal step that navigates away** (`complete:
+     "redirect"`, or `complete: "show"` with a `post-sign-in-url`, i.e.
+     `completing` is set): retire the sentinel **in place** with
+     `history.replaceState({ ...state, zl: false })`, never with a
+     traversal. `history.back()` fires `popstate` in the host, and a host
+     router that reloads its route on `popstate` (TanStack Router, and
+     any router that treats a history move as a navigation) would re-run
+     that route's loader while the handoff exchange is establishing the
+     session — reading the session in the very document the widget is
+     about to replace and acting on it there. The console claim page spent
+     its single-use claim challenge exactly that way, once before the
+     navigation and once after it, and reported the developer's own claim
+     as "already claimed". Retiring in place fires no event, so the host
+     sees nothing until the real full-document navigation. The retired
+     entry stays under the destination (a same-URL destination replaces
+     it, since a same-URL `location.assign` is a replace); a back press
+     from there lands on the host page signed in — the same one-hop
+     stale-sentinel tolerance as the host-pushed-entry case above.
    - Arming only on the unarmed → armed transition means consecutive
      back-capable steps — and re-renders of the *same* step, e.g. after a
      failed submit — never grow the stack.
@@ -145,6 +163,7 @@ sentinel makes those states unrepresentable:
 | Host pushes an entry above the sentinel (e.g. `#anchor`) | Backing out of it lands on the sentinel → no-op, widget stays armed |
 | Multiple rapid back presses | Each `popstate` re-arms; submits are serialized by the loading guard, so presses during an in-flight submit are absorbed |
 | Embedded in a SPA with its own router | Router navigation via `pushState`/`replaceState` fires no `popstate`; when disarmed the handler only reacts to its own tagged (`zl`) entries |
+| Terminal step that navigates away while armed | Sentinel retired in place with `replaceState` — no `popstate`, so a host router cannot reload its route on the session the handoff has just created; the entry is overwritten by the navigation (same URL) or left under it (different URL) |
 
 ### Template rendering
 
@@ -239,7 +258,13 @@ increases flow abandonment.
   `history` array (see `flow-engine-storage.md`) and from the semantics
   of the actions it executes.
 - **`zitadel-login.ts`** — gains the sentinel arm/retire logic in
-  `applyResponse` and the `popstate` handler described above.
+  `applyResponse` and the `popstate` handler described above, including
+  the in-place retirement for terminal steps that navigate away.
+- **Hosts that render the widget and complete something on the session**
+  (the console claim page) — must still read the session once per
+  document rather than on every navigation the router observes
+  (`shouldReload: false` on the claim route), so the double-spend cannot
+  return through a future change to the retirement path.
 - **Templates** — the default template and the branding design catalog
   exclude `kind: "back"` from the generic secondary-action loop and
   render no control for it.
