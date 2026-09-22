@@ -1179,6 +1179,9 @@ func decodeCreateGrantResponse(resp *http.Response) (res CreateGrantRes, _ error
 		default:
 			return res, validate.InvalidContentType(ct)
 		}
+	case 202:
+		// Code 202.
+		return &CreateGrantAccepted{}, nil
 	case 400:
 		// Code 400.
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
