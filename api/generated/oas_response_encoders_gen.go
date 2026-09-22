@@ -571,6 +571,12 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 
 		return nil
 
+	case *CreateGrantAccepted:
+		w.WriteHeader(202)
+		span.SetStatus(codes.Ok, http.StatusText(202))
+
+		return nil
+
 	case *CreateGrantBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
