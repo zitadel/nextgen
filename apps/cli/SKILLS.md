@@ -347,10 +347,10 @@ docker --image <ref>` remains the explicit image override for debugging.
 
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
-- `plan`, `apply` and the resource commands take no `--environment`: the
-  config they read and write belongs to the project, which every environment
-  shares. `variables` is the only command group that addresses an environment;
-  `deploy` (ADR 035) will be the one that targets one with config.
+- `plan`, `apply` and the resource commands take no `--environment`: they
+  work on the project's resources and do not select an environment.
+  `variables` is the only command group that addresses an environment; putting
+  config onto an environment is `deploy`'s job (ADR 035).
 - `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
   findings as `{path, rule, message}`, the same text the human plan prints as
   `# warning:` lines and `apply` prints through stderr. They never fail a run.
