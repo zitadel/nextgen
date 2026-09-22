@@ -91,17 +91,6 @@ func TestPasswordPolicyCheck(t *testing.T) {
 			wantLookup: true,
 		},
 		{
-			name:      "audit mode records the stricter rule but does not block",
-			instances: []*policy.Instance{instance(t, `{"kind":"policy","operation":"user.password.save","enforcement":"audit","config":{"min_length":20}}`)},
-			candidate: long,
-		},
-		{
-			name:      "audit mode still enforces the baseline",
-			instances: []*policy.Instance{instance(t, `{"kind":"policy","operation":"user.password.save","enforcement":"audit","config":{"min_length":20}}`)},
-			candidate: "short",
-			wantRules: []string{"min_length"},
-		},
-		{
 			name:      "length counts code points after NFC, not bytes",
 			candidate: strings.Repeat("e\u0301", 8), // 8 decomposed é: 24 bytes, 16 code points raw, 8 after NFC
 			wantRules: []string{"min_length"},

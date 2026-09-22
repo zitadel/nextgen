@@ -127,16 +127,14 @@ func (e *Engine) DefaultInstance(operation string) (*Instance, error) {
 		cfg[name] = setting.Default
 	}
 	return &Instance{
-		Kind:        KindPolicy,
-		Operation:   operation,
-		Enforcement: EnforcementEnforce,
-		Config:      cfg,
+		Kind:      KindPolicy,
+		Operation: operation,
+		Config:    cfg,
 	}, nil
 }
 
 // ValidateInstance checks an instance against its template: known operation,
-// known settings, values within bounds, valid enforcement mode. This is what
-// release validation runs.
+// known settings, values within bounds. This is what release validation runs.
 func (e *Engine) ValidateInstance(inst *Instance) error {
 	ct, ok := e.templates[inst.Operation]
 	if !ok {
@@ -177,18 +175,11 @@ func (e *Engine) Warnings(inst *Instance) ([]Warning, error) {
 	return out, nil
 }
 
-// Decision is the outcome of one evaluation.
-//
-// Allow is false when the operation must be rejected; Violations are the
-// rules that failed. Under `enforcement: audit` the template defaults are
-// still enforced: a rule that fails under the defaults blocks, a rule that
-// fails only under the instance's stricter values is reported in Audited and
-// the operation proceeds. Audit mode can therefore roll out a stricter policy
-// but never weaken the baseline.
+// Decision is the outcome of one evaluation: Allow is false when the
+// operation must be rejected, and Violations are the rules that failed.
 type Decision struct {
 	Allow      bool        `json:"allow"`
 	Violations []Violation `json:"violations,omitempty"`
-	Audited    []Violation `json:"audited,omitempty"`
 }
 
 // Violation names a failed rule and echoes the public settings it reads,
@@ -215,30 +206,7 @@ func (e *Engine) Evaluate(ctx context.Context, inst *Instance, requestContext ma
 	if err != nil {
 		return Decision{}, err
 	}
-	if inst.Blocks() {
-		return Decision{Allow: len(violations) == 0, Violations: violations}, nil
-	}
-	// Audit: the baseline (template defaults) still blocks; only what the
-	// instance tightened beyond it is audited.
-	defaults, err := e.DefaultInstance(inst.Operation)
-	if err != nil {
-		return Decision{}, err
-	}
-	baselineCfg, err := effectiveConfig(ct.Template, defaults)
-	if err != nil {
-		return Decision{}, err
-	}
-	blocking, err := ct.evaluate(ctx, baselineCfg, requestContext)
-	if err != nil {
-		return Decision{}, err
-	}
-	decision := Decision{Allow: len(blocking) == 0, Violations: blocking}
-	for _, v := range violations {
-		if !slices.ContainsFunc(blocking, func(b Violation) bool { return b.Rule == v.Rule }) {
-			decision.Audited = append(decision.Audited, v)
-		}
-	}
-	return decision, nil
+	return Decision{Allow: len(violations) == 0, Violations: violations}, nil
 }
 
 // evaluate runs every rule over one config and returns the violations, in

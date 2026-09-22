@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"log/slog"
 	"unicode/utf8"
 
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -60,9 +59,8 @@ func (p *PasswordPolicy) FieldValidation(ctx context.Context, projectID string) 
 }
 
 // Check evaluates the policy for a candidate password. It returns
-// [domain.ErrUserPasswordPolicyViolation] on a blocking deny and nil when the
-// operation may proceed. Under `enforcement: audit` the template defaults
-// still block; what the instance tightened beyond them is only recorded.
+// [domain.ErrUserPasswordPolicyViolation] on a deny and nil when the
+// operation may proceed.
 func (p *PasswordPolicy) Check(ctx context.Context, stmts AllStatements, projectID, userID, candidate string) error {
 	candidate = domain.NormalizePassword(candidate)
 	inst, err := policy.Effective(ctx, p.engine, p.resolver, projectID, PasswordSaveOperation, policy.Hint{})
@@ -76,15 +74,6 @@ func (p *PasswordPolicy) Check(ctx context.Context, stmts AllStatements, project
 	decision, err := p.engine.Evaluate(ctx, inst, requestContext)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to evaluate password policy")
-	}
-	if len(decision.Audited) > 0 {
-		// TODO(ADR 066): record the audited violations as a wide event once
-		// the event type is catalogued; until then they are only logged.
-		slog.WarnContext(ctx, "password policy audit: stricter rules not met",
-			slog.String("project_id", projectID),
-			slog.String("user_id", userID),
-			slog.Any("violations", decision.Audited),
-		)
 	}
 	if decision.Allow {
 		return nil
