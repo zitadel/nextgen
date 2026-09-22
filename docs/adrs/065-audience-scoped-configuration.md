@@ -249,3 +249,34 @@ configuration decoupled from the containment hierarchy instead of turning
 containment back into an inheritance chain. The future
 models #899 sketches — default inheritance, restrictive inheritance, explicit
 overrides — remain buildable per control on top of audience resolution.
+
+## Prior art in policy-as-code products
+
+Declared-applicability on the policy document — rather than placement in a
+resource tree — is the established policy-as-code shape:
+
+- **[OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/howto)** —
+  a Constraint carries `spec.match` (kinds, namespaces, label selectors)
+  naming what it applies to; the set of match dimensions is closed and
+  engine-defined, like this ADR's parameter set. Differs in combination:
+  every matching constraint applies (composition), no single winner.
+- **[Kyverno](https://kyverno.io/docs/policy-types/cluster-policy/match-exclude/)** —
+  policies declare `match`/`exclude` blocks over resources, namespaces, and
+  subjects; same declared-applicability pattern, same compose-all-matches
+  divergence.
+- **[Kubernetes label selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)** —
+  the matcher-object convention rule 3 adopts: keys are a conjunction, values
+  within a key are alternatives.
+- **[Istio AuthorizationPolicy](https://istio.io/latest/docs/reference/config/security/authorization-policy/)** —
+  workload `selector` plus a fixed engine-defined precedence between policy
+  kinds (`CUSTOM` > `DENY` > `ALLOW`); precedence owned by the engine, never
+  by the document, like rule 4's fixed parameter rank.
+- **[GitHub repository rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)** —
+  rulesets target branches by pattern, and when several match, the strictest
+  rule wins per control. The closest shipped precedent for the opt-in floor
+  this ADR defers to release validation.
+
+The single-winner, most-specific-match resolution itself (rules 2, 4) has its
+precedent in longest-prefix routing and CSS specificity rather than in these
+engines — the PaC products above compose all matching policies, which is
+exactly the #899 composition layer this ADR leaves for later.
