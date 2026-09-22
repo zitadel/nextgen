@@ -24789,17 +24789,15 @@ func (s *IdentifierFactorPayloadMethod) UnmarshalText(data []byte) error {
 }
 
 // Proof for `identifier` method.
-// A project decides for itself which attributes identify a user — a login flow
-// step collects `email`, `username`, `phone`, or several of them — so the proof
-// names the attribute the value belongs to rather than the server assuming one.
-// The attribute must be registered unique for the project; a value matching only
-// a non-unique property resolves nobody.
+// The login name is resolved against the designated identifier (`x-identifier`)
+// of every user schema in the project, and must identify exactly one user; none,
+// or users of more than one schema, rejects the proof. The caller does not name
+// the property: which property identifies users is the project's decision, made
+// in its user schemas (ADR 058 §5).
 // Ref: #
 type IdentifierProof struct {
 	// The value being identified, as the user typed it.
 	LoginName string `json:"login_name"`
-	// The user attribute `login_name` is a value of.
-	AttributeName string `json:"attribute_name"`
 }
 
 // GetLoginName returns the value of LoginName.
@@ -24807,19 +24805,9 @@ func (s *IdentifierProof) GetLoginName() string {
 	return s.LoginName
 }
 
-// GetAttributeName returns the value of AttributeName.
-func (s *IdentifierProof) GetAttributeName() string {
-	return s.AttributeName
-}
-
 // SetLoginName sets the value of LoginName.
 func (s *IdentifierProof) SetLoginName(val string) {
 	s.LoginName = val
-}
-
-// SetAttributeName sets the value of AttributeName.
-func (s *IdentifierProof) SetAttributeName(val string) {
-	s.AttributeName = val
 }
 
 // Ref: #

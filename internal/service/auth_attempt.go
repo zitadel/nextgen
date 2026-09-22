@@ -208,7 +208,14 @@ type Proof interface {
 	proofCheckType() domain.AuthCheckType
 }
 
-// UserProof identifies the user by login name (email, username, phone).
+// UserProof identifies the user by login name.
+//
+// AttributeName names the property the login name is a value of. The flow path
+// sets it from the step it rendered, whose field must be the bound schema's
+// designated identifier. Left empty — the direct-API path, which renders
+// nothing — the login name resolves against the designated identifier of every
+// user schema in the project instead, and must match exactly one user
+// (ADR 058 §5). A caller never chooses the property.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
@@ -594,6 +601,82 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 	}
 }
 
+var (
+	errNoIdentifierMatch   = errors.New("no user is identified by the login name")
+	errAmbiguousIdentifier = errors.New("the login name identifies users of more than one schema")
+)
+
+// resolveIdentifier finds the user a login name identifies: by the named
+// property when the flow supplied one, otherwise by the project's designated
+// identifiers.
+func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID string, p UserProof) (*domain.User, error) {
+	if p.AttributeName != "" {
+		return s.users.GetByAttributes(ctx, projectID, []domain.Attribute{{
+			Key:   domain.AttributeKey(p.AttributeName),
+			Value: p.LoginName,
+		}})
+	}
+	return s.resolveDesignatedIdentifier(ctx, projectID, p.LoginName)
+}
+
+// resolveDesignatedIdentifier resolves a bare login name as ADR 058 §5 defines
+// for the direct API. Each user schema in the project designates one
+// identifier property (`x-identifier`); the value is looked up in that
+// property, among that schema's users, and only among uniquely registered
+// values — so an equal value in an undesignated or non-unique property can
+// never match. It must identify exactly one user across all schemas: none, or
+// users of several schemas, rejects the proof. Never by precedence, which is
+// how one user's username could shadow another's email at login.
+//
+// Every stored revision is consulted, not only the latest: users keep the
+// schema URL they were created under, so each revision's own designation
+// governs its users.
+func (s *authAttemptService) resolveDesignatedIdentifier(ctx context.Context, projectID, loginName string) (*domain.User, error) {
+	stmts := s.stmts.Statements()
+	// A login resolve, not a management list: nobody is signed in yet, so there
+	// is no caller whose grants could narrow it (as user refs resolve the same
+	// listing).
+	list := listUserSchemas(WithAuthzListUnrestricted(ctx), stmts, projectID)
+	first, err := list(nil)
+	if err != nil {
+		return nil, err
+	}
+	var match *domain.User
+	for schema, err := range first.Iterate(list) {
+		if err != nil {
+			return nil, err
+		}
+		identifier := domain.DesignatedIdentifier(schema.Schema)
+		if identifier == "" {
+			continue
+		}
+		user, err := stmts.GetUser(ctx,
+			database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				database.Equal(database.Col(domain.UserFieldSchemaURL), schema.URL),
+			),
+			UserQueryOptions{
+				Attributes:           []domain.Attribute{{Key: domain.AttributeKey(identifier), Value: loginName}},
+				UniqueAttributesOnly: true,
+			},
+		)
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if match != nil && match.ID != user.ID {
+			return nil, errAmbiguousIdentifier
+		}
+		match = user
+	}
+	if match == nil {
+		return nil, errNoIdentifierMatch
+	}
+	return match, nil
+}
+
 // verify dispatches proof verification to the appropriate secondary port.
 // Returns the checker to persist (always, even on failure), an optional
 // closure with extra writes that must commit atomically with the check
@@ -605,10 +688,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
-			Key:   domain.AttributeKey(p.AttributeName),
-			Value: p.LoginName,
-		}})
+		user, err := s.resolveIdentifier(ctx, attempt.ProjectID, p)
 		if err != nil {
 			return userChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
