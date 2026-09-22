@@ -23,6 +23,11 @@ func (h *Handler) CreateGrant(ctx context.Context, req *api.CreateGrantRequest, 
 	if err != nil {
 		return nil, err
 	}
+	if input.Identifier != "" {
+		// Hit, duplicate, miss and ambiguity all land here: an empty 202
+		// leaves nothing to compare and no id to replay through user_id.
+		return &api.CreateGrantAccepted{}, nil
+	}
 	return grantResponse(grant)
 }
 
