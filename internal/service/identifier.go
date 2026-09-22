@@ -14,36 +14,29 @@ import (
 // which from the outcome.
 var errIdentifierUnresolved = errors.New("identifier unresolved")
 
-// identifierUsers selects which users an identifier lookup may resolve to.
-// Each caller states it explicitly: whether an inactive user can be reached by
-// identifier is decided per surface, not inherited from a shared default.
-type identifierUsers uint8
-
-const (
-	anyUserStatus identifierUsers = iota
-	activeUsersOnly
-)
-
 // resolveDesignatedUser resolves a bare identifier value against the
 // designated identifier (`x-identifier`) of every user schema in the project.
 // Each designated property is looked up among the users of the schemas that
 // designate it and among uniquely registered values only, so an equal value in
 // an undesignated or non-unique property never matches. The value must
 // identify exactly one user; none, or several, is errIdentifierUnresolved —
-// never resolved by precedence between schemas. area names the log stream the
-// unresolved outcomes are recorded under.
-func resolveDesignatedUser(ctx context.Context, stmts AllStatements, projectID, value string, users identifierUsers, area string) (*domain.User, error) {
+// never resolved by precedence between schemas. activeOnly restricts the match
+// to active users; each caller passes it explicitly, since whether an inactive
+// user can be reached by identifier is decided per surface. area names the log
+// stream the unresolved outcomes are recorded under.
+func resolveDesignatedUser(ctx context.Context, stmts AllStatements, projectID, value string, activeOnly bool, area string) (*domain.User, error) {
 	urlsByKey, err := designatedIdentifierKeys(ctx, stmts, projectID)
 	if err != nil {
 		return nil, err
 	}
-	found := map[string]*domain.User{}
+	found := map[string]struct{}{}
+	var match *domain.User
 	for key, urls := range urlsByKey {
 		filters := []database.Filter[domain.UserField]{
 			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 			database.Or(equalIDFilters(domain.UserFieldSchemaURL, urls)...),
 		}
-		if users == activeUsersOnly {
+		if activeOnly {
 			filters = append(filters, database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()))
 		}
 		user, err := stmts.GetUser(ctx, database.And(filters...), UserQueryOptions{
@@ -63,7 +56,8 @@ func resolveDesignatedUser(ctx context.Context, stmts AllStatements, projectID, 
 			}
 			return nil, err
 		}
-		found[user.ID] = user
+		found[user.ID] = struct{}{}
+		match = user
 	}
 	if len(found) != 1 {
 		if len(found) > 1 {
@@ -78,10 +72,7 @@ func resolveDesignatedUser(ctx context.Context, stmts AllStatements, projectID, 
 		}
 		return nil, errIdentifierUnresolved
 	}
-	for _, user := range found {
-		return user, nil
-	}
-	return nil, errIdentifierUnresolved
+	return match, nil
 }
 
 // designatedIdentifierKeys maps each x-identifier property to the schema URLs

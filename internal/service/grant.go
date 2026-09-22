@@ -308,7 +308,7 @@ func (s *GrantService) resolveByID(ctx context.Context, stmts AllStatements, pri
 // resolveUserByIdentifier resolves a grant's identifier locator. Only active
 // users can be granted by identifier.
 func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllStatements, home, identifier string) (string, error) {
-	user, err := resolveDesignatedUser(ctx, stmts, home, identifier, activeUsersOnly, "grant")
+	user, err := resolveDesignatedUser(ctx, stmts, home, identifier, true, "grant")
 	if err != nil {
 		return "", err
 	}
