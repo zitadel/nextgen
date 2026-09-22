@@ -204,9 +204,13 @@ function escapeString(s: string): string {
   );
 }
 
-/** A field name as printed: a server-side key is as untrusted as a value. */
+/**
+ * A field name as printed: a server-side key is as untrusted as a value.
+ * Backslashes are doubled first, as `sanitizeResponse` does for keys, so a key
+ * holding a raw ESC and one holding the literal text `\x1b` get two labels.
+ */
 function fieldLabel(key: string): string {
-  return escapeControlCharacters(key, { keepLayout: false });
+  return escapeControlCharacters(key.replaceAll("\\", "\\\\"), { keepLayout: false });
 }
 
 function fmtPrimitive(v: string | number | boolean | null): string {

@@ -416,6 +416,21 @@ describe("renderPlan — string escaping", () => {
     expect(out).not.toContain("\u001b");
   });
 
+  it("gives two keys distinct labels when one spells out the other's escape", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "create",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: { "k\u001b": "raw", "k\\x1b": "literal" },
+        hash: "a",
+      },
+    ];
+    const out = renderPlan(actions, false);
+    expect(out).toContain('+ k\\x1b  = "raw"');
+    expect(out).toContain('+ k\\\\x1b = "literal"');
+  });
+
   // Multi-line strings are documents, not scalars — see the block-string
   // suite below. Escaping one onto a single line is what made a branding
   // plan unreadable.
