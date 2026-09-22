@@ -4,6 +4,10 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+// Safe as a static import where `@/auth/session` is not: the fixture's only
+// dependency on it is a type, which the transform erases.
+import { makeTestSession } from "@/auth/session.fixture";
+
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
@@ -14,6 +18,13 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
+// Loaded after the env stub, for the same reason `renderAdmins` imports the
+// router dynamically: the API client reads its base once, at module load, and a
+// static import would run before the stub and send every request to port 3000.
+const { NEUTRAL_MESSAGE, SELF_MESSAGE } = await import("@/components/add-admin-dialog");
+
+/** The signed-in address, read from the fixture rather than restated here. */
+const SELF = makeTestSession().user?.identifier ?? "";
 const GRANTS_URL = "http://localhost/api/grants";
 const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
 const USERS_QUERY_URL = "http://localhost/api/users/query";
@@ -78,6 +89,32 @@ function stubGrants(...grants: Record<string, unknown>[]) {
     }),
   );
   return bodies;
+}
+
+/**
+ * `POST /grants` by identifier: 202 with no body, whoever the address belongs
+ * to (#1229). The returned array is every body the console sent.
+ */
+function stubCreateGrant() {
+  const bodies: unknown[] = [];
+  server.use(
+    http.post(GRANTS_URL, async ({ request }) => {
+      bodies.push(await request.json());
+      return new HttpResponse(null, { status: 202 });
+    }),
+  );
+  return bodies;
+}
+
+async function openAddAdmin() {
+  await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
+  const dialog = within(await screen.findByRole("dialog"));
+  return {
+    dialog,
+    input: dialog.getByRole("textbox", { name: "Email address" }),
+    // The dialog's own submit, not the trigger that shares its label.
+    submit: dialog.getByRole("button", { name: "Add admin" }),
+  };
 }
 
 describe("admins screen", () => {
@@ -146,121 +183,124 @@ describe("admins screen", () => {
     expect(await screen.findByText("No admins yet.")).toBeInTheDocument();
   });
 
-  it("adds an existing person as an admin", async () => {
+  it("grants by the address that was typed", async () => {
     stubGrants();
-    server.use(
-      http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({
-          users: [
-            {
-              id: "user_9",
-              identifier: "colleague@acme.com",
-              identifier_property: "email",
-              display: "Colleague",
-              attributes: { email: "colleague@acme.com" },
-            },
-          ],
-        }),
-      ),
-    );
-    let created: Record<string, unknown> | undefined;
-    server.use(
-      http.post(GRANTS_URL, async ({ request }) => {
-        created = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ id: "asgn_new" }, { status: 201 });
-      }),
-    );
+    const created = stubCreateGrant();
     await renderAdmins();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
-    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
-    await userEvent.click(await screen.findByRole("option", { name: /Colleague/ }));
-    // The dialog's own submit, not the trigger that shares its label.
-    await userEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Add admin" }),
-    );
+    const { input, submit } = await openAddAdmin();
+    await userEvent.type(input, "colleague@acme.com");
+    await userEvent.click(submit);
 
-    // Bound to the person, at the only level this journey grants (#769).
+    // The identifier locator, at the only level this journey grants (#769).
     await waitFor(() =>
-      expect(created).toEqual({
-        user: { user_id: "user_9" },
+      expect(created.at(-1)).toEqual({
+        user: { identifier: "colleague@acme.com" },
         relation: "admin",
       }),
     );
+    expect(await screen.findByText(NEUTRAL_MESSAGE)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("does not offer people who are already admins", async () => {
-    // `POST /grants` refuses a second grant for the same principal and relation,
-    // so offering them would be offering a choice that cannot work.
-    stubGrants(grant({ user: grantUser({ user_id: "user_9" }) }));
+  it("says the same thing for an address that belongs to nobody", async () => {
+    // The 202 carries no body, so the console has nothing to branch on and the
+    // operator learns nothing about who is registered.
+    stubGrants();
+    stubCreateGrant();
+    let userQueries = 0;
     server.use(
-      http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({
-          users: [
-            { id: "user_9", identifier: "already@acme.com" },
-            { id: "user_8", identifier: "free@acme.com" },
-          ],
-        }),
-      ),
-    );
-    await renderAdmins();
-
-    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
-    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
-
-    expect(await screen.findByRole("option", { name: /free@acme.com/ })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /already@acme.com/ })).not.toBeInTheDocument();
-  });
-
-  it("still offers someone who only holds a lesser relation", async () => {
-    // A viewer can be made an admin: the refusal is per principal *and*
-    // relation, so filtering on the principal alone would hide a real choice.
-    stubGrants(
-      grant({
-        relation: "viewer",
-        user: grantUser({ user_id: "user_9" }),
+      http.post(USERS_QUERY_URL, () => {
+        userQueries += 1;
+        return HttpResponse.json({ users: [] });
       }),
     );
-    server.use(
-      http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_9", identifier: "viewer@acme.com" }] }),
-      ),
-    );
     await renderAdmins();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
-    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
+    const { input, submit } = await openAddAdmin();
+    await userEvent.type(input, "nobody@acme.com");
+    await userEvent.click(submit);
 
-    expect(await screen.findByRole("option", { name: /viewer@acme.com/ })).toBeInTheDocument();
+    expect(await screen.findByText(NEUTRAL_MESSAGE)).toBeInTheDocument();
+    // No directory read: the old picker listed everyone to whoever opened it.
+    expect(userQueries).toBe(0);
+  });
+
+  it("refuses the operator's own address without sending it", async () => {
+    // Different case and surrounding spaces: the comparison is on the trimmed
+    // value, case-insensitively, because the address is the same address.
+    stubGrants();
+    const created = stubCreateGrant();
+    await renderAdmins();
+
+    const { dialog, input, submit } = await openAddAdmin();
+    await userEvent.type(input, "  Test.User@example.com  ");
+    await userEvent.click(submit);
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(SELF_MESSAGE);
+    expect(input).toBeInvalid();
+    expect(input).toHaveAccessibleDescription(SELF_MESSAGE);
+    expect(created).toHaveLength(0);
+
+    // Editing makes it a different address, and the refusal was about the old
+    // one. `FieldError` renders nothing at all when it has no message, so the
+    // alert is gone rather than empty. The replacement is a well-formed
+    // address on purpose: `toBeInvalid` also reads native constraint
+    // validation, so appending to this one would fail the format check and say
+    // nothing about the error that was meant to be cleared.
+    await userEvent.clear(input);
+    await userEvent.type(input, "colleague@acme.com");
+    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+    expect(input).not.toBeInvalid();
+  });
+
+  it("leaves a malformed address to the browser", async () => {
+    // `type="email"` refuses it before the handler runs, so there is no
+    // console-authored format message to keep in step with the server's.
+    stubGrants();
+    const created = stubCreateGrant();
+    await renderAdmins();
+
+    const { input, submit } = await openAddAdmin();
+    await userEvent.type(input, "not-an-email");
+    await userEvent.click(submit);
+
+    expect(input).toBeInvalid();
+    expect(created).toHaveLength(0);
   });
 
   it("surfaces the API's own message when the grant is refused", async () => {
-    // ADR 030 makes the payload's `message` the human-facing string, so a
-    // duplicate binding explains itself rather than getting console-authored copy.
+    // ADR 030 makes the payload's `message` the human-facing string. Signed in
+    // without an identifier, the console cannot run its own self check, so
+    // self-granting comes back as the API's `grant.invalid` instead. One
+    // resolved value is enough: the guard reads the session once per render,
+    // and this submit fails, so nothing invalidates the route and reads it again.
+    const { fetchSession } = await import("@/auth/session");
+    // A schema that designates no identifier leaves the field off the session
+    // user entirely, rather than carrying it as undefined.
+    const { user, ...session } = makeTestSession();
+    vi.mocked(fetchSession).mockResolvedValueOnce({
+      ...session,
+      user: user && { user_id: user.user_id, display: user.display },
+    });
     stubGrants();
     server.use(
-      http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_9", identifier: "dupe@acme.com" }] }),
-      ),
       http.post(GRANTS_URL, () =>
         HttpResponse.json(
-          { code: "grant.already_exists", message: "This principal already has that access." },
-          { status: 409 },
+          { code: "grant.invalid", message: "you cannot grant access to yourself" },
+          { status: 400 },
         ),
       ),
     );
     await renderAdmins();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
-    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
-    await userEvent.click(await screen.findByRole("option", { name: /dupe@acme.com/ }));
-    await userEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Add admin" }),
-    );
+    const { dialog, input, submit } = await openAddAdmin();
+    await userEvent.type(input, SELF);
+    await userEvent.click(submit);
 
-    expect(
-      await screen.findByText("This principal already has that access."),
-    ).toBeInTheDocument();
+    expect(await dialog.findByRole("alert")).toHaveTextContent(
+      "you cannot grant access to yourself",
+    );
   });
 
   it("names the relation the row holds, not always admin", async () => {
@@ -304,25 +344,6 @@ describe("admins screen", () => {
 
     await screen.findByRole("alertdialog");
     expect(screen.queryByText("no such grant")).not.toBeInTheDocument();
-  });
-
-  it("says the list could not be loaded rather than that everyone is an admin", async () => {
-    // Both cases leave the picker empty; only one of them is the operator's to
-    // act on.
-    stubGrants();
-    server.use(
-      http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
-    await renderAdmins();
-
-    await userEvent.click(await screen.findByRole("button", { name: "Add admin" }));
-    await userEvent.click(await screen.findByRole("combobox", { name: "Person" }));
-
-    expect(
-      await screen.findByText("The people on this project could not be loaded."),
-    ).toBeInTheDocument();
   });
 
   it("removes an admin after confirming", async () => {
