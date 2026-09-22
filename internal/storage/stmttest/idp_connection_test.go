@@ -17,9 +17,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// idpConnectionDocument is a configuration document shaped like the API
-// contract's, but storage never looks inside it: only that the bytes come back
-// as the same JSON object.
+// idpConnectionDocument is shaped like the API contract's document, but storage
+// never looks inside it.
 func idpConnectionDocument(issuer string) []byte {
 	return []byte(`{"protocol":"oidc","issuer":"` + issuer + `","subject_claim":"sub"}`)
 }
@@ -31,15 +30,29 @@ func createIDPConnection(t *testing.T, stmts service.AllStatements, projectID, s
 	return entity
 }
 
+func idpConnectionByID(projectID, id string) database.Filter[domain.IDPConnectionField] {
+	return database.And(
+		database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
+		database.Equal(database.Col(domain.IDPConnectionFieldID), id),
+	)
+}
+
+func idpConnectionBySlug(projectID, slug string) database.Filter[domain.IDPConnectionField] {
+	return database.And(
+		database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
+		database.Equal(database.Col(domain.IDPConnectionFieldSlug), slug),
+	)
+}
+
 func idpConnectionListOptions(projectID string) *database.ListOptions[domain.IDPConnectionField] {
 	return &database.ListOptions[domain.IDPConnectionField]{
 		Filter: database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
 	}
 }
 
-// idpConnectionIDsInDefaultOrder sorts fixtures by the key the default list
-// order pages on — created_at, then id — so an expectation holds even when two
-// connections land on the same timestamp.
+// idpConnectionIDsInDefaultOrder sorts fixtures by the default list key,
+// created_at then id, so an expectation holds when two connections share a
+// timestamp.
 func idpConnectionIDsInDefaultOrder(connections []*domain.IDPConnection) []string {
 	sorted := slices.SortedFunc(slices.Values(connections), func(a, b *domain.IDPConnection) int {
 		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
@@ -51,10 +64,8 @@ func idpConnectionIDsInDefaultOrder(connections []*domain.IDPConnection) []strin
 	return ids
 }
 
-// idpRevisionIDsOldestFirst sorts snapshots of one connection by the key the
-// history list pages on — the revision's creation time, which every read serves
-// as UpdatedAt, then the revision id — ascending, so an expectation holds even
-// when two revises land on the same timestamp.
+// idpRevisionIDsOldestFirst sorts copies of one connection by the history list
+// key, UpdatedAt then the revision id, ascending.
 func idpRevisionIDsOldestFirst(revisions []domain.IDPConnection) []string {
 	sorted := slices.SortedFunc(slices.Values(revisions), func(a, b domain.IDPConnection) int {
 		return cmp.Or(a.UpdatedAt.Compare(b.UpdatedAt), cmp.Compare(a.RevisionID, b.RevisionID))
@@ -74,62 +85,49 @@ func TestIDPConnectionStatements_CreateAndGet(t *testing.T) {
 
 		entity := createIDPConnection(t, d.stmts, projectID, slug, document)
 
-		// Both ids are minted by the dialect, not the caller (ADR 047), and a
-		// revision carries its own prefix rather than the connection's.
+		// The dialect generates both ids, not the caller (ADR 047), and each
+		// carries its own prefix.
 		assert.True(t, domain.PrefixIDPConnection.Matches(entity.ID), "id %q is not idp_-prefixed", entity.ID)
 		assert.True(t, domain.PrefixIDPConnectionRevision.Matches(entity.RevisionID), "revision id %q is not idprev_-prefixed", entity.RevisionID)
 		assert.WithinDuration(t, time.Now(), entity.CreatedAt, 5*time.Second)
-		// UpdatedAt is the creation time of the revision a read serves, and the
-		// first revision is written in the same transaction as the connection —
-		// off the same stamp in every dialect, so a connection nobody has
-		// revised reports the two as one instant, not merely close together.
 		assert.True(t, entity.CreatedAt.Equal(entity.UpdatedAt), "a connection that was never revised must not look edited")
 
-		// The resource-scope index row is what the HTTP management gate reads
-		// to resolve the connection's project, so create writes it in the same
-		// transaction as the rows themselves.
+		// The HTTP management gate reads this row to resolve the connection's
+		// project, so create writes it in the same transaction.
 		scope, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindIDPConnection, projectID, entity.ID)
 		require.NoError(t, err)
 		assert.Equal(t, domain.ResourceKindIDPConnection, scope.ResourceKind)
 		assert.Equal(t, projectID, scope.ProjectID)
 		assert.Nil(t, scope.TeamID)
 
-		byID, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, entity.ID)
+		byID, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, entity.ID))
 		require.NoError(t, err)
 		assert.Equal(t, slug, byID.Slug)
 		assert.Equal(t, entity.RevisionID, byID.RevisionID)
-		// The document round-trips through three JSON representations — JSONB,
-		// Spanner JSON and a TEXT column — and only Spanner's re-serializes, so
-		// the assertion is on the JSON rather than on the bytes.
+		// Spanner re-serializes the document, so the assertion compares JSON
+		// rather than bytes.
 		assert.JSONEq(t, string(document), string(byID.Document))
 
-		bySlug, err := d.stmts.GetIDPConnectionBySlug(t.Context(), projectID, slug)
+		bySlug, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionBySlug(projectID, slug))
 		require.NoError(t, err)
 		assert.Equal(t, entity.ID, bySlug.ID)
 		assert.Equal(t, entity.RevisionID, bySlug.RevisionID)
 
-		// The pinned read serves the same revision the get does, since there is
-		// only one so far.
 		revision, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
 		require.NoError(t, err)
 		assert.Equal(t, entity.ID, revision.ID)
 		assert.Equal(t, entity.RevisionID, revision.RevisionID)
 		assert.JSONEq(t, string(document), string(revision.Document))
 
-		// The connection carries no updated_at of its own, so both reads serve
-		// the same revision row's created_at and cannot drift apart.
 		assert.True(t, byID.UpdatedAt.Equal(revision.UpdatedAt), "the get and the pinned read must report the same revision timestamp")
 		assert.True(t, byID.UpdatedAt.Equal(entity.UpdatedAt), "create must report the timestamp a read serves")
-		// And the two stored rows carry that one instant, not just the two
-		// values create handed back.
 		assert.True(t, byID.CreatedAt.Equal(byID.UpdatedAt), "a connection that was never revised must not read as edited")
 	})
 }
 
-// The slug is what schemas and flow definitions reference a connection by, so a
-// second connection cannot take it. Storage reports the collision as a
-// *database.UniqueError and leaves the service to decide that creating over an
-// existing slug is the revise path.
+// Schemas and flow definitions reference a connection by slug, so a second
+// connection cannot take it. Storage reports the collision as a
+// *database.UniqueError and leaves the service to decide what to do.
 func TestIDPConnectionStatements_SlugUniquePerProject(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -142,8 +140,8 @@ func TestIDPConnectionStatements_SlugUniquePerProject(t *testing.T) {
 	})
 }
 
-// Two projects legitimately name their connections the same, so the slug is
-// unique per project rather than globally.
+// Two projects may use the same slug, so it is unique per project rather than
+// globally.
 func TestIDPConnectionStatements_SlugReusableAcrossProjects(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectA := ensureProject(t, d.stmts)
@@ -156,19 +154,17 @@ func TestIDPConnectionStatements_SlugReusableAcrossProjects(t *testing.T) {
 
 		// A read scoped to project A cannot reach project B's connection even
 		// though the slugs match.
-		got, err := d.stmts.GetIDPConnectionBySlug(t.Context(), projectA, slug)
+		got, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionBySlug(projectA, slug))
 		require.NoError(t, err)
 		assert.Equal(t, connA.ID, got.ID)
 
-		_, err = d.stmts.GetIDPConnectionByID(t.Context(), projectA, connB.ID)
+		_, err = d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectA, connB.ID))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
-// Revising appends: the reads move to the new revision because it carries the
-// greater created_at, while the old one stays readable and unchanged, which is
-// what lets an in-flight auth attempt pin a revision and keep reading the
-// configuration it started with.
+// Revising appends: the reads move to the new revision, which carries the
+// greater created_at, while the old one stays readable and unchanged.
 func TestIDPConnectionStatements_ReviseAppendsRevision(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -185,12 +181,12 @@ func TestIDPConnectionStatements_ReviseAppendsRevision(t *testing.T) {
 		assert.True(t, domain.PrefixIDPConnectionRevision.Matches(entity.RevisionID))
 		assert.False(t, entity.UpdatedAt.Before(entity.CreatedAt), "revising must not move updated_at behind created_at")
 
-		byID, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, entity.ID)
+		byID, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, entity.ID))
 		require.NoError(t, err)
 		assert.Equal(t, entity.RevisionID, byID.RevisionID)
 		assert.JSONEq(t, string(v2Document), string(byID.Document))
 
-		bySlug, err := d.stmts.GetIDPConnectionBySlug(t.Context(), projectID, slug)
+		bySlug, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionBySlug(projectID, slug))
 		require.NoError(t, err)
 		assert.Equal(t, entity.RevisionID, bySlug.RevisionID)
 		assert.JSONEq(t, string(v2Document), string(bySlug.Document))
@@ -201,10 +197,8 @@ func TestIDPConnectionStatements_ReviseAppendsRevision(t *testing.T) {
 		assert.Equal(t, firstRevisionID, pinned.RevisionID)
 		assert.JSONEq(t, string(v1Document), string(pinned.Document), "an appended revision must not rewrite the one before it")
 		assert.Equal(t, slug, pinned.Slug)
-		assert.True(t, pinned.CreatedAt.Equal(byID.CreatedAt), "a revision repeats the connection's birth rather than its own")
+		assert.True(t, pinned.CreatedAt.Equal(byID.CreatedAt), "a revision reports the connection's created_at, not its own")
 
-		// The get's updated_at is the new revision's creation time, to the
-		// instant: it is read off the same row either way.
 		newest, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
 		require.NoError(t, err)
 		assert.True(t, byID.UpdatedAt.Equal(newest.UpdatedAt), "the get must report the revision it serves")
@@ -212,9 +206,8 @@ func TestIDPConnectionStatements_ReviseAppendsRevision(t *testing.T) {
 	})
 }
 
-// The history read pages every revision rather than only the newest: each row
-// repeats the connection's identity and carries the document, revision id and
-// creation time of the revision it stands for, newest first.
+// The history read pages every revision rather than only the newest, newest
+// first.
 func TestIDPConnectionStatements_ListRevisionsNewestFirst(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -245,43 +238,38 @@ func TestIDPConnectionStatements_ListRevisionsNewestFirst(t *testing.T) {
 		got := make([]string, 0, len(result.Items))
 		for _, item := range result.Items {
 			got = append(got, item.RevisionID)
-			// Identity comes from the connection, so every row repeats it; only
-			// the document, the revision id and updated_at vary down the page.
+			// Identity comes from the connection, so only the document, the
+			// revision id and updated_at vary down the page.
 			assert.Equal(t, entity.ID, item.ID)
 			assert.Equal(t, slug, item.Slug)
-			assert.True(t, item.CreatedAt.Equal(entity.CreatedAt), "every revision repeats the connection's birth")
+			assert.True(t, item.CreatedAt.Equal(entity.CreatedAt), "every revision reports the connection's created_at")
 			assert.JSONEq(t, string(byRevisionID[item.RevisionID]), string(item.Document), "revision %q", item.RevisionID)
 		}
 		assert.Equal(t, want, got)
 
-		// The pinned read of the same revision serves the same row, so the two
-		// endpoints agree on updated_at by construction.
 		pinned, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, written[0].RevisionID)
 		require.NoError(t, err)
 		oldest := result.Items[len(result.Items)-1]
 		assert.Equal(t, pinned.RevisionID, oldest.RevisionID)
 		assert.True(t, pinned.UpdatedAt.Equal(oldest.UpdatedAt))
 
-		// A connection nobody can name is an empty page rather than an error:
-		// the handler pairs this with a get to tell an empty history from a
-		// connection that is not there.
+		// An unknown connection is an empty page rather than an error, so the
+		// handler needs a get to tell it from a connection with no revisions.
 		missing, err := d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, "idp_does_not_exist", database.Page[domain.IDPConnectionField]{})
 		require.NoError(t, err)
 		assert.Empty(t, missing.Items)
 
-		// The project scopes the read, so another project's connection id
-		// reaches nothing either.
+		// The project scopes the read, so another project reaches nothing.
 		crossProject, err := d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), otherProject, entity.ID, database.Page[domain.IDPConnectionField]{})
 		require.NoError(t, err)
 		assert.Empty(t, crossProject.Items)
 	})
 }
 
-// Two revises racing on one connection have no head pointer to fight over: each
-// appends a row, and the newest is whichever carries the greater created_at
-// (ADR 063 §7). Two rows on the same instant would leave no newest at all, so
-// the unique index rules that out and the loser of such a tie sees a
-// *database.UniqueError instead of a coin flip.
+// Two revises racing on one connection each append a row, and the newest is
+// the one with the greater created_at (ADR 063 §7). Two rows on the same
+// instant would leave no newest, so the unique index rules that out and the
+// loser gets a *database.UniqueError.
 func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -294,10 +282,9 @@ func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 		entity := createIDPConnection(t, d.stmts, projectID, "race-"+uniqueSuffix(t), v1Document)
 		firstRevisionID := entity.RevisionID
 
-		// Each writer revises its own copy of the entity: the statement writes
-		// RevisionID and UpdatedAt back onto the entity, and Spanner replays a
-		// transaction callback on an ABORTED retry, so a shared struct would be
-		// a data race rather than a test of the storage layer.
+		// Each writer revises its own copy: the statement writes RevisionID and
+		// UpdatedAt back onto the entity, so a shared struct would be a data
+		// race in the test rather than in storage.
 		var (
 			wg       sync.WaitGroup
 			entities [2]domain.IDPConnection
@@ -316,10 +303,8 @@ func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 		landed := map[string][]byte{firstRevisionID: v1Document}
 		for i := range entities {
 			if errs[i] != nil {
-				// The same-instant tie is the only sanctioned failure. A dialect
-				// that surfaces a retryable busy or serialization error here
-				// rather than handling it internally breaks the contract for its
-				// callers.
+				// The same-instant tie is the only allowed failure: a retryable
+				// busy or serialization error is the dialect's to handle.
 				assert.ErrorIs(t, errs[i], new(database.UniqueError), "writer %d", i)
 				continue
 			}
@@ -327,8 +312,8 @@ func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 		}
 		require.Greater(t, len(landed), 1, "both writers lost the tie; at least one revise has to land")
 
-		// Every revision that landed stays readable and keeps its own document,
-		// which is what lets an in-flight auth attempt hold a pin through a race.
+		// Every revision that landed stays readable with its own document, so a
+		// pin survives the race.
 		for revisionID, want := range landed {
 			pinned, err := d.stmts.GetIDPConnectionRevision(t.Context(), projectID, revisionID)
 			require.NoError(t, err, "revision %q", revisionID)
@@ -336,15 +321,14 @@ func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 			assert.JSONEq(t, string(want), string(pinned.Document), "revision %q", revisionID)
 		}
 
-		byID, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, entity.ID)
+		byID, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, entity.ID))
 		require.NoError(t, err)
 		assert.Contains(t, landed, byID.RevisionID, "the get serves a revision nobody wrote")
 		assert.NotEqual(t, firstRevisionID, byID.RevisionID, "a revise that landed supersedes the first revision")
 		assert.JSONEq(t, string(landed[byID.RevisionID]), string(byID.Document))
 		assert.False(t, byID.UpdatedAt.Before(byID.CreatedAt), "revising must not move updated_at behind created_at")
 
-		// The get and the history read the same rows and order them the same
-		// way, so they cannot disagree about which revision is newest.
+		// The get and the history must agree on which revision is newest.
 		history, err := d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, entity.ID, database.Page[domain.IDPConnectionField]{})
 		require.NoError(t, err)
 		require.Len(t, history.Items, len(landed), "the history pages exactly the revisions that landed")
@@ -354,29 +338,27 @@ func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 	})
 }
 
-// Create writes the connection row, its first revision and the resource-scope
-// index row in one transaction, so a failure in any of them must leave nothing
-// behind: a caller that retries would otherwise hit the slug uniqueness of a
-// connection that was never really created.
+// Create writes three rows in one transaction, so a failure must leave nothing
+// behind: a retry would otherwise hit the slug of a connection that was never
+// created.
 func TestIDPConnectionStatements_FailedCreateLeavesNothing(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		slug := "rollback-" + uniqueSuffix(t)
 
 		// Valid JSON of the wrong shape: the connection insert succeeds and the
-		// revision's document CHECK (jsonb_typeof / JSON_TYPE / json_type =
-		// 'object') rejects the array, in every dialect.
+		// revision's document CHECK rejects the array, in every dialect.
 		entity := &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: []byte(`[]`)}
 		require.Error(t, d.stmts.CreateIDPConnection(t.Context(), entity))
-		// Both ids are minted before the write, so the rows they would have
-		// named are the ones to go looking for.
+		// The ids are generated before the write, so they name the rows to look
+		// for.
 		require.NotEmpty(t, entity.ID)
 		require.NotEmpty(t, entity.RevisionID)
 
-		_, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, entity.ID)
+		_, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, entity.ID))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-		_, err = d.stmts.GetIDPConnectionBySlug(t.Context(), projectID, slug)
+		_, err = d.stmts.GetIDPConnection(t.Context(), idpConnectionBySlug(projectID, slug))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError), "the slug must be free for the retry")
 
 		_, err = d.stmts.GetIDPConnectionRevision(t.Context(), projectID, entity.RevisionID)
@@ -388,8 +370,8 @@ func TestIDPConnectionStatements_FailedCreateLeavesNothing(t *testing.T) {
 }
 
 // Revising a connection that is not there must fail rather than leave a
-// revision hanging off no connection: the composite foreign key is what catches
-// it, and storage reports that as a clean not-found.
+// revision without a connection. The foreign key catches it and storage reports
+// a not-found.
 func TestIDPConnectionStatements_ReviseUnknownIsNoRowFound(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -410,16 +392,16 @@ func TestIDPConnectionStatements_GetMissesAreNoRowFound(t *testing.T) {
 		slug := "miss-" + uniqueSuffix(t)
 		entity := createIDPConnection(t, d.stmts, projectID, slug, idpConnectionDocument("https://miss.example.com"))
 
-		_, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, "idp_does_not_exist")
+		_, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, "idp_does_not_exist"))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-		_, err = d.stmts.GetIDPConnectionBySlug(t.Context(), projectID, slug+"-nope")
+		_, err = d.stmts.GetIDPConnection(t.Context(), idpConnectionBySlug(projectID, slug+"-nope"))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-		_, err = d.stmts.GetIDPConnectionByID(t.Context(), otherProject, entity.ID)
+		_, err = d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(otherProject, entity.ID))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-		_, err = d.stmts.GetIDPConnectionBySlug(t.Context(), otherProject, slug)
+		_, err = d.stmts.GetIDPConnection(t.Context(), idpConnectionBySlug(otherProject, slug))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		_, err = d.stmts.GetIDPConnectionRevision(t.Context(), otherProject, entity.RevisionID)
@@ -442,9 +424,9 @@ func TestIDPConnectionStatements_ListIsProjectScopedOldestFirst(t *testing.T) {
 		}
 		createIDPConnection(t, d.stmts, otherProject, "other-"+suffix, idpConnectionDocument("https://other.example.com"))
 
-		// Sorted by the key the default order uses rather than by insertion:
-		// two connections can land on the same created_at, and the id that
-		// breaks that tie is a UUID on Spanner, unrelated to insertion order.
+		// Sorted by the default key rather than by insertion: two connections
+		// can share a created_at, and the id that breaks the tie is a UUID on
+		// Spanner.
 		want := idpConnectionIDsInDefaultOrder(created)
 
 		result, err := d.stmts.ListIDPConnections(unfilteredListCtx(t), idpConnectionListOptions(projectID))
@@ -455,9 +437,8 @@ func TestIDPConnectionStatements_ListIsProjectScopedOldestFirst(t *testing.T) {
 			assert.Equal(t, projectID, item.ProjectID)
 			got = append(got, item.ID)
 		}
-		// EnsureListOptions defaults to created_at + id ascending, so oldest
-		// first — the divergence from flow definitions and releases, which
-		// default to newest first.
+		// The default order is created_at + id ascending, unlike flow
+		// definitions and releases, which default to newest first.
 		assert.Equal(t, want, got)
 	})
 }
@@ -481,21 +462,18 @@ func TestIDPConnectionStatements_ListServesLatestDocument(t *testing.T) {
 	})
 }
 
-// The query contract lets a caller narrow a list by slug and by creation time,
-// and both columns are alias-qualified in idpconnection.Schema (`c.slug`,
-// `c.created_at`) because the read joins the connection to its revisions, where
-// `slug` would be unambiguous only by accident and `created_at` exists on both
-// sides. Filtering on them here is what catches a binding that points at the
-// wrong alias or a time value the dialect fails to coerce.
+// A caller can narrow a list by slug and by creation time. Both columns belong
+// to the connection, not the revision, so filtering on them catches a schema
+// binding that points at the wrong table or a time value a dialect fails to
+// coerce.
 func TestIDPConnectionStatements_ListFiltersBySlugAndCreatedAt(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		suffix := uniqueSuffix(t)
 		latest := idpConnectionDocument("https://v3.example.com")
 
-		// Gaps between the writes so the three fixtures land on distinct
-		// created_at values: without them two connections can share an instant
-		// and a strict time bound would have no subset left to select.
+		// Gaps between the writes give the three fixtures distinct created_at
+		// values, so a strict time bound has a subset to select.
 		created := make([]*domain.IDPConnection, 0, 3)
 		for _, name := range []string{"a", "b", "c"} {
 			if len(created) > 0 {
@@ -503,12 +481,10 @@ func TestIDPConnectionStatements_ListFiltersBySlugAndCreatedAt(t *testing.T) {
 			}
 			created = append(created, createIDPConnection(t, d.stmts, projectID, "filter-"+name+"-"+suffix, idpConnectionDocument("https://v1.example.com")))
 		}
-		// The newest and the oldest connection are each revised twice, in that
-		// order, so the oldest one ends up carrying the most recent revision of
-		// the whole set. A filter has to compose with the newest-revision
-		// anti-join: the rows it selects carry the latest document, and the
-		// time bound it compares against is the connection's birth, not the
-		// revision's.
+		// The newest and then the oldest connection are revised twice each, so
+		// the oldest one carries the most recent revision of the set. A filter
+		// must still select the newest revision, and its time bound must
+		// compare against the connection's created_at, not the revision's.
 		for _, entity := range []*domain.IDPConnection{created[2], created[0]} {
 			for _, document := range [][]byte{idpConnectionDocument("https://v2.example.com"), latest} {
 				entity.Document = document
@@ -524,7 +500,7 @@ func TestIDPConnectionStatements_ListFiltersBySlugAndCreatedAt(t *testing.T) {
 			return got
 		}
 		// Every filter is ANDed with the project scope the endpoint always
-		// applies, which is how a caller reaches these columns at all.
+		// applies.
 		list := func(t *testing.T, filter database.Filter[domain.IDPConnectionField], limit uint32) *database.ListResult[*domain.IDPConnection] {
 			t.Helper()
 			opts := idpConnectionListOptions(projectID)
@@ -535,44 +511,40 @@ func TestIDPConnectionStatements_ListFiltersBySlugAndCreatedAt(t *testing.T) {
 			return result
 		}
 
-		// A slug is unique per project, so equality on it picks out exactly one
-		// connection — served on the revision it was last revised to.
+		// A slug is unique per project, so equality on it selects one
+		// connection, on its newest revision.
 		bySlug := list(t, database.Equal(database.Col(domain.IDPConnectionFieldSlug), created[0].Slug), 0)
 		require.Len(t, bySlug.Items, 1)
 		assert.Equal(t, created[0].ID, bySlug.Items[0].ID)
 		assert.Equal(t, created[0].RevisionID, bySlug.Items[0].RevisionID)
 		assert.JSONEq(t, string(latest), string(bySlug.Items[0].Document))
 
-		// The bound comes from a stored row rather than from what create wrote
-		// back: the Spanner emulator's THEN RETURN reports a created_at a few
-		// hundred microseconds off the value it commits, which a strict
-		// comparison would turn into a coin flip.
-		oldest, err := d.stmts.GetIDPConnectionByID(t.Context(), projectID, created[0].ID)
+		// The bound comes from a stored row, not from what create wrote back:
+		// the Spanner emulator's THEN RETURN reports a created_at a few hundred
+		// microseconds off the value it commits.
+		oldest, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, created[0].ID))
 		require.NoError(t, err)
 
 		after := list(t, database.GreaterThan(database.Col(domain.IDPConnectionFieldCreatedAt), oldest.CreatedAt), 0)
-		// Sorted by the key the default order pages on rather than by insertion,
-		// same as the unfiltered list test. created[0] falls outside the bound
-		// even though it holds the most recent revision row in the join, which
-		// is what separates a c.created_at binding from an r.created_at one.
+		// created[0] falls outside the bound even though it holds the most
+		// recent revision, which is what tells the two created_at columns apart.
 		require.Len(t, after.Items, 2)
 		assert.Equal(t, idpConnectionIDsInDefaultOrder(created[1:]), ids(after.Items))
-		// created[2] is in the selection and was revised twice, so a filtered
-		// row still has to arrive on its newest revision.
+		// created[2] was revised twice, so a filtered row still arrives on its
+		// newest revision.
 		assert.Equal(t, created[2].RevisionID, after.Items[1].RevisionID)
 		assert.JSONEq(t, string(latest), string(after.Items[1].Document))
 
-		// A slug nobody holds is an empty page rather than an error, and an
-		// empty page ends the cursor chain even when the caller asked for more
-		// than it got.
+		// An unmatched slug is an empty page rather than an error, and an empty
+		// page ends the cursor chain.
 		none := list(t, database.Equal(database.Col(domain.IDPConnectionFieldSlug), created[0].Slug+"-nope"), 10)
 		assert.Empty(t, none.Items)
 		assert.Empty(t, none.NextCursor)
 	})
 }
 
-// The project FK cascades through the connection to its revisions, so deleting
-// a project leaves no revisions of a connection that no longer exists.
+// The project foreign key cascades through the connection to its revisions, so
+// deleting a project leaves no revision behind.
 func TestIDPConnectionStatements_ProjectDeleteCascades(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)

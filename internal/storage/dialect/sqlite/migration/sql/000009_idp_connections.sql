@@ -1,9 +1,9 @@
 -- +goose Up
 -- +goose StatementBegin
--- An identity provider connection is strictly revisioned; see the postgres
--- migration for why this table is identity only, nothing records which revision
--- is newest, and there is no updated_at. created_at is unix nanos stamped in
--- Go, as everywhere else in this dialect.
+-- An identity provider connection is revisioned; see the postgres migration for
+-- why this table is identity only, no column records which revision is newest,
+-- and there is no updated_at. created_at is unix nanos stamped in Go, as
+-- everywhere else in this dialect.
 CREATE TABLE idp_connections (
     project_id          TEXT    NOT NULL,
     id                  TEXT    NOT NULL,
@@ -18,8 +18,7 @@ CREATE TABLE idp_connections (
 -- +goose StatementEnd
 
 -- +goose StatementBegin
--- The only user-reachable unique constraint besides the PK; see the postgres
--- migration.
+-- The only constraint a create can trip; see the postgres migration.
 CREATE UNIQUE INDEX uq_idp_connections_project_slug
     ON idp_connections (project_id, slug);
 -- +goose StatementEnd

@@ -1,9 +1,9 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- +goose StatementBegin
--- An identity provider connection is strictly revisioned; see the postgres
--- migration for why this table is identity only and nothing records which
--- revision is newest.
+-- An identity provider connection is revisioned; see the postgres migration for
+-- why this table is identity only and no column records which revision is
+-- newest.
 CREATE TABLE idp_connections (
     project_id          STRING(MAX) NOT NULL,
     id                  STRING(MAX) NOT NULL,
@@ -19,8 +19,8 @@ CREATE TABLE idp_connections (
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 -- +goose StatementBegin
--- The only user-reachable unique constraint besides the PK; see the postgres
--- migration. Not NULL_FILTERED: slug is NOT NULL, so there is nothing to filter.
+-- The only constraint a create can trip; see the postgres migration. Not
+-- NULL_FILTERED: slug is NOT NULL, so there is nothing to filter.
 CREATE UNIQUE INDEX uq_idp_connections_project_slug
     ON idp_connections (project_id, slug)
 -- +goose StatementEnd
@@ -48,11 +48,9 @@ CREATE TABLE idp_connection_revisions (
 -- +goose StatementBegin
 -- Two revisions of one connection stamped at the same instant have no newest,
 -- so uniqueness rules that out; see the postgres migration. created_at is
--- declared DESC in the direction the history list pages: Spanner serves an
--- ORDER BY from an index only when the declared key order matches it, so the
--- newest-first walk has to be spelled out here rather than left to a backward
--- scan the way postgres and sqlite do. Direction does not change what the index
--- holds unique.
+-- declared DESC because Spanner serves an ORDER BY from an index only when the
+-- declared key order matches it, and there is no backward scan as in postgres
+-- and sqlite. The direction does not change what the index holds unique.
 CREATE UNIQUE INDEX uq_idp_connection_revisions_connection_created_at
     ON idp_connection_revisions (project_id, connection_id, created_at DESC)
 -- +goose StatementEnd

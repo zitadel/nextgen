@@ -2509,80 +2509,41 @@ func (c *MockAllStatementsGetFlowDefinitionByIDCall) DoAndReturn(f func(context.
 	return c
 }
 
-// GetIDPConnectionByID mocks base method.
-func (m *MockAllStatements) GetIDPConnectionByID(ctx context.Context, projectID, id string) (*domain.IDPConnection, error) {
+// GetIDPConnection mocks base method.
+func (m *MockAllStatements) GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetIDPConnectionByID", ctx, projectID, id)
+	ret := m.ctrl.Call(m, "GetIDPConnection", ctx, filter)
 	ret0, _ := ret[0].(*domain.IDPConnection)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetIDPConnectionByID indicates an expected call of GetIDPConnectionByID.
-func (mr *MockAllStatementsMockRecorder) GetIDPConnectionByID(ctx, projectID, id any) *MockAllStatementsGetIDPConnectionByIDCall {
+// GetIDPConnection indicates an expected call of GetIDPConnection.
+func (mr *MockAllStatementsMockRecorder) GetIDPConnection(ctx, filter any) *MockAllStatementsGetIDPConnectionCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIDPConnectionByID", reflect.TypeOf((*MockAllStatements)(nil).GetIDPConnectionByID), ctx, projectID, id)
-	return &MockAllStatementsGetIDPConnectionByIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIDPConnection", reflect.TypeOf((*MockAllStatements)(nil).GetIDPConnection), ctx, filter)
+	return &MockAllStatementsGetIDPConnectionCall{Call: call}
 }
 
-// MockAllStatementsGetIDPConnectionByIDCall wrap *gomock.Call
-type MockAllStatementsGetIDPConnectionByIDCall struct {
+// MockAllStatementsGetIDPConnectionCall wrap *gomock.Call
+type MockAllStatementsGetIDPConnectionCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetIDPConnectionByIDCall) Return(arg0 *domain.IDPConnection, arg1 error) *MockAllStatementsGetIDPConnectionByIDCall {
+func (c *MockAllStatementsGetIDPConnectionCall) Return(arg0 *domain.IDPConnection, arg1 error) *MockAllStatementsGetIDPConnectionCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetIDPConnectionByIDCall) Do(f func(context.Context, string, string) (*domain.IDPConnection, error)) *MockAllStatementsGetIDPConnectionByIDCall {
+func (c *MockAllStatementsGetIDPConnectionCall) Do(f func(context.Context, database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)) *MockAllStatementsGetIDPConnectionCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetIDPConnectionByIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.IDPConnection, error)) *MockAllStatementsGetIDPConnectionByIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GetIDPConnectionBySlug mocks base method.
-func (m *MockAllStatements) GetIDPConnectionBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetIDPConnectionBySlug", ctx, projectID, slug)
-	ret0, _ := ret[0].(*domain.IDPConnection)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetIDPConnectionBySlug indicates an expected call of GetIDPConnectionBySlug.
-func (mr *MockAllStatementsMockRecorder) GetIDPConnectionBySlug(ctx, projectID, slug any) *MockAllStatementsGetIDPConnectionBySlugCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIDPConnectionBySlug", reflect.TypeOf((*MockAllStatements)(nil).GetIDPConnectionBySlug), ctx, projectID, slug)
-	return &MockAllStatementsGetIDPConnectionBySlugCall{Call: call}
-}
-
-// MockAllStatementsGetIDPConnectionBySlugCall wrap *gomock.Call
-type MockAllStatementsGetIDPConnectionBySlugCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetIDPConnectionBySlugCall) Return(arg0 *domain.IDPConnection, arg1 error) *MockAllStatementsGetIDPConnectionBySlugCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetIDPConnectionBySlugCall) Do(f func(context.Context, string, string) (*domain.IDPConnection, error)) *MockAllStatementsGetIDPConnectionBySlugCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetIDPConnectionBySlugCall) DoAndReturn(f func(context.Context, string, string) (*domain.IDPConnection, error)) *MockAllStatementsGetIDPConnectionBySlugCall {
+func (c *MockAllStatementsGetIDPConnectionCall) DoAndReturn(f func(context.Context, database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)) *MockAllStatementsGetIDPConnectionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

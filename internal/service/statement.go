@@ -155,54 +155,36 @@ type ReleaseStatements interface {
 }
 
 // IDPConnectionStatements persists identity provider connections and their
-// revisions. Connections are strictly revisioned: an edit never rewrites a
-// revision, so an auth attempt or a release can pin one and keep reading the
-// configuration it started with.
+// revisions. An edit appends a revision instead of rewriting one, so a caller
+// can pin a revision and keep reading it.
 //
-// Nothing records which revision is newest (ADR 063 §7). The newest revision of
-// a connection is the one with the greatest creation time among its own, which
-// is what every head read here serves.
+// No column records which revision is newest (ADR 063 §7): it is the one with
+// the greatest created_at.
 type IDPConnectionStatements interface {
 	Statements
-	// CreateIDPConnection mints the connection and first revision ids, and
-	// writes the connection row, that revision, and the resource-scope index
-	// row in one transaction. UpdatedAt is the first revision's creation time,
-	// which is the connection's own birth instant.
-	// A slug already taken in the project surfaces as *database.UniqueError.
+	// CreateIDPConnection writes the connection, its first revision and the
+	// resource-scope row in one transaction, and sets the ids and timestamps on
+	// entity. A slug already used in the project returns *database.UniqueError.
 	CreateIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
-	// ReviseIDPConnection appends a revision holding entity.Document. There is
-	// no head to move, so this is a single insert. The revision id is always
-	// freshly minted, so passing back an entity read from a get does not
-	// overwrite the revision it was read from: RevisionID and UpdatedAt come
-	// back from the insert, while CreatedAt is left as the caller had it,
-	// because the entity normally arrives from a get that already carries the
-	// connection's birth.
+	// ReviseIDPConnection appends a revision holding entity.Document and sets
+	// RevisionID and UpdatedAt on entity; CreatedAt stays as the caller had it.
 	//
-	// A connection that does not exist is a *database.NoRowFoundError. Two
-	// revisions of one connection created in the same instant have no newest,
-	// so the second fails with *database.UniqueError rather than one of the two
-	// being picked at random; Spanner reports empty constraint names, so a
-	// caller tells that apart from the slug collision CreateIDPConnection
-	// reports by which of the two it called.
+	// An unknown connection returns *database.NoRowFoundError. Two revisions of
+	// one connection created in the same instant have no newest, so the second
+	// returns *database.UniqueError.
 	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
-	GetIDPConnectionByID(ctx context.Context, projectID, id string) (*domain.IDPConnection, error)
-	GetIDPConnectionBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error)
-	// GetIDPConnectionRevision serves the pinned revision rather than the head:
-	// RevisionID is the revision asked for and Document is its document. The
-	// revision id is unique within the project, so the connection it belongs to
-	// is not part of the lookup.
+	// GetIDPConnection returns the connection matching filter at its newest
+	// revision. No match returns *database.NoRowFoundError.
+	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
+	// GetIDPConnectionRevision returns the connection at the given revision,
+	// even when a newer one exists. Revision ids are unique per project. An
+	// unknown revision returns *database.NoRowFoundError.
 	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
 	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
-	// ListIDPConnectionRevisions pages one connection's history newest first:
-	// every row carries the connection's identity with the document, revision
-	// id and creation time of the revision it stands for. The endpoint exposes
-	// neither filter nor sort, so page carries only the limit and the cursor,
-	// and an unset OrderBy defaults to that newest-first key.
-	//
-	// A connection that does not exist is an empty page rather than an error:
-	// nothing here distinguishes it from a connection with no readable
-	// revisions, so the handler pairs this with GetIDPConnectionByID for the
-	// 404.
+	// ListIDPConnectionRevisions pages one connection's revisions newest first.
+	// The endpoint offers no filter or sort, so page carries only the limit and
+	// the cursor. An unknown connection returns an empty page, so a handler
+	// needs GetIDPConnection to tell that from a connection with no revisions.
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 }
 

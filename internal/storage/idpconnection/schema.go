@@ -1,5 +1,5 @@
-// Package idpconnection binds the identity provider connection read:
-// connections joined to their revisions.
+// Package idpconnection holds the read plumbing every dialect shares for
+// identity provider connections joined to their revisions.
 package idpconnection
 
 import (
@@ -7,19 +7,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// Schema binds IdP connection list/filter/order fields for all dialects.
+// Schema binds IdP connection list, filter and order fields for all dialects.
+// The names are qualified because the read joins the connection table `c` to
+// the revision table `r`, and project_id, id and created_at exist on both.
 //
-// The SQL names are table-qualified because the read is a join and every
-// dialect aliases the connection table `c` and the revision table `r`:
-// `project_id`, `id` and `created_at` exist on both sides, so an unqualified
-// name would be ambiguous.
-//
-// RevisionID and UpdatedAt bind the revision row rather than the connection:
-// every read serves the joined revision, so a connection's updated_at is the
-// instant the revision it hands back was created. On a head read that is the
-// newest revision, which the anti-join picks out by its created_at rather than
-// any stored pointer (ADR 063 §7); on the revision list it is the row being
-// paged, which is why both columns can also carry the keyset.
+// RevisionID, UpdatedAt and Document bind the revision row: a connection's
+// updated_at is the created_at of the revision a read serves.
 var Schema = database.NewSchema(map[domain.IDPConnectionField]database.FieldBinding[domain.IDPConnection]{
 	domain.IDPConnectionFieldProjectID: {
 		SQLName:  "c.project_id",

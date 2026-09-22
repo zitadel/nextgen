@@ -683,12 +683,10 @@ func battleReleases(t *testing.T, d dialect) {
 	})
 }
 
-// battleIDPConnections is the newest-revision analogue of
-// battleJSONSchemasLatest: the list joins each connection to all of its
-// revisions and an anti-join keeps only the newest, so a page boundary is where
-// that composition and the keyset predicate would fall out of step. Every
-// connection here has a superseded revision, so a drain that returns a stale
-// row — or drops a current one — is a broken composition.
+// battleIDPConnections works like battleJSONSchemasLatest: the list joins each
+// connection to its revisions and keeps only the newest, and a page boundary is
+// where that and the keyset predicate can fall out of step. Every connection
+// here has a superseded revision, so a stale or missing row shows the break.
 func battleIDPConnections(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
@@ -739,12 +737,10 @@ func battleIDPConnections(t *testing.T, d dialect) {
 	})
 }
 
-// battleIDPConnectionRevisions pages one connection's history, which is the
-// same join without the newest-revision anti-join: the keyset sits on the
-// revision row while every identity column comes from the connection joined to
-// it. A page boundary is where that inversion and the keyset predicate would
-// fall out of step, and each row's id is a revision id rather than a connection
-// id.
+// battleIDPConnectionRevisions pages one connection's history: the same join
+// without the newest-revision filter, where the keyset sits on the revision row
+// and the identity columns come from the connection. Each row's id is a
+// revision id.
 func battleIDPConnectionRevisions(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
@@ -757,8 +753,8 @@ func battleIDPConnectionRevisions(t *testing.T, d dialect) {
 	}
 	want := idpRevisionIDsOldestFirst(revisions)
 
-	// The drain walks both directions, so it reuses the newest-first key and
-	// only inverts the direction; the name says which way this copy points.
+	// The drain walks both directions, so this reuses the newest-first key and
+	// only flips the direction.
 	orderAsc := idpconnection.RevisionsNewestFirst()
 	orderAsc.Direction = database.OrderAsc
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
