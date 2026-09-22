@@ -1,5 +1,5 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
@@ -35,14 +35,6 @@ export const LOCAL_ADMIN_IDENTIFIER_ATTRIBUTE = "email";
 const ADMIN_USER_ID = "user_localadmin";
 const ADMIN_TEAM_ID = "team_localadmin";
 
-/**
- * The user schema the platform project is seeded with, derived from the same
- * default `schema.builtin_public_base` the server uses rather than spelled out
- * here. A document naming a schema the server does not have is bootstrapped
- * against an empty placeholder, and the admin can then never sign in.
- */
-const DEFAULT_USER_SCHEMA_URL = defaultHumanUserSchemaUrl();
-
 const PBKDF2_ROUNDS = 210_000;
 
 export type LocalAdmin = {
@@ -57,8 +49,15 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
   let raw: string;
   try {
     raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
-  } catch {
-    return undefined;
+  } catch (error) {
+    // Only a missing file means `start` never created the admin. A file that
+    // exists but cannot be read is still the credential the server imported,
+    // and minting a replacement would leave the two holding different passwords.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} cannot be read`, {
+      hint: `Check that ${LOCAL_ADMIN_FILE} is readable by you; \`zitadel start\` writes it owner-only.`,
+      details: { cause: error instanceof Error ? error.message : String(error) },
+    });
   }
 
   let parsed: unknown;
@@ -106,6 +105,15 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
  */
 export async function ensureLocalAdmin(
   cwd: string,
+  options: {
+    /**
+     * The server's `schema.builtin_public_base`, when the environment overrides
+     * it. The platform project's default user schema is published under that
+     * base, and a document naming a schema the server does not have is
+     * bootstrapped against an empty placeholder — the admin could never sign in.
+     */
+    builtinSchemaBase?: string;
+  } = {},
 ): Promise<{ admin: LocalAdmin; userFile: string }> {
   await mkdir(join(cwd, LOCAL_RUNTIME_DIR), { recursive: true, mode: 0o700 });
 
@@ -114,11 +122,19 @@ export async function ensureLocalAdmin(
   // Readable beyond the owner, unlike admin.json: the docker runtime mounts
   // this document into a container running as the host user, and an unreadable
   // file fails the server's bootstrap import at startup. It carries a hash.
+  // Written beside it and renamed into place: a concurrent start may be
+  // launching a server that reads this document, and a rename is atomic where
+  // an in-place rewrite is not.
   const userFile = join(cwd, LOCAL_ADMIN_USER_FILE);
-  await writeFile(userFile, `${JSON.stringify(bootstrapUserDocument(admin), null, 2)}\n`, {
+  const schemaUrl = defaultHumanUserSchemaUrl(options.builtinSchemaBase || undefined);
+  // Unique per write, not per process: two starts in one process (or a retry)
+  // must not rename each other's staging file away.
+  const staging = `${userFile}.${randomBytes(6).toString("hex")}.tmp`;
+  await writeFile(staging, `${JSON.stringify(bootstrapUserDocument(admin, schemaUrl), null, 2)}\n`, {
     mode: 0o644,
   });
-  await chmod(userFile, 0o644).catch(() => undefined);
+  await chmod(staging, 0o644).catch(() => undefined);
+  await rename(staging, userFile);
 
   return { admin, userFile };
 }
@@ -155,12 +171,12 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
   return true;
 }
 
-function bootstrapUserDocument(admin: LocalAdmin) {
+function bootstrapUserDocument(admin: LocalAdmin, schemaUrl: string) {
   return {
     header: {
       project_id: PLATFORM_PROJECT_ID,
       team_id: admin.team_id,
-      schema_url: DEFAULT_USER_SCHEMA_URL,
+      schema_url: schemaUrl,
       id: admin.user_id,
     },
     attributes: {

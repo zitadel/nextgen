@@ -1,5 +1,5 @@
 import { pbkdf2Sync } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -92,6 +92,42 @@ describe("local admin", () => {
       nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
     });
     expect((error as { hint: string }).hint).toContain("Both are needed");
+  });
+
+  // A credential that exists but cannot be read is still the one the server
+  // imported; minting a replacement would split the password in two.
+  it.skipIf(process.getuid?.() === 0)("refuses an unreadable credential instead of replacing it", async () => {
+    const cwd = await tempCwd();
+    const { admin } = await ensureLocalAdmin(cwd);
+    await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
+
+    try {
+      await expect(ensureLocalAdmin(cwd)).rejects.toThrow(/cannot be read/);
+    } finally {
+      await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o600);
+    }
+    expect(await readLocalAdmin(cwd)).toEqual(admin);
+  });
+
+  it("names the schema under the server's configured schema base", async () => {
+    const cwd = await tempCwd();
+
+    const { userFile } = await ensureLocalAdmin(cwd, {
+      builtinSchemaBase: "https://schemas.example.test/api/schemas/",
+    });
+
+    const doc = JSON.parse(await readFile(userFile, "utf8")) as { header: { schema_url: string } };
+    expect(doc.header.schema_url).toBe("https://schemas.example.test/api/schemas/default-human-user.json");
+  });
+
+  it("replaces the bootstrap document without leaving a staging file behind", async () => {
+    const cwd = await tempCwd();
+
+    await ensureLocalAdmin(cwd);
+    await ensureLocalAdmin(cwd);
+
+    const entries = await readdir(join(cwd, ".zitadel/local"));
+    expect(entries.filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
 
   it("keeps the same credential on later starts", async () => {

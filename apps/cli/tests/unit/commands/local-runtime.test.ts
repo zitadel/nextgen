@@ -572,6 +572,27 @@ describe("local runtime commands", () => {
     expect(commandLine?.command ?? "").not.toContain("--user-file");
   });
 
+  // The server refuses to bootstrap the platform project while pinned to
+  // another one, so a pin means no local admin rather than a start that fails.
+  it("start creates no local admin when the server is pinned to its own project", async () => {
+    const cwd = await tempProject("zitadel-start-pinned-project-");
+    const fake = await fakeServerBinary();
+    const port = await freePort();
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+      NEXTGEN_PLATFORM_PROJECT_ID: "proj_custom",
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as { data: { runtime: { pid: number }; console?: unknown } };
+    binaryPids.push(envelope.data.runtime.pid);
+    expect(envelope.data.console).toBeUndefined();
+    await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
+    const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
+    expect(commandLine?.command ?? "").not.toContain("--user-file");
+  });
+
   it("start fails if its spawned binary exits even when another health server appears", async () => {
     const cwd = await tempProject("zitadel-start-dead-pid-");
     const fake = await fakeExitingServerWithForeignHealth();

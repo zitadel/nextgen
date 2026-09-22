@@ -40,6 +40,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
+import { PLATFORM_PROJECT_ID } from "../lib/local-server/platform";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
@@ -117,8 +118,11 @@ export default class Start extends BaseCommand {
     // same merged environment the server receives — the project's env files
     // over the shell — so a `false` in `.env.local` turns both off rather than
     // being overridden by the user file forcing the bootstrap back on.
-    const local = platformBootstrapEnabled({ ...this.meta.env, ...env.values })
-      ? await ensureLocalAdmin(this.meta.cwd)
+    const serverEnv = { ...this.meta.env, ...env.values };
+    const local = platformBootstrapEnabled(serverEnv)
+      ? await ensureLocalAdmin(this.meta.cwd, {
+          builtinSchemaBase: serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE,
+        })
       : undefined;
 
     if (runtimeBackend === "binary") {
@@ -251,7 +255,14 @@ export default class Start extends BaseCommand {
  * out, which is how a harness asks for a bare single-project instance.
  */
 function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
-  return (env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true").toLowerCase() !== "false";
+  if ((env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true").toLowerCase() === "false") {
+    return false;
+  }
+  // A server pinned to a project of its own cannot also bootstrap the platform
+  // one — it refuses that combination at startup (cmd/server/config.go) — so the
+  // pin wins and there is no local admin, rather than a start that cannot boot.
+  const pinned = env.NEXTGEN_PLATFORM_PROJECT_ID;
+  return !pinned || pinned === PLATFORM_PROJECT_ID;
 }
 
 /**

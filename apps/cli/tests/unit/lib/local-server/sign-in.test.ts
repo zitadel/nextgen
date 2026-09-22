@@ -148,7 +148,10 @@ describe("local admin sign-in", () => {
     expect(calls).toEqual([]);
   });
 
-  it("explains a rejected identifier as a data directory without the admin", async () => {
+  // The server reports a failed lookup with the same code as a missing user, so
+  // the advice names both causes and never suggests the destructive reset as a
+  // command an agent would run.
+  it("explains a rejected identifier without steering an agent into a reset", async () => {
     server.use(
       http.post(`${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json(
@@ -162,9 +165,11 @@ describe("local admin sign-in", () => {
 
     expect(error).toMatchObject({
       code: "E_AUTH",
-      message: "The local server has no local admin user",
-      nextCommands: ["zitadel reset --force", "zitadel start"],
+      message: "The local server could not find the local admin",
+      nextCommands: ["zitadel logs"],
     });
+    expect((error as { hint: string }).hint).toContain("zitadel reset --force");
+    expect((error as { nextCommands: string[] }).nextCommands).not.toContain("zitadel reset --force");
   });
 
   it("reports a rejected password with the server's own message", async () => {

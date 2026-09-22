@@ -113,16 +113,19 @@ function attemptClient(serverUrl: string, publishableKey: string): AttemptClient
 }
 
 /**
- * A rejected identifier means this server never imported the admin — an older
- * data directory, say — which no retry fixes, so say that rather than letting
- * the generic proof error send the reader hunting.
+ * A rejected identifier usually means this server never imported the admin — a
+ * data directory from before the local admin existed. But the server reports a
+ * failed lookup with the same code, so the message names both causes, and the
+ * command it suggests is the harmless one: the reset that fixes the first cause
+ * deletes local data, so it stays a hint a person reads, never a next command
+ * an agent runs.
  */
 function proofError(method: string, res: JsonResponse): ZitadelError {
   const code = isObject(res.body) && typeof res.body.code === "string" ? res.body.code : undefined;
   if (method === "identifier" && code === "att.proof_rejected") {
-    return new ZitadelError("E_AUTH", "The local server has no local admin user", {
-      hint: "The local data directory predates the local admin. Run `zitadel reset --force`, then `zitadel start`.",
-      nextCommands: ["zitadel reset --force", "zitadel start"],
+    return new ZitadelError("E_AUTH", "The local server could not find the local admin", {
+      hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
+      nextCommands: ["zitadel logs"],
     });
   }
   return apiError(`${method} proof`, res);
