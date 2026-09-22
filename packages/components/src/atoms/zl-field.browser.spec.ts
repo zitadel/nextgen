@@ -137,6 +137,18 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(field.shadowRoot?.activeElement).toBe(input);
   });
 
+  it("keeps the clear button out of the tab order but still clickable", async () => {
+    const { field } = mount(`<form><zl-field name="email" value="a@b.c"></zl-field></form>`);
+    await field.updateComplete;
+    const button = field.shadowRoot?.querySelector(
+      'button[part="trailing-action"]',
+    ) as HTMLButtonElement;
+    expect(button).toBeTruthy();
+    expect(button.tabIndex).toBe(-1);
+    button.click();
+    expect(field.value).toBe("");
+  });
+
   it("syncs native input/change events with host value and FormData", async () => {
     const { form, field } = mount(
       `<form><zl-field name="email" data-testid="zitadel-field-email"></zl-field></form>`,
