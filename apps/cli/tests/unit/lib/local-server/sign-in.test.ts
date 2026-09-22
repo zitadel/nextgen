@@ -82,12 +82,9 @@ describe("local admin sign-in", () => {
     ]);
     expect(calls[0]?.body).toEqual({ project_id: "proj_platform" });
     expect(calls[1]?.body).toEqual({ method: "identifier" });
-    // The proof names the attribute the value belongs to: the CLI wrote the
-    // admin's email under `email`, so it states that rather than guessing.
-    expect(calls[2]?.body).toEqual({
-      login_name: "admin@zitadel.localhost",
-      attribute_name: "email",
-    });
+    // Only the value: the server decides which property identifies the admin,
+    // from the project's designated identifier, so the client never names one.
+    expect(calls[2]?.body).toEqual({ login_name: "admin@zitadel.localhost" });
     expect(calls[3]?.body).toEqual({ method: "password" });
     expect(calls[4]?.body).toEqual({ password: "generated-password" });
 

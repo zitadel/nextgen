@@ -1,6 +1,6 @@
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
-import { LOCAL_ADMIN_IDENTIFIER_ATTRIBUTE, type LocalAdmin } from "./admin-credential";
+import type { LocalAdmin } from "./admin-credential";
 import { apiError, fetchJson, postJson, type JsonResponse } from "./http";
 import { PLATFORM_PROJECT_ID } from "./platform";
 
@@ -59,12 +59,11 @@ async function signIn(
   }
   const attemptId = encodeURIComponent(attempt.body.attempt_id);
 
-  // The CLI wrote this user's attributes itself, so it names the one that
-  // identifies them rather than reading it off a rendered step.
-  await prove(attempts, attemptId, "identifier", {
-    login_name: admin.email,
-    attribute_name: LOCAL_ADMIN_IDENTIFIER_ATTRIBUTE,
-  });
+  // Just the value: the server resolves it against the platform project's
+  // designated identifier — the default user schema designates `email`, the
+  // attribute the bootstrap document writes — rather than a property the
+  // client names (ADR 058 §5).
+  await prove(attempts, attemptId, "identifier", { login_name: admin.email });
   await prove(attempts, attemptId, "password", { password: admin.password });
 
   const handoff = await attempts(`/auth_attempts/${attemptId}/handoff`, {});
