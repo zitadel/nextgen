@@ -70,6 +70,32 @@ describe("createZitadelClient", () => {
     });
   });
 
+  it("walks a response nested deeper than the call stack", async () => {
+    const depth = 20_000;
+    // Sent as text: `JSON.stringify` itself cannot serialise this depth.
+    const text = `${"[".repeat(depth)}"\\u001b"${"]".repeat(depth)}`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(text, { status: 200 })),
+    );
+
+    let node: unknown = await client().getProject("p1");
+    for (let level = 0; level < depth; level += 1) {
+      node = (node as unknown[])[0];
+    }
+    expect(node).toBe("\\x1b");
+  });
+
+  it("keeps a __proto__ key as a field", async () => {
+    stubFetch(200, JSON.parse('{"__proto__": {"polluted": "\\u001b"}}'));
+
+    const body = (await client().getProject("p1")) as Record<string, unknown>;
+
+    expect(Object.getOwnPropertyNames(body)).toEqual(["__proto__"]);
+    expect(Object.getPrototypeOf(body)).toBe(Object.prototype);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
   it("keeps newlines and tabs and leaves non-strings untouched", async () => {
     stubFetch(200, { description: "line one\n\tline two", count: 3, active: true, gone: null });
 

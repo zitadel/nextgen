@@ -60,24 +60,53 @@ function escapeKey(key: string): string {
   return escapeControlCharacters(key.replaceAll("\\", "\\\\"));
 }
 
+/** An array or object still to be copied, paired with the copy to fill. */
+type Pending = { source: object; target: Record<string, unknown> | unknown[] };
+
 /**
  * Escape every string in a decoded JSON value, keys included, at any depth.
  * Numbers, booleans and `null` pass through untouched; the result has the
  * same shape as the input, with the same number of fields.
+ *
+ * The walk keeps its own work list rather than recursing. A user attribute
+ * holds arbitrary JSON, and a few thousand levels of nesting — which
+ * `JSON.parse` and `JSON.stringify` both accept — would otherwise exhaust the
+ * call stack, letting one writer make `list` and `get` fail for every reader.
  */
 export function sanitizeResponse<T>(value: T): T {
-  if (typeof value === "string") {
-    return escapeControlCharacters(value) as T;
+  const pending: Pending[] = [];
+  const copy = (item: unknown): unknown => {
+    if (typeof item === "string") {
+      return escapeControlCharacters(item);
+    }
+    if (typeof item !== "object" || item === null) {
+      return item;
+    }
+    const target = Array.isArray(item) ? [] : {};
+    pending.push({ source: item, target });
+    return target;
+  };
+
+  const root = copy(value);
+  for (let next = pending.pop(); next; next = pending.pop()) {
+    const { source, target } = next;
+    if (Array.isArray(source)) {
+      for (const item of source) {
+        (target as unknown[]).push(copy(item));
+      }
+      continue;
+    }
+    for (const [key, item] of Object.entries(source)) {
+      // Defined rather than assigned, so a `__proto__` key stays a field.
+      Object.defineProperty(target, escapeKey(key), {
+        value: copy(item),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
   }
-  if (Array.isArray(value)) {
-    return value.map((item: unknown) => sanitizeResponse(item)) as T;
-  }
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [escapeKey(key), sanitizeResponse(item)]),
-    ) as T;
-  }
-  return value;
+  return root as T;
 }
 
 /**
