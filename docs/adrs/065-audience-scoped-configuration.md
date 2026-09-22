@@ -250,10 +250,13 @@ containment back into an inheritance chain. The future
 models #899 sketches — default inheritance, restrictive inheritance, explicit
 overrides — remain buildable per control on top of audience resolution.
 
-## Prior art in policy-as-code products
+## Prior art
 
-Declared-applicability on the policy document — rather than placement in a
-resource tree — is the established policy-as-code shape:
+Declared-applicability on the document — rather than placement in a resource
+tree — is the established shape in both policy-as-code and platform-as-code
+products.
+
+Policy as code:
 
 - **[OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/howto)** —
   a Constraint carries `spec.match` (kinds, namespaces, label selectors)
@@ -275,6 +278,25 @@ resource tree — is the established policy-as-code shape:
   rulesets target branches by pattern, and when several match, the strictest
   rule wins per control. The closest shipped precedent for the opt-in floor
   this ADR defers to release validation.
+
+Platform as code:
+
+- **[LaunchDarkly targeting rules](https://launchdarkly.com/docs/home/flags/target)** —
+  a flag serves a default variation ("fallthrough") unless a targeting rule
+  scoped to an audience (segments, context attributes) matches: the same
+  unscoped-default-plus-scoped-override pattern, resolved to a single
+  winner. Differs on ordering: rules are author-ordered, first match wins —
+  the priority this ADR's rule 4 deliberately keeps out of documents.
+- **[Vercel environment variables](https://vercel.com/docs/environment-variables)** /
+  **[GitHub Actions environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)** —
+  one variable, authored per scope (production, preview, a branch, an
+  environment); the most specific scope supplies the value wholesale, and
+  removing the scoped value restores the broader one — the exact
+  default-and-override lifecycle of the Defaults section.
+- **[Kustomize overlays](https://kubectl.docs.kubernetes.io/references/kustomize/glossary/#overlay)** —
+  per-variant configuration layered over a shared base. The contrast case:
+  overlays *patch* the base field by field, the merge model rule 2
+  explicitly rejects in favour of wholesale replacement.
 
 The single-winner, most-specific-match resolution itself (rules 2, 4) has its
 precedent in longest-prefix routing and CSS specificity rather than in these
