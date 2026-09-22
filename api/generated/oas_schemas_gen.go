@@ -24728,13 +24728,13 @@ type IdentifierChallengePayload struct{}
 // Ref: #
 type IdentifierFactorPayload struct {
 	// Always `identifier`; the discriminator of the payload union.
-	Method FactorMethod `json:"method"`
+	Method IdentifierFactorPayloadMethod `json:"method"`
 	// The identified user ID.
 	UserID UserID `json:"user_id"`
 }
 
 // GetMethod returns the value of Method.
-func (s *IdentifierFactorPayload) GetMethod() FactorMethod {
+func (s *IdentifierFactorPayload) GetMethod() IdentifierFactorPayloadMethod {
 	return s.Method
 }
 
@@ -24744,13 +24744,48 @@ func (s *IdentifierFactorPayload) GetUserID() UserID {
 }
 
 // SetMethod sets the value of Method.
-func (s *IdentifierFactorPayload) SetMethod(val FactorMethod) {
+func (s *IdentifierFactorPayload) SetMethod(val IdentifierFactorPayloadMethod) {
 	s.Method = val
 }
 
 // SetUserID sets the value of UserID.
 func (s *IdentifierFactorPayload) SetUserID(val UserID) {
 	s.UserID = val
+}
+
+// Always `identifier`; the discriminator of the payload union.
+type IdentifierFactorPayloadMethod string
+
+const (
+	IdentifierFactorPayloadMethodIdentifier IdentifierFactorPayloadMethod = "identifier"
+)
+
+// AllValues returns all IdentifierFactorPayloadMethod values.
+func (IdentifierFactorPayloadMethod) AllValues() []IdentifierFactorPayloadMethod {
+	return []IdentifierFactorPayloadMethod{
+		IdentifierFactorPayloadMethodIdentifier,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdentifierFactorPayloadMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case IdentifierFactorPayloadMethodIdentifier:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdentifierFactorPayloadMethod) UnmarshalText(data []byte) error {
+	switch IdentifierFactorPayloadMethod(data) {
+	case IdentifierFactorPayloadMethodIdentifier:
+		*s = IdentifierFactorPayloadMethodIdentifier
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Proof for `identifier` method.
@@ -40749,7 +40784,7 @@ func (s *PasskeyChallengePayloadPublicKeyUserVerification) UnmarshalText(data []
 // Ref: #
 type PasskeyFactorPayload struct {
 	// Always `passkey`; the discriminator of the payload union.
-	Method FactorMethod `json:"method"`
+	Method PasskeyFactorPayloadMethod `json:"method"`
 	// The credential ID that was used.
 	CredentialID string `json:"credential_id"`
 	// Whether user verification was performed (PIN/biometric).
@@ -40763,7 +40798,7 @@ type PasskeyFactorPayload struct {
 }
 
 // GetMethod returns the value of Method.
-func (s *PasskeyFactorPayload) GetMethod() FactorMethod {
+func (s *PasskeyFactorPayload) GetMethod() PasskeyFactorPayloadMethod {
 	return s.Method
 }
 
@@ -40793,7 +40828,7 @@ func (s *PasskeyFactorPayload) GetAuthenticatorAttachment() OptPasskeyFactorPayl
 }
 
 // SetMethod sets the value of Method.
-func (s *PasskeyFactorPayload) SetMethod(val FactorMethod) {
+func (s *PasskeyFactorPayload) SetMethod(val PasskeyFactorPayloadMethod) {
 	s.Method = val
 }
 
@@ -40864,6 +40899,41 @@ func (s *PasskeyFactorPayloadAuthenticatorAttachment) UnmarshalText(data []byte)
 	}
 }
 
+// Always `passkey`; the discriminator of the payload union.
+type PasskeyFactorPayloadMethod string
+
+const (
+	PasskeyFactorPayloadMethodPasskey PasskeyFactorPayloadMethod = "passkey"
+)
+
+// AllValues returns all PasskeyFactorPayloadMethod values.
+func (PasskeyFactorPayloadMethod) AllValues() []PasskeyFactorPayloadMethod {
+	return []PasskeyFactorPayloadMethod{
+		PasskeyFactorPayloadMethodPasskey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasskeyFactorPayloadMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case PasskeyFactorPayloadMethodPasskey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasskeyFactorPayloadMethod) UnmarshalText(data []byte) error {
+	switch PasskeyFactorPayloadMethod(data) {
+	case PasskeyFactorPayloadMethodPasskey:
+		*s = PasskeyFactorPayloadMethodPasskey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Proof for `passkey` method.
 // Ref: #
 type PasskeyProof struct {
@@ -40918,17 +40988,52 @@ type PasswordChallengePayload struct{}
 // Ref: #
 type PasswordFactorPayload struct {
 	// Always `password`; the discriminator of the payload union.
-	Method FactorMethod `json:"method"`
+	Method PasswordFactorPayloadMethod `json:"method"`
 }
 
 // GetMethod returns the value of Method.
-func (s *PasswordFactorPayload) GetMethod() FactorMethod {
+func (s *PasswordFactorPayload) GetMethod() PasswordFactorPayloadMethod {
 	return s.Method
 }
 
 // SetMethod sets the value of Method.
-func (s *PasswordFactorPayload) SetMethod(val FactorMethod) {
+func (s *PasswordFactorPayload) SetMethod(val PasswordFactorPayloadMethod) {
 	s.Method = val
+}
+
+// Always `password`; the discriminator of the payload union.
+type PasswordFactorPayloadMethod string
+
+const (
+	PasswordFactorPayloadMethodPassword PasswordFactorPayloadMethod = "password"
+)
+
+// AllValues returns all PasswordFactorPayloadMethod values.
+func (PasswordFactorPayloadMethod) AllValues() []PasswordFactorPayloadMethod {
+	return []PasswordFactorPayloadMethod{
+		PasswordFactorPayloadMethodPassword,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordFactorPayloadMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordFactorPayloadMethodPassword:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordFactorPayloadMethod) UnmarshalText(data []byte) error {
+	switch PasswordFactorPayloadMethod(data) {
+	case PasswordFactorPayloadMethodPassword:
+		*s = PasswordFactorPayloadMethodPassword
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Proof for `password` method.
