@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { BrandingDraft } from "@/lib/branding-draft";
+import type { BrandingRevision } from "@/lib/branding-palette";
 import { flowDisplayName } from "@/lib/flow-definition";
 
 import { api } from "../../../api/zitadel";
@@ -29,8 +29,8 @@ export const Route = createFileRoute("/_authed/branding/")({
   loader: async () => {
     // Newest first, so the head of the list is what visitors see today. The
     // list carries ids only, so the configuration itself is a second call. A
-    // project that has never published branding has no revision, and the draft
-    // then starts from the maintained defaults.
+    // project that has never published branding has no revision, and the
+    // panel then shows the maintained defaults.
     const projectId = getConsoleProjectId();
     const [revisions, flows] = await Promise.all([
       api.listBranding({ project_id: projectId }),
@@ -51,9 +51,9 @@ export const Route = createFileRoute("/_authed/branding/")({
       purposes: Object.keys(entry.flow_definition.purposes ?? {}),
     }));
     const latest = revisions[0];
-    if (!latest) return { published: {} as BrandingDraft, flows: previewFlows };
-    const revision = await api.getBrandingById(latest.id);
-    return { published: revision.branding as BrandingDraft, flows: previewFlows };
+    if (!latest) return { revision: {} as BrandingRevision, flows: previewFlows };
+    const found = await api.getBrandingById(latest.id);
+    return { revision: found.branding as BrandingRevision, flows: previewFlows };
   },
   component: BrandingScreen,
 });
@@ -76,22 +76,18 @@ const GHOST_TRIGGER =
   "h-9 gap-1.5 border-0 px-2.5 font-medium shadow-none hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:hover:bg-accent [&_svg:not([class*='text-'])]:text-foreground";
 
 /**
- * Which side the preview paints: a fixed side, or `draft` to leave it to the
- * draft's own `theme.mode` — what a visitor gets, and the only setting under
- * which the panel's Theme select is visible in the preview. A pinned side
- * still cannot reach one the draft does not publish.
+ * Which side the preview paints: a fixed side, or `revision` to leave it to
+ * the revision's own `theme.mode` — what a visitor gets. A pinned side still
+ * cannot reach one the revision does not publish.
  */
-type PreviewTheme = "light" | "dark" | "draft";
+type PreviewTheme = "light" | "dark" | "revision";
 
 function BrandingScreen() {
-  const { published, flows } = Route.useLoaderData();
-  // The draft starts from what is in use, per #936: customisation continues
-  // from the appearance currently live rather than from an empty form.
-  const [draft, setDraft] = useState<BrandingDraft>(published);
+  const { revision, flows } = Route.useLoaderData();
   // What the operator last picked; `activeJourney` below is what renders.
   const [journey, setJourney] = useState<PreviewJourney>("register");
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
-  const [theme, setTheme] = useState<PreviewTheme>("draft");
+  const [theme, setTheme] = useState<PreviewTheme>("revision");
   const [narrow, setNarrow] = useState(false);
 
   // Only the journeys the chosen flow actually serves: asking it for a purpose
@@ -109,7 +105,7 @@ function BrandingScreen() {
     ? journey
     : (journeys[0]?.id ?? journey);
   // Unset, a widget follows the visitor: the panel shows `auto` for it too.
-  const draftMode = draft.theme?.mode ?? "auto";
+  const revisionMode = revision.theme?.mode ?? "auto";
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
@@ -173,7 +169,11 @@ function BrandingScreen() {
               size="icon"
               aria-label="Switch the previewed theme"
               onClick={() => setTheme(nextTheme(theme))}
-              title={theme === "draft" ? `Theme: ${draftMode} (from the draft)` : `Theme: ${theme}`}
+              title={
+                theme === "revision"
+                  ? `Theme: ${revisionMode} (from the branding in use)`
+                  : `Theme: ${theme}`
+              }
             >
               <Sun />
             </Button>
@@ -191,17 +191,12 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview
-              draft={draft}
-              journey={activeJourney}
-              flowName={flowName}
-              theme={theme}
-            />
+            <LoginPreview journey={activeJourney} flowName={flowName} theme={theme} />
           </div>
         </Card>
 
         <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
-          <SettingsPanel draft={draft} onChange={setDraft} />
+          <SettingsPanel revision={revision} />
         </Card>
       </div>
     </div>
@@ -209,6 +204,6 @@ function BrandingScreen() {
 }
 
 function nextTheme(current: PreviewTheme): PreviewTheme {
-  if (current === "draft") return "light";
-  return current === "light" ? "dark" : "draft";
+  if (current === "revision") return "light";
+  return current === "light" ? "dark" : "revision";
 }

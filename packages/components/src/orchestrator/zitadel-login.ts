@@ -189,22 +189,6 @@ export class ZitadelLogin extends ZitadelSurface {
     | Readonly<Record<string, Partial<Locale>>>
     | undefined;
 
-  /**
-   * Paint this branding instead of the revision the flow response carries.
-   *
-   * For a surface that edits branding — the console's branding screen — where
-   * the point is to see unpublished values against a real flow. It changes
-   * what this element paints and nothing else: the published revision still
-   * governs every other visitor, and the draft is never sent anywhere.
-   *
-   * The draft passes through the same validation as the wire payload, so the
-   * preview never shows a logo or font the published revision would drop.
-   */
-  @property({ attribute: false }) accessor brandingOverride: Branding | undefined;
-
-  /** `brandingOverride` after validation, which is what actually paints. */
-  @state() private accessor sanitisedOverride: Branding | undefined = undefined;
-
   @state() private accessor response: CreateFlow201 | null = null;
 
   @state() private accessor branding: Branding | undefined = undefined;
@@ -360,21 +344,7 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
-    if (changed.has("brandingOverride")) {
-      // Same sanitiser as the wire payload: a draft is an untrusted URL source
-      // too, and a preview that paints what publishing would drop is a lie.
-      const { branding, issues } = validateBranding(this.brandingOverride, {
-        renderingOrigin: this.ownerDocument.location.origin,
-      });
-      this.sanitisedOverride = branding;
-      if (issues.length > 0) {
-        console.warn("[zitadel-login] brandingOverride has issues:", issues);
-      }
-      // The draft carries its own `theme.mode` and its own published sides, so
-      // the controller has to resolve against it rather than the wire value.
-      this.themeController.setBranding(this.activeBranding());
-    }
-    this.applySurfaceTheme(this.activeBranding());
+    this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
 
@@ -532,17 +502,11 @@ export class ZitadelLogin extends ZitadelSurface {
    * that wants to reach them itself.
    */
   private brandingForTemplate(): Branding | Record<string, never> {
-    const branding = this.activeBranding();
-    if (!branding) {
+    if (!this.branding) {
       return {};
     }
-    const logoUrl = resolveLogoUrl(branding, this.themeController.theme);
-    return { ...branding, logo_url: logoUrl };
-  }
-
-  /** The draft when one is set, otherwise the revision the flow carried. */
-  private activeBranding(): Branding | undefined {
-    return this.brandingOverride ? this.sanitisedOverride : this.branding;
+    const logoUrl = resolveLogoUrl(this.branding, this.themeController.theme);
+    return { ...this.branding, logo_url: logoUrl };
   }
 
   /**
@@ -660,10 +624,7 @@ export class ZitadelLogin extends ZitadelSurface {
       renderingOrigin: this.ownerDocument.location.origin,
     });
     this.branding = branding;
-    // `activeBranding`, not `branding`: with a draft set, the sides and mode
-    // that resolve the theme have to be the draft's, or the element paints one
-    // side's colours while resolving the other's.
-    this.themeController.setBranding(this.activeBranding());
+    this.themeController.setBranding(branding);
     if (issues.length > 0) {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }

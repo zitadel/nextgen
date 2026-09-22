@@ -38,7 +38,6 @@ declare module "react" {
         "resume-flow-id"?: string;
         lang?: string;
         locales?: ZitadelLogin["locales"];
-        brandingOverride?: ZitadelLogin["brandingOverride"];
       };
       "zitadel-session": React.HTMLAttributes<HTMLElement> &
         React.RefAttributes<ZitadelSession> & {

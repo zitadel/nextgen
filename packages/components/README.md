@@ -267,7 +267,6 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
-| `brandingOverride` | `Branding` | Paint this branding instead of the revision the flow response carried. For a surface that edits branding, such as the console's branding screen; the published revision still governs every other visitor. Object property (not an attribute) |
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |

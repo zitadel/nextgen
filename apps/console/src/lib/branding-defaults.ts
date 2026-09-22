@@ -1,6 +1,6 @@
 import { THEME_SELECTORS, tokensCss } from "@zitadel/design-tokens";
 
-import { PALETTE_KEYS, type PaletteKey, type ThemeSide } from "./branding-draft";
+import { PALETTE_KEYS, type PaletteKey, type ThemeSide } from "./branding-palette";
 
 /**
  * The variable each palette key paints first — the value a revision that omits

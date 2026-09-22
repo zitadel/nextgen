@@ -80,27 +80,42 @@ async function renderAt(path: string) {
   return router;
 }
 
+/** The value shown beside a row's label. */
+function rowValue(label: string): HTMLElement {
+  const row = screen.getByText(label, { selector: "dt" }).closest("div");
+  if (!row) throw new Error(`no row for ${label}`);
+  return row;
+}
+
 describe("branding screen", () => {
-  it("starts the draft from the revision in use", async () => {
+  it("shows the revision in use, read-only", async () => {
     serveRevision();
     await renderAt("/branding");
 
-    // #936: customisation continues from the appearance currently live rather
-    // than from an empty form.
-    expect(await screen.findByLabelText("Font family")).toHaveValue("Arimo, sans-serif");
-    // A Radix select is a button showing its value, not a form control with one.
-    expect(screen.getByLabelText("Corner radius")).toHaveTextContent("Medium");
-    expect(screen.getByLabelText("Logo dark")).toHaveValue("https://cdn.example.com/on-dark.svg");
+    // The values are changed in the project configuration, so the panel
+    // holds no control: nothing here is a textbox, a select or a picker.
+    await screen.findByText("Arimo, sans-serif");
+    expect(rowValue("Font family")).toHaveTextContent("Arimo, sans-serif");
+    expect(rowValue("Corner radius")).toHaveTextContent("Medium");
+    expect(rowValue("Logo dark")).toHaveTextContent("https://cdn.example.com/on-dark.svg");
+    const panel = screen.getByRole("heading", { name: "Branding", level: 2 }).closest("div");
+    expect(within(panel as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(panel as HTMLElement).queryByRole("combobox")).not.toBeInTheDocument();
   });
 
-  it("starts from the maintained defaults when nothing has been published", async () => {
+  it("shows the maintained defaults when nothing has been published", async () => {
     server.use(
       http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [FLOW] })),
       http.get(LIST_URL, () => HttpResponse.json([])),
     );
     await renderAt("/branding");
 
-    expect(await screen.findByLabelText("Font family")).toHaveValue("");
+    // An omitted key is what the login resolves it to, not a blank.
+    await screen.findByText("Font family", { selector: "dt" });
+    expect(rowValue("Font family")).toHaveTextContent("Arimo");
+    expect(rowValue("Corner radius")).toHaveTextContent("Medium");
+    expect(rowValue("Density")).toHaveTextContent("Regular");
+    expect(screen.queryByText(/issue/)).not.toBeInTheDocument();
   });
 
   it("counts the contrast issues a published palette already carries", async () => {
@@ -123,18 +138,6 @@ describe("branding screen", () => {
 
     expect(await screen.findByText("Primary / On primary")).toBeInTheDocument();
     expect(screen.getByText(/fails AA for normal text \(4.5:1 required\)/)).toBeInTheDocument();
-  });
-
-  it("recounts as the palette is edited", async () => {
-    serveRevision();
-    await renderAt("/branding");
-    const onPrimary = await screen.findByLabelText("On primary (dark mode)");
-
-    // #0A0A0A on the same red reads at 5.3:1, so the warning goes.
-    await userEvent.clear(onPrimary);
-    await userEvent.type(onPrimary, "#0A0A0A");
-
-    expect(screen.queryByText("1 issue")).not.toBeInTheDocument();
   });
 
   it("switches the previewed journey", async () => {
@@ -196,22 +199,5 @@ describe("branding screen", () => {
     // the state selector.
     expect(await screen.findByRole("tab", { name: "Sign up" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Passkey" })).not.toBeInTheDocument();
-  });
-});
-
-describe("clearing a field", () => {
-  it("drops the key rather than publishing an empty string", async () => {
-    serveRevision();
-    await renderAt("/branding");
-    const family = await screen.findByLabelText("Font family");
-
-    // The contract requires at least one character, so `""` is refused where
-    // an absent key takes the maintained default.
-    await userEvent.clear(family);
-
-    expect(family).toHaveValue("");
-    // The URL goes with it: a stylesheet loading a face nothing names is
-    // rejected on publish.
-    expect(screen.getByLabelText("Font URL")).toHaveValue("");
   });
 });

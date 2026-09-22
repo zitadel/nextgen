@@ -5,11 +5,12 @@ import { expectNoErrorBoundary, signIn } from "./support";
 /**
  * The branding screen against a real instance.
  *
- * Read-only: this slice publishes nothing, so the instance is left as it was
- * found. What it covers that a unit spec cannot is the preview — it mounts the
- * real `<zitadel-login>`, which starts a real flow and renders the step this
- * project actually serves. A mocked step would prove only that the fixture
- * matches itself, which is the failure mode the mock exists to avoid.
+ * Read-only: this slice shows the revision in use and publishes nothing, so
+ * the instance is left as it was found. What it covers that a unit spec
+ * cannot is the preview — it mounts the real `<zitadel-login>`, which starts
+ * a real flow and renders the step this project actually serves. A mocked
+ * step would prove only that the fixture matches itself, which is the
+ * failure mode the mock exists to avoid.
  */
 
 test("previews the project's own login beside the settings", async ({ page, seed }) => {
@@ -56,69 +57,22 @@ test("is reached from the sidebar, nested under the flows it brands", async ({ p
   await expectNoErrorBoundary(page);
 });
 
-test("warns on a palette that cannot be read, as it is typed", async ({ page, seed }) => {
+test("shows the branding in use without a control to change it", async ({ page, seed }) => {
   await signIn(page, await seed.user());
 
   await page.goto("/branding");
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
-  // The pair the branding design flags: #FAFAFA on #EB3614 measures 3.97:1,
-  // under the 4.5:1 a button label needs.
-  // Named by side: the app shell's own nav landmark is already called
-  // "Primary", and both palettes carry a row of that name.
-  await page.getByLabel("Primary (dark mode)", { exact: true }).fill("#EB3614");
-  await page.getByLabel("On primary (dark mode)", { exact: true }).fill("#FAFAFA");
-
-  await expect(page.getByText("1 issue")).toBeVisible();
-
-  // The draft publishes only its dark side, so that is the side the widget
-  // resolves whatever the viewer prefers. Asserted rather than assumed: the
-  // colour check below is only meaningful against the side being painted.
-  await expect(page.locator("zitadel-login")).toHaveAttribute("data-theme", "dark");
-
-  // The draft reaches the widget, not just the panel: the preview's primary
-  // button takes the colour being typed.
-  const button = page.locator("zitadel-login").locator("zl-button").first();
-  await expect(button.locator(".zr-btn--primary")).toHaveCSS(
-    "background-color",
-    "rgb(235, 54, 20)",
+  // The values are changed in the project configuration. The panel is a
+  // description list, and the only textbox on the page is the preview's own.
+  const panel = page.getByRole("heading", { name: "Branding", level: 2 }).locator("..");
+  await expect(panel.getByRole("textbox")).toHaveCount(0);
+  await expect(panel.getByRole("combobox")).toHaveCount(0);
+  // A fresh instance has no revision, so the rows read the maintained defaults.
+  await expect(panel.getByText("Corner radius").locator("..")).toContainText("Medium");
+  await expect(panel.getByText("Primary", { exact: true }).first().locator("..")).toContainText(
+    "#",
   );
-
-  await expectNoErrorBoundary(page);
-});
-
-test("says what a failing pair measures and which rule it misses", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
-
-  await page.goto("/branding");
-  await page.getByLabel("Primary (dark mode)", { exact: true }).fill("#EB3614");
-  await page.getByLabel("On primary (dark mode)", { exact: true }).fill("#FAFAFA");
-
-  // The row has space for a glyph, so the measurement sits behind it. Reaching
-  // it by role proves it is operable rather than a title a pointer alone finds.
-  // Both rows of the pair carry one; either opens the same detail.
-  const markers = page.getByRole("button", { name: /Primary \/ On primary/ });
-  await expect(markers).toHaveCount(2);
-  await markers.first().click();
-
-  await expect(page.getByText("Primary / On primary", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText(/3.97:1 .* fails AA for normal text \(4.5:1 required\)/),
-  ).toBeVisible();
-
-  await expectNoErrorBoundary(page);
-});
-
-test("leaves the published revision alone", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
-
-  await page.goto("/branding");
-  await page.getByLabel("Primary (dark mode)", { exact: true }).fill("#123456");
-
-  // Nothing in this slice publishes, so a reload comes back to what the
-  // project actually serves rather than to the edit.
-  await page.reload();
-  await expect(page.getByLabel("Primary (dark mode)", { exact: true })).not.toHaveValue("#123456");
 
   await expectNoErrorBoundary(page);
 });
