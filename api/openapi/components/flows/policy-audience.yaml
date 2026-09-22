@@ -1,0 +1,12 @@
+type: object
+title: PolicyAudience
+additionalProperties: false
+description: |
+  Which requests the policy applies to. Omitted means the project default.
+  Only `team_ids` is applicable today.
+properties:
+  team_ids:
+    type: array
+    uniqueItems: true
+    items:
+      type: string

@@ -87,10 +87,14 @@ func (s *IdpConnectionProvisioning) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *Policy) setDefaults() {
+func (s *PolicyUserPasswordSaveConfig) setDefaults() {
 	{
-		val := PolicyEnforcement("enforce")
-		s.Enforcement.SetTo(val)
+		val := int(15)
+		s.MinLength.SetTo(val)
+	}
+	{
+		val := int(0)
+		s.HistoryDepth.SetTo(val)
 	}
 }
 

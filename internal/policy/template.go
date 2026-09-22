@@ -1,8 +1,7 @@
 // Package policy evaluates operation policies (ADR 066): a Zitadel-defined
 // template per operation holds the config schema, the context schema and a
-// list of named CEL rules; a developer-authored instance holds config values,
-// an audience and an enforcement mode. Every rule must hold for the operation
-// to proceed.
+// list of named CEL rules; a developer-authored instance holds config values
+// and an audience. Every rule must hold for the operation to proceed.
 package policy
 
 import (

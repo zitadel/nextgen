@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreatePolicy(ctx context.Context, req *api.Policy, params api.CreatePolicyParams) (api.CreatePolicyRes, error) {
+func (h *Handler) CreatePolicy(ctx context.Context, req api.Policy, params api.CreatePolicyParams) (api.CreatePolicyRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), policyAccess, opWrite); err != nil {
 		return nil, err
 	}

@@ -58,9 +58,8 @@ func (s *PolicyService) Create(ctx context.Context, input CreatePolicyInput) (*d
 			EntityType: "policy",
 			EntityID:   entity.ID,
 			Payload: domain.PolicyPayload{
-				Operation:   entity.Operation,
-				Enforcement: string(entity.Enforcement),
-				TeamIDs:     entity.Audience.TeamIDs,
+				Operation: entity.Operation,
+				TeamIDs:   entity.Audience.TeamIDs,
 			},
 		})
 	}); err != nil {

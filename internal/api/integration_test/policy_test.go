@@ -3,9 +3,11 @@
 package integration_test
 
 import (
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
-	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,30 +30,49 @@ func TestPolicies(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.CreatePolicyParams{ProjectID: api.ProjectID(project.ID)}
-	document := func(config string) *api.Policy {
-		return &api.Policy{
-			Kind:      api.PolicyKindPolicy,
-			Operation: "user.password.save",
-			Config:    api.PolicyConfig{"min_length": jx.Raw(config)},
-		}
+	document := func(minLength int) api.Policy {
+		return api.NewPolicyUserPasswordSavePolicy(api.PolicyUserPasswordSave{
+			Kind:      api.PolicyUserPasswordSaveKindPolicy,
+			Operation: api.PolicyUserPasswordSaveOperationUserPasswordSave,
+			Config:    api.PolicyUserPasswordSaveConfig{MinLength: api.NewOptInt(minLength)},
+		})
 	}
 
 	t.Run("rejects a value below the template floor", func(t *testing.T) {
-		resp, err := client.CreatePolicy(t.Context(), document("4"), params)
+		// The wire schema carries the template's bounds, so the generated
+		// client refuses this body before sending it; the raw request shows
+		// the server refuses it too.
+		body := helpers.MustMarshal(t, map[string]any{
+			"kind":      "policy",
+			"operation": "user.password.save",
+			"config":    map[string]any{"min_length": 4},
+		})
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+			harness.EnsureTestServer(t).URL+"/policies?project_id="+project.ID, strings.NewReader(body))
 		require.NoError(t, err)
-		bad, ok := resp.(*api.ErrorDetails)
-		require.True(t, ok, "got %T: %s", resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("pol.invalid"), bad.Code)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
+
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		answer, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		// Structural validation (the schema's `minimum`) answers first, as
+		// req.invalid; the template check behind it is the same bound.
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(answer))
+		assert.Contains(t, string(answer), `"code":"req.invalid"`)
 	})
 
 	t.Run("publishes, reads back, lists, and changes the password gate", func(t *testing.T) {
-		created, err := client.CreatePolicy(t.Context(), document("8"), params)
+		created, err := client.CreatePolicy(t.Context(), document(8), params)
 		require.NoError(t, err)
 		revision, ok := created.(*api.PolicyRevisionResponse)
 		require.True(t, ok, "got %T: %s", created, helpers.MustMarshal(t, created))
 		assert.NotEmpty(t, revision.ID)
-		assert.Equal(t, "user.password.save", revision.Policy.Operation)
-		assert.JSONEq(t, "8", string(revision.Policy.Config["min_length"]))
+		assert.Equal(t, api.PolicyUserPasswordSavePolicy, revision.Policy.Type)
+		assert.Equal(t, 8, revision.Policy.PolicyUserPasswordSave.Config.MinLength.Value)
 
 		got, err := client.GetPolicyById(t.Context(), api.GetPolicyByIdParams{ID: revision.ID})
 		require.NoError(t, err)

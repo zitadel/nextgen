@@ -144,7 +144,7 @@ type Handler interface {
 	// settings, out-of-bounds values and fixed settings are rejected.
 	//
 	// POST /policies
-	CreatePolicy(ctx context.Context, req *Policy, params CreatePolicyParams) (CreatePolicyRes, error)
+	CreatePolicy(ctx context.Context, req Policy, params CreatePolicyParams) (CreatePolicyRes, error)
 	// CreateProject implements createProject operation.
 	//
 	// Create project.

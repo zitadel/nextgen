@@ -164,7 +164,7 @@ type Invoker interface {
 	// settings, out-of-bounds values and fixed settings are rejected.
 	//
 	// POST /policies
-	CreatePolicy(ctx context.Context, request *Policy, params CreatePolicyParams) (CreatePolicyRes, error)
+	CreatePolicy(ctx context.Context, request Policy, params CreatePolicyParams) (CreatePolicyRes, error)
 	// CreateProject invokes createProject operation.
 	//
 	// Create project.
@@ -2122,12 +2122,12 @@ func (c *Client) sendCreateIdp(ctx context.Context, request *CreateIdpRequest, p
 // settings, out-of-bounds values and fixed settings are rejected.
 //
 // POST /policies
-func (c *Client) CreatePolicy(ctx context.Context, request *Policy, params CreatePolicyParams) (CreatePolicyRes, error) {
+func (c *Client) CreatePolicy(ctx context.Context, request Policy, params CreatePolicyParams) (CreatePolicyRes, error) {
 	res, err := c.sendCreatePolicy(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreatePolicy(ctx context.Context, request *Policy, params CreatePolicyParams) (res CreatePolicyRes, err error) {
+func (c *Client) sendCreatePolicy(ctx context.Context, request Policy, params CreatePolicyParams) (res CreatePolicyRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {

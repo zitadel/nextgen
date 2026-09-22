@@ -647,7 +647,7 @@ func (s *Server) decodeCreateIdpRequest(r *http.Request) (
 }
 
 func (s *Server) decodeCreatePolicyRequest(r *http.Request) (
-	req *Policy,
+	req Policy,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -719,7 +719,7 @@ func (s *Server) decodeCreatePolicyRequest(r *http.Request) (
 		}(); err != nil {
 			return req, rawBody, close, errors.Wrap(err, "validate")
 		}
-		return &request, rawBody, close, nil
+		return request, rawBody, close, nil
 	default:
 		return req, rawBody, close, validate.InvalidContentType(ct)
 	}

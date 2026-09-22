@@ -7,17 +7,6 @@ import (
 	"slices"
 )
 
-// Enforcement is what a deny does. Under [EnforcementEnforce] the operation
-// is rejected; under [EnforcementAudit] the decision is recorded and the
-// operation proceeds. It is the rollout mode: deploy a stricter policy in
-// audit, read the decisions, switch to enforce.
-type Enforcement string
-
-const (
-	EnforcementEnforce Enforcement = "enforce"
-	EnforcementAudit   Enforcement = "audit"
-)
-
 // Audience is the ADR 065 applicability object: the set of requests an
 // instance applies to. Empty means project default.
 type Audience struct {
@@ -30,13 +19,12 @@ func (a Audience) IsEmpty() bool {
 }
 
 // Instance is the developer-authored half of a policy: config values for one
-// operation, the audience they apply to, and the enforcement mode.
+// operation and the audience they apply to.
 type Instance struct {
-	Kind        string         `json:"kind"`
-	Operation   string         `json:"operation"`
-	Audience    Audience       `json:"audience,omitzero"`
-	Enforcement Enforcement    `json:"enforcement,omitempty"`
-	Config      map[string]any `json:"config"`
+	Kind      string         `json:"kind"`
+	Operation string         `json:"operation"`
+	Audience  Audience       `json:"audience,omitzero"`
+	Config    map[string]any `json:"config"`
 }
 
 // KindPolicy is the `kind` every instance carries.
@@ -58,18 +46,10 @@ func ParseInstance(data []byte) (*Instance, error) {
 	return &inst, nil
 }
 
-// Blocks reports whether a deny under this instance rejects the operation.
-func (i *Instance) Blocks() bool {
-	return i.Enforcement != EnforcementAudit
-}
-
 // effectiveConfig validates the instance's config against the template and
 // fills defaults, returning one canonical map keyed by setting name with
 // integers as int64, booleans as bool and strings as string.
 func effectiveConfig(t *Template, inst *Instance) (map[string]any, error) {
-	if inst.Enforcement != "" && inst.Enforcement != EnforcementEnforce && inst.Enforcement != EnforcementAudit {
-		return nil, fmt.Errorf("enforcement must be %q or %q, got %q", EnforcementEnforce, EnforcementAudit, inst.Enforcement)
-	}
 	for name := range inst.Config {
 		setting, ok := t.Config[name]
 		if !ok {

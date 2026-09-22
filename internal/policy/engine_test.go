@@ -152,14 +152,12 @@ func TestValidateInstance(t *testing.T) {
 		wantErr string
 	}{
 		{"valid", `{"kind":"policy","operation":"user.password.save","config":{"min_length":12}}`, ""},
-		{"audit mode", `{"kind":"policy","operation":"user.password.save","enforcement":"audit","config":{}}`, ""},
 		{"unknown operation", `{"kind":"policy","operation":"user.nope","config":{}}`, "unknown operation"},
 		{"unknown setting", `{"kind":"policy","operation":"user.password.save","config":{"pattern":"x"}}`, `"pattern" is not defined`},
 		{"below floor", `{"kind":"policy","operation":"user.password.save","config":{"min_length":4}}`, "below the minimum 8"},
 		{"above ceiling", `{"kind":"policy","operation":"user.password.save","config":{"history_depth":5}}`, "above the maximum 4"},
 		{"wrong type", `{"kind":"policy","operation":"user.password.save","config":{"min_length":"12"}}`, "expected an integer"},
 		{"fractional", `{"kind":"policy","operation":"user.password.save","config":{"min_length":12.5}}`, "expected an integer"},
-		{"bad enforcement", `{"kind":"policy","operation":"user.password.save","enforcement":"warn","config":{}}`, "enforcement must be"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -196,17 +194,6 @@ func TestContextMismatchFailsClosed(t *testing.T) {
 				t.Fatalf("error = %v, want ErrContextMismatch", err)
 			}
 		})
-	}
-}
-
-func TestEnforcementAuditDoesNotBlock(t *testing.T) {
-	enforce := passwordInstance(t, `{"kind":"policy","operation":"user.password.save","config":{}}`)
-	audit := passwordInstance(t, `{"kind":"policy","operation":"user.password.save","enforcement":"audit","config":{}}`)
-	if !enforce.Blocks() {
-		t.Fatal("default enforcement should block")
-	}
-	if audit.Blocks() {
-		t.Fatal("audit enforcement should not block")
 	}
 }
 
@@ -335,47 +322,6 @@ func TestWarningsBelowRecommendedMinimum(t *testing.T) {
 	}
 	if len(w) != 0 {
 		t.Fatalf("warnings = %+v, want none", w)
-	}
-}
-
-func TestAuditNeverWeakensTheBaseline(t *testing.T) {
-	e := mustEngine(t)
-	audit := passwordInstance(t, `{"kind":"policy","operation":"user.password.save","enforcement":"audit","config":{"min_length":20,"history_depth":2}}`)
-	ctx := func(length int, matches ...bool) map[string]any {
-		if matches == nil {
-			matches = []bool{}
-		}
-		return map[string]any{"candidate": map[string]any{"length": length}, "history_matches": matches}
-	}
-	tests := []struct {
-		name        string
-		context     map[string]any
-		wantAllow   bool
-		wantBlock   []string
-		wantAudited []string
-	}{
-		{"meets the stricter instance", ctx(20), true, nil, nil},
-		{"meets baseline, misses stricter minimum", ctx(15), true, nil, []string{"min_length"}},
-		{"below the baseline blocks even in audit", ctx(10), false, []string{"min_length"}, nil},
-		{"history is off in the baseline, so a match is only audited", ctx(20, true), true, nil, []string{"history"}},
-		{"above the fixed maximum blocks", ctx(65), false, []string{"max_length"}, nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			d, err := e.Evaluate(t.Context(), audit, tt.context)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if d.Allow != tt.wantAllow {
-				t.Fatalf("allow = %v, want %v (%+v)", d.Allow, tt.wantAllow, d)
-			}
-			if got := ruleNames(d.Violations); strings.Join(got, ",") != strings.Join(tt.wantBlock, ",") {
-				t.Fatalf("blocking = %v, want %v", got, tt.wantBlock)
-			}
-			if got := ruleNames(d.Audited); strings.Join(got, ",") != strings.Join(tt.wantAudited, ",") {
-				t.Fatalf("audited = %v, want %v", got, tt.wantAudited)
-			}
-		})
 	}
 }
 
