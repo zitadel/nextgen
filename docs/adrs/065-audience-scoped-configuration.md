@@ -208,11 +208,17 @@ document carrying the stricter values for that team.
 
 Accepted, with eyes open:
 
-- **No restrictive inheritance.** Exactly one document applies (rule 2);
-  nothing lets the project set a floor a scoped document may only strengthen.
-  A team-scoped password policy with `min_length: 8` fully replaces a project
-  default of 15 — the hierarchy could forbid that weakening, audience alone
-  cannot. #899's composition rules are the future layer for this.
+- **No restrictive inheritance at resolution.** Exactly one document applies
+  (rule 2); a team-scoped password policy with `min_length: 8` fully replaces
+  a project default of 15, and audience alone cannot forbid the weakening.
+  It is enforceable at **release validation** instead: with the default (or a
+  field of it) flagged as a floor, validation rejects a scoped document that
+  weakens it — comparing *effective* documents, built-in defaults filled in,
+  so omission cannot weaken silently. Strengthening the default later fails
+  the next release until every scoped document catches up. This needs a
+  per-control definition of "stricter", which #899 already requires each
+  policy to define, and must stay opt-in — sometimes a weaker scoped
+  document is the intent.
 - **No delegated administration.** In the hierarchy each level is an admin
   boundary. Here the project owns everything: team-acme's own admins cannot
   author the policy scoped to team-acme — a project administrator must. Team
