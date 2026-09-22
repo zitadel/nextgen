@@ -1,8 +1,11 @@
+import { createZitadelClient } from "@zitadel/api/client";
+import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
 import type { LocalAdmin } from "./admin-credential";
-import { apiError, fetchJson, postJson, type JsonResponse } from "./http";
-import { PLATFORM_PROJECT_ID } from "./platform";
+import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
 /**
  * Signing the local admin in without a browser.
@@ -13,6 +16,27 @@ import { PLATFORM_PROJECT_ID } from "./platform";
  * one-time `handoff_token`. That token becomes either a console sign-in link or,
  * exchanged, a session cookie.
  */
+
+/**
+ * Every call here runs after the server answered `/healthz`, so a stall means a
+ * wedged server rather than a slow start. Without a bound, `zitadel start`
+ * would hang on a socket that accepts and never answers.
+ */
+const REQUEST_TIMEOUT_MS = 10_000;
+
+/**
+ * Per-call request options: the server's own origin, and a fresh timeout (the
+ * bound starts when the signal is made, so it cannot be shared across calls).
+ */
+export function localAdminRequest(
+  serverUrl: string,
+  headers: Record<string, string> = {},
+): RequestInit {
+  return {
+    headers: { origin: new URL(serverUrl).origin, ...headers },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  };
+}
 
 /** A console URL that signs the admin in once, via a fresh handoff token. */
 export async function consoleSignInUrl(serverUrl: string, admin: LocalAdmin): Promise<string> {
@@ -28,16 +52,31 @@ export async function consoleSignInUrl(serverUrl: string, admin: LocalAdmin): Pr
 export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): Promise<string> {
   const { handoffToken, publishableKey } = await signIn(serverUrl, admin);
 
-  const res = await postJson(
+  // The one call made with fetch directly: the session comes back only as a
+  // Set-Cookie header, which the generated client does not expose.
+  const res = await fetch(
     `${serverUrl}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
-    { handoff_token: handoffToken },
-    { authorization: `Bearer ${publishableKey}`, origin: new URL(serverUrl).origin },
+    {
+      ...localAdminRequest(serverUrl, {
+        "content-type": "application/json",
+        authorization: `Bearer ${publishableKey}`,
+      }),
+      method: "POST",
+      body: JSON.stringify({ handoff_token: handoffToken }),
+    },
   );
-  const cookie = res.cookies
+  const cookie = res.headers
+    .getSetCookie()
     .find((value) => value.startsWith("__nextgen_session="))
     ?.split(";", 1)[0];
   if (!res.ok || !cookie) {
-    throw apiError("sessions/exchange", res);
+    throw new ZitadelError(
+      "E_AUTH",
+      `Local admin session exchange failed (${String(res.status)})`,
+      {
+        details: { status: res.status },
+      },
+    );
   }
   return cookie;
 }
@@ -50,27 +89,35 @@ async function signIn(
   serverUrl: string,
   admin: LocalAdmin,
 ): Promise<{ handoffToken: string; publishableKey: string }> {
-  const publishableKey = await platformPublishableKey(serverUrl);
-  const attempts = attemptClient(serverUrl, publishableKey);
-
-  const attempt = await attempts("/auth_attempts", { project_id: PLATFORM_PROJECT_ID });
-  if (!isObject(attempt.body) || typeof attempt.body.attempt_id !== "string") {
-    throw apiError("auth_attempts", attempt);
+  const runtime = await readPlatformRuntime(serverUrl, REQUEST_TIMEOUT_MS);
+  if (!runtime) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      "The local server does not host the platform project, so the local admin cannot sign in",
+      {
+        // `zitadel start` adopts a healthy running server untouched, so it
+        // cannot fix this on its own: the server has to stop first.
+        hint: "Stop it with `zitadel stop`, then run `zitadel start` so it boots with the platform project and the local admin.",
+        nextCommands: ["zitadel stop", "zitadel start"],
+        details: { server_url: serverUrl },
+      },
+    );
   }
-  const attemptId = encodeURIComponent(attempt.body.attempt_id);
+  const client = createZitadelClient({ baseUrl: serverUrl, token: runtime.publishable_key });
 
+  const { attempt_id } = await client.createAuthAttempt(
+    { project_id: PLATFORM_PROJECT_ID },
+    localAdminRequest(serverUrl),
+  );
   // Just the value: the server resolves it against the platform project's
   // designated identifier — the default user schema designates `email`, the
   // attribute the bootstrap document writes — rather than a property the
-  // client names (ADR 058 §5).
-  await prove(attempts, attemptId, "identifier", { login_name: admin.email });
-  await prove(attempts, attemptId, "password", { password: admin.password });
+  // client names.
+  await prove(client, serverUrl, attempt_id, "identifier", { login_name: admin.email });
+  await prove(client, serverUrl, attempt_id, "password", { password: admin.password });
 
-  const handoff = await attempts(`/auth_attempts/${attemptId}/handoff`, {});
-  if (!isObject(handoff.body) || typeof handoff.body.handoff_token !== "string") {
-    throw apiError("handoff", handoff);
-  }
-  return { handoffToken: handoff.body.handoff_token, publishableKey };
+  const { handoff_token } = await client.createHandoff(attempt_id, localAdminRequest(serverUrl));
+  return { handoffToken: handoff_token, publishableKey: runtime.publishable_key };
 }
 
 /**
@@ -79,36 +126,31 @@ async function signIn(
  * challenge, so the two calls belong together.
  */
 async function prove(
-  attempts: AttemptClient,
+  client: ReturnType<typeof createZitadelClient>,
+  serverUrl: string,
   attemptId: string,
   method: "identifier" | "password",
-  proof: Record<string, string>,
+  proof: VerifyChallengeProofBody,
 ): Promise<void> {
-  const challenge = await attempts(`/auth_attempts/${attemptId}/challenges`, { method });
-  if (!isObject(challenge.body) || typeof challenge.body.challenge_id !== "string") {
-    throw apiError(`${method} challenge`, challenge);
-  }
-
-  const challengeId = encodeURIComponent(challenge.body.challenge_id);
-  const verified = await attempts(
-    `/auth_attempts/${attemptId}/challenges/${challengeId}/verify`,
-    proof,
+  const { challenge_id } = await client.issueChallenge(
+    attemptId,
+    { method },
+    localAdminRequest(serverUrl),
   );
-  if (!verified.ok) {
-    throw proofError(method, verified);
+  try {
+    await client.verifyChallengeProof(attemptId, challenge_id, proof, localAdminRequest(serverUrl));
+  } catch (error) {
+    if (method === "identifier" && isProofRejected(error)) {
+      throw adminNotFound();
+    }
+    throw error;
   }
 }
 
-type AttemptClient = (path: string, body: Record<string, unknown>) => Promise<JsonResponse>;
-
-/** Posts to the auth-attempt API with the browser-plane credential it expects. */
-function attemptClient(serverUrl: string, publishableKey: string): AttemptClient {
-  const origin = new URL(serverUrl).origin;
-  return async (path, body) =>
-    postJson(`${serverUrl}${path}`, body, {
-      authorization: `Bearer ${publishableKey}`,
-      origin,
-    });
+function isProofRejected(error: unknown): boolean {
+  return (
+    error instanceof ApiError && isObject(error.body) && error.body.code === "att.proof_rejected"
+  );
 }
 
 /**
@@ -119,45 +161,9 @@ function attemptClient(serverUrl: string, publishableKey: string): AttemptClient
  * deletes local data, so it stays a hint a person reads, never a next command
  * an agent runs.
  */
-function proofError(method: string, res: JsonResponse): ZitadelError {
-  const code = isObject(res.body) && typeof res.body.code === "string" ? res.body.code : undefined;
-  if (method === "identifier" && code === "att.proof_rejected") {
-    return new ZitadelError("E_AUTH", "The local server could not find the local admin", {
-      hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
-      nextCommands: ["zitadel logs"],
-    });
-  }
-  return apiError(`${method} proof`, res);
-}
-
-/**
- * The platform project's browser-safe key, which also authorises the
- * auth-attempt calls. Its absence means this server was not started with the
- * platform project, which no retry will change.
- */
-async function platformPublishableKey(serverUrl: string): Promise<string> {
-  const res = await fetchJson(`${serverUrl}/console/runtime.json`, { method: "GET" });
-  const runtime = res.body;
-  if (
-    !res.ok ||
-    !isObject(runtime) ||
-    runtime.console_project_id !== PLATFORM_PROJECT_ID ||
-    typeof runtime.publishable_key !== "string"
-  ) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      "The local server does not host the platform project, so the local admin cannot sign in",
-      {
-        // `zitadel start` adopts a healthy running server untouched, so it
-        // cannot fix this on its own: the server has to stop first.
-        hint: "Stop it with `zitadel stop`, then run `zitadel start` so it boots with the platform project and the local admin.",
-        nextCommands: ["zitadel stop", "zitadel start"],
-        details: {
-          server_url: serverUrl,
-          console_project_id: isObject(runtime) ? runtime.console_project_id : undefined,
-        },
-      },
-    );
-  }
-  return runtime.publishable_key;
+function adminNotFound(): ZitadelError {
+  return new ZitadelError("E_AUTH", "The local server could not find the local admin", {
+    hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
+    nextCommands: ["zitadel logs"],
+  });
 }

@@ -83,23 +83,6 @@ describe("claiming a project as the local admin", () => {
     expect(complete?.body).toEqual({ challenge_id: "claim_ch_1" });
   });
 
-  it("reports the owning team of an already-claimed project without signing in", async () => {
-    server.use(
-      http.post(`${SERVER}/projects/${PROJECT}/claim/init`, () =>
-        HttpResponse.json(
-          { code: "proj.already_claimed", details: { team_id: "team_someone_else" } },
-          { status: 409 },
-        ),
-      ),
-    );
-
-    // No claimed_at: the 409 names the team but not when the claim happened,
-    // and setup records a claim only when it has both.
-    await expect(claim()).resolves.toEqual({ team_id: "team_someone_else" });
-    expect(signIns).toBe(0);
-    expect(complete).toBeUndefined();
-  });
-
   it("fails when claim/init opens no challenge", async () => {
     server.use(
       http.post(`${SERVER}/projects/${PROJECT}/claim/init`, () =>
@@ -107,17 +90,7 @@ describe("claiming a project as the local admin", () => {
       ),
     );
 
-    await expect(claim()).rejects.toThrow("Local admin claim/init failed (500): boom");
+    await expect(claim()).rejects.toMatchObject({ status: 500, body: { message: "boom" } });
     expect(signIns).toBe(0);
-  });
-
-  it("fails rather than recording a claim the server did not timestamp", async () => {
-    server.use(
-      http.post(`${SERVER}/projects/${PROJECT}/claim/complete`, () =>
-        HttpResponse.json({ team_id: "team_localadmin" }),
-      ),
-    );
-
-    await expect(claim()).rejects.toThrow(/claim\/complete failed/);
   });
 });

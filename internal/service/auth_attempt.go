@@ -620,7 +620,7 @@ func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID st
 			Value: p.LoginName,
 		}})
 	}
-	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, anyUserStatus, "auth_attempt")
+	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
 }
 
 // verify dispatches proof verification to the appropriate secondary port.

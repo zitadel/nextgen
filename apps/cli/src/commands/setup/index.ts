@@ -30,7 +30,9 @@ import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
-import { claimProjectAsAdmin, readLocalAdmin } from "../../lib/local-server/admin";
+import { readLocalAdmin } from "../../lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
+import { readPlatformRuntime } from "../../lib/local-server/runtime";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
@@ -45,7 +47,6 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { PLATFORM_PROJECT_ID } from "../../lib/local-server/platform";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
@@ -459,27 +460,17 @@ export default class Setup extends BaseCommand {
             projectSecret: project.project_secret,
             admin,
           });
-          // Only a claim this run completed carries the platform's own
-          // timestamp. Without it the record would name a team but no claim
-          // time, which `isAttached` reads as a half-written attachment, so
-          // leave the secret alone and let the claim nudge stand. The team is
-          // whichever one the platform attached the project to — the admin's
-          // earliest active membership, which need not be the team its
-          // bootstrap document named.
-          if (owner.claimed_at === undefined) {
-            consola.info(
-              `Project already belongs to team ${owner.team_id}; leaving the local record unchanged.`,
-            );
-          } else {
-            const secret = await readZitadelSecret(cwd);
-            await writeZitadelSecret(cwd, {
-              ...secret,
-              team_id: owner.team_id,
-              claimed_at: owner.claimed_at,
-            });
-            ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
-            consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
-          }
+          // The team is whichever one the platform attached the project to —
+          // the admin's earliest active membership, which need not be the team
+          // its bootstrap document named.
+          const secret = await readZitadelSecret(cwd);
+          await writeZitadelSecret(cwd, {
+            ...secret,
+            team_id: owner.team_id,
+            claimed_at: owner.claimed_at,
+          });
+          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
         }
       } catch (error) {
         consola.warn(
@@ -642,18 +633,7 @@ export async function localServerHostsPlatform(
   server: string,
   timeoutMs = 1500,
 ): Promise<boolean> {
-  try {
-    const res = await fetch(new URL("/console/runtime.json", server), {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) {
-      return false;
-    }
-    const doc = (await res.json()) as { console_project_id?: unknown };
-    return doc.console_project_id === PLATFORM_PROJECT_ID;
-  } catch {
-    return false;
-  }
+  return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */

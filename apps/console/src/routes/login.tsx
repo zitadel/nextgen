@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createZitadelClient } from "@zitadel/api/client";
 import { ZitadelLogin, type ZitadelProject } from "@zitadel/sdk-react";
 import { useMemo } from "react";
 
@@ -83,20 +84,17 @@ function isLoopbackConsole(): boolean {
 async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
   const projectId = getConsoleProjectId();
   if (!projectId) return;
-  const publishableKey = getPublishableKey();
-  try {
-    await fetch(`${apiBase}/sessions/exchange?project_id=${encodeURIComponent(projectId)}`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "content-type": "application/json",
-        ...(publishableKey ? { authorization: `Bearer ${publishableKey}` } : {}),
-      },
-      body: JSON.stringify({ handoff_token: handoffToken }),
-    });
-  } catch {
+  // The console's shared client was configured before the runtime document
+  // resolved, so it carries no key; this one carries the publishable key the
+  // exchange requires.
+  await createZitadelClient({ baseUrl: apiBase, token: getPublishableKey() })
+    .exchangeHandoff(
+      { handoff_token: handoffToken },
+      { project_id: projectId },
+      { credentials: "include" },
+    )
     // Fall through to the widget.
-  }
+    .catch(() => undefined);
 }
 
 function LoginScreen() {

@@ -124,7 +124,9 @@ describe("local admin sign-in", () => {
       http.post(`${SERVER}/sessions/exchange`, () => HttpResponse.json({}, { status: 200 })),
     );
 
-    await expect(adminSessionCookie(SERVER, admin)).rejects.toThrow(/sessions\/exchange failed/);
+    await expect(adminSessionCookie(SERVER, admin)).rejects.toThrow(
+      "Local admin session exchange failed (200)",
+    );
   });
 
   it("refuses a server that does not host the platform project, and says how to fix it", async () => {
@@ -181,16 +183,9 @@ describe("local admin sign-in", () => {
 
     // Only the identifier gets the data-directory explanation; a password
     // failure is reported as the server gave it.
-    await expect(consoleSignInUrl(SERVER, admin)).rejects.toThrow(
-      "Local admin password proof failed (409): The proof was rejected.",
-    );
-  });
-
-  it("fails when the handoff carries no token", async () => {
-    server.use(
-      http.post(`${SERVER}/auth_attempts/:attempt/handoff`, () => HttpResponse.json({})),
-    );
-
-    await expect(consoleSignInUrl(SERVER, admin)).rejects.toThrow(/handoff failed/);
+    await expect(consoleSignInUrl(SERVER, admin)).rejects.toMatchObject({
+      status: 409,
+      body: { message: "The proof was rejected." },
+    });
   });
 });

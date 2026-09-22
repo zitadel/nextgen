@@ -11,7 +11,7 @@ import {
   LOCAL_ADMIN_USER_FILE,
   ensureLocalAdmin,
   readLocalAdmin,
-} from "../../../../src/lib/local-server/admin";
+} from "../../../../src/lib/local-server/admin-credential";
 
 const tempDirs: string[] = [];
 
@@ -112,9 +112,7 @@ describe("local admin", () => {
   it("names the schema under the server's configured schema base", async () => {
     const cwd = await tempCwd();
 
-    const { userFile } = await ensureLocalAdmin(cwd, {
-      builtinSchemaBase: "https://schemas.example.test/api/schemas/",
-    });
+    const { userFile } = await ensureLocalAdmin(cwd, "https://schemas.example.test/api/schemas/");
 
     const doc = JSON.parse(await readFile(userFile, "utf8")) as { header: { schema_url: string } };
     expect(doc.header.schema_url).toBe("https://schemas.example.test/api/schemas/default-human-user.json");

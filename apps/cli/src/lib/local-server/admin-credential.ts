@@ -6,8 +6,7 @@ import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
-import { LOCAL_RUNTIME_DIR } from "./runtime";
-import { PLATFORM_PROJECT_ID } from "./platform";
+import { LOCAL_RUNTIME_DIR, PLATFORM_PROJECT_ID } from "./runtime";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -95,18 +94,16 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
  * user document, returning the credential and the document path for
  * `--user-file`. The server imports the user once; later starts skip it because
  * the user already exists, so the stored password stays valid.
+ *
+ * `builtinSchemaBase` is the server's `schema.builtin_public_base`, when the
+ * environment overrides it. The platform project's default user schema is
+ * published under that base, and a document naming a schema the server does
+ * not have is bootstrapped against an empty placeholder — the admin could
+ * never sign in.
  */
 export async function ensureLocalAdmin(
   cwd: string,
-  options: {
-    /**
-     * The server's `schema.builtin_public_base`, when the environment overrides
-     * it. The platform project's default user schema is published under that
-     * base, and a document naming a schema the server does not have is
-     * bootstrapped against an empty placeholder — the admin could never sign in.
-     */
-    builtinSchemaBase?: string;
-  } = {},
+  builtinSchemaBase?: string,
 ): Promise<{ admin: LocalAdmin; userFile: string }> {
   await mkdir(join(cwd, LOCAL_RUNTIME_DIR), { recursive: true, mode: 0o700 });
 
@@ -119,7 +116,7 @@ export async function ensureLocalAdmin(
   // launching a server that reads this document, and a rename is atomic where
   // an in-place rewrite is not.
   const userFile = join(cwd, LOCAL_ADMIN_USER_FILE);
-  const schemaUrl = defaultHumanUserSchemaUrl(options.builtinSchemaBase || undefined);
+  const schemaUrl = defaultHumanUserSchemaUrl(builtinSchemaBase || undefined);
   // Unique per write, not per process: two starts in one process (or a retry)
   // must not rename each other's staging file away.
   const staging = `${userFile}.${randomBytes(6).toString("hex")}.tmp`;

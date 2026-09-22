@@ -5,7 +5,8 @@ import { Flags } from "@oclif/core";
 import consola from "consola";
 
 import { ZitadelError, toZitadelError } from "../lib/errors";
-import { consoleSignInUrl, ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin";
+import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
+import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import {
   binaryLogs,
   isProcessRunning,
@@ -29,6 +30,7 @@ import {
 import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
+  PLATFORM_PROJECT_ID,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
@@ -40,7 +42,6 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
-import { PLATFORM_PROJECT_ID } from "../lib/local-server/platform";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
@@ -120,9 +121,7 @@ export default class Start extends BaseCommand {
     // being overridden by the user file forcing the bootstrap back on.
     const serverEnv = { ...this.meta.env, ...env.values };
     const local = platformBootstrapEnabled(serverEnv)
-      ? await ensureLocalAdmin(this.meta.cwd, {
-          builtinSchemaBase: serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE,
-        })
+      ? await ensureLocalAdmin(this.meta.cwd, serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE)
       : undefined;
 
     if (runtimeBackend === "binary") {

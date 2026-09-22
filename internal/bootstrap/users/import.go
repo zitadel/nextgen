@@ -166,8 +166,8 @@ func loadUserSchema(ctx context.Context, stmts service.AllStatements, h Header) 
 	return schema, nil
 }
 
-// uniqueScopeFromSchema maps a property's `x-unique` annotation to its
-// uniqueness scope, the same rule domain.CreateAttributesFromMap applies.
+// uniqueScopeFromSchema reads a property's `x-unique` annotation and maps it
+// through domain.UniqueScopeOf, as domain.CreateAttributesFromMap does.
 // Bootstrap attribute keys are flattened dotted paths, so a nested property
 // is addressed the way the recursive walk addresses it: every node but the
 // last sits behind its own `properties` object.
@@ -178,14 +178,7 @@ func uniqueScopeFromSchema(schema map[string]any, key domain.AttributeKey) domai
 	}
 	path = append(path, domain.SchemaAnnotationUnique)
 	scope, _ := maputil.GetNested[string](schema, path)
-	switch scope {
-	case domain.SchemaUniqueScopeProject:
-		return domain.AttributeUniquenessProject
-	case domain.SchemaUniqueScopeTeam:
-		return domain.AttributeUniquenessTeam
-	default:
-		return domain.AttributeUniquenessUnspecified
-	}
+	return domain.UniqueScopeOf(scope)
 }
 
 // DialectFromConfig returns the sole configured database dialect name, or "" if unset.

@@ -239,7 +239,11 @@ describe("setup command", () => {
   it("detects the platform plane from the local runtime document, failing closed", async () => {
     server.use(
       http.get("http://localhost:9931/console/runtime.json", () =>
-        HttpResponse.json({ mode: "standalone", console_project_id: "proj_platform" }),
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
       ),
       http.get("http://localhost:9932/console/runtime.json", () =>
         HttpResponse.json({ mode: "standalone", console_project_id: "proj_someone" }),
@@ -385,7 +389,11 @@ describe("setup command", () => {
     );
     server.use(
       http.get("http://localhost:9941/console/runtime.json", () =>
-        HttpResponse.json({ mode: "standalone", console_project_id: "proj_platform" }),
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
       ),
       http.post("http://localhost:9941/projects/:projectId/claim/init", () =>
         HttpResponse.json({ code: "internal", message: "claim unavailable" }, { status: 500 }),

@@ -514,17 +514,29 @@ describe("local runtime commands", () => {
     expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
   });
 
-  // The platform project and the local admin travel together, and a harness
-  // that wants a bare single-project instance opts out of both
-  // (apps/console-e2e's real and embedded lanes do).
-  it("start creates no local admin when the platform bootstrap is opted out", async () => {
+  // The platform project and the local admin travel together: a harness that
+  // wants a bare single-project instance opts out of both (apps/console-e2e's
+  // real and embedded lanes do). The project's env files reach the server over
+  // the shell and the user file forces the bootstrap on, so an opt-out in
+  // `.env.local` must be read by the CLI too. And the server refuses to
+  // bootstrap the platform project while pinned to another one, so a pin means
+  // no local admin rather than a start that fails.
+  it.each<{ how: string; env?: Record<string, string>; envLocal?: string }>([
+    { how: "the shell opts out", env: { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false" } },
+    { how: ".env.local opts out", envLocal: "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false\n" },
+    {
+      how: "the server is pinned to its own project",
+      env: { NEXTGEN_PLATFORM_PROJECT_ID: "proj_custom" },
+    },
+  ])("start creates no local admin when $how", async ({ env, envLocal }) => {
     const cwd = await tempProject("zitadel-start-no-platform-");
+    if (envLocal) await writeFile(join(cwd, ".env.local"), envLocal);
     const fake = await fakeServerBinary();
     const port = await freePort();
 
     const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
       ZITADEL_SERVER_BINARY: fake.binPath,
-      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false",
+      ...env,
     });
 
     expect(result.exitCode).toBe(0);
@@ -542,53 +554,6 @@ describe("local runtime commands", () => {
     await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
     await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
     // And the server is started without the bootstrap user document.
-    const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
-    expect(commandLine?.command ?? "").not.toContain("--user-file");
-  });
-
-  // The project's env files reach the server over the shell, and the user file
-  // forces the platform bootstrap on — so an opt-out written in `.env.local`
-  // has to be read by the CLI too, or it would be silently overridden.
-  it("start honours a platform bootstrap opt-out written in .env.local", async () => {
-    const cwd = await tempProject("zitadel-start-no-platform-envfile-");
-    await writeFile(join(cwd, ".env.local"), "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false\n");
-    const fake = await fakeServerBinary();
-    const port = await freePort();
-
-    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
-      ZITADEL_SERVER_BINARY: fake.binPath,
-    });
-
-    expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as {
-      status: string;
-      data: { runtime: { pid: number }; console?: unknown };
-    };
-    expect(envelope.status).toBe("ok");
-    binaryPids.push(envelope.data.runtime.pid);
-    expect(envelope.data.console).toBeUndefined();
-    await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
-    const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
-    expect(commandLine?.command ?? "").not.toContain("--user-file");
-  });
-
-  // The server refuses to bootstrap the platform project while pinned to
-  // another one, so a pin means no local admin rather than a start that fails.
-  it("start creates no local admin when the server is pinned to its own project", async () => {
-    const cwd = await tempProject("zitadel-start-pinned-project-");
-    const fake = await fakeServerBinary();
-    const port = await freePort();
-
-    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
-      ZITADEL_SERVER_BINARY: fake.binPath,
-      NEXTGEN_PLATFORM_PROJECT_ID: "proj_custom",
-    });
-
-    expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as { data: { runtime: { pid: number }; console?: unknown } };
-    binaryPids.push(envelope.data.runtime.pid);
-    expect(envelope.data.console).toBeUndefined();
-    await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
     const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
     expect(commandLine?.command ?? "").not.toContain("--user-file");
   });

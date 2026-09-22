@@ -34,24 +34,4 @@ describe("console", () => {
     expect(json.message).toContain("No local admin");
     expect(json.next_commands.at(-1)).toMatch(/ start$/);
   });
-
-  it("refuses a --server it could not honour", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(cwd);
-
-    const res = await runCliForTest([
-      "console",
-      "--cwd",
-      cwd,
-      "--server",
-      "https://example.com",
-      "--json",
-      "--no-open",
-    ]);
-
-    expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("--server");
-  });
 });

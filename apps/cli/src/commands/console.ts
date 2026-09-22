@@ -3,7 +3,8 @@ import consola from "consola";
 
 import { openInBrowser } from "../lib/browser";
 import { ZitadelError } from "../lib/errors";
-import { consoleSignInUrl, readLocalAdmin } from "../lib/local-server/admin";
+import { readLocalAdmin } from "../lib/local-server/admin-credential";
+import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
@@ -31,11 +32,6 @@ export default class Console extends BaseCommand {
 
   static override flags = {
     "no-open": Flags.boolean({ description: "Print the sign-in link instead of opening a browser." }),
-    // Inherited from BaseCommand, but this command only ever signs in to the
-    // runtime started from this directory, so the override would be a lie in
-    // the help and the README. Hidden rather than removed: passing it is a
-    // clear error below instead of oclif's "Nonexistent flag".
-    server: Flags.string({ char: "s", hidden: true }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -46,14 +42,6 @@ export default class Console extends BaseCommand {
       resolveServer: false,
       source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
     });
-
-    // The link is minted against the runtime this directory started, so a
-    // server override would be silently ignored: say so instead.
-    if (this.meta.serverFlag) {
-      throw new ZitadelError("E_VALIDATION", "`console` does not take --server", {
-        hint: "It signs in to the local runtime started from this directory; run it without --server.",
-      });
-    }
 
     const admin = await readLocalAdmin(cwd);
     if (!admin) {
