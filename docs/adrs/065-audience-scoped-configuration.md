@@ -208,37 +208,33 @@ document carrying the stricter values for that team.
 
 Accepted, with eyes open:
 
-- **Two levels, no chain.** The hierarchy composes defaults down arbitrary
-  depth (instance → org → project → app). Audience gives one default and one
-  winning override; there is no override-of-an-override, and no place for an
-  intermediate level to contribute part of the answer.
-- **No restrictive inheritance.** The hierarchy can express "the parent sets a
-  floor the child may only strengthen". A scoped document replaces the default
-  entirely and can therefore *weaken* it. #899's composition rules (stricter-
-  value ordering, policies that cannot weaken each other) are a future layer
-  on top; audience only answers *which documents are in play*.
+- **No restrictive inheritance.** Exactly one document applies (rule 2);
+  nothing lets the project set a floor a scoped document may only strengthen.
+  A team-scoped password policy with `min_length: 8` fully replaces a project
+  default of 15 — the hierarchy could forbid that weakening, audience alone
+  cannot. #899's composition rules are the future layer for this.
 - **No delegated administration.** In the hierarchy each level is an admin
-  boundary — org admins manage org policies. Under audience the project owns
-  everything: a team-scoped policy is authored by project administrators, not
-  by the team it targets. Team self-service would need an explicit grant
-  model, not this mechanism.
-- **Effective configuration is computed, not located.** In a tree you find the
-  effective policy by walking up from a node. With audiences it is the result
-  of resolution per (app, team, …) combination, and the number of distinct
-  effective configurations grows with the documents authored. #899 requires
-  administrators to see the effective requirements; that needs a "which
-  document wins for this audience" answer, not a tree view.
-- **Overlap is invisible without validation.** Two documents scoped to the
-  same team are a conflict the hierarchy cannot express (one slot per node);
-  under audience it takes release validation to surface (rule 6).
+  boundary. Here the project owns everything: team-acme's own admins cannot
+  author the policy scoped to team-acme — a project administrator must. Team
+  self-service would need an explicit grant model, not this mechanism.
+- **Effective configuration is computed, not located.** "Which password
+  policy governs team-1 through app-1?" is answered by running resolution,
+  not by walking up a tree, and the number of distinct effective
+  configurations grows with the documents authored. Administrators need a
+  "which document wins for this audience" view (#899 requires that
+  visibility).
+- **Overlap is invisible without validation.** Two documents both scoped
+  `{"team_ids": ["team_1"]}` silently resolve newest-first (rule 6) — the
+  second author may never notice the first. The hierarchy has one slot per
+  node, so this conflict cannot even be expressed there; here release
+  validation has to surface it.
 - **Cross-parameter shadowing is silent.** An app-scoped document outranks a
-  team-scoped one for every request where both match (rules 4–5), so a team's
-  stricter policy is bypassed for logins through that app — deterministic,
-  but easy to author by accident because the two documents name different
-  resources and never look like duplicates. Conjunction gives the admin an
-  authored fix — a document binding team *and* app for the intersection —
-  but nothing forces authoring it; making overlapping documents contribute
-  jointly is #899's composition layer, out of scope here.
+  team-scoped one wherever both match (rules 4–5): team-1 requires SSO, yet
+  logins through app-1 resolve app-1's document and skip the requirement.
+  Conjunction gives an authored fix — a `{team_1 + app_1}` document for the
+  intersection — but nothing forces authoring it; making overlapping
+  documents contribute jointly is #899's composition layer, out of scope
+  here.
 
 What the model buys in exchange: it matches #899's single-owner split of
 ownership and applicability, it keeps every document inside the release
