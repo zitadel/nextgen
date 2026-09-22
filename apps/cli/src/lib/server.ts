@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
 import { resolveLocalServer } from "./local-server/runtime";
-import { isObject, parseJsonObject } from "./json";
+import { parseJsonObject } from "./json";
 
 /**
  * Server URL used when nothing else resolves. Also surfaced in hints and
@@ -19,26 +19,24 @@ export const DEFAULT_SERVER = "https://api.zitadel.cloud";
  */
 export type ResolvedServer = {
   value: string;
-  origin: "flag" | "env" | "config-env" | "config-top" | "default" | "local";
+  origin: "flag" | "env" | "config-top" | "default" | "local";
 };
 
 /**
  * Inputs to {@link resolveServer}. Passed explicitly (cwd, env) rather
  * than read from globals so resolution is pure and testable. `serverFlag`
- * and `environment` come from the parsed CLI invocation.
+ * comes from the parsed CLI invocation.
  */
 export type ResolveServerInput = {
   cwd: string;
   env: NodeJS.ProcessEnv;
   serverFlag?: string;
-  environment?: string;
 };
 
 /**
  * Resolves which server the CLI should target, applying a fixed
  * precedence: explicit `--server` flag, then `ZITADEL_API_BASE`, then the
- * selected environment block in `zitadel.json`, then the config's
- * top-level `server`, falling back to {@link DEFAULT_SERVER}. Every
+ * `server` in `zitadel.json`, falling back to {@link DEFAULT_SERVER}. Every
  * candidate is validated to a normalised origin; an invalid URL throws a
  * `ZitadelError` rather than silently falling through.
  */
@@ -52,14 +50,8 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
   }
 
   const config = await readConfig(input.cwd);
-  if (config) {
-    const envBranch = readEnvServer(config, input.environment);
-    if (envBranch) {
-      return validate(input.cwd, { value: envBranch, origin: "config-env" });
-    }
-    if (typeof config.server === "string") {
-      return validate(input.cwd, { value: config.server, origin: "config-top" });
-    }
+  if (typeof config?.server === "string") {
+    return validate(input.cwd, { value: config.server, origin: "config-top" });
   }
 
   return { value: DEFAULT_SERVER, origin: "default" };
@@ -104,22 +96,4 @@ async function readConfig(cwd: string): Promise<Record<string, unknown> | undefi
     }
     throw error;
   }
-}
-
-function readEnvServer(
-  config: Record<string, unknown>,
-  environment: string | undefined,
-): string | undefined {
-  if (!environment) {
-    return undefined;
-  }
-  const envs = config.environments;
-  if (!isObject(envs)) {
-    return undefined;
-  }
-  const branch = envs[environment];
-  if (!isObject(branch)) {
-    return undefined;
-  }
-  return typeof branch.server === "string" ? branch.server : undefined;
 }

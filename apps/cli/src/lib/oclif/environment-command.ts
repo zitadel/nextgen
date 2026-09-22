@@ -52,13 +52,10 @@ export abstract class EnvironmentCommand extends BaseCommand {
   private projectLevel = false;
 
   /**
-   * Validate the owner flags, then build the invocation context without them.
+   * Validate the owner flags, then build the invocation context.
    *
-   * `--environment` names an owner on the one instance the CLI talks to; it is
-   * not a `zitadel.json` block. `BaseCommand.toMeta` passes a
-   * `flags.environment` to the server resolver, where a matching
-   * `environments.<name>.server` would redirect the request, so it is withheld
-   * and the server resolves as it does for a command with no such flag.
+   * `--environment` names an owner on the one instance the CLI talks to; it
+   * plays no part in choosing that instance.
    */
   protected override async toMeta(
     flags: Record<string, unknown>,
@@ -69,7 +66,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
       this.requestedEnvironment = flags.environment;
     }
     this.projectLevel = flags["project-level"] === true;
-    return super.toMeta({ ...flags, environment: undefined }, options);
+    return super.toMeta(flags, options);
   }
 
   /**

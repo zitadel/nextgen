@@ -1,10 +1,8 @@
-import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel/api/client";
 
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { environmentSchema } from "../lib/environment";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -30,14 +28,6 @@ export default class Apply extends BaseCommand {
   static override description = "Validate and upload repo config to the platform.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
-  static override flags = {
-    environment: Flags.string({
-      char: "e",
-      description: "Target environment (default: development).",
-      options: [...environmentSchema.options],
-    }),
-  };
-
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Apply);
     await this.toMeta(flags);

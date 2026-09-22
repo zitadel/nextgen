@@ -1,4 +1,3 @@
-import { Flags } from "@oclif/core";
 import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
 import {
   CreateGrantBody,
@@ -62,7 +61,6 @@ import type {
 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
-import { environmentSchema } from "../lib/environment";
 import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
 import { buildResourceCommands, type ResourceRegistry } from "../lib/oclif/crud";
@@ -557,13 +555,6 @@ export const RESOURCES = {
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   operations: FILTER_OPERATIONS,
-  flags: {
-    environment: Flags.string({
-      char: "e",
-      description: "Target environment (default: development).",
-      options: [...environmentSchema.options],
-    }),
-  },
   connect: async ({ cwd, source }) => {
     const secret = await readZitadelSecret(cwd);
     // Which project and server a verb is about is worth stating to a human, and
