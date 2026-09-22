@@ -4,6 +4,14 @@ import { expectNoErrorBoundary, grantProjectAdmin, signIn } from "./support";
 
 test.describe.configure({ mode: "parallel" });
 
+/**
+ * What Settings → Admins says on every accepted submit. Retyped rather than
+ * imported: this project does not compile console source, so the constant it
+ * mirrors (`apps/console/src/components/add-admin-dialog.tsx`) is out of reach.
+ */
+const NEUTRAL_MESSAGE =
+  "If the user exists in our system, they have been granted access to your project.";
+
 test("shows the bootstrapped project in the list and detail views", async ({
   page,
   zitadel,
@@ -160,12 +168,13 @@ test("gives a colleague admin access to the project, and takes it away", async (
 
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
-  await dialog.getByRole("combobox", { name: "Person" }).click();
-  await page.getByRole("option", { name: colleague.email }).click();
+  await dialog.getByRole("textbox", { name: "Email address" }).fill(colleague.email);
   await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+  await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
 
   // The row is what proves the write landed: it comes back from the list read,
-  // not from the form's own state.
+  // not from the form's own state. The message above says the same thing
+  // whether or not anything was created, which is the point of it.
   const row = page.getByRole("row").filter({ hasText: colleague.email });
   await expect(row).toBeVisible();
   await expect(row.getByText("Admin", { exact: true })).toBeVisible();
@@ -180,36 +189,34 @@ test("gives a colleague admin access to the project, and takes it away", async (
   await expectNoErrorBoundary(page);
 });
 
-test("stops offering a colleague once they are already an admin", async ({ page, seed }) => {
-  // `POST /grants` refuses a second grant for the same principal and relation.
-  // Rather than let the operator pick someone and then read an error, the
-  // picker drops people who already hold one — asserted here because the list
-  // it filters against comes from the server, not from the form.
+test("answers the same way for an address that belongs to nobody", async ({ page, seed }) => {
+  // The neutrality of `POST /grants` by identifier (#1229) as the operator
+  // experiences it: an address nobody has registered gets the same sentence as
+  // one that worked, and the only honest difference — no row — is a fact about
+  // the project, not an answer about the address. Asserted against a real
+  // instance because it is the server that decides to say nothing, and a stub
+  // would be asserting the stub.
   const operator = await seed.user();
-  const colleague = await seed.user();
+  const unknown = `nobody-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
   await signIn(page, operator);
 
   await page.goto("/settings/admins");
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
-  await dialog.getByRole("combobox", { name: "Person" }).click();
-  await page.getByRole("option", { name: colleague.email }).click();
+  await dialog.getByRole("textbox", { name: "Email address" }).fill(unknown);
+
+  // The list read the dialog triggers on its way out. Without waiting for it,
+  // "no row for this address" would be asserted against the list as it was
+  // before the submit, where there was no such row either — an assertion that
+  // cannot fail.
+  const refreshed = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/grants/query" && response.ok(),
+  );
   await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
-  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toBeVisible();
 
-  // Second time round they are not on offer.
-  await page.getByRole("button", { name: "Add admin", exact: true }).click();
-  await page.getByRole("dialog", { name: "Add admin" }).getByRole("combobox", { name: "Person" }).click();
-  await expect(page.getByRole("option", { name: colleague.email })).toHaveCount(0);
-  // The operator, who holds no grant, is still offered.
-  await expect(page.getByRole("option", { name: operator.email })).toBeVisible();
-
-  // Leave the instance as found.
-  await page.keyboard.press("Escape");
-  await page.getByRole("dialog", { name: "Add admin" }).getByRole("button", { name: "Cancel" }).click();
-  const row = page.getByRole("row").filter({ hasText: colleague.email });
-  await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
-  await page.getByRole("menuitem", { name: "Remove admin" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Remove admin", exact: true }).click();
-  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
+  await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  await refreshed;
+  await expect(page.getByRole("row").filter({ hasText: unknown })).toHaveCount(0);
+  await expectNoErrorBoundary(page);
 });
