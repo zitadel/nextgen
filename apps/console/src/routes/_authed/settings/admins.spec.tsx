@@ -239,6 +239,7 @@ describe("admins screen", () => {
 
     expect(await dialog.findByRole("alert")).toHaveTextContent(SELF_MESSAGE);
     expect(input).toBeInvalid();
+    expect(input).toHaveAccessibleDescription(SELF_MESSAGE);
     expect(created).toHaveLength(0);
   });
 

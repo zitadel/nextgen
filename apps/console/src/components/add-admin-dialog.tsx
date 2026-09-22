@@ -89,6 +89,7 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
   const { session } = useRouteContext({ from: "/_authed" });
   const self = session.user?.identifier;
   const inputId = useId();
+  const errorId = `${inputId}-error`;
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -125,8 +126,11 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
     // native validation and Enter-to-submit, not as a layout box.
     <form className="contents" onSubmit={(event) => void submit(event)}>
       {/* A refusal makes the field invalid, not just the text below it: the
-          `Input` and the `Field` both carry their own styling for that state,
-          and `aria-invalid` is what ties the message to the control. */}
+          `Input` and the `Field` both carry their own styling for that state.
+          `aria-describedby` is what carries the reason, which `aria-invalid`
+          alone does not: `Field` wires up no description of its own, so a
+          screen reader returning to the control would otherwise hear that it
+          is wrong without hearing why. */}
       <Field data-invalid={error ? true : undefined}>
         <FieldLabel htmlFor={inputId}>Email address</FieldLabel>
         <Input
@@ -136,10 +140,11 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
           required
           autoComplete="off"
           aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
           value={value}
           onChange={(event) => setValue(event.target.value)}
         />
-        <FieldError>{error}</FieldError>
+        <FieldError id={errorId}>{error}</FieldError>
       </Field>
 
       <DialogFooter>
