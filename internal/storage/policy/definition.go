@@ -11,9 +11,8 @@ import (
 // Definition is the structure stored inside the definition JSON column: the
 // instance body minus the columns the row already carries.
 type Definition struct {
-	Audience    policy.Audience    `json:"audience,omitzero"`
-	Enforcement policy.Enforcement `json:"enforcement,omitempty"`
-	Config      map[string]any     `json:"config"`
+	Audience policy.Audience `json:"audience,omitzero"`
+	Config   map[string]any  `json:"config"`
 }
 
 // Marshal converts the revision body into JSON for the definition column.
@@ -23,9 +22,8 @@ func Marshal(p *domain.Policy) ([]byte, error) {
 		cfg = map[string]any{}
 	}
 	return json.Marshal(Definition{
-		Audience:    p.Audience,
-		Enforcement: p.Enforcement,
-		Config:      cfg,
+		Audience: p.Audience,
+		Config:   cfg,
 	})
 }
 
@@ -42,12 +40,11 @@ func ToDomain(projectID, id, operation string, createdAt time.Time, definition [
 		def.Config = map[string]any{}
 	}
 	return &domain.Policy{
-		ProjectID:   projectID,
-		ID:          id,
-		Operation:   operation,
-		Audience:    def.Audience,
-		Enforcement: def.Enforcement,
-		Config:      def.Config,
+		ProjectID: projectID,
+		ID:        id,
+		Operation: operation,
+		Audience:  def.Audience,
+		Config:    def.Config,
 		// Spanner returns UTC while pgx defaults to local; normalize to UTC.
 		CreatedAt: createdAt.UTC(),
 	}, nil

@@ -5,8 +5,6 @@ description: |
 properties:
   operation:
     type: string
-  enforcement:
-    type: string
   team_ids:
     type: array
     items:

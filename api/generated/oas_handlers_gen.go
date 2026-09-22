@@ -2013,7 +2013,7 @@ func (s *Server) handleCreatePolicyRequest(args [0]string, argsEscaped bool, w h
 		}
 
 		type (
-			Request  = *Policy
+			Request  = Policy
 			Params   = CreatePolicyParams
 			Response = CreatePolicyRes
 		)

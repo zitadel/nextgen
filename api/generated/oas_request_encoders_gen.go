@@ -123,7 +123,7 @@ func encodeCreateIdpRequest(
 }
 
 func encodeCreatePolicyRequest(
-	req *Policy,
+	req Policy,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

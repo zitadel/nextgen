@@ -33,12 +33,11 @@ func ensurePolicyProject(t *testing.T, stmts service.AllStatements, projectID st
 
 func samplePolicy(projectID, id string) *domain.Policy {
 	return &domain.Policy{
-		ProjectID:   projectID,
-		ID:          id,
-		Operation:   "user.password.save",
-		Audience:    policy.Audience{TeamIDs: []string{"team_acme"}},
-		Enforcement: policy.EnforcementAudit,
-		Config:      map[string]any{"min_length": float64(20), "history_depth": float64(2)},
+		ProjectID: projectID,
+		ID:        id,
+		Operation: "user.password.save",
+		Audience:  policy.Audience{TeamIDs: []string{"team_acme"}},
+		Config:    map[string]any{"min_length": float64(20), "history_depth": float64(2)},
 	}
 }
 
@@ -57,7 +56,6 @@ func TestPolicyStatements_CreateAndGet(t *testing.T) {
 		assert.Equal(t, entity.ID, got.ID)
 		assert.Equal(t, entity.Operation, got.Operation)
 		assert.Equal(t, entity.Audience, got.Audience)
-		assert.Equal(t, entity.Enforcement, got.Enforcement)
 		assert.Equal(t, entity.Config, got.Config)
 	})
 }

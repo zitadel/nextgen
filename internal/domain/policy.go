@@ -24,28 +24,25 @@ func ErrPolicyPermissionDenied() Error {
 }
 
 // Policy is one immutable revision of a policy instance (ADR 066): the
-// developer-authored config, audience and enforcement mode for one catalogued
-// operation. Revisions are never updated or deleted; every edit publishes a
+// developer-authored config and audience for one catalogued operation. Revisions are never updated or deleted; every edit publishes a
 // new revision and evaluation resolves the newest one per operation and
 // audience.
 type Policy struct {
-	ProjectID   string
-	ID          string
-	Operation   string
-	Audience    policy.Audience
-	Enforcement policy.Enforcement
-	Config      map[string]any
-	CreatedAt   time.Time
+	ProjectID string
+	ID        string
+	Operation string
+	Audience  policy.Audience
+	Config    map[string]any
+	CreatedAt time.Time
 }
 
 // Instance returns the evaluator's view of the revision.
 func (p *Policy) Instance() *policy.Instance {
 	return &policy.Instance{
-		Kind:        policy.KindPolicy,
-		Operation:   p.Operation,
-		Audience:    p.Audience,
-		Enforcement: p.Enforcement,
-		Config:      p.Config,
+		Kind:      policy.KindPolicy,
+		Operation: p.Operation,
+		Audience:  p.Audience,
+		Config:    p.Config,
 	}
 }
 
@@ -79,12 +76,11 @@ func NewPolicy(projectID string, inst *policy.Instance) (*Policy, error) {
 		cfg = map[string]any{}
 	}
 	return &Policy{
-		ProjectID:   projectID,
-		Operation:   inst.Operation,
-		Audience:    inst.Audience,
-		Enforcement: inst.Enforcement,
-		Config:      cfg,
-		CreatedAt:   time.Now().UTC(),
+		ProjectID: projectID,
+		Operation: inst.Operation,
+		Audience:  inst.Audience,
+		Config:    cfg,
+		CreatedAt: time.Now().UTC(),
 	}, nil
 }
 

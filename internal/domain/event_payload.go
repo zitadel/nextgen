@@ -182,12 +182,11 @@ type BrandingPayload struct {
 type BrandingCreatedPayload = BrandingPayload
 
 // PolicyPayload is the allowlisted projection of a policy revision (ADR 066):
-// which operation, how it is enforced and who it applies to. Config values
-// stay out; the revision itself is readable through the API.
+// which operation and who it applies to. Config values stay out; the revision
+// itself is readable through the API.
 type PolicyPayload struct {
-	Operation   string   `json:"operation,omitempty"`
-	Enforcement string   `json:"enforcement,omitempty"`
-	TeamIDs     []string `json:"team_ids,omitempty"`
+	Operation string   `json:"operation,omitempty"`
+	TeamIDs   []string `json:"team_ids,omitempty"`
 }
 
 // PolicyCreatedPayload is an alias for policy.created.

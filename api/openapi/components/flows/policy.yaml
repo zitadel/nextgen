@@ -1,61 +1,18 @@
 x-meta-schema: true
-type: object
 title: Policy
 description: |
-  A policy instance (ADR 066): the developer-authored half of an operation
-  policy. It carries the configuration values for one catalogued operation,
-  the audience the values apply to, and the enforcement mode. Used as the
-  request body of `POST /policies`, which publishes it as a new immutable
-  revision, and locally as a `.zitadel/policies/<operation>.json` file that
-  `zitadel apply` publishes.
+  A policy instance: the developer-authored half of an operation policy. It
+  carries the configuration values for one catalogued operation and the
+  audience the values apply to. Used as the request body of `POST /policies`,
+  which publishes it as a new immutable revision, and locally as a
+  `.zitadel/policies/<operation>.json` file that `zitadel apply` publishes.
 
-  The rules themselves are not part of this document: they are defined by
-  Zitadel per operation, and `config` may only carry the settings that
-  operation's template declares, within its bounds.
-additionalProperties: false
-required:
-  - kind
-  - operation
-  - config
-properties:
-  "$schema":
-    type: string
-    description: |
-      Editor affordance: path or URL of this file's JSON meta-schema. The CLI
-      strips it before upload; the platform ignores it.
-  kind:
-    type: string
-    enum: [policy]
-    description: Always `policy`.
-  operation:
-    type: string
-    description: |
-      The catalogued operation this policy guards, for example
-      `user.password.save`. The catalogue is closed and server-defined.
-  audience:
-    type: object
-    additionalProperties: false
-    description: |
-      Which requests the policy applies to. Omitted means the project
-      default. Only `team_ids` is applicable today.
-    properties:
-      team_ids:
-        type: array
-        uniqueItems: true
-        items:
-          type: string
-  enforcement:
-    type: string
-    enum: [enforce, audit]
-    default: enforce
-    description: |
-      `enforce` rejects the operation on a deny. `audit` keeps enforcing the
-      template defaults but only records what the instance tightened beyond
-      them, so a stricter policy can be rolled out before it blocks anyone.
-  config:
-    type: object
-    description: |
-      Setting values for the operation, validated against the operation's
-      template: unknown settings, out-of-bounds values and fixed settings are
-      rejected. Omitted settings take the template default.
-    additionalProperties: true
+  `operation` selects the shape: each catalogued operation has its own
+  `config` object with the settings that operation exposes, within Zitadel's
+  bounds. The rules themselves are not part of this document.
+oneOf:
+  - $ref: policy-user-password-save.yaml
+discriminator:
+  propertyName: operation
+  mapping:
+    user.password.save: policy-user-password-save.yaml

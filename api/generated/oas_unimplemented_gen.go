@@ -176,7 +176,7 @@ func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest
 // settings, out-of-bounds values and fixed settings are rejected.
 //
 // POST /policies
-func (UnimplementedHandler) CreatePolicy(ctx context.Context, req *Policy, params CreatePolicyParams) (r CreatePolicyRes, _ error) {
+func (UnimplementedHandler) CreatePolicy(ctx context.Context, req Policy, params CreatePolicyParams) (r CreatePolicyRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

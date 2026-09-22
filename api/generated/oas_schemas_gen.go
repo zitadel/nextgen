@@ -37079,52 +37079,6 @@ func (o OptPolicyCreatedEventDelegationType) Or(d PolicyCreatedEventDelegationTy
 	return d
 }
 
-// NewOptPolicyEnforcement returns new OptPolicyEnforcement with value set to v.
-func NewOptPolicyEnforcement(v PolicyEnforcement) OptPolicyEnforcement {
-	return OptPolicyEnforcement{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptPolicyEnforcement is optional PolicyEnforcement.
-type OptPolicyEnforcement struct {
-	Value PolicyEnforcement
-	Set   bool
-}
-
-// IsSet returns true if OptPolicyEnforcement was set.
-func (o OptPolicyEnforcement) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptPolicyEnforcement) Reset() {
-	var v PolicyEnforcement
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptPolicyEnforcement) SetTo(v PolicyEnforcement) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptPolicyEnforcement) Get() (v PolicyEnforcement, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptPolicyEnforcement) Or(d PolicyEnforcement) PolicyEnforcement {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -42153,100 +42107,56 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	return m
 }
 
-// A policy instance (ADR 066): the developer-authored half of an operation
-// policy. It carries the configuration values for one catalogued operation,
-// the audience the values apply to, and the enforcement mode. Used as the
-// request body of `POST /policies`, which publishes it as a new immutable
-// revision, and locally as a `.zitadel/policies/<operation>.json` file that
-// `zitadel apply` publishes.
-// The rules themselves are not part of this document: they are defined by
-// Zitadel per operation, and `config` may only carry the settings that
-// operation's template declares, within its bounds.
+// A policy instance: the developer-authored half of an operation policy. It
+// carries the configuration values for one catalogued operation and the
+// audience the values apply to. Used as the request body of `POST /policies`,
+// which publishes it as a new immutable revision, and locally as a
+// `.zitadel/policies/<operation>.json` file that `zitadel apply` publishes.
+// `operation` selects the shape: each catalogued operation has its own
+// `config` object with the settings that operation exposes, within Zitadel's
+// bounds. The rules themselves are not part of this document.
 // Ref: #
+// Policy represents sum type.
 type Policy struct {
-	// Editor affordance: path or URL of this file's JSON meta-schema. The CLI
-	// strips it before upload; the platform ignores it.
-	Schema OptString `json:"$schema"`
-	// Always `policy`.
-	Kind PolicyKind `json:"kind"`
-	// The catalogued operation this policy guards, for example
-	// `user.password.save`. The catalogue is closed and server-defined.
-	Operation string `json:"operation"`
-	// Which requests the policy applies to. Omitted means the project
-	// default. Only `team_ids` is applicable today.
-	Audience OptPolicyAudience `json:"audience"`
-	// `enforce` rejects the operation on a deny. `audit` keeps enforcing the
-	// template defaults but only records what the instance tightened beyond
-	// them, so a stricter policy can be rolled out before it blocks anyone.
-	Enforcement OptPolicyEnforcement `json:"enforcement"`
-	// Setting values for the operation, validated against the operation's
-	// template: unknown settings, out-of-bounds values and fixed settings are
-	// rejected. Omitted settings take the template default.
-	Config PolicyConfig `json:"config"`
+	Type                   PolicyType // switch on this field
+	PolicyUserPasswordSave PolicyUserPasswordSave
 }
 
-// GetSchema returns the value of Schema.
-func (s *Policy) GetSchema() OptString {
-	return s.Schema
+// PolicyType is oneOf type of Policy.
+type PolicyType string
+
+// Possible values for PolicyType.
+const (
+	PolicyUserPasswordSavePolicy PolicyType = "user.password.save"
+)
+
+// IsPolicyUserPasswordSave reports whether Policy is PolicyUserPasswordSave.
+func (s Policy) IsPolicyUserPasswordSave() bool { return s.Type == PolicyUserPasswordSavePolicy }
+
+// SetPolicyUserPasswordSave sets Policy to PolicyUserPasswordSave.
+func (s *Policy) SetPolicyUserPasswordSave(v PolicyUserPasswordSave) {
+	s.Type = PolicyUserPasswordSavePolicy
+	s.PolicyUserPasswordSave = v
 }
 
-// GetKind returns the value of Kind.
-func (s *Policy) GetKind() PolicyKind {
-	return s.Kind
+// GetPolicyUserPasswordSave returns PolicyUserPasswordSave and true boolean if Policy is PolicyUserPasswordSave.
+func (s Policy) GetPolicyUserPasswordSave() (v PolicyUserPasswordSave, ok bool) {
+	if !s.IsPolicyUserPasswordSave() {
+		return v, false
+	}
+	return s.PolicyUserPasswordSave, true
 }
 
-// GetOperation returns the value of Operation.
-func (s *Policy) GetOperation() string {
-	return s.Operation
+// NewPolicyUserPasswordSavePolicy returns new Policy from PolicyUserPasswordSave.
+func NewPolicyUserPasswordSavePolicy(v PolicyUserPasswordSave) Policy {
+	var s Policy
+	s.SetPolicyUserPasswordSave(v)
+	return s
 }
 
-// GetAudience returns the value of Audience.
-func (s *Policy) GetAudience() OptPolicyAudience {
-	return s.Audience
-}
-
-// GetEnforcement returns the value of Enforcement.
-func (s *Policy) GetEnforcement() OptPolicyEnforcement {
-	return s.Enforcement
-}
-
-// GetConfig returns the value of Config.
-func (s *Policy) GetConfig() PolicyConfig {
-	return s.Config
-}
-
-// SetSchema sets the value of Schema.
-func (s *Policy) SetSchema(val OptString) {
-	s.Schema = val
-}
-
-// SetKind sets the value of Kind.
-func (s *Policy) SetKind(val PolicyKind) {
-	s.Kind = val
-}
-
-// SetOperation sets the value of Operation.
-func (s *Policy) SetOperation(val string) {
-	s.Operation = val
-}
-
-// SetAudience sets the value of Audience.
-func (s *Policy) SetAudience(val OptPolicyAudience) {
-	s.Audience = val
-}
-
-// SetEnforcement sets the value of Enforcement.
-func (s *Policy) SetEnforcement(val OptPolicyEnforcement) {
-	s.Enforcement = val
-}
-
-// SetConfig sets the value of Config.
-func (s *Policy) SetConfig(val PolicyConfig) {
-	s.Config = val
-}
-
-// Which requests the policy applies to. Omitted means the project
-// default. Only `team_ids` is applicable today.
+// Which requests the policy applies to. Omitted means the project default.
+// Only `team_ids` is applicable today.
+// Ref: #
 type PolicyAudience struct {
 	TeamIds []string `json:"team_ids"`
 }
@@ -42259,20 +42169,6 @@ func (s *PolicyAudience) GetTeamIds() []string {
 // SetTeamIds sets the value of TeamIds.
 func (s *PolicyAudience) SetTeamIds(val []string) {
 	s.TeamIds = val
-}
-
-// Setting values for the operation, validated against the operation's
-// template: unknown settings, out-of-bounds values and fixed settings are
-// rejected. Omitted settings take the template default.
-type PolicyConfig map[string]jx.Raw
-
-func (s *PolicyConfig) init() PolicyConfig {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Merged schema.
@@ -42723,19 +42619,13 @@ func (s *PolicyCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // Allowlisted fields for `policy.created`. Omits the `config` values.
 // Ref: #
 type PolicyCreatedPayload struct {
-	Operation   OptString `json:"operation"`
-	Enforcement OptString `json:"enforcement"`
-	TeamIds     []string  `json:"team_ids"`
+	Operation OptString `json:"operation"`
+	TeamIds   []string  `json:"team_ids"`
 }
 
 // GetOperation returns the value of Operation.
 func (s *PolicyCreatedPayload) GetOperation() OptString {
 	return s.Operation
-}
-
-// GetEnforcement returns the value of Enforcement.
-func (s *PolicyCreatedPayload) GetEnforcement() OptString {
-	return s.Enforcement
 }
 
 // GetTeamIds returns the value of TeamIds.
@@ -42748,93 +42638,9 @@ func (s *PolicyCreatedPayload) SetOperation(val OptString) {
 	s.Operation = val
 }
 
-// SetEnforcement sets the value of Enforcement.
-func (s *PolicyCreatedPayload) SetEnforcement(val OptString) {
-	s.Enforcement = val
-}
-
 // SetTeamIds sets the value of TeamIds.
 func (s *PolicyCreatedPayload) SetTeamIds(val []string) {
 	s.TeamIds = val
-}
-
-// `enforce` rejects the operation on a deny. `audit` keeps enforcing the
-// template defaults but only records what the instance tightened beyond
-// them, so a stricter policy can be rolled out before it blocks anyone.
-type PolicyEnforcement string
-
-const (
-	PolicyEnforcementEnforce PolicyEnforcement = "enforce"
-	PolicyEnforcementAudit   PolicyEnforcement = "audit"
-)
-
-// AllValues returns all PolicyEnforcement values.
-func (PolicyEnforcement) AllValues() []PolicyEnforcement {
-	return []PolicyEnforcement{
-		PolicyEnforcementEnforce,
-		PolicyEnforcementAudit,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s PolicyEnforcement) MarshalText() ([]byte, error) {
-	switch s {
-	case PolicyEnforcementEnforce:
-		return []byte(s), nil
-	case PolicyEnforcementAudit:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *PolicyEnforcement) UnmarshalText(data []byte) error {
-	switch PolicyEnforcement(data) {
-	case PolicyEnforcementEnforce:
-		*s = PolicyEnforcementEnforce
-		return nil
-	case PolicyEnforcementAudit:
-		*s = PolicyEnforcementAudit
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Always `policy`.
-type PolicyKind string
-
-const (
-	PolicyKindPolicy PolicyKind = "policy"
-)
-
-// AllValues returns all PolicyKind values.
-func (PolicyKind) AllValues() []PolicyKind {
-	return []PolicyKind{
-		PolicyKindPolicy,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s PolicyKind) MarshalText() ([]byte, error) {
-	switch s {
-	case PolicyKindPolicy:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *PolicyKind) UnmarshalText(data []byte) error {
-	switch PolicyKind(data) {
-	case PolicyKindPolicy:
-		*s = PolicyKindPolicy
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // A stored policy revision. `policy` echoes the canonical stored document so
@@ -42880,6 +42686,176 @@ func (s *PolicyRevisionResponse) SetPolicy(val Policy) {
 
 func (*PolicyRevisionResponse) createPolicyRes()  {}
 func (*PolicyRevisionResponse) getPolicyByIdRes() {}
+
+// The `user.password.save` policy: the rules that apply whenever a password is
+// set, through any API, SDK or authentication journey. Zitadel fixes the
+// maximum length (64 Unicode code points) and the built-in checks; a project
+// chooses the minimum length and the password history depth.
+// Ref: #
+type PolicyUserPasswordSave struct {
+	// Editor affordance: path or URL of this file's JSON meta-schema. The CLI
+	// strips it before upload; the platform ignores it.
+	Schema OptString `json:"$schema"`
+	// Always `policy`.
+	Kind PolicyUserPasswordSaveKind `json:"kind"`
+	// Always `user.password.save`.
+	Operation PolicyUserPasswordSaveOperation `json:"operation"`
+	Audience  OptPolicyAudience               `json:"audience"`
+	// Setting values. An omitted setting takes its default.
+	Config PolicyUserPasswordSaveConfig `json:"config"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *PolicyUserPasswordSave) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetKind returns the value of Kind.
+func (s *PolicyUserPasswordSave) GetKind() PolicyUserPasswordSaveKind {
+	return s.Kind
+}
+
+// GetOperation returns the value of Operation.
+func (s *PolicyUserPasswordSave) GetOperation() PolicyUserPasswordSaveOperation {
+	return s.Operation
+}
+
+// GetAudience returns the value of Audience.
+func (s *PolicyUserPasswordSave) GetAudience() OptPolicyAudience {
+	return s.Audience
+}
+
+// GetConfig returns the value of Config.
+func (s *PolicyUserPasswordSave) GetConfig() PolicyUserPasswordSaveConfig {
+	return s.Config
+}
+
+// SetSchema sets the value of Schema.
+func (s *PolicyUserPasswordSave) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetKind sets the value of Kind.
+func (s *PolicyUserPasswordSave) SetKind(val PolicyUserPasswordSaveKind) {
+	s.Kind = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *PolicyUserPasswordSave) SetOperation(val PolicyUserPasswordSaveOperation) {
+	s.Operation = val
+}
+
+// SetAudience sets the value of Audience.
+func (s *PolicyUserPasswordSave) SetAudience(val OptPolicyAudience) {
+	s.Audience = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PolicyUserPasswordSave) SetConfig(val PolicyUserPasswordSaveConfig) {
+	s.Config = val
+}
+
+// Setting values. An omitted setting takes its default.
+type PolicyUserPasswordSaveConfig struct {
+	// Minimum password length in Unicode code points after NFC
+	// normalization. 15 is what NIST SP 800-63B requires for a password
+	// used as a single factor; values from 8 to 14 are accepted with a
+	// warning at authoring time.
+	MinLength OptInt `json:"min_length"`
+	// How many previous passwords, the current one included, a new
+	// password may not match. 0 turns history off.
+	HistoryDepth OptInt `json:"history_depth"`
+}
+
+// GetMinLength returns the value of MinLength.
+func (s *PolicyUserPasswordSaveConfig) GetMinLength() OptInt {
+	return s.MinLength
+}
+
+// GetHistoryDepth returns the value of HistoryDepth.
+func (s *PolicyUserPasswordSaveConfig) GetHistoryDepth() OptInt {
+	return s.HistoryDepth
+}
+
+// SetMinLength sets the value of MinLength.
+func (s *PolicyUserPasswordSaveConfig) SetMinLength(val OptInt) {
+	s.MinLength = val
+}
+
+// SetHistoryDepth sets the value of HistoryDepth.
+func (s *PolicyUserPasswordSaveConfig) SetHistoryDepth(val OptInt) {
+	s.HistoryDepth = val
+}
+
+// Always `policy`.
+type PolicyUserPasswordSaveKind string
+
+const (
+	PolicyUserPasswordSaveKindPolicy PolicyUserPasswordSaveKind = "policy"
+)
+
+// AllValues returns all PolicyUserPasswordSaveKind values.
+func (PolicyUserPasswordSaveKind) AllValues() []PolicyUserPasswordSaveKind {
+	return []PolicyUserPasswordSaveKind{
+		PolicyUserPasswordSaveKindPolicy,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyUserPasswordSaveKind) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyUserPasswordSaveKindPolicy:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyUserPasswordSaveKind) UnmarshalText(data []byte) error {
+	switch PolicyUserPasswordSaveKind(data) {
+	case PolicyUserPasswordSaveKindPolicy:
+		*s = PolicyUserPasswordSaveKindPolicy
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Always `user.password.save`.
+type PolicyUserPasswordSaveOperation string
+
+const (
+	PolicyUserPasswordSaveOperationUserPasswordSave PolicyUserPasswordSaveOperation = "user.password.save"
+)
+
+// AllValues returns all PolicyUserPasswordSaveOperation values.
+func (PolicyUserPasswordSaveOperation) AllValues() []PolicyUserPasswordSaveOperation {
+	return []PolicyUserPasswordSaveOperation{
+		PolicyUserPasswordSaveOperationUserPasswordSave,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyUserPasswordSaveOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyUserPasswordSaveOperationUserPasswordSave:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyUserPasswordSaveOperation) UnmarshalText(data []byte) error {
+	switch PolicyUserPasswordSaveOperation(data) {
+	case PolicyUserPasswordSaveOperationUserPasswordSave:
+		*s = PolicyUserPasswordSaveOperationUserPasswordSave
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #

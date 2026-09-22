@@ -56511,39 +56511,6 @@ func (s *OptPolicyCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes PolicyEnforcement as json.
-func (o OptPolicyEnforcement) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes PolicyEnforcement from json.
-func (o *OptPolicyEnforcement) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptPolicyEnforcement to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptPolicyEnforcement) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptPolicyEnforcement) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes ProjClaimExpiredDetails as json.
 func (o OptProjClaimExpiredDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -61947,54 +61914,42 @@ func (s *PatchUserRequestAttributes) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *Policy) Encode(e *jx.Encoder) {
+// Encode encodes Policy as json.
+func (s Policy) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-// encodeFields encodes fields.
-func (s *Policy) encodeFields(e *jx.Encoder) {
-	{
-		if s.Schema.Set {
-			e.FieldStart("$schema")
-			s.Schema.Encode(e)
-		}
-	}
-	{
-		e.FieldStart("kind")
-		s.Kind.Encode(e)
-	}
-	{
+func (s Policy) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case PolicyUserPasswordSavePolicy:
 		e.FieldStart("operation")
-		e.Str(s.Operation)
-	}
-	{
-		if s.Audience.Set {
-			e.FieldStart("audience")
-			s.Audience.Encode(e)
+		e.Str("user.password.save")
+		{
+			s := s.PolicyUserPasswordSave
+			{
+				if s.Schema.Set {
+					e.FieldStart("$schema")
+					s.Schema.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("kind")
+				s.Kind.Encode(e)
+			}
+			{
+				if s.Audience.Set {
+					e.FieldStart("audience")
+					s.Audience.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("config")
+				s.Config.Encode(e)
+			}
 		}
 	}
-	{
-		if s.Enforcement.Set {
-			e.FieldStart("enforcement")
-			s.Enforcement.Encode(e)
-		}
-	}
-	{
-		e.FieldStart("config")
-		s.Config.Encode(e)
-	}
-}
-
-var jsonFieldsNameOfPolicy = [6]string{
-	0: "$schema",
-	1: "kind",
-	2: "operation",
-	3: "audience",
-	4: "enforcement",
-	5: "config",
 }
 
 // Decode decodes Policy from json.
@@ -62002,118 +61957,53 @@ func (s *Policy) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode Policy to nil")
 	}
-	var requiredBitSet [1]uint8
-	s.setDefaults()
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
 
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "$schema":
-			if err := func() error {
-				s.Schema.Reset()
-				if err := s.Schema.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"$schema\"")
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
 			}
-		case "kind":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				if err := s.Kind.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"kind\"")
-			}
-		case "operation":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				v, err := d.Str()
-				s.Operation = string(v)
+			switch string(key) {
+			case "operation":
+				typ, err := d.Str()
 				if err != nil {
 					return err
 				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"operation\"")
-			}
-		case "audience":
-			if err := func() error {
-				s.Audience.Reset()
-				if err := s.Audience.Decode(d); err != nil {
-					return err
+				switch typ {
+				case "user.password.save":
+					s.Type = PolicyUserPasswordSavePolicy
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
 				}
 				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"audience\"")
 			}
-		case "enforcement":
-			if err := func() error {
-				s.Enforcement.Reset()
-				if err := s.Enforcement.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"enforcement\"")
-			}
-		case "config":
-			requiredBitSet[0] |= 1 << 5
-			if err := func() error {
-				if err := s.Config.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"config\"")
-			}
-		default:
-			return errors.Errorf("unexpected field %q", k)
-		}
-		return nil
+			return d.Skip()
+		})
 	}); err != nil {
-		return errors.Wrap(err, "decode Policy")
+		return errors.Wrap(err, "capture")
 	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00100110,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfPolicy) {
-					name = jsonFieldsNameOfPolicy[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case PolicyUserPasswordSavePolicy:
+		if err := s.PolicyUserPasswordSave.Decode(d); err != nil {
+			return err
 		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *Policy) MarshalJSON() ([]byte, error) {
+func (s Policy) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
@@ -62197,64 +62087,6 @@ func (s *PolicyAudience) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PolicyAudience) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s PolicyConfig) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s PolicyConfig) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes PolicyConfig from json.
-func (s *PolicyConfig) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PolicyConfig to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode PolicyConfig")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PolicyConfig) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PolicyConfig) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -62860,12 +62692,6 @@ func (s *PolicyCreatedPayload) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Enforcement.Set {
-			e.FieldStart("enforcement")
-			s.Enforcement.Encode(e)
-		}
-	}
-	{
 		if s.TeamIds != nil {
 			e.FieldStart("team_ids")
 			e.ArrStart()
@@ -62877,10 +62703,9 @@ func (s *PolicyCreatedPayload) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPolicyCreatedPayload = [3]string{
+var jsonFieldsNameOfPolicyCreatedPayload = [2]string{
 	0: "operation",
-	1: "enforcement",
-	2: "team_ids",
+	1: "team_ids",
 }
 
 // Decode decodes PolicyCreatedPayload from json.
@@ -62900,16 +62725,6 @@ func (s *PolicyCreatedPayload) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"operation\"")
-			}
-		case "enforcement":
-			if err := func() error {
-				s.Enforcement.Reset()
-				if err := s.Enforcement.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"enforcement\"")
 			}
 		case "team_ids":
 			if err := func() error {
@@ -62950,84 +62765,6 @@ func (s *PolicyCreatedPayload) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PolicyCreatedPayload) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PolicyEnforcement as json.
-func (s PolicyEnforcement) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes PolicyEnforcement from json.
-func (s *PolicyEnforcement) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PolicyEnforcement to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch PolicyEnforcement(v) {
-	case PolicyEnforcementEnforce:
-		*s = PolicyEnforcementEnforce
-	case PolicyEnforcementAudit:
-		*s = PolicyEnforcementAudit
-	default:
-		*s = PolicyEnforcement(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PolicyEnforcement) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PolicyEnforcement) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PolicyKind as json.
-func (s PolicyKind) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes PolicyKind from json.
-func (s *PolicyKind) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PolicyKind to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch PolicyKind(v) {
-	case PolicyKindPolicy:
-		*s = PolicyKindPolicy
-	default:
-		*s = PolicyKind(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PolicyKind) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PolicyKind) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -63156,6 +62893,321 @@ func (s *PolicyRevisionResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PolicyRevisionResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *PolicyUserPasswordSave) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *PolicyUserPasswordSave) encodeFields(e *jx.Encoder) {
+	{
+		if s.Schema.Set {
+			e.FieldStart("$schema")
+			s.Schema.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
+	{
+		e.FieldStart("operation")
+		s.Operation.Encode(e)
+	}
+	{
+		if s.Audience.Set {
+			e.FieldStart("audience")
+			s.Audience.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("config")
+		s.Config.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfPolicyUserPasswordSave = [5]string{
+	0: "$schema",
+	1: "kind",
+	2: "operation",
+	3: "audience",
+	4: "config",
+}
+
+// Decode decodes PolicyUserPasswordSave from json.
+func (s *PolicyUserPasswordSave) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PolicyUserPasswordSave to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "$schema":
+			if err := func() error {
+				s.Schema.Reset()
+				if err := s.Schema.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"$schema\"")
+			}
+		case "kind":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "operation":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Operation.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"operation\"")
+			}
+		case "audience":
+			if err := func() error {
+				s.Audience.Reset()
+				if err := s.Audience.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"audience\"")
+			}
+		case "config":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Config.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"config\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode PolicyUserPasswordSave")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00010110,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfPolicyUserPasswordSave) {
+					name = jsonFieldsNameOfPolicyUserPasswordSave[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PolicyUserPasswordSave) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PolicyUserPasswordSave) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *PolicyUserPasswordSaveConfig) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *PolicyUserPasswordSaveConfig) encodeFields(e *jx.Encoder) {
+	{
+		if s.MinLength.Set {
+			e.FieldStart("min_length")
+			s.MinLength.Encode(e)
+		}
+	}
+	{
+		if s.HistoryDepth.Set {
+			e.FieldStart("history_depth")
+			s.HistoryDepth.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfPolicyUserPasswordSaveConfig = [2]string{
+	0: "min_length",
+	1: "history_depth",
+}
+
+// Decode decodes PolicyUserPasswordSaveConfig from json.
+func (s *PolicyUserPasswordSaveConfig) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PolicyUserPasswordSaveConfig to nil")
+	}
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "min_length":
+			if err := func() error {
+				s.MinLength.Reset()
+				if err := s.MinLength.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"min_length\"")
+			}
+		case "history_depth":
+			if err := func() error {
+				s.HistoryDepth.Reset()
+				if err := s.HistoryDepth.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"history_depth\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode PolicyUserPasswordSaveConfig")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PolicyUserPasswordSaveConfig) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PolicyUserPasswordSaveConfig) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PolicyUserPasswordSaveKind as json.
+func (s PolicyUserPasswordSaveKind) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes PolicyUserPasswordSaveKind from json.
+func (s *PolicyUserPasswordSaveKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PolicyUserPasswordSaveKind to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch PolicyUserPasswordSaveKind(v) {
+	case PolicyUserPasswordSaveKindPolicy:
+		*s = PolicyUserPasswordSaveKindPolicy
+	default:
+		*s = PolicyUserPasswordSaveKind(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PolicyUserPasswordSaveKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PolicyUserPasswordSaveKind) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PolicyUserPasswordSaveOperation as json.
+func (s PolicyUserPasswordSaveOperation) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes PolicyUserPasswordSaveOperation from json.
+func (s *PolicyUserPasswordSaveOperation) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PolicyUserPasswordSaveOperation to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch PolicyUserPasswordSaveOperation(v) {
+	case PolicyUserPasswordSaveOperationUserPasswordSave:
+		*s = PolicyUserPasswordSaveOperationUserPasswordSave
+	default:
+		*s = PolicyUserPasswordSaveOperation(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PolicyUserPasswordSaveOperation) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PolicyUserPasswordSaveOperation) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

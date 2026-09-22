@@ -50,6 +50,13 @@ built yet.
 
 ## Where instances come from
 
+The wire schema of an instance is a union discriminated on `operation`
+(`api/openapi/components/flows/policy.yaml`), one branch per row of the table
+above with that operation's `config` typed from its template
+(`policy-user-password-save.yaml` for the first row). A Go test in
+`internal/policy` keeps each branch's settings, bounds and defaults equal to
+the template's.
+
 Instances are revisions of the `policy` resource: authored as
 `.zitadel/policies/<operation>.json`, published by `zitadel apply` through
 `POST /policies`, stored in the `policies` table, and read back with
