@@ -23,10 +23,6 @@ by re-applying an earlier file.
   bounds. For `user.password.save`: `min_length` (8 to 64, default 15) and
   `history_depth` (0 to 4, default 0). The maximum length (64) and the
   built-in checks are fixed and cannot be turned off.
-- `enforcement: "audit"` rolls out a stricter policy without blocking anyone:
-  the defaults stay enforced, and only what you tightened beyond them is
-  recorded instead of rejected. Switch back to `enforce` (the default) once
-  the audit trail looks right.
 - A stricter policy applies the next time a password is set. Existing
   passwords and sessions are not affected.
 

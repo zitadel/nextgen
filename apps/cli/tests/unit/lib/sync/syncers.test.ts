@@ -550,7 +550,9 @@ describe("PolicySyncer", () => {
 
     expect(() => policy.validate(instance)).not.toThrow();
     expect(() => policy.validate({ ...instance, kind: "rule" })).toThrow(ZitadelError);
-    expect(() => policy.validate({ ...instance, enforcement: "warn" })).toThrow(ZitadelError);
+    expect(() => policy.validate({ ...instance, operation: "user.unknown" })).toThrow(ZitadelError);
+    expect(() => policy.validate({ ...instance, config: { min_length: 4 } })).toThrow(ZitadelError);
+    expect(() => policy.validate({ ...instance, config: { max_length: 64 } })).toThrow(ZitadelError);
     expect(() => policy.validate({ ...instance, rules: [] })).toThrow(ZitadelError);
     const { operation, ...noOperation } = instance;
     void operation;
@@ -581,7 +583,6 @@ describe("PolicySyncer", () => {
             policy: {
               kind: "policy",
               operation: "user.password.save",
-              enforcement: "enforce",
               config: { min_length: 15, history_depth: 0 },
             },
           },
@@ -604,7 +605,6 @@ describe("PolicySyncer", () => {
       $schema: "../meta/policy.json",
       kind: "policy",
       operation: "user.password.save",
-      enforcement: "enforce",
       config: { min_length: 15, history_depth: 0 },
     });
   });

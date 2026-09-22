@@ -175,12 +175,16 @@ function validateBrandingAssetUrl(
 }
 
 /**
- * Policy instance file (`.zitadel/policies/<operation>.json`, ADR 066).
- * Strict, like branding: an unknown top-level key must fail plan. `config`
- * stays open here because its keys are the operation's settings, which the
- * server validates against the operation's template on publish.
+ * Policy instance file (`.zitadel/policies/<operation>.json`). Strict, like
+ * branding: an unknown key must fail plan. The generated body already carries
+ * the operation's settings with their bounds, so plan rejects what the server
+ * would reject.
  */
 export const policyConfigSchema = z.strictObject({
   ...CreatePolicyBody.shape,
+  // Strict at the config level too: a setting the operation does not have
+  // (or a fixed one, such as max_length) must fail plan rather than be
+  // stripped and vanish on write-back.
+  config: CreatePolicyBody.shape.config.strict(),
   $schema: z.string().optional(),
 });

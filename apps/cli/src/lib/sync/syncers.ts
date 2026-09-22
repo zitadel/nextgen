@@ -367,7 +367,7 @@ class PolicySyncer implements ResourceSyncer {
     if (!result.success) {
       throw new ZitadelError("E_VALIDATION", "Policy file is not a valid policy instance", {
         details: { issues: result.error.issues },
-        hint: "A policy file carries kind, operation, optional audience and enforcement, and config.",
+        hint: "A policy file carries kind, operation, optional audience, and the config its operation allows.",
       });
     }
     assertEnvRefs(data, this.env);
