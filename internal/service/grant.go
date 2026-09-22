@@ -68,11 +68,6 @@ type CreateGrantInput struct {
 	CallerUserID string
 }
 
-// errIdentifierUnresolved is the identifier-path miss/ambiguity signal.
-// Create maps it to a synthetic 201 rather than grant.principal_not_found
-// so the HTTP status cannot tell a caller whether the address matched.
-var errIdentifierUnresolved = errors.New("grant identifier unresolved")
-
 func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Grant, error) {
 	input.UserID = strings.TrimSpace(input.UserID)
 	input.Identifier = strings.TrimSpace(input.Identifier)
@@ -91,6 +86,9 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Gra
 func (s *GrantService) createByIdentifier(ctx context.Context, input CreateGrantInput) (*Grant, error) {
 	userID, err := s.resolveUserByIdentifier(ctx, s.v2Pool.Statements(), s.locatorHome(input.ProjectID), input.Identifier)
 	if err != nil {
+		// A miss or an ambiguous match becomes a synthetic 201 rather than
+		// grant.principal_not_found, so the HTTP status cannot tell a caller
+		// whether the address matched.
 		if errors.Is(err, errIdentifierUnresolved) {
 			return s.syntheticIdentifierGrant(ctx, input)
 		}
@@ -363,77 +361,14 @@ func (s *GrantService) resolveByID(ctx context.Context, stmts AllStatements, pri
 	return principalType, id, nil
 }
 
+// resolveUserByIdentifier resolves a grant's identifier locator. Only active
+// users can be granted by identifier.
 func (s *GrantService) resolveUserByIdentifier(ctx context.Context, stmts AllStatements, home, identifier string) (string, error) {
-	urlsByKey, err := s.designatedIdentifierKeys(ctx, stmts, home)
+	user, err := resolveDesignatedUser(ctx, stmts, home, identifier, activeUsersOnly, "grant")
 	if err != nil {
 		return "", err
 	}
-	found := map[string]struct{}{}
-	var matchID string
-	for key, urls := range urlsByKey {
-		user, err := stmts.GetUser(ctx, database.And(
-			database.Equal(database.Col(domain.UserFieldProjectID), home),
-			database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
-			database.Or(equalIDFilters(domain.UserFieldSchemaURL, urls)...),
-		), UserQueryOptions{
-			Attributes:           []domain.Attribute{{Key: domain.AttributeKey(key), Value: identifier}},
-			UniqueAttributesOnly: true,
-		})
-		if err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				continue
-			}
-			if _, ok := errors.AsType[*database.MultipleRowsFoundError](err); ok {
-				getLoggingContext(ctx, "grant").Info("grant identifier lookup is ambiguous",
-					slog.String("home_project_id", home),
-					slog.String("identifier_property", key),
-				)
-				return "", errIdentifierUnresolved
-			}
-			return "", err
-		}
-		found[user.ID] = struct{}{}
-		matchID = user.ID
-	}
-	if len(found) != 1 {
-		if len(found) > 1 {
-			getLoggingContext(ctx, "grant").Info("grant identifier lookup matched multiple users",
-				slog.String("home_project_id", home),
-				slog.Int("matches", len(found)),
-			)
-		} else {
-			getLoggingContext(ctx, "grant").Info("grant identifier lookup matched no user",
-				slog.String("home_project_id", home),
-			)
-		}
-		return "", errIdentifierUnresolved
-	}
-	return matchID, nil
-}
-
-// designatedIdentifierKeys maps each x-identifier property to the schema URLs
-// that designate it. Lookup must be scoped to those schemas so a unique value
-// on a property that is not designated (another schema's notification email,
-// for example) cannot be selected.
-func (s *GrantService) designatedIdentifierKeys(ctx context.Context, stmts AllStatements, projectID string) (map[string][]string, error) {
-	ctx = WithAuthzListUnrestricted(ctx)
-	list := listUserSchemas(ctx, stmts, projectID)
-	first, err := list(nil)
-	if err != nil {
-		return nil, err
-	}
-	urlsByKey := map[string][]string{}
-	for schema, err := range first.Iterate(list) {
-		if err != nil {
-			return nil, err
-		}
-		key := domain.DesignatedIdentifier(schema.Schema)
-		if key == "" || schema.URL == "" {
-			continue
-		}
-		urlsByKey[key] = append(urlsByKey[key], schema.URL)
-	}
-	return urlsByKey, nil
+	return user.ID, nil
 }
 
 func (s *GrantService) resolveTeamByName(ctx context.Context, stmts AllStatements, home, name string) (string, error) {

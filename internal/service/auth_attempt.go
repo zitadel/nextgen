@@ -214,8 +214,9 @@ type Proof interface {
 // sets it from the step it rendered, whose field must be the bound schema's
 // designated identifier. Left empty — the direct-API path, which renders
 // nothing — the login name resolves against the designated identifier of every
-// user schema in the project instead, and must match exactly one user
-// (ADR 058 §5). A caller never chooses the property.
+// user schema in the project instead, and must match exactly one user. A
+// direct-API caller never chooses the property. See resolveIdentifier for how
+// the two paths are scoped today.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
@@ -601,14 +602,17 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 	}
 }
 
-var (
-	errNoIdentifierMatch   = errors.New("no user is identified by the login name")
-	errAmbiguousIdentifier = errors.New("the login name identifies users of more than one schema")
-)
-
-// resolveIdentifier finds the user a login name identifies: by the named
-// property when the flow supplied one, otherwise by the project's designated
-// identifiers.
+// resolveIdentifier finds the user a login name identifies.
+//
+// With an attribute name — the flow path — it looks the value up in that
+// property across the project. That lookup is not yet scoped to the flow's
+// bound schema, which ADR 058 §5 asks for so a same-named team-unique property
+// on another schema cannot collide with it; that predates this resolution and
+// is left for a follow-up.
+//
+// Without one — the direct-API path — the value resolves against the project's
+// designated identifiers. Any status, as the flow path: whether a login may
+// reach an inactive user is decided with status enforcement, not here.
 func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID string, p UserProof) (*domain.User, error) {
 	if p.AttributeName != "" {
 		return s.users.GetByAttributes(ctx, projectID, []domain.Attribute{{
@@ -616,65 +620,7 @@ func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID st
 			Value: p.LoginName,
 		}})
 	}
-	return s.resolveDesignatedIdentifier(ctx, projectID, p.LoginName)
-}
-
-// resolveDesignatedIdentifier resolves a bare login name as ADR 058 §5 defines
-// for the direct API. Each user schema in the project designates one
-// identifier property (`x-identifier`); the value is looked up in that
-// property, among that schema's users, and only among uniquely registered
-// values — so an equal value in an undesignated or non-unique property can
-// never match. It must identify exactly one user across all schemas: none, or
-// users of several schemas, rejects the proof. Never by precedence, which is
-// how one user's username could shadow another's email at login.
-//
-// Every stored revision is consulted, not only the latest: users keep the
-// schema URL they were created under, so each revision's own designation
-// governs its users.
-func (s *authAttemptService) resolveDesignatedIdentifier(ctx context.Context, projectID, loginName string) (*domain.User, error) {
-	stmts := s.stmts.Statements()
-	// A login resolve, not a management list: nobody is signed in yet, so there
-	// is no caller whose grants could narrow it (as user refs resolve the same
-	// listing).
-	list := listUserSchemas(WithAuthzListUnrestricted(ctx), stmts, projectID)
-	first, err := list(nil)
-	if err != nil {
-		return nil, err
-	}
-	var match *domain.User
-	for schema, err := range first.Iterate(list) {
-		if err != nil {
-			return nil, err
-		}
-		identifier := domain.DesignatedIdentifier(schema.Schema)
-		if identifier == "" {
-			continue
-		}
-		user, err := stmts.GetUser(ctx,
-			database.And(
-				database.Equal(database.Col(domain.UserFieldProjectID), projectID),
-				database.Equal(database.Col(domain.UserFieldSchemaURL), schema.URL),
-			),
-			UserQueryOptions{
-				Attributes:           []domain.Attribute{{Key: domain.AttributeKey(identifier), Value: loginName}},
-				UniqueAttributesOnly: true,
-			},
-		)
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		if match != nil && match.ID != user.ID {
-			return nil, errAmbiguousIdentifier
-		}
-		match = user
-	}
-	if match == nil {
-		return nil, errNoIdentifierMatch
-	}
-	return match, nil
+	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, anyUserStatus, "auth_attempt")
 }
 
 // verify dispatches proof verification to the appropriate secondary port.
