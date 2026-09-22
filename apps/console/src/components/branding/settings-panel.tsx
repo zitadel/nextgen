@@ -47,13 +47,19 @@ const COLOUR_ROW = "flex h-5 items-center justify-between";
 const SWATCH = "size-3.5 shrink-0 rounded-[3px] border border-border";
 const ISSUE_BADGE = "rounded-4xl bg-destructive/10 text-destructive dark:bg-destructive/20";
 
-const THEME_LABELS: Record<string, string> = { light: "Light", dark: "Dark", auto: "Auto" };
-const DENSITY_LABELS: Record<string, string> = {
+// Keyed by the wire enums, so a lookup is total under noUncheckedIndexedAccess
+// and a value the contract adds fails here rather than rendering blank.
+type ThemeMode = NonNullable<NonNullable<BrandingRevision["theme"]>["mode"]>;
+type Density = NonNullable<NonNullable<BrandingRevision["shape"]>["density"]>;
+type RadiusPreset = Exclude<NonNullable<NonNullable<BrandingRevision["shape"]>["radius"]>, number>;
+
+const THEME_LABELS: Record<ThemeMode, string> = { light: "Light", dark: "Dark", auto: "Auto" };
+const DENSITY_LABELS: Record<Density, string> = {
   compact: "Compact",
   regular: "Regular",
   comfortable: "Comfortable",
 };
-const RADIUS_LABELS: Record<string, string> = {
+const RADIUS_LABELS: Record<RadiusPreset, string> = {
   none: "None",
   sm: "Small",
   md: "Medium",
