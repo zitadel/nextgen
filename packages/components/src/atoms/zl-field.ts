@@ -35,7 +35,10 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *   input        36px tall, 10px/4px padding, `--zl-radius-md`, a
  *                `--zl-input` edge over `--zl-input-fill`
  *   focus        the edge takes `--zl-ring` and a 3px ring sits outside it
- *   trailing     cross (clear) | alert-circle (error) | check (success)
+ *   trailing     cross (clear) | alert-circle (error) | check (success).
+ *                The clear button is a pointer-only affordance (`tabindex="-1"`)
+ *                so Tab moves from one input straight to the next; keyboard
+ *                users clear via the input itself.
  *   description  14/20 in `--zl-muted-foreground`, the size the sign-up
  *                frame's password hint uses
  *
@@ -288,6 +291,7 @@ export class ZlField extends LitElement {
           class="zr-field__trailing-action"
           part="trailing-action"
           aria-label="Clear"
+          tabindex="-1"
           ?disabled=${this.disabled}
           @click=${this.handleClear}
         >
