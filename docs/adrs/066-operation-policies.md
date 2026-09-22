@@ -59,8 +59,8 @@ Azure Policy's definition/assignment):
   the rules receive, and the **rules** themselves: a list of named boolean
   expressions in [CEL](https://cel.dev) over `config` and context.
 - The **instance** is developer-authored and lives in the release. It carries the
-  configuration values, the audience the policy applies to
-  ([ADR 065](065-audience-scoped-configuration.md)), and the enforcement mode.
+  configuration values and the audience the policy applies to
+  ([ADR 065](065-audience-scoped-configuration.md)).
 
 A policy is always evaluated **before** its operation runs. Every rule must hold
 for the operation to proceed.
@@ -69,7 +69,7 @@ for the operation to proceed.
 
 - **Operation**: a domain action that can carry a policy, such as `user.password.save` (static list defined by Zitadel)
 - **Template**: the Zitadel-defined half of a policy for one operation: config schema, context schema, rules
-- **Instance** (or just *policy*): the developer-authored half: config values, audience, enforcement mode; a revisioned resource in the release
+- **Instance** (or just *policy*): the developer-authored half: config values and audience; a revisioned resource in the release
 - **Rule**: one named CEL expression in a template that must evaluate to `true`
 - **Decision**: what evaluating an instance against a request context returns — `allow` or `deny` with the violated rules
 
@@ -78,8 +78,9 @@ for the operation to proceed.
 #### Instance
 
 Each instance guards one operation and carries its own configuration under `config`.
-The envelope (`kind`, `operation`, `audience`, `enforcement`) is the same for every
-operation; `config` is what the operation's template defines.
+The envelope (`kind`, `operation`, `audience`) is the same for every operation;
+`config` is what the operation's template defines, and `operation` is the
+discriminator that says which template that is.
 
 ```json
 // .zitadel/policies/user.password.save.json — the project default
@@ -99,7 +100,6 @@ operation; `config` is what the operation's template defines.
   "kind": "policy",
   "operation": "user.password.save",
   "audience": { "team_ids": ["team_01k…"] },
-  "enforcement": "audit",
   "config": {
     "min_length": 20,
     "history_depth": 4
@@ -109,17 +109,16 @@ operation; `config` is what the operation's template defines.
 
 - `audience` follows [ADR 065](065-audience-scoped-configuration.md): absent means
   project default, the most specific matching instance applies wholesale.
-- `enforcement` is `enforce` (default) or `audit`. In `audit` the template
-  defaults are still enforced; only what the instance tightened beyond them is
-  evaluated and recorded without blocking. This is the rollout mode: deploy a
-  stricter policy in `audit`, read the decisions, switch to `enforce`. It can
-  never weaken the baseline: a project cannot use `audit` to accept a
-  password the defaults reject, which keeps #898's "secure defaults are not
-  configurable by Projects" true for every instance. Every policy-as-code
-  system surveyed carries this tier on the instance, not the logic (Kubernetes
-  `validationActions`, Gatekeeper `enforcementAction`, Azure `enforcementMode`).
 - `config` is validated against the template's config schema at write time.
   A key the template does not declare is rejected.
+- The wire schema of the instance is a **discriminated union on `operation`**:
+  one branch per catalogued operation, each with the `config` object that
+  operation's template declares (its settings, bounds and defaults, no others).
+  The union is what the OpenAPI component publishes, what the generated client
+  types carry, and what the `policy.json` editor meta-schema is derived from,
+  so an editor completes `min_length` for `user.password.save` and rejects a
+  key that operation does not have. A test keeps every branch in parity with
+  its template.
 
 #### Template
 
@@ -272,11 +271,6 @@ never echoed.
 - `allow`: every rule held; the operation may proceed
 - `deny`: at least one rule failed; the operation is rejected with the violated rules
 
-Under `enforcement: audit` the rules run twice, once with the instance's config
-and once with the template defaults. A rule that fails under the defaults
-denies as usual; a rule that fails only under the instance's stricter values is
-recorded as a wide event and the operation proceeds.
-
 A third outcome, `require` (the operation is not yet permissible, these
 requirements are unmet, used to inject a step mid-flow), is not needed by any MVP
 operation. It returns as a per-rule field when the first assurance consumer lands.
@@ -289,7 +283,8 @@ serves traffic, and CEL has no I/O, no recursion and no unbounded loops. What
 remains is Go failing to build the context (a storage error while loading
 password history), which is an ordinary service error: the operation fails,
 closed. There is no per-operation failure posture to declare. An operator who
-needs a misbehaving policy out of the way switches it to `audit`.
+needs a misbehaving policy out of the way publishes a revision with the
+template defaults.
 
 ### End to end: a user enters their password during sign-up (via flow-engine)
 
@@ -599,6 +594,22 @@ rather than configured:
   vendor behaviour (Okta, Auth0, Entra, Google, Keycloak). A later
   "validate at sign-in and force a change" switch is an instance setting, not a
   template property.
+
+### Enforcement modes
+
+Not MVP. Every policy-as-code system surveyed carries an enforcement tier on
+the instance, not the logic (Kubernetes `validationActions: Deny | Warn |
+Audit`, Gatekeeper `enforcementAction: deny | dryrun | warn`, Azure
+`enforcementMode`), and the rollout it enables, deploy a stricter policy in
+audit, read the decisions, switch to enforce, is the one thing a first-match
+resolution model cannot offer any other way. The shape is fixed now so the MVP
+does not foreclose it: an `enforcement` field on the instance, `enforce` by
+default, and an `audit` mode in which the template defaults stay enforced and
+only what the instance tightened beyond them is evaluated and recorded without
+blocking. Audit can therefore never weaken the baseline, which is what keeps
+#898's "secure defaults are not configurable by Projects" true. It needs the
+audited decision to land as a wide event (ADR 048), which is why it waits for
+the event type.
 
 ### Developer-authored rules
 
