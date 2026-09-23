@@ -672,9 +672,24 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	mux := http.NewServeMux()
 
 	// Registered as an exact path, so it wins over the catch-all API mount
-	// below.
+	// below — but through the same middleware, because the handler sets the
+	// flow cookie and `cookieSecureFromContext` reads the request host that
+	// `WithRequestHostMiddleware` puts in the context. Without it the two legs
+	// of one sign-in disagree about the same cookie's Secure flag.
 	if idpCallback != nil {
-		mux.Handle(api.IdpCallbackRoute, idpCallback)
+		mux.Handle(api.IdpCallbackRoute,
+			middleware.Chain(idpCallback,
+				func(next http.Handler) http.Handler {
+					return middleware.WithRequestContextMiddleware(reqIdGen, next)
+				},
+				middleware.WithLogging,
+				api.WithRequestHostMiddleware,
+				middleware.WithUserAgentMiddleware,
+				func(next http.Handler) http.Handler {
+					return audit.WithRequestEventMiddleware(requestEvents, next)
+				},
+			),
+		)
 	}
 
 	if cfg.LoginEnabled {

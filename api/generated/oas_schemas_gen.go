@@ -48357,7 +48357,7 @@ func (s *SSOAuthMethod) SetProviders(val []string) {
 // An available SSO identity provider.
 // Ref: #
 type SSOProvider struct {
-	// Provider instance identifier.
+	// The connection's slug, echoed back as `sso_provider_id` on the submit.
 	ID string `json:"id"`
 	// Display name for the provider.
 	Name string `json:"name"`

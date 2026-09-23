@@ -138,13 +138,20 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			}
 			// The origin decides the redirect_uri handed to the provider and
 			// where the callback sends the browser afterwards, and it comes
-			// from a client header. Unchecked it is an open redirect and a
-			// way to have the provider deliver the code elsewhere, so it is
-			// held to the project's registered origins exactly as the passkey
-			// relying party below is.
+			// from a client header. Unchecked it is an open redirect and a way
+			// to have the provider deliver the authorization code elsewhere.
+			//
+			// Fails closed, unlike the passkey check below: that one degrades
+			// to a bad ceremony when a project registered no origins, this one
+			// would degrade to code exfiltration. A project with no registered
+			// origin cannot start an external sign-in at all.
 			project, err := h.projectService.Get(ctx, state.ProjectID)
 			if err != nil {
 				return nil, domain.ErrInternal(err)
+			}
+			if origin == "" || len(project.PreviewOrigins) == 0 {
+				return nil, domain.ErrRequestInvalid().WithMessage(
+					"external sign-in needs the app's origin registered with the project")
 			}
 			if err := validateOriginAgainstProject(origin, project); err != nil {
 				return nil, domain.ErrRequestInvalid().WithMessage(err.Error())

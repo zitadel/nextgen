@@ -5,7 +5,7 @@ description: An available SSO identity provider.
 properties:
   id:
     type: string
-    description: Provider instance identifier.
+    description: The connection's slug, echoed back as `sso_provider_id` on the submit.
     example: google
   name:
     type: string
