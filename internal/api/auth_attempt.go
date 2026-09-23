@@ -134,6 +134,9 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	switch req.GetOneOf().Type {
 	case api.IdentifierProofVerifyChallengeRequestSum:
 		p := req.GetOneOf().IdentifierProof
+		// No attribute name: the direct API resolves the login name against the
+		// project's designated identifiers rather than a property the caller
+		// picks (ADR 058 §5).
 		return service.UserProof{
 			LoginName: p.GetLoginName(),
 		}, nil
