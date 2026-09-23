@@ -70,7 +70,13 @@ type resourceAccess struct {
 }
 
 func (res resourceAccess) miss(op accessOp) error {
-	if op == opWrite || op == opAdminister {
+	// One comparison per branch, on purpose: api/internal/erroranalysis folds a
+	// single == against the op the call site passes, but not an || chain, and
+	// an unfolded guard makes every read endpoint declare its writeMiss code.
+	if op == opWrite {
+		return res.writeMiss()
+	}
+	if op == opAdminister {
 		return res.writeMiss()
 	}
 	return res.readMiss()
