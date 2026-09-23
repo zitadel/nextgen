@@ -4,6 +4,7 @@ import { consola } from "consola";
 import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { ZitadelError } from "../errors";
 import { readZitadelSecret } from "../project";
+import { publicCliCommand } from "../public-cli";
 import { BaseCommand } from "./base";
 import type { GlobalOptions } from "./types";
 
@@ -34,6 +35,10 @@ export abstract class OwnerCommand extends BaseCommand {
    * context. The refusal is the same on a terminal and in a script: with one
    * owner available there is nothing to ask about, and a prompt offering a
    * single answer is a keystroke, not a choice.
+   *
+   * It answers with the run it was given plus the missing flag, the way the
+   * resource commands' `--force` refusal does, so an agent re-runs a structured
+   * `next_commands` entry instead of parsing the hint.
    */
   protected override async toMeta(
     flags: Record<string, unknown>,
@@ -41,8 +46,13 @@ export abstract class OwnerCommand extends BaseCommand {
   ): Promise<GlobalOptions> {
     const meta = await super.toMeta(flags, options);
     if (flags["project-level"] !== true) {
+      const retry = publicCliCommand(
+        [...(this.id ?? "").split(":"), ...this.argv, "--project-level"].join(" "),
+        meta.cliVersion,
+      );
       throw new ZitadelError("E_VALIDATION", "Name the owner: --project-level", {
         hint: "The project level is the only owner the CLI can address today; --environment returns when the platform's environments settle.",
+        nextCommands: [retry],
       });
     }
     return meta;

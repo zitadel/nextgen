@@ -99,6 +99,9 @@ describe("variables list", () => {
       { name: "GOOGLE_CLIENT_ID", secret: false, value: "999-prod" },
       { name: "GOOGLE_CLIENT_SECRET", secret: true },
     ]);
+    // One owner, so the envelope states none: a permanent `null` would read as
+    // a value the run could have chosen.
+    expect(json.data).not.toHaveProperty("environment");
   });
 
   it("never emits a value key for a secret", async () => {
@@ -547,6 +550,7 @@ describe("variables set", () => {
       as: "string",
     });
     expect(json.data).not.toHaveProperty("value");
+    expect(json.data).not.toHaveProperty("environment");
   });
 
   it("sets an empty value, which the scalar schema accepts", async () => {
@@ -827,6 +831,7 @@ describe("variables delete", () => {
     });
     // Nothing was deleted, so the preview must not say it was.
     expect(json.data).not.toHaveProperty("deleted");
+    expect(json.data).not.toHaveProperty("environment");
   });
 
   it("refuses to delete without --force in non-interactive mode", async () => {
@@ -934,4 +939,48 @@ describe("naming the owner", () => {
       expect(json.message).toContain("Nonexistent flag");
     },
   );
+
+  // Every command inherits the owner flag from one base class, so each one has
+  // to refuse: a command that quietly resolved an owner would write where the
+  // run never said to.
+  it.each([
+    ["list", ["variables", "list"]],
+    ["get", ["variables", "get", "GOOGLE_CLIENT_ID"]],
+    ["set", ["variables", "set", "GOOGLE_CLIENT_ID"]],
+    ["delete", ["variables", "delete", "GOOGLE_CLIENT_ID", "--force"]],
+  ])("refuses %s when no owner is named, before any request", async (_verb, argv) => {
+    const cwd = await makeProject();
+    let requested = false;
+    const record = () => {
+      requested = true;
+      return HttpResponse.json({});
+    };
+    server.use(
+      http.get("*/variables", record),
+      http.get("*/variables/:name", record),
+      http.patch("*/variables", record),
+      http.delete("*/variables/:name", record),
+    );
+
+    const res = await runCliForTest([...argv, ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(requested).toBe(false);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--project-level");
+  });
+
+  it("suggests the same run with the owner named, as a command an agent can re-run", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest(["variables", "get", "GOOGLE_CLIENT_ID", ...base(cwd)]);
+
+    const json = parseJson(res.stdout) as { next_commands: string[] };
+    const retry = json.next_commands.join(" ");
+    // The retry has to carry the whole run, not just the flag: a bare
+    // `--project-level` would drop the name being read.
+    expect(retry).toContain("variables get GOOGLE_CLIENT_ID");
+    expect(retry).toContain("--project-level");
+  });
 });

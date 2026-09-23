@@ -37,7 +37,7 @@ export default class VariablesGet extends OwnerCommand {
     const row = toVariableRow(name, await client.getVariable(name, scope));
     this.recordTelemetry({ is_secret: row.secret });
 
-    const data = { ...row };
+    const data = row;
     // The resource commands' `get`: a pipe receives the whole record, since a
     // script wants the record rather than a view of it. That is also what keeps
     // a secret from being mistaken for a value — it reads `"secret": true` and
