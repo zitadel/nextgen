@@ -107,6 +107,23 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   const backendUrl =
     process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
   const projectSecret = process.env.CONSOLE_PROJECT_SECRET ?? nodeEnv.CONSOLE_PROJECT_SECRET ?? "";
+  // The project the secret belongs to. The secret is injected only for calls
+  // that target it (or name no project): the server lets a Bearer win over the
+  // session cookie, so injecting it on a call scoped to another project would
+  // authorize as the wrong principal and hide that project as a 404. A call
+  // scoped elsewhere rides on the cookie alone — the session-derived access the
+  // person actually holds there (`GET /users/me/projects`, a project's admins).
+  //
+  // `CONSOLE_PROJECT_SECRET_PROJECT_ID` names that project explicitly; it falls
+  // back to the console's own pin, which is the same project except in claim
+  // mode, where the console is pinned to the platform project while the secret
+  // still belongs to the seeded one being claimed (`scripts/dev-real.mts`).
+  const secretProjectId =
+    process.env.CONSOLE_PROJECT_SECRET_PROJECT_ID ??
+    nodeEnv.CONSOLE_PROJECT_SECRET_PROJECT_ID ??
+    process.env.VITE_CONSOLE_PROJECT_ID ??
+    env.VITE_CONSOLE_PROJECT_ID ??
+    "";
 
   // Anchor the context to a path segment so a similarly-prefixed path (e.g.
   // `/api2/...`) is not accidentally proxied and rewritten.
@@ -129,13 +146,42 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       },
       configure: (proxy) => {
         proxy.on("proxyReq", (proxyReq) => {
-          if (projectSecret && !proxyReq.getHeader("authorization")) {
-            proxyReq.setHeader("authorization", `Bearer ${projectSecret}`);
+          const inject =
+            Boolean(projectSecret) &&
+            !proxyReq.getHeader("authorization") &&
+            !targetsOtherProject(proxyReq.path, secretProjectId);
+          if (inject) proxyReq.setHeader("authorization", `Bearer ${projectSecret}`);
+          // `CONSOLE_DEV_PROXY_LOG=1` prints which credential each proxied
+          // request went out with — the thing to look at when a screen
+          // answers 401/403/404 and it is not obvious who the server saw.
+          if (process.env.CONSOLE_DEV_PROXY_LOG) {
+            console.log(
+              `[console-proxy] ${proxyReq.method} ${proxyReq.path} → ${inject ? "project secret" : "cookie only"}`,
+            );
           }
         });
       },
     },
   };
+}
+
+/**
+ * Whether a proxied request is scoped to a project other than the one the
+ * injected secret belongs to. A project is named either by the `project_id`
+ * query parameter (grants, schemas, …) or by the path (`/projects/{id}` and
+ * everything under it). A request that names no project is not scoped
+ * elsewhere: those are the credential's own (users, teams, `/projects/query`).
+ */
+function targetsOtherProject(path: string, projectId: string): boolean {
+  const url = new URL(path, "http://proxy.invalid");
+  const target = url.searchParams.get("project_id") ?? projectIdFromPath(url.pathname);
+  return target !== null && target !== projectId;
+}
+
+function projectIdFromPath(pathname: string): string | null {
+  const match = /^\/projects\/([^/]+)/.exec(pathname);
+  // `/projects/query` is the list; only a resource id names a project.
+  return match && match[1] !== "query" ? decodeURIComponent(match[1]!) : null;
 }
 
 function keepGoEmbedPlaceholder(outDir: string) {

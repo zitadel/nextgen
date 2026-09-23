@@ -24,8 +24,8 @@ import { describeError } from "../lib/api-error";
  * grant carries.
  *
  * **The copy is literally true.** `DELETE /grants/{id}` revokes one binding on
- * one project — the `projectId` the section passes in, since the screen lists
- * admins per project rather than the console's own (#1238). It does not touch the user record, and it does not touch any
+ * one project — the `projectId` of the project page whose admins section
+ * renders this, never the console's own project (#1238). It does not touch the user record, and it does not touch any
  * other grant that person holds, so the design's "their user account isn't
  * deleted, and their other team memberships aren't affected" is accurate rather
  * than reassuring.

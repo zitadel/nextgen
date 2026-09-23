@@ -29,10 +29,10 @@ import { userIdentifier, userIdentity } from "../lib/user";
 /**
  * Give an existing person admin access to a project (#769).
  *
- * **The project is the caller's.** Settings → Admins renders one of these per
- * project the signed-in person can act on, so the grant is created against the
- * section's `projectId` — never the console's own platform project, whose grants
- * are not the ones anyone means (#1238).
+ * **The project is the caller's.** The admins section of a project's page
+ * renders this, so the grant is created against that route's `projectId` —
+ * never the console's own platform project, whose grants are not the ones
+ * anyone means (#1238).
  *
  * **The colleague must already have signed up.** A grant binds a `user_id`,
  * so there is nobody to bind until the account exists — which is why this picks

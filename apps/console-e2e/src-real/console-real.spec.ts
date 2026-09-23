@@ -145,18 +145,26 @@ test("embeds the team memberships on the list read rather than degrading", async
   await expectNoErrorBoundary(page);
 });
 
-test("gives a colleague admin access to the project, and takes it away", async ({ page, seed }) => {
+test("gives a colleague admin access to the project, and takes it away", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
   // The whole journey of #769 against a live backend: the grant is created for
   // somebody who already exists, shows up in the list with their resolved
   // identity, and is revoked again. Asserted here rather than only over stubs
   // because both writes and the `expand: ["principal"]` read are server
   // behaviour, and the unit specs prove only what the console does with them.
+  //
+  // Admins live on the project's page (#1238). The operator needs access to the
+  // project to open it — a seeded user can sign in but holds no grant.
   const operator = await seed.user();
   const colleague = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
   await signIn(page, operator);
 
-  await page.goto("/settings/admins");
-  await expect(page.getByRole("heading", { name: "Admins", exact: true })).toBeVisible();
+  await page.goto(`/projects/${zitadel.handle.projectId}`);
+  await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
@@ -180,16 +188,23 @@ test("gives a colleague admin access to the project, and takes it away", async (
   await expectNoErrorBoundary(page);
 });
 
-test("stops offering a colleague once they are already an admin", async ({ page, seed }) => {
+test("stops offering a colleague once they are already an admin", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
   // `POST /grants` refuses a second grant for the same principal and relation.
   // Rather than let the operator pick someone and then read an error, the
   // picker drops people who already hold one — asserted here because the list
   // it filters against comes from the server, not from the form.
   const operator = await seed.user();
   const colleague = await seed.user();
+  // Somebody with no grant at all, to prove the filter drops only the granted.
+  const bystander = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
   await signIn(page, operator);
 
-  await page.goto("/settings/admins");
+  await page.goto(`/projects/${zitadel.handle.projectId}`);
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
   await dialog.getByRole("combobox", { name: "Person" }).click();
@@ -201,8 +216,8 @@ test("stops offering a colleague once they are already an admin", async ({ page,
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   await page.getByRole("dialog", { name: "Add admin" }).getByRole("combobox", { name: "Person" }).click();
   await expect(page.getByRole("option", { name: colleague.email })).toHaveCount(0);
-  // The operator, who holds no grant, is still offered.
-  await expect(page.getByRole("option", { name: operator.email })).toBeVisible();
+  // The bystander, who holds no grant, is still offered.
+  await expect(page.getByRole("option", { name: bystander.email })).toBeVisible();
 
   // Leave the instance as found.
   await page.keyboard.press("Escape");
