@@ -162,6 +162,28 @@ export const en: Record<string, string> = {
 
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",
+  // `{name}` is replaced with the provider's own name by <zl-sso-providers>,
+  // so one key covers every vendor the project enables.
+  "sso.continue_with": "Continue with {name}",
+  "sso.divider": "or",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: register-sso (the provider returned someone new — collect the rest)
+  // ═══════════════════════════════════════════════════════════════════════════
+  "register-sso.title": "Finish creating your account",
+  "register-sso.description": "We need a little more to set you up",
+  "register-sso.field.email": "Email",
+  "register-sso.action.submit": "Create account",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: sso-conflict (that email already has an account here)
+  // ═══════════════════════════════════════════════════════════════════════════
+  "sso-conflict.title": "You already have an account",
+  "sso-conflict.description": "Sign in the way you usually do, and we'll connect the two",
+  "sso-conflict.field.password": "Password",
+  "sso-conflict.action.submit": "Sign in",
+  "sso-conflict.action.passkey": "Use a passkey",
+  "sso-conflict.action.sign_in": "Back to sign in",
 
   // --- Passkey ceremony ---
   "passkey.pending.status": "Waiting for your passkey…",
