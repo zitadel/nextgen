@@ -359,30 +359,32 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	apiHandler := api.NewHandler(
+		flowService,
+		authAttemptSvc,
+		sessionService,
+		projectService,
+		userService,
+		schemaService,
+		flowDefinitionSvc,
+		teamService,
+		brandingService,
+		environmentService,
+		releaseService,
+		eventService,
+		tokenService,
+		keyService,
+		claimService,
+		grantService,
+		variableService,
+		serviceDBPool,
+		// Resolved, not the raw pin: in bootstrap mode project_id is empty
+		// and an empty handler pin rejects every claim/complete session.
+		cfg.Platform.ResolvedProjectID(),
+	).WithPersonalTeamEnsurer(personalTeams).WithEgressClient(egressClient)
+
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(
-			flowService,
-			authAttemptSvc,
-			sessionService,
-			projectService,
-			userService,
-			schemaService,
-			flowDefinitionSvc,
-			teamService,
-			brandingService,
-			environmentService,
-			releaseService,
-			eventService,
-			tokenService,
-			keyService,
-			claimService,
-			grantService,
-			variableService,
-			serviceDBPool,
-			// Resolved, not the raw pin: in bootstrap mode project_id is empty
-			// and an empty handler pin rejects every claim/complete session.
-			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams),
+		apiHandler,
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
@@ -395,7 +397,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer, apiHandler.IdpCallbackHandler(),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf)
 	if err != nil {
@@ -660,8 +662,20 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
+// idpCallback is the identity provider's return leg. Passed in rather than
+// reached through the API handler so a test can mount the rest of the surface
+// without one; nil skips the route.
+//
+// Stub: the OpenAPI does not model this endpoint because the real engine owns
+// it (#1032), so it is removed with `internal/api/idp_sso_stub.go`.
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, idpCallback http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
+
+	// Registered as an exact path, so it wins over the catch-all API mount
+	// below.
+	if idpCallback != nil {
+		mux.Handle(api.IdpCallbackRoute, idpCallback)
+	}
 
 	if cfg.LoginEnabled {
 		if err := login.ValidateDist(); err != nil {

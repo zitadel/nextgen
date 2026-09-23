@@ -20,7 +20,10 @@ import (
 )
 
 const (
-	flowCookieName          = "_zflow"
+	flowCookieName = "_zflow"
+	// ssoSubmitAction is the reserved action that starts an external sign-in
+	// (`flow-submit-request.yaml`).
+	ssoSubmitAction         = "sso"
 	flowCookieMaxAgeSeconds = 600
 )
 
@@ -123,6 +126,41 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	}
 	if id, ok := req.SSOProviderID.Get(); ok {
 		submitReq.SSOProviderID = &id
+		// Stub: the engine cannot start an external sign-in yet, so the
+		// authorize redirect is answered here instead (see idp_sso_stub.go).
+		// Delete this branch with that file.
+		if req.Action == ssoSubmitAction {
+			origin := ""
+			if o, ok := params.Origin.Get(); ok {
+				origin = o.String()
+			} else if h, ok := requestOriginFromContext(ctx); ok {
+				origin = h
+			}
+			// The origin decides the redirect_uri handed to the provider and
+			// where the callback sends the browser afterwards, and it comes
+			// from a client header. Unchecked it is an open redirect and a
+			// way to have the provider deliver the code elsewhere, so it is
+			// held to the project's registered origins exactly as the passkey
+			// relying party below is.
+			project, err := h.projectService.Get(ctx, state.ProjectID)
+			if err != nil {
+				return nil, domain.ErrInternal(err)
+			}
+			if err := validateOriginAgainstProject(origin, project); err != nil {
+				return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
+			}
+			step, bindingCookie, err := h.ssoAuthorizeStep(ctx, state, id, origin)
+			if err != nil {
+				return nil, normalizeFlowError(err)
+			}
+			// The binding cookie takes the response's one cookie slot: the
+			// flow state is unchanged by this leg and is held server-side
+			// until the callback, so there is nothing to re-seal here.
+			return &api.SubmitFlowStepOK{
+				SetCookie: api.NewOptString(bindingCookie),
+				Response:  h.buildFlowResponse(ctx, domain.FlowStepResult{State: state, Step: step}, false),
+			}, nil
+		}
 	}
 	if cr, ok := req.ChallengeResponse.Get(); ok {
 		var proof []byte
@@ -300,6 +338,9 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 			resp.RedirectURI = api.NewOptURI(u)
 		}
 	}
+	// Stub: give each slug the connection's display name and template so the
+	// login can label and brand its buttons (#1031 does this in the engine).
+	resp.Step.SSOProviders = h.resolveSsoProviders(result.State.ProjectID, result.Step)
 	if terminal && result.HandoffToken != "" {
 		resp.HandoffToken = api.NewOptString(result.HandoffToken)
 		resp.HandoffTokenExpiresAt = api.NewOptDateTime(result.HandoffTokenExpiresAt)

@@ -1366,15 +1366,32 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 		})
 	}
 	return &FlowStep{
-		Name:         step.Name,
-		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
-		Error:        errorKey,
-		Complete:     complete,
-		RedirectURL:  redirectURL,
-		Fields:       resolved.Fields,
-		Actions:      actions,
-		SSOProviders: nil,
+		Name:        step.Name,
+		Texts:       FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
+		Error:       errorKey,
+		Complete:    complete,
+		RedirectURL: redirectURL,
+		Fields:      resolved.Fields,
+		Actions:     actions,
+		// Carried as slugs. Resolving each to the connection's display name
+		// and template is the identity layer's, so the API fills those in
+		// (see internal/api/idp_sso_stub.go) until #1031 lands.
+		SSOProviders: ssoProvidersFromSlugs(step.SSOProviders),
 	}
+}
+
+// ssoProvidersFromSlugs carries a step's authored connection slugs into the
+// rendered step. Only the slug is known here: the flow definition references
+// connections by slug and the engine does not read the identity layer.
+func ssoProvidersFromSlugs(slugs []string) []FlowSSOProvider {
+	if len(slugs) == 0 {
+		return nil
+	}
+	providers := make([]FlowSSOProvider, 0, len(slugs))
+	for _, slug := range slugs {
+		providers = append(providers, FlowSSOProvider{ID: slug})
+	}
+	return providers
 }
 
 // collectsStepFields reports whether a submission commits the step's
