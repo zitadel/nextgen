@@ -28,7 +28,7 @@ cd my-app
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
-npm run dev
+npx @zitadel/cli@alpha run
 ```
 
 `start` runs the `@zitadel/server` npm binary by default and stores runtime data
@@ -55,6 +55,13 @@ from versioned local defaults; setup writes editable copies into
 APIs, then seeds `.zitadel/state.json` so `zitadel plan` is immediately empty.
 Open the dev server URL printed by your framework, register a user, log out,
 log back in, and end on the signed-in profile page.
+
+`run` is the development loop: it starts the local server and your app's own
+`dev` script together and interleaves their logs, so one terminal holds the
+whole stack. While it runs, `r` uploads the repo config the way `zitadel apply`
+does, `R` does the same around a full restart of both, and `q` (or Ctrl-C) ends
+the session, stopping whatever it started. Use `npm run dev` and a separate
+`zitadel apply` instead if you would rather drive the two yourself.
 
 For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
@@ -100,6 +107,8 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel branding eject` — scaffold an editable login template from a design
 - `zitadel schemas list` — list the project's user schemas
 - `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
+- `zitadel run` - run the local server and your app together, applying config
+  on a keystroke
 - `zitadel start|stop|logs|reset` — manage the local runtime
 
 The full agent-facing contract (JSON envelope, posture rules, claim flow,
@@ -145,6 +154,7 @@ which ships in this package.
 * [`zitadel releases list`](#zitadel-releases-list)
 * [`zitadel reset`](#zitadel-reset)
 * [`zitadel resources`](#zitadel-resources)
+* [`zitadel run`](#zitadel-run)
 * [`zitadel schemas get SCHEMA`](#zitadel-schemas-get-schema)
 * [`zitadel schemas list`](#zitadel-schemas-list)
 * [`zitadel search`](#zitadel-search)
@@ -816,10 +826,9 @@ Create a grant.
 ```
 USAGE
   $ zitadel grants create [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--principal-type user|team]
-    [--principal-id <value>] [--relation viewer|editor|admin] [--expires-at
-    <value>] [--data <value> | --file <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--relation
+    viewer|editor|admin] [--expires-at <value>] [--data <value> | --file
+    <value>] [-e development|preview|production]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -845,19 +854,14 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 REQUIRED FIELD FLAGS
-  --principal-id=<value>     (required) Principal id (`user_<opaque>` or
-                             `team_<opaque>`).
-  --principal-type=<option>  (required) Kind of principal to bind.
-                             <options: user|team>
-  --relation=<option>        (required) Catalog relation on `object_type`
-                             `project`.
-                             <options: viewer|editor|admin>
+  --relation=<option>  (required) Catalog relation on `object_type` `project`.
+                       <options: viewer|editor|admin>
 
 DESCRIPTION
   Create a grant.
 
 EXAMPLES
-  $ zitadel grants create --principal-type user --principal-id <principal_id> --relation viewer --json
+  $ zitadel grants create --relation viewer --json
 
   $ zitadel grants create --data '{...}' --json
 
@@ -984,10 +988,10 @@ FLAGS
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields:
       created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
-      qual|greater_than|greater_than_or_equal), principal_type
+      qual|greater_than|greater_than_or_equal), user_id
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
-      r_than|greater_than_or_equal), principal_id (equals|not_equals|contains|not_
-      contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      r_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_conta
+      ins|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
       relation (equals|not_equals|contains|not_contains|less_than|less_than_or_equ
       al|greater_than|greater_than_or_equal), expires_at
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
@@ -1546,6 +1550,45 @@ EXAMPLES
   $ zitadel resources --json
 
   $ zitadel resources --json | jq -r '.data.resources[] | "\(.topic): \(.verbs | join(", "))"'
+```
+
+## `zitadel run`
+
+Run the local Zitadel server and your app together, applying config on a keystroke.
+
+```
+USAGE
+  $ zitadel run [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--app-command <value>]
+    [--app] [--apply] [--image <value>] [--port <value>] [--runtime
+    binary|docker]
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --[no-]app             Start the app dev server. Disable with --no-app.
+      --app-command=<value>  Command to start the app instead of the package
+                             manager's dev script.
+      --[no-]apply           Apply repo config once at startup. Disable with
+                             --no-apply.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --image=<value>        Container image to run.
+      --port=<value>         [default: 8080] Local HTTP port.
+      --runtime=<option>     Local runtime backend.
+                             <options: binary|docker>
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Run the local Zitadel server and your app together, applying config on a
+  keystroke.
 ```
 
 ## `zitadel schemas get SCHEMA`

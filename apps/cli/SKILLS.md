@@ -354,6 +354,25 @@ The groups below mirror the ones `zitadel --help` prints.
   in the shell or in `.env.local` / `.env`, opts out of both the platform project
   and the local admin, for harnesses that
   want a bare single-project server; `data.console` is then absent.
+- `run` - the development loop: start (or adopt) the local server, start the
+  app's own `dev` script, interleave both log streams on stdout with a
+  `server`/`app`/`zitadel` prefix, and hold the session open. Keystrokes drive
+  it: `r` applies repo config exactly as `apply` does, `R` applies around a
+  full restart of the server and the app, `q` (or Ctrl-C) ends the session.
+  It applies once at startup unless `--no-apply`. Interactive by contract: it
+  refuses `--json` with `E_VALIDATION` (use `start` plus `apply`, which both
+  emit envelopes), and `--dry-run` reports the plan (runtime, app command,
+  `apply_on_start`, and the keys) as a normal envelope. Without a TTY it
+  still streams and still answers `SIGINT`, but there are no keystrokes.
+  The app command is the project's `dev` script through its package manager;
+  `--app-command "<cmd>"` overrides it and `--no-app` runs the server alone. A
+  project with no `dev` script is not an error: the reason is reported and the
+  session continues. Config goes to the project's resolved server, which for a
+  project set up with `--server local` is the server the session started; a
+  project pointing elsewhere is called out at startup. The session stops only
+  what it started: a server that was already running keeps running after `q`.
+  Flags: `--port`, `--runtime`, `--image`, `--app`/`--no-app`,
+  `--app-command`, `--apply`/`--no-apply`.
 - `console` — print (and, interactively, open) a fresh one-time sign-in link
   for the local console as the local admin: `data.sign_in_url`,
   `data.signed_in_as`, `data.browser_opened`. Each link works once; run the

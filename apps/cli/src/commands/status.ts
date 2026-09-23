@@ -37,7 +37,7 @@ import { publicCliCommand } from "../lib/public-cli";
 export default class Status extends BaseCommand {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.localServer;
-  static override groupOrder = 3;
+  static override groupOrder = 4;
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Status);

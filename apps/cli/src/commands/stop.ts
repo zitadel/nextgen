@@ -19,7 +19,7 @@ import { publicCliCommand } from "../lib/public-cli";
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
   static override group = CommandGroups.localServer;
-  static override groupOrder = 2;
+  static override groupOrder = 3;
   static override flags = {
     all: Flags.boolean({
       description: "Stop all discovered CLI-managed local Zitadel runtime processes.",

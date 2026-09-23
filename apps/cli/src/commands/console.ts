@@ -23,7 +23,7 @@ export default class Console extends BaseCommand {
   static override description =
     "Open the local console, signed in as the local admin created by `zitadel start`.";
   static override group = CommandGroups.localServer;
-  static override groupOrder = 6;
+  static override groupOrder = 7;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",

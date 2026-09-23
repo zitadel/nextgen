@@ -29,6 +29,7 @@ and release workflows. Agent-facing workspace rules live in
 | Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
 | Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
 | Add auth to my app                | `npx @zitadel/cli@alpha setup --server local`                  |
+| Run server and app together       | `npx @zitadel/cli@alpha run`                                   |
 | Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |

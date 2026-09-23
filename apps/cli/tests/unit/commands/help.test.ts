@@ -26,6 +26,7 @@ Project commands
 
 Local server commands
   start:                 Start a local Zitadel server
+  run:                   Run the local Zitadel server and your app together, applying config on a keystroke
   stop:                  Stop the local Zitadel server
   status:                Summarize the local Zitadel server and project state
   logs:                  Show local Zitadel server logs

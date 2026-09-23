@@ -18,7 +18,7 @@ import { publicCliCommand } from "../lib/public-cli";
 export default class Reset extends BaseCommand {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localServer;
-  static override groupOrder = 5;
+  static override groupOrder = 6;
   static override flags = {
     force: Flags.boolean({
       char: "f",

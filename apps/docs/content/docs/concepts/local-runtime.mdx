@@ -23,6 +23,11 @@ With no database override, that directory holds SQLite at `zitadel.db`. See [Dat
 
 `zitadel stop` preserves that data. `zitadel reset --force` deletes it.
 
+`zitadel run` starts the same runtime and your app's `dev` script together, streams both log
+streams, and holds the session open: `r` applies your repo config, `R` applies and restarts both
+processes, `q` ends the session. It stops only what it started, so a runtime that was already up
+keeps running.
+
 Use Docker only when intentionally testing the Docker backend:
 
 ```sh

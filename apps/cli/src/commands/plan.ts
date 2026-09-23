@@ -1,18 +1,15 @@
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient } from "../lib/api-client";
+import { planWithContext, resolveApplyContext } from "../lib/apply";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { environmentSchema } from "../lib/environment";
 import {
-  buildSyncPlan,
   collectPlanWarnings,
   enumeratePlanResources,
-  makeSyncers,
   renderPlan,
   summarizePlan,
 } from "../lib/sync";
-import { readZitadelSecret } from "../lib/project";
 
 /**
  * `zitadel plan` — validate config and preview the sync diff without mutating.
@@ -39,23 +36,12 @@ export default class Plan extends BaseCommand {
     await this.toMeta(flags);
     const { cwd, source, env, isTTY } = this.meta;
 
-    const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
+    const context = await resolveApplyContext({ cwd, source, env });
+    consola.info(`Project   ${context.projectId}`);
     consola.info(`Server    ${source}`);
-    // Verbatim: the plan diffs what it reads against the project's files.
-    const client = createZitadelClient(
-      { baseUrl: source, token: secret.project_secret },
-      { verbatim: true },
-    );
-    const syncers = makeSyncers({
-      client,
-      projectId: secret.project_id,
-      env,
-      cwd,
-    });
 
     consola.start("Building plan");
-    const plan = await buildSyncPlan(cwd, syncers, true);
+    const plan = await planWithContext(context);
     const summary = summarizePlan(plan);
     this.recordTelemetry({
       creates: summary.creates,

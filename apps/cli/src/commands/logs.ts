@@ -11,7 +11,7 @@ import { publicCliCommand } from "../lib/public-cli";
 export default class Logs extends BaseCommand {
   static override description = "Show local Zitadel server logs.";
   static override group = CommandGroups.localServer;
-  static override groupOrder = 4;
+  static override groupOrder = 5;
   static override flags = {
     follow: Flags.boolean({ description: "Follow logs." }),
     tail: Flags.integer({ description: "Number of lines to show.", default: 200 }),
