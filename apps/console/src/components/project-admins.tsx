@@ -25,7 +25,7 @@ import {
 
 import type { api } from "../api/zitadel";
 
-export type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
+type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 /**
  * A project's admins: who administers it, and how that access is given and

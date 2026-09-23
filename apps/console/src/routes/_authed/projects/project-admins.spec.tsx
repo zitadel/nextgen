@@ -450,15 +450,15 @@ describe("project admins", () => {
   });
 });
 
-describe("settings nav", () => {
-  it("has no Admins entry anywhere in the sidebar", async () => {
-    // Admins lives on the project page now; neither the portal list nor the
-    // Settings view advertises it.
+describe("portal nav", () => {
+  it("has no Admins entry in the primary sidebar", async () => {
+    // Admins lives on the project page now, not as a list screen. The Settings
+    // half of this is asserted where Settings renders (`landing.spec.tsx`):
+    // on a project URL the Settings nav is never mounted.
     stubProject([]);
     await renderProject();
 
     const primary = await screen.findByRole("navigation", { name: "Primary" });
     expect(within(primary).queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
   });
 });

@@ -58,5 +58,10 @@ describe("landing routes", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("No settings yet.")).toBeInTheDocument();
+    // Asserted here, where the Settings nav is actually mounted: no route
+    // claims a Settings heading any more, so neither a WORKSPACE group over
+    // nothing nor an Admins row survives.
+    expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
 });

@@ -6,9 +6,9 @@
  *
  * `dev-real` boots one project and signs the console into it. A second project
  * is one `POST /projects` away (unauthenticated; the server answers with the
- * new project's secret exactly once), and access is the same grant Settings →
- * Admins creates: `POST /grants?project_id=<new>` with the new project's
- * secret, binding the dev user by id. The server allows a user homed in the
+ * new project's secret exactly once), and access is the same grant a
+ * project's admins section creates: `POST /grants?project_id=<new>` with the
+ * new project's secret, binding the dev user by id. The server allows a user homed in the
  * seeded project to be bound on another one because dev-real pins no platform
  * project (`internal/service/grant.go`, `resolvePrincipalHome`).
  *
@@ -46,13 +46,15 @@
  *   CONSOLE_DEV_ZITADEL_PORT  the booted instance's port, default 8094
  */
 
+import { parseArgs } from "node:util";
+
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const backendUrl = `http://localhost:${process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094}`;
 
 /** Secrets of projects this run created, keyed by id — the server hands each out once. */
 const createdSecrets = new Map<string, string>();
 
-const args = parseArgs(process.argv.slice(2));
+const args = readArgs();
 const name = args.name ?? "Second project";
 const email = args.email ?? process.env.CONSOLE_DEV_EMAIL ?? "dev@zitadel.local";
 const relation = args.relation ?? "admin";
@@ -193,17 +195,24 @@ async function request(url: string, init: RequestInit): Promise<Response> {
   return response;
 }
 
-function parseArgs(argv: string[]): Record<string, string> {
-  const parsed: Record<string, string> = {};
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index]!;
-    if (!arg.startsWith("--")) fail(`unexpected argument ${arg}`);
-    const [key, inline] = arg.slice(2).split("=", 2);
-    const value = inline ?? argv[++index];
-    if (value === undefined) fail(`--${key} needs a value`);
-    parsed[key!] = value;
+/** `node:util` parsing: rejects unknown flags and missing values, keeps a value's own `=`. */
+function readArgs(): Partial<Record<string, string>> {
+  try {
+    return parseArgs({
+      options: {
+        name: { type: "string" },
+        email: { type: "string" },
+        "user-id": { type: "string" },
+        identifier: { type: "string" },
+        relation: { type: "string" },
+        "project-id": { type: "string" },
+        secret: { type: "string" },
+      },
+      strict: true,
+    }).values;
+  } catch (error) {
+    fail((error as Error).message);
   }
-  return parsed;
 }
 
 function fail(message: string): never {

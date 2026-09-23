@@ -18,15 +18,6 @@ import { formatDate } from "../../../lib/date";
 const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-foreground";
 
 /**
- * One page of grants. `POST /grants/query` is cursor-paginated like the other
- * list reads, but the admins section does not page yet: a project's
- * administrators are a handful of people, and `Load more` with nothing past the
- * first page is a control that never does anything. Add it with the first
- * project that needs it.
- */
-const GRANTS_PAGE_SIZE = 100;
-
-/**
  * Project detail.
  *
  * The header card carries `PROJECT ID` and `CREATED`. The design draws a third
@@ -46,10 +37,9 @@ export const Route = createFileRoute("/_authed/projects/$projectId")({
   loader: async ({ params }) => {
     const [project, grants] = await Promise.all([
       api.getProject(params.projectId),
-      api.queryGrants(
-        { limit: GRANTS_PAGE_SIZE, expand: ["principal"] },
-        { project_id: params.projectId },
-      ),
+      // One page: a project's admins are a handful. Add paging with the first
+      // project that needs it.
+      api.queryGrants({ limit: 100, expand: ["principal"] }, { project_id: params.projectId }),
     ]);
     return { project, grants: grants.grants };
   },

@@ -287,7 +287,7 @@ if (seedOnly) {
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
       `    CONSOLE_PROJECT_SECRET=${projectSecret} \\`,
       `    CONSOLE_PROJECT_SECRET_PROJECT_ID=${projectId} \\`,
-      `    VITE_CONSOLE_PROJECT_ID=${projectId} \\`,
+      `    VITE_CONSOLE_PROJECT_ID=${consoleProjectId} \\`,
       "    corepack pnpm --filter @zitadel/console dev",
       "",
     ].join("\n"),
