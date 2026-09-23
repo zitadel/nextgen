@@ -16,24 +16,32 @@ export const ENV_LOCAL = ".env.local";
 export const ENV_EXAMPLE = ".env.example";
 
 /**
- * Whether git ignores `relPath` in this Project.
+ * Whether a secret may be written to `relPath` in this Project.
  *
- * `git check-ignore` is the only honest answer: ignore rules compose from the
- * repository's `.gitignore` files, nested directories, the global excludes
- * file and `.git/info/exclude`, so reading `.gitignore` would agree with git
- * only by coincidence.
+ * Two questions, because they have different answers:
  *
- * Anything other than a clear "yes" reads as not ignored: no repository, no
- * git binary, or an unreadable tree all leave us unable to prove the file is
- * safe, and a secret is written only against proof.
+ * - **Outside a repository** nothing can be committed, so there is nothing to
+ *   leak. `zitadel setup` scaffolds `.gitignore` with `.env*` but does not run
+ *   `git init`, so this is the state a fresh project is in, and refusing there
+ *   would block the common first run for no gain.
+ * - **Inside a repository** only git can answer. Ignore rules compose from
+ *   `.gitignore` files at every level, `.git/info/exclude` and the global
+ *   excludes file, so reading `.gitignore` would agree with git only by
+ *   coincidence. The index is deliberately consulted (no `--no-index`): a
+ *   file that is already tracked is not ignored whatever the patterns say,
+ *   and committing to it would publish the secret.
  *
- * The index is deliberately consulted (no `--no-index`): a file that is
- * already tracked is not ignored, whatever the patterns say, and committing
- * to it would publish the secret.
+ * Inside a repository, anything other than a clear "ignored" is a refusal.
  */
-export async function isGitIgnored(cwd: string, relPath: string): Promise<boolean> {
+export async function isSafeForSecrets(cwd: string, relPath: string): Promise<boolean> {
   try {
-    // Exit 0 means ignored, anything else means it is not, or that we could
+    await exec("git", ["rev-parse", "--is-inside-work-tree"], { cwd });
+  } catch {
+    // No repository, or no git at all: nothing here can be committed.
+    return true;
+  }
+  try {
+    // Exit 0 means ignored; anything else means it is not, or that we could
     // not tell — both answer "do not write a secret here".
     await exec("git", ["check-ignore", "--quiet", relPath], { cwd });
     return true;
@@ -99,7 +107,7 @@ export type SecretOutcome =
  *
  * The name is always added to `.env.example` without its value, so the
  * variable is discoverable in a fresh clone. The value is written only to
- * `.env.local`, and only once git confirms that file is ignored — writing a
+ * `.env.local`, and only where that cannot be committed — writing a
  * credential into a tracked file is the one failure this whole path exists to
  * prevent, and a later `git add -A` would publish it.
  *
@@ -116,7 +124,7 @@ export async function storeClientSecret(options: {
   if (value === undefined || value === "") {
     return { stored: false, name, reason: "deferred" };
   }
-  if (!(await isGitIgnored(cwd, ENV_LOCAL))) {
+  if (!(await isSafeForSecrets(cwd, ENV_LOCAL))) {
     return { stored: false, name, reason: "not-ignored" };
   }
   await mergeEnvFile(cwd, ENV_LOCAL, [{ name, value }]);

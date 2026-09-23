@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { ENV_LOCAL, isGitIgnored, mergeEnvFile, storeClientSecret } from "../../../../src/lib/idp";
+import { ENV_LOCAL, isSafeForSecrets, mergeEnvFile, storeClientSecret } from "../../../../src/lib/idp";
 
 const exec = promisify(execFile);
 
@@ -24,15 +24,15 @@ beforeEach(async () => {
   cwd = await mkdtemp(join(tmpdir(), "zitadel-idp-cred-"));
 });
 
-describe("isGitIgnored", () => {
+describe("isSafeForSecrets", () => {
   it("is true for a file the repository ignores", async () => {
     await initRepo(".env*\n!.env.example\n");
-    expect(await isGitIgnored(cwd, ENV_LOCAL)).toBe(true);
+    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(true);
   });
 
   it("is false when nothing ignores it", async () => {
     await initRepo("node_modules\n");
-    expect(await isGitIgnored(cwd, ENV_LOCAL)).toBe(false);
+    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(false);
   });
 
   it("is false for a tracked file, whatever the patterns say", async () => {
@@ -40,11 +40,13 @@ describe("isGitIgnored", () => {
     await writeFile(join(cwd, ENV_LOCAL), "EXISTING=1\n", "utf8");
     // Tracking it beats the pattern: a commit would publish the secret.
     await exec("git", ["add", "--force", ENV_LOCAL], { cwd });
-    expect(await isGitIgnored(cwd, ENV_LOCAL)).toBe(false);
+    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(false);
   });
 
-  it("is false outside a repository", async () => {
-    expect(await isGitIgnored(cwd, ENV_LOCAL)).toBe(false);
+  it("is true outside a repository, where nothing can be committed", async () => {
+    // `zitadel setup` scaffolds .gitignore but does not run `git init`, so a
+    // fresh project sits here and must not be refused.
+    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(true);
   });
 });
 

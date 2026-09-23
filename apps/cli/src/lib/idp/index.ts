@@ -27,7 +27,7 @@ export {
   ENV_EXAMPLE,
   ENV_LOCAL,
   type EnvEntry,
-  isGitIgnored,
+  isSafeForSecrets,
   mergeEnvFile,
   type SecretOutcome,
   storeClientSecret,
