@@ -4,6 +4,7 @@ import type {
   CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
   GetBrandingById200,
+  CreateIdpBodyIdp,
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
@@ -13,7 +14,12 @@ import { consola } from "consola";
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
-import { brandingConfigSchema, flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
+import {
+  brandingConfigSchema,
+  flowConfigSchema,
+  idpConnectionConfigSchema,
+  schemaConfigSchema,
+} from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
 
 import {
@@ -24,6 +30,7 @@ import {
   toLocalBrandingBody,
 } from "../branding";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
+import { IDPS_DIR } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { ResourceSyncer } from "./types.js";
@@ -51,6 +58,9 @@ export function makeSyncers(opts: {
 }): ReadonlyArray<ResourceSyncer> {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
+    // Before flows: a flow step naming a connection slug is only valid once
+    // that connection exists on the platform.
+    new IdpConnectionSyncer(opts.client, opts.projectId),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
     new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
   ];
@@ -66,6 +76,89 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
   const missing = flowEnvRefs(data).filter((name) => !env[name]);
   if (missing.length > 0) {
     throw new ZitadelError("E_VALIDATION", `Missing environment variables: ${missing.join(", ")}`);
+  }
+}
+
+/**
+ * Syncs `.zitadel/idps/*.json`, one identity provider connection per file.
+ *
+ * `mutable` with `revisioned: false`: the connection keeps one id for life and
+ * the server files each edit as a revision beneath it, so an edit is an update
+ * here rather than a new resource, and nothing that references the slug has to
+ * be re-pinned.
+ *
+ * Deletion is not supported yet (#1013): what should happen to users already
+ * linked to a connection is undesigned, so a removed file is reported and no
+ * deletion is sent.
+ */
+class IdpConnectionSyncer implements ResourceSyncer {
+  readonly kind = "idp";
+  readonly directory = IDPS_DIR;
+  readonly mutable = true;
+  readonly revisioned = false;
+
+  constructor(
+    private readonly client: ZitadelClient,
+    private readonly projectId: string,
+  ) {}
+
+  /**
+   * Parse against the generated `CreateIdpBody.idp` Zod, the orval-emitted
+   * equivalent of `idp-connection.json`. A literal `client_secret` fails that
+   * pattern, so it is caught here and named plainly: it is the one mistake
+   * that would publish a credential.
+   */
+  validate(data: object): void {
+    const result = idpConnectionConfigSchema.safeParse(data);
+    if (result.success) {
+      return;
+    }
+    const literalSecret = result.error.issues.some(
+      (issue) => issue.path.length > 1 && issue.path[issue.path.length - 1] === "client_secret",
+    );
+    throw new ZitadelError(
+      "E_VALIDATION",
+      literalSecret
+        ? "Connection file's client_secret must reference a variable, not hold a value"
+        : "Connection file is not a valid identity provider connection",
+      {
+        hint: literalSecret
+          ? 'Use "client_secret": "${{ NAME }}" and keep the value in .env.local.'
+          : undefined,
+        details: { issues: result.error.issues },
+      },
+    );
+  }
+
+  /**
+   * `POST /idps` creates the connection when its slug is new to the project.
+   * The response carries the stored document, so no follow-up fetch is needed.
+   */
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const result = await this.client.createIdp(
+      { idp: data as CreateIdpBodyIdp },
+      { project_id: this.projectId },
+    );
+    return { id: result.id, canonical: result.definition };
+  }
+
+  /**
+   * The same call: a document whose slug already exists revises that
+   * connection, keeping its id. The id is passed for the sync loop's benefit
+   * and deliberately unused — the slug inside the document addresses the row.
+   */
+  async update(_id: string, data: object): Promise<{ canonical?: object }> {
+    const result = await this.client.createIdp(
+      { idp: data as CreateIdpBodyIdp },
+      { project_id: this.projectId },
+    );
+    return { canonical: result.definition };
+  }
+
+  async delete(_id: string): Promise<void> {
+    throw new ZitadelError("E_NOT_IMPLEMENTED", "Deleting an identity provider connection is not supported yet", {
+      hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
+    });
   }
 }
 
