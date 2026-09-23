@@ -81913,6 +81913,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case IdpNotFoundSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.not_found")
+		{
+			s := s.IdpNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -82134,6 +82150,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
 					found = true
+				case "idp.not_found":
+					s.Type = IdpNotFoundSubmitFlowStepErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalSubmitFlowStepErrorResponse
 					found = true
@@ -82241,6 +82260,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case FlowUnsupportedSubmitFlowStepErrorResponse:
 		if err := s.FlowUnsupported.Decode(d); err != nil {
+			return err
+		}
+	case IdpNotFoundSubmitFlowStepErrorResponse:
+		if err := s.IdpNotFound.Decode(d); err != nil {
 			return err
 		}
 	case InternalSubmitFlowStepErrorResponse:
