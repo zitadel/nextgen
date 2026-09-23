@@ -47,7 +47,9 @@ export abstract class OwnerCommand extends BaseCommand {
     const meta = await super.toMeta(flags, options);
     if (flags["project-level"] !== true) {
       const retry = publicCliCommand(
-        [...(this.id ?? "").split(":"), ...this.argv, "--project-level"].join(" "),
+        [this.id?.replaceAll(":", " "), ...this.argv, "--project-level"]
+          .filter((part) => part !== undefined && part !== "")
+          .join(" "),
         meta.cliVersion,
       );
       throw new ZitadelError("E_VALIDATION", "Name the owner: --project-level", {
