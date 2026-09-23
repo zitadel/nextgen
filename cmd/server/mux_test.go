@@ -45,7 +45,7 @@ func requireEmbeddedUI(t *testing.T) {
 
 func newTestMux(t *testing.T, cfg ServerConfig) *http.ServeMux {
 	t.Helper()
-	mux, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(),
+	mux, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(), nil,
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
 		nil)
 	require.NoError(t, err)

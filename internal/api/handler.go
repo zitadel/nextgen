@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/service"
@@ -44,6 +45,11 @@ type Handler struct {
 	// lands (#1003). See internal/api/idp_stub.go.
 	idpStub *idpStubStore
 	ssoStub *ssoStubStore
+
+	// ssoEgress fetches the provider's token endpoint. Optional (see
+	// WithEgressClient); without it the sso stub refuses the exchange rather
+	// than reaching the network unguarded.
+	ssoEgress *http.Client
 }
 
 func NewHandler(
@@ -98,6 +104,15 @@ func NewHandler(
 // untouched; without it the exchange simply skips the ensure.
 func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handler {
 	h.personalTeams = e
+	return h
+}
+
+// WithEgressClient wires the hardened outbound client (ADR 061) the sso stub
+// uses for its token exchange. The token endpoint comes from a tenant-authored
+// connection, so it is a user-injectable URL and must not be fetched with a
+// standard-library client. Chainable for the same reason as above.
+func (h *Handler) WithEgressClient(client *http.Client) *Handler {
+	h.ssoEgress = client
 	return h
 }
 

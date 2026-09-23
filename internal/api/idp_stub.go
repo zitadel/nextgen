@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
@@ -53,7 +54,7 @@ func (s *idpStubStore) upsert(projectID string, definition api.IdpConnection, mi
 		project = map[string]*idpStubRecord{}
 		s.byProject[projectID] = project
 	}
-	revisionID, err := mint(domain.PrefixIDPConnection)
+	revisionID, err := mint(domain.PrefixIDPConnectionRevision)
 	if err != nil {
 		return nil, false, err
 	}
@@ -81,12 +82,15 @@ func (s *idpStubStore) upsert(projectID string, definition api.IdpConnection, mi
 	return record, true, nil
 }
 
-func (s *idpStubStore) list(projectID string) []*idpStubRecord {
+// list returns copies. `upsert` mutates a stored record in place, so handing
+// out the pointer would let a caller read a half-updated connection while a
+// `zitadel apply` revises it.
+func (s *idpStubStore) list(projectID string) []idpStubRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	records := make([]*idpStubRecord, 0, len(s.byProject[projectID]))
+	records := make([]idpStubRecord, 0, len(s.byProject[projectID]))
 	for _, record := range s.byProject[projectID] {
-		records = append(records, record)
+		records = append(records, *record)
 	}
 	// Oldest first, as the query's default sort promises.
 	sort.Slice(records, func(i, j int) bool {
@@ -98,18 +102,29 @@ func (s *idpStubStore) list(projectID string) []*idpStubRecord {
 	return records
 }
 
-func (s *idpStubStore) get(projectID, id string) (*idpStubRecord, bool) {
+func (s *idpStubStore) get(projectID, id string) (idpStubRecord, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, record := range s.byProject[projectID] {
 		if record.id == id {
-			return record, true
+			return *record, true
 		}
 	}
-	return nil, false
+	return idpStubRecord{}, false
 }
 
-func (r *idpStubRecord) response() api.IdpResponse {
+// getBySlug finds a connection by the slug a flow definition references.
+func (s *idpStubStore) getBySlug(projectID, slug string) (idpStubRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.byProject[projectID][slug]
+	if !ok {
+		return idpStubRecord{}, false
+	}
+	return *record, true
+}
+
+func (r idpStubRecord) response() api.IdpResponse {
 	return api.IdpResponse{
 		ID:         r.id,
 		RevisionID: r.revisionID,
@@ -117,6 +132,21 @@ func (r *idpStubRecord) response() api.IdpResponse {
 		CreatedAt:  r.createdAt,
 		UpdatedAt:  r.updatedAt,
 		Definition: r.definition,
+	}
+}
+
+// idpConnectionErrorResponse maps the identity-provider errors onto their
+// declared statuses. Without it `idp.not_found` falls through to the internal
+// case and a missing connection answers 500, contradicting the 404 the
+// endpoint documents.
+func idpConnectionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrIDPConnectionNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrIDPConnectionFieldImmutable(nil).Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	default:
+		return internalErrorResponse(err)
 	}
 }
 
