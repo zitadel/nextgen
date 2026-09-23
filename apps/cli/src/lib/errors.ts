@@ -17,6 +17,14 @@ export type ZitadelErrorCode =
   | "E_NOT_FOUND"
   | "E_PORT_IN_USE"
   | "E_VALIDATION"
+  /**
+   * A credential the configuration references has no value locally. Distinct
+   * from `E_VALIDATION`: the file is correct and the fix is to supply the
+   * value, not to edit the file.
+   */
+  | "E_CREDENTIAL_MISSING"
+  /** The user backed out of an interactive journey. Not a failure. */
+  | "E_CANCELLED"
   | "E_NOT_IMPLEMENTED";
 
 /**
@@ -35,6 +43,10 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NOT_FOUND: 4,
   E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
+  E_CREDENTIAL_MISSING: 3,
+  // Backing out is the user's choice, not a failure, so it exits cleanly —
+  // as E_ALREADY_INIT does for a run that had nothing to do.
+  E_CANCELLED: 0,
   E_NOT_IMPLEMENTED: 2,
 };
 
