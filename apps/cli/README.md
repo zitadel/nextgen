@@ -119,6 +119,7 @@ which ships in this package.
 * [`zitadel branding list`](#zitadel-branding-list)
 * [`zitadel claim`](#zitadel-claim)
 * [`zitadel commands`](#zitadel-commands)
+* [`zitadel console`](#zitadel-console)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel environments get NAME`](#zitadel-environments-get-name)
@@ -412,6 +413,40 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/4.1.55/src/commands/commands.ts)_
+
+## `zitadel console`
+
+Open the local console, signed in as the local admin created by `zitadel start`.
+
+```
+USAGE
+  $ zitadel console [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--no-open]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --no-open          Print the sign-in link instead of opening a browser.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Open the local console, signed in as the local admin created by `zitadel
+  start`.
+
+EXAMPLES
+  $ zitadel console
+
+  $ zitadel console --no-open
+```
 
 ## `zitadel doctor`
 
