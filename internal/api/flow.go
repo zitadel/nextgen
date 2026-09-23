@@ -136,16 +136,28 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			} else if h, ok := requestOriginFromContext(ctx); ok {
 				origin = h
 			}
-			step, err := h.ssoAuthorizeStep(ctx, state, id, origin)
+			// The origin decides the redirect_uri handed to the provider and
+			// where the callback sends the browser afterwards, and it comes
+			// from a client header. Unchecked it is an open redirect and a
+			// way to have the provider deliver the code elsewhere, so it is
+			// held to the project's registered origins exactly as the passkey
+			// relying party below is.
+			project, err := h.projectService.Get(ctx, state.ProjectID)
+			if err != nil {
+				return nil, domain.ErrInternal(err)
+			}
+			if err := validateOriginAgainstProject(origin, project); err != nil {
+				return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
+			}
+			step, bindingCookie, err := h.ssoAuthorizeStep(ctx, state, id, origin)
 			if err != nil {
 				return nil, normalizeFlowError(err)
 			}
-			cookieValue, err := h.sealState(ctx, state)
-			if err != nil {
-				return nil, err
-			}
+			// The binding cookie takes the response's one cookie slot: the
+			// flow state is unchanged by this leg and is held server-side
+			// until the callback, so there is nothing to re-seal here.
 			return &api.SubmitFlowStepOK{
-				SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
+				SetCookie: api.NewOptString(bindingCookie),
 				Response:  h.buildFlowResponse(ctx, domain.FlowStepResult{State: state, Step: step}, false),
 			}, nil
 		}

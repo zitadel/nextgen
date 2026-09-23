@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -25,11 +27,32 @@ import (
 //
 // What it is not: the authorization request is not PKCE-protected, the nonce is
 // not checked, and the id_token's signature is NOT verified — the claims are
-// read from its payload. Pending authorizations live in this process's memory,
-// so they do not survive a restart and are not shared between replicas. No
-// identity link is recorded, so a returning user is matched on the email claim
-// alone. None of that is acceptable in the real engine; all of it is enough to
-// prove the round trip the CLI configures actually works.
+// read from its payload, so `iss` and `aud` are not checked either. Pending
+// authorizations live in this process's memory, so they do not survive a
+// restart and are not shared between replicas. No identity link is recorded,
+// so every returning identity looks new. The connection's `client_secret` is
+// posted as stored, which means the `${{ NAME }}` reference reaches the
+// provider verbatim: resolving it against the environment's variables is the
+// engine's, and until then only a provider that ignores the secret (a local
+// mock) completes the exchange. None of that is acceptable in the real
+// engine; all of it is enough to prove the round trip the CLI configures.
+
+// ssoBindingCookie carries a nonce that ties a callback to the browser that
+// started the authorization. It is SameSite=Lax deliberately: the callback is
+// a cross-site navigation back from the provider, which a Strict cookie would
+// not be sent with — the flow cookie's own Strict setting is exactly why the
+// state has to be held server-side in the first place.
+const ssoBindingCookie = "_zsso"
+
+// maxPendingSSO caps the authorization requests held at once. `POST /flow` is
+// unauthenticated, so without a cap a loop of create-flow/submit-sso grows the
+// map at request rate, and the sweep below would scan more of it on every
+// insert.
+const maxPendingSSO = 10_000
+
+// ssoPendingTTL bounds how long an authorization may sit unredeemed, and how
+// long the binding cookie lives.
+const ssoPendingTTL = 10 * time.Minute
 
 // ssoPending is one authorization request waiting for its callback.
 type ssoPending struct {
@@ -46,6 +69,10 @@ type ssoPending struct {
 	// page that started the sign-in.
 	returnURL string
 	createdAt time.Time
+	// binding is the nonce the browser must present. Without it anyone who
+	// learns a `state` can redeem a callback in someone else's browser and
+	// plant their own half-finished flow there (login CSRF).
+	binding string
 }
 
 type ssoStubStore struct {
@@ -69,9 +96,12 @@ func (s *ssoStubStore) put(p ssoPending) (string, error) {
 	// Opportunistic sweep: a browser that never comes back would otherwise
 	// leave its entry behind for the life of the process.
 	for key, entry := range s.pending {
-		if time.Since(entry.createdAt) > 10*time.Minute {
+		if time.Since(entry.createdAt) > ssoPendingTTL {
 			delete(s.pending, key)
 		}
+	}
+	if len(s.pending) >= maxPendingSSO {
+		return "", fmt.Errorf("too many authorization requests in flight")
 	}
 	s.pending[state] = p
 	return state, nil
@@ -90,18 +120,32 @@ func (s *ssoStubStore) take(state string) (ssoPending, bool) {
 // ssoAuthorizeStep answers `action: "sso"` with the step that sends the browser
 // to the provider. Returns nil when the submission is not an SSO one, so the
 // caller falls through to the ordinary pipeline.
-func (h *Handler) ssoAuthorizeStep(ctx context.Context, state *domain.FlowState, providerID string, origin string) (*domain.FlowStep, error) {
-	record, ok := h.idpStub.get(state.ProjectID, providerID)
+// Returns the step and the `Set-Cookie` value that binds the callback to this
+// browser. The flow state is unchanged by the authorize leg — it is held in
+// the pending record instead — so the response's one cookie slot carries the
+// binding rather than a re-sealed flow cookie.
+func (h *Handler) ssoAuthorizeStep(ctx context.Context, state *domain.FlowState, providerID string, origin string) (*domain.FlowStep, string, error) {
+	// The step has to offer this provider: without the check, the reserved
+	// action would start an external sign-in from any step of any flow, which
+	// is a lateral move out of, say, a second-factor step.
+	if !h.stepOffersProvider(ctx, state, providerID) {
+		return nil, "", domain.ErrIDPConnectionNotFound()
+	}
+	record, ok := h.idpStub.getBySlug(state.ProjectID, providerID)
 	if !ok {
-		return nil, domain.ErrIDPConnectionNotFound()
+		return nil, "", domain.ErrIDPConnectionNotFound()
 	}
 	oidc, ok := record.definition.Oidc.Get()
 	if !ok {
-		return nil, domain.ErrRequestInvalid().WithMessage("only oidc connections can be used to sign in")
+		return nil, "", domain.ErrRequestInvalid().WithMessage("only oidc connections can be used to sign in")
 	}
 	sealed, err := h.sealState(ctx, state)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	binding, err := randomToken()
+	if err != nil {
+		return nil, "", domain.ErrInternal(err)
 	}
 	returnURL := strings.TrimSuffix(origin, "/")
 	callback := returnURL + IdpCallbackPath
@@ -112,14 +156,15 @@ func (h *Handler) ssoAuthorizeStep(ctx context.Context, state *domain.FlowState,
 		connection:  record.definition,
 		returnURL:   returnURL,
 		createdAt:   time.Now(),
+		binding:     binding,
 	})
 	if err != nil {
-		return nil, domain.ErrInternal(err)
+		return nil, "", domain.ErrInternal(err)
 	}
 
 	authorize, err := authorizeEndpoint(oidc)
 	if err != nil {
-		return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
+		return nil, "", domain.ErrRequestInvalid().WithMessage(err.Error())
 	}
 	query := authorize.Query()
 	query.Set("client_id", oidc.ClientID)
@@ -132,11 +177,49 @@ func (h *Handler) ssoAuthorizeStep(ctx context.Context, state *domain.FlowState,
 
 	// A step with only a redirect: the client navigates away, so nothing on it
 	// is ever painted.
+	cookie := (&http.Cookie{
+		Name:     ssoBindingCookie,
+		Value:    binding,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   cookieSecureFromContext(ctx),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(ssoPendingTTL.Seconds()),
+	}).String()
+
 	return &domain.FlowStep{
 		Name:        "sso-redirect",
 		Texts:       domain.FlowStepTexts{TitleKey: "sso.redirect.title"},
 		RedirectURL: &target,
-	}, nil
+	}, cookie, nil
+}
+
+// randomToken returns a URL-safe 192-bit token.
+func randomToken() (string, error) {
+	raw := make([]byte, 24)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+// stepOffersProvider reports whether the step the flow is currently on lists
+// this connection's slug.
+//
+// Without it the reserved action would start an external sign-in from any step
+// of any flow — a lateral move out of, say, a second-factor step, into one the
+// definition never routed to. `flowService.Submit` makes the equivalent check
+// for every other action; this branch bypasses it, so it makes its own.
+func (h *Handler) stepOffersProvider(ctx context.Context, state *domain.FlowState, slug string) bool {
+	def, err := h.flowDefinitionService.Get(ctx, state.ProjectID, state.DefinitionID)
+	if err != nil || def == nil {
+		return false
+	}
+	step, ok := def.FindStep(state.CurrentStep)
+	if !ok {
+		return false
+	}
+	return slices.Contains(step.SSOProviders, slug)
 }
 
 // IdpCallbackPath is the redirect URI registered with the vendor, on the app's
@@ -153,11 +236,33 @@ const IdpCallbackRoute = "/idp/callback"
 func (h *Handler) IdpCallbackHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		// No-store on a response that carries a Set-Cookie for the flow: a
+		// shared cache keyed on this URL would otherwise hand one user's flow
+		// to the next. Same-origin is the default referrer policy, which
+		// would leak the code and state in the Referer of everything the
+		// redirect target loads.
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+
 		pending, ok := h.ssoStub.take(r.URL.Query().Get("state"))
 		if !ok {
 			http.Error(w, "unknown or already used sso state", http.StatusBadRequest)
 			return
 		}
+		// The browser must present the nonce it was given when the
+		// authorization started. Without this anyone who learns a `state` can
+		// redeem the callback in someone else's browser and plant their own
+		// half-finished flow there.
+		binding, err := r.Cookie(ssoBindingCookie)
+		if err != nil || subtle.ConstantTimeCompare([]byte(binding.Value), []byte(pending.binding)) != 1 {
+			http.Error(w, "sso callback did not come from the browser that started it", http.StatusBadRequest)
+			return
+		}
+		// Redeemed: retire the binding so it cannot be replayed.
+		http.SetCookie(w, &http.Cookie{
+			Name: ssoBindingCookie, Value: "", Path: "/", HttpOnly: true,
+			Secure: cookieSecureFromContext(ctx), SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		})
 		if errParam := r.URL.Query().Get("error"); errParam != "" {
 			// The user declined at the provider, or it refused. Put them back
 			// on the step they started from rather than on an error page.
@@ -189,6 +294,10 @@ func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, 
 	}
 	target := h.ssoOutcomeStep(ctx, state, email)
 	state.CurrentStep = target
+	// Every advance refreshes this (see FlowState.IssuedAt); without it a user
+	// who spent a while at the provider resumes holding an almost-expired
+	// state.
+	state.IssuedAt = time.Now().UTC()
 	if email != "" {
 		// The provider supplied the identifier, so the step the flow resumes
 		// on does not have to ask for it again.
@@ -207,11 +316,15 @@ func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, 
 		Value:    sealed,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		// The same rule every other cookie here follows: honours
+		// X-Forwarded-Proto and fails closed, so TLS terminated at a proxy
+		// still yields a Secure cookie.
+		Secure: cookieSecureFromContext(ctx),
 		// Lax, not Strict: the browser is arriving from the provider, and a
 		// Strict cookie set here would not be sent with the redirect that
 		// follows. The real engine has to make this decision deliberately.
 		SameSite: http.SameSiteLaxMode,
+		MaxAge:   flowCookieMaxAgeSeconds,
 	})
 	// The flow handle rides in the query so the page can resume rather than
 	// start a new flow: `<zitadel-login resume-flow-id>` reads it and calls
@@ -286,7 +399,10 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("token endpoint answered %d", resp.StatusCode)
+		// OAuth error bodies (invalid_client, invalid_grant) are the entire
+		// diagnostic here, and this stub's most likely failure — an
+		// unresolved `${{ VAR }}` client secret — reports exactly that way.
+		return "", fmt.Errorf("token endpoint answered %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	var tokens struct {
 		IDToken string `json:"id_token"`
@@ -312,13 +428,24 @@ func emailClaim(idToken string) (string, error) {
 		return "", err
 	}
 	var claims struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Verified *bool  `json:"email_verified"`
+		Expiry   int64  `json:"exp"`
 	}
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return "", err
 	}
 	if claims.Email == "" {
 		return "", fmt.Errorf("id_token carried no email claim")
+	}
+	// An address the provider has not verified is an address anyone could
+	// have typed there. Provisioning on it is the classic account takeover,
+	// and is a separate mistake from not checking the signature.
+	if claims.Verified == nil || !*claims.Verified {
+		return "", fmt.Errorf("id_token's email is not verified by the provider")
+	}
+	if claims.Expiry > 0 && time.Now().After(time.Unix(claims.Expiry, 0)) {
+		return "", fmt.Errorf("id_token has expired")
 	}
 	return claims.Email, nil
 }
@@ -327,22 +454,46 @@ func emailClaim(idToken string) (string, error) {
 // derives one from the issuer, which is what a discovery document would give.
 func authorizeEndpoint(oidc api.IdpConnectionOidc) (*url.URL, error) {
 	if explicit, ok := oidc.AuthorizationEndpoint.Get(); ok && explicit != "" {
-		return url.Parse(explicit)
+		return checkedEndpoint(explicit)
 	}
 	if oidc.Issuer == "" {
 		return nil, fmt.Errorf("connection has no issuer")
 	}
-	return url.Parse(strings.TrimSuffix(oidc.Issuer, "/") + "/authorize")
+	return checkedEndpoint(strings.TrimSuffix(oidc.Issuer, "/") + "/authorize")
 }
 
 func tokenEndpoint(oidc api.IdpConnectionOidc) (string, error) {
+	raw := strings.TrimSuffix(oidc.Issuer, "/") + "/token"
 	if explicit, ok := oidc.TokenEndpoint.Get(); ok && explicit != "" {
-		return explicit, nil
-	}
-	if oidc.Issuer == "" {
+		raw = explicit
+	} else if oidc.Issuer == "" {
 		return "", fmt.Errorf("connection has no issuer")
 	}
-	return strings.TrimSuffix(oidc.Issuer, "/") + "/token", nil
+	parsed, err := checkedEndpoint(raw)
+	if err != nil {
+		return "", err
+	}
+	return parsed.String(), nil
+}
+
+// checkedEndpoint holds a connection's endpoint to the schema's own rule:
+// https, or http on loopback for local development (`idp-connection.yaml`).
+// The stub stores documents without validating them, so without this a
+// `javascript:` authorization endpoint would reach the browser as a step's
+// redirect_url, and a token endpoint could name any scheme at all.
+func checkedEndpoint(raw string) (*url.URL, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case parsed.Scheme == "https":
+		return parsed, nil
+	case parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname()):
+		return parsed, nil
+	default:
+		return nil, fmt.Errorf("endpoint %q must be https, or http on loopback", raw)
+	}
 }
 
 func scopesOrDefault(oidc api.IdpConnectionOidc) []string {
@@ -374,10 +525,10 @@ func (h *Handler) resolveSsoProviders(projectID string, step *domain.FlowStep) [
 			name = record.slug
 		}
 		template := record.definition.Template.Or("")
-		out = append(out, api.SSOProvider{ID: record.id, Name: name, Template: template})
-	}
-	if len(out) == 0 {
-		return nil
+		// The slug, not the connection id: `sso-provider.yaml` documents this
+		// field with the example `google`, and it is the value the client
+		// sends back as `sso_provider_id`, which is looked up by slug.
+		out = append(out, api.SSOProvider{ID: record.slug, Name: name, Template: template})
 	}
 	return out
 }
