@@ -6,8 +6,18 @@ import { idpCatalogEntry, type IdpCatalogEntry } from "@zitadel/config/idp-catal
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
 
-/** Project-relative directory holding one file per IdP connection. */
+/**
+ * Relative directory (from the project root) where local connection files
+ * live, one per provider. Owned here alongside the only reader of it, and
+ * re-exported from `lib/idp` so callers and tests share one source of truth
+ * for the path, as `FLOWS_DIR` and `SCHEMAS_DIR` do for their domains.
+ */
 export const IDPS_DIR = ".zitadel/idps";
+
+/** Whether a caught error is the given `errno` code. */
+function isErrno(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
 
 /** A connection file as it sits on disk, with the name needed to report it. */
 export type ConnectionFile = {
@@ -32,7 +42,7 @@ export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]
   try {
     entries = await readdir(dir);
   } catch (error) {
-    if (isObject(error) && error.code === "ENOENT") {
+    if (isErrno(error, "ENOENT")) {
       return [];
     }
     throw error;

@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { ENV_LOCAL, isGitIgnored, mergeEnvFile, storeClientSecret } from "../../../../src/lib/idp/credentials";
+import { ENV_LOCAL, isGitIgnored, mergeEnvFile, storeClientSecret } from "../../../../src/lib/idp";
 
 const exec = promisify(execFile);
 

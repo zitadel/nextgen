@@ -10,7 +10,7 @@ import {
   IDPS_DIR,
   planConnection,
   readConnectionFiles,
-} from "../../../../src/lib/idp/connections";
+} from "../../../../src/lib/idp";
 
 const googleBody = (over: Record<string, unknown> = {}) => ({
   slug: "google",

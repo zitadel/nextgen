@@ -5,6 +5,11 @@ import { promisify } from "node:util";
 
 const exec = promisify(execFile);
 
+/** Whether a caught error is the given `errno` code. */
+function isErrno(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
+
 /** Env file holding real values. Never committed. */
 export const ENV_LOCAL = ".env.local";
 /** Env file holding the names only, committed so a teammate knows what to set. */
@@ -61,7 +66,7 @@ export async function mergeEnvFile(
   try {
     existing = await readFile(path, "utf8");
   } catch (error) {
-    if (!(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")) {
+    if (!isErrno(error, "ENOENT")) {
       throw error;
     }
   }
