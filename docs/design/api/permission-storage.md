@@ -82,7 +82,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   `dialect/authz.ExpressionEdgeKind` (not on the compiler IR).
 - **Grants API (later):** `CreateAuthzAssignment` / `RevokeAuthzAssignment` /
   list-by-principal — not dual-write from CreateUser. `CreateProject` does
-  seed one `sk_proj` ↔ `project.viewer` assignment so the returned project
+  seed one `sk_proj` ↔ `project.admin` assignment so the returned project
   secret can pass the HTTP gate.
 - **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz` returns
   allowed+foothold in one round-trip, `ListAuthzObjectIDs` as an L4/oracle
@@ -535,8 +535,9 @@ predicate — never fetch a page then filter in application code.
 
 Actors: project `proj_acme`, team `team_eng`, users `user_alice` /
 `user_bob` / `user_carol`, active catalog `cat_sys_1`, relation
-`project.viewer` (implies `project.editor` / `project.admin` via closure in the
-seeded OpenFGA-style model).
+`project.viewer` (the weakest role; `project.admin` implies `project.editor`
+and `project.viewer` via closure in the seeded OpenFGA-style model, never the
+reverse).
 
 ```text
 t0  Seed cat_sys_1 (typed relations + edges + closure)
@@ -622,7 +623,7 @@ relation_references / expression_edges:
   from compiler shape (direct, computed_userset, tuple_to_userset)
 
 closure (with depth):
-  reflexive rows + viewer→editor→admin implications
+  reflexive rows + admin→editor→viewer implications
 
 bundles:
   tables empty (v1 mapper does not fill them)
