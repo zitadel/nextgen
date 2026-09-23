@@ -2,4 +2,4 @@
 "@zitadel/cli": minor
 ---
 
-Manage per-environment variables and secrets from the CLI with `zitadel variables list|get|set|delete`. Each command names its owner with `--environment` (alias `--env`) or `--project-level`, and a non-interactive run that names neither is refused rather than defaulted.
+Manage the variables and secrets a configuration document references as `${{ NAME }}` from the CLI with `zitadel variables list|get|set|delete`. Every command names the owner it addresses with `--project-level`, which is required: a run that names none is refused rather than defaulted. The platform also holds variables per environment; the CLI addresses those once the platform's environments settle.
