@@ -232,6 +232,11 @@ func (h *Handler) stepOffersProvider(ctx context.Context, state *domain.FlowStat
 
 // IdpCallbackPath is the redirect URI registered with the vendor, on the app's
 // own origin — the same value the CLI prints during `sso enable`.
+//
+// It pins the SDKs' default proxy prefix. An app that sets its own `proxyPath`
+// would register a URI its proxy never serves and see `redirect_uri_mismatch`
+// at the provider; deriving this from the project's configured prefix is the
+// real implementation's to do.
 const IdpCallbackPath = "/__nextgen/idp/callback"
 
 // IdpCallbackRoute is where that request lands on this server. The app's proxy
@@ -391,13 +396,23 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 	form.Set("code", code)
 	form.Set("redirect_uri", pending.returnURL+IdpCallbackPath)
 	form.Set("client_id", oidc.ClientID)
-	form.Set("client_secret", oidc.ClientSecret)
+	// The schema's default is client_secret_basic, so a connection that omits
+	// the field expects the header form. Posting the secret in the body
+	// regardless is rejected by any provider that enforces basic auth.
+	basic := oidc.TokenEndpointAuthMethod.Or(api.IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic) ==
+		api.IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic
+	if !basic {
+		form.Set("client_secret", oidc.ClientSecret)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if basic {
+		req.SetBasicAuth(url.QueryEscape(oidc.ClientID), url.QueryEscape(oidc.ClientSecret))
+	}
 	if h.ssoEgress == nil {
 		return "", fmt.Errorf("no egress client configured for the token exchange")
 	}
