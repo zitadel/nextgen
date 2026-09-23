@@ -79,7 +79,7 @@ properties:
   oidc:
     type: object
     additionalProperties: false
-    description: OIDC connection details. Endpoints come from discovery, but any may be supplied to override it, or to serve a provider that exposes no .well-known document.
+    description: "OIDC connection details. Endpoints come from the issuer's discovery document. A provider that exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint, jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting some but not all is rejected."
     required:
       - issuer
       - client_id
@@ -89,11 +89,11 @@ properties:
       issuer:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)(/[^\s?#]*)?$'
-        description: Discovery base. Endpoints are resolved from its .well-known document unless overridden below.
+        description: Discovery base. Endpoints are resolved from its .well-known document unless the connection names them all.
       jwks_uri:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
-        description: Overrides the JWKS endpoint from discovery. Required in practice when the provider exposes no .well-known document, since ID tokens cannot otherwise be validated.
+        description: JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other endpoints.
       id_token_mapping:
         type: boolean
         default: false
@@ -101,15 +101,15 @@ properties:
       authorization_endpoint:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
-        description: Overrides discovery.
+        description: For a provider that exposes no .well-known document. Set together with the other endpoints.
       token_endpoint:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
-        description: Overrides discovery.
+        description: For a provider that exposes no .well-known document. Set together with the other endpoints.
       userinfo_endpoint:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
-        description: Overrides discovery.
+        description: For a provider that exposes no .well-known document. Set together with the other endpoints; not needed when id_token_mapping is set.
       client_id:
         type: string
         minLength: 1
