@@ -30,6 +30,7 @@ Local server commands
   status:                Summarize the local Zitadel server and project state
   logs:                  Show local Zitadel server logs
   reset:                 Delete the local Zitadel server runtime and data
+  console:               Open the local console, signed in as the local admin created by \`zitadel start\`
 
 Configuration commands
   plan:                  Validate config without mutation and preview the sync diff
@@ -45,6 +46,10 @@ Configuration commands
   releases list:         List releases
   schemas get:           Get one schema by id
   schemas list:          List schemas
+  variables delete:      Delete one variable from an environment or the project
+  variables get:         Get one variable from an environment or the project
+  variables list:        List the variables entered on an environment or the project
+  variables set:         Set one variable on an environment or the project
 
 Resource commands
   resources:             List the resources this CLI manages and what can be done to each

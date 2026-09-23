@@ -119,6 +119,7 @@ which ships in this package.
 * [`zitadel branding list`](#zitadel-branding-list)
 * [`zitadel claim`](#zitadel-claim)
 * [`zitadel commands`](#zitadel-commands)
+* [`zitadel console`](#zitadel-console)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel environments get NAME`](#zitadel-environments-get-name)
@@ -165,6 +166,10 @@ which ships in this package.
 * [`zitadel users get ID`](#zitadel-users-get-id)
 * [`zitadel users list`](#zitadel-users-list)
 * [`zitadel users update ID`](#zitadel-users-update-id)
+* [`zitadel variables delete NAME`](#zitadel-variables-delete-name)
+* [`zitadel variables get NAME`](#zitadel-variables-get-name)
+* [`zitadel variables list`](#zitadel-variables-list)
+* [`zitadel variables set NAME`](#zitadel-variables-set-name)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
 
@@ -408,6 +413,40 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/4.1.55/src/commands/commands.ts)_
+
+## `zitadel console`
+
+Open the local console, signed in as the local admin created by `zitadel start`.
+
+```
+USAGE
+  $ zitadel console [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--no-open]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --no-open          Print the sign-in link instead of opening a browser.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Open the local console, signed in as the local admin created by `zitadel
+  start`.
+
+EXAMPLES
+  $ zitadel console
+
+  $ zitadel console --no-open
+```
 
 ## `zitadel doctor`
 
@@ -2490,6 +2529,175 @@ EXAMPLES
   $ zitadel users update <id> --data '{...}' --json
 
   $ zitadel users update <id> --file ./user.json
+```
+
+## `zitadel variables delete NAME`
+
+Delete one variable from an environment or the project.
+
+```
+USAGE
+  $ zitadel variables delete NAME [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level] [-f]
+
+ARGUMENTS
+  NAME  Variable name to delete.
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to address, by name.
+  -f, --force                Delete the variable without the confirmation
+                             prompt. Required when non-interactive.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Delete one variable from an environment or the project.
+
+EXAMPLES
+  $ zitadel variables delete GOOGLE_CLIENT_ID --environment prod
+
+  $ zitadel variables delete GOOGLE_CLIENT_ID --project-level --force
+```
+
+## `zitadel variables get NAME`
+
+Get one variable from an environment or the project.
+
+```
+USAGE
+  $ zitadel variables get NAME [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level]
+
+ARGUMENTS
+  NAME  Variable name to read.
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to address, by name.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one variable from an environment or the project.
+
+EXAMPLES
+  $ zitadel variables get GOOGLE_CLIENT_ID --environment prod
+
+  $ zitadel variables get GOOGLE_CLIENT_ID --environment prod --json
+```
+
+## `zitadel variables list`
+
+List the variables entered on an environment or the project.
+
+```
+USAGE
+  $ zitadel variables list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level] [--plain]
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to address, by name.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --plain                Tab-separated rows with no header, for piping.
+                             Implied when stdout is not a terminal.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the variables entered on an environment or the project.
+
+EXAMPLES
+  $ zitadel variables list --environment prod
+
+  $ zitadel variables list --project-level --json
+```
+
+## `zitadel variables set NAME`
+
+Set one variable on an environment or the project.
+
+```
+USAGE
+  $ zitadel variables set NAME [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-e <value> |
+    --project-level] [--secret] [--as string|number|boolean]
+
+ARGUMENTS
+  NAME  Variable name (letters, digits and underscores).
+
+FLAGS
+  -c, --cwd=<value>          Project directory to operate on.
+  -e, --environment=<value>  Environment to address, by name.
+  -n, --non-interactive      Disable prompts. Required when scripting or running
+                             as an agent.
+  -s, --server=<value>       Override the resolved server URL.
+      --as=<option>          [default: string] Store the value as this JSON
+                             type. A reference to the whole field resolves to
+                             that type, so a number stays a number.
+                             <options: string|number|boolean>
+      --debug                Debug logging.
+      --dry-run              Preview without mutating files or the platform.
+      --project-level        Address the project level instead of an
+                             environment. Environments do not inherit
+                             project-level values.
+      --secret               Store the value encrypted. It can be replaced later
+                             but never read back.
+      --[no-]telemetry       Send anonymous usage analytics. Disable with
+                             --no-telemetry.
+      --verbose              Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Set one variable on an environment or the project.
+
+EXAMPLES
+  $ zitadel variables set GOOGLE_CLIENT_ID --environment prod
+
+  $ zitadel variables set GOOGLE_CLIENT_SECRET --environment prod --secret < secret.txt
+
+  $ zitadel variables set SESSION_TTL --project-level --as number
 ```
 
 ## `zitadel version`
