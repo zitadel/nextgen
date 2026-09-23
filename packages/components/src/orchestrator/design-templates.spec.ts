@@ -115,8 +115,8 @@ describe("branding design catalog", () => {
     const withProviders = {
       ...context,
       sso_providers: [
-        { id: "idp_01GOOGLE", name: "Google", template: "google" },
-        { id: "idp_01ACME", name: "Acme SSO", template: "oidc-generic" },
+        { id: "google", name: "Google", template: "google" },
+        { id: "acme-sso", name: "Acme SSO", template: "oidc-generic" },
       ],
     };
 
@@ -132,8 +132,8 @@ describe("branding design catalog", () => {
       expect(html).toContain("<zl-sso-providers");
       expect(html).toContain('data-testid="zitadel-sso-providers"');
       // The payload survives sanitisation intact — the atom parses it back.
-      expect(html).toContain("idp_01GOOGLE");
-      expect(html).toContain("idp_01ACME");
+      expect(html).toContain("google");
+      expect(html).toContain("acme-sso");
     });
 
     it("passes the localised label format and divider through", () => {

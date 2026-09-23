@@ -286,8 +286,8 @@ export class ZitadelLogin extends ZitadelSurface {
       // cancelled. Surface the error on the current step.
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
       // <zl-sso-providers> emits `zl-sso-select` when a provider button is
-      // chosen. The answer is a redirect to that provider, which
-      // `applyResponse` follows like any other `complete: "redirect"` step.
+      // chosen. The answer is a non-terminal step carrying `redirect_url`,
+      // which `applyResponse` follows on its way out.
       root.addEventListener("zl-sso-select", this.handleSsoSelect as EventListener);
     }
     return root;
@@ -708,7 +708,11 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private maybeRedirectToProvider(response: CreateFlow201): boolean {
     const target = response.step.redirect_url;
-    if (!target) return false;
+    // A terminal step carries `redirect_url` too — the engine copies the
+    // relying party's `redirect_uri` onto it when a sign-in completes
+    // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
+    // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
+    if (!target || response.step.complete) return false;
     emit(this, "zitadel-flow-redirect", { redirect_url: target, step: response.step });
     if (typeof window === "undefined") return false;
     window.location.assign(target);
@@ -1314,10 +1318,10 @@ function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string)
  * is the flow's own last word — it still renders.
  */
 function navigatesOnComplete(wire: CreateFlow201, postSignInUrl: string | undefined): boolean {
-  // A step carrying `redirect_url` hands the browser to an identity provider
-  // mid-flow — the flow is not finished, but this document is leaving, so the
-  // step must not paint either.
-  if (wire.step.redirect_url) return true;
+  // A non-terminal step carrying `redirect_url` hands the browser to an
+  // identity provider mid-flow — the flow is not finished, but this document
+  // is leaving, so the step must not paint either.
+  if (wire.step.redirect_url && !wire.step.complete) return true;
   const behavior = wire.step.complete;
   if (behavior === "redirect") return Boolean(wire.redirect_uri);
   if (behavior === "show") return Boolean(wire.handoff_token && postSignInUrl);

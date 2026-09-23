@@ -15,6 +15,9 @@ import type { CreateFlow201, CreateFlow201StepSsoProvidersItem } from "@zitadel/
 
 export type MockSsoProvider = CreateFlow201StepSsoProvidersItem;
 
+// `id` is the connection's slug — what the client sends back as
+// `sso_provider_id` and what the flow definition references.
+
 /**
  * Steps the engine attaches providers to: the ones a sign-in can start from.
  * `password` is reached only after an identifier, so it never carries them —

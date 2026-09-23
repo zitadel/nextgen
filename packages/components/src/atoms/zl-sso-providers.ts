@@ -13,7 +13,7 @@ import "./zl-icon.js";
 
 /** One entry of the step's `sso_providers`, as the engine renders it. */
 export type SsoProvider = {
-  /** Connection id to send back as `sso_provider_id`. */
+  /** The connection's slug, sent back as `sso_provider_id`. */
   readonly id: string;
   /** Vendor name to show, already localised by the server. */
   readonly name: string;
