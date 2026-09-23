@@ -366,6 +366,65 @@ describe("setup command pre-flight", () => {
   });
 });
 
+describe("setup --sso flags", () => {
+  it("refuses a provider with no client id before touching the directory", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "google",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string; message?: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--sso-client-id");
+  });
+
+  it("refuses a client id with no provider", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+  });
+
+  it("rejects a provider the catalog does not know", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "myspace",
+      "--sso-client-id",
+      "abc",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+  });
+});
+
 describe("setup --renderer surface", () => {
   it("--help advertises only implemented renderers", async () => {
     const res = await runCliForTest(["setup", "--help"]);

@@ -16,12 +16,15 @@
  * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
  */
 export {
+  CONNECTION_SCHEMA_REF,
   IDPS_DIR,
   type ConnectionFile,
   type ConnectionPlan,
   planConnection,
   readConnectionFiles,
 } from "./connections";
+
+export { callbackUriFor, IDP_CALLBACK_PATH } from "./callback";
 
 export {
   ENV_EXAMPLE,
@@ -34,6 +37,7 @@ export {
 } from "./credentials";
 
 export {
+  authMethods,
   enabledMethods,
   type FlowFile,
   readFlowFiles,

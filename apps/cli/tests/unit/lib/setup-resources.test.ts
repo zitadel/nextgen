@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { materializeSetupResources } from "../../../src/lib/setup-resources";
+import { IDPS_DIR } from "../../../src/lib/idp";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
 import { hashForState } from "../../../src/lib/sync";
@@ -333,5 +334,115 @@ describe("materializeSetupResources branding design", () => {
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
     expect(Object.keys(state.resources)).not.toContain(".zitadel/branding/branding.json");
+  });
+});
+
+describe("materializeSetupResources with a social provider", () => {
+  /**
+   * A client that records what it was sent, echoing each create back so the
+   * write-back path runs exactly as it does against a real server.
+   */
+  function recordingClient() {
+    return {
+      createIdp: vi.fn().mockImplementation(async (body: { idp: object }) => ({
+        id: "idp_01KWHE",
+        definition: body.idp,
+      })),
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi.fn().mockImplementation(async (body: {
+        flow_definition: object;
+      }) => ({ id: "flow_01KWHG", status: "active", flow_definition: body.flow_definition })),
+    } as unknown as ZitadelClient;
+  }
+
+  const google = { provider: "google", clientId: "1234-abc.apps.googleusercontent.com" };
+
+  it("writes the connection and records the id the platform assigned", async () => {
+    const client = recordingClient();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client,
+      projectId: "project_123",
+      force: false,
+      sso: google,
+    });
+
+    const connection = JSON.parse(
+      await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8"),
+    ) as { slug: string; oidc: { client_id: string; client_secret: string } };
+    expect(connection.slug).toBe("google");
+    expect(connection.oidc.client_id).toBe(google.clientId);
+    // The value never reaches the file, only the reference the platform
+    // resolves from its variables.
+    expect(connection.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
+
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
+  });
+
+  it("creates the connection before the flow that names it", async () => {
+    const client = recordingClient();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client,
+      projectId: "project_123",
+      force: false,
+      sso: google,
+    });
+
+    const idpCall = vi.mocked(client.createIdp).mock.invocationCallOrder[0] ?? Infinity;
+    const flowCall = vi.mocked(client.createFlowDefinition).mock.invocationCallOrder[0] ?? 0;
+    expect(idpCall).toBeLessThan(flowCall);
+  });
+
+  it("enables the provider on the published schema and login flow", async () => {
+    const client = recordingClient();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client,
+      projectId: "project_123",
+      force: false,
+      sso: google,
+    });
+
+    const schema = JSON.parse(
+      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
+    ) as { "x-auth-methods": { sso?: { enabled: boolean; providers: string[] } } };
+    expect(schema["x-auth-methods"].sso).toEqual({ enabled: true, providers: ["google"] });
+
+    const flow = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
+      steps: Array<{ name: string; sso_providers?: string[] }>;
+    };
+    const entry = flow.steps.find((step) => step.name === "identifier");
+    expect(entry?.sso_providers).toEqual(["google"]);
+    expect(flow.steps.map((step) => step.name)).toEqual(
+      expect.arrayContaining(["register-sso", "sso-conflict"]),
+    );
+  });
+
+  it("leaves the schema and flow untouched when no provider was chosen", async () => {
+    const client = recordingClient();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client,
+      projectId: "project_123",
+      force: false,
+    });
+
+    const schema = JSON.parse(
+      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
+    ) as { "x-auth-methods": { sso?: unknown } };
+    expect(schema["x-auth-methods"].sso).toBeUndefined();
+    expect(client.createIdp).not.toHaveBeenCalled();
   });
 });

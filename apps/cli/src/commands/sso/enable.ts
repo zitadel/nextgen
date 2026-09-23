@@ -15,6 +15,8 @@ import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/conf
 
 import { ZitadelError } from "../../lib/errors";
 import {
+  callbackUriFor,
+  CONNECTION_SCHEMA_REF,
   enabledMethods,
   IDPS_DIR,
   planConnection,
@@ -30,12 +32,6 @@ import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
-
-/** Fixed route every provider redirects back to, on the Project's own origin. */
-const CALLBACK_PATH = "/__nextgen/idp/callback";
-
-/** `$schema` a scaffolded connection carries, relative to `.zitadel/idps/`. */
-const CONNECTION_SCHEMA_REF = "../meta/idp-connection.json";
 
 /**
  * The `sso enable` command — add a provider to a Project's sign-in methods.
@@ -97,7 +93,7 @@ export default class SsoEnable extends BaseCommand {
         hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
       });
     }
-    const callbackUri = `${issuer.replace(/\/$/, "")}${CALLBACK_PATH}`;
+    const callbackUri = callbackUriFor(issuer);
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);

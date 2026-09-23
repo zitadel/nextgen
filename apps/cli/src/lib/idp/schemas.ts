@@ -152,8 +152,22 @@ export async function readFlowFiles(cwd: string): Promise<FlowFile[]> {
   return files;
 }
 
-/** Whether a schema enables a given authentication method. */
-export function enabledMethods(schema: SchemaFile): { password: boolean; passkey: boolean } {
+/** The authentication methods a schema document enables. */
+export type AuthMethods = { password: boolean; passkey: boolean };
+
+/**
+ * Read the enabled methods straight off a schema document.
+ *
+ * Setup composes its schema in memory and never reads it back from disk, so
+ * it needs this before a {@link SchemaFile} exists.
+ */
+export function authMethods(body: Record<string, unknown>): AuthMethods {
+  const enabled = methodsOf(body);
+  return { password: enabled.includes("password"), passkey: enabled.includes("passkey") };
+}
+
+/** Whether a schema file enables a given authentication method. */
+export function enabledMethods(schema: SchemaFile): AuthMethods {
   return {
     password: schema.methods.includes("password"),
     passkey: schema.methods.includes("passkey"),

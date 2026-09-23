@@ -14,6 +14,13 @@ import { isObject } from "../json";
  */
 export const IDPS_DIR = ".zitadel/idps";
 
+/**
+ * `$schema` pointer a scaffolded connection carries, relative to
+ * {@link IDPS_DIR}: the meta-schema `zitadel setup` writes under
+ * `.zitadel/meta/`, so an editor validates the file as it is typed.
+ */
+export const CONNECTION_SCHEMA_REF = "../meta/idp-connection.json";
+
 /** Whether a caught error is the given `errno` code. */
 function isErrno(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;

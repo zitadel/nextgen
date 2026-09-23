@@ -125,6 +125,19 @@ describe("applySsoToFlow", () => {
     expect(step.transitions).not.toHaveProperty("submit");
   });
 
+  it("sends the conflict step's sign-in back to the flow's own login entry", () => {
+    // The engine rejects a transition that re-purposes to `login` while
+    // targeting anything but that purpose's entry step, and a passkey-first
+    // flow does not start at `identifier`.
+    const passkeyFirst = getDefaultLoginFlow({ useCase: "minimal", preset: "passkey-first" });
+    const entry = (passkeyFirst as unknown as { purposes: { login: string } }).purposes.login;
+
+    const { document } = applySsoToFlow(passkeyFirst, "google", bothMethods);
+
+    expect(entry).not.toBe("identifier");
+    expect(targetsOf(document, "sso-conflict").sign_in).toBe(entry);
+  });
+
   it("is a no-op the second time", () => {
     const first = applySsoToFlow(shippedFlow(), "google", bothMethods);
     const second = applySsoToFlow(first.document, "google", bothMethods);

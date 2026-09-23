@@ -35,6 +35,23 @@ function providerSteps(flow: Json): string[] {
   return wanted;
 }
 
+/**
+ * The step a flow starts its login purpose at, which a transition that
+ * re-purposes to `login` must target.
+ *
+ * The engine rejects a `purpose: "login"` transition pointing anywhere else,
+ * so this cannot be hardcoded: `identifier` is only the password-first flow's
+ * entry, and a passkey-first flow starts at its passkey screen.
+ */
+function loginEntry(flow: Json): string {
+  const purposes = isObject(flow.purposes) ? flow.purposes : {};
+  const named = purposes.login;
+  if (typeof named === "string" && stepNamed(flow, named) !== undefined) {
+    return named;
+  }
+  return "identifier";
+}
+
 /** Step the engine sends a new external identity to. */
 const REGISTER_SSO = "register-sso";
 /** Step shown when the provider's email already has an account. */
@@ -123,7 +140,11 @@ function registerSsoStep(): Step {
  * only the methods the schema actually enables — a password box on a schema
  * without passwords is a dead end.
  */
-function ssoConflictStep(slug: string, methods: { password: boolean; passkey: boolean }): Step {
+function ssoConflictStep(
+  slug: string,
+  methods: { password: boolean; passkey: boolean },
+  loginStep: string,
+): Step {
   const actions: Json[] = [];
   const fields: string[] = [];
   if (methods.password) {
@@ -144,7 +165,7 @@ function ssoConflictStep(slug: string, methods: { password: boolean; passkey: bo
   }
   transitions.callback = { target: "done" };
   transitions.user_already_exists = { target: SSO_CONFLICT };
-  transitions.sign_in = { target: "identifier", purpose: "login" };
+  transitions.sign_in = { target: loginStep, purpose: "login" };
   transitions.identity_unknown = { target: REGISTER_SSO };
 
   return { name: SSO_CONFLICT, fields, actions, sso_providers: [slug], transitions };
@@ -213,7 +234,7 @@ export function applySsoToFlow(
   const list = steps(document);
   const terminalIndex = list.findIndex((step) => step.name === "done");
   const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
-  const wanted: Step[] = [registerSsoStep(), ssoConflictStep(slug, enabled)];
+  const wanted: Step[] = [registerSsoStep(), ssoConflictStep(slug, enabled, loginEntry(document))];
   let offset = 0;
   for (const step of wanted) {
     const existing = stepNamed(document, step.name as string);
