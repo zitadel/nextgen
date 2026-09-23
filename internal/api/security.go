@@ -117,6 +117,8 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.QueryGrantsOperation:    true,
 	api.QueryUsersOperation:     true,
 	api.ListMyProjectsOperation: true,
+	api.GetProjectOperation:     true,
+	api.PatchProjectOperation:   true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

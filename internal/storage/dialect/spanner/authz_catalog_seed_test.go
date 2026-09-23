@@ -85,6 +85,8 @@ SELECT COUNT(1) FROM authz_expression_edges WHERE catalog_id = @p1`, domain.Syst
 			})
 		})
 		require.NoError(t, err)
-		assert.Equal(t, int64(7), edgeCount)
+		// team.member and project.team direct, and direct + one rewrite on each
+		// of viewer (→ editor), editor (→ admin) and admin (TTU on project.team).
+		assert.Equal(t, int64(8), edgeCount)
 	})
 }

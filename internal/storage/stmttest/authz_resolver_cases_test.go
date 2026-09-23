@@ -136,27 +136,46 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			assert.True(t, allowed)
 		})
 
-		t.Run("check closure viewer implies editor", func(t *testing.T) {
+		// Roles are monotonic (ADR 054 §5): the stronger assignment closes to
+		// the weaker checks, never the reverse.
+		t.Run("check closure admin implies editor", func(t *testing.T) {
 			u := "user_impl_ed_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "admin", domain.NewProjectAssignmentScope())))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "editor"))
 			assert.True(t, allowed)
 		})
 
-		t.Run("check closure viewer implies admin", func(t *testing.T) {
-			u := "user_impl_ad_" + uniqueSuffix(t)
+		t.Run("check closure admin implies viewer", func(t *testing.T) {
+			u := "user_impl_vw_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "admin"))
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "admin", domain.NewProjectAssignmentScope())))
+			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
 			assert.True(t, allowed)
 		})
 
-		t.Run("check closure admin does not imply viewer", func(t *testing.T) {
-			u := "user_admin_only_" + uniqueSuffix(t)
+		t.Run("check closure editor implies viewer", func(t *testing.T) {
+			u := "user_impl_edvw_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "admin", domain.NewProjectAssignmentScope())))
-			allowed, foothold := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "editor", domain.NewProjectAssignmentScope())))
+			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
+			assert.True(t, allowed)
+		})
+
+		t.Run("check closure viewer does not imply editor", func(t *testing.T) {
+			u := "user_viewer_only_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
+			allowed, foothold := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "editor"))
+			assert.False(t, allowed)
+			assert.True(t, foothold)
+		})
+
+		t.Run("check closure viewer does not imply admin", func(t *testing.T) {
+			u := "user_viewer_only_ad_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
+			allowed, foothold := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "admin"))
 			assert.False(t, allowed)
 			assert.True(t, foothold)
 		})
@@ -312,6 +331,23 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
 			assert.True(t, allowed)
+		})
+
+		t.Run("check ttu membership closes to every project role", func(t *testing.T) {
+			// The tuple-to-userset edge sits on project.admin; the owning
+			// team's members pass editor and viewer through the closure, the
+			// same way a direct admin assignment does. The edge is matched
+			// through authz_relation_closure, not by relation name.
+			u := "user_ttu_roles_" + uniqueSuffix(t)
+			team := "team_ttu_roles_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
+			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
+			for _, rel := range []string{"admin", "editor", "viewer"} {
+				allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", rel))
+				assert.True(t, allowed, "owning-team member must pass %s", rel)
+			}
 		})
 
 		t.Run("check ttu membership shortcut not member deny", func(t *testing.T) {

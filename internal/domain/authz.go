@@ -295,10 +295,10 @@ const (
 // NewSKProjProjectSetupAssignment is the grant seeded at CreateProject so the
 // returned full project secret can set up the project via resolver.Check.
 //
-// Relation is project.viewer (not admin): the seeded system catalog closure
-// treats viewer as the assigned relation that satisfies viewer/editor/admin
-// checks (placeholders pending #420). PrincipalID equals the project id so the
-// grant survives secret rotate/claim.
+// Relation is project.admin: the full secret administers its own project, and
+// the seeded system catalog closes admin to editor and viewer (ADR 054 §5), so
+// one row answers every check. PrincipalID equals the project id so the grant
+// survives secret rotate/claim.
 func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
 	a := &AuthzAssignment{
 		ProjectID:     projectID,
@@ -306,7 +306,7 @@ func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
 		PrincipalType: AuthzPrincipalTypeSKProj,
 		PrincipalID:   projectID,
 		ObjectType:    "project",
-		Relation:      "viewer",
+		Relation:      "admin",
 	}
 	a.ApplyScope(NewProjectAssignmentScope())
 	return a

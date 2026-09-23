@@ -364,7 +364,9 @@ func TestGrantCreateLocators(t *testing.T) {
 	t.Run("own identifier is grant.invalid", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		harness.SeedProjectViewer(t, project.ID, userID)
+		// Admin: the write check runs before validation, so a viewer would
+		// be refused before the self-grant rule is ever reached.
+		harness.SeedProjectAdmin(t, project.ID, userID)
 		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		user, ok := userResp.(*api.User)
@@ -405,7 +407,7 @@ func TestGrantCreateLocators(t *testing.T) {
 	t.Run("own user_id is grant.invalid", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		harness.SeedProjectViewer(t, project.ID, userID)
+		harness.SeedProjectAdmin(t, project.ID, userID)
 
 		sessionClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
@@ -886,7 +888,9 @@ func TestGrantSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 
 	operatorID := harness.CreateUserWithTeam(t, platform.ID)
-	harness.SeedProjectViewer(t, project.ID, operatorID)
+	// Admin, because the operator creates and deletes grants below and those
+	// are write checks; a viewer would be found (foothold) and refused.
+	harness.SeedProjectAdmin(t, project.ID, operatorID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)

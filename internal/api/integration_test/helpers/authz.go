@@ -9,9 +9,21 @@ import (
 
 // SeedProjectViewer writes a project-scoped viewer assignment and returns it,
 // so a caller that needs to revoke or inspect the grant has its minted id.
-// Until #420, that relation also closes editor/admin Checks on the seeded
-// catalog.
+// Viewer is the weakest role: it passes read checks only. A caller that has to
+// write through the session needs SeedProjectAdmin.
 func (h *Harness) SeedProjectViewer(t *testing.T, projectID, userID string) *domain.AuthzAssignment {
+	t.Helper()
+	return h.seedProjectRole(t, projectID, userID, "viewer")
+}
+
+// SeedProjectAdmin writes a project-scoped admin assignment: the strongest
+// role, which the seeded catalog closes to editor and viewer (ADR 054 §5).
+func (h *Harness) SeedProjectAdmin(t *testing.T, projectID, userID string) *domain.AuthzAssignment {
+	t.Helper()
+	return h.seedProjectRole(t, projectID, userID, "admin")
+}
+
+func (h *Harness) seedProjectRole(t *testing.T, projectID, userID, relation string) *domain.AuthzAssignment {
 	t.Helper()
 	asgn := &domain.AuthzAssignment{
 		ProjectID:     projectID,
@@ -19,7 +31,7 @@ func (h *Harness) SeedProjectViewer(t *testing.T, projectID, userID string) *dom
 		PrincipalType: domain.AuthzPrincipalTypeUser,
 		PrincipalID:   userID,
 		ObjectType:    "project",
-		Relation:      "viewer",
+		Relation:      relation,
 	}
 	asgn.ApplyScope(domain.NewProjectAssignmentScope())
 	require.NoError(t, h.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
