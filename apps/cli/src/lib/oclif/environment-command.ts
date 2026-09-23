@@ -2,8 +2,7 @@ import { cancel, isCancel, select } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
-
+import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { assertEnvironmentName, listEnvironmentNames } from "../environment";
 import { ZitadelError } from "../errors";
 import { readZitadelSecret } from "../project";
