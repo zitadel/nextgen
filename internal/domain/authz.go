@@ -26,6 +26,7 @@ const (
 	ResourceKindSession        ResourceKind = "session"
 	ResourceKindEnvironment    ResourceKind = "environment"
 	ResourceKindRelease        ResourceKind = "release"
+	ResourceKindIDPConnection  ResourceKind = "idp_connection"
 )
 
 func (k ResourceKind) String() string { return string(k) }
