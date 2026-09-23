@@ -1,21 +1,6 @@
-import { z } from "zod";
-
 import type { ZitadelClient } from "@zitadel/api/client";
 
 import { ZitadelError } from "./errors";
-
-/**
- * CLI-side deployment environment. Not an API model — it gates which
- * `zitadel.json` environment block and server the commands target.
- * Project request/response shapes live in `@zitadel/api`
- * (generated from the OpenAPI spec).
- *
- * This is the older of the CLI's two meanings of "environment", used by
- * `plan`, `apply` and the resource commands to pick a server. It does not match
- * the platform's environments, which are open DNS-style names seeded as `dev`,
- * `staging` and `prod`; {@link assertEnvironmentName} is the grammar for those.
- */
-export const environmentSchema = z.enum(["development", "preview", "production"]);
 
 /**
  * The platform's environment-name grammar, from `environment-name.yaml`: a

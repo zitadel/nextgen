@@ -72,6 +72,28 @@ describe("resource registry", () => {
     }
   });
 
+  it("gives no generated command an --environment flag, since none addresses one", () => {
+    const generated = Object.entries(COMMANDS).filter(([id]) => id.split(":")[0] in RESOURCES);
+    expect(generated.length).toBeGreaterThan(0);
+    for (const [id, command] of generated) {
+      const flags = { ...command.baseFlags, ...command.flags };
+      expect(Object.keys(flags), id).not.toContain("environment");
+      expect(
+        Object.values(flags).map((flag) => flag.char),
+        id,
+      ).not.toContain("e");
+    }
+  });
+
+  it("refuses -e on a generated command before any request", async () => {
+    const cwd = await makeProject();
+    const res = await run(cwd, ["users", "list", "-e", "prod"]);
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Nonexistent flag");
+  });
+
   it("advertises only filter and sort fields the generated query schemas accept", () => {
     // Only a spec carrying `body` is sent as a structured query, and that body
     // is the authority on which fields exist. A GET list has no such schema,

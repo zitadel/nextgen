@@ -180,21 +180,18 @@ Validate and upload repo config to the platform.
 ```
 USAGE
   $ zitadel apply [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -273,27 +270,23 @@ Get one branding revision by id.
 ```
 USAGE
   $ zitadel branding get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  branding revision id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -315,25 +308,22 @@ List branding.
 USAGE
   $ zitadel branding list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [--plain]
-    [-e development|preview|production]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
-                              id,attributes.email). Defaults to the resource's
-                              own columns; `--json` is unaffected.
-      --plain                 Tab-separated rows with no header, for piping.
-                              Implied when stdout is not a terminal.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Columns to show, comma-separated dot-paths (e.g.
+                         id,attributes.email). Defaults to the resource's own
+                         columns; `--json` is unaffected.
+      --plain            Tab-separated rows with no header, for piping. Implied
+                         when stdout is not a terminal.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -520,27 +510,23 @@ Get one environment by id.
 ```
 USAGE
   $ zitadel environments get NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   NAME  environment name
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -562,29 +548,26 @@ List environments.
 USAGE
   $ zitadel environments list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
-    --page-token <value>] [--fields <value>] [--plain] [-e
-    development|preview|production]
+    --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
-  -a, --all                   Fetch every page instead of one.
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
-                              id,attributes.email). Defaults to the resource's
-                              own columns; `--json` is unaffected.
-      --limit=<value>         Page size (server default 20, max 100).
-      --page-token=<value>    Continue from a previous page's next_page_token.
-      --plain                 Tab-separated rows with no header, for piping.
-                              Implied when stdout is not a terminal.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+      --verbose             Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -605,27 +588,23 @@ Get one event by id.
 ```
 USAGE
   $ zitadel events get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  event id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -648,7 +627,7 @@ USAGE
   $ zitadel events list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
-    [--sort <value>] [-e development|preview|production]
+    [--sort <value>]
 
 FLAGS
   -a, --all
@@ -656,10 +635,6 @@ FLAGS
 
   -c, --cwd=<value>
       Project directory to operate on.
-
-  -e, --environment=<option>
-      Target environment (default: development).
-      <options: development|preview|production>
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.
@@ -725,27 +700,23 @@ Get one flow definition by id.
 ```
 USAGE
   $ zitadel flow-definitions get FLOW [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   FLOW  flow name (newest revision) or revision id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -767,33 +738,29 @@ List flow-definitions.
 USAGE
   $ zitadel flow-definitions list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
-    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...] [-e
-    development|preview|production]
+    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
 
 FLAGS
-  -a, --all                   Fetch every page instead of one.
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
-                              id,attributes.email). Defaults to the resource's
-                              own columns; `--json` is unaffected.
-      --filter=<value>...     Filter as field=operation:value (operation
-                              defaults to equals). Fields: name (equals),
-                              purpose (equals), revisions (equals; values
-                              all|latest).
-      --limit=<value>         Page size (server default 20, max 100).
-      --page-token=<value>    Continue from a previous page's next_page_token.
-      --plain                 Tab-separated rows with no header, for piping.
-                              Implied when stdout is not a terminal.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --filter=<value>...   Filter as field=operation:value (operation defaults
+                            to equals). Fields: name (equals), purpose (equals),
+                            revisions (equals; values all|latest).
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+      --verbose             Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -818,21 +785,18 @@ USAGE
   $ zitadel grants create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--principal-type user|team]
     [--principal-id <value>] [--relation viewer|editor|admin] [--expires-at
-    <value>] [--data <value> | --file <value>] [-e
-    development|preview|production]
+    <value>] [--data <value> | --file <value>]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 RAW BODY FLAGS
   --data=<value>  Whole body as a JSON object, instead of the field flags.
@@ -871,26 +835,23 @@ Delete a grant by id.
 ```
 USAGE
   $ zitadel grants delete ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-f]
 
 ARGUMENTS
   ID  grant id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -f, --force                 Delete the grant without the confirmation prompt.
-                              Required when non-interactive.
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Delete the grant without the confirmation prompt.
+                         Required when non-interactive.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -909,27 +870,23 @@ Get one grant by id.
 ```
 USAGE
   $ zitadel grants get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  grant id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -952,7 +909,7 @@ USAGE
   $ zitadel grants list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
-    [--sort <value>] [-e development|preview|production]
+    [--sort <value>]
 
 FLAGS
   -a, --all
@@ -960,10 +917,6 @@ FLAGS
 
   -c, --cwd=<value>
       Project directory to operate on.
-
-  -e, --environment=<option>
-      Target environment (default: development).
-      <options: development|preview|production>
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.
@@ -1054,20 +1007,18 @@ Create an identity provider connection.
 USAGE
   $ zitadel idps create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--data <value> | --file
-    <value>] [-e development|preview|production]
+    <value>]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 RAW BODY FLAGS
   --data=<value>  Whole body as a JSON object, instead of the field flags.
@@ -1092,27 +1043,23 @@ Get one identity provider connection by id.
 ```
 USAGE
   $ zitadel idps get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  identity provider connection id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1135,7 +1082,7 @@ USAGE
   $ zitadel idps list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
-    [--sort <value>] [-e development|preview|production]
+    [--sort <value>]
 
 FLAGS
   -a, --all
@@ -1143,10 +1090,6 @@ FLAGS
 
   -c, --cwd=<value>
       Project directory to operate on.
-
-  -e, --environment=<option>
-      Target environment (default: development).
-      <options: development|preview|production>
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.
@@ -1239,21 +1182,18 @@ Validate config without mutation and preview the sync diff.
 ```
 USAGE
   $ zitadel plan [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1269,27 +1209,23 @@ Get one project by id.
 ```
 USAGE
   $ zitadel projects get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  project id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1312,34 +1248,32 @@ USAGE
   $ zitadel projects list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
-    [--sort <value>] [-e development|preview|production]
+    [--sort <value>]
 
 FLAGS
-  -a, --all                   Fetch every page instead of one.
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
-                              id,attributes.email). Defaults to the resource's
-                              own columns; `--json` is unaffected.
-      --filter=<value>...     Filter as field=operation:value (operation
-                              defaults to equals). Fields: created_at (equals|no
-                              t_equals|contains|not_contains|less_than|less_than
-                              _or_equal|greater_than|greater_than_or_equal).
-      --limit=<value>         Page size (server default 20, max 100).
-      --page-token=<value>    Continue from a previous page's next_page_token.
-      --plain                 Tab-separated rows with no header, for piping.
-                              Implied when stdout is not a terminal.
-      --sort=<value>          Sort as field:direction (asc|desc). Fields:
-                              created_at.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --filter=<value>...   Filter as field=operation:value (operation defaults
+                            to equals). Fields: created_at (equals|not_equals|co
+                            ntains|not_contains|less_than|less_than_or_equal|gre
+                            ater_than|greater_than_or_equal).
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --sort=<value>        Sort as field:direction (asc|desc). Fields:
+                            created_at.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+      --verbose             Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1363,23 +1297,21 @@ Update a project by id.
 USAGE
   $ zitadel projects update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--name <value>] [--data
-    <value> | --file <value>] [-e development|preview|production]
+    <value> | --file <value>]
 
 ARGUMENTS
   ID  project id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 RAW BODY FLAGS
   --data=<value>  Whole body as a JSON object, instead of the field flags.
@@ -1407,27 +1339,23 @@ Get one release by id.
 ```
 USAGE
   $ zitadel releases get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  release id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1449,29 +1377,26 @@ List releases.
 USAGE
   $ zitadel releases list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
-    --page-token <value>] [--fields <value>] [--plain] [-e
-    development|preview|production]
+    --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
-  -a, --all                   Fetch every page instead of one.
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
-                              id,attributes.email). Defaults to the resource's
-                              own columns; `--json` is unaffected.
-      --limit=<value>         Page size (server default 20, max 100).
-      --page-token=<value>    Continue from a previous page's next_page_token.
-      --plain                 Tab-separated rows with no header, for piping.
-                              Implied when stdout is not a terminal.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+      --verbose             Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1555,27 +1480,23 @@ Get one schema by id.
 ```
 USAGE
   $ zitadel schemas get SCHEMA [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   SCHEMA  object type (current revision) or revision id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1597,33 +1518,29 @@ List schemas.
 USAGE
   $ zitadel schemas list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
-    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...] [-e
-    development|preview|production]
+    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
 
 FLAGS
-  -a, --all                   Fetch every page instead of one.
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
-                              id,attributes.email). Defaults to the resource's
-                              own columns; `--json` is unaffected.
-      --filter=<value>...     Filter as field=operation:value (operation
-                              defaults to equals). Fields: object_type (equals),
-                              kind (equals), revisions (equals; values
-                              all|latest).
-      --limit=<value>         Page size (server default 20, max 100).
-      --page-token=<value>    Continue from a previous page's next_page_token.
-      --plain                 Tab-separated rows with no header, for piping.
-                              Implied when stdout is not a terminal.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --filter=<value>...   Filter as field=operation:value (operation defaults
+                            to equals). Fields: object_type (equals), kind
+                            (equals), revisions (equals; values all|latest).
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+      --verbose             Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1663,27 +1580,23 @@ Get one session by id.
 ```
 USAGE
   $ zitadel sessions get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  session id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1706,7 +1619,7 @@ USAGE
   $ zitadel sessions list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
-    [--sort <value>] [-e development|preview|production]
+    [--sort <value>]
 
 FLAGS
   -a, --all
@@ -1714,10 +1627,6 @@ FLAGS
 
   -c, --cwd=<value>
       Project directory to operate on.
-
-  -e, --environment=<option>
-      Target environment (default: development).
-      <options: development|preview|production>
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.
@@ -1785,26 +1694,23 @@ Revoke a session by id.
 ```
 USAGE
   $ zitadel sessions revoke ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-f]
 
 ARGUMENTS
   ID  session id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -f, --force                 Revoke the session without the confirmation
-                              prompt. Required when non-interactive.
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Revoke the session without the confirmation prompt.
+                         Required when non-interactive.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1999,20 +1905,18 @@ Create a team.
 USAGE
   $ zitadel teams create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--name <value>] [--data
-    <value> | --file <value>] [-e development|preview|production]
+    <value> | --file <value>]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 RAW BODY FLAGS
   --data=<value>  Whole body as a JSON object, instead of the field flags.
@@ -2042,26 +1946,23 @@ Deactivate a team by id.
 ```
 USAGE
   $ zitadel teams deactivate ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-f]
 
 ARGUMENTS
   ID  team id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -f, --force                 Deactivate the team without the confirmation
-                              prompt. Required when non-interactive.
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Deactivate the team without the confirmation prompt.
+                         Required when non-interactive.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2080,27 +1981,23 @@ Get one team by id.
 ```
 USAGE
   $ zitadel teams get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  team id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2123,7 +2020,7 @@ USAGE
   $ zitadel teams list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
-    [--sort <value>] [-e development|preview|production]
+    [--sort <value>]
 
 FLAGS
   -a, --all
@@ -2131,10 +2028,6 @@ FLAGS
 
   -c, --cwd=<value>
       Project directory to operate on.
-
-  -e, --environment=<option>
-      Target environment (default: development).
-      <options: development|preview|production>
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.
@@ -2201,23 +2094,21 @@ Update a team by id.
 USAGE
   $ zitadel teams update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--name <value>] [--data
-    <value> | --file <value>] [-e development|preview|production]
+    <value> | --file <value>]
 
 ARGUMENTS
   ID  team id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 RAW BODY FLAGS
   --data=<value>  Whole body as a JSON object, instead of the field flags.
@@ -2278,21 +2169,18 @@ Create an user.
 USAGE
   $ zitadel users create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--schema <value>]
-    [--attributes <value>...] [--data <value> | --file <value>] [-e
-    development|preview|production]
+    [--attributes <value>...] [--data <value> | --file <value>]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 REQUIRED FIELD FLAGS
   --attributes=<value>...  (required) Repeatable attributes entry: key=value for
@@ -2326,26 +2214,23 @@ Delete an user by id.
 ```
 USAGE
   $ zitadel users delete ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [-f]
 
 ARGUMENTS
   ID  user id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -f, --force                 Delete the user without the confirmation prompt.
-                              Required when non-interactive.
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Delete the user without the confirmation prompt.
+                         Required when non-interactive.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2364,27 +2249,23 @@ Get one user by id.
 ```
 USAGE
   $ zitadel users get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
-    development|preview|production]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  user id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --fields=<value>        Fields to show, comma-separated dot-paths.
-                              Defaults to the resource's own; `--json` is
-                              unaffected.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2407,7 +2288,7 @@ USAGE
   $ zitadel users list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
-    [--sort <value>] [-e development|preview|production]
+    [--sort <value>]
 
 FLAGS
   -a, --all
@@ -2415,10 +2296,6 @@ FLAGS
 
   -c, --cwd=<value>
       Project directory to operate on.
-
-  -e, --environment=<option>
-      Target environment (default: development).
-      <options: development|preview|production>
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.
@@ -2491,24 +2368,21 @@ Update an user by id.
 USAGE
   $ zitadel users update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--schema <value>]
-    [--attributes <value>...] [--data <value> | --file <value>] [-e
-    development|preview|production]
+    [--attributes <value>...] [--data <value> | --file <value>]
 
 ARGUMENTS
   ID  user id
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-      --verbose               Verbose logging.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+      --verbose          Verbose logging.
 
 OPTIONAL FIELD FLAGS
   --attributes=<value>...  Repeatable attributes entry: key=value for a string,

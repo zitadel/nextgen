@@ -219,7 +219,7 @@ export type ResourceCommandOptions<Ctx> = Readonly<{
   connect: (meta: GlobalOptions) => Promise<Ctx>;
   /** Filter operations the query endpoints accept (`equals`, `contains`, …). */
   operations: readonly string[];
-  /** Extra flags added to every generated command (e.g. an environment selector). */
+  /** Extra flags added to every generated command. */
   flags?: Interfaces.FlagInput;
   /** Wire vocabulary; each property falls back to {@link DEFAULT_WIRE}. */
   wire?: Partial<WireConventions>;
