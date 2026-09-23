@@ -38,7 +38,9 @@ export abstract class OwnerCommand extends BaseCommand {
    *
    * It answers with the run it was given plus the missing flag, the way the
    * resource commands' `--force` refusal does, so an agent re-runs a structured
-   * `next_commands` entry instead of parsing the hint.
+   * `next_commands` entry instead of parsing the hint. Echoing `argv` is safe
+   * here: no variables command takes a value as a flag — `set` reads it from
+   * stdin or a prompt — so a credential cannot be in the suggestion.
    */
   protected override async toMeta(
     flags: Record<string, unknown>,
