@@ -157,16 +157,11 @@ export default class Setup extends BaseCommand {
     }),
     sso: Flags.string({
       description:
-        "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider.",
+        "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
       options: [...IDP_PROVIDERS],
     }),
     "sso-client-id": Flags.string({
       description: "Client id of the OAuth application registered with the --sso provider.",
-    }),
-    "sso-secret-stdin": Flags.boolean({
-      default: false,
-      description:
-        "Read the --sso provider's client secret from standard input. Never pass a secret as a flag: it would land in shell history, process listings and CI logs.",
     }),
   };
 
@@ -690,18 +685,18 @@ function dryRunProject(issuer: string): CreateProject201 {
  *
  * The client id is required alongside the provider rather than prompted for:
  * a run that named a provider on the command line is scripted, and stopping
- * to ask would hang it. The secret is never a flag; `--sso-secret-stdin`
- * feeds it in, and is opt-in because reading stdin on the chance something
- * was piped would hang every run that piped nothing.
+ * to ask would hang it. The secret is never a flag, following `variables
+ * set`: it is piped in, so it cannot reach shell history, a process listing
+ * or a CI log. A terminal on stdin means nothing was piped, and reading it
+ * would block forever, so that case is treated as "not supplied".
  */
 async function ssoFromFlags(flags: {
   sso?: string;
   "sso-client-id"?: string;
-  "sso-secret-stdin"?: boolean;
 }): Promise<SsoAnswer | undefined> {
   if (flags.sso === undefined) {
-    if (flags["sso-client-id"] !== undefined || flags["sso-secret-stdin"]) {
-      throw new ZitadelError("E_VALIDATION", "--sso-client-id and --sso-secret-stdin need --sso", {
+    if (flags["sso-client-id"] !== undefined) {
+      throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
         hint: "Name the provider with --sso, e.g. --sso google.",
       });
     }
@@ -713,7 +708,7 @@ async function ssoFromFlags(flags: {
       hint: `Register an OAuth application at ${idpCatalogEntry(flags.sso).console_url} and pass its client id.`,
     });
   }
-  const piped = flags["sso-secret-stdin"] ? (await readStdin(process.stdin)).trim() : "";
+  const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
   return { provider: flags.sso, clientId, secret: piped === "" ? undefined : piped };
 }
 
@@ -734,7 +729,7 @@ type SetupRetryOptions = {
    * The social provider and its client id. The secret is deliberately absent:
    * a retry re-reads it from stdin (or leaves it to be set in `.env.local`),
    * because putting a credential in suggested command text is exactly what
-   * `--sso-secret-stdin` exists to avoid.
+   * piping the secret exists to avoid.
    */
   sso?: { provider: string; clientId: string };
 };

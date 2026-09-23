@@ -69,10 +69,6 @@ export default class SsoEnable extends BaseCommand {
       default: false,
       description: "Do not offer to open the provider's console in a browser.",
     }),
-    "secret-stdin": Flags.boolean({
-      default: false,
-      description: "Read the client secret from standard input. Never pass a secret as a flag.",
-    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -128,7 +124,7 @@ export default class SsoEnable extends BaseCommand {
 
     const clientId = flags["client-id"] ?? (await this.askClientId(entry.display_name, nonInteractive));
     const variable = clientSecretVariableName(plan.slug);
-    const secretValue = await this.askClientSecret(variable, nonInteractive, flags["secret-stdin"]);
+    const secretValue = await this.askClientSecret(variable, nonInteractive);
 
     const connection = scaffoldConnection({
       provider,
@@ -254,37 +250,38 @@ export default class SsoEnable extends BaseCommand {
       validate: (value) => (value.trim() === "" ? "Enter the client id." : undefined),
     });
     if (isCancel(answer)) {
-      cancel("Nothing was changed.");
-      throw new ZitadelError("E_CANCELLED", "Cancelled by user");
+      cancel("Enable cancelled.");
+      throw new ZitadelError("E_VALIDATION", "Enable cancelled by user");
     }
     return String(answer).trim();
   }
 
   /**
-   * Ask for the secret, or read it from stdin when explicitly asked to.
+   * Ask for the secret, or read it from stdin on a scripted run, following
+   * `variables set`: never a flag, so it cannot reach shell history, a process
+   * listing or a CI log.
    *
-   * Empty is a deliberate answer: the developer may prefer to paste it into
-   * `.env.local` themselves, and the connection file is written either way.
-   * A scripted run therefore has to opt in with `--secret-stdin`, because
-   * reading stdin on the chance something was piped would hang every run that
-   * piped nothing — stdin stays open with no data and no end.
+   * A terminal on stdin means nothing was piped, and reading would block
+   * forever on a stream with no data and no end — so that case is treated as
+   * "not supplied" rather than waited on. Empty is a deliberate answer
+   * either way: the connection file is written regardless, and the developer
+   * may prefer to paste the value into `.env.local` themselves.
    */
   private async askClientSecret(
     variable: string,
     nonInteractive: boolean,
-    fromStdin: boolean,
   ): Promise<string | undefined> {
-    if (fromStdin) {
+    if (nonInteractive) {
+      if (process.stdin.isTTY) {
+        return undefined;
+      }
       const piped = (await readStdin(process.stdin)).trim();
       return piped === "" ? undefined : piped;
     }
-    if (nonInteractive) {
-      return undefined;
-    }
     const answer = await password({ message: `Client secret (stored in .env.local as ${variable}, Enter to skip)` });
     if (isCancel(answer)) {
-      cancel("Nothing was changed.");
-      throw new ZitadelError("E_CANCELLED", "Cancelled by user");
+      cancel("Enable cancelled.");
+      throw new ZitadelError("E_VALIDATION", "Enable cancelled by user");
     }
     const value = String(answer ?? "").trim();
     return value === "" ? undefined : value;

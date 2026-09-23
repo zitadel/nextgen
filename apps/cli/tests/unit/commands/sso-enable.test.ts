@@ -2,6 +2,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { Readable } from "node:stream";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
@@ -41,8 +43,31 @@ const defaultSchema = {
   "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
 };
 
+/**
+ * Run the command with a stand-in stdin, the way `variables` does: a scripted
+ * run reads the secret from the stream, so leaving the real one in place
+ * would block on a stream that never ends. Passing no `piped` value stands
+ * for a terminal — nothing was piped.
+ */
+async function withStdin<T>(piped: string | undefined, run: () => Promise<T>): Promise<T> {
+  const original = Object.getOwnPropertyDescriptor(process, "stdin");
+  Object.defineProperty(process, "stdin", {
+    value: piped === undefined ? { isTTY: true } : Readable.from([piped]),
+    configurable: true,
+  });
+  try {
+    return await run();
+  } finally {
+    if (original) {
+      Object.defineProperty(process, "stdin", original);
+    }
+  }
+}
+
 function enable(cwd: string, ...extra: string[]) {
-  return runCliForTest(["sso", "enable", "--cwd", cwd, "--provider", "google", "--json", ...extra]);
+  return withStdin(undefined, () =>
+    runCliForTest(["sso", "enable", "--cwd", cwd, "--provider", "google", "--json", ...extra]),
+  );
 }
 
 afterEach(async () => {
@@ -132,5 +157,47 @@ describe("sso enable", () => {
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.stdout).not.toContain("GOCSPX");
     expect(result.stderr).not.toContain("GOCSPX");
+  });
+});
+
+describe("sso enable secret handling", () => {
+  it("stores a secret piped in on a scripted run", async () => {
+    const cwd = await makeProject();
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--provider",
+        "google",
+        "--json",
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+        "--non-interactive",
+      ]),
+    );
+
+    expect(result.exitCode).toBe(0);
+    const env = await readFile(join(cwd, ".env.local"), "utf8");
+    expect(env).toContain("GOOGLE_CLIENT_SECRET=piped-secret");
+    // The value is never echoed back, only whether it was stored.
+    expect(result.stdout).not.toContain("piped-secret");
+  });
+
+  it("does not block when a scripted run pipes nothing in", async () => {
+    const cwd = await makeProject();
+
+    const result = await enable(
+      cwd,
+      "--client-id",
+      "1234-abc.apps.googleusercontent.com",
+      "--non-interactive",
+    );
+
+    expect(result.exitCode).toBe(0);
+    const json = parseJson(result.stdout) as { data: { secret: { stored: boolean } } };
+    expect(json.data.secret.stored).toBe(false);
   });
 });

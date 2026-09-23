@@ -96,7 +96,7 @@ export type PromptContext = {
    * Whether `--sso` was passed explicitly. When set, the flag is
    * authoritative and {@link import("./social-sign-in").SocialSignInPrompt}
    * skips itself — including the credential questions, which `--sso-client-id`
-   * and `--sso-secret-stdin` answer.
+   * and the piped secret answer.
    */
   readonly ssoFromFlag?: boolean;
 };

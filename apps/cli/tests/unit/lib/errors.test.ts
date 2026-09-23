@@ -17,11 +17,6 @@ describe("EXIT_CODES", () => {
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
-      // A referenced credential has no value locally: bad input, like
-      // E_VALIDATION, rather than a broken file.
-      E_CREDENTIAL_MISSING: 3,
-      // Backing out of a journey is a choice, not a failure.
-      E_CANCELLED: 0,
       E_NOT_IMPLEMENTED: 2,
     });
   });
