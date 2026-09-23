@@ -76,6 +76,18 @@ server lines and an aligned table, while a piped or redirected run (or
 `--plain`) gets one tab-separated record per line and nothing else. `--json`
 is unaffected and remains the contract for agents.
 
+Text the server returns is escaped before it is printed, in `--json` as in
+human mode, so a value someone stored cannot drive the reader's terminal.
+Control, format and bidi characters in `data` values and keys and in an
+error's `message` appear as visible `\xNN`, `\uNNNN` or `\u{NNNNN}` text;
+newlines and tabs are kept, and a key's backslashes are doubled so two keys
+never merge. A value that contained such a character is therefore not the
+stored value byte for byte: do not send it back in an update as if it were.
+When you need the exact stored value, call the platform API directly with the
+project secret; the CLI only ever shows the escaped form.
+`plan`, `apply` and `setup` are the exception for `.zitadel/` files: they
+write the server's bodies back verbatim and escape only what they print.
+
 A property whose name reads as a credential (`password`, `client_secret`,
 `api_key`, …) is refused anywhere on the command line — as an `--attributes`
 entry and inside an inline `--data` body alike, since argv is visible to other
