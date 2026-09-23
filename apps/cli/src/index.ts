@@ -3,6 +3,7 @@ import type { Command } from "@oclif/core";
 import Apply from "./commands/apply";
 import BrandingEject from "./commands/branding/eject";
 import Claim from "./commands/claim";
+import Console from "./commands/console";
 import Doctor from "./commands/doctor/index";
 import Eject from "./commands/eject";
 import Logs from "./commands/logs";
@@ -31,6 +32,7 @@ import VariablesSet from "./commands/variables/set";
 export const COMMANDS: Record<string, typeof Command> = {
   apply: Apply,
   claim: Claim,
+  console: Console,
   doctor: Doctor,
   eject: Eject,
   logs: Logs,
