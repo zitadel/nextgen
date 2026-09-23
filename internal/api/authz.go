@@ -24,11 +24,6 @@ const (
 	opRead accessOp = iota
 	opWrite
 	opDelete
-	// opAdminister is a create/update that confers authority on the project
-	// (minting a grant). It checks project.admin like opDelete, but shapes a
-	// no-foothold miss like a write. Gating it at editor would let an editor
-	// grant admin to a team they belong to and escalate through team#member.
-	opAdminister
 )
 
 // errResourceGone means path.id has no RSI row in the caller's project scope.
@@ -48,7 +43,7 @@ func projectRelation(op accessOp) string {
 		return "viewer"
 	case opWrite:
 		return "editor"
-	case opDelete, opAdminister:
+	case opDelete:
 		return "admin"
 	default:
 		return "admin"
@@ -70,13 +65,7 @@ type resourceAccess struct {
 }
 
 func (res resourceAccess) miss(op accessOp) error {
-	// One comparison per branch, on purpose: api/internal/erroranalysis folds a
-	// single == against the op the call site passes, but not an || chain, and
-	// an unfolded guard makes every read endpoint declare its writeMiss code.
 	if op == opWrite {
-		return res.writeMiss()
-	}
-	if op == opAdminister {
 		return res.writeMiss()
 	}
 	return res.readMiss()

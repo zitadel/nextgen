@@ -438,6 +438,18 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	writeTable(w, env, "authz_expression_edges")
 	w.WriteString(` edge
         JOIN `)
+	writeTable(w, env, "authz_relation_closure")
+	w.WriteString(` ec
+          ON  ec.catalog_id       = edge.catalog_id
+          AND ec.from_object_type = edge.object_type
+          AND ec.from_relation    = edge.relation
+          AND ec.to_object_type   = `)
+	w.WriteArg(params.ObjectType)
+	w.WriteString(`
+          AND ec.to_relation      = `)
+	w.WriteArg(params.Relation)
+	w.WriteString(`
+        JOIN `)
 	writeTable(w, env, "authz_assignments")
 	w.WriteString(` ts
           ON  ts.catalog_id  = edge.catalog_id
@@ -458,21 +470,6 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteArg(params.ObjectType)
 	w.WriteString(`
           AND edge.kind = 'tuple_to_userset'
-          AND EXISTS (
-                SELECT 1
-                FROM `)
-	writeTable(w, env, "authz_relation_closure")
-	w.WriteString(` ec
-                WHERE ec.catalog_id       = edge.catalog_id
-                  AND ec.from_object_type = edge.object_type
-                  AND ec.from_relation    = edge.relation
-                  AND ec.to_object_type   = `)
-	w.WriteArg(params.ObjectType)
-	w.WriteString(`
-                  AND ec.to_relation      = `)
-	w.WriteArg(params.Relation)
-	w.WriteString(`
-          )
           AND (
                 (
                     edge.source_object_type = 'team'

@@ -293,8 +293,7 @@ func TestProjectSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 
 	granteeID := harness.CreateUserWithTeam(t, platform.ID)
-	// Admin, which closes to editor and viewer: one grant covers the read and
-	// the rename below.
+	// One grant covers the read and the rename below.
 	harness.SeedProjectAdmin(t, project.ID, granteeID)
 
 	grantee, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)

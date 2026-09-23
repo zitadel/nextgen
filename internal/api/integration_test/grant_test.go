@@ -888,8 +888,6 @@ func TestGrantSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 
 	operatorID := harness.CreateUserWithTeam(t, platform.ID)
-	// Admin, because the operator creates and deletes grants below and those
-	// are write checks; a viewer would be found (foothold) and refused.
 	harness.SeedProjectAdmin(t, project.ID, operatorID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -953,16 +951,13 @@ func TestGrantSessionCaller(t *testing.T) {
 		require.NoError(t, err)
 		editor.SetSessionToken(platformSessionCookie(t, editorID).Value)
 
-		for _, rel := range []api.CreateGrantRequestRelation{
-			api.CreateGrantRequestRelationViewer,
-			api.CreateGrantRequestRelationAdmin,
-		} {
-			resp, err := editor.CreateGrant(t.Context(), userIDGrant(harness.CreateUserWithTeam(t, platform.ID), rel), params)
-			require.NoError(t, err)
-			forbidden, ok := resp.(*api.CreateGrantForbidden)
-			require.True(t, ok, "%s: %s", rel, helpers.MustMarshal(t, resp))
-			assert.Equal(t, api.ErrorCode(domain.ErrGrantPermissionDenied().Code), forbidden.Code)
-		}
+		// The check runs before the body is read, so the requested relation
+		// cannot change the answer; one request proves the gate.
+		resp, err := editor.CreateGrant(t.Context(), userIDGrant(harness.CreateUserWithTeam(t, platform.ID), api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		forbidden, ok := resp.(*api.CreateGrantForbidden)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrGrantPermissionDenied().Code), forbidden.Code)
 
 		// Reading grants stays open to an editor.
 		queryResp, err := editor.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
