@@ -14,6 +14,11 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
+import {
+  clientSecretVariableName,
+  idpCatalogEntry,
+  IDP_PROVIDERS,
+} from "@zitadel/config/idp-catalog";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
@@ -27,6 +32,7 @@ import {
   claimWindowDeadline,
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
+import { storeClientSecret, type SecretOutcome } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -51,12 +57,18 @@ import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
+import { readStdin } from "../../lib/variables";
 import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
-import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
+import {
+  PickFrameworkPrompt,
+  SETUP_PROMPTS,
+  type SetupAnswers,
+  type SsoAnswer,
+} from "./prompts";
 import {
   designWarnings,
   detectProjectFacts,
@@ -147,6 +159,14 @@ export default class Setup extends BaseCommand {
         "Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the wizard's design question. When omitted in non-interactive runs, the login uses the built-in template; run the `branding eject` command later to customize. Split-family designs (split, split-right, hero) collapse their brand pane by container width: narrow containers — including widget-posture embeds at card width — render the compact brand mark instead (logo_url, else hero_url, from .zitadel/branding/branding.json; hero falls back to editable text).",
       options: [...BRANDING_DESIGNS],
     }),
+    sso: Flags.string({
+      description:
+        "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
+      options: [...IDP_PROVIDERS],
+    }),
+    "sso-client-id": Flags.string({
+      description: "Client id of the OAuth application registered with the --sso provider.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -166,6 +186,12 @@ export default class Setup extends BaseCommand {
         hint: "Move the secret aside or restore zitadel.json before running setup.",
       });
     }
+
+    // Resolved before anything is detected, created or written: an
+    // inconsistent set of --sso flags is a mistake in the command line, and
+    // reporting it after a project has been created would leave the developer
+    // to clean up.
+    const ssoFromCommandLine = await ssoFromFlags(flags, nonInteractive);
 
     const orca = createOrca();
 
@@ -207,6 +233,7 @@ export default class Setup extends BaseCommand {
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       design: flags.design ?? "built-in",
+      sso: flags.sso ?? "none",
       step: "framework_resolved",
     });
 
@@ -237,6 +264,7 @@ export default class Setup extends BaseCommand {
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
       design: flags.design as BrandingDesign | undefined,
+      sso: ssoFromCommandLine,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -249,6 +277,7 @@ export default class Setup extends BaseCommand {
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
         designFromFlag: flags.design !== undefined,
+        ssoFromFlag: flags.sso !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
@@ -263,6 +292,7 @@ export default class Setup extends BaseCommand {
       preset: answers.preset,
       use_case: answers.useCase,
       design: answers.design ?? "built-in",
+      sso: answers.sso?.provider ?? "none",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -299,6 +329,9 @@ export default class Setup extends BaseCommand {
             useCase: answers.useCase,
             design: answers.design,
             devPort: answers.devPort,
+            sso: answers.sso
+              ? { provider: answers.sso.provider, clientId: answers.sso.clientId }
+              : undefined,
           },
         );
     consola.success(`Created project ${project.id}`);
@@ -344,6 +377,7 @@ export default class Setup extends BaseCommand {
             preset: answers.preset,
             useCase: answers.useCase,
             design: answers.design,
+            sso: answers.sso,
             cliVersion: this.meta.cliVersion,
           });
     } catch (error) {
@@ -378,6 +412,26 @@ export default class Setup extends BaseCommand {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+
+    // After the connection exists, not before: the name belongs in
+    // `.env.example` only once something references it. The value is written
+    // only where git cannot pick it up, and a refusal is reported rather than
+    // failing setup — everything else is already provisioned, and the
+    // developer can set the variable themselves.
+    let ssoSecret: SecretOutcome | undefined;
+    if (answers.sso && !dryRun) {
+      const variable = clientSecretVariableName(answers.sso.provider);
+      ssoSecret = await storeClientSecret({ cwd, name: variable, value: answers.sso.secret });
+      if (ssoSecret.stored) {
+        consola.success(`Stored ${variable} in .env.local`);
+      } else {
+        consola.warn(
+          ssoSecret.reason === "deferred"
+            ? `${variable} has no value yet. Set it in .env.local before signing in.`
+            : `${variable} was not written: .env.local is not ignored by git. Set it yourself, or ignore that file first.`,
+        );
+      }
+    }
 
     if (!dryRun) {
       // Record what was actually scaffolded so `doctor` can later verify the
@@ -517,6 +571,7 @@ export default class Setup extends BaseCommand {
         issuer,
         scaffoldedFramework,
         design: answers.design,
+        sso: answers.sso,
       });
       // Frame the report in a consola box so it reads as a distinct
       // status panel separate from the per-step narration above it.
@@ -571,6 +626,18 @@ export default class Setup extends BaseCommand {
         // The chosen login design, or null for the built-in template — so
         // agents can verify what setup published without diffing the repo.
         design: answers.design ?? null,
+        // The provider enabled during scaffolding, or null. `secret` reports
+        // only whether a value was stored, never the value itself.
+        sso: answers.sso
+          ? {
+              provider: answers.sso.provider,
+              client_id: answers.sso.clientId,
+              connection: `.zitadel/idps/${answers.sso.provider}.json`,
+              secret: ssoSecret
+                ? { variable: ssoSecret.name, stored: ssoSecret.stored }
+                : null,
+            }
+          : null,
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
@@ -653,6 +720,47 @@ function dryRunProject(issuer: string): CreateProject201 {
 }
 
 /**
+ * The provider a scripted run asked for, or `undefined` when it asked for
+ * none — in which case the wizard's question decides.
+ *
+ * The client id is required alongside the provider rather than prompted for:
+ * a run that named a provider on the command line is scripted, and stopping
+ * to ask would hang it.
+ *
+ * The secret is never a flag, following `variables set`: it cannot reach
+ * shell history, a process listing or a CI log. Only a scripted run reads it
+ * from stdin — an interactive one is asked, and consuming stdin there would
+ * leave the wizard's own prompts reading a stream already at EOF. A terminal
+ * on stdin means nothing was piped, and reading it would block forever, so
+ * that case is treated as "not supplied".
+ */
+async function ssoFromFlags(
+  flags: {
+    sso?: string;
+    "sso-client-id"?: string;
+  },
+  nonInteractive: boolean,
+): Promise<SsoAnswer | undefined> {
+  if (flags.sso === undefined) {
+    if (flags["sso-client-id"] !== undefined) {
+      throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
+        hint: "Name the provider with --sso, e.g. --sso google.",
+      });
+    }
+    return undefined;
+  }
+  const clientId = flags["sso-client-id"]?.trim();
+  if (clientId === undefined || clientId === "") {
+    throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
+      hint: `Register an OAuth application at ${idpCatalogEntry(flags.sso).console_url} and pass its client id.`,
+    });
+  }
+  const piped =
+    nonInteractive && !process.stdin.isTTY ? (await readStdin(process.stdin)).trim() : "";
+  return { provider: flags.sso, clientId, secret: piped === "" ? undefined : piped };
+}
+
+/**
  * The parts of a setup invocation that a retry suggestion must reproduce.
  * Suggested retries are followed verbatim (especially by agents), so dropping
  * a flag here silently changes what the retry scaffolds.
@@ -665,6 +773,13 @@ type SetupRetryOptions = {
   renderer?: string;
   devPort?: number;
   nonInteractive?: boolean;
+  /**
+   * The social provider and its client id. The secret is deliberately absent:
+   * a retry re-reads it from stdin (or leaves it to be set in `.env.local`),
+   * because putting a credential in suggested command text is exactly what
+   * piping the secret exists to avoid.
+   */
+  sso?: { provider: string; clientId: string };
 };
 
 /**
@@ -692,6 +807,9 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
   }
+  if (opts.sso) {
+    parts.push(`--sso ${opts.sso.provider} --sso-client-id ${opts.sso.clientId}`);
+  }
   if (opts.nonInteractive) {
     parts.push("--non-interactive");
   }
@@ -712,6 +830,8 @@ function retryOptionsFromFlags(flags: {
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
+  sso?: string;
+  "sso-client-id"?: string;
 }): SetupRetryOptions {
   return {
     framework: flags.framework,
@@ -721,6 +841,10 @@ function retryOptionsFromFlags(flags: {
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
+    sso:
+      flags.sso !== undefined && flags["sso-client-id"] !== undefined
+        ? { provider: flags.sso, clientId: flags["sso-client-id"] }
+        : undefined,
   };
 }
 
@@ -876,6 +1000,7 @@ function buildSummary(opts: {
   issuer: string;
   scaffoldedFramework: boolean;
   design?: BrandingDesign;
+  sso?: SsoAnswer;
 }): Section[] {
   const {
     projectFacts,
@@ -886,6 +1011,7 @@ function buildSummary(opts: {
     issuer,
     scaffoldedFramework,
     design,
+    sso,
   } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
@@ -949,6 +1075,13 @@ function buildSummary(opts: {
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
+  }
+  if (sso) {
+    customizeRows.push({
+      label: "Social sign-in",
+      value: idpCatalogEntry(sso.provider).display_name,
+      secondary: stylePath(`.zitadel/idps/${sso.provider}.json`),
+    });
   }
 
   const projectRows: Row[] = [

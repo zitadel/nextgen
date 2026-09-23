@@ -63,6 +63,11 @@
       "types": "./dist/validate.d.mts",
       "import": "./dist/validate.mjs"
     },
+    "./idp-catalog": {
+      "@zitadel/source": "./src/idp-catalog.ts",
+      "types": "./dist/idp-catalog.d.mts",
+      "import": "./dist/idp-catalog.mjs"
+    },
     "./meta-schemas": {
       "@zitadel/source": "./src/meta-schemas.ts",
       "types": "./dist/meta-schemas.d.mts",
@@ -75,7 +80,12 @@
     },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./sso": {
+      "@zitadel/source": "./src/sso.ts",
+      "types": "./dist/sso.d.mts",
+      "import": "./dist/sso.mjs"
+    }
   },
   "publishConfig": {
     "access": "public"

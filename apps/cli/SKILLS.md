@@ -403,6 +403,24 @@ docker --image <ref>` remains the explicit image override for debugging.
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and
   pretty-prints the selected revision body.
+- `sso enable --provider <name>` — add a social identity provider to a Project
+  and wire it into sign-in. It reports the redirect URI to register with the
+  vendor (`<issuer>/__nextgen/idp/callback`), then writes
+  `.zitadel/idps/<slug>.json`, enables `sso` on the user schema (`--schema` when
+  the Project has more than one), and adds the provider to every login flow that
+  runs against that schema — the button on each step that can start a sign-in,
+  plus a `register-sso` step for a new external identity and an `sso-conflict`
+  step for an email that already has an account, the latter offering only the
+  methods that schema enables. Idempotent: a provider already configured is
+  reused, and two matching connections or a client id that disagrees with the
+  stored one stop the command without changing a file. The client secret is
+  never a flag — it is prompted for, or read from stdin on a non-interactive
+  run, as `variables set` does — and only its `${{ NAME }}` reference reaches
+  the connection file. A step edited by hand is left alone and reported. `setup`
+  asks the same question during onboarding (`--sso`, `--sso-client-id`, secret
+  on stdin). `plan`/`apply` then publish the connection; **deleting** one is not
+  supported yet (#1013), so a removed file fails `apply` with
+  `E_NOT_IMPLEMENTED`.
 - `branding eject` — take ownership of the login template: scaffold
   `.zitadel/branding/` (a `branding.json` descriptor plus the `login.liquid`
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`

@@ -12,6 +12,21 @@ import type { FrameworkFacts } from "../../../lib/orca";
  * prompt can decide whether to ask (skip when its flag is already a valid
  * value, otherwise prompt and write).
  */
+/**
+ * A social provider chosen during setup, with the credentials of the OAuth
+ * application the developer registered for it.
+ *
+ * `secret` is held only long enough to reach `.env.local` and is never written
+ * to a `.zitadel/` file — the connection document stores the `${{ NAME }}`
+ * reference instead. It is optional because skipping it is a deliberate
+ * answer: everything else is scaffolded, and the value can be pasted in later.
+ */
+export type SsoAnswer = {
+  readonly provider: string;
+  readonly clientId: string;
+  readonly secret?: string;
+};
+
 export type SetupAnswers = {
   server: string;
   devPort: number;
@@ -27,6 +42,13 @@ export type SetupAnswers = {
    * the same choice after setup).
    */
   design?: BrandingDesign;
+  /**
+   * Social provider to enable while scaffolding, or `undefined` for email
+   * sign-in only. Chosen by {@link import("./social-sign-in").SocialSignInPrompt};
+   * `sso enable` adds one to an existing Project later, so this is
+   * never the only way in.
+   */
+  sso?: SsoAnswer;
 };
 
 /** Read-only facts a prompt may need. */
@@ -70,6 +92,13 @@ export type PromptContext = {
    * authoritative and {@link import("./design").DesignPrompt} skips itself.
    */
   readonly designFromFlag?: boolean;
+  /**
+   * Whether `--sso` was passed explicitly. When set, the flag is
+   * authoritative and {@link import("./social-sign-in").SocialSignInPrompt}
+   * skips itself — including the credential questions, which `--sso-client-id`
+   * and the piped secret answer.
+   */
+  readonly ssoFromFlag?: boolean;
 };
 
 /**

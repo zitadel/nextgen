@@ -12,6 +12,7 @@ import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
 import Setup from "./commands/setup/index";
+import SsoEnable from "./commands/sso/enable";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
@@ -44,6 +45,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   status: Status,
   stop: Stop,
   "branding:eject": BrandingEject,
+  "sso:enable": SsoEnable,
   "variables:list": VariablesList,
   "variables:get": VariablesGet,
   "variables:set": VariablesSet,

@@ -6,6 +6,8 @@ vi.mock("@clack/prompts", () => ({
   confirm: vi.fn(),
   select: vi.fn(),
   text: vi.fn(),
+  password: vi.fn(),
+  note: vi.fn(),
   intro: vi.fn(),
   outro: vi.fn(),
   cancel: vi.fn(),
@@ -28,7 +30,9 @@ vi.mock("../../../../src/lib/local-server/runtime", async (importOriginal) => ({
   detectHealthyLocalServer: vi.fn(),
 }));
 
-import { confirm, isCancel, select, text } from "@clack/prompts";
+import { confirm, isCancel, note, password, select, text } from "@clack/prompts";
+import { IDP_PROVIDERS } from "@zitadel/config/idp-catalog";
+
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 import {
@@ -38,6 +42,7 @@ import {
   PickFrameworkPrompt,
   ServerPrompt,
   SignInPresetPrompt,
+  SocialSignInPrompt,
   UseCasePrompt,
   type PromptContext,
   type SetupAnswers,
@@ -333,6 +338,103 @@ describe("DesignPrompt", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     await expect(new DesignPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("SocialSignInPrompt", () => {
+  it("leaves the answers alone when no provider is wanted", async () => {
+    vi.mocked(select).mockResolvedValueOnce("" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+    expect(answers.sso).toBeUndefined();
+    // Nothing is asked for once the developer has declined.
+    expect(text).not.toHaveBeenCalled();
+    expect(password).not.toHaveBeenCalled();
+  });
+
+  it("offers every catalog provider alongside the declining option", async () => {
+    vi.mocked(select).mockResolvedValueOnce("" as never);
+
+    await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+    expect(selectOptionsFromFirstCall().map((option) => option.value)).toEqual([
+      "",
+      ...IDP_PROVIDERS,
+    ]);
+  });
+
+  it("captures the credentials and shows the redirect URI to register", async () => {
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  " as never);
+    vi.mocked(password).mockResolvedValueOnce("  s3cret  " as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers({ devPort: 4321 }), ctx);
+
+    expect(answers.sso).toEqual({
+      provider: "google",
+      clientId: "1234-abc.apps.googleusercontent.com",
+      secret: "s3cret",
+    });
+    // The URI has to be exact — the vendor matches it literally — and the
+    // port answered a moment earlier is what decides it.
+    expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(
+      "http://localhost:4321/__nextgen/idp/callback",
+    );
+  });
+
+  it("treats an empty secret as deferred rather than as a value", async () => {
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text).mockResolvedValueOnce("client-id" as never);
+    vi.mocked(password).mockResolvedValueOnce("" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+    expect(answers.sso).toEqual({ provider: "google", clientId: "client-id", secret: undefined });
+  });
+
+  it("does not ask which provider when --sso named one", async () => {
+    vi.mocked(password).mockResolvedValueOnce("" as never);
+    const seeded = baseAnswers({ sso: { provider: "google", clientId: "from-the-flag" } });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(select).not.toHaveBeenCalled();
+    expect(text).not.toHaveBeenCalled();
+    expect(answers.sso?.provider).toBe("google");
+    expect(answers.sso?.clientId).toBe("from-the-flag");
+  });
+
+  it("still asks for the secret a flagged run could not supply", async () => {
+    // The secret is never a flag, and only a scripted run pipes it in — so an
+    // interactive run with --sso arrives here without one.
+    vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag" as never);
+    const seeded = baseAnswers({ sso: { provider: "google", clientId: "from-the-flag" } });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(password).toHaveBeenCalledOnce();
+    expect(answers.sso?.secret).toBe("typed-after-the-flag");
+  });
+
+  it("keeps a secret that was already piped in rather than asking again", async () => {
+    const seeded = baseAnswers({
+      sso: { provider: "google", clientId: "from-the-flag", secret: "piped" },
+    });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(password).not.toHaveBeenCalled();
+    expect(answers.sso?.secret).toBe("piped");
+  });
+
+  it("throws E_VALIDATION on Ctrl-C at the provider question", async () => {
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+    vi.mocked(isCancel).mockReturnValueOnce(true);
+
+    await expect(new SocialSignInPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
   });

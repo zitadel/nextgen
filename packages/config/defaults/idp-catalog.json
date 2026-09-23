@@ -1,0 +1,25 @@
+{
+  "$schema": "./idp-catalog.schema.json",
+  "google": {
+    "display_name": "Google",
+    "template": "google",
+    "console_url": "https://console.cloud.google.com/apis/credentials",
+    "docs_url": "https://developers.google.com/identity/openid-connect/openid-connect",
+    "callback_guidance": "multi_uri_client",
+    "protocol_block": {
+      "protocol": "oidc",
+      "subject_claim": "sub",
+      "verified_claims": { "email": "email_verified" },
+      "oidc": {
+        "issuer": "https://accounts.google.com",
+        "scopes": ["openid", "profile", "email"],
+        "static_authorize_parameters": { "prompt": "select_account" }
+      }
+    },
+    "claim_table": {
+      "email": "email",
+      "givenName": "given_name",
+      "familyName": "family_name"
+    }
+  }
+}

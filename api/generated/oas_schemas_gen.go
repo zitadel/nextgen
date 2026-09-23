@@ -10075,6 +10075,7 @@ func (*CreateIdpCreated) createIdpRes() {}
 type CreateIdpErrorResponse struct {
 	Type             CreateIdpErrorResponseType // switch on this field
 	AuthUnauthorized AuthUnauthorized
+	IdpNotFound      IdpNotFound
 	Internal         Internal
 	ReqInvalid       ReqInvalid
 }
@@ -10085,6 +10086,7 @@ type CreateIdpErrorResponseType string
 // Possible values for CreateIdpErrorResponseType.
 const (
 	AuthUnauthorizedCreateIdpErrorResponse CreateIdpErrorResponseType = "auth.unauthorized"
+	IdpNotFoundCreateIdpErrorResponse      CreateIdpErrorResponseType = "idp.not_found"
 	InternalCreateIdpErrorResponse         CreateIdpErrorResponseType = "internal"
 	ReqInvalidCreateIdpErrorResponse       CreateIdpErrorResponseType = "req.invalid"
 )
@@ -10092,6 +10094,11 @@ const (
 // IsAuthUnauthorized reports whether CreateIdpErrorResponse is AuthUnauthorized.
 func (s CreateIdpErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateIdpErrorResponse
+}
+
+// IsIdpNotFound reports whether CreateIdpErrorResponse is IdpNotFound.
+func (s CreateIdpErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundCreateIdpErrorResponse
 }
 
 // IsInternal reports whether CreateIdpErrorResponse is Internal.
@@ -10120,6 +10127,27 @@ func (s CreateIdpErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bo
 func NewAuthUnauthorizedCreateIdpErrorResponse(v AuthUnauthorized) CreateIdpErrorResponse {
 	var s CreateIdpErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets CreateIdpErrorResponse to IdpNotFound.
+func (s *CreateIdpErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundCreateIdpErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if CreateIdpErrorResponse is IdpNotFound.
+func (s CreateIdpErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpNotFound.
+func NewIdpNotFoundCreateIdpErrorResponse(v IdpNotFound) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 
@@ -17181,11 +17209,20 @@ type FlowDefinitionStep struct {
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
 	Gates OptFlowDefinitionStepGates `json:"gates"`
-	// Available SSO identity providers for this step.
-	SSOProviders []SSOProvider `json:"sso_providers"`
+	// Slugs of the identity provider connections this step offers, in display
+	// order. Each names the `slug` of a connection under `.zitadel/idps/`; the
+	// connection carries the display name and template, so a rename there
+	// reaches every step without editing the flow. The rendered step the client
+	// receives carries the resolved `{id, name, template}` objects instead.
+	SSOProviders []string `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
-	// - create_user: creates the user record (registration flows).
+	// - create_user: creates the user record (registration flows)
+	// - create_user_with_sso: creates the user record from the identity an
+	// external provider returned, linking it to that identity. Accepted by
+	// the API so an SSO flow can be authored and stored; the engine handler
+	// is not wired yet, and a step reaching it fails with a flow integrity
+	// error rather than creating anything.
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -17220,7 +17257,7 @@ func (s *FlowDefinitionStep) GetGates() OptFlowDefinitionStepGates {
 }
 
 // GetSSOProviders returns the value of SSOProviders.
-func (s *FlowDefinitionStep) GetSSOProviders() []SSOProvider {
+func (s *FlowDefinitionStep) GetSSOProviders() []string {
 	return s.SSOProviders
 }
 
@@ -17260,7 +17297,7 @@ func (s *FlowDefinitionStep) SetGates(val OptFlowDefinitionStepGates) {
 }
 
 // SetSSOProviders sets the value of SSOProviders.
-func (s *FlowDefinitionStep) SetSSOProviders(val []SSOProvider) {
+func (s *FlowDefinitionStep) SetSSOProviders(val []string) {
 	s.SSOProviders = val
 }
 
@@ -17340,17 +17377,24 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 
 // Server-side mutation to execute when this step completes successfully.
 // Runs after field validation passes, before the transition fires.
-// - create_user: creates the user record (registration flows).
+// - create_user: creates the user record (registration flows)
+// - create_user_with_sso: creates the user record from the identity an
+// external provider returned, linking it to that identity. Accepted by
+// the API so an SSO flow can be authored and stored; the engine handler
+// is not wired yet, and a step reaching it fails with a flow integrity
+// error rather than creating anything.
 type FlowDefinitionStepOnSuccess string
 
 const (
-	FlowDefinitionStepOnSuccessCreateUser FlowDefinitionStepOnSuccess = "create_user"
+	FlowDefinitionStepOnSuccessCreateUser        FlowDefinitionStepOnSuccess = "create_user"
+	FlowDefinitionStepOnSuccessCreateUserWithSSO FlowDefinitionStepOnSuccess = "create_user_with_sso"
 )
 
 // AllValues returns all FlowDefinitionStepOnSuccess values.
 func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 	return []FlowDefinitionStepOnSuccess{
 		FlowDefinitionStepOnSuccessCreateUser,
+		FlowDefinitionStepOnSuccessCreateUserWithSSO,
 	}
 }
 
@@ -17358,6 +17402,8 @@ func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 func (s FlowDefinitionStepOnSuccess) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowDefinitionStepOnSuccessCreateUser:
+		return []byte(s), nil
+	case FlowDefinitionStepOnSuccessCreateUserWithSSO:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -17369,6 +17415,9 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 	switch FlowDefinitionStepOnSuccess(data) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
+		return nil
+	case FlowDefinitionStepOnSuccessCreateUserWithSSO:
+		*s = FlowDefinitionStepOnSuccessCreateUserWithSSO
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -21861,6 +21910,7 @@ func (*GetHealthOK) getHealthRes() {}
 type GetIdpByIdErrorResponse struct {
 	Type             GetIdpByIdErrorResponseType // switch on this field
 	AuthUnauthorized AuthUnauthorized
+	IdpNotFound      IdpNotFound
 	Internal         Internal
 	ReqInvalid       ReqInvalid
 }
@@ -21871,6 +21921,7 @@ type GetIdpByIdErrorResponseType string
 // Possible values for GetIdpByIdErrorResponseType.
 const (
 	AuthUnauthorizedGetIdpByIdErrorResponse GetIdpByIdErrorResponseType = "auth.unauthorized"
+	IdpNotFoundGetIdpByIdErrorResponse      GetIdpByIdErrorResponseType = "idp.not_found"
 	InternalGetIdpByIdErrorResponse         GetIdpByIdErrorResponseType = "internal"
 	ReqInvalidGetIdpByIdErrorResponse       GetIdpByIdErrorResponseType = "req.invalid"
 )
@@ -21878,6 +21929,11 @@ const (
 // IsAuthUnauthorized reports whether GetIdpByIdErrorResponse is AuthUnauthorized.
 func (s GetIdpByIdErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetIdpByIdErrorResponse
+}
+
+// IsIdpNotFound reports whether GetIdpByIdErrorResponse is IdpNotFound.
+func (s GetIdpByIdErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundGetIdpByIdErrorResponse
 }
 
 // IsInternal reports whether GetIdpByIdErrorResponse is Internal.
@@ -21906,6 +21962,27 @@ func (s GetIdpByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok b
 func NewAuthUnauthorizedGetIdpByIdErrorResponse(v AuthUnauthorized) GetIdpByIdErrorResponse {
 	var s GetIdpByIdErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets GetIdpByIdErrorResponse to IdpNotFound.
+func (s *GetIdpByIdErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundGetIdpByIdErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if GetIdpByIdErrorResponse is IdpNotFound.
+func (s GetIdpByIdErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from IdpNotFound.
+func NewIdpNotFoundGetIdpByIdErrorResponse(v IdpNotFound) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 
@@ -25627,6 +25704,59 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type IdpNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpNotFound) GetDetails() OptIdpNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpNotFound) SetDetails(val OptIdpNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpNotFoundDetails map[string]jx.Raw
+
+func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // The protocol used by the identity provider.
@@ -33569,6 +33699,52 @@ func (o OptIdpConnectionVerifiedClaims) Get() (v IdpConnectionVerifiedClaims, ok
 
 // Or returns value if set, or given parameter if does not.
 func (o OptIdpConnectionVerifiedClaims) Or(d IdpConnectionVerifiedClaims) IdpConnectionVerifiedClaims {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpNotFoundDetails returns new OptIdpNotFoundDetails with value set to v.
+func NewOptIdpNotFoundDetails(v IdpNotFoundDetails) OptIdpNotFoundDetails {
+	return OptIdpNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpNotFoundDetails is optional IdpNotFoundDetails.
+type OptIdpNotFoundDetails struct {
+	Value IdpNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpNotFoundDetails was set.
+func (o OptIdpNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpNotFoundDetails) Reset() {
+	var v IdpNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpNotFoundDetails) SetTo(v IdpNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpNotFoundDetails) Get() (v IdpNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpNotFoundDetails) Or(d IdpNotFoundDetails) IdpNotFoundDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -44221,6 +44397,7 @@ func (*QueryIdpsBadRequest) queryIdpsRes() {}
 type QueryIdpsErrorResponse struct {
 	Type             QueryIdpsErrorResponseType // switch on this field
 	AuthUnauthorized AuthUnauthorized
+	IdpNotFound      IdpNotFound
 	Internal         Internal
 	ReqInvalid       ReqInvalid
 }
@@ -44231,6 +44408,7 @@ type QueryIdpsErrorResponseType string
 // Possible values for QueryIdpsErrorResponseType.
 const (
 	AuthUnauthorizedQueryIdpsErrorResponse QueryIdpsErrorResponseType = "auth.unauthorized"
+	IdpNotFoundQueryIdpsErrorResponse      QueryIdpsErrorResponseType = "idp.not_found"
 	InternalQueryIdpsErrorResponse         QueryIdpsErrorResponseType = "internal"
 	ReqInvalidQueryIdpsErrorResponse       QueryIdpsErrorResponseType = "req.invalid"
 )
@@ -44238,6 +44416,11 @@ const (
 // IsAuthUnauthorized reports whether QueryIdpsErrorResponse is AuthUnauthorized.
 func (s QueryIdpsErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedQueryIdpsErrorResponse
+}
+
+// IsIdpNotFound reports whether QueryIdpsErrorResponse is IdpNotFound.
+func (s QueryIdpsErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundQueryIdpsErrorResponse
 }
 
 // IsInternal reports whether QueryIdpsErrorResponse is Internal.
@@ -44266,6 +44449,27 @@ func (s QueryIdpsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bo
 func NewAuthUnauthorizedQueryIdpsErrorResponse(v AuthUnauthorized) QueryIdpsErrorResponse {
 	var s QueryIdpsErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets QueryIdpsErrorResponse to IdpNotFound.
+func (s *QueryIdpsErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundQueryIdpsErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if QueryIdpsErrorResponse is IdpNotFound.
+func (s QueryIdpsErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from IdpNotFound.
+func NewIdpNotFoundQueryIdpsErrorResponse(v IdpNotFound) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 

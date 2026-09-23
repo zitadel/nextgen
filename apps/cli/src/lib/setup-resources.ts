@@ -7,6 +7,7 @@ import type {
   CreateBranding201,
   CreateBrandingBody,
   CreateFlowDefinition201,
+  CreateIdpBodyIdp,
   CreateSchema201,
   CreateSchemaBody,
   GetSchemaById200,
@@ -29,12 +30,15 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
+import { scaffoldConnection } from "@zitadel/config/idp-catalog";
+import { applySsoToFlow, applySsoToSchema } from "@zitadel/config/sso";
 import { BRANDING_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { BRANDING_DIR, toBrandingWireBody } from "./branding";
 import { FLOWS_DIR } from "./flows";
+import { authMethods, CONNECTION_SCHEMA_REF, IDPS_DIR } from "./idp";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState, writeBackResource } from "./sync";
@@ -67,6 +71,12 @@ export async function materializeSetupResources(opts: {
   /** Use case (schema field set) to scaffold; defaults to minimal. */
   useCase?: SetupUseCase;
   /**
+   * Social provider to enable while scaffolding. Its connection is written
+   * and created before the schema and flow that reference it, so the Project
+   * is never published naming a provider the platform does not hold.
+   */
+  sso?: { provider: string; clientId: string };
+  /**
    * Login design to eject into `.zitadel/branding/` and publish as branding
    * revision 1. When absent, no branding files are scaffolded and the login
    * renders the built-in template (the `branding eject` command opts in later).
@@ -87,10 +97,53 @@ export async function materializeSetupResources(opts: {
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
   const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
 
-  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({ preset, useCase }) as {
-    $id?: string;
-  } & Record<string, unknown>;
+  const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
+    preset,
+    useCase,
+  }) as { $id?: string } & Record<string, unknown>;
   void _templateId;
+
+  // The connection goes first, and is created before the schema and flow that
+  // name its slug: a Project should never be published claiming a provider the
+  // platform does not hold. Its claim mapping reads the template's properties,
+  // which enabling the provider does not change.
+  const connection = opts.sso
+    ? scaffoldConnection({
+        provider: opts.sso.provider,
+        clientId: opts.sso.clientId,
+        schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+        schemaRef: CONNECTION_SCHEMA_REF,
+      })
+    : undefined;
+  const slug = typeof connection?.slug === "string" ? connection.slug : undefined;
+  if (connection && slug) {
+    await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
+    const connectionPath = `${IDPS_DIR}/${slug}.json`;
+    if (await writeResourceFile(opts.cwd, connectionPath, connection, opts.force)) {
+      filesWritten.push(join(opts.cwd, connectionPath));
+    }
+    // `client_secret` travels as its `${{ NAME }}` reference: the platform
+    // resolves it from the environment's variables, so no credential is sent
+    // here and none is written to the file.
+    const created = await opts.client.createIdp(
+      { idp: connection as CreateIdpBodyIdp },
+      { project_id: opts.projectId },
+    );
+    const written = await writeBackResource(
+      opts.cwd,
+      connectionPath,
+      {},
+      (created.definition ?? connection) as object,
+    );
+    await updateState(opts.cwd, connectionPath, {
+      id: requiredString(created.id, "created identity provider connection id"),
+      hash: written.hash,
+    });
+  }
+
+  const schemaBody = slug
+    ? (applySsoToSchema(schemaTemplate, slug).document as Record<string, unknown>)
+    : schemaTemplate;
 
   const schemaWritten = await writeResourceFile(
     opts.cwd,
@@ -133,7 +186,13 @@ export async function materializeSetupResources(opts: {
     hash: schemaHash,
   });
 
-  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
+  const flowTemplate = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
+  // The conflict step the provider needs can only offer what this schema
+  // actually enables, so the methods are read back off the composed document
+  // rather than inferred from the preset.
+  const flowBody = (
+    slug ? applySsoToFlow(flowTemplate, slug, authMethods(schemaBody)).document : flowTemplate
+  ) as typeof flowTemplate;
 
   const flowWritten = await writeResourceFile(
     opts.cwd,
