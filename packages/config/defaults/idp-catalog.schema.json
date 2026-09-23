@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IdentityProviderCatalog",
+  "description": "Vendor knowledge `zitadel setup` scaffolds connection files from, keyed by the entry's default slug. Bundled so scaffolding works offline; the table ages with the installed CLI, and the written connection file stays tenant-editable. Adding a provider is a data change to this table.",
+  "type": "object",
+  "propertyNames": {
+    "$comment": "Every key but the editor pointer is a provider, and doubles as the default connection slug, so it obeys the slug grammar `idp-connection.json` enforces.",
+    "anyOf": [
+      { "const": "$schema" },
+      { "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 }
+    ]
+  },
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "display_name",
+      "template",
+      "console_url",
+      "docs_url",
+      "callback_guidance",
+      "protocol_block",
+      "claim_table"
+    ],
+    "properties": {
+      "display_name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "description": "Written to the connection as `display_name` and shown on the sign-in button."
+      },
+      "template": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Written to the connection as `template`. Keys vendor knowledge only (glyphs, the setup scan/match, claim tables); it carries no protocol behaviour."
+      },
+      "console_url": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https://",
+        "description": "The vendor console where the developer registers the OAuth application. Surfaced during the announce step and in error envelopes."
+      },
+      "docs_url": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https://",
+        "description": "The vendor's own integration documentation, surfaced alongside `console_url`."
+      },
+      "callback_guidance": {
+        "type": "string",
+        "enum": ["multi_uri_client", "app_per_environment"],
+        "description": "Whether the vendor accepts many redirect URIs on one client, or needs an application per environment. Surfaced during the announce step to guide app registration."
+      },
+      "protocol_block": {
+        "type": "object",
+        "description": "Merged into the scaffolded connection file verbatim. Holds vendor conduct only: the prompted `client_id`, the derived `client_secret` reference, `slug`, `display_name`, `template`, `claim_mapping` and `provisioning` are composed at scaffold time, never stored here.",
+        "required": ["protocol"],
+        "properties": {
+          "protocol": { "type": "string", "enum": ["oidc", "oauth2"] },
+          "subject_claim": { "type": "string", "minLength": 1 },
+          "verified_claims": { "type": "object" },
+          "oidc": { "type": "object" },
+          "oauth2": { "type": "object" }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "protocol": { "const": "oidc" } },
+              "required": ["protocol"]
+            },
+            "then": { "required": ["oidc"], "properties": { "oauth2": false } }
+          },
+          {
+            "if": {
+              "properties": { "protocol": { "const": "oauth2" } },
+              "required": ["protocol"]
+            },
+            "then": {
+              "required": ["oauth2", "subject_claim"],
+              "properties": { "oidc": false }
+            }
+          }
+        ]
+      },
+      "claim_table": {
+        "type": "object",
+        "description": "Maps a user-schema property name to the provider's documented claim name. Authored per provider, not derived. At scaffold the rows whose key the active schema defines become the connection's `claim_mapping`; the rest stay unmapped.",
+        "minProperties": 1,
+        "propertyNames": { "minLength": 1 },
+        "additionalProperties": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^$]",
+          "description": "An exact top-level claim key: no path syntax, and `$`-prefixed values are reserved."
+        }
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ export default defineConfig({
     "branding-url": "src/branding-url.ts",
     index: "src/index.ts",
     defaults: "src/defaults.ts",
+    "idp-catalog": "src/idp-catalog.ts",
     "meta-schemas": "src/meta-schemas.ts",
     normalize: "src/normalize.ts",
     schemas: "src/schemas.ts",
