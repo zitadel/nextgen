@@ -62,11 +62,12 @@ const claimMode = process.argv.includes("--claim");
 /** The well-known platform project id (`domain.PlatformProjectID`). */
 const PLATFORM_PROJECT_ID = "proj_platform";
 
-if (claimMode) {
-  // Read by the server through the CLI's `start`, which inherits this process's
-  // environment (`packages/testing/src/cli.ts` merges `process.env`).
-  process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = "true";
-}
+// Read by the server through the CLI's `start`, which inherits this process's
+// environment (`packages/testing/src/cli.ts` merges `process.env`). Set either
+// way: `zitadel start` bootstraps the platform project by default, and that
+// pins the console's default project to `proj_platform` — which would leave
+// DEV_USER, seeded in the project this script bootstraps, unable to sign in.
+process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = claimMode ? "true" : "false";
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -191,7 +192,7 @@ async function grantDevUserAdmin(userId: string): Promise<boolean> {
     const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
-      body: JSON.stringify({ principal_type: "user", principal_id: userId, relation: "admin" }),
+      body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
       signal: AbortSignal.timeout(5_000),
     });
     return response.ok;

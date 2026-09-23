@@ -2657,7 +2657,10 @@ func (s CompletedFactorPayload) Validate() error {
 		}
 		return nil
 	case PasswordFactorPayloadCompletedFactorPayload:
-		return nil // no validation needed
+		if err := s.PasswordFactorPayload.Validate(); err != nil {
+			return err
+		}
+		return nil
 	case PasskeyFactorPayloadCompletedFactorPayload:
 		if err := s.PasskeyFactorPayload.Validate(); err != nil {
 			return err
@@ -2863,40 +2866,6 @@ func (s *CreateGrantRequest) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.PrincipalType.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "principal_type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := (validate.String{
-			MinLength:     1,
-			MinLengthSet:  true,
-			MaxLength:     0,
-			MaxLengthSet:  false,
-			Email:         false,
-			Hostname:      false,
-			Regex:         nil,
-			MinNumeric:    0,
-			MinNumericSet: false,
-			MaxNumeric:    0,
-			MaxNumericSet: false,
-		}).Validate(string(s.PrincipalID)); err != nil {
-			return errors.Wrap(err, "string")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "principal_id",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if err := s.Relation.Validate(); err != nil {
 			return err
 		}
@@ -2907,21 +2876,46 @@ func (s *CreateGrantRequest) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.User.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "user",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Team.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s CreateGrantRequestPrincipalType) Validate() error {
-	switch s {
-	case "user":
-		return nil
-	case "team":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s CreateGrantRequestRelation) Validate() error {
@@ -5118,17 +5112,6 @@ func (s *Grant) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.PrincipalType.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "principal_type",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if err := s.ObjectType.Validate(); err != nil {
 			return err
 		}
@@ -5169,7 +5152,7 @@ func (s *Grant) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.Principal.Get(); ok {
+		if value, ok := s.Team.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
 					return err
@@ -5182,7 +5165,7 @@ func (s *Grant) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "principal",
+			Name:  "team",
 			Error: err,
 		})
 	}
@@ -5201,30 +5184,13 @@ func (s GrantExpand) Validate() error {
 	}
 }
 
-func (s GrantExpandedPrincipal) Validate() error {
-	switch s.Type {
-	case UserGrantExpandedPrincipal:
-		if err := s.User.Validate(); err != nil {
-			return err
-		}
-		return nil
-	case TeamResponseGrantExpandedPrincipal:
-		if err := s.TeamResponse.Validate(); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
-}
-
 func (s GrantFilterField) Validate() error {
 	switch s {
 	case "created_at":
 		return nil
-	case "principal_type":
+	case "user_id":
 		return nil
-	case "principal_id":
+	case "team_id":
 		return nil
 	case "relation":
 		return nil
@@ -5238,17 +5204,6 @@ func (s GrantFilterField) Validate() error {
 func (s GrantObjectType) Validate() error {
 	switch s {
 	case "project":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
-func (s GrantPrincipalType) Validate() error {
-	switch s {
-	case "user":
-		return nil
-	case "team":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -5281,7 +5236,37 @@ func (s GrantSortingField) Validate() error {
 	}
 }
 
-func (s *IdentifierFactorPayload) Validate() error {
+func (s *GrantTeam) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.Status.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GrantUser) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -5298,10 +5283,71 @@ func (s *IdentifierFactorPayload) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Metadata.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "metadata",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s *IdentifierFactorPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Method.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.UserID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "user_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s IdentifierFactorPayloadMethod) Validate() error {
+	switch s {
+	case "identifier":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *IdpConnection) Validate() error {
@@ -6792,6 +6838,17 @@ func (s *PasskeyFactorPayload) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := s.Method.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.AuthenticatorAttachment.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -6820,6 +6877,47 @@ func (s PasskeyFactorPayloadAuthenticatorAttachment) Validate() error {
 	case "platform":
 		return nil
 	case "cross-platform":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PasskeyFactorPayloadMethod) Validate() error {
+	switch s {
+	case "passkey":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *PasswordFactorPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Method.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s PasswordFactorPayloadMethod) Validate() error {
+	switch s {
+	case "password":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -10301,6 +10399,66 @@ func (s TeamID) Validate() error {
 	return nil
 }
 
+func (s *TeamLocator) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.TeamID.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Name.Get(); ok {
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         nil,
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(value)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *TeamResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -10980,6 +11138,66 @@ func (s UserID) Validate() error {
 		MaxNumericSet: false,
 	}).Validate(string(alias)); err != nil {
 		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *UserLocator) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.UserID.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "user_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Identifier.Get(); ok {
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         nil,
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(value)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "identifier",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }

@@ -60,7 +60,7 @@ export async function grantProjectAdmin(
       authorization: `Bearer ${handle.projectSecret}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ principal_type: "user", principal_id: userId, relation: "admin" }),
+    body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
   });
   if (!response.ok) {
     throw new Error(`POST /grants answered ${response.status}: ${await response.text()}`);

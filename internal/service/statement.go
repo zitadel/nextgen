@@ -485,6 +485,11 @@ type AuthzAssignmentStatements interface {
 	// grant (ADR 049 export visibility), ordered by project_id after afterID
 	// (empty starts at the beginning).
 	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
+	// HasActiveOwningTeamGrant reports whether the team still owns a project.
+	// Keyed on the team alone: the owning row sits on the owned project, which
+	// for a claim is not the team's own project. Expiry is not consulted, the
+	// authz_assignments CHECK forbids expires_at on (project, team) rows (ADR 054 §2).
+	HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error)
 	// ListAuthorizedProjects pages the projects the user can act on, by the
 	// three routes ADR 053 §6 puts in the authorized set:
 	//
