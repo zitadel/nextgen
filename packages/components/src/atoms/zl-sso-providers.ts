@@ -93,8 +93,12 @@ export class ZlSsoProviders extends LitElement {
     if (providers.length === 0) {
       return nothing;
     }
+    // `<zl-button>` announces every click as `zl-submit`, which the
+    // orchestrator reads as "submit this step". A provider button is not that
+    // — it carries its own action and its own payload — so the inner event is
+    // caught at the boundary and `zl-sso-select` is emitted in its place.
     return html`
-      <div class="zr-sso" part="root">
+      <div class="zr-sso" part="root" @zl-submit=${stopInnerSubmit}>
         ${this.dividerLabel
           ? html`<div class="zr-sso__divider" part="divider" role="separator" aria-orientation="horizontal">
               <span>${this.dividerLabel}</span>
@@ -160,6 +164,14 @@ export class ZlSsoProviders extends LitElement {
   reset(): void {
     this.pendingId = undefined;
   }
+}
+
+/**
+ * Keep `<zl-button>`'s own submit announcement inside this atom, so the step
+ * is not submitted a second time with the wrong action.
+ */
+function stopInnerSubmit(event: Event): void {
+  event.stopPropagation();
 }
 
 /**

@@ -90,6 +90,21 @@ describe("<zl-sso-providers>", () => {
     document.removeEventListener("zl-sso-select", listener);
   });
 
+  it("does not let the inner button's zl-submit escape", async () => {
+    // `<zl-button>` announces every click as `zl-submit`. If that reached the
+    // orchestrator it would submit the step with the wrong action — which is
+    // exactly what happened before this was caught: the server answered
+    // `error.email_required` instead of redirecting to the provider.
+    const atom = await mount([GOOGLE]);
+    const escaped = vi.fn();
+    document.addEventListener("zl-submit", escaped);
+
+    buttons(atom)[0]?.click();
+
+    expect(escaped).not.toHaveBeenCalled();
+    document.removeEventListener("zl-submit", escaped);
+  });
+
   it("holds the chosen button and disables the rest while the redirect is in flight", async () => {
     const atom = await mount([GOOGLE, GITHUB]);
 
