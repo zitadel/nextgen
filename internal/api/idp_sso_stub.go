@@ -107,14 +107,22 @@ func (s *ssoStubStore) put(p ssoPending) (string, error) {
 	return state, nil
 }
 
-// take consumes a pending authorization. A `state` can be redeemed once, so a
-// replayed callback finds nothing.
-func (s *ssoStubStore) take(state string) (ssoPending, bool) {
+// peek reads a pending authorization without consuming it, so a caller can
+// check the browser binding first. A callback that fails that check must not
+// burn the entry: anyone who learned a `state` could otherwise cancel the
+// sign-in it belongs to.
+func (s *ssoStubStore) peek(state string) (ssoPending, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p, ok := s.pending[state]
-	delete(s.pending, state)
 	return p, ok
+}
+
+// consume retires a `state` so it can be redeemed only once.
+func (s *ssoStubStore) consume(state string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.pending, state)
 }
 
 // ssoAuthorizeStep answers `action: "sso"` with the step that sends the browser
@@ -244,7 +252,8 @@ func (h *Handler) IdpCallbackHandler() http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 
-		pending, ok := h.ssoStub.take(r.URL.Query().Get("state"))
+		stateParam := r.URL.Query().Get("state")
+		pending, ok := h.ssoStub.peek(stateParam)
 		if !ok {
 			http.Error(w, "unknown or already used sso state", http.StatusBadRequest)
 			return
@@ -255,9 +264,12 @@ func (h *Handler) IdpCallbackHandler() http.Handler {
 		// half-finished flow there.
 		binding, err := r.Cookie(ssoBindingCookie)
 		if err != nil || subtle.ConstantTimeCompare([]byte(binding.Value), []byte(pending.binding)) != 1 {
+			// Deliberately before `consume`: a wrong binding leaves the
+			// authorization redeemable by the browser it belongs to.
 			http.Error(w, "sso callback did not come from the browser that started it", http.StatusBadRequest)
 			return
 		}
+		h.ssoStub.consume(stateParam)
 		// Redeemed: retire the binding so it cannot be replayed.
 		http.SetCookie(w, &http.Cookie{
 			Name: ssoBindingCookie, Value: "", Path: "/", HttpOnly: true,
