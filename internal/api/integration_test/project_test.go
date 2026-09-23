@@ -5,6 +5,7 @@ package integration_test
 import (
 	"cmp"
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -313,6 +314,28 @@ func TestProjectSessionCaller(t *testing.T) {
 		resp, err := grantee.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString(project.Name + " renamed")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("viewer opens but cannot rename", func(t *testing.T) {
+		// Roles are monotonic, never the reverse: a viewer passes the read
+		// check and is refused the editor check. The foothold makes the refusal
+		// a 403, not the anti-oracle 404 a stranger gets.
+		viewerID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectViewer(t, project.ID, viewerID)
+		viewer, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		viewer.SetSessionToken(platformSessionCookie(t, viewerID).Value)
+
+		resp, err := viewer.GetProject(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+
+		patchResp, err := viewer.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("viewer rename")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchProjectErrorResponseStatusCode{}, patchResp, helpers.MustMarshal(t, patchResp))
+		denied := patchResp.(*api.PatchProjectErrorResponseStatusCode)
+		assert.Equal(t, http.StatusForbidden, denied.StatusCode)
+		assert.Equal(t, api.PatchProjectErrorResponseType(domain.ErrProjectPermissionDenied().Code), denied.Response.Type)
 	})
 
 	t.Run("no foothold is not found", func(t *testing.T) {

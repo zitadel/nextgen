@@ -5,7 +5,7 @@
 -- references store compiled policy. Bundle tables exist but are unused by the
 -- v1 compiler mapper.
 --
--- Seed cat_sys_1 matches this OpenFGA-style model (placeholders pending #420):
+-- Seed cat_sys_1 matches this OpenFGA-style model:
 --   type user
 --   type team
 --     relations

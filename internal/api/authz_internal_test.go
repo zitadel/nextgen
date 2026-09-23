@@ -133,6 +133,9 @@ func TestProjectRelation(t *testing.T) {
 	if got := projectRelation(opDelete); got != "admin" {
 		t.Fatalf("opDelete → %q, want admin", got)
 	}
+	if got := projectRelation(opAdminister); got != "admin" {
+		t.Fatalf("opAdminister → %q, want admin", got)
+	}
 }
 
 func TestHasOperatorProjectWrite(t *testing.T) {
@@ -271,6 +274,7 @@ func TestMapAuthzDecision(t *testing.T) {
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionForbidden, res, opRead), domain.ErrUserPermissionDenied().Code)
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionNotFound, res, opRead), domain.ErrUserNotFound().Code)
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionNotFound, res, opWrite), domain.ErrUserInvalid().Code)
+	assertDomainCode(t, mapAuthzDecision(resolver.DecisionNotFound, res, opAdminister), domain.ErrUserInvalid().Code)
 
 	assertDomainCode(t, mapAuthzDecisionAfterRSI(resolver.DecisionNotFound, res), domain.ErrUserNotFound().Code)
 	assertDomainCode(t, mapAuthzDecisionAfterRSI(resolver.DecisionForbidden, res), domain.ErrUserPermissionDenied().Code)

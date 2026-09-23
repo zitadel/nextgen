@@ -942,6 +942,34 @@ func TestGrantSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 
+	t.Run("editor cannot mint grants", func(t *testing.T) {
+		t.Parallel()
+		// Creating a grant is an admin check: a grant can carry any role up to
+		// admin, so an editor minting one could escalate (for instance, admin
+		// to a team it belongs to, which the self-grant rule does not cover).
+		editorID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectEditor(t, project.ID, editorID)
+		editor, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		editor.SetSessionToken(platformSessionCookie(t, editorID).Value)
+
+		for _, rel := range []api.CreateGrantRequestRelation{
+			api.CreateGrantRequestRelationViewer,
+			api.CreateGrantRequestRelationAdmin,
+		} {
+			resp, err := editor.CreateGrant(t.Context(), userIDGrant(harness.CreateUserWithTeam(t, platform.ID), rel), params)
+			require.NoError(t, err)
+			forbidden, ok := resp.(*api.CreateGrantForbidden)
+			require.True(t, ok, "%s: %s", rel, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode(domain.ErrGrantPermissionDenied().Code), forbidden.Code)
+		}
+
+		// Reading grants stays open to an editor.
+		queryResp, err := editor.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryGrantsResponse{}, queryResp, helpers.MustMarshal(t, queryResp))
+	})
+
 	t.Run("no foothold is not found", func(t *testing.T) {
 		t.Parallel()
 		strangerID := harness.CreateUserWithTeam(t, platform.ID)

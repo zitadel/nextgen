@@ -10,7 +10,7 @@
 -- are NULL when the row should be excluded from uniqueness; NULL_FILTERED unique
 -- indexes then match the Postgres partial-unique semantics.
 --
--- Seed cat_sys_1 matches this OpenFGA-style model (placeholders pending #420):
+-- Seed cat_sys_1 matches this OpenFGA-style model:
 --   type user
 --   type team
 --     relations
