@@ -48,8 +48,9 @@ func (h *Harness) seedProjectRole(t *testing.T, projectID, userID, relation stri
 // SeedOwningTeam writes the owning-team assignment claim/complete writes
 // (ADR 046 §1), binding a team to the project's `team` relation. It is the
 // shape that makes a claimer an operator: the seeded catalog resolves
-// `project.viewer` for the team's members through `member from team`, so a
-// test that seeds a direct user grant instead would not exercise that path.
+// `project.admin` for the team's members through `member from team`, and admin
+// closes to editor and viewer (ADR 054 §5). A test that seeds a direct user
+// grant instead would not exercise that tuple-to-userset path.
 func (h *Harness) SeedOwningTeam(t *testing.T, projectID, teamID string) {
 	t.Helper()
 	asgn := domain.NewClaimTeamAssignment(projectID, teamID)
