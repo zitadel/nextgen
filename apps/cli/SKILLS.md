@@ -379,10 +379,11 @@ docker --image <ref>` remains the explicit image override for debugging.
 
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
-- `plan`, `apply` and the resource commands take no `--environment`: they
-  work on the project's resources and do not select an environment.
-  `variables` is the only command group that addresses an environment; putting
-  config onto an environment is `deploy`'s job (ADR 035).
+- No command takes `--environment` (`-e`, `--env`). `plan`, `apply` and the
+  resource commands work on the project's resources and never selected an
+  environment; `variables` names its owner with `--project-level`. The flag
+  returns when the platform's environments settle, and `deploy` (ADR 035) is
+  what will put config onto one.
 - `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
   findings as `{path, rule, message}`, the same text the human plan prints as
   `# warning:` lines and `apply` prints through stderr. They never fail a run.
@@ -412,29 +413,27 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`
   or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
-- `variables list|get|set|delete` — manage the per-environment variables and
-  secrets a configuration document references as `${{ NAME }}`. Every command
-  addresses one owner: `--environment <name>` (`-e`, alias `--env`) names an
-  environment, and `--project-level` names the project level. Owners do not
-  inherit from one another — a value set at the project level is **not** seen
-  by any environment — so a value a running environment needs must be set on
-  that environment, and one needed on several must be set on each. Because of
-  that, the owner is never defaulted: with neither flag a person is asked and a
-  non-interactive run fails with `E_VALIDATION` naming the project's
-  environments, as ADR 035 specifies for `deploy`. `set` takes its value from a
-  prompt or from stdin and never from a flag, so a credential never reaches
-  `argv`; `--secret` stores it encrypted, after which it can be replaced but
-  never read back (`list` reports it as held, and `--json` omits the value key
-  entirely). `set --as number|boolean` stores a JSON number or boolean
-  instead of a string, so a whole-field `${{ NAME }}` reference resolves to that
-  type; it is refused with `--secret`, and an integer too large to store exactly
-  is refused rather than rounded. Output follows the resource commands: on a
-  pipe, `list` prints tab-separated `name`/`value` rows (a secret's value is
-  `(secret)`) and `get` prints the whole record as JSON, which carries no
-  `value` key for a secret. There is no `pull` and no bulk import. `set` and
-  `delete` honour `--dry-run` and make no change (with no owner flag, a person is still asked,
-  which reads the project's environments); `delete` needs `--force` when
-  non-interactive.
+- `variables list|get|set|delete` — manage the variables and secrets a
+  configuration document references as `${{ NAME }}`. Every command addresses
+  one owner, and `--project-level` is the only one the CLI can name today, so it
+  is **required**: a run without it fails with `E_VALIDATION`, on a terminal as
+  in a script. The platform also keeps variables per environment, but the CLI
+  cannot address those until the platform's environments settle; `--environment`
+  returns then, and every command written today keeps its meaning because the
+  owner was named rather than assumed. Owners do not inherit from one another —
+  a value entered at the project level is **not** seen by an environment
+  (ADR 062 §4). `set` takes its value from a prompt or from stdin and never from
+  a flag, so a credential never reaches `argv`; `--secret` stores it encrypted,
+  after which it can be replaced but never read back (`list` reports it as held,
+  and `--json` omits the value key entirely). `set --as number|boolean` stores a
+  JSON number or boolean instead of a string, so a whole-field `${{ NAME }}`
+  reference resolves to that type; it is refused with `--secret`, and an integer
+  too large to store exactly is refused rather than rounded. Output follows the
+  resource commands: on a pipe, `list` prints tab-separated `name`/`value` rows
+  (a secret's value is `(secret)`) and `get` prints the whole record as JSON,
+  which carries no `value` key for a secret. There is no `pull` and no bulk
+  import. `set` and `delete` honour `--dry-run` and make no change; `delete`
+  needs `--force` when non-interactive.
 
 ## Golden path
 

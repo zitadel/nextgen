@@ -71,11 +71,13 @@ describe("variables telemetry dimensions", () => {
     }
   });
 
-  it("covers every variables command", async () => {
+  it("covers every variables command that has a dimension to record", async () => {
     const recorded = await recordedDimensions();
     expect([...recorded.keys()].sort()).toEqual(["delete.ts", "get.ts", "list.ts", "set.ts"]);
-    for (const [file, keys] of recorded) {
-      expect(keys.length, `${file} records no dimensions`).toBeGreaterThan(0);
+    // `delete` records none: with one owner and no per-command shape to report,
+    // the lifecycle events already carry everything true of the run.
+    for (const command of ["get.ts", "list.ts", "set.ts"]) {
+      expect(recorded.get(command)?.length, `${command} records no dimensions`).toBeGreaterThan(0);
     }
   });
 });
