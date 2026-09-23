@@ -23,8 +23,8 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  */
 const API_BASE = "https://flow-sso.test.invalid";
 
-const GOOGLE = { id: "idp_01GOOGLE", name: "Google", template: "google" };
-const ACME = { id: "idp_01ACME", name: "Acme SSO", template: "oidc-generic" };
+const GOOGLE = { id: "google", name: "Google", template: "google" };
+const ACME = { id: "acme-sso", name: "Acme SSO", template: "oidc-generic" };
 
 let mock: MockHandle = setupMockHandlers();
 const server = setupServer(...mock.handlers);
@@ -190,6 +190,48 @@ describe("<zitadel-login> with identity providers", () => {
     });
 
     expect(element.shadowRoot?.querySelector('slot[name="loader"]')).not.toBeNull();
+  });
+
+  it("still completes a terminal redirect rather than treating it as a provider hop", async () => {
+    // The engine copies the relying party's redirect_uri onto `redirect_url`
+    // when a sign-in completes, so a terminal step carries the same field a
+    // provider hop does. Reading only that field made every OIDC/SAML
+    // sign-in emit flow-redirect and stop calling the host back.
+    clearSsoProviders();
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    const completes: CustomEvent[] = [];
+    const redirects: CustomEvent[] = [];
+    element.addEventListener("zitadel-flow-complete", (e) => completes.push(e as CustomEvent));
+    element.addEventListener("zitadel-flow-redirect", (e) => redirects.push(e as CustomEvent));
+
+    await withStubbedNavigation(async () => {
+      // Drive applyResponse directly: the shared mock has no fixture pairing
+      // a terminal step with a redirect_url, which is why this escaped.
+      (element as unknown as { applyResponse(wire: unknown): void }).applyResponse({
+        id: "flow_terminal",
+        session_id: "sess",
+        session_token: "tok",
+        step: {
+          name: "done",
+          complete: "redirect",
+          redirect_url: "https://rp.example.invalid/cb?code=abc",
+          fields: [],
+          actions: [],
+          gates: {},
+        },
+        redirect_uri: "https://rp.example.invalid/cb?code=abc",
+      });
+      await waitFor(() => (completes.length > 0 ? completes : null));
+    });
+
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.detail.behavior).toBe("redirect");
+    expect(redirects).toHaveLength(0);
   });
 
   it("offers no providers when the project has enabled none", async () => {
