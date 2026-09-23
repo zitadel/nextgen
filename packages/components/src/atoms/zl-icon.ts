@@ -147,7 +147,11 @@ export const SHIPPED_ICON_NAMES = [
   "brand-google",
 ] as const satisfies readonly IconName[];
 
-/** Brand marks only, for the provider button and its playground. */
+/**
+ * Brand marks only. `<zl-sso-providers>` reads this to decide whether a
+ * connection's template has a mark of its own, so adding one here is what
+ * makes a new vendor's button carry its logo.
+ */
 export const SHIPPED_BRAND_ICON_NAMES = ["brand-google"] as const satisfies readonly BrandIconName[];
 
 export type IconSize = "16" | "24";
