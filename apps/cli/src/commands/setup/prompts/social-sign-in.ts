@@ -4,6 +4,7 @@ import {
   clientSecretVariableName,
   idpCatalogEntry,
   IDP_PROVIDERS,
+  type IdpCatalogEntry,
 } from "@zitadel/config/idp-catalog";
 
 import { callbackUriFor } from "../../../lib/idp";
@@ -25,16 +26,33 @@ const NONE = "";
  *
  * Registering the OAuth application is the developer's to do and cannot be
  * automated, so the question announces what to register and where before
- * asking for anything back. Declining costs nothing: `sso enable`
- * performs exactly this journey on an existing Project, which is why this
- * prompt collects answers rather than doing any work — the scaffolding step
- * writes the connection, the schema and the flow in one place for both paths.
+ * asking for anything back. Declining costs nothing: `sso enable` performs
+ * exactly this journey on an existing Project, which is why this prompt
+ * collects answers rather than doing any work — the scaffolding step writes
+ * the connection, the schema and the flow in one place for both paths.
+ *
+ * `--sso` skips only the parts it answers. A flagged run that could not
+ * supply the secret — it is never a flag, and only a scripted run pipes it in
+ * — is still asked for it here, the way `--preset` skips its own question and
+ * no other.
  */
 export class SocialSignInPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.ssoFromFlag) {
+    const provider = ctx.ssoFromFlag ? answers.sso?.provider : await this.chooseProvider();
+    if (provider === undefined) {
       return answers;
     }
+
+    const entry = idpCatalogEntry(provider);
+    this.announce(entry, answers.devPort);
+
+    const clientId = answers.sso?.clientId ?? (await this.askClientId());
+    const secret = answers.sso?.secret ?? (await this.askSecret(provider));
+    return { ...answers, sso: { provider, clientId, secret } };
+  }
+
+  /** The provider, or `undefined` when the developer wants none. */
+  private async chooseProvider(): Promise<string | undefined> {
     const chosen = await select({
       message: "Add a social sign-in provider?",
       initialValue: NONE,
@@ -56,50 +74,48 @@ export class SocialSignInPrompt implements SetupPrompt {
       ],
     });
     bail(chosen);
-    const provider = String(chosen);
-    if (provider === NONE) {
-      return answers;
-    }
+    return String(chosen) === NONE ? undefined : String(chosen);
+  }
 
-    const entry = idpCatalogEntry(provider);
-    // The redirect URI is settled by now: the port question runs before this
-    // one, and the issuer derives from it. Showing it beats making the
-    // developer work it out, because the vendor matches it literally.
+  /**
+   * Say what to register and where. The redirect URI is settled by now — the
+   * port question runs before this one and the issuer derives from it — so it
+   * can be shown rather than left for the developer to work out, which
+   * matters because the vendor matches it literally.
+   */
+  private announce(entry: IdpCatalogEntry, devPort: number): void {
     note(
       [
-        `Register an OAuth application at:`,
+        "Register an OAuth application at:",
         entry.console_url,
         "",
-        `Redirect URI:`,
-        callbackUriFor(issuerFromPort(answers.devPort)),
+        "Redirect URI:",
+        callbackUriFor(issuerFromPort(devPort)),
       ].join("\n"),
       `${entry.display_name} sign-in`,
     );
+  }
 
-    const clientId = await text({
+  private async askClientId(): Promise<string> {
+    const answer = await text({
       message: "Client ID",
       // Vendors format these differently, so only emptiness can be checked.
       validate: (value) => (value.trim() === "" ? "Enter the client id." : undefined),
     });
-    bail(clientId);
+    bail(answer);
+    return String(answer).trim();
+  }
 
-    // Prompted, never a flag: a secret on a command line lands in shell
-    // history, a process listing and CI logs. Empty is a real answer — the
-    // connection is scaffolded either way and the value can be pasted into
-    // .env.local afterwards.
-    const secret = await password({
+  /**
+   * Empty is a deliberate answer: the connection is scaffolded either way and
+   * the developer may prefer to set the value themselves later.
+   */
+  private async askSecret(provider: string): Promise<string | undefined> {
+    const answer = await password({
       message: `Client secret (stored in .env.local as ${clientSecretVariableName(provider)}, Enter to skip)`,
     });
-    bail(secret);
-    const value = String(secret ?? "").trim();
-
-    return {
-      ...answers,
-      sso: {
-        provider,
-        clientId: String(clientId).trim(),
-        secret: value === "" ? undefined : value,
-      },
-    };
+    bail(answer);
+    const value = String(answer ?? "").trim();
+    return value === "" ? undefined : value;
   }
 }

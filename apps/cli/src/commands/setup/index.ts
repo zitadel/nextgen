@@ -187,7 +187,7 @@ export default class Setup extends BaseCommand {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    const ssoFromCommandLine = await ssoFromFlags(flags);
+    const ssoFromCommandLine = await ssoFromFlags(flags, nonInteractive);
 
     const orca = createOrca();
 
@@ -685,15 +685,22 @@ function dryRunProject(issuer: string): CreateProject201 {
  *
  * The client id is required alongside the provider rather than prompted for:
  * a run that named a provider on the command line is scripted, and stopping
- * to ask would hang it. The secret is never a flag, following `variables
- * set`: it is piped in, so it cannot reach shell history, a process listing
- * or a CI log. A terminal on stdin means nothing was piped, and reading it
- * would block forever, so that case is treated as "not supplied".
+ * to ask would hang it.
+ *
+ * The secret is never a flag, following `variables set`: it cannot reach
+ * shell history, a process listing or a CI log. Only a scripted run reads it
+ * from stdin — an interactive one is asked, and consuming stdin there would
+ * leave the wizard's own prompts reading a stream already at EOF. A terminal
+ * on stdin means nothing was piped, and reading it would block forever, so
+ * that case is treated as "not supplied".
  */
-async function ssoFromFlags(flags: {
-  sso?: string;
-  "sso-client-id"?: string;
-}): Promise<SsoAnswer | undefined> {
+async function ssoFromFlags(
+  flags: {
+    sso?: string;
+    "sso-client-id"?: string;
+  },
+  nonInteractive: boolean,
+): Promise<SsoAnswer | undefined> {
   if (flags.sso === undefined) {
     if (flags["sso-client-id"] !== undefined) {
       throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
@@ -708,7 +715,8 @@ async function ssoFromFlags(flags: {
       hint: `Register an OAuth application at ${idpCatalogEntry(flags.sso).console_url} and pass its client id.`,
     });
   }
-  const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
+  const piped =
+    nonInteractive && !process.stdin.isTTY ? (await readStdin(process.stdin)).trim() : "";
   return { provider: flags.sso, clientId, secret: piped === "" ? undefined : piped };
 }
 

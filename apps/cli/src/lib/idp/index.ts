@@ -24,7 +24,7 @@ export {
   readConnectionFiles,
 } from "./connections";
 
-export { callbackUriFor, IDP_CALLBACK_PATH } from "./callback";
+export { callbackUriFor } from "./callback";
 
 export {
   ENV_EXAMPLE,

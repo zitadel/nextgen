@@ -395,13 +395,39 @@ describe("SocialSignInPrompt", () => {
     expect(answers.sso).toEqual({ provider: "google", clientId: "client-id", secret: undefined });
   });
 
-  it("skips itself when --sso was passed", async () => {
+  it("does not ask which provider when --sso named one", async () => {
+    vi.mocked(password).mockResolvedValueOnce("" as never);
     const seeded = baseAnswers({ sso: { provider: "google", clientId: "from-the-flag" } });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
-    expect(answers).toEqual(seeded);
     expect(select).not.toHaveBeenCalled();
+    expect(text).not.toHaveBeenCalled();
+    expect(answers.sso?.provider).toBe("google");
+    expect(answers.sso?.clientId).toBe("from-the-flag");
+  });
+
+  it("still asks for the secret a flagged run could not supply", async () => {
+    // The secret is never a flag, and only a scripted run pipes it in — so an
+    // interactive run with --sso arrives here without one.
+    vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag" as never);
+    const seeded = baseAnswers({ sso: { provider: "google", clientId: "from-the-flag" } });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(password).toHaveBeenCalledOnce();
+    expect(answers.sso?.secret).toBe("typed-after-the-flag");
+  });
+
+  it("keeps a secret that was already piped in rather than asking again", async () => {
+    const seeded = baseAnswers({
+      sso: { provider: "google", clientId: "from-the-flag", secret: "piped" },
+    });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(password).not.toHaveBeenCalled();
+    expect(answers.sso?.secret).toBe("piped");
   });
 
   it("throws E_VALIDATION on Ctrl-C at the provider question", async () => {
