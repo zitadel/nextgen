@@ -43,6 +43,7 @@ type Handler struct {
 	// idpStub holds identity provider connections until the real service
 	// lands (#1003). See internal/api/idp_stub.go.
 	idpStub *idpStubStore
+	ssoStub *ssoStubStore
 }
 
 func NewHandler(
@@ -85,6 +86,7 @@ func NewHandler(
 		grantService:          grantService,
 		variableService:       variableService,
 		pool:                  pool,
+		ssoStub:               newSsoStubStore(),
 		idpStub:               newIdpStubStore(),
 		platformProjectID:     platformProjectID,
 	}

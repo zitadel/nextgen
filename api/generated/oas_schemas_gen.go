@@ -51763,6 +51763,7 @@ type SubmitFlowStepErrorResponse struct {
 	FlowInvalidAction   FlowInvalidAction
 	FlowNotFound        FlowNotFound
 	FlowUnsupported     FlowUnsupported
+	IdpNotFound         IdpNotFound
 	Internal            Internal
 	TknInvalid          TknInvalid
 	NotImplemented      NotImplemented
@@ -51796,6 +51797,7 @@ const (
 	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
 	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
+	IdpNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "idp.not_found"
 	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
@@ -51890,6 +51892,11 @@ func (s SubmitFlowStepErrorResponse) IsFlowNotFound() bool {
 // IsFlowUnsupported reports whether SubmitFlowStepErrorResponse is FlowUnsupported.
 func (s SubmitFlowStepErrorResponse) IsFlowUnsupported() bool {
 	return s.Type == FlowUnsupportedSubmitFlowStepErrorResponse
+}
+
+// IsIdpNotFound reports whether SubmitFlowStepErrorResponse is IdpNotFound.
+func (s SubmitFlowStepErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundSubmitFlowStepErrorResponse
 }
 
 // IsInternal reports whether SubmitFlowStepErrorResponse is Internal.
@@ -52291,6 +52298,27 @@ func (s SubmitFlowStepErrorResponse) GetFlowUnsupported() (v FlowUnsupported, ok
 func NewFlowUnsupportedSubmitFlowStepErrorResponse(v FlowUnsupported) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetFlowUnsupported(v)
+	return s
+}
+
+// SetIdpNotFound sets SubmitFlowStepErrorResponse to IdpNotFound.
+func (s *SubmitFlowStepErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundSubmitFlowStepErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if SubmitFlowStepErrorResponse is IdpNotFound.
+func (s SubmitFlowStepErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpNotFound.
+func NewIdpNotFoundSubmitFlowStepErrorResponse(v IdpNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 
