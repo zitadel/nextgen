@@ -593,6 +593,47 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
 }
 
+// create_user_with_sso is accepted by the contract so an SSO flow can be
+// authored and stored, but no handler is wired yet. A step that reaches it
+// must fail loudly rather than advance as though a user had been created.
+func TestFlowStateMachine_Process_CreateUserWithSsoNotWired(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	// The create_user handler must not run for a different mutation.
+	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
+
+	withSso := domain.FlowOnSuccessCreateUserWithSso
+	def := signupDefinition()
+	def.Steps[0].OnSuccess = &withSso
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "correct-horse-battery-staple",
+		},
+	})
+	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+	assert.Contains(t, err.Error(), "on_success create_user_with_sso not wired")
+}
+
 func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)

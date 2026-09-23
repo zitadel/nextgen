@@ -17185,7 +17185,12 @@ type FlowDefinitionStep struct {
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
-	// - create_user: creates the user record (registration flows).
+	// - create_user: creates the user record (registration flows)
+	// - create_user_with_sso: creates the user record from the identity an
+	// external provider returned, linking it to that identity. Accepted by
+	// the API so an SSO flow can be authored and stored; the engine handler
+	// is not wired yet, and a step reaching it fails with a flow integrity
+	// error rather than creating anything.
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -17340,17 +17345,24 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 
 // Server-side mutation to execute when this step completes successfully.
 // Runs after field validation passes, before the transition fires.
-// - create_user: creates the user record (registration flows).
+// - create_user: creates the user record (registration flows)
+// - create_user_with_sso: creates the user record from the identity an
+// external provider returned, linking it to that identity. Accepted by
+// the API so an SSO flow can be authored and stored; the engine handler
+// is not wired yet, and a step reaching it fails with a flow integrity
+// error rather than creating anything.
 type FlowDefinitionStepOnSuccess string
 
 const (
-	FlowDefinitionStepOnSuccessCreateUser FlowDefinitionStepOnSuccess = "create_user"
+	FlowDefinitionStepOnSuccessCreateUser        FlowDefinitionStepOnSuccess = "create_user"
+	FlowDefinitionStepOnSuccessCreateUserWithSSO FlowDefinitionStepOnSuccess = "create_user_with_sso"
 )
 
 // AllValues returns all FlowDefinitionStepOnSuccess values.
 func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 	return []FlowDefinitionStepOnSuccess{
 		FlowDefinitionStepOnSuccessCreateUser,
+		FlowDefinitionStepOnSuccessCreateUserWithSSO,
 	}
 }
 
@@ -17358,6 +17370,8 @@ func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 func (s FlowDefinitionStepOnSuccess) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowDefinitionStepOnSuccessCreateUser:
+		return []byte(s), nil
+	case FlowDefinitionStepOnSuccessCreateUserWithSSO:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -17369,6 +17383,9 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 	switch FlowDefinitionStepOnSuccess(data) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
+		return nil
+	case FlowDefinitionStepOnSuccessCreateUserWithSSO:
+		*s = FlowDefinitionStepOnSuccessCreateUserWithSSO
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
