@@ -658,8 +658,23 @@ export class ZitadelLogin extends ZitadelSurface {
         // same tradeoff as disconnect; the popstate handler skips stale
         // sentinels in one extra hop from either direction.
         if ((history.state as { zl?: boolean } | null)?.zl === true) {
-          this.ignoreNextPop = true;
-          history.back();
+          if (this.completing) {
+            // A terminal step that navigates away: retire the sentinel in
+            // place instead of traversing. `history.back()` fires `popstate`
+            // in the host, and a host router that reloads on popstate would
+            // re-read the session `maybeCompleteFlow` is about to establish
+            // and act on it in a document that is already being replaced —
+            // the console claim page spent its single-use challenge that way,
+            // once here and once in the document it navigated to. The
+            // retired entry stays on the stack under the destination (a
+            // same-URL destination, like the claim page, replaces it); a back
+            // press from there lands on the host page signed in, which is the
+            // same stale-sentinel tradeoff as above, one hop at most.
+            history.replaceState({ ...history.state, zl: false }, "");
+          } else {
+            this.ignoreNextPop = true;
+            history.back();
+          }
         }
       }
     }

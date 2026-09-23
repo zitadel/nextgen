@@ -328,6 +328,25 @@ The groups below mirror the ones `zitadel --help` prints.
   `start` with `E_VALIDATION` before any runtime is stopped. `setup` writes a
   comment saying so at the top of the scaffolded `.env.example` and
   `.env.local`.
+  The server boots with the platform project
+  and a local admin, so the developer exists on their own server without
+  signing up: the admin signs in as `admin@zitadel.localhost`, and a
+  generated password is kept in `.zitadel/local/admin.json` (gitignored with
+  the rest of `.zitadel/local/`) and never printed. `start` prints a one-time
+  console sign-in link and reports it as `data.console.sign_in_url` with
+  `data.console.signed_in_as`; if no link can be minted (for example a data
+  directory from before the local admin existed), `data.console.error` and
+  `data.console.hint` say why, `start` still succeeds, and `zitadel console`
+  drops out of `next_commands`. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`,
+  in the shell or in `.env.local` / `.env`, opts out of both the platform project
+  and the local admin, for harnesses that
+  want a bare single-project server; `data.console` is then absent.
+- `console` — print (and, interactively, open) a fresh one-time sign-in link
+  for the local console as the local admin: `data.sign_in_url`,
+  `data.signed_in_as`, `data.browser_opened`. Each link works once; run the
+  command again for a new one. The console honours the link only when it is
+  served from loopback, since the token signs in whoever opens it. Fails with `E_VALIDATION` when `start` never
+  created a local admin in this directory. Flags: `--no-open`.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes
@@ -376,6 +395,29 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`
   or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
+- `variables list|get|set|delete` — manage the per-environment variables and
+  secrets a configuration document references as `${{ NAME }}`. Every command
+  addresses one owner: `--environment <name>` (`-e`, alias `--env`) names an
+  environment, and `--project-level` names the project level. Owners do not
+  inherit from one another — a value set at the project level is **not** seen
+  by any environment — so a value a running environment needs must be set on
+  that environment, and one needed on several must be set on each. Because of
+  that, the owner is never defaulted: with neither flag a person is asked and a
+  non-interactive run fails with `E_VALIDATION` naming the project's
+  environments, as ADR 035 specifies for `deploy`. `set` takes its value from a
+  prompt or from stdin and never from a flag, so a credential never reaches
+  `argv`; `--secret` stores it encrypted, after which it can be replaced but
+  never read back (`list` reports it as held, and `--json` omits the value key
+  entirely). `set --as number|boolean` stores a JSON number or boolean
+  instead of a string, so a whole-field `${{ NAME }}` reference resolves to that
+  type; it is refused with `--secret`, and an integer too large to store exactly
+  is refused rather than rounded. Output follows the resource commands: on a
+  pipe, `list` prints tab-separated `name`/`value` rows (a secret's value is
+  `(secret)`) and `get` prints the whole record as JSON, which carries no
+  `value` key for a secret. There is no `pull` and no bulk import. `set` and
+  `delete` honour `--dry-run` and make no change (with no owner flag, a person is still asked,
+  which reads the project's environments); `delete` needs `--force` when
+  non-interactive.
 
 ## Golden path
 
