@@ -38,8 +38,9 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 		require.NoError(t, err)
 		listed, ok := resp.(*api.QueryTeamsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.True(t, teamListed(listed.Teams, claimerTeamID),
-			"the team that owns the project must be in the session-authenticated list")
+		assert.True(t, slices.ContainsFunc(listed.Teams, func(team api.TeamResponse) bool {
+			return team.ID == claimerTeamID
+		}), "the team that owns the project must be in the session-authenticated list")
 	})
 
 	t.Run("getTeam returns the claimer's team", func(t *testing.T) {
@@ -60,7 +61,9 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 		require.NoError(t, err)
 		listed, ok := resp.(*api.QueryTeamsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.True(t, teamListed(listed.Teams, claimerTeamID))
+		assert.True(t, slices.ContainsFunc(listed.Teams, func(team api.TeamResponse) bool {
+			return team.ID == claimerTeamID
+		}))
 
 		getResp, err := secret.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(claimerTeamID)})
 		require.NoError(t, err)
@@ -176,8 +179,4 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.QueryTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
-}
-
-func teamListed(teams []api.TeamResponse, id string) bool {
-	return slices.ContainsFunc(teams, func(team api.TeamResponse) bool { return team.ID == id })
 }
