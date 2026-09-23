@@ -364,7 +364,9 @@ func TestGrantCreateLocators(t *testing.T) {
 	t.Run("own identifier is grant.invalid", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		harness.SeedProjectViewer(t, project.ID, userID)
+		// Admin: the write check runs before validation, so a viewer would
+		// be refused before the self-grant rule is ever reached.
+		harness.SeedProjectAdmin(t, project.ID, userID)
 		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		user, ok := userResp.(*api.User)
@@ -405,7 +407,7 @@ func TestGrantCreateLocators(t *testing.T) {
 	t.Run("own user_id is grant.invalid", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		harness.SeedProjectViewer(t, project.ID, userID)
+		harness.SeedProjectAdmin(t, project.ID, userID)
 
 		sessionClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
@@ -886,7 +888,7 @@ func TestGrantSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 
 	operatorID := harness.CreateUserWithTeam(t, platform.ID)
-	harness.SeedProjectViewer(t, project.ID, operatorID)
+	harness.SeedProjectAdmin(t, project.ID, operatorID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -937,6 +939,31 @@ func TestGrantSessionCaller(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
+
+	t.Run("editor cannot mint grants", func(t *testing.T) {
+		t.Parallel()
+		// Creating a grant is an admin check: a grant can carry any role up to
+		// admin, so an editor minting one could escalate (for instance, admin
+		// to a team it belongs to, which the self-grant rule does not cover).
+		editorID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectEditor(t, project.ID, editorID)
+		editor, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		editor.SetSessionToken(platformSessionCookie(t, editorID).Value)
+
+		// The check runs before the body is read, so the requested relation
+		// cannot change the answer; one request proves the gate.
+		resp, err := editor.CreateGrant(t.Context(), userIDGrant(harness.CreateUserWithTeam(t, platform.ID), api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		forbidden, ok := resp.(*api.CreateGrantForbidden)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrGrantPermissionDenied().Code), forbidden.Code)
+
+		// Reading grants stays open to an editor.
+		queryResp, err := editor.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryGrantsResponse{}, queryResp, helpers.MustMarshal(t, queryResp))
+	})
 
 	t.Run("no foothold is not found", func(t *testing.T) {
 		t.Parallel()

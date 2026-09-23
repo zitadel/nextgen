@@ -11,7 +11,11 @@ import (
 )
 
 func (h *Handler) CreateGrant(ctx context.Context, req *api.CreateGrantRequest, params api.CreateGrantParams) (api.CreateGrantRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), grantAccess, opWrite); err != nil {
+	// opDelete, for its project.admin check: a grant can carry any role up to
+	// admin, so an editor minting one could escalate itself (e.g. admin to a
+	// team it is a member of). The op's miss shape does not matter here —
+	// grantAccess answers a no-foothold miss with grant.not_found either way.
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), grantAccess, opDelete); err != nil {
 		return nil, err
 	}
 	input, err := createGrantInput(string(params.ProjectID), req)

@@ -5,6 +5,7 @@ package integration_test
 import (
 	"cmp"
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -277,6 +278,80 @@ func TestGetProject(t *testing.T) {
 			assertProjectResponse(t, tc.want, resp)
 		})
 	}
+}
+
+// TestProjectSessionCaller covers the session scheme on the by-id project
+// endpoints: a signed-in person holding a grant on a project (the projects
+// `GET /users/me/projects` lists for them) can open it, and somebody without a
+// foothold gets the same proj.not_found a wrong id gets, so the response does
+// not confirm the project exists.
+func TestProjectSessionCaller(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	granteeID := harness.CreateUserWithTeam(t, platform.ID)
+	// One grant covers the read and the rename below.
+	harness.SeedProjectAdmin(t, project.ID, granteeID)
+
+	grantee, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	grantee.SetSessionToken(platformSessionCookie(t, granteeID).Value)
+
+	params := api.GetProjectParams{ProjectID: api.ProjectID(project.ID)}
+
+	// Sequential: the rename below changes what the read before it sees.
+	t.Run("granted person opens the project", func(t *testing.T) {
+		resp, err := grantee.GetProject(t.Context(), params)
+		require.NoError(t, err)
+		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, PreviewOrigins: []string{}}, resp)
+	})
+
+	t.Run("granted person renames the project", func(t *testing.T) {
+		resp, err := grantee.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString(project.Name + " renamed")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("viewer opens but cannot rename", func(t *testing.T) {
+		// Roles are monotonic, never the reverse: a viewer passes the read
+		// check and is refused the editor check. The foothold makes the refusal
+		// a 403, not the anti-oracle 404 a stranger gets.
+		viewerID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectViewer(t, project.ID, viewerID)
+		viewer, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		viewer.SetSessionToken(platformSessionCookie(t, viewerID).Value)
+
+		resp, err := viewer.GetProject(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+
+		patchResp, err := viewer.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("viewer rename")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchProjectErrorResponseStatusCode{}, patchResp, helpers.MustMarshal(t, patchResp))
+		denied := patchResp.(*api.PatchProjectErrorResponseStatusCode)
+		assert.Equal(t, http.StatusForbidden, denied.StatusCode)
+		assert.Equal(t, api.PatchProjectErrorResponseType(domain.ErrProjectPermissionDenied().Code), denied.Response.Type)
+	})
+
+	t.Run("no foothold is not found", func(t *testing.T) {
+		strangerID := harness.CreateUserWithTeam(t, platform.ID)
+		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		stranger.SetSessionToken(platformSessionCookie(t, strangerID).Value)
+
+		notFound := domain.ErrProjectNotFound()
+		resp, err := stranger.GetProject(t.Context(), params)
+		require.NoError(t, err)
+		assertProjectResponse(t, &api.GetProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message}, resp)
+
+		patchResp, err := stranger.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("taken")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchProjectNotFound{}, patchResp, helpers.MustMarshal(t, patchResp))
+	})
 }
 
 func TestPatchProject(t *testing.T) {
