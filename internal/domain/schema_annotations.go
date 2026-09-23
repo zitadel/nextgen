@@ -21,6 +21,19 @@ const (
 	SchemaUniqueScopeTeam    = "team"
 )
 
+// UniqueScopeOf maps an [SchemaAnnotationUnique] value to the uniqueness scope
+// it declares. Anything else, including an absent annotation, is unspecified.
+func UniqueScopeOf(annotation string) AttributeUniqueness {
+	switch annotation {
+	case SchemaUniqueScopeProject:
+		return AttributeUniquenessProject
+	case SchemaUniqueScopeTeam:
+		return AttributeUniquenessTeam
+	default:
+		return AttributeUniquenessUnspecified
+	}
+}
+
 // SchemaDocumentKindUser is the `kind` discriminator of a user schema
 // document (distinct from [SchemaKindUser], the meta-schema filename stem).
 const SchemaDocumentKindUser = "user-schema"

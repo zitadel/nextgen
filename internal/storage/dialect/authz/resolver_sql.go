@@ -421,6 +421,13 @@ func writeScopedClosureExists(w ArgWriter, env Env, params domain.AuthzCheckPara
     )`)
 }
 
+// writeFullTTUExists is the tuple-to-userset arm of a Check. The edge is
+// matched through the relation closure rather than by name: a TTU written on
+// `admin` also answers `editor` and `viewer` checks when the catalog closes
+// admin to those, exactly as a direct `admin` assignment does through
+// writeScopedClosureExists. The compiler records computed usersets only in the
+// closure (compiler.go: "TTU and userset references … remain in the query
+// plan"), so without this join an inherited relation would never see the edge.
 func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	home := params.HomeProjectID()
 	ptype := params.PrincipalType.String()
@@ -430,6 +437,18 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
         FROM `)
 	writeTable(w, env, "authz_expression_edges")
 	w.WriteString(` edge
+        JOIN `)
+	writeTable(w, env, "authz_relation_closure")
+	w.WriteString(` ec
+          ON  ec.catalog_id       = edge.catalog_id
+          AND ec.from_object_type = edge.object_type
+          AND ec.from_relation    = edge.relation
+          AND ec.to_object_type   = `)
+	w.WriteArg(params.ObjectType)
+	w.WriteString(`
+          AND ec.to_relation      = `)
+	w.WriteArg(params.Relation)
+	w.WriteString(`
         JOIN `)
 	writeTable(w, env, "authz_assignments")
 	w.WriteString(` ts
@@ -449,9 +468,6 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString(`
           AND edge.object_type = `)
 	w.WriteArg(params.ObjectType)
-	w.WriteString(`
-          AND edge.relation = `)
-	w.WriteArg(params.Relation)
 	w.WriteString(`
           AND edge.kind = 'tuple_to_userset'
           AND (

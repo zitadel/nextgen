@@ -158,6 +158,18 @@ export const it: Locale = {
   "action.back": "Indietro",
 
   // --- SSO ---
+  "sso.continue_with": "Continua con {name}",
+  "sso.divider": "oppure",
+  "register-sso.title": "Completa la creazione del tuo account",
+  "register-sso.description": "Ci servono ancora pochi dati",
+  "register-sso.field.email": "Email",
+  "register-sso.action.submit": "Crea account",
+  "sso-conflict.title": "Hai già un account",
+  "sso-conflict.description": "Accedi come fai di solito e li collegheremo",
+  "sso-conflict.field.password": "Password",
+  "sso-conflict.action.submit": "Accedi",
+  "sso-conflict.action.passkey": "Usa una passkey",
+  "sso-conflict.action.sign_in": "Torna all'accesso",
   "sso.redirect.title": "Reindirizzamento al provider…",
 
   // --- Cerimonia passkey ---

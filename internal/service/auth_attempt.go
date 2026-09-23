@@ -208,7 +208,15 @@ type Proof interface {
 	proofCheckType() domain.AuthCheckType
 }
 
-// UserProof identifies the user by login name (email, username, phone).
+// UserProof identifies the user by login name.
+//
+// AttributeName names the property the login name is a value of. The flow path
+// sets it from the step it rendered, whose field must be the bound schema's
+// designated identifier. Left empty — the direct-API path, which renders
+// nothing — the login name resolves against the designated identifier of every
+// user schema in the project instead, and must match exactly one user. A
+// direct-API caller never chooses the property. See resolveIdentifier for how
+// the two paths are scoped today.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
@@ -594,6 +602,27 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 	}
 }
 
+// resolveIdentifier finds the user a login name identifies.
+//
+// With an attribute name — the flow path — it looks the value up in that
+// property across the project. That lookup is not yet scoped to the flow's
+// bound schema, which ADR 058 §5 asks for so a same-named team-unique property
+// on another schema cannot collide with it; that predates this resolution and
+// is left for a follow-up.
+//
+// Without one — the direct-API path — the value resolves against the project's
+// designated identifiers. Any status, as the flow path: whether a login may
+// reach an inactive user is decided with status enforcement, not here.
+func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID string, p UserProof) (*domain.User, error) {
+	if p.AttributeName != "" {
+		return s.users.GetByAttributes(ctx, projectID, []domain.Attribute{{
+			Key:   domain.AttributeKey(p.AttributeName),
+			Value: p.LoginName,
+		}})
+	}
+	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
+}
+
 // verify dispatches proof verification to the appropriate secondary port.
 // Returns the checker to persist (always, even on failure), an optional
 // closure with extra writes that must commit atomically with the check
@@ -605,10 +634,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
-			Key:   domain.AttributeKey(p.AttributeName),
-			Value: p.LoginName,
-		}})
+		user, err := s.resolveIdentifier(ctx, attempt.ProjectID, p)
 		if err != nil {
 			return userChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}

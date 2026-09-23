@@ -48,8 +48,9 @@ Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.w
 > `GetResourceScope` (`resource_scope_index`) **before** `resolver.Check` on
 > coarse `project.{viewer,editor,admin}` (seeded system catalog). Create/list
 > keep an explicit `project_id` and call Check directly. `CreateProject` seeds
-> an `sk_proj` ↔ `project.viewer` assignment so the returned project secret can
-> set up the project. The operator-plane ceiling still requires token scope
+> an `sk_proj` ↔ `project.admin` assignment so the returned project secret can
+> set up the project; roles are monotonic, so `admin` closes to `editor` and
+> `viewer` (ADR 054 §5). The operator-plane ceiling still requires token scope
 > `project.write` (preview/`project.read` remains browser-plane). Fine-grained
 > `{resource}.{verb}` catalog relations land with #420; until then do not
 > assume independently mintable per-resource scopes when configuring clients.

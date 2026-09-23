@@ -1,0 +1,44 @@
+/* Styles for `<zl-sso-providers>` — the divider first, then the button list. */
+
+:host {
+  display: block;
+}
+
+.zr-sso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-2);
+}
+
+/* A labelled rule ("or"), drawn with the label sitting in the gap so it needs
+   no background to punch through the line. */
+.zr-sso__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-3);
+  margin-block: var(--zl-spacing-1);
+  color: var(--zl-muted-foreground);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+}
+.zr-sso__divider::before,
+.zr-sso__divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--zl-border);
+}
+
+.zr-sso__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-2);
+}
+
+/* The mark keeps its own colours, so it must not inherit the button's text
+   colour, and it holds its size when the label wraps. */
+.zr-sso__mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+}

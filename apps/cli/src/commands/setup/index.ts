@@ -3,7 +3,6 @@ import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,
@@ -22,6 +21,7 @@ import {
 } from "@zitadel/config/idp-catalog";
 import { consola } from "consola";
 
+import { createZitadelClient } from "../../lib/api-client";
 import { brandingDesignLabel } from "../../lib/branding/designs";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import {
@@ -36,6 +36,10 @@ import { storeClientSecret, type SecretOutcome } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
+import { readLocalAdmin } from "../../lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
+import { readPlatformRuntime } from "../../lib/local-server/runtime";
+import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -363,7 +367,11 @@ export default class Setup extends BaseCommand {
         ? { filesWritten: [] }
         : await materializeSetupResources({
             cwd,
-            client: createZitadelClient({ baseUrl: answers.server, token: project.project_secret }),
+            // Verbatim: the canonical bodies are written back to the project.
+            client: createZitadelClient(
+              { baseUrl: answers.server, token: project.project_secret },
+              { verbatim: true },
+            ),
             projectId: project.id,
             force,
             preset: answers.preset,
@@ -487,11 +495,54 @@ export default class Setup extends BaseCommand {
     // computes the same date the platform will hold the user to. A dry run
     // gets the generic wording: its stand-in project has a fixed past
     // created_at, and no real window started anyway.
+    // On a CLI-managed local server the developer already exists as the local
+    // admin, so the project is attached to their team right away and
+    // `zitadel claim` has nothing left to do. Claiming an anonymous project
+    // stays a cloud journey.
+    let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
+    if (!dryRun && serverKind.value(answers.server) === "local") {
+      // The runtime document naming the platform project does not prove a
+      // claim can complete (a deployment can pin that project without the
+      // platform bootstrap, which leaves the admin without a personal team),
+      // so attaching the project is best-effort: on failure the project stays
+      // unclaimed and setup falls back to the usual claim nudge instead of
+      // failing after it has already written the app files. Reading the admin
+      // belongs inside the guard for the same reason — a malformed
+      // `admin.json` must not fail a setup that already wrote the app.
+      try {
+        const admin = await readLocalAdmin(cwd);
+        if (admin && (await localServerHostsPlatform(answers.server))) {
+          const owner = await claimProjectAsAdmin({
+            serverUrl: answers.server,
+            projectId: project.id,
+            projectSecret: project.project_secret,
+            admin,
+          });
+          // The team is whichever one the platform attached the project to —
+          // the admin's earliest active membership, which need not be the team
+          // its bootstrap document named.
+          const secret = await readZitadelSecret(cwd);
+          await writeZitadelSecret(cwd, {
+            ...secret,
+            team_id: owner.team_id,
+            claimed_at: owner.claimed_at,
+          });
+          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+        }
+      } catch (error) {
+        consola.warn(
+          `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
+        );
+      }
+    }
+
     const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
-      claimState({ secret: {}, server: answers.server }).kind === "detached" ||
-      (serverKind.value(answers.server) === "local" &&
-        (dryRun || (await localServerHostsPlatform(answers.server))));
+      !ownedByLocalAdmin &&
+      (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+        (serverKind.value(answers.server) === "local" &&
+          (dryRun || (await localServerHostsPlatform(answers.server)))));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
@@ -653,18 +704,7 @@ export async function localServerHostsPlatform(
   server: string,
   timeoutMs = 1500,
 ): Promise<boolean> {
-  try {
-    const res = await fetch(new URL("/console/runtime.json", server), {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) {
-      return false;
-    }
-    const doc = (await res.json()) as { console_project_id?: unknown };
-    return doc.console_project_id === "proj_platform";
-  } catch {
-    return false;
-  }
+  return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */

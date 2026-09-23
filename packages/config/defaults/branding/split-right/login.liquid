@@ -124,6 +124,22 @@
         {% endif %}
       {% endfor %}
 
+      {% comment %}
+        Identity providers the step offers, below the primary action: the
+        password path stays the default and this is the alternative, which is
+        also the order the divider reads in. The atom renders nothing when the
+        step carries no providers, so this costs a shipped flow nothing.
+      {% endcomment %}
+      {% if sso_providers and sso_providers.size > 0 %}
+        <zl-sso-providers
+          data-testid="zitadel-sso-providers"
+          providers='{{ sso_providers | json }}'
+          label-format="{{ 'sso.continue_with' | t }}"
+          divider-label="{{ 'sso.divider' | t }}"
+          {% if loading %}disabled{% endif %}
+        ></zl-sso-providers>
+      {% endif %}
+
       {% for a in actions %}
         {% unless a.primary or a.kind == 'back' or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
           <zl-button

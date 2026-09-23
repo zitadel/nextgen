@@ -160,6 +160,18 @@ export const de: Locale = {
   "action.back": "Zurück",
 
   // --- SSO ---
+  "sso.continue_with": "Weiter mit {name}",
+  "sso.divider": "oder",
+  "register-sso.title": "Konto fertig einrichten",
+  "register-sso.description": "Wir brauchen noch ein paar Angaben",
+  "register-sso.field.email": "E-Mail",
+  "register-sso.action.submit": "Konto erstellen",
+  "sso-conflict.title": "Sie haben bereits ein Konto",
+  "sso-conflict.description": "Melden Sie sich wie gewohnt an, dann verbinden wir beide",
+  "sso-conflict.field.password": "Passwort",
+  "sso-conflict.action.submit": "Anmelden",
+  "sso-conflict.action.passkey": "Passkey verwenden",
+  "sso-conflict.action.sign_in": "Zurück zur Anmeldung",
   "sso.redirect.title": "Weiterleitung zum Anbieter…",
 
   // --- Passkey-Vorgang ---

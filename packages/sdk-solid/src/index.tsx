@@ -17,6 +17,7 @@ import {
 
 import type {
   ZitadelFlowCompleteDetail,
+  ZitadelFlowRedirectDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
@@ -46,6 +47,7 @@ declare module "solid-js" {
         "on:zitadel-flow-step"?: (event: CustomEvent<ZitadelFlowStepDetail>) => void;
         "on:zitadel-flow-input"?: (event: CustomEvent<ZitadelFlowInputDetail>) => void;
         "on:zitadel-flow-complete"?: (event: CustomEvent<ZitadelFlowCompleteDetail>) => void;
+        "on:zitadel-flow-redirect"?: (event: CustomEvent<ZitadelFlowRedirectDetail>) => void;
         "on:zitadel-flow-error"?: (event: CustomEvent<ZitadelFlowErrorDetail>) => void;
       };
       "zitadel-logout": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
@@ -113,6 +115,7 @@ export function ZitadelLogin(
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
+      on:zitadel-flow-redirect={(event) => props.onFlowRedirect?.(event.detail)}
       on:zitadel-flow-error={(event) => props.onFlowError?.(event.detail)}
     />
   );

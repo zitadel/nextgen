@@ -22,6 +22,8 @@ const locale: Record<string, string> = {
   "submit.continue": "Continue",
   "action.recover": "Forgot password?",
   "action.back": "Back",
+  "sso.continue_with": "Continue with {name}",
+  "sso.divider": "or",
 };
 
 const step: CreateFlow201Step = {
@@ -107,6 +109,47 @@ describe("branding design catalog", () => {
       });
     });
   }
+
+  describe.each([...BRANDING_DESIGNS])("%s with identity providers", (design) => {
+    /** The step as the engine renders it once a connection is enabled. */
+    const withProviders = {
+      ...context,
+      sso_providers: [
+        { id: "idp_01GOOGLE", name: "Google", template: "google" },
+        { id: "idp_01ACME", name: "Acme SSO", template: "oidc-generic" },
+      ],
+    };
+
+    function render(ctx: Record<string, unknown>): string {
+      const engine = createLiquidEngine({ locale });
+      const { template } = getDefaultBrandingConfig(design);
+      return createSanitiser()(engine.parseAndRenderSync(template, ctx));
+    }
+
+    it("renders the provider atom with the step's providers", () => {
+      const html = render(withProviders);
+
+      expect(html).toContain("<zl-sso-providers");
+      expect(html).toContain('data-testid="zitadel-sso-providers"');
+      // The payload survives sanitisation intact — the atom parses it back.
+      expect(html).toContain("idp_01GOOGLE");
+      expect(html).toContain("idp_01ACME");
+    });
+
+    it("passes the localised label format and divider through", () => {
+      const html = render(withProviders);
+
+      expect(html).toContain('label-format="Continue with {name}"');
+      expect(html).toContain('divider-label="or"');
+    });
+
+    it("renders nothing for a step with no providers", () => {
+      // The shipped presets carry none until `sso enable` adds one, so this
+      // is the common case and must cost the markup nothing.
+      expect(render(context)).not.toContain("zl-sso-providers");
+      expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
+    });
+  });
 
   it("split designs keep the brand pane and mirror class", () => {
     const split = renderDesign("split");

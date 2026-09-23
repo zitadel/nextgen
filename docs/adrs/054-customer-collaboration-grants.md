@@ -158,14 +158,17 @@ The hierarchy direction is normative:
 admin -> editor -> viewer
 ```
 
-Viewer never implies editor or administrator. The current MVP seed closes in
-the opposite direction and assigns project secrets to `project.viewer` so that
-placeholder closure satisfies administrator checks.
+Viewer never implies editor or administrator. The checked-in PostgreSQL,
+SQLite, and Spanner seed migrations close in this direction, and a project
+secret receives `project.admin`. Earlier MVP seeds closed the opposite way and
+assigned project secrets to `project.viewer`; because this software is still
+alpha, those seeds were corrected in place. No compatibility migration or
+assignment backfill is provided, so a database seeded before the correction
+needs a fresh instance.
 
-This software is still alpha. Correct the checked-in PostgreSQL, SQLite, and
-Spanner seed migrations, constructors, and tests together: a project secret
-receives `project.admin`, and `admin` satisfies `editor` and `viewer`. No
-compatibility migration or assignment backfill is provided.
+Creating a grant is an administrator check. A grant can carry any role up to
+`admin`, so an editor that could mint one could escalate itself, for example
+by granting `admin` to a team it belongs to.
 
 That closure applies to a customer project's own `sk_proj_` secret. The
 reserved platform project mints no secret by default, and platform-homed

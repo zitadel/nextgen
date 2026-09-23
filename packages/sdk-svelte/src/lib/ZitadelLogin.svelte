@@ -25,6 +25,7 @@
     onFlowStep,
     onFlowInput,
     onFlowComplete,
+    onFlowRedirect,
     onFlowError,
   }: ZitadelLoginProps = $props();
 
@@ -50,11 +51,14 @@
       onFlowInput?.((event as CustomEvent<ZitadelFlowInputDetail>).detail);
     const complete = (event: Event): void =>
       onFlowComplete?.((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
+    const redirect = (event: Event): void =>
+      onFlowRedirect?.((event as CustomEvent<ZitadelFlowRedirectDetail>).detail);
     const error = (event: Event): void =>
       onFlowError?.((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
     node.addEventListener('zitadel-flow-step', step);
     node.addEventListener('zitadel-flow-input', input);
     node.addEventListener('zitadel-flow-complete', complete);
+    node.addEventListener('zitadel-flow-redirect', redirect);
     node.addEventListener('zitadel-flow-error', error);
     return () => {
       node.removeEventListener('zitadel-flow-step', step);
