@@ -90,42 +90,55 @@ describe("<zl-sso-providers>", () => {
     document.removeEventListener("zl-sso-select", listener);
   });
 
-  it("holds the chosen button and disables the rest while the redirect is in flight", async () => {
-    const atom = await mount([GOOGLE, GITHUB]);
-
-    buttons(atom)[0]?.click();
-    await atom.updateComplete;
-
-    expect(buttons(atom)[0]?.hasAttribute("loading")).toBe(true);
-    expect(buttons(atom)[1]?.hasAttribute("disabled")).toBe(true);
-  });
-
-  it("ignores a second click while a redirect is already in flight", async () => {
+  it("does not let the inner button's zl-submit escape", async () => {
+    // `<zl-button>` announces every click as `zl-submit`. If that reached the
+    // orchestrator it would submit the step with the wrong action — which is
+    // exactly what happened before this was caught: the server answered
+    // `error.email_required` instead of redirecting to the provider.
     const atom = await mount([GOOGLE]);
-    const listener = vi.fn();
-    atom.addEventListener("zl-sso-select", listener);
+    const escaped = vi.fn();
+    document.addEventListener("zl-submit", escaped);
 
     buttons(atom)[0]?.click();
-    await atom.updateComplete;
-    buttons(atom)[0]?.click();
 
-    expect(listener).toHaveBeenCalledOnce();
+    expect(escaped).not.toHaveBeenCalled();
+    document.removeEventListener("zl-submit", escaped);
   });
 
-  it("releases the buttons on reset, so a failed submit is recoverable", async () => {
+  it("does not hold state of its own across a click", async () => {
+    // Submitting re-renders the step and replaces this element, so a pending
+    // flag kept here would be discarded on the same frame. The template's
+    // `disabled` is the whole mechanism — see the class docstring.
     const atom = await mount([GOOGLE, GITHUB]);
-    buttons(atom)[0]?.click();
-    await atom.updateComplete;
 
-    atom.reset();
+    buttons(atom)[0]?.click();
     await atom.updateComplete;
 
     expect(buttons(atom)[0]?.hasAttribute("loading")).toBe(false);
     expect(buttons(atom)[1]?.hasAttribute("disabled")).toBe(false);
-    const listener = vi.fn();
-    atom.addEventListener("zl-sso-select", listener);
-    buttons(atom)[1]?.click();
-    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it("gives each button a test id from the connection, not the template", async () => {
+    // Two connections for one vendor is an ordinary setup (staging and prod
+    // tenants); keying on the template would make both ids identical and
+    // every getByTestId lookup ambiguous.
+    const second = { id: "idp_google_2", name: "Google (staging)", template: "google" };
+    const atom = await mount([GOOGLE, second]);
+
+    expect(buttons(atom).map((b) => b.getAttribute("data-testid"))).toEqual([
+      `zitadel-sso-provider-${GOOGLE.id}`,
+      `zitadel-sso-provider-${second.id}`,
+    ]);
+  });
+
+  it("drops a null hole rather than throwing", async () => {
+    // Reachable when a host assigns the property directly from server data.
+    host.innerHTML = `<zl-sso-providers></zl-sso-providers>`;
+    const atom = host.querySelector("zl-sso-providers") as ZlSsoProviders;
+    atom.providers = [GOOGLE, null as unknown as typeof GOOGLE];
+    await atom.updateComplete;
+
+    expect(buttons(atom)).toHaveLength(1);
   });
 
   it("disables every button while the step is submitting", async () => {

@@ -20,7 +20,7 @@ export type MockSsoProvider = CreateFlow201StepSsoProvidersItem;
  * `password` is reached only after an identifier, so it never carries them —
  * the same rule the CLI's generator applies when writing the flow file.
  */
-const PROVIDER_STEPS = new Set(["identifier", "register", "passkey-login", "sso-conflict"]);
+const PROVIDER_STEPS = new Set(["identifier", "register", "passkey-login"]);
 
 let overlay: readonly MockSsoProvider[] = [];
 
