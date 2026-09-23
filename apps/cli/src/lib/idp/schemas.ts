@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import { FLOWS_DIR } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
@@ -106,4 +107,55 @@ export function selectSchema(files: readonly SchemaFile[], requested?: string): 
     });
   }
   return only;
+}
+
+/** The login flow files a Project holds, with the names to report them by. */
+export type FlowFile = {
+  readonly name: string;
+  readonly path: string;
+  readonly body: Record<string, unknown>;
+};
+
+/**
+ * Read the Project's flow files.
+ *
+ * A flow names the schema it runs against, so the caller can pick the ones
+ * belonging to the schema being changed rather than editing every flow.
+ */
+export async function readFlowFiles(cwd: string): Promise<FlowFile[]> {
+  const dir = join(cwd, FLOWS_DIR);
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return [];
+  }
+  const files: FlowFile[] = [];
+  for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
+    const path = `${FLOWS_DIR}/${entry}`;
+    let body: unknown;
+    try {
+      body = JSON.parse(await readFile(join(dir, entry), "utf8"));
+    } catch (error) {
+      throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
+        hint: "Fix the file, then run the command again.",
+        details: { file: path, parse_error: String(error) },
+      });
+    }
+    if (!isObject(body)) {
+      throw new ZitadelError("E_VALIDATION", `${path} does not contain a JSON object`, {
+        details: { file: path },
+      });
+    }
+    files.push({ name: basename(entry, ".json"), path, body });
+  }
+  return files;
+}
+
+/** Whether a schema enables a given authentication method. */
+export function enabledMethods(schema: SchemaFile): { password: boolean; passkey: boolean } {
+  return {
+    password: schema.methods.includes("password"),
+    passkey: schema.methods.includes("passkey"),
+  };
 }

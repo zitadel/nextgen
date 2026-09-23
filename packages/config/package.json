@@ -80,7 +80,12 @@
     },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./sso": {
+      "@zitadel/source": "./src/sso.ts",
+      "types": "./dist/sso.d.mts",
+      "import": "./dist/sso.mjs"
+    }
   },
   "publishConfig": {
     "access": "public"

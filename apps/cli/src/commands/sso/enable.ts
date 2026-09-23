@@ -11,19 +11,24 @@ import {
   IDP_PROVIDERS,
   scaffoldConnection,
 } from "@zitadel/config/idp-catalog";
+import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
 
 import { ZitadelError } from "../../lib/errors";
 import {
+  enabledMethods,
   IDPS_DIR,
   planConnection,
+  readFlowFiles,
   readConnectionFiles,
   readSchemaFiles,
   selectSchema,
   storeClientSecret,
+  type SchemaFile,
   type SecretOutcome,
 } from "../../lib/idp";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
+import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
 
 /** Fixed route every provider redirects back to, on the Project's own origin. */
@@ -142,8 +147,15 @@ export default class SsoEnable extends BaseCommand {
     // not exist, and anything that appeared since is not ours to overwrite.
     await writeFile(target, `${JSON.stringify(connection, null, 2)}\n`, { flag: "wx" });
     const secret = await storeClientSecret({ cwd, name: variable, value: secretValue });
+    const edits = await this.enableInConfiguration(cwd, schema, plan.slug);
 
     consola.success(`Wrote ${plan.path}`);
+    for (const file of edits.written) {
+      consola.success(`Updated ${file}`);
+    }
+    for (const skipped of edits.skipped) {
+      consola.warn(`Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`);
+    }
     if (secret.stored) {
       consola.success(`Stored ${variable} in .env.local`);
     } else {
@@ -156,10 +168,54 @@ export default class SsoEnable extends BaseCommand {
 
     return this.emit({
       status: "ok",
-      data: this.payload({ provider, schema: schema.name, plan, callbackUri, secret }),
+      data: this.payload({
+        provider,
+        schema: schema.name,
+        plan,
+        callbackUri,
+        secret,
+        changed: edits.written,
+        skipped: edits.skipped,
+      }),
       pretty: `Enabled ${entry.display_name} for ${schema.name}`,
       nextCommands: ["plan", "apply"],
     });
+  }
+
+
+  /**
+   * Enable the provider in the schema and every login flow that runs against
+   * it, writing only what changed. A flow belonging to another schema is left
+   * alone: enabling Google for customers must not touch the employee journey.
+   */
+  private async enableInConfiguration(
+    cwd: string,
+    schema: SchemaFile,
+    slug: string,
+  ): Promise<{ written: string[]; skipped: SsoSkipped[] }> {
+    const written: string[] = [];
+    const skipped: SsoSkipped[] = [];
+
+    const schemaResult = applySsoToSchema(schema.body, slug);
+    if (schemaResult.changed) {
+      await writeFile(join(cwd, schema.path), `${JSON.stringify(schemaResult.document, null, 2)}\n`);
+      written.push(schema.path);
+    }
+
+    const methods = enabledMethods(schema);
+    const publishedSchemaId = await publishedIdOf(cwd, schema.path);
+    for (const flow of await readFlowFiles(cwd)) {
+      if (!flowUsesSchema(flow.body, schema, publishedSchemaId)) {
+        continue;
+      }
+      const result = applySsoToFlow(flow.body, slug, methods);
+      skipped.push(...result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })));
+      if (result.changed) {
+        await writeFile(join(cwd, flow.path), `${JSON.stringify(result.document, null, 2)}\n`);
+        written.push(flow.path);
+      }
+    }
+    return { written, skipped };
   }
 
   /** The machine-readable payload. Never the secret, only whether it is held. */
@@ -169,6 +225,8 @@ export default class SsoEnable extends BaseCommand {
     plan: { action: string; slug: string; path?: string; file?: { path: string } };
     callbackUri: string;
     secret: SecretOutcome | undefined;
+    changed?: string[];
+    skipped?: SsoSkipped[];
   }): Record<string, unknown> {
     return {
       provider: input.provider,
@@ -179,6 +237,8 @@ export default class SsoEnable extends BaseCommand {
         file: input.plan.file?.path ?? input.plan.path ?? `${IDPS_DIR}/${input.plan.slug}.json`,
       },
       callback_uri: input.callbackUri,
+      changed: input.changed ?? [],
+      untouched: (input.skipped ?? []).map((s) => s.region),
       secret:
         input.secret === undefined
           ? null
@@ -232,5 +292,46 @@ export default class SsoEnable extends BaseCommand {
     }
     const value = String(answer ?? "").trim();
     return value === "" ? undefined : value;
+  }
+}
+
+/**
+ * Whether a flow runs against this schema. Flows name it by the URL the
+ * schema publishes, so the schema's own `$id` is the reliable link; a Project
+ * with one schema and one flow matches on that alone.
+ */
+function flowUsesSchema(
+  flow: Record<string, unknown>,
+  schema: SchemaFile,
+  publishedSchemaId: string | undefined,
+): boolean {
+  const used = flow.user_schema;
+  if (typeof used !== "string") {
+    return false;
+  }
+  // Once a Project has been applied, the flow names the schema by the id the
+  // platform assigned, which `.zitadel/state.json` records against the schema
+  // file. Before that it still carries the scaffolded URL.
+  if (publishedSchemaId !== undefined && used === publishedSchemaId) {
+    return true;
+  }
+  const id = schema.body.$id;
+  if (typeof id === "string" && id === used) {
+    return true;
+  }
+  return used.endsWith(`/${schema.name}.json`);
+}
+
+/**
+ * The platform id a local file was last synced as, from `.zitadel/state.json`.
+ * Absent before the first `apply`, and absent entirely on a Project that has
+ * never synced — both mean "fall back to matching on the scaffolded URL".
+ */
+async function publishedIdOf(cwd: string, path: string): Promise<string | undefined> {
+  try {
+    const state = await readState(cwd);
+    return state.resources?.[path]?.id;
+  } catch {
+    return undefined;
   }
 }
