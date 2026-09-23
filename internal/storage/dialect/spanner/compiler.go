@@ -22,8 +22,8 @@ func (c *statementCompiler) Reset() {
 	c.args = nil
 }
 
-func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
-	return compileList[F, T](context.Background(), c, stmt, opt, schema, "", "")
+func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T], conjuncts ...string) error {
+	return compileList[F, T](context.Background(), c, stmt, opt, schema, "", "", conjuncts...)
 }
 
 // compileList builds a list SELECT with authz EXISTS injection before
