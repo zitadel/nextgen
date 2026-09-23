@@ -125,7 +125,7 @@ func TestProjectService_Create(t *testing.T) {
 						assert.Equal(t, domain.AuthzPrincipalTypeSKProj, a.PrincipalType)
 						assert.Equal(t, "proj_generated", a.PrincipalID)
 						assert.Equal(t, "project", a.ObjectType)
-						assert.Equal(t, "viewer", a.Relation)
+						assert.Equal(t, "admin", a.Relation)
 						return nil
 					},
 				)

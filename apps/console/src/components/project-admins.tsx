@@ -62,14 +62,6 @@ export function ProjectAdmins({
   onChanged: () => void;
 }) {
   const rows = grants.map(toAdminRow);
-  // Only `admin`: this section creates that relation, and `POST /grants`
-  // refuses a duplicate per principal *and* relation, so somebody holding
-  // `viewer` can still be made an admin.
-  const alreadyAdmins = grants
-    .filter((grant) => grant.relation === "admin")
-    .map((grant) => grant.user?.user_id ?? grant.team?.team_id)
-    .filter((id): id is string => Boolean(id));
-
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <Card className="mt-8 gap-0 rounded-xl py-0" role="region" aria-labelledby="project-admins">
@@ -78,7 +70,7 @@ export function ProjectAdmins({
           <span id="project-admins" className={EYEBROW}>
             Admins
           </span>
-          <AddAdminDialog projectId={projectId} alreadyAdmins={alreadyAdmins} onAdded={onChanged}>
+          <AddAdminDialog projectId={projectId} onAdded={onChanged}>
             {/* Primary and the list screens' size: it is the section's one
                 action, and it reads like the Add on Users and Teams. */}
             <Button className="shrink-0 gap-1.5 px-2.5!">

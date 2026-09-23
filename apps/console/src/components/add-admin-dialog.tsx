@@ -1,15 +1,8 @@
-import { Loader2, UserRound } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { useRouteContext } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxPlaceholder,
-  ComboboxTrigger,
-  ComboboxValue,
-} from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,51 +13,51 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
-import { field } from "../lib/record";
-import { userIdentifier, userIdentity } from "../lib/user";
 
 /**
- * Give an existing person admin access to a project (#769).
+ * Give somebody admin access to a project by their email address (#1236,
+ * journey in #769).
  *
  * **The project is the caller's.** The admins section of a project's page
  * renders this, so the grant is created against that route's `projectId` —
  * never the console's own platform project, whose grants are not the ones
  * anyone means (#1238).
  *
- * **The colleague must already have signed up.** A grant binds a `user_id`,
- * so there is nobody to bind until the account exists — which is why this picks
- * from people rather than taking an email like the design's `Invite admin`
- * frame. #769 scopes it the same way: the signup link is shared separately, and
- * access is given afterwards.
+ * **The field holds the designated identifier.** A schema designates which
+ * property identifies a user (ADR 058); in the default schema that is the email
+ * address, which is what the label says and what `type="email"` validates.
  *
- * **The picker filters on the client.** `POST /users/query` has no filter field
- * for an identifier: the enum is `created_at`, `id`, `schema`, `status`,
- * `team_id` and `lifecycle_owner_team_id`, so an email cannot be resolved
- * server-side. One page of users is loaded and the Combobox's own search
- * narrows it, which is honest for a project whose people fit in a page and
- * wants a server-side filter before it does not.
+ * **The answer is always the same.** `POST /grants` with `user.identifier`
+ * answers 202 with no body whatever the address turns out to be — a hit, a
+ * miss, a duplicate or an ambiguous lookup (#1229). There is nothing to branch
+ * on, so the console never does: every accepted submit shows
+ * `NEUTRAL_MESSAGE`. That is the point — an operator cannot use this field to
+ * find out who has an account.
  *
- * **People who are already admins are not offered.** `POST /grants` refuses a
- * second grant for the same principal and relation, so offering them is
- * offering a choice that cannot work. The refusal is still handled: the list of
- * existing admins is a snapshot, and somebody else can grant the same person
- * while this dialog is open.
+ * **The one exception is the operator's own address**, which the API refuses
+ * outright rather than neutrally. The console checks for it before sending, so
+ * the answer names the mistake instead of claiming a grant that was not made.
+ * Signed in without an identifier there is nothing to compare against, and the
+ * API's own `grant.invalid` message comes back inline instead.
+ *
+ * **The list read is how the result becomes visible.** `onAdded` refreshes the
+ * screen behind the dialog, so a grant that was really created shows up as a
+ * row; one that was not, does not.
  */
 export function AddAdminDialog({
   children,
   projectId,
   onAdded,
-  alreadyAdmins,
 }: {
   children: ReactNode;
   /** The project the grant is created on. */
   projectId: string;
   onAdded: () => void;
-  /** Principal ids that already hold an `admin` grant on that project. */
-  alreadyAdmins: readonly string[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -82,11 +75,10 @@ export function AddAdminDialog({
           </DialogDescription>
         </DialogHeader>
         {/* Remounted per opening so a cancelled attempt does not leave its
-            selection, its error or its people list behind. */}
+            address or its error behind. */}
         {open && (
           <AddAdminForm
             projectId={projectId}
-            alreadyAdmins={alreadyAdmins}
             onDone={() => {
               setOpen(false);
               onAdded();
@@ -99,157 +91,95 @@ export function AddAdminDialog({
   );
 }
 
-/** A person the picker offers. */
-interface Person {
-  id: string;
-  /** What the row reads: the resolved display or identifier, else the id. */
-  label: string;
-  /** The second line, when the display and the identifier are different values. */
-  description?: string;
-}
+/** What every accepted submit says, whoever the address belongs to. */
+export const NEUTRAL_MESSAGE =
+  "If the user exists in our system, they have been granted access to your project.";
+
+/** What the operator's own address gets instead, since the API refuses it. */
+export const SELF_MESSAGE = "You already have access to this project. Enter a colleague's address.";
 
 function AddAdminForm({
   projectId,
-  alreadyAdmins,
   onDone,
   onCancel,
 }: {
   projectId: string;
-  alreadyAdmins: readonly string[];
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [people, setPeople] = useState<Person[] | undefined>(undefined);
-  const [selected, setSelected] = useState<Person | undefined>(undefined);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const { session } = useRouteContext({ from: "/_authed" });
+  const self = session.user?.identifier;
+  const inputId = useId();
+  const errorId = `${inputId}-error`;
+  const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const page = await api.queryUsers({ limit: PEOPLE_LIMIT });
-        if (cancelled) return;
-        const granted = new Set(alreadyAdmins);
-        setPeople(page.users.map(toPerson).filter((person) => !granted.has(person.id)));
-      } catch (cause) {
-        if (cancelled) return;
-        setPeople([]);
-        setError(describeError(cause, "The people on this project could not be loaded."));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // The snapshot is taken once per opening: the dialog is remounted each time,
-    // so a person granted since the last open is already excluded.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function submit() {
-    if (!selected) return;
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    // The browser has already refused a malformed address by this point:
+    // `type="email"` and `required` are the format check, so there is no
+    // console-authored format message to keep in step with the server's.
+    event.preventDefault();
+    const identifier = value.trim();
+    if (self && identifier.toLowerCase() === self.trim().toLowerCase()) {
+      setError(SELF_MESSAGE);
+      return;
+    }
     setSubmitting(true);
     setError(undefined);
     try {
-      await api.createGrant(
-        { user: { user_id: selected.id }, relation: "admin" },
-        { project_id: projectId },
-      );
-      toast.success(`${selected.label} added`, {
-        description: "They now have admin access to this project.",
-      });
+      await api.createGrant({ user: { identifier }, relation: "admin" }, { project_id: projectId });
+      toast(NEUTRAL_MESSAGE);
       onDone();
     } catch (cause) {
-      // Includes the duplicate case: the API refuses a second identical
-      // binding, and its own message says so better than console-authored copy.
+      // ADR 030: the refusal's own message is the human-facing string.
       setError(describeError(cause, "The admin could not be added."));
     } finally {
       setSubmitting(false);
     }
   }
 
-  const loading = people === undefined;
-
   return (
-    <>
-      <Combobox open={pickerOpen} onOpenChange={setPickerOpen}>
-        <ComboboxAnchor asChild>
-          <ComboboxTrigger
-            label="Person"
-            open={pickerOpen}
-            disabled={loading}
-            className="w-full"
-            addon={<UserRound className="size-4" />}
-            onOpen={() => setPickerOpen(true)}
-          >
-            {selected ? (
-              <ComboboxValue>{selected.label}</ComboboxValue>
-            ) : (
-              <ComboboxPlaceholder>
-                {loading ? "Loading people…" : "Select a person"}
-              </ComboboxPlaceholder>
-            )}
-          </ComboboxTrigger>
-        </ComboboxAnchor>
-        <ComboboxContent
-          options={(people ?? []).map((person) => ({
-            value: person.id,
-            label: person.label,
-            description: person.description,
-          }))}
-          selected={selected ? [selected.id] : []}
-          searchPlaceholder="Search people"
-          emptyLabel={emptyLabel(people, error)}
-          onSelect={(id) => setSelected((people ?? []).find((person) => person.id === id))}
-          onClose={() => setPickerOpen(false)}
+    // `contents` keeps the dialog's own column spacing: the form is here for
+    // native validation and Enter-to-submit, not as a layout box.
+    <form className="contents" onSubmit={(event) => void submit(event)}>
+      {/* A refusal makes the field invalid, not just the text below it: the
+          `Input` and the `Field` both carry their own styling for that state.
+          `aria-describedby` is what carries the reason, which `aria-invalid`
+          alone does not: `Field` wires up no description of its own, so a
+          screen reader returning to the control would otherwise hear that it
+          is wrong without hearing why. */}
+      <Field data-invalid={error ? true : undefined}>
+        <FieldLabel htmlFor={inputId}>Email address</FieldLabel>
+        <Input
+          id={inputId}
+          name="identifier"
+          type="email"
+          required
+          autoComplete="off"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            // The message described the address that was refused. Editing makes
+            // it a different address, so the message and the invalid state go
+            // with the old one rather than waiting for the next submit.
+            setError(undefined);
+          }}
         />
-      </Combobox>
-
-      {error && <p className="text-destructive text-sm">{error}</p>}
+        <FieldError id={errorId}>{error}</FieldError>
+      </Field>
 
       <DialogFooter>
-        <Button variant="outline" onClick={onCancel} disabled={submitting}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
-        <Button onClick={() => void submit()} disabled={!selected || submitting}>
+        <Button type="submit" disabled={value.trim() === "" || submitting}>
           {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
           Add admin
         </Button>
       </DialogFooter>
-    </>
+    </form>
   );
-}
-
-/**
- * What the picker says when it has nothing to offer, which happens for three
- * different reasons: the list could not be loaded, everyone already holds a
- * grant, or the search matched nobody. Only the last of those is the operator's
- * to act on by signing the colleague up.
- */
-function emptyLabel(people: Person[] | undefined, error: string | undefined): string {
-  if (error && people?.length === 0) return "The people on this project could not be loaded.";
-  if (people?.length === 0) return "Everyone on this project is already an admin.";
-  return "Nobody found. They need to sign up first.";
-}
-
-/**
- * How many people the picker holds. One page, because the filtering is
- * client-side: a project with more people than this cannot reach the ones past
- * it, and the fix is a server-side identifier filter rather than a bigger
- * number.
- */
-const PEOPLE_LIMIT = 100;
-
-function toPerson(user: Record<string, unknown>): Person {
-  const id = field(user, "id") ?? "";
-  const identifier = userIdentifier(user);
-  const label = userIdentity(user) ?? id;
-  return {
-    id,
-    label,
-    // Only when it adds something: a user whose display *is* the identifier
-    // would otherwise render the same string twice.
-    description: identifier && identifier !== label ? identifier : undefined,
-  };
 }
