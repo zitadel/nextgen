@@ -326,6 +326,9 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 			resp.RedirectURI = api.NewOptURI(u)
 		}
 	}
+	// Stub: give each slug the connection's display name and template so the
+	// login can label and brand its buttons (#1031 does this in the engine).
+	resp.Step.SSOProviders = h.resolveSsoProviders(result.State.ProjectID, result.Step)
 	if terminal && result.HandoffToken != "" {
 		resp.HandoffToken = api.NewOptString(result.HandoffToken)
 		resp.HandoffTokenExpiresAt = api.NewOptDateTime(result.HandoffTokenExpiresAt)

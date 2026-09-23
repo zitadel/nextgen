@@ -16,7 +16,6 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 )
 
 // This file is a stub for the external sign-in half of the flow engine, so the
@@ -140,10 +139,14 @@ func (h *Handler) ssoAuthorizeStep(ctx context.Context, state *domain.FlowState,
 	}, nil
 }
 
-// IdpCallbackPath is where a provider returns the browser. The CLI tells the
-// developer to register `<app origin>/__nextgen/idp/callback` with the vendor,
-// and the app's dev proxy forwards `/__nextgen/*` here with the prefix intact.
+// IdpCallbackPath is the redirect URI registered with the vendor, on the app's
+// own origin — the same value the CLI prints during `sso enable`.
 const IdpCallbackPath = "/__nextgen/idp/callback"
+
+// IdpCallbackRoute is where that request lands on this server. The app's proxy
+// strips its own prefix before forwarding (see `proxyRequest` in the Next
+// SDK's middleware), so the server serves the remainder.
+const IdpCallbackRoute = "/idp/callback"
 
 // IdpCallbackHandler serves the provider's return leg. Stub: see the note at
 // the top of this file.
@@ -210,57 +213,44 @@ func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, 
 		// follows. The real engine has to make this decision deliberately.
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, pending.returnURL+"/login", http.StatusFound)
+	// The flow handle rides in the query so the page can resume rather than
+	// start a new flow: `<zitadel-login resume-flow-id>` reads it and calls
+	// `GET /flow/{id}` with the cookie set above.
+	http.Redirect(w, r, pending.returnURL+"/login?flow="+url.QueryEscape(state.ID), http.StatusFound)
 }
 
-// ssoOutcomeStep picks the step the flow resumes on, mirroring the three
-// outcomes the flow definition routes: a known identity signs in, an unknown
-// one registers, and an email that already has an account has to prove it.
+// ssoOutcomeStep picks the step the flow resumes on.
+//
+// Always `register-sso` on a successful return, because this stub records no
+// identity link: every returning identity is one it has never seen, which is
+// the engine's `identity_unknown` outcome. The other two outcomes are reached
+// from there rather than decided here — `register-sso` commits with
+// `on_success: create_user_with_sso`, and an email that already has an account
+// fails that with `user_already_exists`, which the flow definition routes to
+// `sso-conflict`. Recognising a returning user at all is what the identity
+// link buys, and that is #1033's.
 func (h *Handler) ssoOutcomeStep(ctx context.Context, state *domain.FlowState, email string) string {
 	if email == "" {
+		// The user declined at the provider: leave them where they were.
 		return state.CurrentStep
 	}
-	exists, err := h.userExistsByEmail(ctx, state.ProjectID, email)
-	if err != nil {
-		slog.ErrorContext(ctx, "sso stub: user lookup failed", slog.String("error", err.Error()))
+	const registerSSOStep = "register-sso"
+	if !h.flowStepExists(ctx, state, registerSSOStep) {
+		// A project whose flow has no provider steps (the CLI writes them with
+		// `sso enable`) has nowhere to go; the current step is the safe answer.
 		return state.CurrentStep
 	}
-	if exists {
-		// No identity link is recorded by this stub, so an existing account is
-		// always treated as "not linked yet" — the conflict step. The real
-		// engine signs a linked user straight in here.
-		return "sso-conflict"
-	}
-	return "register-sso"
+	return registerSSOStep
 }
 
-func (h *Handler) userExistsByEmail(ctx context.Context, projectID, email string) (bool, error) {
-	out, err := h.userService.ListUsers(ctx, service.ListUsersInput{ProjectID: projectID})
-	if err != nil {
-		return false, err
+// flowStepExists reports whether the running definition declares a step.
+func (h *Handler) flowStepExists(ctx context.Context, state *domain.FlowState, name string) bool {
+	def, err := h.flowDefinitionService.Get(ctx, state.ProjectID, state.DefinitionID)
+	if err != nil || def == nil {
+		return false
 	}
-	for _, user := range out.Items {
-		if strings.EqualFold(userEmail(user), email) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// userEmail reads the email attribute off a user read. The stub matches on it
-// because it records no identity link; the real engine looks the link up.
-func userEmail(user *domain.User) string {
-	if user == nil {
-		return ""
-	}
-	for _, attr := range user.Attributes {
-		if attr.Key == "email" {
-			if value, ok := attr.Value.(string); ok {
-				return value
-			}
-		}
-	}
-	return ""
+	_, ok := def.FindStep(name)
+	return ok
 }
 
 // exchangeSsoCode swaps the authorization code for tokens and reads the email
@@ -283,7 +273,10 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := http.DefaultClient.Do(req)
+	if h.ssoEgress == nil {
+		return "", fmt.Errorf("no egress client configured for the token exchange")
+	}
+	resp, err := h.ssoEgress.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -357,4 +350,34 @@ func scopesOrDefault(oidc api.IdpConnectionOidc) []string {
 		return oidc.Scopes
 	}
 	return []string{"openid", "profile", "email"}
+}
+
+// resolveSsoProviders turns the slugs a rendered step carries into the
+// {id, name, template} entries the login components draw buttons from.
+//
+// Stub: the engine renders slugs only (see ssoProvidersFromSlugs), and looking
+// each one up in the identity layer is #1031's job. A slug with no connection
+// is dropped rather than shown — a button that cannot start a sign-in is worse
+// than no button.
+func (h *Handler) resolveSsoProviders(projectID string, step *domain.FlowStep) []api.SSOProvider {
+	if step == nil || len(step.SSOProviders) == 0 {
+		return nil
+	}
+	out := make([]api.SSOProvider, 0, len(step.SSOProviders))
+	for _, provider := range step.SSOProviders {
+		record, ok := h.idpStub.getBySlug(projectID, provider.ID)
+		if !ok {
+			continue
+		}
+		name := record.definition.DisplayName
+		if name == "" {
+			name = record.slug
+		}
+		template := record.definition.Template.Or("")
+		out = append(out, api.SSOProvider{ID: record.id, Name: name, Template: template})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

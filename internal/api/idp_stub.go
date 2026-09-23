@@ -109,6 +109,14 @@ func (s *idpStubStore) get(projectID, id string) (*idpStubRecord, bool) {
 	return nil, false
 }
 
+// getBySlug finds a connection by the slug a flow definition references.
+func (s *idpStubStore) getBySlug(projectID, slug string) (*idpStubRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.byProject[projectID][slug]
+	return record, ok
+}
+
 func (r *idpStubRecord) response() api.IdpResponse {
 	return api.IdpResponse{
 		ID:         r.id,
