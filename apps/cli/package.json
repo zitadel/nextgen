@@ -71,6 +71,9 @@
       },
       "branding": {
         "description": "Work with login branding revisions."
+      },
+      "sso": {
+        "description": "Manage the identity providers users can sign in with."
       }
     }
   },

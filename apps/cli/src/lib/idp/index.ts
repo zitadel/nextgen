@@ -32,3 +32,5 @@ export {
   type SecretOutcome,
   storeClientSecret,
 } from "./credentials";
+
+export { readSchemaFiles, type SchemaFile, selectSchema } from "./schemas";
