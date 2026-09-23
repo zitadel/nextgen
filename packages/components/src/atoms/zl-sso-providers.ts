@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property } from "lit/decorators.js";
 
 import ssoStyles from "./zl-sso-providers.css?inline";
 
@@ -51,9 +51,11 @@ const NAME_PLACEHOLDER = "{name}";
  * answers with. The atom does not navigate: the flow owns that, as it owns
  * every other transition.
  *
- * Because the answer to a click is a full-page redirect, the chosen button
- * takes a loading state and the rest are disabled — the page is on its way
- * out, and a second click would start a second authorization request.
+ * It holds no in-flight state of its own. Submitting re-renders the step —
+ * the orchestrator injects the rendered string with `unsafeHTML`, so this
+ * element is replaced, not updated — and the template passes `disabled` while
+ * the step is submitting. Any "pending" flag kept here would be thrown away
+ * on that same frame, so the disabled attribute is the whole mechanism.
  */
 @customElement("zl-sso-providers")
 export class ZlSsoProviders extends LitElement {
@@ -64,12 +66,7 @@ export class ZlSsoProviders extends LitElement {
    * pass the step's array straight through (`providers='{{ sso_providers |
    * json }}'`), exactly as `<zl-select>` takes its options.
    */
-  @property({
-    converter: {
-      fromAttribute: (value: string | null): readonly SsoProvider[] => parseProviders(value),
-      toAttribute: (value: readonly SsoProvider[]): string => JSON.stringify(value),
-    },
-  })
+  @property({ converter: { fromAttribute: parseProviders } })
   accessor providers: readonly SsoProvider[] = [];
 
   /**
@@ -82,11 +79,12 @@ export class ZlSsoProviders extends LitElement {
   /** Text for the rule above the buttons. Omitted renders no rule. */
   @property({ attribute: "divider-label" }) accessor dividerLabel: string | undefined = undefined;
 
-  /** Disables every button, e.g. while the step is already submitting. */
+  /**
+   * Disables every button. The template sets this while the step is
+   * submitting, which is also what stops a second click starting a second
+   * authorization request.
+   */
   @property({ type: Boolean, reflect: true }) accessor disabled = false;
-
-  /** The provider whose redirect is in flight, if any. */
-  @state() private accessor pendingId: string | undefined = undefined;
 
   override render() {
     const providers = this.providers.filter(isRenderable);
@@ -100,8 +98,8 @@ export class ZlSsoProviders extends LitElement {
     return html`
       <div class="zr-sso" part="root" @zl-submit=${stopInnerSubmit}>
         ${this.dividerLabel
-          ? html`<div class="zr-sso__divider" part="divider" role="separator" aria-orientation="horizontal">
-              <span>${this.dividerLabel}</span>
+          ? html`<div class="zr-sso__divider" part="divider" role="separator" aria-label=${this.dividerLabel}>
+              <span aria-hidden="true">${this.dividerLabel}</span>
             </div>`
           : nothing}
         <div class="zr-sso__list" part="list">
@@ -113,7 +111,6 @@ export class ZlSsoProviders extends LitElement {
 
   private renderProvider(provider: SsoProvider) {
     const mark = brandIconFor(provider.template);
-    const pending = this.pendingId === provider.id;
     return html`
       <zl-button
         part="provider"
@@ -124,9 +121,8 @@ export class ZlSsoProviders extends LitElement {
         block
         data-provider=${provider.id}
         data-template=${provider.template ?? nothing}
-        data-testid=${`zitadel-sso-provider-${provider.template ?? provider.id}`}
-        ?disabled=${this.disabled || (this.pendingId !== undefined && !pending)}
-        ?loading=${pending}
+        data-testid=${`zitadel-sso-provider-${provider.id}`}
+        ?disabled=${this.disabled}
         label=${this.labelFor(provider)}
         @click=${() => this.choose(provider)}
       >
@@ -145,10 +141,9 @@ export class ZlSsoProviders extends LitElement {
   }
 
   private choose(provider: SsoProvider): void {
-    if (this.disabled || this.pendingId !== undefined) {
+    if (this.disabled) {
       return;
     }
-    this.pendingId = provider.id;
     emit<ZlSsoSelectDetail>(this, "zl-sso-select", {
       providerId: provider.id,
       template: provider.template,
@@ -156,14 +151,6 @@ export class ZlSsoProviders extends LitElement {
     });
   }
 
-  /**
-   * Clear the in-flight state. The orchestrator calls this when a submit
-   * fails, because the promised redirect never came and the buttons would
-   * otherwise stay dead for the life of the step.
-   */
-  reset(): void {
-    this.pendingId = undefined;
-  }
 }
 
 /**
@@ -192,9 +179,10 @@ function parseProviders(value: string | null): readonly SsoProvider[] {
 }
 
 /** An entry with no id cannot be submitted, and one with no name has nothing to show. */
-function isRenderable(provider: SsoProvider | undefined): provider is SsoProvider {
+function isRenderable(provider: SsoProvider | null | undefined): provider is SsoProvider {
   return (
     provider !== undefined &&
+    provider !== null &&
     typeof provider.id === "string" &&
     provider.id !== "" &&
     typeof provider.name === "string" &&

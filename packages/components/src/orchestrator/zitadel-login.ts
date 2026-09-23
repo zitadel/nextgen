@@ -1058,27 +1058,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * A provider was chosen. `sso` is the reserved action the flow contract
    * defines for this, carrying the connection id the button reported.
    *
-   * The atom has already put itself in a pending state, because what follows
-   * is a full-page redirect. If the submit fails instead, the redirect never
-   * comes, so the buttons are released — otherwise a transport error would
-   * leave the only way forward permanently dead.
+   * Nothing is released afterwards: submitting re-renders the step, which
+   * replaces the provider atom outright, and a failed submit re-renders it
+   * again with `loading` back to false — so the buttons come back enabled on
+   * their own.
    */
   private handleSsoSelect = (event: CustomEvent<{ providerId?: string }>): void => {
     const providerId = event.detail?.providerId;
     if (this.loading || !providerId) return;
-    void this.submit(SSO_ACTION, undefined, providerId).finally(() => {
-      this.releaseSsoButtons();
-    });
+    void this.submit(SSO_ACTION, undefined, providerId);
   };
-
-  /** Clear any in-flight state on the provider buttons of the current step. */
-  private releaseSsoButtons(): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-    for (const atom of root.querySelectorAll("zl-sso-providers")) {
-      (atom as { reset?: () => void }).reset?.();
-    }
-  }
 
   /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
   private handleDelegatedAction = (event: Event): void => {

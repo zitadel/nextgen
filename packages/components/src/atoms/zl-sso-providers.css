@@ -36,9 +36,22 @@
   gap: var(--zl-spacing-2);
 }
 
-/* The mark keeps its own colours, so it must not inherit the button's text
-   colour, and it holds its size when the label wraps. */
+/* The mark holds its size when the label beside it wraps. Its colours are its
+   own — every path in the glyph carries an explicit fill — so nothing here
+   needs to stop it inheriting the button's text colour. */
 .zr-sso__mark {
   flex: 0 0 auto;
   display: inline-flex;
+}
+
+/* Vendor names are tenant-authored and can be long. The button is a fixed
+   height with `white-space: nowrap`, so without this an "Contoso Corporation
+   Enterprise Single Sign-On" runs past the card and gives the page a
+   horizontal scrollbar. */
+.zr-sso__list zl-button::part(root) {
+  min-width: 0;
+}
+.zr-sso__list zl-button::part(label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

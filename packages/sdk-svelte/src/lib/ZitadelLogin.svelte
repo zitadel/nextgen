@@ -6,6 +6,7 @@
     ZitadelFlowCompleteDetail,
     ZitadelFlowErrorDetail,
     ZitadelFlowInputDetail,
+    ZitadelFlowRedirectDetail,
     ZitadelFlowStepDetail,
     ZitadelLoginProps,
   } from './types';
@@ -64,6 +65,7 @@
       node.removeEventListener('zitadel-flow-step', step);
       node.removeEventListener('zitadel-flow-input', input);
       node.removeEventListener('zitadel-flow-complete', complete);
+      node.removeEventListener('zitadel-flow-redirect', redirect);
       node.removeEventListener('zitadel-flow-error', error);
     };
   });
