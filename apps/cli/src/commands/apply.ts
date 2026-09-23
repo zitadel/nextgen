@@ -1,8 +1,7 @@
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient } from "@zitadel/api/client";
-
+import { createZitadelClient } from "../lib/api-client";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { environmentSchema } from "../lib/environment";
 import {
@@ -46,10 +45,11 @@ export default class Apply extends BaseCommand {
     const secret = await readZitadelSecret(cwd);
     consola.info(`Project   ${secret.project_id}`);
     consola.info(`Server    ${source}`);
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
+    // Verbatim: the sync loop diffs and writes back what it reads.
+    const client = createZitadelClient(
+      { baseUrl: source, token: secret.project_secret },
+      { verbatim: true },
+    );
     const syncers = makeSyncers({
       client,
       projectId: secret.project_id,

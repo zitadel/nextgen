@@ -2,7 +2,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { Flags } from "@oclif/core";
 
+import consola from "consola";
+
 import { ZitadelError, toZitadelError } from "../lib/errors";
+import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
+import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import {
   binaryLogs,
   isProcessRunning,
@@ -26,6 +30,7 @@ import {
 import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
+  PLATFORM_PROJECT_ID,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
@@ -106,6 +111,18 @@ export default class Start extends BaseCommand {
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
     const env = await loadProjectEnv(this.meta.cwd);
+    // The developer exists on their own server from the first start: the
+    // server imports the local admin, and the console signs them in by link.
+    // The admin is a user of the platform project, so the two travel together:
+    // a caller that opts out of the platform bootstrap (a test harness wanting
+    // a bare single-project server) gets neither. The opt-out is read from the
+    // same merged environment the server receives — the project's env files
+    // over the shell — so a `false` in `.env.local` turns both off rather than
+    // being overridden by the user file forcing the bootstrap back on.
+    const serverEnv = { ...this.meta.env, ...env.values };
+    const local = platformBootstrapEnabled(serverEnv)
+      ? await ensureLocalAdmin(this.meta.cwd, serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE)
+      : undefined;
 
     if (runtimeBackend === "binary") {
       if (
@@ -117,7 +134,12 @@ export default class Start extends BaseCommand {
         await writeRuntimeMetadata(this.meta.cwd, existingRuntime);
         return this.emit({
           status: "ok",
-          data: readyData(existingRuntime, true, this.meta.cliVersion),
+          data: readyData(
+            existingRuntime,
+            true,
+            this.meta.cliVersion,
+            await consoleLoginFor(serverUrl, local?.admin),
+          ),
         });
       }
       await stopExistingRuntime(existingRuntime);
@@ -129,6 +151,7 @@ export default class Start extends BaseCommand {
         port,
         serverUrl,
         env,
+        userFile: local?.userFile,
       });
       try {
         await waitForHealth(
@@ -154,7 +177,7 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, false, this.meta.cliVersion),
+        data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
       });
     }
 
@@ -183,7 +206,7 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, true, this.meta.cliVersion),
+        data: readyData(metadata, true, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
       });
     }
 
@@ -200,6 +223,7 @@ export default class Start extends BaseCommand {
       dataDir: paths.dataDir,
       identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
       env,
+      userFile: local?.userFile,
     });
     await waitForHealth(serverUrl, this.meta.cliVersion, {
       runtime: "docker",
@@ -219,10 +243,58 @@ export default class Start extends BaseCommand {
     await writeRuntimeMetadata(this.meta.cwd, metadata);
     return this.emit({
       status: "ok",
-      data: readyData(metadata, false, this.meta.cliVersion),
+      data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
     });
   }
 }
+
+/**
+ * Whether this start boots the platform project, and with it the local admin.
+ * On by default; an explicit `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` opts
+ * out, which is how a harness asks for a bare single-project instance.
+ */
+function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
+  if ((env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true").toLowerCase() === "false") {
+    return false;
+  }
+  // A server pinned to a project of its own cannot also bootstrap the platform
+  // one — it refuses that combination at startup (cmd/server/config.go) — so the
+  // pin wins and there is no local admin, rather than a start that cannot boot.
+  const pinned = env.NEXTGEN_PLATFORM_PROJECT_ID;
+  return !pinned || pinned === PLATFORM_PROJECT_ID;
+}
+
+/**
+ * Mints a console sign-in link for the local admin. A failure (for
+ * example a data directory from before the local admin existed) must not fail
+ * the start itself, so it degrades to a warning with the fix. Without a local
+ * admin there is nothing to sign in as, and the result carries no console.
+ */
+async function consoleLoginFor(
+  serverUrl: string,
+  admin: LocalAdmin | undefined,
+): Promise<ConsoleLogin | undefined> {
+  if (!admin) {
+    return undefined;
+  }
+  try {
+    const url = await consoleSignInUrl(serverUrl, admin);
+    consola.log(`Console: signed in as ${admin.email}. Open this link (works once):`);
+    consola.log(url);
+    return { signed_in_as: admin.email, sign_in_url: url };
+  } catch (error) {
+    const reason = toZitadelError(error);
+    consola.warn(`Could not create a console sign-in link: ${reason.message}`);
+    return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
+  }
+}
+
+type ConsoleLogin = {
+  signed_in_as: string;
+  sign_in_url?: string;
+  error?: string;
+  hint?: string;
+};
 
 function startupCleanupFailedError(
   error: unknown,
@@ -278,6 +350,7 @@ function readyData(
   metadata: RuntimeMetadata,
   alreadyRunning: boolean,
   cliVersion: string,
+  console: ConsoleLogin | undefined,
 ) {
   return {
     title: alreadyRunning
@@ -306,11 +379,21 @@ function readyData(
       console: `${metadata.server_url}/ui/console/`,
       login: `${metadata.server_url}/ui/login/`,
     },
+    ...(console ? { console } : {}),
     next_actions: [
+      ...(console?.sign_in_url
+        ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
+        : []),
       "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
     ],
-    next_commands: [publicCliCommand("setup --server local", cliVersion)],
+    next_commands: [
+      publicCliCommand("setup --server local", cliVersion),
+      // Only when a link could actually be minted: `zitadel console` mints
+      // the same way, so suggesting it after a failure sends the caller at a
+      // command that fails again.
+      ...(console?.sign_in_url ? [publicCliCommand("console", cliVersion)] : []),
+    ],
   };
 }
 

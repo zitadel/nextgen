@@ -1,5 +1,6 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 
+import { escapeControlCharacters } from "./api-client";
 import { ZitadelError } from "./errors";
 
 /**
@@ -41,22 +42,15 @@ const SECRET_MARKER = "(secret)";
  * Render a stored scalar for a terminal.
  *
  * A value is attacker-influenceable — anyone holding `variable.write` chooses
- * it — so it is never interpolated raw. A newline would break the table out of
- * its own row, and an ESC or OSC byte would drive the terminal itself (setting
- * its title, or writing the clipboard through OSC 52). Control and format
- * characters are therefore escaped to their `\xNN`/`\uNNNN` spelling, which
- * keeps ordinary values readable and leaves nothing executable behind.
+ * it — so it is never interpolated raw. The client already escapes what could
+ * drive the terminal; this also escapes a newline and a tab, which would
+ * break the table out of its own row or split a tab-separated line.
  */
 export function renderScalar(value: string | number | boolean | undefined): string {
   if (typeof value !== "string") {
     return String(value);
   }
-  return value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, (char) => {
-    const code = char.codePointAt(0) ?? 0;
-    return code <= 0xff
-      ? `\\x${code.toString(16).padStart(2, "0")}`
-      : `\\u${code.toString(16).padStart(4, "0")}`;
-  });
+  return escapeControlCharacters(value, { keepLayout: false });
 }
 
 /**
