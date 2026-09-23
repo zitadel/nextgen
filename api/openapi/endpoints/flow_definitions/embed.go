@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -120,7 +121,7 @@ func convertSteps(steps []api.FlowDefinitionStep) ([]domain.FlowDefinitionStep, 
 			Fields:       domain.FieldsFromStrings(step.GetFields()),
 			Actions:      actions,
 			Gates:        gates,
-			SSOProviders: convertStepSSOProviders(step.GetSSOProviders()),
+			SSOProviders: slices.Clone(step.GetSSOProviders()),
 			OnSuccess:    onSuccess,
 			Complete:     complete,
 			Transitions:  transitions,
@@ -206,18 +207,6 @@ func convertOnSuccess(success api.OptFlowDefinitionStepOnSuccess) (*domain.FlowO
 		return nil, err
 	}
 	return &ret, nil
-}
-
-func convertStepSSOProviders(providers []api.SSOProvider) []domain.FlowSSOProvider {
-	ret := make([]domain.FlowSSOProvider, len(providers))
-	for i, ssoProvider := range providers {
-		ret[i] = domain.FlowSSOProvider{
-			ID:       ssoProvider.GetID(),
-			Name:     ssoProvider.GetName(),
-			Template: ssoProvider.GetTemplate(),
-		}
-	}
-	return ret
 }
 
 func convertStepGates(gates api.OptFlowDefinitionStepGates) (map[string]domain.FlowStepGate, error) {

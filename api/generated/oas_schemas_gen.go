@@ -17209,8 +17209,12 @@ type FlowDefinitionStep struct {
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
 	Gates OptFlowDefinitionStepGates `json:"gates"`
-	// Available SSO identity providers for this step.
-	SSOProviders []SSOProvider `json:"sso_providers"`
+	// Slugs of the identity provider connections this step offers, in display
+	// order. Each names the `slug` of a connection under `.zitadel/idps/`; the
+	// connection carries the display name and template, so a rename there
+	// reaches every step without editing the flow. The rendered step the client
+	// receives carries the resolved `{id, name, template}` objects instead.
+	SSOProviders []string `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
 	// - create_user: creates the user record (registration flows).
@@ -17248,7 +17252,7 @@ func (s *FlowDefinitionStep) GetGates() OptFlowDefinitionStepGates {
 }
 
 // GetSSOProviders returns the value of SSOProviders.
-func (s *FlowDefinitionStep) GetSSOProviders() []SSOProvider {
+func (s *FlowDefinitionStep) GetSSOProviders() []string {
 	return s.SSOProviders
 }
 
@@ -17288,7 +17292,7 @@ func (s *FlowDefinitionStep) SetGates(val OptFlowDefinitionStepGates) {
 }
 
 // SetSSOProviders sets the value of SSOProviders.
-func (s *FlowDefinitionStep) SetSSOProviders(val []SSOProvider) {
+func (s *FlowDefinitionStep) SetSSOProviders(val []string) {
 	s.SSOProviders = val
 }
 
