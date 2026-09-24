@@ -26,7 +26,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** Projects whose typecheck is known-vacuous, pending the follow-up fix. */
-const KNOWN_VACUOUS = new Set(["apps/cli"]);
+const KNOWN_VACUOUS = new Set([]);
 
 function stripJsonComments(text) {
   return text.replace(/^\s*\/\/.*$/gm, "");
