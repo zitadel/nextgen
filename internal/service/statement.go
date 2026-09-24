@@ -31,6 +31,7 @@ type AllStatements interface {
 	JSONSchemaStatements
 	EnvironmentStatements
 	ReleaseStatements
+	IDPConnectionStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -156,6 +157,40 @@ type ReleaseStatements interface {
 	// already holds it rather than writing a second one.
 	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+}
+
+// IDPConnectionStatements persists identity provider connections and their
+// revisions. An edit appends a revision instead of rewriting one, so a caller
+// can pin a revision and keep reading it.
+//
+// No column records which revision is newest (ADR 063 §7): it is the one with
+// the greatest created_at.
+type IDPConnectionStatements interface {
+	Statements
+	// CreateIDPConnection writes the connection, its first revision and the
+	// resource-scope row in one transaction, and sets the ids and timestamps on
+	// entity. A slug already used in the project returns *database.UniqueError.
+	CreateIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	// ReviseIDPConnection appends a revision holding entity.Document and sets
+	// RevisionID and UpdatedAt on entity; CreatedAt stays as the caller had it.
+	//
+	// An unknown connection returns *database.NoRowFoundError. Two revisions of
+	// one connection created in the same instant have no newest, so the second
+	// returns *database.UniqueError.
+	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	// GetIDPConnection returns the connection matching filter at its newest
+	// revision. No match returns *database.NoRowFoundError.
+	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
+	// GetIDPConnectionRevision returns the connection at the given revision,
+	// even when a newer one exists. Revision ids are unique per project. An
+	// unknown revision returns *database.NoRowFoundError.
+	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
+	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+	// ListIDPConnectionRevisions pages one connection's revisions newest first.
+	// The endpoint offers no filter or sort, so page carries only the limit and
+	// the cursor. An unknown connection returns an empty page, so a handler
+	// needs GetIDPConnection to tell that from a connection with no revisions.
+	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -490,6 +525,11 @@ type AuthzAssignmentStatements interface {
 	// grant (ADR 049 export visibility), ordered by project_id after afterID
 	// (empty starts at the beginning).
 	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
+	// HasActiveOwningTeamGrant reports whether the team still owns a project.
+	// Keyed on the team alone: the owning row sits on the owned project, which
+	// for a claim is not the team's own project. Expiry is not consulted, the
+	// authz_assignments CHECK forbids expires_at on (project, team) rows (ADR 054 §2).
+	HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error)
 	// ListAuthorizedProjects pages the projects the user can act on, by the
 	// three routes ADR 053 §6 puts in the authorized set:
 	//

@@ -130,6 +130,27 @@ describe("materializeSetupResources", () => {
     );
   });
 
+  // Setup reconciliation used to pre-encode the created schema's id. The
+  // generated client owns the encoding now (#1272), so pre-encoding here sent
+  // `%25` for every delimiter in a `$id` URL and the fetch 404'd.
+  it("fetches the created schema by its id verbatim, leaving encoding to the client", async () => {
+    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    const getSchemaById = vi.fn().mockResolvedValue({
+      id,
+      schema: { objectType: "human-user", kind: "user-schema", title: "T" },
+      metadata: { created_at: "2026-01-01T00:00:00Z" },
+    });
+    const client = {
+      createSchema: vi.fn().mockResolvedValue({ id }),
+      getSchemaById,
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
+    } as unknown as ZitadelClient;
+
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+
+    expect(getSchemaById).toHaveBeenCalledWith(id);
+  });
+
   it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),

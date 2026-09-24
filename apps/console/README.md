@@ -97,16 +97,21 @@ seed transport ships the reserved platform project end to end.
 
 A deployment can opt out of the fallback today by setting
 `platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`), which
-provisions the reserved platform project itself at startup — keys, default
-schema, default login flow — and is what makes `zitadel claim` and
-self-registration work; it still lacks §2's fuller seed transport (an initial
-user, membership, owner assignment), so it is a manual opt-in, not the
-default.
+provisions the reserved platform project itself at startup (keys, default
+schema, default login flow) and is what makes `zitadel claim` and
+self-registration work. It still lacks §2's server-discovered seed transport
+for membership and owner assignment, but it is no longer only a manual
+opt-in: `zitadel start` sets the flag and hands the server an initial
+operator, `admin@zitadel.localhost`, through `--user-file`. So on a
+CLI-started server that keeps the default bootstrap the console signs into
+`proj_platform`, and `zitadel console` prints a one-time link that signs that
+operator in. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` or pinning
+another project turns both the platform project and the local admin off.
 
-While no project exists yet, the login screen shows a "run `zitadel setup`"
-hint; refresh after setup and the console picks the new project up. Only
-`standalone` mode exists today; `platform` (cloud portal) mode is future
-work.
+The "run `zitadel setup`" hint on the login screen therefore only shows where
+the platform project is off and no project exists yet; refresh after setup and
+the console picks the new project up. Only `standalone` mode exists today;
+`platform` (cloud portal) mode is future work.
 
 **A server the console cannot reach is an error, not a mode** (ADR 0004 §3).
 An unreachable endpoint, a non-2xx answer, or a body that is not a runtime
@@ -157,6 +162,15 @@ Note `queryUsers` requires `user.read`, which only the **project secret** carrie
 (`internal/api/user.go`). So real list screens need the proxy's
 `CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.
 
+The proxy injects that secret only for requests aimed at the seeded project
+(no `project_id`, or the seeded one). A request scoped to another project —
+one you were granted access to, or one added with
+[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts) — goes
+through on the session cookie alone, because the server lets a Bearer win over
+the cookie and the seeded project's secret would only hide the other project
+as a 404. That is also why the Add-admin picker on a project's page lists the
+seeded project's users for every project: `POST /users/query` names no project.
+
 ### Mock backend
 
 ```sh
@@ -192,6 +206,8 @@ embed base path.
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
 | `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
+| `CONSOLE_PROJECT_SECRET_PROJECT_ID` | Node (dev proxy) | The project that secret belongs to; the proxy attaches the secret only to requests scoped to it (or to none). Defaults to `VITE_CONSOLE_PROJECT_ID`, which differs only in claim mode |
+| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print which credential each proxied request went out with (project secret, caller's authorization, or cookie only) — for a screen that answers 401/403/404 when it is not obvious who the server saw |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
 | `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`, api-mock): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |

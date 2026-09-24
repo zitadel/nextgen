@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
+import { EMPTY_ENV, type ResolvedEnv, envSummary } from "./env-vars";
 import {
   type BinaryRuntimeMetadata,
   type RuntimeMetadata,
@@ -25,6 +26,10 @@ export type BinaryRunSpec = {
   logPath: string;
   port: number;
   serverUrl: string;
+  /** Project variables for the child's environment, never its argv. */
+  env?: ResolvedEnv;
+  /** Bootstrap user document for the local admin, passed as `--user-file`. */
+  userFile?: string;
 };
 
 export type StopBinaryRuntimeResult = Readonly<{
@@ -61,19 +66,30 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
 
 export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRuntimeMetadata> {
   const command = resolveServerCommand();
+  const env = spec.env ?? EMPTY_ENV;
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
-    const args = withMigrateFlag(command.args);
+    const args = withMigrateFlag([
+      ...command.args,
+      ...(spec.userFile ? ["--user-file", spec.userFile] : []),
+    ]);
     const child = spawn(command.command, args, {
       detached: true,
       env: {
         ...process.env,
+        // Declared project variables ride the child's environment, never argv.
+        ...env.values,
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
         // Browser-facing URLs (claim, dashboard) must point at this local
         // server, not the cloud default the server config falls back to.
         NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
+        // The platform project and the local admin travel together: the admin
+        // is a user of it. The caller decides by passing a user file, and an
+        // opted-out start passes none — leaving whatever the environment says
+        // (by default nothing, which the server reads as disabled).
+        ...(spec.userFile ? { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true" } : {}),
       },
       stdio: ["ignore", log.fd, log.fd],
     });
@@ -94,6 +110,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       data_dir: spec.dataDir,
       created_at: new Date().toISOString(),
       cli_version: spec.cliVersion,
+      env: envSummary(env),
     };
   } finally {
     await log.close();

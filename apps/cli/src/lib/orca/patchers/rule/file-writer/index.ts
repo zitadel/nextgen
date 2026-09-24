@@ -101,7 +101,7 @@ async function applyOp(
       await appendText(abs(opts.cwd, op.path), op.contents, op.ifMissing, opts.dryRun, result);
       break;
     case "merge-env":
-      await mergeEnv(abs(opts.cwd, op.path), op.entries, opts.dryRun, result);
+      await mergeEnv(abs(opts.cwd, op.path), op.entries, op.comment ?? [], opts.dryRun, result);
       break;
     case "merge-json":
       await mergeJson(abs(opts.cwd, op.path), op.patch, opts.dryRun, result);
@@ -135,12 +135,14 @@ async function editFile(
   const candidates = (typeof pathOrPaths === "string" ? [pathOrPaths] : pathOrPaths).map((p) =>
     abs(cwd, p),
   );
-  if (candidates.length === 0) {
+  const [preferred] = candidates;
+  if (preferred === undefined) {
     throw new ZitadelError("E_VALIDATION", "An edit op needs at least one candidate path", {
       hint: "This is an internal patcher error — please report it if you hit it.",
     });
   }
-  let path = candidates[0];
+  // The first candidate is where the file is created when none of them exist.
+  let path = preferred;
   let source: string | undefined;
   let mode: number | undefined;
   for (const candidate of candidates) {
@@ -284,6 +286,7 @@ async function appendText(
 async function mergeEnv(
   path: string,
   entries: Readonly<Record<string, string>>,
+  comment: ReadonlyArray<string>,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -301,7 +304,11 @@ async function mergeEnv(
     return;
   }
 
-  const block = additions.map(([key, value]) => `${key}=${value}`).join("\n");
+  const commentLines = comment.map((line) => `# ${line}`);
+  const [firstCommentLine] = commentLines;
+  const header =
+    firstCommentLine !== undefined && !existing.includes(firstCommentLine) ? commentLines : [];
+  const block = [...header, ...additions.map(([key, value]) => `${key}=${value}`)].join("\n");
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${block}\n`;
   const action = raw === undefined ? "create" : "update";
   if (dryRun) {

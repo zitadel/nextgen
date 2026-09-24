@@ -23,7 +23,8 @@ parse the result rather than scraping human output.
 - The CLI sends anonymous usage telemetry by default. For automated/agent runs
   that should stay silent, disable it with `--no-telemetry` (per invocation) or
   `ZITADEL_TELEMETRY=0` / `DO_NOT_TRACK=1` (per environment); this also skips the
-  small end-of-command network flush.
+  small end-of-command network flush and drops the `ci/` and `host/` tokens from
+  the CLI's HTTP `User-Agent`.
 - See `README.md` (its commands section is generated from the CLI's own
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
@@ -71,6 +72,29 @@ Each invocation prints one JSON object:
   Stop that process, run `npx @zitadel/cli@alpha stop --all` for host-wide
   CLI-managed local runtimes, or choose another `start --port`.
 
+In human mode the output follows the terminal: a TTY gets the project and
+server lines and an aligned table, while a piped or redirected run (or
+`--plain`) gets one tab-separated record per line and nothing else. `--json`
+is unaffected and remains the contract for agents.
+
+Text the server returns is escaped before it is printed, in `--json` as in
+human mode, so a value someone stored cannot drive the reader's terminal.
+Control, format and bidi characters in `data` values and keys and in an
+error's `message` appear as visible `\xNN`, `\uNNNN` or `\u{NNNNN}` text;
+newlines and tabs are kept, and a key's backslashes are doubled so two keys
+never merge. A value that contained such a character is therefore not the
+stored value byte for byte: do not send it back in an update as if it were.
+When you need the exact stored value, call the platform API directly with the
+project secret; the CLI only ever shows the escaped form.
+`plan`, `apply` and `setup` are the exception for `.zitadel/` files: they
+write the server's bodies back verbatim and escape only what they print.
+
+A property whose name reads as a credential (`password`, `client_secret`,
+`api_key`, …) is refused anywhere on the command line — as an `--attributes`
+entry and inside an inline `--data` body alike, since argv is visible to other
+processes and kept in shell history. Send such bodies with `--file <path>` or
+`--file -` (stdin), which never pass through argv.
+
 Capture stdout and stderr separately when scripting. Some terminals and agent
 UIs display both streams together, but the machine contract is one parseable
 JSON object on stdout; installer, audit, and package-manager progress belongs
@@ -79,6 +103,80 @@ on stderr.
 Exit codes mirror the error class (3 = validation, 4 = network or not-found,
 5 = conflict, 1 = auth, 2 = not-implemented). An unknown command is handled by
 the CLI's help layer, not the envelope.
+
+## Resource commands
+
+Runtime resources — users, teams, sessions, events, grants, projects — have a
+uniform `zitadel <resource> <verb>` surface built from one registry
+(`src/commands/resources.ts`); the conventions are documented in
+`docs/design/cli/resource-commands.md`. Config resources (schemas, flows,
+branding) stay on `plan` / `apply`; the resource commands never write them.
+
+| Resource   | Verbs                                  |
+| ---------- | -------------------------------------- |
+| `users`    | list, get, create, update, delete      |
+| `teams`    | list, get, create, update, deactivate  |
+| `sessions` | list, get, revoke                      |
+| `events`   | list, get                              |
+| `grants`   | list, get, create, delete              |
+| `projects` | list, get, update                      |
+
+Every verb reads the project credential from `.zitadel/secret` and injects
+`project_id` itself; there is no project flag.
+
+`zitadel resources --json` reports the whole surface in one call: every
+resource, its verbs, its `filter_fields` / `sort_fields`, and the fields of its writes,
+reported per verb as `create_fields` and `update_fields` (flag name, kind,
+`required`, and any closed value set), and `delete_outcome`, the property a
+delete's envelope carries beside `id`. Prefer it
+over reading `--help` per command. It contacts no server.
+
+- `list` emits `data: { items, count, next_page_token }`, and when a page
+  remains, `data.next_commands` carries the exact command for the next page —
+  the cursor repeated alongside the same `--limit`, `--sort` and `--filter`,
+  since a token is only valid with the query that issued it. Prefer it over
+  rebuilding the invocation yourself. One page by default
+  (`--limit`, `--page-token`); `--all` drains every page and sets
+  `next_page_token` to `null`. Query-backed lists take `--filter
+  field=operation:value` (repeatable, AND-combined; the operation defaults to
+  `equals`) and `--sort field:asc|desc`; the accepted fields are listed in
+  `--help` and an unknown one fails with `E_VALIDATION` before any request.
+  `events list` takes its filters as named flags (`--category`, `--actor-id`,
+  `--created-after`, …).
+- `--fields id,attributes.email` chooses which columns the human rendering
+  shows (dot-paths allowed); an unknown path fails before any request, with the
+  available ones in `details.available`; a user's schema-defined `attributes`
+  accept any key. `--json` always carries the whole resource regardless.
+- `get <id>` emits the resource as `data`. Its human rendering lays the record
+  out field by field on a terminal and prints the whole object when piped;
+  `--json` is unchanged either way.
+- `create` / `update <id>` take the body either as one flag per schema field
+  (`--name`, `--relation`, …; run `<resource> create --help` for the
+  list, where required fields are marked `(required)`) or as a whole JSON
+  object via `--data '<json>'` / `--file <path>` (`--file -` reads stdin). A
+  field flag overrides the same key in `--data`. A user's schema-defined
+  `attributes` are set with the repeatable `--attributes`, where `key=value` is
+  always a string and `key:=value` parses the value as JSON — use `:=` for a
+  field the user schema types as a number, boolean, null, array, or object
+  (`--attributes age:=42`), and `=` to keep a numeric-looking identifier a
+  string (`--attributes postcode=02139`). A missing
+  required field fails with `E_VALIDATION`, naming the flags in `message` and
+  listing their wire names in `details.missing`. The body is validated against
+  the API schema locally, and the server's resource is emitted as `data`. A create adds
+  `data.next_commands` pointing at the matching `get`. `--dry-run` emits
+  `{ dry_run: true, verb, topic, body }` without calling the platform.
+- The destructive verb (`delete`, `revoke`, `deactivate`) requires `--force` in non-interactive mode (declared per command, so its help says what it permits)
+  (the error's `next_commands` carries the exact retry) and report what the API
+  did: `{ id, deleted: true }` for users and grants, `{ id, revoked: true }` for
+  sessions, and `{ id, deactivated: true }` for teams, whose DELETE deactivates
+  the team and leaves it readable (ADR 024). Read the property that accompanies
+  `id` rather than assuming `deleted`.
+
+```sh
+npx @zitadel/cli@alpha users list --filter status=active --sort created_at:desc --non-interactive --json
+npx @zitadel/cli@alpha users create --schema sch_… --attributes email=a@b.c --non-interactive --json
+npx @zitadel/cli@alpha sessions revoke sess_… --force --non-interactive --json
+```
 
 ## Commands
 
@@ -91,7 +189,18 @@ The groups below mirror the ones `zitadel --help` prints.
   default user schema and login flow into
   `.zitadel/schemas/default-human-user.json` and
   `.zitadel/flows/default-login.json`, uploads them through the schema and flow
-  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty. Agents
+  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty.
+  Against a local server that hosts the platform project and has a local admin
+  (the default `start` configuration), setup also attaches the project to the
+  local admin's team: it writes `team_id` and `claimed_at` into
+  `.zitadel/secret` and prints
+  `Project owned by admin@zitadel.localhost (team ...)`, so a later `claim`
+  returns `status: "skipped"` with `reason: "already-claimed"`. The step is
+  best-effort. When the attempt fails on a platform-hosting runtime, setup
+  warns and the normal claim nudge applies. When `start` opted out of the
+  platform bootstrap there is no local admin and no claim surface, so setup
+  skips the step silently, emits no nudge, and the project has no owning
+  team. Agents
   must pass `--framework` when scaffolding into a fresh directory; interactive
   humans can omit it and choose from the prompt. Supported floors: Next.js 15+
   and React 18+ — `setup` and `doctor` fail with `E_UNSUPPORTED_PROJECT_SHAPE`
@@ -232,12 +341,43 @@ The groups below mirror the ones `zitadel --help` prints.
   `dev+<short-commit>` source build it launched. That label names the revision
   the binary was built from, which after a Moon cache hit can be an earlier
   commit whose server sources are byte-identical. Use `--runtime docker` or
-  `--image` for the Docker backend.
+  `--image` for the Docker backend. The project's env files configure the
+  local server: every `NEXTGEN_*` variable in `.env.local` and `.env` (the
+  former wins; empty values are skipped) is handed to the runtime through its
+  environment only (bare `--env NAME` on Docker), so no value reaches `argv`,
+  logs, `runtime.json`, or `--json`. The address, data dir and public base the
+  CLI sets itself always win. `data.runtime.env` and `runtime.json` carry
+  `injected`, the list of names. A running runtime is not updated in place:
+  after changing a value run `stop` then `start`. An unreadable env file fails
+  `start` with `E_VALIDATION` before any runtime is stopped. `setup` writes a
+  comment saying so at the top of the scaffolded `.env.example` and
+  `.env.local`.
+  The server boots with the platform project
+  and a local admin, so the developer exists on their own server without
+  signing up: the admin signs in as `admin@zitadel.localhost`, and a
+  generated password is kept in `.zitadel/local/admin.json` (gitignored with
+  the rest of `.zitadel/local/`) and never printed. `start` prints a one-time
+  console sign-in link and reports it as `data.console.sign_in_url` with
+  `data.console.signed_in_as`; if no link can be minted (for example a data
+  directory from before the local admin existed), `data.console.error` and
+  `data.console.hint` say why, `start` still succeeds, and `zitadel console`
+  drops out of `next_commands`. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`,
+  in the shell or in `.env.local` / `.env`, opts out of both the platform project
+  and the local admin, for harnesses that
+  want a bare single-project server; `data.console` is then absent.
+- `console` — print (and, interactively, open) a fresh one-time sign-in link
+  for the local console as the local admin: `data.sign_in_url`,
+  `data.signed_in_as`, `data.browser_opened`. Each link works once; run the
+  command again for a new one. The console honours the link only when it is
+  served from loopback, since the token signs in whoever opens it. Fails with `E_VALIDATION` when `start` never
+  created a local admin in this directory. Flags: `--no-open`.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes
   from other local projects; it does not kill arbitrary `/healthz` listeners.
 - `status` — summarize the local runtime and project state.
+  `data.server.runtime.env.injected` repeats the variable names recorded at
+  the last `start` (empty for a runtime started before this field existed).
 - `logs` — print managed runtime logs; `--follow` streams in human mode.
 - `reset` — stop/remove the managed runtime and delete local runtime data;
   requires `--force` when non-interactive.
@@ -270,6 +410,11 @@ docker --image <ref>` remains the explicit image override for debugging.
   `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
   unchanged, and as a changed-line diff when it moved — not as one escaped
   line. Read the file itself for full content.
+- No command takes `--environment` (`-e`, `--env`). `plan`, `apply` and the
+  resource commands work on the project's resources and never selected an
+  environment; `variables` names its owner with `--project-level`. The flag
+  returns when the platform's environments settle, and `deploy` (ADR 035) is
+  what will put config onto one.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and
@@ -279,6 +424,27 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|split|split-right|hero|minimal`
   or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
+- `variables list|get|set|delete` — manage the variables and secrets a
+  configuration document references as `${{ NAME }}`. Every command addresses
+  one owner, and `--project-level` is the only one the CLI can name today, so it
+  is **required**: a run without it fails with `E_VALIDATION`, on a terminal as
+  in a script. The platform also keeps variables per environment, but the CLI
+  cannot address those until the platform's environments settle; `--environment`
+  returns then, and every command written today keeps its meaning because the
+  owner was named rather than assumed. Owners do not inherit from one another —
+  a value entered at the project level is **not** seen by an environment
+  (ADR 062 §4). `set` takes its value from a prompt or from stdin and never from
+  a flag, so a credential never reaches `argv`; `--secret` stores it encrypted,
+  after which it can be replaced but never read back (`list` reports it as held,
+  and `--json` omits the value key entirely). `set --as number|boolean` stores a
+  JSON number or boolean instead of a string, so a whole-field `${{ NAME }}`
+  reference resolves to that type; it is refused with `--secret`, and an integer
+  too large to store exactly is refused rather than rounded. Output follows the
+  resource commands: on a pipe, `list` prints tab-separated `name`/`value` rows
+  (a secret's value is `(secret)`) and `get` prints the whole record as JSON,
+  which carries no `value` key for a secret. There is no `pull` and no bulk
+  import. `set` and `delete` honour `--dry-run` and make no change; `delete`
+  needs `--force` when non-interactive.
 
 ## Golden path
 

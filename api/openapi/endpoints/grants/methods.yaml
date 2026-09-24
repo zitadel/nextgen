@@ -4,10 +4,18 @@ post:
   description: |
     Bind a user or team to `project.viewer`, `project.editor`, or
     `project.admin` on the project identified by the `project-id` header.
-    IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-    created here — claim owns that path. An unrevoked grant with the same
-    principal and relation occupies the unique key even after `expires_at`;
-    DELETE it before re-creating.
+    Name the principal with `user` (`user_id` or `identifier`) or `team`
+    (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+    (`project.team`) grants are not created here — claim owns that path. An
+    unrevoked grant with the same principal and relation occupies the unique
+    key even after `expires_at`; DELETE it before re-creating.
+    Create does not accept `expand`. The `user_id` and team locators
+    return 201, whose `user` / `team` carry only `user_id` / `team_id`,
+    and still 404 / 409 when the principal is missing or the tuple
+    already exists. Creating by `user.identifier` answers 202 with no
+    body on every outcome. Granting the session caller's own user is
+    `grant.invalid` on either user locator. Read the grant back for
+    identifier and display.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
     session cookie (`nextgenSession`). Session callers are authorized as
@@ -29,11 +37,19 @@ post:
           $ref: create-grant-request.yaml
   responses:
     '201':
-      description: The grant was created successfully.
+      description: |
+        The grant was created. Returned for the `user.user_id` and team
+        locators only.
       content:
         application/json:
           schema:
             $ref: grant.yaml
+    '202':
+      description: |
+        Accepted. Returned only for the `user.identifier` locator, on
+        every outcome. The server does not disclose whether a grant was
+        written, whether one already existed, or whether the identifier
+        matched a user. Read the grant list to see the result.
     '400':
       description: The provided parameters were not acceptable.
       content:
@@ -53,13 +69,17 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     '404':
-      description: Project not found, or the principal could not be resolved.
+      description: |
+        Project not found, or an id or team-name locator could not be
+        resolved. Identifier create answers 202 instead.
       content:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
     '409':
-      description: An unrevoked grant with this principal and relation already exists on the project.
+      description: |
+        An unrevoked grant with this principal and relation already
+        exists on the project. Identifier create answers 202 instead.
       content:
         application/json:
           schema:

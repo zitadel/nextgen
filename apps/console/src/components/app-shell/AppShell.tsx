@@ -211,8 +211,9 @@ function SettingsHeader() {
  * and declare `view: "settings"` so they leave the primary list alone.
  *
  * A heading renders only when a route claims it. `ACCOUNT / Profile` needs a
- * call that updates a user (#693) and is not built, so today the nav is
- * `WORKSPACE` alone rather than an empty section above it.
+ * call that updates a user (#693) and is not built, and Admins moved to the
+ * project page (#1238), so today no route claims either heading and the nav
+ * is empty rather than a heading over nothing.
  */
 function SettingsNav() {
   const items = useNavItems("settings");

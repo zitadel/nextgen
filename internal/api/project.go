@@ -47,9 +47,10 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 	}
 	project, err := h.projectService.Get(ctx, projectID)
 	if err != nil {
-		// The guard already bound the request to the token's own project, so
-		// this only fires if that project vanished mid-request; answer with
-		// the same proj.not_found the guard uses so the two are inseparable.
+		// The guard already found the project for this caller (its own project
+		// for a secret, a granted one for a session), so this only fires if the
+		// project vanished mid-request; answer with the same proj.not_found the
+		// guard uses so the two are inseparable.
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
 		}
