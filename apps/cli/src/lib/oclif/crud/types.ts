@@ -14,9 +14,13 @@ export type ResourceCommandId = `${string}:${Verb}`;
 export type Json = Readonly<Record<string, unknown>>;
 export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
 
-/** Structural subset of a Zod schema; keeps the factory free of a Zod import. */
-export type Schema = {
-  safeParse: (value: unknown) => { success: boolean; data?: unknown; error?: { issues: unknown } };
+/**
+ * Structural subset of a Zod schema; keeps the factory free of a Zod import.
+ * `B` is the schema's parsed output — a `ZodType<B>` satisfies it — so a spec
+ * can carry its body type from the generated schema straight to its `call`.
+ */
+export type Schema<B = unknown> = {
+  safeParse: (value: unknown) => { success: boolean; data?: B; error?: { issues: unknown } };
 };
 
 /**
@@ -67,7 +71,7 @@ export type FilterField = Readonly<{
  * without it is sent as flat query parameters. Everything the caller sees —
  * the flags, the grammar, the envelope — is the same either way.
  */
-export type ListSpec<Ctx> = Readonly<{
+export type ListSpec<Ctx, B = Json> = Readonly<{
   /**
    * Response property holding the page of items; omit when the response body
    * is itself the array.
@@ -97,7 +101,7 @@ export type ListSpec<Ctx> = Readonly<{
    * Generated request-body schema of a structured query endpoint. Its presence
    * selects that transport; a `GET` list omits it.
    */
-  body?: Schema;
+  body?: Schema<B>;
   /** Filterable fields; omit for a list that accepts none. */
   filters?: readonly FilterField[];
   /** Sortable fields; omit for a list that cannot be sorted. */
@@ -107,7 +111,7 @@ export type ListSpec<Ctx> = Readonly<{
    * for an endpoint that orders by one implicit field.
    */
   sortParam?: string;
-  call: (ctx: Ctx, request: Json) => Promise<unknown>;
+  call(ctx: Ctx, request: B): Promise<unknown>;
 }>;
 
 export type GetSpec<Ctx> = Readonly<{
@@ -115,13 +119,19 @@ export type GetSpec<Ctx> = Readonly<{
   /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
   response?: Schema;
 }>;
-export type CreateSpec<Ctx> = Readonly<{
-  schema: Schema;
-  call: (ctx: Ctx, body: Json) => Promise<unknown>;
+// `call` is written in method syntax on purpose: it makes the body parameter
+// bivariant, so a spec built for a concrete body type (`CreateSpec<Ctx,
+// CreateUserBody>`) still assigns to the erased `CreateSpec<Ctx>` the registry
+// and factory hold. The body type is checked where it matters — at the
+// `create`/`update`/`query` builder call site against the schema — not
+// re-checked as bodies flow through the transport-agnostic factory.
+export type CreateSpec<Ctx, B = Json> = Readonly<{
+  schema: Schema<B>;
+  call(ctx: Ctx, body: B): Promise<unknown>;
 }>;
-export type UpdateSpec<Ctx> = Readonly<{
-  schema: Schema;
-  call: (ctx: Ctx, id: string, body: Json) => Promise<unknown>;
+export type UpdateSpec<Ctx, B = Json> = Readonly<{
+  schema: Schema<B>;
+  call(ctx: Ctx, id: string, body: B): Promise<unknown>;
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
   /**

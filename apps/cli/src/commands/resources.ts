@@ -40,24 +40,11 @@ import {
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
-  CreateGrantBody as CreateGrantBodyT,
-  CreateIdpBody as CreateIdpBodyT,
-  CreateTeamBody as CreateTeamBodyT,
-  CreateUserBody as CreateUserBodyT,
   ListEnvironmentsParams,
   ListEventsParams,
   ListFlowDefinitionsParams,
   ListReleasesParams,
   ListSchemasParams,
-  PatchProjectBody as PatchProjectBodyT,
-  PatchUserByIDBody as PatchUserByIDBodyT,
-  QueryGrantsBody as QueryGrantsBodyT,
-  QueryIdpsBody as QueryIdpsBodyT,
-  QueryProjectsBody as QueryProjectsBodyT,
-  QuerySessionsBody as QuerySessionsBodyT,
-  QueryTeamsBody as QueryTeamsBodyT,
-  QueryUsersBody as QueryUsersBodyT,
-  UpdateTeamBody as UpdateTeamBodyT,
 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
@@ -65,7 +52,14 @@ import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
 import { environmentSchema } from "../lib/environment";
 import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
-import { buildResourceCommands, type ResourceRegistry } from "../lib/oclif/crud";
+import {
+  buildResourceCommands,
+  type CreateSpec,
+  type ListSpec,
+  type ResourceRegistry,
+  type Schema,
+  type UpdateSpec,
+} from "../lib/oclif/crud";
 import { readZitadelSecret } from "../lib/project";
 
 /**
@@ -75,6 +69,24 @@ import { readZitadelSecret } from "../lib/project";
  * from here; the flag surface never exposes it.
  */
 export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
+
+// Builders that infer a verb's body type from its generated Zod schema, so a
+// `call` receives the typed body straight from `parseOrThrow` — no cast from
+// `Json`. `<B>` is bound at each call site by the schema passed in.
+const create = <B>(
+  schema: Schema<B>,
+  call: (ctx: Platform, body: B) => Promise<unknown>,
+): CreateSpec<Platform, B> => ({ schema, call });
+
+const update = <B>(
+  schema: Schema<B>,
+  call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
+): UpdateSpec<Platform, B> => ({ schema, call });
+
+// A structured-query list: `B` is inferred from the spec's `body` schema and
+// flows to `call`'s request. A `GET` list has no body schema, so it stays a
+// plain object whose request is the flat parameter map.
+const query = <B>(spec: ListSpec<Platform, B>): ListSpec<Platform, B> => spec;
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
 const FILTER_OPERATIONS = [
@@ -115,7 +127,7 @@ export const RESOURCES = {
       "metadata.created_at",
       "metadata.updated_at",
     ],
-    list: {
+    list: query({
       items: "users",
       body: QueryUsersBody,
       response: QueryUsersResponse,
@@ -129,18 +141,12 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
       // The users query binds to the token's project; no project_id param.
-      call: ({ client }, body) => client.queryUsers(body as QueryUsersBodyT),
-    },
+      call: ({ client }, body) => client.queryUsers(body),
+    }),
     get: { call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse },
-    create: {
-      schema: CreateUserBody,
-      call: ({ client, projectId }, body) =>
-        client.createUser(body as CreateUserBodyT, { project_id: projectId }),
-    },
-    update: {
-      schema: PatchUserByIDBody,
-      call: ({ client }, id, body) => client.patchUserByID(id, body as PatchUserByIDBodyT),
-    },
+    create: create(CreateUserBody, ({ client, projectId }, body) =>
+      client.createUser(body, { project_id: projectId })),
+    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
     delete: { call: ({ client }, id) => client.deleteUserByID(id) },
   },
 
@@ -151,7 +157,7 @@ export const RESOURCES = {
     columns: ["id", "name", "status", "created_at"],
     heading: "name",
     detail: ["id", "status", "created_at", "updated_at"],
-    list: {
+    list: query({
       items: "teams",
       body: QueryTeamsBody,
       response: QueryTeamsResponse,
@@ -162,18 +168,12 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "name", "status"],
       call: ({ client, projectId }, body) =>
-        client.queryTeams(body as QueryTeamsBodyT, { project_id: projectId }),
-    },
+        client.queryTeams(body, { project_id: projectId }),
+    }),
     get: { call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse },
-    create: {
-      schema: CreateTeamBody,
-      call: ({ client, projectId }, body) =>
-        client.createTeam(body as CreateTeamBodyT, { project_id: projectId }),
-    },
-    update: {
-      schema: UpdateTeamBody,
-      call: ({ client }, id, body) => client.updateTeam(id, body as UpdateTeamBodyT),
-    },
+    create: create(CreateTeamBody, ({ client, projectId }, body) =>
+      client.createTeam(body, { project_id: projectId })),
+    update: update(UpdateTeamBody, ({ client }, id, body) => client.updateTeam(id, body)),
     // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
     // command is named after that rather than claiming the team is gone.
     delete: { verb: "deactivate", call: ({ client }, id) => client.deleteTeam(id) },
@@ -186,7 +186,7 @@ export const RESOURCES = {
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
     heading: "session_id",
     detail: ["project_id", "state", "user_id", "created_at", "expires_at"],
-    list: {
+    list: query({
       items: "sessions",
       body: QuerySessionsBody,
       response: QuerySessionsResponse,
@@ -198,8 +198,8 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "user_id"],
       call: ({ client, projectId }, body) =>
-        client.querySessions(body as QuerySessionsBodyT, { project_id: projectId }),
-    },
+        client.querySessions(body, { project_id: projectId }),
+    }),
     get: { call: ({ client }, id) => client.getSession(id), response: GetSessionResponse },
     // The endpoint terminates the session rather than removing a record, so
     // the command says `revoke`. `delete` would tell the caller it is gone.
@@ -277,7 +277,7 @@ export const RESOURCES = {
       "created_at",
       "expires_at",
     ],
-    list: {
+    list: query({
       items: "grants",
       body: QueryGrantsBody,
       response: QueryGrantsResponse,
@@ -290,17 +290,14 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "expires_at", "id"],
       call: ({ client, projectId }, body) =>
-        client.queryGrants(body as QueryGrantsBodyT, { project_id: projectId }),
-    },
+        client.queryGrants(body, { project_id: projectId }),
+    }),
     get: {
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
       response: GetGrantResponse,
     },
-    create: {
-      schema: CreateGrantBody,
-      call: ({ client, projectId }, body) =>
-        client.createGrant(body as CreateGrantBodyT, { project_id: projectId }),
-    },
+    create: create(CreateGrantBody, ({ client, projectId }, body) =>
+      client.createGrant(body, { project_id: projectId })),
     delete: {
       call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
     },
@@ -317,7 +314,7 @@ export const RESOURCES = {
     columns: ["id", "slug", "definition.protocol", "definition.display_name", "created_at"],
     heading: "slug",
     detail: ["id", "revision_id", "slug", "created_at", "updated_at"],
-    list: {
+    list: query({
       items: "idps",
       body: QueryIdpsBody,
       response: QueryIdpsResponse,
@@ -327,19 +324,17 @@ export const RESOURCES = {
       ],
       sorts: ["slug", "created_at"],
       call: ({ client, projectId }, body) =>
-        client.queryIdps(body as QueryIdpsBodyT, { project_id: projectId }),
-    },
+        client.queryIdps(body, { project_id: projectId }),
+    }),
     get: {
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
       response: GetIdpByIdResponse,
     },
-    create: {
-      // The body nests everything under `idp`, so there are no field flags to
-      // generate; `--data` and `--file` carry it.
-      schema: CreateIdpBody,
-      call: ({ client, projectId }, body) =>
-        client.createIdp(body as CreateIdpBodyT, { project_id: projectId }),
-    },
+    // The body nests everything under `idp`, so there are no field flags to
+    // generate; `--data` and `--file` carry it.
+    create: create(CreateIdpBody, ({ client, projectId }, body) =>
+      client.createIdp(body, { project_id: projectId }),
+    ),
   },
 
   projects: {
@@ -349,7 +344,7 @@ export const RESOURCES = {
     columns: ["id", "name", "created_at"],
     heading: "name",
     detail: ["id", "preview_origins", "created_at", "updated_at"],
-    list: {
+    list: query({
       items: "projects",
       body: QueryProjectsBody,
       response: QueryProjectsResponse,
@@ -357,13 +352,10 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at"],
-      call: ({ client }, body) => client.queryProjects(body as QueryProjectsBodyT),
-    },
+      call: ({ client }, body) => client.queryProjects(body),
+    }),
     get: { call: ({ client }, id) => client.getProject(id), response: GetProjectResponse },
-    update: {
-      schema: PatchProjectBody,
-      call: ({ client }, id, body) => client.patchProject(id, body as PatchProjectBodyT),
-    },
+    update: update(PatchProjectBody, ({ client }, id, body) => client.patchProject(id, body)),
   },
 
   // Configuration resources (ADR 035) are read-only here. They are authored as
