@@ -12,6 +12,7 @@ import {
   bodyFromFlags,
   describeBody,
   fieldExample,
+  needsRawBody,
 } from "../../../../../src/lib/oclif/crud";
 
 const byName = (schema: Parameters<typeof describeBody>[0]) =>
@@ -198,6 +199,24 @@ describe("bodyFromFlags", () => {
 
   it("returns undefined when no field flag was given", () => {
     expect(bodyFromFlags(grantFields, { json: true })).toBeUndefined();
+  });
+});
+
+describe("needsRawBody", () => {
+  it("reports a body whose principal is a nested object", () => {
+    // `user` and `team` carry the grant's principal and neither becomes a flag,
+    // so no run made of flags alone is a complete grant.
+    expect(needsRawBody(CreateGrantBody)).toBe(true);
+  });
+
+  it("reports nothing for a body every field of which is a flag", () => {
+    expect(needsRawBody(CreateTeamBody)).toBe(false);
+    expect(needsRawBody(CreateUserBody)).toBe(false);
+    expect(needsRawBody(PatchProjectBody)).toBe(false);
+  });
+
+  it("reports nothing for a schema it cannot introspect", () => {
+    expect(needsRawBody(z.string())).toBe(false);
   });
 });
 

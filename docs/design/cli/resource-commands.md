@@ -231,7 +231,7 @@ output both say which, since it changes what the query means.
 
 **One flag per field.** The generated request schema names every field, its
 type, whether it is required, and its allowed values, so the factory turns each
-into a flag: `principal_type` becomes `--principal-type`, a closed value set
+into a flag: `expires_at` becomes `--expires-at`, a closed value set
 becomes the flag's `options` (oclif rejects anything else at parse time), and
 the schema's own description becomes the flag help. `--help` groups them under
 `REQUIRED FIELD` and `OPTIONAL FIELD`, and each required flag also carries a
@@ -239,7 +239,13 @@ the schema's own description becomes the flag help. `--help` groups them under
 alphabetically rather than by declaration.
 
 ```sh
-zitadel grants create --principal-type user --principal-id user_01J… --relation viewer
+zitadel users create --schema human-user --attributes email=ada@example.com
+```
+
+The two forms combine, so a field flag can sit beside a raw body:
+
+```sh
+zitadel grants create --relation viewer --data '{"user":{"user_id":"user_01J…"}}'
 ```
 
 An **open record** — a user's `attributes`, whose keys come from the project's
@@ -265,7 +271,10 @@ by the user schema, since the value would reach the server quoted. A malformed
 JSON value fails locally and the error offers the string form.
 
 Fields the CLI cannot express as a single flag (nested objects, arrays) are
-absent from the flag list and stay reachable through the raw body.
+absent from the flag list and stay reachable through the raw body. A resource
+that has one — `grants create` names its principal with a nested `user` or
+`team` object — also gets no flags-only example in `--help`, because that run
+would send an incomplete body for the platform to reject.
 
 **Credentials are refused on the command line.** Anything in argv is visible to
 anyone running `ps`, is kept in shell history, and is captured by CI logs — and
@@ -287,9 +296,9 @@ so presence is checked once both sources are merged, and reported as the flags
 the caller is missing rather than as schema issues:
 
 ```console
-$ zitadel grants create --principal-id user_01J… --json | jq -r '.message, .hint'
-grants create is missing required fields: --principal-type, --relation
-Pass --principal-type and --relation, or include them in --data / --file. See `grants create --help`.
+$ zitadel grants create --expires-at 2030-01-01T00:00:00Z --json | jq -r '.message, .hint'
+grants create is missing required field: --relation
+Pass --relation, or include it in --data / --file. See `grants create --help`.
 ```
 
 Either way the assembled body is validated against the generated request schema

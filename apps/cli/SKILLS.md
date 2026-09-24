@@ -151,7 +151,7 @@ over reading `--help` per command. It contacts no server.
   out field by field on a terminal and prints the whole object when piped;
   `--json` is unchanged either way.
 - `create` / `update <id>` take the body either as one flag per schema field
-  (`--name`, `--principal-type`, …; run `<resource> create --help` for the
+  (`--name`, `--relation`, …; run `<resource> create --help` for the
   list, where required fields are marked `(required)`) or as a whole JSON
   object via `--data '<json>'` / `--file <path>` (`--file -` reads stdin). A
   field flag overrides the same key in `--data`. A user's schema-defined
