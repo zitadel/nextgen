@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -23,13 +24,16 @@ func TestAuthCheckTypeSSOCallback_WireName(t *testing.T) {
 
 func TestNewSSOState(t *testing.T) {
 	t.Parallel()
+	crypter := &crypto.InverseCrypter{}
 
 	t.Run("mints every secret and hashes the state into the id", func(t *testing.T) {
-		state, check, err := domain.NewSSOState("google", "idprev_1", "/after-login", true)
+		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
 		require.NoError(t, err)
+		require.NotNil(t, sso)
+		check := sso.Check
 		require.NotNil(t, check)
 
-		assert.Equal(t, domain.HashSecret(state), check.ID)
+		assert.Equal(t, domain.HashSecret(sso.State), check.ID)
 		assert.Equal(t, domain.AuthCheckTypeSSOCallback, check.Type())
 		assert.True(t, check.IssuedAt.IsZero(), "the storage layer stamps the issue time")
 		assert.Nil(t, check.Result)
@@ -47,31 +51,54 @@ func TestNewSSOState(t *testing.T) {
 			require.NoError(t, err)
 			return len(raw)
 		}
-		assert.Equal(t, 16, decodedLen(t, state))
+		assert.Equal(t, 16, decodedLen(t, sso.State))
 		assert.Equal(t, 16, decodedLen(t, check.Pending.BindingNonce))
 		assert.Equal(t, 16, decodedLen(t, check.Pending.OIDCNonce))
-		assert.Equal(t, 32, decodedLen(t, check.Pending.PKCEVerifier))
+		assert.Equal(t, 32, decodedLen(t, sso.PKCEVerifier))
+	})
+
+	t.Run("the verifier is stored encrypted and round-trips", func(t *testing.T) {
+		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		require.NoError(t, err)
+
+		stored := sso.Check.Pending.EncryptedPKCEVerifier
+		require.NotEmpty(t, stored)
+		assert.NotEqual(t, sso.PKCEVerifier, stored, "the record must never hold the plaintext verifier")
+
+		decrypted, err := sso.Check.Pending.DecryptPKCEVerifier(crypter)
+		require.NoError(t, err)
+		assert.Equal(t, sso.PKCEVerifier, decrypted)
+
+		// What the submit step sends to the provider is derived from the
+		// plaintext the constructor handed back, never from the record.
+		assert.Equal(t, domain.PKCEChallenge(sso.PKCEVerifier), domain.PKCEChallenge(decrypted))
 	})
 
 	t.Run("two calls share no secret", func(t *testing.T) {
-		firstState, first, err := domain.NewSSOState("google", "idprev_1", "/after-login", true)
+		first, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
 		require.NoError(t, err)
-		secondState, second, err := domain.NewSSOState("google", "idprev_1", "/after-login", true)
+		second, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
 		require.NoError(t, err)
 
-		assert.NotEqual(t, firstState, secondState)
-		assert.NotEqual(t, first.ID, second.ID)
-		assert.NotEqual(t, first.Pending.BindingNonce, second.Pending.BindingNonce)
-		assert.NotEqual(t, first.Pending.OIDCNonce, second.Pending.OIDCNonce)
-		assert.NotEqual(t, first.Pending.PKCEVerifier, second.Pending.PKCEVerifier)
+		assert.NotEqual(t, first.State, second.State)
+		assert.NotEqual(t, first.Check.ID, second.Check.ID)
+		assert.NotEqual(t, first.PKCEVerifier, second.PKCEVerifier)
+		assert.NotEqual(t, first.Check.Pending.EncryptedPKCEVerifier, second.Check.Pending.EncryptedPKCEVerifier)
+		assert.NotEqual(t, first.Check.Pending.BindingNonce, second.Check.Pending.BindingNonce)
+		assert.NotEqual(t, first.Check.Pending.OIDCNonce, second.Check.Pending.OIDCNonce)
 	})
 
-	t.Run("no pkce means no verifier", func(t *testing.T) {
-		_, check, err := domain.NewSSOState("github", "idprev_2", "", false)
+	t.Run("no encrypter means no pkce", func(t *testing.T) {
+		sso, err := domain.NewSSOState("github", "idprev_2", "", nil)
 		require.NoError(t, err)
-		assert.Empty(t, check.Pending.PKCEVerifier)
-		assert.NotEmpty(t, check.Pending.OIDCNonce)
-		assert.NotEmpty(t, check.Pending.BindingNonce)
+		assert.Empty(t, sso.PKCEVerifier)
+		assert.Empty(t, sso.Check.Pending.EncryptedPKCEVerifier)
+		assert.NotEmpty(t, sso.Check.Pending.OIDCNonce)
+		assert.NotEmpty(t, sso.Check.Pending.BindingNonce)
+
+		decrypted, err := sso.Check.Pending.DecryptPKCEVerifier(crypter)
+		require.NoError(t, err)
+		assert.Empty(t, decrypted)
 	})
 }
 
@@ -87,8 +114,10 @@ func TestPKCEChallenge(t *testing.T) {
 
 func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 	t.Parallel()
-	state, check, err := domain.NewSSOState("google", "idprev_1", "/after-login", true)
+	crypter := &crypto.InverseCrypter{}
+	sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
 	require.NoError(t, err)
+	check := sso.Check
 	check.AuthAttemptID = "att_1"
 	check.Result = &domain.SSOCallbackResult{
 		Subject:              "sub-1",
@@ -102,6 +131,7 @@ func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 	// value, otherwise the handler reflects over the struct and prints
 	// everything in it.
 	logger.Info("sso",
+		"sso_ptr", sso, "sso_value", *sso,
 		"check_ptr", check, "check_value", *check,
 		"payload_ptr", check.Pending, "payload_value", *check.Pending,
 		"result_ptr", check.Result, "result_value", *check.Result,
@@ -109,8 +139,9 @@ func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 	logged := buf.String()
 
 	for _, secret := range []string{
-		state,
-		check.Pending.PKCEVerifier,
+		sso.State,
+		sso.PKCEVerifier,
+		check.Pending.EncryptedPKCEVerifier,
 		check.Pending.OIDCNonce,
 		check.Pending.BindingNonce,
 		"alice@example.com",

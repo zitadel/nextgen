@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"log/slog"
 	"time"
+
+	"github.com/zitadel/nextgen/internal/crypto"
 )
 
 // ErrSSOStateInvalid covers every way a presented SSO state fails to resolve:
@@ -23,9 +25,27 @@ type SSOStatePayload struct {
 	ProviderSlug         string `json:"provider_slug"`
 	ConnectionRevisionID string `json:"connection_revision_id"`
 	BindingNonce         string `json:"binding_nonce"`
-	PKCEVerifier         string `json:"pkce_verifier,omitempty"`
-	OIDCNonce            string `json:"oidc_nonce"`
-	ReturnTarget         string `json:"return_target"`
+	// EncryptedPKCEVerifier is AES-GCM ciphertext, empty when the connection
+	// runs without PKCE. The verifier travels to the provider's token endpoint
+	// later, so it cannot be stored in the clear (ADR 029, data at rest).
+	EncryptedPKCEVerifier string `json:"encrypted_pkce_verifier,omitempty"`
+	OIDCNonce             string `json:"oidc_nonce"`
+	ReturnTarget          string `json:"return_target"`
+}
+
+// DecryptPKCEVerifier returns the plaintext verifier for the token exchange,
+// or "" when the record was issued without PKCE. Call it only after
+// ConsumeSSOState succeeded. Services pass the crypter the issue used:
+// keys.GetProjectCrypter(ctx, projectID, EncryptionKeyPurposeSecret).
+func (p SSOStatePayload) DecryptPKCEVerifier(dec crypto.Decrypter) (string, error) {
+	if p.EncryptedPKCEVerifier == "" {
+		return "", nil
+	}
+	verifier, err := dec.Decrypt(p.EncryptedPKCEVerifier)
+	if err != nil {
+		return "", ErrDecryptionFailed(err)
+	}
+	return verifier, nil
 }
 
 // LogValue implements [slog.LogValuer]. The nonces and the PKCE verifier are
@@ -39,7 +59,7 @@ func (p SSOStatePayload) LogValue() slog.Value {
 		slog.String("provider_slug", p.ProviderSlug),
 		slog.String("connection_revision_id", p.ConnectionRevisionID),
 		slog.String("return_target", p.ReturnTarget),
-		slog.Bool("pkce", p.PKCEVerifier != ""),
+		slog.Bool("pkce", p.EncryptedPKCEVerifier != ""),
 	)
 }
 
@@ -71,14 +91,16 @@ type SSOCallbackCheck struct {
 	// ID is HashSecret(state): the plaintext state travels to the provider and
 	// back, only its hash is stored.
 	ID string
-	// AuthAttemptID is filled when the record is consumed; the callback
-	// carries the state alone.
+	// AuthAttemptID is filled by IssueSSOState and by ConsumeSSOState, which is
+	// how the callback learns the attempt from the state alone.
 	AuthAttemptID string
 	// IssuedAt mirrors last_challenged_at and is zero once consumed.
 	IssuedAt time.Time
-	// Pending is nil once consumed.
+	// Pending is what the callback needs: set by NewSSOState and by every
+	// IssueSSOState, cleared when ConsumeSSOState burns the record.
 	Pending *SSOStatePayload
-	// Result is nil until the exchange stored it.
+	// Result is what the provider asserted: nil until SetSSOCallbackResult
+	// stores it, and cleared again by a re-issue.
 	Result *SSOCallbackResult
 }
 
@@ -101,41 +123,73 @@ func (c SSOCallbackCheck) LogValue() slog.Value {
 // Deliberately not an AuthFactor and not an AuthChallenge.
 var _ AuthCheck = (*SSOCallbackCheck)(nil)
 
-// NewSSOState mints the plaintext state and the record it keys. Every value is
-// crypto/rand and base64url: the state (16 bytes), the binding nonce (16
-// bytes), the OIDC nonce (16 bytes) and, when pkce is set, the PKCE verifier
-// (32 bytes, the 43-character form RFC 7636 §4.1 recommends).
+// SSOState is what NewSSOState hands the submit step: the two plaintext
+// secrets the authorize request needs and the record to persist. Neither
+// plaintext is ever stored: State is only stored as its hash, the verifier
+// only as AES-GCM ciphertext (ADR 029, data at rest).
+type SSOState struct {
+	State        string            // plaintext state, goes to the provider
+	PKCEVerifier string            // plaintext verifier for PKCEChallenge; empty when PKCE is off
+	Check        *SSOCallbackCheck // ready for IssueSSOState
+}
+
+// LogValue implements [slog.LogValuer]. Both plaintext secrets stay out of the
+// log; only the record summary and whether PKCE is in play are reported.
+func (s SSOState) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.Any("check", s.Check),
+		slog.Bool("pkce", s.PKCEVerifier != ""),
+	)
+}
+
+// NewSSOState mints the secrets. Every value is crypto/rand and base64url: the
+// state (16 bytes), the binding nonce (16 bytes), the OIDC nonce (16 bytes) and
+// the PKCE verifier (32 bytes, the 43-character form RFC 7636 §4.1 recommends).
+//
+// pkceEncrypter nil means PKCE is disabled for this connection: no verifier is
+// minted. Otherwise the verifier is encrypted with it before it is placed on
+// the record, because it later travels to the provider's token endpoint and so
+// cannot be stored in the clear (ADR 029, data at rest). Services pass
+// keys.GetProjectCrypter(ctx, projectID, EncryptionKeyPurposeSecret), the same
+// crypter secret variables use.
 //
 // Only the state's hash becomes the record id, so the plaintext is the single
 // thing that can find the record again.
-func NewSSOState(providerSlug, connectionRevisionID, returnTarget string, pkce bool) (string, *SSOCallbackCheck, error) {
+func NewSSOState(providerSlug, connectionRevisionID, returnTarget string, pkceEncrypter crypto.Encrypter) (*SSOState, error) {
 	state, err := randomSecret(16)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	bindingNonce, err := randomSecret(16)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	oidcNonce, err := randomSecret(16)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	var verifier string
-	if pkce {
+	var verifier, encryptedVerifier string
+	if pkceEncrypter != nil {
 		if verifier, err = randomSecret(32); err != nil {
-			return "", nil, err
+			return nil, err
+		}
+		if encryptedVerifier, err = pkceEncrypter.Encrypt(verifier); err != nil {
+			return nil, ErrEncryptionFailed(err)
 		}
 	}
-	return state, &SSOCallbackCheck{
-		ID: HashSecret(state),
-		Pending: &SSOStatePayload{
-			ProviderSlug:         providerSlug,
-			ConnectionRevisionID: connectionRevisionID,
-			BindingNonce:         bindingNonce,
-			PKCEVerifier:         verifier,
-			OIDCNonce:            oidcNonce,
-			ReturnTarget:         returnTarget,
+	return &SSOState{
+		State:        state,
+		PKCEVerifier: verifier,
+		Check: &SSOCallbackCheck{
+			ID: HashSecret(state),
+			Pending: &SSOStatePayload{
+				ProviderSlug:          providerSlug,
+				ConnectionRevisionID:  connectionRevisionID,
+				BindingNonce:          bindingNonce,
+				EncryptedPKCEVerifier: encryptedVerifier,
+				OIDCNonce:             oidcNonce,
+				ReturnTarget:          returnTarget,
+			},
 		},
 	}, nil
 }

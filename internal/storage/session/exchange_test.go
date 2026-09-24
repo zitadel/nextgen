@@ -183,7 +183,7 @@ func TestDecodeAuthChecks(t *testing.T) {
 func TestDecodeAuthChecks_SSOCallback(t *testing.T) {
 	t.Parallel()
 	issuedAt := time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC)
-	pendingPayload := json.RawMessage(`{"provider_slug":"google","connection_revision_id":"idprev_1","binding_nonce":"bn","pkce_verifier":"pv","oidc_nonce":"on","return_target":"/home"}`)
+	pendingPayload := json.RawMessage(`{"provider_slug":"google","connection_revision_id":"idprev_1","binding_nonce":"bn","encrypted_pkce_verifier":"ct","oidc_nonce":"on","return_target":"/home"}`)
 	resultPayload := json.RawMessage(`{"subject":"sub-1","connection_revision_id":"idprev_1","claims":{"email":"alice@example.com"}}`)
 
 	decode := func(t *testing.T, lastChallengedAt time.Time, challenge, factor json.RawMessage) *domain.SSOCallbackCheck {
@@ -208,7 +208,7 @@ func TestDecodeAuthChecks_SSOCallback(t *testing.T) {
 		assert.Equal(t, issuedAt, ssoCheck.IssuedAt)
 		require.NotNil(t, ssoCheck.Pending)
 		assert.Equal(t, "google", ssoCheck.Pending.ProviderSlug)
-		assert.Equal(t, "pv", ssoCheck.Pending.PKCEVerifier)
+		assert.Equal(t, "ct", ssoCheck.Pending.EncryptedPKCEVerifier)
 		assert.Equal(t, "/home", ssoCheck.Pending.ReturnTarget)
 		assert.Nil(t, ssoCheck.Result)
 	})
