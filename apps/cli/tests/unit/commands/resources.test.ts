@@ -85,9 +85,16 @@ describe("resource registry", () => {
     }
   });
 
-  it("refuses -e on a generated command before any request", async () => {
+  // A read and a write verb, since the flag reached both through the generated
+  // command's own flags and the base flags it inherits.
+  it.each([
+    ["a read verb", ["users", "list", "-e", "prod"]],
+    ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
+  ])("refuses the environment flag on %s before any request", async (_case, argv) => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["users", "list", "-e", "prod"]);
+
+    const res = await run(cwd, argv);
+
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_VALIDATION");

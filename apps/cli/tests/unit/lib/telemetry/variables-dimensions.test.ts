@@ -63,7 +63,18 @@ describe("variables telemetry dimensions", () => {
   });
 
   it("records nothing that identifies a person, a machine, or a credential", async () => {
-    const forbidden = ["name", "value", "secret_value", "file", "path", "environment", "project"];
+    const forbidden = [
+      "name",
+      "value",
+      "secret_value",
+      "file",
+      "path",
+      "environment",
+      // The owner dimension the commands recorded while they could address an
+      // environment. Every run has the same owner now, so it says nothing.
+      "is_environment_scoped",
+      "project",
+    ];
     for (const [file, keys] of await recordedDimensions()) {
       for (const key of keys) {
         expect(forbidden, `${file} records ${key}, which is not allow-listed`).not.toContain(key);

@@ -40,6 +40,11 @@ async function makeProject(): Promise<string> {
 
 const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", SERVER];
 
+/** Writes a `zitadel.json`, for the runs that exercise server resolution. */
+async function writeConfig(cwd: string, config: unknown): Promise<void> {
+  await writeFile(join(cwd, "zitadel.json"), JSON.stringify(config), "utf8");
+}
+
 /** The plain rendering: no `--json`. */
 const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", SERVER, "--non-interactive"];
 
@@ -181,20 +186,67 @@ describe("variables list", () => {
     expect(res.stdout).toContain("No variables on the project.");
   });
 
+  it("no longer resolves as though `development` had been named", async () => {
+    const cwd = await makeProject();
+    // A command with no `--environment` once resolved as though it had been
+    // given `development`, so this block became the server. With no top-level
+    // `server` the run now falls through to the default, which is what the
+    // handler below answers on.
+    await writeConfig(cwd, {
+      project: "proj_test",
+      environments: { development: { server: "https://dev.example" } },
+    });
+    let hit = "";
+    server.use(
+      http.get("*/variables", ({ request }) => {
+        hit = new URL(request.url).origin;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await runCliForTest([
+      "variables",
+      "list",
+      "--project-level",
+      "--cwd",
+      cwd,
+      "--json",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(hit).toBe(SERVER);
+  });
+
+  it("prints the project and the server on a terminal, and neither on a pipe", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables", () => HttpResponse.json({ A: "b" })));
+
+    // The harness captures stdout, so process.stdout.isTTY is undefined here —
+    // the same condition a pipe or a redirect creates.
+    const piped = await runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]);
+    const terminal = await asTerminal(() =>
+      runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]),
+    );
+
+    expect(piped.exitCode).toBe(0);
+    expect(piped.stdout).not.toContain("Project   ");
+    expect(piped.stdout).not.toContain("Server    ");
+    expect(piped.stdout.trim()).toBe("A\tb");
+    expect(terminal.stdout).toContain("proj_test");
+    expect(terminal.stdout).toContain(SERVER);
+  });
+
   it("ignores a per-environment server block in zitadel.json", async () => {
     const cwd = await makeProject();
     // `zitadel.json` names one server for the project and another under an
     // environment. Nothing reads the per-environment entry, so the project's
     // own server serves the request. No `--server` here: that flag
     // short-circuits resolution and would hide it.
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        project: "proj_test",
-        server: SERVER,
-        environments: { prod: { server: "https://elsewhere.example" } },
-      }),
-    );
+    await writeConfig(cwd, {
+      project: "proj_test",
+      server: SERVER,
+      environments: { prod: { server: "https://elsewhere.example" } },
+    });
     let hit = "";
     server.use(
       http.get("*/variables", ({ request }) => {
@@ -963,6 +1015,27 @@ describe("naming the owner", () => {
     );
 
     const res = await runCliForTest([...argv, ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(requested).toBe(false);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--project-level");
+  });
+
+  it("refuses under --dry-run too, so a preview cannot imply an owner", async () => {
+    const cwd = await makeProject();
+    let requested = false;
+    server.use(
+      http.patch("*/variables", () => {
+        requested = true;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await withStdin("v", () =>
+      runCliForTest(["variables", "set", "TOKEN", "--dry-run", ...base(cwd)]),
+    );
 
     expect(res.exitCode).not.toBe(0);
     expect(requested).toBe(false);

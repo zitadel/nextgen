@@ -73,6 +73,15 @@ describe("resolveServer", () => {
     expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
   });
 
+  it("ignores the environment that used to be the default, `development`", async () => {
+    // Every command without `--environment` once resolved as though it had been
+    // given `development`, so this block silently became the target. Nothing
+    // reads it now, and a project holding one falls through to the default.
+    await writeConfig({ environments: { development: { server: "https://dev.example.com" } } });
+    const resolved = await resolveServer({ cwd: dir, env: {} });
+    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
+  });
+
   it("normalises a resolved URL down to its origin", async () => {
     const resolved = await resolveServer({
       cwd: dir,
