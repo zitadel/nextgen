@@ -123,8 +123,11 @@ describe("<zl-sso-providers>", () => {
     buttons(atom)[0]?.click();
     await atom.updateComplete;
 
-    expect(buttons(atom)[0]?.hasAttribute("loading")).toBe(false);
-    expect(buttons(atom)[1]?.hasAttribute("disabled")).toBe(false);
+    // Read the properties, not host attributes: `loading` and `disabled` are
+    // Lit properties on zl-button and neither reflects, so an attribute
+    // assertion passes whatever the button is doing.
+    expect(buttons(atom)[0]?.loading).toBe(false);
+    expect(buttons(atom)[1]?.disabled).toBe(false);
   });
 
   it("gives each button a test id from the connection, not the template", async () => {

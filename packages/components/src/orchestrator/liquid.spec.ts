@@ -625,6 +625,48 @@ describe("LiquidJS engine", () => {
  * `FlowFieldValidationErrors.StepError()` in
  * `internal/domain/flow_field_resolver.go`).
  */
+describe("provider names are server data", () => {
+  // The provider list rides in a single-quoted attribute, and a connection
+  // may legitimately be named `O'Reilly`. The JSON filter does not escape
+  // apostrophes, so what keeps the attribute intact is the engine's
+  // `outputEscape: "escape"` — a single global option. This pins it: flip it
+  // off and the attribute closes early and the list is corrupt.
+  it("escapes an apostrophe in a provider name rather than closing the attribute", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [{ id: "oreilly", name: "O'Reilly", template: "oidc" }],
+      messages: [],
+      identity: null,
+    };
+
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+
+    const attribute = /providers='([^']*)'/.exec(result);
+    expect(attribute, "the providers attribute closed early").not.toBeNull();
+    expect(attribute?.[1]).toContain("&#39;");
+    // Decoded, it is still the name the server sent — escaping must not
+    // corrupt the value, only the delimiter hazard.
+    expect(JSON.parse(decodeEntities(attribute?.[1] ?? ""))[0].name).toBe("O'Reilly");
+  });
+});
+
+/** Undo the entity escaping the engine applies, as a browser would. */
+function decodeEntities(value: string): string {
+  return value
+    .replaceAll("&#34;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
+}
+
 describe("localiseFlowErrorKeys", () => {
   const ctx = { locale: fullLocale, stepName: "register" };
 
