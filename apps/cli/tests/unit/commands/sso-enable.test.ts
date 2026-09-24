@@ -30,12 +30,42 @@ async function makeProject(schemas: Record<string, unknown> = {}): Promise<strin
     })}\n`,
   );
   const files = Object.keys(schemas).length > 0 ? schemas : { "default-human-user": defaultSchema };
+  await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
   for (const [name, body] of Object.entries(files)) {
     await writeFile(join(cwd, `.zitadel/schemas/${name}.json`), `${JSON.stringify(body)}\n`);
+    // Every schema gets the login flow that runs against it: the provider is
+    // offered by a flow, so a project without one is not a project this
+    // command can configure.
+    await writeFile(join(cwd, `.zitadel/flows/${name}-login.json`), `${JSON.stringify(loginFlow(name))}\n`);
   }
   // The README that ships beside the schemas must not be read as one.
   await writeFile(join(cwd, ".zitadel/schemas/README.md"), "# schemas\n");
   return cwd;
+}
+
+/** A login flow bound to a schema by the URL the scaffold writes. */
+function loginFlow(schemaName: string) {
+  return {
+    name: `${schemaName}-login`,
+    status: "active",
+    user_schema: `https://schemas.test.invalid/${schemaName}.json`,
+    purposes: { login: "identifier", register: "register" },
+    steps: [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit", primary: true }],
+        transitions: { submit: { target: "done" } },
+      },
+      {
+        name: "register",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit", primary: true }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ],
+  };
 }
 
 const defaultSchema = {
@@ -199,5 +229,65 @@ describe("sso enable secret handling", () => {
     expect(result.exitCode).toBe(0);
     const json = parseJson(result.stdout) as { data: { secret: { stored: boolean } } };
     expect(json.data.secret.stored).toBe(false);
+  });
+});
+
+describe("sso enable with a connection already on disk", () => {
+  it("still configures a second schema, rather than reporting a no-op", async () => {
+    // The command's own example advertises `--schema customers`. Reusing the
+    // connection must not skip the schema and flow edits: they are per-schema
+    // and they are the point of the command.
+    const cwd = await makeProject({
+      customers: structuredClone(defaultSchema),
+      employees: structuredClone(defaultSchema),
+    });
+
+    const first = await enable(cwd, "--client-id", "abc", "--schema", "customers");
+    expect(first.exitCode).toBe(0);
+    const second = await enable(cwd, "--schema", "employees");
+    expect(second.exitCode).toBe(0);
+
+    for (const name of ["customers", "employees"]) {
+      const schema = JSON.parse(
+        await readFile(join(cwd, `.zitadel/schemas/${name}.json`), "utf8"),
+      ) as { "x-auth-methods": { sso?: { providers: string[] } } };
+      expect(schema["x-auth-methods"].sso?.providers, name).toEqual(["google"]);
+
+      const flow = JSON.parse(
+        await readFile(join(cwd, `.zitadel/flows/${name}-login.json`), "utf8"),
+      ) as { steps: Array<{ name: string; sso_providers?: string[] }> };
+      const entry = flow.steps.find((s) => s.name === "identifier");
+      expect(entry?.sso_providers, name).toEqual(["google"]);
+    }
+  });
+
+  it("finishes a run interrupted after the connection file was written", async () => {
+    const cwd = await makeProject();
+    // What a Ctrl-C between the file write and the schema edit leaves behind.
+    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/idps/google.json"),
+      `${JSON.stringify({ slug: "google", template: "google", protocol: "oidc", oidc: { issuer: "https://accounts.google.com", client_id: "abc", client_secret: "${{ GOOGLE_CLIENT_SECRET }}" } })}\n`,
+    );
+
+    const result = await enable(cwd);
+
+    expect(result.exitCode).toBe(0);
+    const schema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
+    ) as { "x-auth-methods": { sso?: { enabled: boolean } } };
+    expect(schema["x-auth-methods"].sso?.enabled).toBe(true);
+  });
+
+  it("refuses when no flow runs against the schema, instead of a silent no-op", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect(result.exitCode).not.toBe(0);
+    const json = parseJson(result.stdout) as { code: string; hint?: string };
+    expect(json.code).toBe("E_NOT_FOUND");
+    expect(json.hint).toContain(".zitadel/flows/");
   });
 });

@@ -138,6 +138,65 @@ describe("applySsoToFlow", () => {
     expect(targetsOf(document, "sso-conflict").sign_in).toBe(entry);
   });
 
+  it("offers a second provider on every step that already had the first", () => {
+    const first = applySsoToFlow(shippedFlow(), "google", bothMethods);
+
+    const second = applySsoToFlow(first.document, "github", bothMethods);
+
+    expect(second.changed).toBe(true);
+    // Nothing was hand-edited — the generator wrote every one of these.
+    expect(second.skipped).toEqual([]);
+    for (const step of ["identifier", "register", "sso-conflict"]) {
+      expect(stepNamed(second.document, step).sso_providers, step).toEqual(["google", "github"]);
+    }
+  });
+
+  it("does not offer providers on the step that collects what the provider missed", () => {
+    const { document } = applySsoToFlow(shippedFlow(), "google", bothMethods);
+
+    expect(stepNamed(document, "register-sso").sso_providers).toBeUndefined();
+  });
+
+  it("reports a step the generator did not write as hand-edited, key order aside", () => {
+    const first = applySsoToFlow(shippedFlow(), "google", bothMethods);
+    // Managed files are written key-sorted, so a flow that has been through
+    // `apply` comes back with its keys in a different order. That is not an
+    // edit, and reporting it as one would tell the developer to fix nothing.
+    const sortDeep = (value: unknown): unknown =>
+      Array.isArray(value)
+        ? value.map(sortDeep)
+        : value && typeof value === "object"
+          ? Object.fromEntries(
+              Object.keys(value as Record<string, unknown>)
+                .sort()
+                .map((k) => [k, sortDeep((value as Record<string, unknown>)[k])]),
+            )
+          : value;
+    const reserialised = sortDeep(first.document) as object;
+
+    expect(applySsoToFlow(reserialised, "google", bothMethods).skipped).toEqual([]);
+  });
+
+  it("leaves out the sign-in escape on a flow that does not serve login", () => {
+    // `sso enable` edits every flow bound to the schema, and a register-only
+    // flow has nowhere to send someone who wants to sign in — the validator
+    // rejects a transition that re-purposes to a purpose the flow lacks.
+    const registerOnly = {
+      name: "register-only",
+      purposes: { register: "register" },
+      steps: [
+        { name: "register", fields: ["email"], actions: [], transitions: {} },
+        { name: "done", complete: "show" },
+      ],
+    };
+
+    const { document } = applySsoToFlow(registerOnly, "google", bothMethods);
+    const conflict = stepNamed(document, "sso-conflict");
+
+    expect(conflict.transitions).not.toHaveProperty("sign_in");
+    expect((conflict.actions as Array<{ name: string }>).map((a) => a.name)).not.toContain("sign_in");
+  });
+
   it("is a no-op the second time", () => {
     const first = applySsoToFlow(shippedFlow(), "google", bothMethods);
     const second = applySsoToFlow(first.document, "google", bothMethods);
