@@ -29,10 +29,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * does not exist". Also covers the theme toggle writing `data-theme` and
  * persisting the preference.
  */
-// The top-level surfaces with a design hand-off, in the order the design puts
-// them. `User schemas` nests beneath `Users` (`Schema directory` frame) rather
-// than adding a second top-level row.
-const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows"];
+// The selected project's contents, in the order the design puts them, then the
+// project's own settings. `User schemas` nests beneath `Users` (`Schema
+// directory` frame) rather than adding a second top-level row. The Projects
+// overview is not here: it is about no one project, so the switcher links to it.
+const NAV_ORDER = ["Teams", "Users", "Login flows", "Project settings"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 // Absent for two different reasons, both deliberate:
@@ -123,7 +124,7 @@ describe("app shell navigation", () => {
     ).toHaveAttribute("href", scopedPath("/branding", "proj_1"));
   });
 
-  it("lists only unscoped screens until a project is selected", async () => {
+  it("lists nothing until a project is selected", async () => {
     // Several to choose from, so `/` lands on Projects with nothing selected.
     server.use(
       http.get(MY_PROJECTS, () =>
@@ -141,9 +142,7 @@ describe("app shell navigation", () => {
     await vi.waitFor(() => expect(pill).toHaveTextContent("Select a project"));
 
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
-    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual([
-      "Projects",
-    ]);
+    expect(nav.queryAllByRole("link")).toEqual([]);
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
@@ -338,6 +337,21 @@ describe("project pill", () => {
 
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
     expect(router.state.location.search).toMatchObject({ project: "proj_2" });
+  });
+
+  it("links to the overview of every project beneath the list", async () => {
+    const router = renderShell();
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    await userEvent.click(pill);
+
+    const all = await screen.findByRole("link", { name: "All projects" });
+    // The selection rides along: the overview is a look around, not a reset.
+    expect(all).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
+    await userEvent.click(all);
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
   });
 
   it("says there are no projects instead of loading forever", async () => {

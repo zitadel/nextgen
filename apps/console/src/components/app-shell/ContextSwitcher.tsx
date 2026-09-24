@@ -1,6 +1,6 @@
 // `Building2` returns with the parked organisation switcher below.
 import { Link, type LinkProps, useMatches } from "@tanstack/react-router";
-import { Boxes, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
+import { Boxes, ChevronsUpDown, LayoutList, type LucideIcon, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,10 @@ import { useProjectScope, withoutTrailingSlash } from "../../lib/project-scope";
  * Org / project pills — Figma `Sidebar / PopoverContextSwitcher`
  * (`j3qqriDab6WQfrlgLujf4Y`). Desktop: 196px `bg-card` pills side-by-side.
  * Mobile (`Dashboard xs`): full-width stacked rows. Built on shadcn `Popover`.
+ *
+ * The project popover's footer links to the Projects overview (`All projects`):
+ * the overview is not a sidebar entry, because the sidebar is the selected
+ * project's contents, so this is its way in.
  *
  * There is deliberately no create action in the footer. One used to render here,
  * but because this component backs both switchers it said "Create team" inside
@@ -93,6 +97,7 @@ export function ContextSwitcher() {
         options={projects}
         emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
         ariaLabel="Switch project"
+        footer={{ label: "All projects", icon: LayoutList, link: { to: "/projects" } }}
       />
     </div>
   );
@@ -200,6 +205,7 @@ function Switcher({
   options,
   emptyLabel,
   ariaLabel,
+  footer,
 }: {
   icon: LucideIcon;
   /** `undefined` while loading, and when there are no options to name. */
@@ -213,6 +219,8 @@ function Switcher({
   /** Shown in place of a label once the options have loaded and there are none. */
   emptyLabel: string;
   ariaLabel: string;
+  /** A link beneath the options — for projects, the overview of all of them. */
+  footer?: { label: string; icon: LucideIcon; link: Pick<LinkProps, "to" | "search"> };
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -333,6 +341,19 @@ function Switcher({
             })
           )}
         </ul>
+
+        {footer && (
+          <div className="border-border mt-1 border-t pt-1">
+            <Link
+              {...footer.link}
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <footer.icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+              {footer.label}
+            </Link>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
