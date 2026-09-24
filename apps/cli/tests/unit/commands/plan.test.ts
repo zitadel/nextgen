@@ -132,4 +132,24 @@ describe("plan command", () => {
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
   });
+
+  it.each(["-e", "--environment"])("refuses %s, which addresses no environment", async (flag) => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "plan",
+      flag,
+      "prod",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Nonexistent flag");
+  });
 });
