@@ -4,7 +4,7 @@
  * oclif and the Zitadel envelope contract (ADR 004) is in one place.
  */
 export { BaseCommand } from "./base";
-export { EnvironmentCommand } from "./environment-command";
+export { OwnerCommand } from "./owner-command";
 export { CommandGroups, type CommandGroup } from "./groups";
 export type {
   CommandResult,

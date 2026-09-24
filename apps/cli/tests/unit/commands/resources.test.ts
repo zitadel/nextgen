@@ -72,6 +72,35 @@ describe("resource registry", () => {
     }
   });
 
+  it("gives no generated command an --environment flag, since none addresses one", () => {
+    const generated = Object.entries(COMMANDS).filter(([id]) => id.split(":")[0] in RESOURCES);
+    expect(generated.length).toBeGreaterThan(0);
+    for (const [id, command] of generated) {
+      const flags = { ...command.baseFlags, ...command.flags };
+      expect(Object.keys(flags), id).not.toContain("environment");
+      expect(
+        Object.values(flags).map((flag) => flag.char),
+        id,
+      ).not.toContain("e");
+    }
+  });
+
+  // A read and a write verb, since the flag reached both through the generated
+  // command's own flags and the base flags it inherits.
+  it.each([
+    ["a read verb", ["users", "list", "-e", "prod"]],
+    ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
+  ])("refuses the environment flag on %s before any request", async (_case, argv) => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, argv);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Nonexistent flag");
+  });
+
   it("advertises only filter and sort fields the generated query schemas accept", () => {
     // Only a spec carrying `body` is sent as a structured query, and that body
     // is the authority on which fields exist. A GET list has no such schema,
@@ -1254,10 +1283,51 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     expect(path).toBe("/schemas/sch_04");
   });
 
-  it("resolves an object type to its current revision in one call", async () => {
+  // A customer's `$id` is any string the API accepts, so the client has to
+  // send it whole. Unencoded, the `//` collapses on a redirect and the fetch
+  // 404s — the bug behind #1272.
+  it("encodes a revision id that is a URL", async () => {
+    const cwd = await makeProject();
+    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    let path = "";
+    server.use(
+      http.get(`${SERVER}/schemas/:id`, ({ request }) => {
+        path = new URL(request.url).pathname;
+        return HttpResponse.json({ id, schema: { objectType: "human-user" } });
+      }),
+    );
+
+    const res = await run(cwd, ["schemas", "get", id]);
+
+    expect(res.exitCode).toBe(0);
+    expect(path).toBe(`/schemas/${encodeURIComponent(id)}`);
+    const json = parseJson(res.stdout) as { data: { id: string } };
+    expect(json.data.id).toBe(id);
+  });
+
+  // `urn:example:human` is a revision id with none of the shapes the CLI used
+  // to test for. The server decides what an id is, not a prefix check.
+  it("fetches a revision whose id looks like neither a prefix nor a URL", async () => {
+    const cwd = await makeProject();
+    let path = "";
+    server.use(
+      http.get(`${SERVER}/schemas/:id`, ({ request }) => {
+        path = new URL(request.url).pathname;
+        return HttpResponse.json({ id: "urn:example:human", schema: { objectType: "human-user" } });
+      }),
+    );
+
+    const res = await run(cwd, ["schemas", "get", "urn:example:human"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(path).toBe(`/schemas/${encodeURIComponent("urn:example:human")}`);
+  });
+
+  it("resolves an object type to its current revision once the fetch 404s", async () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
+      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
       http.get(`${SERVER}/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
@@ -1275,9 +1345,12 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     expect(json.data.id).toBe("sch_04");
   });
 
-  it("says so when the object type has no schema", async () => {
+  it("says so when the ref is neither a revision nor an object type", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/schemas`, () => HttpResponse.json({ schemas: [] })));
+    server.use(
+      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${SERVER}/schemas`, () => HttpResponse.json({ schemas: [] })),
+    );
 
     const res = await run(cwd, ["schemas", "get", "nonexistent"]);
 
@@ -1285,6 +1358,27 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_NOT_FOUND");
     expect(json.message).toContain("nonexistent");
+  });
+
+  // A 500 is the server failing, not the server saying "that was a name".
+  // Falling through to the list would turn it into a misleading E_NOT_FOUND.
+  it("does not fall back to the object-type lookup on a non-404", async () => {
+    const cwd = await makeProject();
+    let listed = false;
+    server.use(
+      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 500 })),
+      http.get(`${SERVER}/schemas`, () => {
+        listed = true;
+        return HttpResponse.json({ schemas: [] });
+      }),
+    );
+
+    const res = await run(cwd, ["schemas", "get", "human-user"]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(listed).toBe(false);
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).not.toBe("E_NOT_FOUND");
   });
 
   it("resolves a flow name to its newest revision", async () => {

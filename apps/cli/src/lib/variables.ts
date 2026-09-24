@@ -156,7 +156,7 @@ export function parseVariableValue(raw: string, type: VariableType): string | nu
 
 /**
  * Read a value from stdin, for the non-interactive path
- * (`variables set NAME --secret < secret.txt`).
+ * (`variables set NAME --project-level --secret < secret.txt`).
  *
  * A single trailing newline is stripped — a here-doc or `echo` adds one and it
  * is not part of the credential — but nothing else is trimmed, because

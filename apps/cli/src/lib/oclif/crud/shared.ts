@@ -38,20 +38,20 @@ export const capitalize = (word: string): string => word.charAt(0).toUpperCase()
  * `toZitadelError` produces for a thrown Zod error, with a message and hint
  * that name the flag the user got wrong.
  */
-export const parseOrThrow = (
-  schema: Schema,
+export const parseOrThrow = <B>(
+  schema: Schema<B>,
   value: unknown,
   message: string,
   hint?: string,
-): Json => {
+): B => {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
     throw new ZitadelError("E_VALIDATION", message, {
       hint,
-      details: { issues: parsed.error?.issues },
+      details: { issues: parsed.error.issues },
     });
   }
-  return parsed.data as Json;
+  return parsed.data;
 };
 
 export const dryRunResult = (
