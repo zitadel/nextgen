@@ -45,10 +45,13 @@ type JourneyMetadata = {
 const NEUTRAL_MESSAGE =
   "If the user exists in our system, they have been granted access to your project.";
 /**
- * Every heading `apps/console/src/components/boundaries.tsx` renders for a
- * failed route load: "Not authorized" (403), "Request failed (404)" and the
- * generic fallback. One locator, so which status the read answers with does not
- * decide whether the boundary is found.
+ * The headings `describeError` gives the error boundary in
+ * `apps/console/src/components/boundaries.tsx`: "Not authorized" for a 403,
+ * "Request failed (<status>)" for any other refusal, and the generic fallback.
+ * One locator, so which status the read answers with does not decide whether
+ * the boundary is found. A failed loader always lands here rather than in the
+ * not-found state, which the router only renders for a path that matches no
+ * route.
  */
 const ERROR_BOUNDARY_HEADING = /Not authorized|Request failed \(\d+\)|Something went wrong/;
 
@@ -155,8 +158,12 @@ test("the setup admin can add and remove a project admin, and the colleague sees
       .getByRole("alertdialog")
       .getByRole("button", { name: "Remove admin", exact: true })
       .click();
+    // The region is asserted again rather than only the row's absence: the
+    // table is gone from a not-found state, an unauthorized one and a redirect
+    // to login too, so only a still-rendered screen makes the empty list mean
+    // what it says.
     await expect(page.getByRole("row").filter({ hasText: email })).toHaveCount(0);
-    await expect(page.getByText(ERROR_BOUNDARY_HEADING)).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
     // The colleague loses the project with the grant: the page's loader fails,
     // so the route's error boundary replaces the screen it rendered before.
