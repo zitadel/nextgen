@@ -1,5 +1,65 @@
 # @zitadel/components
 
+## 1.0.0-alpha.23
+
+### Major Changes
+
+- [#1206](https://github.com/zitadel/nextgen/pull/1206) [`fc1bb82`](https://github.com/zitadel/nextgen/commit/fc1bb8299cd1dddde0b5490d74385576b83e4ad4) Thanks [@bastionstack](https://github.com/bastionstack)! - The login widget paints the appearance a branding revision publishes.
+
+  An element `theme` now selects among the sides a revision publishes, and cannot reach one it did not: with a single published side the property has no effect. An embedder pinning `theme="light"` against a dark-only revision gets the dark side.
+
+  Each theme side keeps its own colours: a light key no longer leaks into the dark surface, and the mark comes from the resolved side, so a wordmark drawn for a light card is never placed on a dark one. A revision that publishes one side renders that side only — `auto`, the visitor's operating system, and the element's `theme` property can all ask for the other one, and it is not there to give.
+
+  `shape.radius` accepts the pixel value the contract allows, and scales the whole corner ramp in proportion rather than only the three middle steps, so `none` now squares off checkboxes and fields too. `shape.logo_scale` multiplies the logo height caps. `typography.scale` reaches the text sizes and their leading, so the multiplier changes what the surface renders at.
+
+  `Branding` and its member types are now the wire shapes rather than a parallel client declaration. `BrandingAssets` is removed from the package's exported types, along with the `assets` block it described: `logo_dark`, `favicon` and `background_image` were only ever validated, never rendered. A per-side `theme.light.logo_url` / `theme.dark.logo_url` replaces the first, and the other two have no successor. The client-only `typography.font_family_heading` and `font_family_mono` go the same way — a revision carries one face, and a page with a licensed display face points `--zl-font-family-heading` at it directly.
+
+### Patch Changes
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - An embedded widget no longer injects the tenant font stylesheet into the
+  embedding application's document. The widget applies `typography.font_family`
+  and leaves loading the face to the page around it; a Zitadel-served page still
+  injects, because it owns its own document.
+
+  `typography.scale` and `shape.logo_scale` no longer declare a schema `default`,
+  so an omitted key stays omitted through decoding rather than being persisted as
+  an explicit `1`.
+
+  `zitadel plan` now applies the server's URL rules to `typography.font_url` and
+  rejects credentials in any branding URL, so a value that would fail on publish
+  fails locally first.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - Branding revisions carry login appearance.
+
+  `theme` publishes complete `light` and `dark` sides, each with its own logo and
+  semantic palette; neither side inherits from the other, and a side that is not
+  published is never resolved. `typography` names one face for body and headings
+  plus the stylesheet that loads it. `shape` carries a corner radius — a preset
+  name or a pixel value — along with density and a logo scale.
+
+  `font_url` becomes writable and moves onto `typography`, beside the family it
+  loads. It is stored, not injected: an embedded widget applies the family and
+  relies on the embedding page having loaded the face.
+
+  Appearance values are held to an allowlist, because the widget writes them into
+  a CSS declaration. A colour must be hex, a colour name, or a colour function; a
+  font stack must be identifiers or quoted names. `url()` and `var()` are
+  rejected, asset URLs may not carry credentials, and colours, font stacks and
+  URLs all have length caps. The contract states the same shapes as a JSON Schema
+  `pattern`, so generated clients reject them too.
+
+  Revisions published before these fields existed keep working and use the
+  maintained defaults.
+
+- [#1277](https://github.com/zitadel/nextgen/pull/1277) [`85db700`](https://github.com/zitadel/nextgen/commit/85db70036625cdf6dc4560487c4f7cf6f6694a1d) Thanks [@peintnermax](https://github.com/peintnermax)! - The login widget's text fields no longer stop on the "Clear" cross when tabbing between inputs. The cross remains a pointer-only affordance; Tab now moves from one input straight to the next.
+
+- [#1278](https://github.com/zitadel/nextgen/pull/1278) [`58c25fd`](https://github.com/zitadel/nextgen/commit/58c25fd9dd9776ab3d92a86515c879d6f4888de4) Thanks [@peintnermax](https://github.com/peintnermax)! - The console claim page reads the session once per document and no longer completes the claim on a navigation the router sees while the sign-in widget is up, so a claim link is spent exactly once and the developer sees "Project claimed" rather than "Already claimed" for their own claim.
+
+  `<zitadel-login>` no longer calls `history.back()` to retire its back-gesture sentinel on a terminal step that navigates to `post-sign-in-url`. The traversal fired `popstate` in the host page, and a host router that reloads its route on `popstate` could see the session the handoff exchange had just created and act on it in the document about to be replaced — the console claim page spent its single-use challenge twice that way, once before the navigation and once after, and told the developer their project was already claimed. The sentinel is now retired in place with `history.replaceState`, so the host sees no navigation until the real one.
+
+- Updated dependencies [[`40025fe`](https://github.com/zitadel/nextgen/commit/40025feb3d9a7154db7d1348043248dbd42f5d6c), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`f118796`](https://github.com/zitadel/nextgen/commit/f118796f01af9e90be00f3313f1f9fc5ab407b4b), [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8), [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36), [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9)]:
+  - @zitadel/config@1.0.0-alpha.23
+
 ## 1.0.0-alpha.22
 
 ### Patch Changes

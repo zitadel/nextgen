@@ -14,6 +14,10 @@
  *                              is what authorizes `queryUsers` (`user.read`);
  *                              the browser-plane publishable key deliberately
  *                              cannot list users (`internal/api/user.go`)
+ *   CONSOLE_PROJECT_SECRET_PROJECT_ID
+ *                           -> the project that secret belongs to, so the proxy
+ *                              injects it only for calls scoped to that project;
+ *                              differs from the pin below in claim mode
  *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project, so
  *                              it agrees with the secret above
  *
@@ -46,8 +50,7 @@ const workspaceRoot = resolve(appDir, "../..");
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const port = Number(process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094);
 const configuredServerBinary = process.env.ZITADEL_SERVER_BINARY;
-const serverBinary =
-  configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
+const serverBinary = configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
 const seedOnly = process.argv.includes("--seed-only");
 /**
  * Claim mode boots the deployment's *platform* project and points the console
@@ -283,7 +286,8 @@ if (seedOnly) {
       "",
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
       `    CONSOLE_PROJECT_SECRET=${projectSecret} \\`,
-      `    VITE_CONSOLE_PROJECT_ID=${projectId} \\`,
+      `    CONSOLE_PROJECT_SECRET_PROJECT_ID=${projectId} \\`,
+      `    VITE_CONSOLE_PROJECT_ID=${consoleProjectId} \\`,
       "    corepack pnpm --filter @zitadel/console dev",
       "",
     ].join("\n"),
@@ -307,6 +311,7 @@ if (seedOnly) {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
       CONSOLE_PROJECT_SECRET: projectSecret,
+      CONSOLE_PROJECT_SECRET_PROJECT_ID: projectId,
       VITE_CONSOLE_PROJECT_ID: consoleProjectId,
     },
   });
