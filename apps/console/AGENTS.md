@@ -44,8 +44,8 @@ direction for the console build-out (issue
   and is what makes claiming and self-registration work. `zitadel start` is
   the exception to "today": it sets that flag and hands the server an initial
   operator through `--user-file`, so on a CLI-started server with the default
-  bootstrap the Console signs into `proj_platform` (the opt-out below keeps the
-  fallback). Do not remove that
+  bootstrap the Console signs into `proj_platform` (setting the flag to
+  `false` or pinning another project keeps the fallback). Do not remove that
   fallback (or the `platform.project_id` pin) until the seed transport ships;
   doing so strands self-hosters. Standalone optimizes for one project but does
   not forbid more. The runtime document carries only public sign-in metadata;

@@ -29,7 +29,7 @@ npm run dev
 
 `start` also creates a local admin, `admin@zitadel.localhost`, and ends by
 printing a one-time sign-in link for the management console. `setup --server
-local` attaches the new project to that admin's team and prints
+local` by default attaches the new project to that admin's team and prints
 `Project owned by admin@zitadel.localhost (team ...)`, so the project is
 already owned and `zitadel claim` has nothing to do.
 

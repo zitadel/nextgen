@@ -19,4 +19,4 @@ A user is an identity inside a project. Users can be self-owned or team-owned de
 
 Some design docs still describe target claim and platform lifecycle behavior. Claim is implemented end to end: a claimed project is one that carries an active owning-team grant, and the CLI, the OpenAPI endpoints, the server handlers, and the console claim page (the guided UI for the browser leg of the flow) are all shipped.
 
-A local project skips that browser leg. `zitadel start` creates a local admin, `admin@zitadel.localhost`, with a team of its own, and `zitadel setup --server local` attaches the new project to that team, so a local project is owned by the local admin from the moment setup finishes.
+A local project skips that browser leg by default. `zitadel start` creates a local admin, `admin@zitadel.localhost`, with a team of its own, and `zitadel setup --server local` attaches the new project to that team, so a local project is owned by the local admin from the moment setup finishes.

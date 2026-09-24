@@ -72,9 +72,11 @@ npm run dev
 `admin@zitadel.localhost`. It ends by printing a sign-in link for the
 management console. That link works once.
 
-`setup --server local` creates the project and attaches it to that admin's
-team, so the project is owned from the start. There is nothing left to claim:
-`zitadel claim` reports it as already owned.
+`setup --server local` creates the project and, by default, attaches it to
+that admin's team, so the project is owned from the start and `zitadel claim`
+reports it as already owned. If setup could not attach it (the platform
+bootstrap was turned off, or the step failed), setup prints a warning and
+`zitadel claim` remains the way to attach it.
 
 Any time you need the console again, print a fresh link:
 

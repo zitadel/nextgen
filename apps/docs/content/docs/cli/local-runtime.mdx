@@ -28,8 +28,9 @@ The command signs in as `admin@zitadel.localhost` and opens the link in a
 browser. Add `--no-open` to print it without opening anything, which is what
 you want over SSH or on a headless machine.
 
-If `start` never ran in this directory there is no local admin, and the command
-fails with `E_VALIDATION` and tells you to run `start` first.
+If there is no local admin in this directory, because `start` never ran here or
+ran with the platform bootstrap turned off, the command fails with
+`E_VALIDATION` and tells you to run `start` first.
 
 The credential file, how the password is handled, and how to turn the local
 admin off are described in
