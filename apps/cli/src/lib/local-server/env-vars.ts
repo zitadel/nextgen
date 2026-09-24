@@ -65,30 +65,26 @@ export const loadEnvFiles = async (
   );
 };
 
-/**
- * `parseEnv` is typed as a dictionary whose values may be absent, so drop the
- * absent ones to get the plain string map the rest of this module works with.
- */
-const definedValues = (
-  parsed: Readonly<Record<string, string | undefined>>,
-): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(parsed).filter((entry): entry is [string, string] => entry[1] !== undefined),
+const readEnvFile = async (path: string): Promise<Readonly<Record<string, string>>> => {
+  let contents: string;
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error: unknown) {
+    if (isObject(error) && error.code === "ENOENT") {
+      return {};
+    }
+    throw new ZitadelError("E_VALIDATION", `Cannot read ${path}`, {
+      hint: "The file exists but could not be read; fix its permissions or remove it.",
+      details: { path, message: error instanceof Error ? error.message : String(error) },
+    });
+  }
+  // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
+  return Object.fromEntries(
+    Object.entries(parseEnv(contents.replace(/^\uFEFF/, ""))).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined,
+    ),
   );
-
-const readEnvFile = (path: string): Promise<Readonly<Record<string, string>>> =>
-  readFile(path, "utf8").then<Readonly<Record<string, string>>, Readonly<Record<string, string>>>(
-    (contents) => definedValues(parseEnv(contents.replace(/^\uFEFF/, ""))),
-    (error: unknown) => {
-      if (isObject(error) && error.code === "ENOENT") {
-        return {};
-      }
-      throw new ZitadelError("E_VALIDATION", `Cannot read ${path}`, {
-        hint: "The file exists but could not be read; fix its permissions or remove it.",
-        details: { path, message: error instanceof Error ? error.message : String(error) },
-      });
-    },
-  );
+};
 
 /**
  * The `NEXTGEN_*` variables from the project's env files, ready to hand to a
