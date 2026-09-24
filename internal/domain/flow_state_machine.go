@@ -205,12 +205,17 @@ type FlowAuthRequestRef struct {
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas      SchemaResolver
-	schemaStore  JSONSchemaStore
-	fields       FlowFieldResolver
-	userCreater  FlowOnSuccessHandler
-	authAttempts FlowAuthAttemptService
-	now          func() time.Time
+	schemas     SchemaResolver
+	schemaStore JSONSchemaStore
+	fields      FlowFieldResolver
+	userCreater FlowOnSuccessHandler
+	// ssoUserCreater commits the account an external identity arrived
+	// without. It is separate from userCreater because it proves a
+	// different thing: the provider vouched for the email, and no password
+	// was ever collected.
+	ssoUserCreater FlowOnSuccessHandler
+	authAttempts   FlowAuthAttemptService
+	now            func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -220,6 +225,7 @@ func NewFlowStateMachine(
 	schemaStore JSONSchemaStore,
 	fields FlowFieldResolver,
 	createUser FlowOnSuccessHandler,
+	createUserWithSSO FlowOnSuccessHandler,
 	authAttempts FlowAuthAttemptService,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
@@ -227,12 +233,13 @@ func NewFlowStateMachine(
 		now = time.Now
 	}
 	return &FlowStateMachineRuntime{
-		schemas:      schemas,
-		schemaStore:  schemaStore,
-		fields:       fields,
-		userCreater:  createUser,
-		authAttempts: authAttempts,
-		now:          now,
+		schemas:        schemas,
+		schemaStore:    schemaStore,
+		fields:         fields,
+		userCreater:    createUser,
+		ssoUserCreater: createUserWithSSO,
+		authAttempts:   authAttempts,
+		now:            now,
 	}
 }
 
@@ -1148,6 +1155,15 @@ func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved FlowReso
 			State:         pc.state,
 			ResolvedFlow:  pc.def,
 		})
+	case FlowOnSuccessCreateUserWithSso:
+		return r.ssoUserCreater.Handle(pc.ctx, FlowOnSuccessInput{
+			ProjectID:     pc.state.ProjectID,
+			UserSchemaURL: pc.state.UserSchemaURL,
+			Fields:        pc.in.Fields,
+			Resolved:      resolved,
+			State:         pc.state,
+			ResolvedFlow:  pc.def,
+		})
 	default:
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
 	}
@@ -1500,4 +1516,90 @@ func FindCollectedFieldByChallenge(resolved []FlowField, collected map[string]an
 		}
 	}
 	return "", FlowField{}, nil, false
+}
+
+// ResumeWithOutcome advances a paused flow on an outcome resolved outside a
+// submit, and renders whatever the flow lands on.
+//
+// Only the identity-provider callback produces one: the browser is at the
+// provider while the ceremony completes, so the outcome arrives on a request
+// that carries no step submission. It routes through [routeOutcome] rather
+// than moving the step itself, because every rule that makes an outcome mean
+// something lives there -- the purpose flip `identity_unknown` carries, the
+// back-stack bookkeeping, and, when the target is terminal, [terminate],
+// which mints the handoff token the caller exchanges for a session. A caller
+// that assigns [FlowState.CurrentStep] itself gets a flow parked on the done
+// step having never finished: no handoff, no session, nothing to show.
+//
+// `irreversible` clears the back stack, as it does after any mutation the
+// user cannot undo -- an account created from the provider's claims is one.
+func (r *FlowStateMachineRuntime) ResumeWithOutcome(
+	ctx context.Context,
+	def *FlowDefinition,
+	state *FlowState,
+	outcome string,
+	irreversible bool,
+) (FlowStepResult, error) {
+	if def == nil || state == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: resume without definition or state", ErrFlowIntegrity())
+	}
+	currentStep, ok := def.FindStep(state.CurrentStep)
+	if !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: resume from unknown step %q", ErrFlowIntegrity(), state.CurrentStep)
+	}
+	if _, ok := currentStep.Transitions[outcome]; !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: step %q does not route %q", ErrFlowIntegrity(), currentStep.Name, outcome)
+	}
+	pc := &processCtx{
+		ctx:         ctx,
+		def:         def,
+		state:       state,
+		currentStep: currentStep,
+		// The outcome did not come from an action, so naming it as the action
+		// too keeps routeOutcome's "unroutable outcome" branch reachable
+		// rather than reporting a step error for something nobody submitted.
+		in: FlowSubmitInput{Action: outcome},
+	}
+	resolved, err := r.resolveStepFields(ctx, state, currentStep)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	if outcome == FlowImplicitOutcomeUserAlreadyExists {
+		if err := r.bindCollidingUser(pc, resolved); err != nil {
+			return FlowStepResult{}, err
+		}
+	}
+	return r.routeOutcome(pc, resolved, outcome, irreversible)
+}
+
+// bindCollidingUser pins the attempt to the account an external identity
+// collided with, which the conflict step then verifies.
+//
+// The step it routes to offers a password or a passkey, and both refuse to
+// run against an attempt with no user on it ("password challenge requires
+// user verification first"). On the typed paths the identifier dispatch has
+// already done this; a resolution that arrives without a submit has to do it
+// here, or the conflict step is a dead end that cannot be answered.
+//
+// A miss is not an error: the account may have been deleted between the
+// resolution and this call, and the conflict step will simply fail to verify.
+func (r *FlowStateMachineRuntime) bindCollidingUser(pc *processCtx, resolved FlowResolvedFields) error {
+	name, value, ok := fieldValueByChallenge(resolved, pc.state.CollectedData.UserData, FlowFieldChallengeIdentifier)
+	if !ok {
+		return nil
+	}
+	userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
+		ProjectID:     pc.state.ProjectID,
+		AttemptID:     pc.state.AuthAttemptID,
+		AttributeName: name,
+		Value:         value,
+	})
+	if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("flow state machine: bind colliding user: %w", err)
+	}
+	recordResolvedUser(pc.state, userID)
+	return nil
 }
