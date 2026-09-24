@@ -426,39 +426,55 @@ function diffLines(oldLines: readonly string[], newLines: readonly string[]): Li
   return lcsDiff(midOld, midNew);
 }
 
+/**
+ * A cell of the LCS table. Cells past the end of the table are the base case
+ * of the recurrence — the LCS of an empty suffix — which is length 0, so an
+ * out-of-range lookup reads as 0 rather than needing its own row.
+ */
+function lcsCell(table: readonly (readonly number[])[], i: number, j: number): number {
+  return table[i]?.[j] ?? 0;
+}
+
 /** Classic LCS-length DP, walked back into an op list. */
 function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
-  const table: number[][] = Array.from({ length: a.length + 1 }, () =>
-    new Array<number>(b.length + 1).fill(0),
-  );
+  const table: number[][] = [];
   for (let i = a.length - 1; i >= 0; i -= 1) {
+    const row = new Array<number>(b.length + 1).fill(0);
+    table[i] = row;
     for (let j = b.length - 1; j >= 0; j -= 1) {
-      table[i][j] =
-        a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+      row[j] =
+        a[i] === b[j]
+          ? lcsCell(table, i + 1, j + 1) + 1
+          : Math.max(lcsCell(table, i + 1, j), lcsCell(table, i, j + 1));
     }
   }
 
   const ops: LineOp[] = [];
   let i = 0;
   let j = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      ops.push({ kind: "same", line: a[i] });
+  for (;;) {
+    const left = i < a.length ? a[i] : undefined;
+    const right = j < b.length ? b[j] : undefined;
+    if (left === undefined || right === undefined) {
+      break;
+    }
+    if (left === right) {
+      ops.push({ kind: "same", line: left });
       i += 1;
       j += 1;
-    } else if (table[i + 1][j] >= table[i][j + 1]) {
-      ops.push({ kind: "del", line: a[i] });
+    } else if (lcsCell(table, i + 1, j) >= lcsCell(table, i, j + 1)) {
+      ops.push({ kind: "del", line: left });
       i += 1;
     } else {
-      ops.push({ kind: "add", line: b[j] });
+      ops.push({ kind: "add", line: right });
       j += 1;
     }
   }
-  for (; i < a.length; i += 1) {
-    ops.push({ kind: "del", line: a[i] });
+  for (const line of a.slice(i)) {
+    ops.push({ kind: "del", line });
   }
-  for (; j < b.length; j += 1) {
-    ops.push({ kind: "add", line: b[j] });
+  for (const line of b.slice(j)) {
+    ops.push({ kind: "add", line });
   }
   return ops;
 }

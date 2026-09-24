@@ -59,12 +59,26 @@ export const loadEnvFiles = async (
   files: readonly string[] = ENV_FILES,
 ): Promise<Readonly<Record<string, string>>> => {
   const parsed = await Promise.all(files.map((file) => readEnvFile(join(cwd, file))));
-  return parsed.reduceRight((merged, source) => ({ ...merged, ...source }), {});
+  return parsed.reduceRight<Record<string, string>>(
+    (merged, source) => ({ ...merged, ...source }),
+    {},
+  );
 };
 
+/**
+ * `parseEnv` is typed as a dictionary whose values may be absent, so drop the
+ * absent ones to get the plain string map the rest of this module works with.
+ */
+const definedValues = (
+  parsed: Readonly<Record<string, string | undefined>>,
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(parsed).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
+
 const readEnvFile = (path: string): Promise<Readonly<Record<string, string>>> =>
-  readFile(path, "utf8").then(
-    (contents) => parseEnv(contents.replace(/^\uFEFF/, "")),
+  readFile(path, "utf8").then<Readonly<Record<string, string>>, Readonly<Record<string, string>>>(
+    (contents) => definedValues(parseEnv(contents.replace(/^\uFEFF/, ""))),
     (error: unknown) => {
       if (isObject(error) && error.code === "ENOENT") {
         return {};
