@@ -35,6 +35,15 @@ describe("<zl-sso-providers>", () => {
     return Array.from(atom.shadowRoot?.querySelectorAll("zl-button") ?? []);
   }
 
+  /**
+   * The label is slotted rather than passed as `<zl-button label>`, so this
+   * atom's stylesheet can keep a long vendor name inside the card — read it
+   * back the same way.
+   */
+  function labels(atom: ZlSsoProviders): string[] {
+    return buttons(atom).map((b) => b.textContent?.trim() ?? "");
+  }
+
   it("renders one button per provider, in the order given", async () => {
     const atom = await mount([GOOGLE, GITHUB]);
 
@@ -47,7 +56,7 @@ describe("<zl-sso-providers>", () => {
   it("labels each button with the vendor's name in the given format", async () => {
     const atom = await mount([GOOGLE], `label-format="Weiter mit {name}"`);
 
-    expect(buttons(atom)[0]?.getAttribute("label")).toBe("Weiter mit Google");
+    expect(labels(atom)[0]).toBe("Weiter mit Google");
   });
 
   it("shows the mark for a template that has one", async () => {
@@ -64,7 +73,7 @@ describe("<zl-sso-providers>", () => {
 
     expect(buttons(atom)).toHaveLength(1);
     expect(atom.shadowRoot?.querySelector("zl-icon")).toBeNull();
-    expect(buttons(atom)[0]?.getAttribute("label")).toBe("Continue with Acme SSO");
+    expect(labels(atom)[0]).toBe("Continue with Acme SSO");
   });
 
   it("emits zl-sso-select with the connection id when a button is chosen", async () => {
