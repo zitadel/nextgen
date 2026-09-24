@@ -94,7 +94,7 @@ export const it: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (terminale — conferma accesso)
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "Sei connesso come",
+  "done.title": "Sei connesso",
   "done.description": "",
 
   // --- Alias dei nomi step per il flusso login predefinito ---
@@ -129,7 +129,7 @@ export const it: Locale = {
   "register.action.sign_in.lead": "Hai già un account? ",
   "register.action.sign_in.link": "Accedi",
 
-  "complete.title": "Sei connesso come",
+  "complete.title": "Sei connesso",
   "signed-in.continue": "Continua",
   "signed-in.logout": "Esci",
 

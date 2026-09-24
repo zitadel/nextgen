@@ -99,7 +99,7 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (terminal — signed-in confirmation)
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "You're signed in as",
+  "done.title": "You're signed in",
   "done.description": "",
 
   // --- Step-name aliases used by the default login flow ---
@@ -133,7 +133,7 @@ export const en: Record<string, string> = {
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",
 
-  "complete.title": "You're signed in as",
+  "complete.title": "You're signed in",
   "signed-in.continue": "Continue",
   "signed-in.logout": "Sign out",
 

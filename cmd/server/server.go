@@ -310,11 +310,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		schemaStore,
 		serviceDBPool,
 	)
+	createUserWithSSOHandler := service.NewFlowCreateUserWithSsoHandler(
+		userService,
+		schemaStore,
+		serviceDBPool,
+	)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
 		schemaStore,
 		fields,
 		createUserHandler,
+		createUserWithSSOHandler,
 		flowAuth,
 		time.Now,
 	)
@@ -381,7 +387,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		// Resolved, not the raw pin: in bootstrap mode project_id is empty
 		// and an empty handler pin rejects every claim/complete session.
 		cfg.Platform.ResolvedProjectID(),
-	).WithPersonalTeamEnsurer(personalTeams).WithEgressClient(egressClient)
+	).WithPersonalTeamEnsurer(personalTeams).WithEgressClient(egressClient).
+		WithSsoUserCreater(createUserWithSSOHandler).
+		WithFlowStateMachine(stateMachine)
 
 	oasServer, err := oasapi.NewServer(
 		apiHandler,

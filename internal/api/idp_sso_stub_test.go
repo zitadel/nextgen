@@ -66,27 +66,40 @@ func idToken(t *testing.T, claims map[string]any) string {
 
 func TestEmailClaim(t *testing.T) {
 	verified := map[string]any{"email": "a@example.com", "email_verified": true}
-	if got, err := emailClaim(idToken(t, verified)); err != nil || got != "a@example.com" {
-		t.Fatalf("want the verified address, got %q (%v)", got, err)
+	got, err := emailClaim(idToken(t, verified))
+	if err != nil || got.Email != "a@example.com" || !got.Verified {
+		t.Fatalf("want the verified address, got %+v (%v)", got, err)
 	}
 
 	// An address the provider has not verified is one anyone could have typed
-	// there; provisioning on it is account takeover.
+	// there. It is read, so the user can confirm it on the collection step,
+	// but it is reported unverified so nothing provisions an account on it.
 	for _, claims := range []map[string]any{
 		{"email": "a@example.com", "email_verified": false},
 		{"email": "a@example.com"},
+		{"email": "a@example.com", "email_verified": "yes"},
 	} {
-		if _, err := emailClaim(idToken(t, claims)); err == nil {
-			t.Fatalf("want %v refused", claims)
+		got, err := emailClaim(idToken(t, claims))
+		if err != nil {
+			t.Fatalf("want %v read, got %v", claims, err)
+		}
+		if got.Verified {
+			t.Fatalf("want %v reported unverified", claims)
 		}
 	}
 
-	expired := map[string]any{
-		"email": "a@example.com", "email_verified": true,
-		"exp": time.Now().Add(-time.Minute).Unix(),
-	}
-	if _, err := emailClaim(idToken(t, expired)); err == nil {
-		t.Fatal("want an expired id_token refused")
+	// Structural problems are still refusals: there is nothing to collect
+	// from a token that carries no address or has expired.
+	for name, claims := range map[string]map[string]any{
+		"no email": {"email_verified": true},
+		"expired": {
+			"email": "a@example.com", "email_verified": true,
+			"exp": time.Now().Add(-time.Minute).Unix(),
+		},
+	} {
+		if _, err := emailClaim(idToken(t, claims)); err == nil {
+			t.Fatalf("want %s refused", name)
+		}
 	}
 }
 
