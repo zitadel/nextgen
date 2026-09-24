@@ -45,13 +45,13 @@
 }
 
 /* Vendor names are tenant-authored and can be long. The button is a fixed
-   height with `white-space: nowrap`, so without this an "Contoso Corporation
-   Enterprise Single Sign-On" runs past the card and gives the page a
-   horizontal scrollbar. */
-.zr-sso__list zl-button::part(root) {
+   height and inherits `white-space: nowrap`, so an unconstrained "Contoso
+   Corporation Enterprise Single Sign-On" runs past the card and gives the
+   page a horizontal scrollbar. `min-width: 0` is what lets a flex item
+   shrink below its content width at all. */
+.zr-sso__label {
+  display: block;
   min-width: 0;
-}
-.zr-sso__list zl-button::part(label) {
   overflow: hidden;
   text-overflow: ellipsis;
 }

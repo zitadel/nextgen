@@ -22,6 +22,9 @@ const locale: Record<string, string> = {
   "submit.continue": "Continue",
   "action.recover": "Forgot password?",
   "action.back": "Back",
+  "register.action.sign_in.lead": "Have an account already? ",
+  "register.action.sign_in.link": "Sign in",
+  "sso-conflict.action.sign_in": "Back to sign in",
   "sso.continue_with": "Continue with {name}",
   "sso.divider": "or",
 };
@@ -141,6 +144,34 @@ describe("branding design catalog", () => {
 
       expect(html).toContain('label-format="Continue with {name}"');
       expect(html).toContain('divider-label="or"');
+    });
+
+    it("keeps the register row's copy for the register step's own sign_in", () => {
+      const html = render({
+        ...context,
+        actions: [
+          ...step.actions,
+          { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
+        ],
+      });
+
+      expect(html).toContain("Have an account already? ");
+      expect(html).toContain('data-action="sign_in"');
+    });
+
+    it("uses a step's own copy when it supplies one, without the register lead", () => {
+      // The SSO conflict screen has just said "you already have an account";
+      // repeating "Already have an account?" under it reads as a mistake.
+      const html = render({
+        ...context,
+        actions: [
+          ...step.actions,
+          { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+        ],
+      });
+
+      expect(html).toContain("Back to sign in");
+      expect(html).not.toContain("Have an account already? ");
     });
 
     it("renders nothing for a step with no providers", () => {

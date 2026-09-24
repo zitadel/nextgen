@@ -178,7 +178,17 @@
       {% assign sign_in = actions | where: "name", "sign_in" | first %}
       {% if sign_in %}
         <p class="zl-card-nav">
+          {% comment %}
+          The register step's row reads "Already have an account? Sign in".
+          Any other step that offers `sign_in` — the SSO conflict screen, which
+          has just told the user they have one — carries its own copy, so the
+          lead is dropped and the action's own text is used.
+        {% endcomment %}
+        {% if sign_in.text_key == 'register.action.sign_in.link' %}
           {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
+        {% else %}
+          <a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ sign_in.text_key | t }}</a>
+        {% endif %}
         </p>
       {% endif %}
       </div>

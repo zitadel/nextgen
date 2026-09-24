@@ -110,8 +110,9 @@ describe("<zitadel-login> with identity providers", () => {
     const atom = providerAtom(element);
     await atom.updateComplete;
 
+    // Slotted, not the button's `label` attribute — see the atom.
     const labels = Array.from(atom.shadowRoot?.querySelectorAll("zl-button") ?? []).map((b) =>
-      b.getAttribute("label"),
+      b.textContent?.trim(),
     );
     expect(labels).toEqual(["Continue with Google", "Continue with Acme SSO"]);
   });
