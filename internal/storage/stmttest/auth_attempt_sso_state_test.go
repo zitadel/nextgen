@@ -75,7 +75,10 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 
 		t.Run("consume_returns_payload_once", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
+			// A bare attempt carries no TTL, so nothing can expire: the
+			// consume has to treat that as alive, not as expired.
 			attempt := createBareAttempt(t, d.stmts, projectID)
+			require.Nil(t, attempt.TimeToLive)
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			stateHash := domain.HashSecret(sso.State)
 
@@ -100,6 +103,29 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			require.True(t, ok)
 			assert.Nil(t, stored.Pending)
 			assert.True(t, stored.IssuedAt.IsZero())
+		})
+
+		// An expired ceremony must not be told apart from an unknown state, and
+		// the row goes either way: a caller that retries finds nothing left.
+		t.Run("expired_attempt_is_burned_and_rejected", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			ttl := time.Nanosecond
+			attempt := &domain.AuthAttempt{ProjectID: projectID, TimeToLive: &ttl}
+			require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), attempt))
+			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+			stateHash := domain.HashSecret(sso.State)
+
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+
+			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+
+			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+			require.NoError(t, err)
+			stored, ok := got.SSOCallback()
+			require.True(t, ok)
+			assert.Nil(t, stored.Pending, "the expired state is burned, not left pending")
 		})
 
 		t.Run("unknown_hash_same_sentinel", func(t *testing.T) {

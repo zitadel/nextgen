@@ -71,8 +71,10 @@ const issueSSOStateStmt = `INSERT INTO zitadel_nextgen.checks` +
 	` factor_payload = NULL, last_verified_at = NULL, failure_count = 0, last_failed_at = NULL` +
 	` RETURNING last_challenged_at`
 
-const selectPendingSSOStateStmt = `SELECT auth_attempt_id, challenge_payload FROM zitadel_nextgen.checks` +
-	` WHERE project_id = $1 AND id = $2 AND type = $3 AND last_challenged_at IS NOT NULL`
+const selectPendingSSOStateStmt = `SELECT c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
+	` FROM zitadel_nextgen.checks c` +
+	` JOIN zitadel_nextgen.auth_attempts aa ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id` +
+	` WHERE c.project_id = $1 AND c.id = $2 AND c.type = $3 AND c.last_challenged_at IS NOT NULL`
 
 const consumeSSOStateStmt = `UPDATE zitadel_nextgen.checks` +
 	` SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
@@ -428,9 +430,11 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
 	check := &domain.SSOCallbackCheck{ID: stateHash}
 	var payload []byte
+	var createdAt time.Time
+	var timeToLive *time.Duration
 	err := as.client.QueryRow(ctx, selectPendingSSOStateStmt,
 		projectID, stateHash, domain.AuthCheckTypeSSOCallback).
-		Scan(&check.AuthAttemptID, &payload)
+		Scan(&check.AuthAttemptID, &payload, &createdAt, &timeToLive)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrSSOStateInvalid()
@@ -442,13 +446,14 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
 		}
 	}
+	expired := (&domain.AuthAttempt{CreatedAt: createdAt, TimeToLive: timeToLive}).IsExpired()
 	// The guarded update is the single-use gate: a racing consumer that
 	// already cleared the challenge state leaves zero rows for this one.
 	tag, err := as.client.Exec(ctx, consumeSSOStateStmt, projectID, stateHash, domain.AuthCheckTypeSSOCallback)
 	if err != nil {
 		return nil, fmt.Errorf("failed to consume sso state: %w", wrapError(err))
 	}
-	if tag.RowsAffected() == 0 {
+	if tag.RowsAffected() == 0 || expired {
 		return nil, domain.ErrSSOStateInvalid()
 	}
 	return check, nil

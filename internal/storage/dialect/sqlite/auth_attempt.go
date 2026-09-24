@@ -50,8 +50,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` DO UPDATE SET id = EXCLUDED.id, last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload,` +
 		` factor_payload = NULL, last_verified_at = NULL, failure_count = 0, last_failed_at = NULL`
 
-	selectPendingSSOStateStmt = `SELECT auth_attempt_id, challenge_payload FROM checks` +
-		` WHERE project_id = ? AND id = ? AND type = ? AND last_challenged_at IS NOT NULL`
+	selectPendingSSOStateStmt = `SELECT c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
+		` FROM checks c` +
+		` JOIN auth_attempts aa ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id` +
+		` WHERE c.project_id = ? AND c.id = ? AND c.type = ? AND c.last_challenged_at IS NOT NULL`
 
 	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
 		` WHERE project_id = ? AND id = ? AND type = ? AND last_challenged_at IS NOT NULL`
@@ -443,9 +445,11 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
 	check := &domain.SSOCallbackCheck{ID: stateHash}
 	var payload sql.NullString
+	var createdNano int64
+	var timeToLiveNano sql.NullInt64
 	err := as.client.QueryRow(ctx, selectPendingSSOStateStmt,
 		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback),
-	).Scan(&check.AuthAttemptID, &payload)
+	).Scan(&check.AuthAttemptID, &payload, &createdNano, &timeToLiveNano)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrSSOStateInvalid()
@@ -457,6 +461,12 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
 		}
 	}
+	attempt := domain.AuthAttempt{CreatedAt: timeFromUnixNano(createdNano)}
+	if timeToLiveNano.Valid {
+		ttl := time.Duration(timeToLiveNano.Int64)
+		attempt.TimeToLive = &ttl
+	}
+	expired := attempt.IsExpired()
 	// The guarded update is the single-use gate: a racing consumer that
 	// already cleared the challenge state leaves zero rows for this one.
 	n, err := execAffected(ctx, as.client, consumeSSOStateStmt,
@@ -464,7 +474,7 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to consume sso state: %w", err)
 	}
-	if n == 0 {
+	if n == 0 || expired {
 		return nil, domain.ErrSSOStateInvalid()
 	}
 	return check, nil

@@ -291,8 +291,8 @@ type AuthAttemptStatements interface {
 	IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error
 	// ConsumeSSOState atomically consumes the pending row keyed by state hash and returns
 	// AuthAttemptID and Pending. Zero matches (unknown, consumed, re-issued) return
-	// domain.ErrSSOStateInvalid(). Expiry is not checked here: the caller loads the attempt,
-	// applies AuthAttempt.IsExpired() and maps it to the same sentinel.
+	// domain.ErrSSOStateInvalid(). An expired attempt is burned and rejected with the same
+	// sentinel; no expiry check is left to the caller.
 	ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error)
 	// SetSSOCallbackResult stores the callback result on the row consumed under
 	// stateHash. Returns ErrSSOStateInvalid when no such consumed row exists,

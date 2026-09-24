@@ -144,9 +144,8 @@ func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
 // the record is deliberately not one.
 //
 // The record's Result may hold personal data: the claims the provider asserted.
-// This is the one place claim values live outside the user record, and only for
-// that window: at most the attempt TTL, wiped by a re-issue, and gone when the
-// user is bound or the attempt is deleted.
+// It lives at most the attempt TTL, a re-issue wipes it, and it cascades away
+// with the attempt, which the session exchange deletes.
 func (a *AuthAttempt) SSOCallback() (*SSOCallbackCheck, bool) {
 	for _, check := range a.Checks {
 		if ssoCheck, ok := check.(*SSOCallbackCheck); ok {

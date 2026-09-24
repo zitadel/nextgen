@@ -49,8 +49,10 @@ const (
 	deleteSSOStateStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
 	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0)`
-	selectPendingSSOStateStmt = `SELECT auth_attempt_id, challenge_payload FROM checks` +
-		` WHERE project_id = @p1 AND id = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
+	selectPendingSSOStateStmt = `SELECT c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
+		` FROM checks c` +
+		` JOIN auth_attempts aa ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id` +
+		` WHERE c.project_id = @p1 AND c.id = @p2 AND c.type = @p3 AND c.last_challenged_at IS NOT NULL`
 	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
 		` WHERE project_id = @p1 AND id = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
 	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = @p4` +
@@ -474,9 +476,11 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 	selection := buildStatement(selectPendingSSOStateStmt,
 		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback)).statement()
 	var payload spanner.NullJSON
+	var createdAt time.Time
+	var timeToLiveNanos spanner.NullInt64
 	err := as.db.Query(ctx, selection, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			return struct{}{}, row.Columns(&check.AuthAttemptID, &payload)
+			return struct{}{}, row.Columns(&check.AuthAttemptID, &payload, &createdAt, &timeToLiveNanos)
 		})
 		return err
 	})
@@ -492,6 +496,12 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
 		}
 	}
+	attempt := domain.AuthAttempt{CreatedAt: createdAt}
+	if timeToLiveNanos.Valid {
+		ttl := time.Duration(timeToLiveNanos.Int64)
+		attempt.TimeToLive = &ttl
+	}
+	expired := attempt.IsExpired()
 	// The guarded update is the single-use gate: a racing consumer that
 	// already cleared the challenge state leaves zero rows for this one.
 	consume := buildStatement(consumeSSOStateStmt,
@@ -500,7 +510,7 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to consume sso state: %w", err)
 	}
-	if n == 0 {
+	if n == 0 || expired {
 		return nil, domain.ErrSSOStateInvalid()
 	}
 	return check, nil
