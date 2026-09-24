@@ -36,7 +36,7 @@ export type BodyField = Readonly<{
 }>;
 
 /** Flags the write commands own; a body field of the same name stays raw-body only. */
-const RESERVED = new Set(["data", "file", "json", "cwd", "server", "force", "environment", "help"]);
+const RESERVED = new Set(["data", "file", "json", "cwd", "server", "force", "help"]);
 
 const kebab = (name: string): string => name.replaceAll("_", "-");
 
